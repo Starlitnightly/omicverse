@@ -1,0 +1,102 @@
+LINE 205 : 2021-03-23 19:41:26,054 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:41:27,307 [DEBUG   ] http://127.0.0.1:4780 "GET http://maayanlab.cloud/Enrichr/datasetStatistics HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:41:27,310 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:41:28,446 [DEBUG   ] https://maayanlab.cloud:443 "GET /Enrichr/datasetStatistics HTTP/1.1" 200 None
+LINE 385 : 2021-03-23 19:41:28,665 [INFO    ] Connecting to Enrichr Server to get latest library names
+LINE 403 : 2021-03-23 19:41:28,665 [DEBUG   ] Start Enrichr using library: KEGG_2013
+LINE 404 : 2021-03-23 19:41:28,665 [INFO    ] Analysis name: test_name, Enrichr Library: KEGG_2013
+LINE 205 : 2021-03-23 19:41:28,668 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:41:29,280 [DEBUG   ] http://127.0.0.1:4780 "POST http://maayanlab.cloud/Enrichr/addList HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:41:29,285 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:41:34,891 [DEBUG   ] https://maayanlab.cloud:443 "POST /Enrichr/addList HTTP/1.1" 200 74
+LINE 205 : 2021-03-23 19:41:35,917 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:41:36,525 [DEBUG   ] http://127.0.0.1:4780 "GET http://maayanlab.cloud/Enrichr/export?userListId=36587314&filename=KEGG_2013.test_name.reports&backgroundType=KEGG_2013 HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:41:36,529 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:41:39,006 [DEBUG   ] https://maayanlab.cloud:443 "GET /Enrichr/export?userListId=36587314&filename=KEGG_2013.test_name.reports&backgroundType=KEGG_2013 HTTP/1.1" 200 103
+LINE 412 : 2021-03-23 19:41:39,037 [INFO    ] Save file of enrichment results: Job Id:162c078d41ffd1e71adbdb743d9023d1
+LINE 421 : 2021-03-23 19:41:39,041 [WARNING ] Warning: No enrich terms using library KEGG_2013 when cutoff = 0.5
+LINE 422 : 2021-03-23 19:41:39,042 [INFO    ] Done.
+
+LINE 205 : 2021-03-23 19:44:49,605 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:44:50,241 [DEBUG   ] http://127.0.0.1:4780 "GET http://maayanlab.cloud/Enrichr/datasetStatistics HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:44:50,248 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:44:51,393 [DEBUG   ] https://maayanlab.cloud:443 "GET /Enrichr/datasetStatistics HTTP/1.1" 200 None
+LINE 385 : 2021-03-23 19:44:51,616 [INFO    ] Connecting to Enrichr Server to get latest library names
+LINE 403 : 2021-03-23 19:44:51,617 [DEBUG   ] Start Enrichr using library: KEGG_2013
+LINE 404 : 2021-03-23 19:44:51,617 [INFO    ] Analysis name: test_name, Enrichr Library: KEGG_2013
+LINE 205 : 2021-03-23 19:44:51,619 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:44:52,219 [DEBUG   ] http://127.0.0.1:4780 "POST http://maayanlab.cloud/Enrichr/addList HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:44:52,225 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:44:57,778 [DEBUG   ] https://maayanlab.cloud:443 "POST /Enrichr/addList HTTP/1.1" 200 74
+LINE 205 : 2021-03-23 19:44:58,839 [DEBUG   ] Starting new HTTP connection (1): 127.0.0.1:4780
+LINE 393 : 2021-03-23 19:44:59,454 [DEBUG   ] http://127.0.0.1:4780 "GET http://maayanlab.cloud/Enrichr/export?userListId=36587517&filename=KEGG_2013.test_name.reports&backgroundType=KEGG_2013 HTTP/1.1" 308 172
+LINE 823 : 2021-03-23 19:44:59,463 [DEBUG   ] Starting new HTTPS connection (1): maayanlab.cloud:443
+LINE 393 : 2021-03-23 19:45:01,845 [DEBUG   ] https://maayanlab.cloud:443 "GET /Enrichr/export?userListId=36587517&filename=KEGG_2013.test_name.reports&backgroundType=KEGG_2013 HTTP/1.1" 200 None
+LINE 412 : 2021-03-23 19:45:02,074 [INFO    ] Save file of enrichment results: Job Id:fc97eeb4f4c7fb311a63e3079ee535b5
+LINE 1346: 2021-03-23 19:45:02,637 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=12:stretch=normal:size=16.0 to Arial ('C:\\WINDOWS\\Fonts\\arial.ttf') with score of 0.418600
+LINE 658 : 2021-03-23 19:45:02,640 [DEBUG   ] Assigning font /b'F1' = 'C:\\WINDOWS\\Fonts\\arial.ttf'
+LINE 1346: 2021-03-23 19:45:02,700 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=bold:stretch=normal:size=16.0 to Arial ('C:\\WINDOWS\\Fonts\\arialbd.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:02,711 [DEBUG   ] findfont: Matching :family=STIXGeneral:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXGeneral ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXGeneral.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,843 [DEBUG   ] findfont: Matching :family=STIXGeneral:style=italic:variant=normal:weight=12:stretch=normal:size=10.0 to STIXGeneral ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXGeneralItalic.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,845 [DEBUG   ] findfont: Matching :family=STIXGeneral:style=normal:variant=normal:weight=bold:stretch=normal:size=10.0 to STIXGeneral ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXGeneralBol.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:02,862 [DEBUG   ] findfont: Matching :family=STIXNonUnicode:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXNonUnicode ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXNonUni.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,873 [DEBUG   ] findfont: Matching :family=STIXNonUnicode:style=italic:variant=normal:weight=12:stretch=normal:size=10.0 to STIXNonUnicode ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXNonUniIta.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,874 [DEBUG   ] findfont: Matching :family=STIXNonUnicode:style=normal:variant=normal:weight=bold:stretch=normal:size=10.0 to STIXNonUnicode ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXNonUniBol.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:02,910 [DEBUG   ] findfont: Matching :family=STIXSizeOneSym:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXSizeOneSym ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXSizOneSymReg.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,970 [DEBUG   ] findfont: Matching :family=STIXSizeTwoSym:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXSizeTwoSym ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXSizTwoSymReg.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,987 [DEBUG   ] findfont: Matching :family=STIXSizeThreeSym:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXSizeThreeSym ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXSizThreeSymReg.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:02,998 [DEBUG   ] findfont: Matching :family=STIXSizeFourSym:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXSizeFourSym ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXSizFourSymReg.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,008 [DEBUG   ] findfont: Matching :family=STIXSizeFiveSym:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to STIXSizeFiveSym ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\STIXSizFiveSymReg.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,020 [DEBUG   ] findfont: Matching :family=cmsy10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmsy10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmsy10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,030 [DEBUG   ] findfont: Matching :family=cmr10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmr10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmr10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,041 [DEBUG   ] findfont: Matching :family=cmtt10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmtt10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmtt10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,052 [DEBUG   ] findfont: Matching :family=cmmi10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmmi10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmmi10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,063 [DEBUG   ] findfont: Matching :family=cmb10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmb10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmb10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,073 [DEBUG   ] findfont: Matching :family=cmss10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmss10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmss10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,084 [DEBUG   ] findfont: Matching :family=cmex10:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to cmex10 ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\cmex10.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,095 [DEBUG   ] findfont: Matching :family=DejaVu Sans:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to DejaVu Sans ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,114 [DEBUG   ] findfont: Matching :family=DejaVu Sans:style=italic:variant=normal:weight=12:stretch=normal:size=10.0 to DejaVu Sans ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans-Oblique.ttf') with score of 0.518600
+LINE 1346: 2021-03-23 19:45:03,115 [DEBUG   ] findfont: Matching :family=DejaVu Sans:style=normal:variant=normal:weight=bold:stretch=normal:size=10.0 to DejaVu Sans ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans-Bold.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:03,125 [DEBUG   ] findfont: Matching :family=DejaVu Sans Mono:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to DejaVu Sans Mono ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSansMono.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:45:03,136 [DEBUG   ] findfont: Matching :family=DejaVu Sans Display:style=normal:variant=normal:weight=12:stretch=normal:size=10.0 to DejaVu Sans Display ('D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSansDisplay.ttf') with score of 0.418600
+LINE 658 : 2021-03-23 19:45:03,749 [DEBUG   ] Assigning font /b'F2' = 'C:\\WINDOWS\\Fonts\\arialbd.ttf'
+LINE 658 : 2021-03-23 19:45:03,749 [DEBUG   ] Assigning font /b'F3' = 'D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans.ttf'
+LINE 1346: 2021-03-23 19:45:03,783 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=bold:stretch=normal:size=24.0 to Arial ('C:\\WINDOWS\\Fonts\\arialbd.ttf') with score of 0.000000
+LINE 710 : 2021-03-23 19:45:03,785 [DEBUG   ] Embedding font C:\WINDOWS\Fonts\arial.ttf.
+LINE 717 : 2021-03-23 19:45:03,785 [DEBUG   ] Writing TrueType font.
+LINE 710 : 2021-03-23 19:45:03,861 [DEBUG   ] Embedding font C:\WINDOWS\Fonts\arialbd.ttf.
+LINE 717 : 2021-03-23 19:45:03,862 [DEBUG   ] Writing TrueType font.
+LINE 710 : 2021-03-23 19:45:03,879 [DEBUG   ] Embedding font D:\Anaconda\lib\site-packages\matplotlib\mpl-data\fonts\ttf\DejaVuSans.ttf.
+LINE 717 : 2021-03-23 19:45:03,879 [DEBUG   ] Writing TrueType font.
+LINE 658 : 2021-03-23 19:45:03,934 [DEBUG   ] Assigning font /b'F1' = 'C:\\WINDOWS\\Fonts\\arial.ttf'
+LINE 658 : 2021-03-23 19:45:03,949 [DEBUG   ] Assigning font /b'F2' = 'C:\\WINDOWS\\Fonts\\arialbd.ttf'
+LINE 658 : 2021-03-23 19:45:03,950 [DEBUG   ] Assigning font /b'F3' = 'D:\\Anaconda\\lib\\site-packages\\matplotlib\\mpl-data\\fonts\\ttf\\DejaVuSans.ttf'
+LINE 710 : 2021-03-23 19:45:03,982 [DEBUG   ] Embedding font C:\WINDOWS\Fonts\arial.ttf.
+LINE 717 : 2021-03-23 19:45:03,982 [DEBUG   ] Writing TrueType font.
+LINE 710 : 2021-03-23 19:45:04,000 [DEBUG   ] Embedding font C:\WINDOWS\Fonts\arialbd.ttf.
+LINE 717 : 2021-03-23 19:45:04,000 [DEBUG   ] Writing TrueType font.
+LINE 710 : 2021-03-23 19:45:04,016 [DEBUG   ] Embedding font D:\Anaconda\lib\site-packages\matplotlib\mpl-data\fonts\ttf\DejaVuSans.ttf.
+LINE 717 : 2021-03-23 19:45:04,016 [DEBUG   ] Writing TrueType font.
+LINE 422 : 2021-03-23 19:45:04,031 [INFO    ] Done.
+
+LINE 1346: 2021-03-23 19:45:04,112 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=bold:stretch=normal:size=14.0 to Arial ('C:\\WINDOWS\\Fonts\\arialbd.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:04,152 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=bold:stretch=normal:size=20.0 to Arial ('C:\\WINDOWS\\Fonts\\arialbd.ttf') with score of 0.000000
+LINE 1346: 2021-03-23 19:45:04,186 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=normal:stretch=normal:size=12.0 to Arial ('C:\\WINDOWS\\Fonts\\arial.ttf') with score of 0.050000
+LINE 1346: 2021-03-23 19:46:48,293 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=12:stretch=normal:size=15.0 to Arial ('C:\\WINDOWS\\Fonts\\arial.ttf') with score of 0.418600
+LINE 1346: 2021-03-23 19:46:48,311 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=bold:stretch=normal:size=15.0 to Arial ('C:\\WINDOWS\\Fonts\\arialbd.ttf') with score of 0.000000
+LINE 501 : 2021-03-23 19:47:40,030 [INFO    ] Parsing data files for GSEA.............................
+LINE 166 : 2021-03-23 19:47:40,031 [INFO    ] Enrichr library gene sets already downloaded in: C:\Users\FernandoZeng\.cache/gseapy, use local file
+LINE 135 : 2021-03-23 19:47:41,432 [INFO    ] 0168 gene_sets have been filtered out when max_size=500 and min_size=15
+LINE 505 : 2021-03-23 19:47:41,433 [INFO    ] 0125 gene_sets used for further statistical testing.....
+LINE 506 : 2021-03-23 19:47:41,433 [INFO    ] Start to run GSEA...Might take a while..................
+LINE 465 : 2021-03-23 19:47:41,433 [DEBUG   ] Start to compute enrichment scores......................
+LINE 489 : 2021-03-23 19:47:41,433 [DEBUG   ] Start to compute es and esnulls........................
+LINE 652 : 2021-03-23 19:48:02,758 [DEBUG   ] Start to compute pvals..................................
+LINE 656 : 2021-03-23 19:48:02,759 [DEBUG   ] Start to compute nes and nesnull........................
+LINE 660 : 2021-03-23 19:48:02,760 [DEBUG   ] Start to compute fdrs..................................
+LINE 634 : 2021-03-23 19:48:02,762 [DEBUG   ] Statistical testing finished.............................
+LINE 514 : 2021-03-23 19:48:02,763 [INFO    ] Start to generate gseapy reports, and produce figures...
+LINE 526 : 2021-03-23 19:48:15,353 [INFO    ] Congratulations. GSEApy runs successfully................
+
+LINE 1346: 2021-03-23 20:23:44,574 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=15:stretch=normal:size=15.0 to Arial ('C:\\WINDOWS\\Fonts\\arial.ttf') with score of 0.415750
+LINE 1346: 2021-03-23 20:23:44,678 [DEBUG   ] findfont: Matching :family=Arial:style=normal:variant=normal:weight=15:stretch=normal:size=10.0 to Arial ('C:\\WINDOWS\\Fonts\\arial.ttf') with score of 0.415750
