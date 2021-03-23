@@ -1,0 +1,14 @@
+README.md
+setup.py
+Pyomic/DeGene.py
+Pyomic/Enrichment.py
+Pyomic/Gene_module.py
+Pyomic/R_func.py
+Pyomic/__init__.py
+Pyomic/df_apply.py
+Pyomic/dynamicTree.py
+Pyomic.egg-info/PKG-INFO
+Pyomic.egg-info/SOURCES.txt
+Pyomic.egg-info/dependency_links.txt
+Pyomic.egg-info/requires.txt
+Pyomic.egg-info/top_level.txt
