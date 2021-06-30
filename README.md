@@ -2,11 +2,17 @@
 
 [![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing)
 [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt)
-[![License:MIT](https://img.shields.io/apm/l/vim-mode)](https://img.shields.io/apm/l/vim-mode)
+[![License:GPL](https://img.shields.io/badge/license-GPL-blue)](https://img.shields.io/apm/l/vim-mode)
 
 
 
 **The first python library for omics !**
+
+## Reference
+
+dynamicTreeCut was originally published by in *Bioinformatics*:
+
+Langfelder P, Zhang B, Horvath S (2007) Defining clusters from a hierarchical cluster tree: the Dynamic Tree Cut package for R. Bioinformatics 2008 24(5):719-720
 
 ## Where to get it
 

@@ -20,7 +20,7 @@ import ERgene
 import os
 
 def find_DEG(data,eg,cg,
-             fold_change=-1,
+             log2fc=-1,
              fold_threshold=0,
              pvalue_threshold=0.05,
              cmap="seismic"
@@ -38,11 +38,11 @@ def find_DEG(data,eg,cg,
     cg:list
         Columns name of the control group
         Sample:['Ctrl1','Ctrl2']
-    fold_change:float
+    log2fc:float
         The threshold value of the difference multiple
         If it is -1, then use the column in the middle of the HIST diagram to filter
     fold_threshold:int
-        This parameter is only valid when fold_change is -1, representing a multiple of the HIST filter
+        This parameter is only valid when log2fc is -1, representing a multiple of the HIST filter
     pvalue_threshold:float
         Represents the threshold value of pvalue
     cmap:string
@@ -51,7 +51,7 @@ def find_DEG(data,eg,cg,
     Returns
     ----------
     result:pandas.DataFrame
-        index is data's index, columns=['pvalue','FoldChange','log(pvalue)','log2FC','sig','size']
+        index is data's index, columns=['pvalue','qvalue','FoldChange','log(pvalue)','log2FC','sig','size']
     '''
 
 
@@ -72,28 +72,32 @@ def find_DEG(data,eg,cg,
     fold=eg_mean/cg_mean
     log2fold=-np.log2(fold)
     foldp=plt.hist(log2fold,color="#384793")
-    if fold_change==-1:
+    if log2fc==-1:
         foldchange=(foldp[1][np.where(foldp[1]>0)[0][fold_threshold]]+foldp[1][np.where(foldp[1]>0)[0][fold_threshold+1]])/2
     else:
-        foldchange=fold_change
+        foldchange=log2fc
     cmap1=sns.color_palette(cmap)
     plt.title("log2fc",font1)
     plt.ylabel('Density',font1)
     plt.yticks(fontsize=15)
     plt.xticks(fontsize=15)
-    plt.savefig("fold_change.png",dpi=300,bbox_inches = 'tight')
+    plt.savefig("log2fc.png",dpi=300,bbox_inches = 'tight')
     
     #pvalue
     pvalue = []
     for i in range(0, len(data)):
-        ttest = stats.ttest_ind(list(data.iloc[i][eg].values), list(data.iloc[i,2:4].values))
+        ttest = stats.ttest_ind(list(data.iloc[i][eg].values), list(data.iloc[i][cg].values))
         pvalue.append(ttest[1])
+    
+    #FDR
+    from statsmodels.stats.multitest import fdrcorrection
+    qvalue=fdrcorrection(np.array(pvalue), alpha=0.05, method='indep', is_sorted=False)
     
     #result
     genearray = np.asarray(pvalue)
-    result = pd.DataFrame({'pvalue':genearray,'FoldChange':fold})
-    result['log(pvalue)'] = -np.log10(result['pvalue'])
-    result['log2FC'] = -np.log2(result['FoldChange'])
+    result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
+    result['-log(pvalue)'] = -np.log10(result['pvalue'])
+    result['log2FC'] = np.log2(result['FoldChange'])
     result['sig'] = 'normal'
     result['size']  =np.abs(result['FoldChange'])/10
     result.loc[(result.log2FC> foldchange )&(result.pvalue < pvalue_threshold),'sig'] = 'up'
@@ -104,7 +108,7 @@ def find_DEG(data,eg,cg,
     
     #plt
     plt.subplot(grid[0,2:4])
-    ax = sns.scatterplot(x="log2FC", y="log(pvalue)",
+    ax = sns.scatterplot(x="log2FC", y="-log(pvalue)",
                       hue='sig',
                       hue_order = ('up','down','normal'),
                       palette=(cmap1[5],cmap1[0],"grey"),
@@ -123,7 +127,7 @@ def find_DEG(data,eg,cg,
     pvalue_cutoff = 0.05
     filtered_ids = []
     for i in range(0, len(result)):
-        if (abs(-np.log2(fold[i])) >= fold_cutoff) and (pvalue[i] <= pvalue_cutoff):
+        if (abs(np.log2(fold[i])) >= fold_cutoff) and (pvalue[i] <= pvalue_cutoff):
             filtered_ids.append(i)        
     filtered = data.iloc[filtered_ids,:]
     filtered.to_csv('fi.csv')
@@ -314,3 +318,34 @@ def ID_mapping(raw_data,
             #print(mapping[mapping[raw_col]==i][map_col].values[0],raw_data.loc[i])
     map_data.index=map_index
     return map_data
+
+def Drop_dupligene(raw_data):
+    '''
+    Drop the duplicate genes by max
+
+    Parameters
+    ----------
+    raw_data:pandas.DataFrame
+        DataFrame of data points with each entry in the form:[sample1','sample2'...],index=probe
+
+    Returns
+    ----------
+    new_data:pandas.DataFrame
+        A expression data matrix that have been duplicated
+    '''
+
+    print("...Drop the duplicate genes by max")
+    raw_len=len(raw_data.columns)
+    new_data=pd.DataFrame(columns=raw_data.columns)
+    raw_index=raw_data.index
+    new_index=[]
+    for i in sorted(set(list(raw_index)),key=list(raw_index).index):
+        if(raw_data.loc[i].size==raw_len):
+            new_index.append(i)
+            new_data=new_data.append(raw_data.loc[i],ignore_index=True)
+        else:
+            new_index.append(i)
+            testdata=raw_data.loc[i]
+            new_data=new_data.append(testdata.iloc[np.where(testdata.mean(axis=1)==testdata.mean(axis=1).max())[0][0]],ignore_index=True)       
+    new_data.index=new_index
+    return new_data
