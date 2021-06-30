@@ -7,3 +7,4 @@ scipy
 networkx
 seaborn
 datetime
+statsmodels
