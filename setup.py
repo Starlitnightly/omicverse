@@ -15,7 +15,7 @@ setup(
     # keywords = ('chinesename',),  
     description = 'A python framework library for omics analysis',  
     license = 'GNU License',  
-    install_requires = ['ERgene','numpy','pandas','matplotlib','sklearn','scipy','networkx','seaborn','datetime','statsmodels'],  
+    install_requires = ['ERgene','numpy','pandas','matplotlib','sklearn','scipy','networkx','seaborn','datetime','statsmodels','gseapy'],  
     packages = find_packages(),  # 要打包的项目文件夹
     include_package_data=True,   # 自动打包文件夹内所有数据
     author = 'ZehuaZeng',  

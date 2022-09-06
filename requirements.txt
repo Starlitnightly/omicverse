@@ -1,5 +1,6 @@
 Pyomic
 scanpy
+gseapy
 matplotlib
 seaborn
 sklearn
