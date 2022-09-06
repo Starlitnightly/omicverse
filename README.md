@@ -1,6 +1,6 @@
 # Pyomic - framework for omics
 
-[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/scltnn)
+[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/Pyomic)
 
 **The python library for omics !**
 
@@ -9,8 +9,8 @@
 ````
 .
 ├── Pyomic                  # Main Python package
-├── sample             # Experiments and case studies
-├── result                   # the test result by tutorial
+├── sample                  # Experiments and case studies
+├── result                  # the test result by tutorial
 ├── source                  # Documentation files
 ├── LICENSE
 └── README.md
