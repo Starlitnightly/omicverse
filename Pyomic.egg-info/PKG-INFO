@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: Pyomic
-Version: 1.1.0
+Version: 1.1.1
 Summary: A python framework library for omics analysis
 Home-page: https://github.com/Starlitnightly/Pyomic
 Author: ZehuaZeng
@@ -12,7 +12,7 @@ License-File: LICENSE
 
 # Pyomic - framework for omics
 
-[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/scltnn)
+[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/Pyomic) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://pyomic.readthedocs.io/en/latest/?badge=latest) 
 
 **The python library for omics !**
 
@@ -21,8 +21,8 @@ License-File: LICENSE
 ````
 .
 ├── Pyomic                  # Main Python package
-├── sample             # Experiments and case studies
-├── result                   # the test result by tutorial
+├── sample                  # Experiments and case studies
+├── result                  # the test result by tutorial
 ├── source                  # Documentation files
 ├── LICENSE
 └── README.md
