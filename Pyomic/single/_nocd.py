@@ -4,29 +4,36 @@ import pandas as pd
 import scanpy as sc
 import anndata
 import scipy.sparse as sp
-
-try:
-    import torch
-except ImportError:
-    raise ImportError(
-        'Please install the pytorch: `conda install -c conda-forge pytorch` or `pip install pytorch`.'
-    )
-
-from .. import nocd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 from sklearn.preprocessing import normalize
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def outer(origin):
+    def inner(*args, **kwargs):
+        try:
+            import torch
+            import torch.nn as nn
+            import torch.nn.functional as F
+            from .. import nocd
+        except ImportError:
+            raise ImportError(
+                'Please install the pytorch: `conda install -c conda-forge pytorch` or `pip install pytorch`.'
+            )
+        res = origin(*args, **kwargs)
+        return res
+ 
+    return inner
+
 
 
 class scnocd(object):
     
+    @outer
     def __init__(self,adata):
         self.adata_raw=adata
         self.adata=adata.copy()
-        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    @outer    
     def matrix_transform(self):
         
         try:
@@ -53,11 +60,13 @@ class scnocd(object):
         self.Z_gt=self.Z_gt.astype(np.float32)
         
         self.N, self.K = self.Z_gt.shape
-        
+
+    @outer   
     def matrix_normalize(self,cuda=False):
         self.x_norm = normalize(self.X)
         self.x_norm=nocd.utils.to_sparse_tensor(self.x_norm,cuda=cuda)
-        
+
+    @outer  
     def GNN_configure(self,hidden_size=128,
                      weight_decay=1e-2,
                      dropout=0.5,
@@ -79,16 +88,18 @@ class scnocd(object):
         self.balance_loss = balance_loss     # whether to use balanced loss
         self.stochastic_loss = stochastic_loss  # whether to use stochastic or full-batch training
         self.batch_size = batch_size      # batch size (only for stochastic training)
-        
+
+    @outer 
     def GNN_preprocess(self,num_workers=5,
                       ):
         self.sampler = nocd.sampler.get_edge_sampler(self.A, self.batch_size, self.batch_size, num_workers=num_workers)
         self.gnn = nocd.nn.GCN(self.x_norm.shape[1], self.hidden_sizes, self.K, 
-                               batch_norm=self.batch_norm, dropout=self.dropout).to(device)
+                               batch_norm=self.batch_norm, dropout=self.dropout).to(self.device)
         self.adj_norm = self.gnn.normalize_adj(self.A)
         self.decoder = nocd.nn.BerpoDecoder(self.N, self.A.nnz, balance_loss=self.balance_loss)
         self.opt = torch.optim.Adam(self.gnn.parameters(), lr=self.lr)
-        
+
+    @outer    
     def get_nmi(self,thresh=0.5):
         """Compute Overlapping NMI of the communities predicted by the GNN."""
         self.gnn.eval()
@@ -97,6 +108,7 @@ class scnocd(object):
         nmi = nocd.metrics.overlapping_nmi(Z_pred, self.Z_gt)
         return nmi
     
+    @outer
     def GNN_model(self):
         val_loss = np.inf
         validation_fn = lambda: val_loss
@@ -134,7 +146,8 @@ class scnocd(object):
             loss += nocd.utils.l2_reg_loss(self.gnn, scale=self.weight_decay)
             loss.backward()
             self.opt.step()
-            
+
+    @outer        
     def GNN_result(self,thresh=0.5):
         thresh = thresh
 
@@ -142,13 +155,15 @@ class scnocd(object):
         self.Z_pred = Z.cpu().detach().numpy() > thresh
         self.model_saver.restore()
         print(f'Final nmi = {self.get_nmi(thresh):.3f}')
-        
+
+    @outer   
     def GNN_plot(self,figsize=[10,10],markersize=0.05):
         plt.figure(figsize=figsize)
         z = np.argmax(self.Z_pred, 1)
         o = np.argsort(z)
         nocd.utils.plot_sparse_clustered_adjacency(self.A, self.K, z, o, markersize=markersize)
-        
+
+    @outer    
     def calculate_nocd(self):
         zpred=self.Z_pred+0
         pr=np.argmax(zpred, axis=-1)
@@ -174,6 +189,7 @@ class scnocd(object):
         print('......add nocd result to adata.obs')
         self.adata.obs['nocd']=con
     
+    @outer
     def cal_nocd(self):
         #pred matrix
         pred_pd=pd.DataFrame(self.Z_pred+0)
