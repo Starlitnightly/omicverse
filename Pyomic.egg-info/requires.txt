@@ -1,5 +1,6 @@
 ERgene
 numpy
+scanpy
 pandas
 matplotlib
 sklearn
