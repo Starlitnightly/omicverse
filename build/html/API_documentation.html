@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API documentation &mdash; Pyomic 1.0.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/clipboard.min.js"></script>
+        <script src="_static/copybutton.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Pyomic.bulk.pywgcna" href="api/Pyomic.bulk.pywgcna.html" />
+    <link rel="prev" title="Single Tutorial: scRNA-seq cell annotate" href="Tutorials/t_cellanno.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> Pyomic
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Installation_guild.html">Installation guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Tutorials/Tutorials.html">Tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#bulk">bulk</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.pywgcna.html">Pyomic.bulk.pywgcna</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.enrichment_KEGG.html">Pyomic.bulk.enrichment_KEGG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.enrichment_GO.html">Pyomic.bulk.enrichment_GO</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.enrichment_GSEA.html">Pyomic.bulk.enrichment_GSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.Plot_GSEA.html">Pyomic.bulk.Plot_GSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.find_DEG.html">Pyomic.bulk.find_DEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.ID_mapping.html">Pyomic.bulk.ID_mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.Drop_dupligene.html">Pyomic.bulk.Drop_dupligene</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.generate_G.html">Pyomic.bulk.generate_G</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.string_interaction.html">Pyomic.bulk.string_interaction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.bulk.string_map.html">Pyomic.bulk.string_map</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#single">single</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.single.cosg.html">Pyomic.single.cosg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.single.data_preprocess.html">Pyomic.single.data_preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.single.cell_annotate.html">Pyomic.single.cell_annotate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.single.cell_anno_print.html">Pyomic.single.cell_anno_print</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api/Pyomic.single.scnocd.html">Pyomic.single.scnocd</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Example_dataset.html">Example dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Release_notes.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Developer_guild.html">Developer guild</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Pyomic</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>API documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/API_documentation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="api-documentation">
+<h1>API documentation<a class="headerlink" href="#api-documentation" title="Permalink to this heading"></a></h1>
+<p>This section provides detailed API documentation for all public functions
+and classes in <code class="docutils literal notranslate"><span class="pre">Pyomic</span></code>.</p>
+<section id="bulk">
+<h2>bulk<a class="headerlink" href="#bulk" title="Permalink to this heading"></a></h2>
+<p>bulk (A omic framework for bulk omic analysis)</p>
+<span class="target" id="module-Pyomic.bulk"></span><table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.pywgcna.html#Pyomic.bulk.pywgcna" title="Pyomic.bulk.pywgcna"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.pywgcna</span></code></a>(data[, save_path])</p></td>
+<td><p>pywgcna:Weighted correlation network analysis in Python</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.bulk.enrichment_KEGG.html#Pyomic.bulk.enrichment_KEGG" title="Pyomic.bulk.enrichment_KEGG"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.enrichment_KEGG</span></code></a>(gene_list[, ...])</p></td>
+<td><p>Gene enrichment analysis of KEGG</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.enrichment_GO.html#Pyomic.bulk.enrichment_GO" title="Pyomic.bulk.enrichment_GO"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.enrichment_GO</span></code></a>(gene_list[, ...])</p></td>
+<td><p>Gene enrichment analysis of GO</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.bulk.enrichment_GSEA.html#Pyomic.bulk.enrichment_GSEA" title="Pyomic.bulk.enrichment_GSEA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.enrichment_GSEA</span></code></a>(data[, ...])</p></td>
+<td><p>Gene enrichment analysis of GSEA</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.Plot_GSEA.html#Pyomic.bulk.Plot_GSEA" title="Pyomic.bulk.Plot_GSEA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.Plot_GSEA</span></code></a>(data[, num])</p></td>
+<td><p>Plot the GSEA result figure</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.bulk.find_DEG.html#Pyomic.bulk.find_DEG" title="Pyomic.bulk.find_DEG"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.find_DEG</span></code></a>(data, eg, cg[, log2fc, ...])</p></td>
+<td><p>Find out the differential expression gene</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.ID_mapping.html#Pyomic.bulk.ID_mapping" title="Pyomic.bulk.ID_mapping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.ID_mapping</span></code></a>(raw_data, ...)</p></td>
+<td><p>Universal probe matching conversion gene ID</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.bulk.Drop_dupligene.html#Pyomic.bulk.Drop_dupligene" title="Pyomic.bulk.Drop_dupligene"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.Drop_dupligene</span></code></a>(raw_data)</p></td>
+<td><p>Drop the duplicate genes by max</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.generate_G.html#Pyomic.bulk.generate_G" title="Pyomic.bulk.generate_G"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.generate_G</span></code></a>(gene, species[, score])</p></td>
+<td><p>A Python library to get the PPI network in string-db</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.bulk.string_interaction.html#Pyomic.bulk.string_interaction" title="Pyomic.bulk.string_interaction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.string_interaction</span></code></a>(gene, species)</p></td>
+<td><p>A Python library to analysis the protein-protein interaction network by string-db</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.bulk.string_map.html#Pyomic.bulk.string_map" title="Pyomic.bulk.string_map"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.bulk.string_map</span></code></a>(gene, species)</p></td>
+<td><p>A Python library to find the gene name in string-db</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="single">
+<h2>single<a class="headerlink" href="#single" title="Permalink to this heading"></a></h2>
+<p>single (A omic framework for single cell omic analysis)</p>
+<span class="target" id="module-0"></span><table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.single.cosg.html#Pyomic.single.cosg" title="Pyomic.single.cosg"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.single.cosg</span></code></a>(adata[, groupby, groups, ...])</p></td>
+<td><p>Marker gene identification for single-cell sequencing data using COSG.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.single.data_preprocess.html#Pyomic.single.data_preprocess" title="Pyomic.single.data_preprocess"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.single.data_preprocess</span></code></a>(adata[, path])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.single.cell_annotate.html#Pyomic.single.cell_annotate" title="Pyomic.single.cell_annotate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.single.cell_annotate</span></code></a>(data[, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/Pyomic.single.cell_anno_print.html#Pyomic.single.cell_anno_print" title="Pyomic.single.cell_anno_print"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.single.cell_anno_print</span></code></a>(anno)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/Pyomic.single.scnocd.html#Pyomic.single.scnocd" title="Pyomic.single.scnocd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyomic.single.scnocd</span></code></a>(adata)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="Tutorials/t_cellanno.html" class="btn btn-neutral float-left" title="Single Tutorial: scRNA-seq cell annotate" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api/Pyomic.bulk.pywgcna.html" class="btn btn-neutral float-right" title="Pyomic.bulk.pywgcna" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, starlitnightly.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

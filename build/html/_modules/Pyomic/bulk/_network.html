@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pyomic.bulk._network &mdash; Pyomic 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/clipboard.min.js"></script>
+        <script src="../../../_static/copybutton.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> Pyomic
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../Installation_guild.html">Installation guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Tutorials/Tutorials.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../API_documentation.html">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Example_dataset.html">Example dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Release_notes.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Developer_guild.html">Developer guild</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Pyomic</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>Pyomic.bulk._network</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for Pyomic.bulk._network</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span> 
+<span class="kn">import</span> <span class="nn">networkx</span> <span class="k">as</span> <span class="nn">nx</span>
+
+<div class="viewcode-block" id="string_interaction"><a class="viewcode-back" href="../../../api/Pyomic.bulk.string_interaction.html#Pyomic.bulk.string_interaction">[docs]</a><span class="k">def</span> <span class="nf">string_interaction</span><span class="p">(</span><span class="n">gene</span><span class="p">,</span><span class="n">species</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;A Python library to analysis the protein-protein interaction network by string-db</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gene</span>
+<span class="sd">        The gene list to analysis PPI</span>
+<span class="sd">    species</span>
+<span class="sd">        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    res</span>
+<span class="sd">        the dataframe of protein-protein interaction</span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">requests</span> <span class="c1">## python -m pip install requests</span>
+    <span class="n">string_api_url</span> <span class="o">=</span> <span class="s2">&quot;https://string-db.org/api&quot;</span>
+    <span class="n">output_format</span> <span class="o">=</span> <span class="s2">&quot;tsv-no-header&quot;</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;network&quot;</span>
+    <span class="n">request_url</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">string_api_url</span><span class="p">,</span> <span class="n">output_format</span><span class="p">,</span> <span class="n">method</span><span class="p">])</span>
+    <span class="n">my_genes</span> <span class="o">=</span> <span class="n">gene</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+
+        <span class="s2">&quot;identifiers&quot;</span> <span class="p">:</span> <span class="s2">&quot;</span><span class="si">%0d</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">my_genes</span><span class="p">),</span> <span class="c1"># your protein</span>
+        <span class="s2">&quot;species&quot;</span> <span class="p">:</span> <span class="n">species</span><span class="p">,</span> <span class="c1"># species NCBI identifier </span>
+        <span class="s2">&quot;caller_identity&quot;</span> <span class="p">:</span> <span class="s2">&quot;www.awesome_app.org&quot;</span> <span class="c1"># your app name</span>
+
+    <span class="p">}</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">request_url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">params</span><span class="p">)</span>
+    <span class="n">res</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;stringId_A&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;stringId_B&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;preferredName_A&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;preferredName_B&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;ncbiTaxonId&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;score&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;nscore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;fscore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;pscore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;ascore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;escore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;dscore&#39;</span><span class="p">,</span>\
+                             <span class="s1">&#39;tscore&#39;</span><span class="p">])</span>
+    <span class="n">num</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">num</span><span class="p">]</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;stringId_A&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>\
+                             <span class="s1">&#39;stringId_B&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>\
+                             <span class="s1">&#39;preferredName_A&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>\
+                             <span class="s1">&#39;preferredName_B&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>\
+                             <span class="s1">&#39;ncbiTaxonId&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>\
+                             <span class="s1">&#39;score&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span>\
+                             <span class="s1">&#39;nscore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span>\
+                             <span class="s1">&#39;fscore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">7</span><span class="p">],</span>\
+                             <span class="s1">&#39;pscore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">8</span><span class="p">],</span>\
+                             <span class="s1">&#39;ascore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">9</span><span class="p">],</span>\
+                             <span class="s1">&#39;escore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span>\
+                             <span class="s1">&#39;dscore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">11</span><span class="p">],</span>\
+                             <span class="s1">&#39;tscore&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">12</span><span class="p">]}</span>
+        <span class="n">num</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+
+<div class="viewcode-block" id="string_map"><a class="viewcode-back" href="../../../api/Pyomic.bulk.string_map.html#Pyomic.bulk.string_map">[docs]</a><span class="k">def</span> <span class="nf">string_map</span><span class="p">(</span><span class="n">gene</span><span class="p">,</span><span class="n">species</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;A Python library to find the gene name in string-db</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gene</span>
+<span class="sd">        The gene list to analysis PPI</span>
+<span class="sd">    species</span>
+<span class="sd">        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    res</span>
+<span class="sd">        the dataframe of query gene and new gene</span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">requests</span> <span class="c1">## python -m pip install requests</span>
+    <span class="n">string_api_url</span> <span class="o">=</span> <span class="s2">&quot;https://string-db.org/api&quot;</span>
+    <span class="n">output_format</span> <span class="o">=</span> <span class="s2">&quot;tsv-no-header&quot;</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;get_string_ids&quot;</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+
+        <span class="s2">&quot;identifiers&quot;</span> <span class="p">:</span> <span class="s2">&quot;</span><span class="se">\r</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">gene</span><span class="p">),</span> <span class="c1"># your protein list</span>
+        <span class="s2">&quot;species&quot;</span> <span class="p">:</span> <span class="n">species</span><span class="p">,</span> <span class="c1"># species NCBI identifier </span>
+        <span class="s2">&quot;limit&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># only one (best) identifier per input protein</span>
+        <span class="s2">&quot;echo_query&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># see your input identifiers in the output</span>
+        <span class="s2">&quot;caller_identity&quot;</span> <span class="p">:</span> <span class="s2">&quot;www.awesome_app.org&quot;</span> <span class="c1"># your app name</span>
+
+    <span class="p">}</span>
+    <span class="n">request_url</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">string_api_url</span><span class="p">,</span> <span class="n">output_format</span><span class="p">,</span> <span class="n">method</span><span class="p">])</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">request_url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">params</span><span class="p">)</span>
+    <span class="n">res</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;queryItem&#39;</span><span class="p">,</span><span class="s1">&#39;queryIndex&#39;</span><span class="p">,</span><span class="s1">&#39;stringId&#39;</span><span class="p">,</span><span class="s1">&#39;ncbiTaxonId&#39;</span><span class="p">,</span><span class="s1">&#39;taxonName&#39;</span><span class="p">,</span><span class="s1">&#39;preferredName&#39;</span><span class="p">,</span><span class="s1">&#39;annotation&#39;</span><span class="p">])</span>
+    <span class="n">num</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">res</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">num</span><span class="p">]</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;queryItem&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>\
+          <span class="s1">&#39;queryIndex&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>\
+          <span class="s1">&#39;stringId&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>\
+          <span class="s1">&#39;ncbiTaxonId&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>\
+          <span class="s1">&#39;taxonName&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>\
+          <span class="s1">&#39;preferredName&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span>\
+          <span class="s1">&#39;annotation&#39;</span><span class="p">:</span><span class="n">l</span><span class="p">[</span><span class="mi">6</span><span class="p">]}</span>
+        <span class="n">num</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<span class="k">def</span> <span class="nf">max_interaction</span><span class="p">(</span><span class="n">gene</span><span class="p">,</span><span class="n">species</span><span class="p">):</span>
+    <span class="n">gene_len</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">gene</span><span class="p">)</span>
+    <span class="n">times</span><span class="o">=</span><span class="n">gene_len</span><span class="o">//</span><span class="mi">1000</span>
+    <span class="n">shengyu</span><span class="o">=</span><span class="n">gene_len</span><span class="o">-</span><span class="n">times</span><span class="o">*</span><span class="mi">1000</span>
+    <span class="k">if</span> <span class="n">shengyu</span><span class="o">!=</span><span class="mi">0</span><span class="p">:</span>
+        <span class="n">times</span><span class="o">+=</span><span class="mi">1</span>
+    <span class="n">ge</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">times</span><span class="p">):</span>
+        <span class="n">ge</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gene</span><span class="p">[</span><span class="mi">1000</span><span class="o">*</span><span class="n">i</span><span class="p">:</span><span class="mi">1000</span><span class="o">*</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)])</span>
+    <span class="n">b</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">combinations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">times</span><span class="p">),</span><span class="mi">2</span><span class="p">):</span>
+        <span class="n">b</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">string_interaction</span><span class="p">(</span><span class="n">ge</span><span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">+</span><span class="n">ge</span><span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span><span class="n">species</span><span class="p">))</span>
+    <span class="n">res</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">b</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">res</span>
+    
+
+<div class="viewcode-block" id="generate_G"><a class="viewcode-back" href="../../../api/Pyomic.bulk.generate_G.html#Pyomic.bulk.generate_G">[docs]</a><span class="k">def</span> <span class="nf">generate_G</span><span class="p">(</span><span class="n">gene</span><span class="p">,</span><span class="n">species</span><span class="p">,</span><span class="n">score</span><span class="o">=</span><span class="mf">0.4</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;A Python library to get the PPI network in string-db</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gene</span>
+<span class="sd">        The gene list to analysis PPI</span>
+<span class="sd">    species</span>
+<span class="sd">        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).</span>
+<span class="sd">    score</span>
+<span class="sd">        The threshold of protein A and B interaction</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    G</span>
+<span class="sd">        the networkx object of PPI in query gene list</span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">itertools</span>
+    <span class="n">a</span><span class="o">=</span><span class="n">string_interaction</span><span class="p">(</span><span class="n">gene</span><span class="p">,</span><span class="n">species</span><span class="p">)</span>
+    <span class="n">b</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="n">b</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+    <span class="kn">import</span> <span class="nn">networkx</span> <span class="k">as</span> <span class="nn">nx</span>
+    <span class="n">G</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
+    <span class="n">G</span><span class="o">.</span><span class="n">add_nodes_from</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="s1">&#39;preferredName_A&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="o">+</span><span class="n">b</span><span class="p">[</span><span class="s1">&#39;preferredName_B&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()))</span>
+
+    <span class="c1">#Connect nodes</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+        <span class="n">col_label</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;preferredName_A&#39;</span><span class="p">]</span>
+        <span class="n">row_label</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;preferredName_B&#39;</span><span class="p">]</span>
+        <span class="k">if</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;score&#39;</span><span class="p">])</span><span class="o">&gt;</span><span class="n">score</span><span class="p">):</span>
+            <span class="n">G</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">col_label</span><span class="p">,</span><span class="n">row_label</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">G</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, starlitnightly.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

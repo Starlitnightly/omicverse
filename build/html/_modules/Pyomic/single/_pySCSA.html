@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pyomic.single._pySCSA &mdash; Pyomic 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/clipboard.min.js"></script>
+        <script src="../../../_static/copybutton.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> Pyomic
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../Installation_guild.html">Installation guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Tutorials/Tutorials.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../API_documentation.html">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Example_dataset.html">Example dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Release_notes.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../Developer_guild.html">Developer guild</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Pyomic</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>Pyomic.single._pySCSA</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for Pyomic.single._pySCSA</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">os</span> 
+<span class="kn">import</span> <span class="nn">scanpy</span> <span class="k">as</span> <span class="nn">sc</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">._SCSA</span> <span class="kn">import</span> <span class="n">Process</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">gzip</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="k">def</span> <span class="nf">data_downloader</span><span class="p">(</span><span class="n">url</span><span class="p">,</span><span class="n">path</span><span class="p">,</span><span class="n">title</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;datasets downloader</span>
+<span class="sd">    </span>
+<span class="sd">    Arguments</span>
+<span class="sd">    ---------</span>
+<span class="sd">    url</span>
+<span class="sd">        the download url of datasets</span>
+<span class="sd">    path</span>
+<span class="sd">        the save path of datasets</span>
+<span class="sd">    title</span>
+<span class="sd">        the name of datasets</span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Loading dataset from </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">path</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Downloading dataset save to </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        
+    <span class="n">dirname</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Creating directory </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dirname</span><span class="p">))</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Unable to create directory </span><span class="si">{}</span><span class="s2">. Reason </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span><span class="n">e</span><span class="p">))</span>
+    
+    
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">chunk_size</span> <span class="o">=</span> <span class="mi">102400</span>
+    <span class="n">content_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;content-length&quot;</span><span class="p">])</span> 
+    <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;......[</span><span class="si">%s</span><span class="s1"> Size of file]: </span><span class="si">%0.2f</span><span class="s1"> MB&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">content_size</span><span class="o">/</span><span class="n">chunk_size</span><span class="o">/</span><span class="mf">10.24</span><span class="p">))</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">size</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> 
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\r</span><span class="s1">&#39;</span><span class="o">+</span> <span class="s1">&#39;......[Downloader]: </span><span class="si">%s%.2f%%</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="o">*</span><span class="nb">int</span><span class="p">(</span><span class="n">size</span><span class="o">*</span><span class="mi">50</span><span class="o">/</span><span class="n">content_size</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">size</span><span class="o">/</span><span class="n">content_size</span><span class="o">*</span><span class="mi">100</span><span class="p">)),</span> <span class="n">end</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="s2">&quot;.......Finish！</span><span class="si">%s</span><span class="s2">.2f s&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
+    
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<div class="viewcode-block" id="data_preprocess"><a class="viewcode-back" href="../../../api/Pyomic.single.data_preprocess.html#Pyomic.single.data_preprocess">[docs]</a><span class="k">def</span> <span class="nf">data_preprocess</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">path</span><span class="o">=</span><span class="s1">&#39;temp/rna.csv&#39;</span><span class="p">):</span>
+    <span class="n">dirname</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Creating directory </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dirname</span><span class="p">))</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;......Unable to create directory </span><span class="si">{}</span><span class="s2">. Reason </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span><span class="n">e</span><span class="p">))</span>
+
+    <span class="n">sc</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">verbosity</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># reduce the verbosity</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">rank_genes_groups</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s1">&#39;leiden&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;wilcoxon&#39;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;rank_genes_groups&#39;</span><span class="p">]</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;names&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">names</span>
+    <span class="n">dat</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">group</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">key</span><span class="p">[:</span><span class="mi">1</span><span class="p">]:</span> <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="n">group</span><span class="p">]</span> <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">groups</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;names&#39;</span><span class="p">,</span> <span class="s1">&#39;logfoldchanges&#39;</span><span class="p">,</span><span class="s1">&#39;scores&#39;</span><span class="p">,</span><span class="s1">&#39;pvals&#39;</span><span class="p">]})</span>
+    <span class="n">dat</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dat</span></div>
+
+<div class="viewcode-block" id="cell_annotate"><a class="viewcode-back" href="../../../api/Pyomic.single.cell_annotate.html#Pyomic.single.cell_annotate">[docs]</a><span class="k">def</span> <span class="nf">cell_annotate</span><span class="p">(</span><span class="n">data</span><span class="p">,</span>
+                <span class="n">foldchange</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span><span class="n">pvalue</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+                <span class="n">output</span><span class="o">=</span><span class="s1">&#39;temp/rna_anno.txt&#39;</span><span class="p">,</span>
+                <span class="n">outfmt</span><span class="o">=</span><span class="s1">&#39;txt&#39;</span><span class="p">,</span><span class="n">Gensymbol</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">species</span><span class="o">=</span><span class="s1">&#39;Human&#39;</span><span class="p">,</span><span class="n">weight</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">tissue</span><span class="o">=</span><span class="s1">&#39;All&#39;</span><span class="p">,</span>
+                <span class="n">celltype</span><span class="o">=</span><span class="s1">&#39;normal&#39;</span><span class="p">,</span><span class="n">norefdb</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">noprint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">list_tissue</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;temp/rna.csv&#39;</span><span class="p">)</span>
+
+    <span class="c1">#https://figshare.com/ndownloader/files/37262710</span>
+    <span class="n">model_path</span> <span class="o">=</span> <span class="n">data_downloader</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s1">&#39;https://figshare.com/ndownloader/files/37262710&#39;</span><span class="p">,</span>
+                                    <span class="n">path</span><span class="o">=</span><span class="s1">&#39;temp/whole.db&#39;</span><span class="p">,</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;whole&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;......Auto annotate cell&#39;</span><span class="p">)</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-i&#39;</span><span class="p">,</span> <span class="s1">&#39;--input&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;temp/rna.csv&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-o&#39;</span><span class="p">,</span> <span class="s1">&#39;--output&#39;</span><span class="p">,</span><span class="n">default</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-d&#39;</span><span class="p">,</span> <span class="s1">&#39;--db&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="n">model_path</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-s&#39;</span><span class="p">,</span> <span class="s1">&#39;--source&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;scanpy&quot;</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;--cluster&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;all&quot;</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-f&#39;</span><span class="p">,</span><span class="s2">&quot;--fc&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;1.5&quot;</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-fc&#39;</span><span class="p">,</span><span class="s2">&quot;--foldchange&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span><span class="n">foldchange</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-p&#39;</span><span class="p">,</span><span class="s2">&quot;--pvalue&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="n">pvalue</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-w&#39;</span><span class="p">,</span><span class="s2">&quot;--weight&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="n">weight</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-g&#39;</span><span class="p">,</span><span class="s2">&quot;--species&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="n">species</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-k&#39;</span><span class="p">,</span><span class="s2">&quot;--tissue&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="n">tissue</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-m&#39;</span><span class="p">,</span> <span class="s1">&#39;--outfmt&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="n">outfmt</span><span class="p">,</span> <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-T&#39;</span><span class="p">,</span><span class="s2">&quot;--celltype&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="n">celltype</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-t&#39;</span><span class="p">,</span> <span class="s1">&#39;--target&#39;</span><span class="p">,</span> <span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;cellmarker&quot;</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-E&#39;</span><span class="p">,</span><span class="s2">&quot;--Gensymbol&quot;</span><span class="p">,</span><span class="n">action</span> <span class="o">=</span> <span class="s2">&quot;store_true&quot;</span><span class="p">,</span><span class="n">default</span><span class="o">=</span><span class="n">Gensymbol</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-N&#39;</span><span class="p">,</span><span class="s2">&quot;--norefdb&quot;</span><span class="p">,</span><span class="n">action</span> <span class="o">=</span> <span class="s2">&quot;store_true&quot;</span><span class="p">,</span><span class="n">default</span><span class="o">=</span><span class="n">norefdb</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-b&#39;</span><span class="p">,</span><span class="s2">&quot;--noprint&quot;</span><span class="p">,</span><span class="n">action</span> <span class="o">=</span> <span class="s2">&quot;store_true&quot;</span><span class="p">,</span><span class="n">default</span><span class="o">=</span><span class="n">noprint</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-l&#39;</span><span class="p">,</span><span class="s2">&quot;--list_tissue&quot;</span><span class="p">,</span><span class="n">action</span> <span class="o">=</span> <span class="s2">&quot;store_true&quot;</span><span class="p">,</span><span class="n">default</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-M&#39;</span><span class="p">,</span> <span class="s1">&#39;--MarkerDB&#39;</span><span class="p">,)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="n">p</span> <span class="o">=</span> <span class="n">Process</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">:</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">run_cmd</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">result</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;temp/rna_anno.txt&#39;</span><span class="p">,</span><span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="cell_anno_print"><a class="viewcode-back" href="../../../api/Pyomic.single.cell_anno_print.html#Pyomic.single.cell_anno_print">[docs]</a><span class="k">def</span> <span class="nf">cell_anno_print</span><span class="p">(</span><span class="n">anno</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">anno</span><span class="p">[</span><span class="s1">&#39;Cluster&#39;</span><span class="p">]):</span>
+        <span class="n">test</span><span class="o">=</span><span class="n">anno</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">anno</span><span class="p">[</span><span class="s1">&#39;Cluster&#39;</span><span class="p">]</span><span class="o">==</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;Z-score&#39;</span><span class="p">]</span><span class="o">&gt;</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;Z-score&#39;</span><span class="p">]</span><span class="o">*</span><span class="mi">2</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Nice:Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;Cell Type&#39;</span><span class="p">],</span>
+                                                        <span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;Z-score&#39;</span><span class="p">],</span><span class="mi">3</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">&#39;Cell Type&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()),</span>
+                                                        <span class="p">(</span><span class="s1">&#39;|&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">&#39;Z-score&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())))</span></div>
+
+<span class="k">def</span> <span class="nf">scanpy_lazy</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">min_genes</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span><span class="n">min_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">n_genes_by_counts</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span><span class="n">pct_counts_mt</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                <span class="n">target_sum</span><span class="o">=</span><span class="mf">1e4</span><span class="p">,</span><span class="n">min_mean</span><span class="o">=</span><span class="mf">0.0125</span><span class="p">,</span> <span class="n">max_mean</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_disp</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">max_value</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                <span class="n">n_comps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">svd_solver</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span><span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">random_state</span> <span class="o">=</span> <span class="mi">112</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                <span class="p">):</span>
+    <span class="c1">#filter cells and genes</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_cells</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_genes</span><span class="o">=</span><span class="n">min_genes</span><span class="p">)</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_cells</span><span class="o">=</span><span class="n">min_cells</span><span class="p">)</span>
+    <span class="c1">#calculate the proportion of mito-genes</span>
+    <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mt&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;MT-&#39;</span><span class="p">)</span>  <span class="c1"># annotate the group of mitochondrial genes as &#39;mt&#39;</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">calculate_qc_metrics</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">qc_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mt&#39;</span><span class="p">],</span> <span class="n">percent_top</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log1p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">n_genes_by_counts</span> <span class="o">&lt;</span> <span class="n">n_genes_by_counts</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">pct_counts_mt</span> <span class="o">&lt;</span> <span class="n">pct_counts_mt</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="c1">#normalization, the max counts of total_counts is 20000 means the amount is 10e4</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">normalize_total</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">target_sum</span><span class="o">=</span><span class="n">target_sum</span><span class="p">)</span>
+    <span class="c1">#log</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+    <span class="c1">#select high-variable genes</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">highly_variable_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_mean</span><span class="o">=</span><span class="n">min_mean</span><span class="p">,</span> <span class="n">max_mean</span><span class="o">=</span><span class="n">max_mean</span><span class="p">,</span> <span class="n">min_disp</span><span class="o">=</span><span class="n">min_disp</span><span class="p">)</span>
+    <span class="c1">#save and filter</span>
+    <span class="n">adata</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">adata</span>
+    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">highly_variable</span><span class="p">]</span>
+    <span class="c1">#regression：we use the proportion of mito-genes as control to revised the other expression of genes</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">regress_out</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;total_counts&#39;</span><span class="p">,</span> <span class="s1">&#39;pct_counts_mt&#39;</span><span class="p">])</span>
+    <span class="c1">#scale</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">max_value</span><span class="o">=</span><span class="n">max_value</span><span class="p">)</span>
+    <span class="c1">#pca analysis</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_comps</span><span class="o">=</span><span class="n">n_comps</span><span class="p">,</span> <span class="n">svd_solver</span><span class="o">=</span><span class="n">svd_solver</span><span class="p">)</span>
+    <span class="c1">#cell neighbors graph construct</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">neighbors</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="n">n_neighbors</span><span class="p">,</span> <span class="n">random_state</span> <span class="o">=</span> <span class="n">random_state</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="n">n_pcs</span><span class="p">)</span>
+    <span class="c1">#umap</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">leiden</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># remove `plot=False` if you want to see the coarse-grained graph</span>
+    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">init_pos</span><span class="o">=</span><span class="s1">&#39;paga&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">adata</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, starlitnightly.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

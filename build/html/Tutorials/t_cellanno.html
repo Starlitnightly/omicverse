@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Single Tutorial: scRNA-seq cell annotate &mdash; Pyomic 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/clipboard.min.js"></script>
+        <script src="../_static/copybutton.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API documentation" href="../API_documentation.html" />
+    <link rel="prev" title="Bulk tutorial: WGCNA (Weighted gene co-expression network analysis) analysis" href="t_wgcna.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> Pyomic
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">Installation guild</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="Tutorials.html">Tutorial</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="t_network.html">Bulk tutorial: Protein-Protein interaction (PPI) analysis by String-db</a></li>
+<li class="toctree-l2"><a class="reference internal" href="t_wgcna.html">Bulk tutorial: WGCNA (Weighted gene co-expression network analysis) analysis</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Single Tutorial: scRNA-seq cell annotate</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#Part.1-Data-preprocess">Part.1 Data preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Part.2-cell-type-annotate">Part.2 cell type annotate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Part.3-Cell-sub-type-annotate">Part.3 Cell sub-type annotate</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../API_documentation.html">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Example_dataset.html">Example dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Pyomic</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="Tutorials.html">Tutorial</a> &raquo;</li>
+      <li>Single Tutorial: scRNA-seq cell annotate</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/Tutorials/t_cellanno.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS for nbsphinx extension */
+
+/* remove conflicting styling from Sphinx themes */
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
+}
+
+/* avoid gaps between output lines */
+div.nboutput.container div[class*=highlight] pre {
+    line-height: normal;
+}
+
+/* input/output containers */
+div.nbinput.container,
+div.nboutput.container {
+    display: -webkit-flex;
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    width: 100%;
+}
+@media (max-width: 540px) {
+    div.nbinput.container,
+    div.nboutput.container {
+        flex-direction: column;
+    }
+}
+
+/* input container */
+div.nbinput.container {
+    padding-top: 5px;
+}
+
+/* last container */
+div.nblast.container {
+    padding-bottom: 5px;
+}
+
+/* input prompt */
+div.nbinput.container div.prompt pre {
+    color: #307FC1;
+}
+
+/* output prompt */
+div.nboutput.container div.prompt pre {
+    color: #BF5B3D;
+}
+
+/* all prompts */
+div.nbinput.container div.prompt,
+div.nboutput.container div.prompt {
+    width: 4.5ex;
+    padding-top: 5px;
+    position: relative;
+    user-select: none;
+}
+
+div.nbinput.container div.prompt > div,
+div.nboutput.container div.prompt > div {
+    position: absolute;
+    right: 0;
+    margin-right: 0.3ex;
+}
+
+@media (max-width: 540px) {
+    div.nbinput.container div.prompt,
+    div.nboutput.container div.prompt {
+        width: unset;
+        text-align: left;
+        padding: 0.4em;
+    }
+    div.nboutput.container div.prompt.empty {
+        padding: 0;
+    }
+
+    div.nbinput.container div.prompt > div,
+    div.nboutput.container div.prompt > div {
+        position: unset;
+    }
+}
+
+/* disable scrollbars on prompts */
+div.nbinput.container div.prompt pre,
+div.nboutput.container div.prompt pre {
+    overflow: hidden;
+}
+
+/* input/output area */
+div.nbinput.container div.input_area,
+div.nboutput.container div.output_area {
+    -webkit-flex: 1;
+    flex: 1;
+    overflow: auto;
+}
+@media (max-width: 540px) {
+    div.nbinput.container div.input_area,
+    div.nboutput.container div.output_area {
+        width: 100%;
+    }
+}
+
+/* input area */
+div.nbinput.container div.input_area {
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    /*background: #f5f5f5;*/
+}
+
+/* override MathJax center alignment in output cells */
+div.nboutput.container div[class*=MathJax] {
+    text-align: left !important;
+}
+
+/* override sphinx.ext.imgmath center alignment in output cells */
+div.nboutput.container div.math p {
+    text-align: left;
+}
+
+/* standard error */
+div.nboutput.container div.output_area.stderr {
+    background: #fdd;
+}
+
+/* ANSI colors */
+.ansi-black-fg { color: #3E424D; }
+.ansi-black-bg { background-color: #3E424D; }
+.ansi-black-intense-fg { color: #282C36; }
+.ansi-black-intense-bg { background-color: #282C36; }
+.ansi-red-fg { color: #E75C58; }
+.ansi-red-bg { background-color: #E75C58; }
+.ansi-red-intense-fg { color: #B22B31; }
+.ansi-red-intense-bg { background-color: #B22B31; }
+.ansi-green-fg { color: #00A250; }
+.ansi-green-bg { background-color: #00A250; }
+.ansi-green-intense-fg { color: #007427; }
+.ansi-green-intense-bg { background-color: #007427; }
+.ansi-yellow-fg { color: #DDB62B; }
+.ansi-yellow-bg { background-color: #DDB62B; }
+.ansi-yellow-intense-fg { color: #B27D12; }
+.ansi-yellow-intense-bg { background-color: #B27D12; }
+.ansi-blue-fg { color: #208FFB; }
+.ansi-blue-bg { background-color: #208FFB; }
+.ansi-blue-intense-fg { color: #0065CA; }
+.ansi-blue-intense-bg { background-color: #0065CA; }
+.ansi-magenta-fg { color: #D160C4; }
+.ansi-magenta-bg { background-color: #D160C4; }
+.ansi-magenta-intense-fg { color: #A03196; }
+.ansi-magenta-intense-bg { background-color: #A03196; }
+.ansi-cyan-fg { color: #60C6C8; }
+.ansi-cyan-bg { background-color: #60C6C8; }
+.ansi-cyan-intense-fg { color: #258F8F; }
+.ansi-cyan-intense-bg { background-color: #258F8F; }
+.ansi-white-fg { color: #C5C1B4; }
+.ansi-white-bg { background-color: #C5C1B4; }
+.ansi-white-intense-fg { color: #A1A6B2; }
+.ansi-white-intense-bg { background-color: #A1A6B2; }
+
+.ansi-default-inverse-fg { color: #FFFFFF; }
+.ansi-default-inverse-bg { background-color: #000000; }
+
+.ansi-bold { font-weight: bold; }
+.ansi-underline { text-decoration: underline; }
+
+
+div.nbinput.container div.input_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight].math,
+div.nboutput.container div.output_area.rendered_html,
+div.nboutput.container div.output_area > div.output_javascript,
+div.nboutput.container div.output_area:not(.rendered_html) > img{
+    padding: 5px;
+    margin: 0;
+}
+
+/* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
+div.nbinput.container div.input_area > div[class^='highlight'],
+div.nboutput.container div.output_area > div[class^='highlight']{
+    overflow-y: hidden;
+}
+
+/* hide copybtn icon on prompts (needed for 'sphinx_copybutton') */
+.prompt .copybtn {
+    display: none;
+}
+
+/* Some additional styling taken form the Jupyter notebook CSS */
+.jp-RenderedHTMLCommon table,
+div.rendered_html table {
+  border: none;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: black;
+  font-size: 12px;
+  table-layout: fixed;
+}
+.jp-RenderedHTMLCommon thead,
+div.rendered_html thead {
+  border-bottom: 1px solid black;
+  vertical-align: bottom;
+}
+.jp-RenderedHTMLCommon tr,
+.jp-RenderedHTMLCommon th,
+.jp-RenderedHTMLCommon td,
+div.rendered_html tr,
+div.rendered_html th,
+div.rendered_html td {
+  text-align: right;
+  vertical-align: middle;
+  padding: 0.5em 0.5em;
+  line-height: normal;
+  white-space: normal;
+  max-width: none;
+  border: none;
+}
+.jp-RenderedHTMLCommon th,
+div.rendered_html th {
+  font-weight: bold;
+}
+.jp-RenderedHTMLCommon tbody tr:nth-child(odd),
+div.rendered_html tbody tr:nth-child(odd) {
+  background: #f5f5f5;
+}
+.jp-RenderedHTMLCommon tbody tr:hover,
+div.rendered_html tbody tr:hover {
+  background: rgba(66, 165, 245, 0.2);
+}
+
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="Single-Tutorial:-scRNA-seq-cell-annotate">
+<h1>Single Tutorial: scRNA-seq cell annotate<a class="headerlink" href="#Single-Tutorial:-scRNA-seq-cell-annotate" title="Permalink to this heading"></a></h1>
+<p>Single-cell transcriptomics allows the analysis of thousands of cells in a single experiment and the identification of novel cell types, states and dynamics in a variety of tissues and organisms. Standard experimental protocols and analytical workflows have been developed to create single-cell transcriptomic maps from tissues.</p>
+<p>This tutorial focuses on how to interpret this data to identify cell types, states, and other biologically relevant patterns with the goal of creating annotated cell maps.</p>
+<section id="Part.1-Data-preprocess">
+<h2>Part.1 Data preprocess<a class="headerlink" href="#Part.1-Data-preprocess" title="Permalink to this heading"></a></h2>
+<p>In this part, we perform preliminary processing of the data, such as normalization and logarithmization, in order to make the data more interpretable</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#import package</span>
+<span class="kn">import</span> <span class="nn">anndata</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;anndata(Ver): &#39;</span><span class="p">,</span><span class="n">anndata</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">scanpy</span> <span class="k">as</span> <span class="nn">sc</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;scanpy(Ver): &#39;</span><span class="p">,</span><span class="n">sc</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;matplotlib(Ver): &#39;</span><span class="p">,</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;seaborn(Ver): &#39;</span><span class="p">,</span><span class="n">sns</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;numpy(Ver): &#39;</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;pandas(Ver): &#39;</span><span class="p">,</span><span class="n">pd</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">Pyomic</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Pyomic(Ver): &#39;</span><span class="p">,</span><span class="n">Pyomic</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+anndata(Ver):  0.8.0
+scanpy(Ver):  1.9.1
+matplotlib(Ver):  3.5.3
+seaborn(Ver):  0.11.2
+numpy(Ver):  1.22.4
+pandas(Ver):  1.4.3
+Pyomic(Ver):  1.1.0
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#param for visualization</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">verbosity</span> <span class="o">=</span> <span class="mi">3</span>             <span class="c1"># verbosity: errors (0), warnings (1), info (2), hints (3)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">set_figure_params</span><span class="p">(</span><span class="n">dpi</span><span class="o">=</span><span class="mi">80</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">LinearSegmentedColormap</span>
+<span class="n">sc_color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;#7CBB5F&#39;</span><span class="p">,</span><span class="s1">&#39;#368650&#39;</span><span class="p">,</span><span class="s1">&#39;#A499CC&#39;</span><span class="p">,</span><span class="s1">&#39;#5E4D9A&#39;</span><span class="p">,</span><span class="s1">&#39;#78C2ED&#39;</span><span class="p">,</span><span class="s1">&#39;#866017&#39;</span><span class="p">,</span> <span class="s1">&#39;#9F987F&#39;</span><span class="p">,</span><span class="s1">&#39;#E0DFED&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;#EF7B77&#39;</span><span class="p">,</span> <span class="s1">&#39;#279AD7&#39;</span><span class="p">,</span><span class="s1">&#39;#F0EEF0&#39;</span><span class="p">,</span> <span class="s1">&#39;#1F577B&#39;</span><span class="p">,</span> <span class="s1">&#39;#A56BA7&#39;</span><span class="p">,</span> <span class="s1">&#39;#E0A7C8&#39;</span><span class="p">,</span> <span class="s1">&#39;#E069A6&#39;</span><span class="p">,</span> <span class="s1">&#39;#941456&#39;</span><span class="p">,</span> <span class="s1">&#39;#FCBC10&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;#EAEFC5&#39;</span><span class="p">,</span> <span class="s1">&#39;#01A0A7&#39;</span><span class="p">,</span> <span class="s1">&#39;#75C8CC&#39;</span><span class="p">,</span> <span class="s1">&#39;#F0D7BC&#39;</span><span class="p">,</span> <span class="s1">&#39;#D5B26C&#39;</span><span class="p">,</span> <span class="s1">&#39;#D5DA48&#39;</span><span class="p">,</span> <span class="s1">&#39;#B6B812&#39;</span><span class="p">,</span> <span class="s1">&#39;#9DC3C3&#39;</span><span class="p">,</span> <span class="s1">&#39;#A89C92&#39;</span><span class="p">,</span> <span class="s1">&#39;#FEE00C&#39;</span><span class="p">,</span> <span class="s1">&#39;#FEF2A1&#39;</span><span class="p">]</span>
+<span class="n">sc_color_cmap</span> <span class="o">=</span> <span class="n">LinearSegmentedColormap</span><span class="o">.</span><span class="n">from_list</span><span class="p">(</span><span class="s1">&#39;Custom&#39;</span><span class="p">,</span> <span class="n">sc_color</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sc_color</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#load data</span>
+<span class="n">adata</span><span class="o">=</span><span class="n">sc</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s1">&#39;sample/rna.h5ad&#39;</span><span class="p">)</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 22679 × 25596
+    obs: &#39;Type&#39;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#filter cells and genes</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_cells</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_genes</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+filtered out 1234 cells that have less than 200 genes expressed
+filtered out 4074 genes that are detected in less than 3 cells
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#calculate the proportion of mito-genes</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;mt&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;MT-&#39;</span><span class="p">)</span>  <span class="c1"># annotate the group of mitochondrial genes as &#39;mt&#39;</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">calculate_qc_metrics</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">qc_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mt&#39;</span><span class="p">],</span> <span class="n">percent_top</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log1p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#visualization of mito-genes and total-genes</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">violin</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;n_genes_by_counts&#39;</span><span class="p">,</span> <span class="s1">&#39;total_counts&#39;</span><span class="p">,</span> <span class="s1">&#39;pct_counts_mt&#39;</span><span class="p">],</span>
+             <span class="n">jitter</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">multi_panel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_8_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_8_0.png" style="width: 1182px; height: 383px;" />
+</div>
+</div>
+<p>In general, low gene counts and high proportions of mitochondrial genes are usually indicative of poor cell quality. However, some cells, including proximal and distal renal tubule cells, are inherently mitochondria-rich</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#viaualization of cells with more mito-genes or total-genes</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">ax1</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;total_counts&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;pct_counts_mt&#39;</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax1</span><span class="p">,</span><span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;total_counts&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;n_genes_by_counts&#39;</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax2</span><span class="p">,</span><span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_10_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_10_0.png" style="width: 622px; height: 303px;" />
+</div>
+</div>
+<p>Here, we found that the vast majority of cells had mitochondrial gene expression below 20. To ensure the quality of the data, we chose 10% as the filtering condition for our mitochondrial QC, while the total gene expression was below 2000, so we chose 10 vs. 2000 for our filtering parameters</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">n_genes_by_counts</span> <span class="o">&lt;</span> <span class="mi">2000</span><span class="p">,</span> <span class="p">:]</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">pct_counts_mt</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">,</span> <span class="p">:]</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+View of AnnData object with n_obs × n_vars = 16977 × 21522
+    obs: &#39;Type&#39;, &#39;n_genes&#39;, &#39;n_genes_by_counts&#39;, &#39;total_counts&#39;, &#39;total_counts_mt&#39;, &#39;pct_counts_mt&#39;
+    var: &#39;n_cells&#39;, &#39;mt&#39;, &#39;n_cells_by_counts&#39;, &#39;mean_counts&#39;, &#39;pct_dropout_by_counts&#39;, &#39;total_counts&#39;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#normalization, the max counts of total_counts is 20000 means the amount is 10e4</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">normalize_total</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">target_sum</span><span class="o">=</span><span class="mf">1e4</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/miniforge3/envs/django/lib/python3.8/site-packages/scanpy/preprocessing/_normalization.py:170: UserWarning: Received a view of an AnnData. Making a copy.
+  view_to_actual(adata)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+normalizing counts per cell
+    finished (0:00:00)
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#log</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#select high-variable genes</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">highly_variable_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_mean</span><span class="o">=</span><span class="mf">0.0125</span><span class="p">,</span> <span class="n">max_mean</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_disp</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+extracting highly variable genes
+    finished (0:00:02)
+--&gt; added
+    &#39;highly_variable&#39;, boolean vector (adata.var)
+    &#39;means&#39;, float vector (adata.var)
+    &#39;dispersions&#39;, float vector (adata.var)
+    &#39;dispersions_norm&#39;, float vector (adata.var)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#visualization of high-variable genes</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">highly_variable_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_16_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_16_0.png" style="width: 559px; height: 308px;" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#save and filter</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">adata</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">highly_variable</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#regression：we use the proportion of mito-genes as control to revised the other expression of genes</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">regress_out</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;total_counts&#39;</span><span class="p">,</span> <span class="s1">&#39;pct_counts_mt&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+regressing out [&#39;total_counts&#39;, &#39;pct_counts_mt&#39;]
+    finished (0:00:15)
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#scale</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">max_value</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#pca analysis</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_comps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">svd_solver</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+computing PCA
+Note that scikit-learn&#39;s randomized PCA might not be exactly reproducible across different computational platforms. For exact reproducibility, choose `svd_solver=&#39;arpack&#39;.`
+    on highly variable genes
+    with n_comps=100
+    finished (0:00:03)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#cell neighbors graph construct</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">neighbors</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">random_state</span> <span class="o">=</span> <span class="mi">112</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+computing neighbors
+    using &#39;X_pca&#39; with n_pcs = 50
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/miniforge3/envs/django/lib/python3.8/site-packages/tqdm/auto.py:22: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+    finished: added to `.uns[&#39;neighbors&#39;]`
+    `.obsp[&#39;distances&#39;]`, distances for each pair of neighbors
+    `.obsp[&#39;connectivities&#39;]`, weighted adjacency matrix (0:00:09)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#umap</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">leiden</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># remove `plot=False` if you want to see the coarse-grained graph</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">init_pos</span><span class="o">=</span><span class="s1">&#39;paga&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+running Leiden clustering
+    finished: found 19 clusters and added
+    &#39;leiden&#39;, the cluster labels (adata.obs, categorical) (0:00:01)
+running PAGA
+    finished: added
+    &#39;paga/connectivities&#39;, connectivities adjacency (adata.uns)
+    &#39;paga/connectivities_tree&#39;, connectivities subtree (adata.uns) (0:00:00)
+--&gt; added &#39;pos&#39;, the PAGA positions (adata.uns[&#39;paga&#39;])
+computing UMAP
+    finished: added
+    &#39;X_umap&#39;, UMAP coordinates (adata.obsm) (0:00:06)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;leiden&#39;</span><span class="p">,</span><span class="s1">&#39;Type&#39;</span><span class="p">],</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">palette</span><span class="o">=</span><span class="n">sc_color</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_23_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_23_0.png" style="width: 829px; height: 303px;" />
+</div>
+</div>
+<p>Here, our data pre-processing session is complete, and in the following analysis, we will label the breast cancer cell types</p>
+</section>
+<section id="Part.2-cell-type-annotate">
+<h2>Part.2 cell type annotate<a class="headerlink" href="#Part.2-cell-type-annotate" title="Permalink to this heading"></a></h2>
+<p>By reviewing the literature “A single-cell and spatially resolved atlas of human breast cancers”, we have gained a preliminary understanding of the cell types in breast cancer cells and have distilled the following dictionary：epithelial cells (EPCAM), proliferating cells (MKI67), T cells (CD3D), myeloid cells (CD68), B cells (MS4A1), plasmablasts (JCHAIN), endothelial cells (PECAM1) and mesenchymal cells (fibroblasts/perivascular-like cells; PDGFRB).</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">marker_genes_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;Epitheilial&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;EPCAM&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Proliferating&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;MKI67&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;T-cell&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;CD3D&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Myeloid&#39;</span><span class="p">:[</span><span class="s1">&#39;CD68&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;B-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;MS4A1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;plasmablasts&#39;</span><span class="p">:[</span><span class="s1">&#39;JCHAIN&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Endothelial&#39;</span><span class="p">:[</span><span class="s1">&#39;PECAM1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Mesenchymal&#39;</span><span class="p">:[</span><span class="s1">&#39;PDGFRB&#39;</span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">marker_genes_dict</span><span class="p">,</span> <span class="s1">&#39;leiden&#39;</span><span class="p">,</span> <span class="n">dendrogram</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+WARNING: dendrogram data not found (using key=dendrogram_leiden). Running `sc.tl.dendrogram` with default parameters. For fine tuning it is recommended to run `sc.tl.dendrogram` independently.
+    using &#39;X_pca&#39; with n_pcs = 100
+Storing dendrogram info using `.uns[&#39;dendrogram_leiden&#39;]`
+WARNING: Groups are not reordered because the `groupby` categories and the `var_group_labels` are different.
+categories: 0, 1, 2, etc.
+var_group_labels: Epitheilial, Proliferating, T-cell, etc.
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_27_1.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_27_1.png" style="width: 377px; height: 589px;" />
+</div>
+</div>
+<p>We found that the vast majority of cells in our data showed T cells as well as B cells, and a small number of plasma cells, as well as 18, 11, and 15 were unknown cells, suggesting to us that the marker genes given in this literature may not fully label our cell types, so here, we took an automated labeling approach to pre-annotate the cells</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dat</span><span class="o">=</span><span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">data_preprocess</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+ranking genes
+    finished (0:00:42)
+</pre></div></div>
+</div>
+<p>SCSA is a cell type annotation tool for scRNA-seq data. Currently, most methods employ a manual strategy to annotate cell types after clustering single-cell RNA-seq data. Such methods are labor-intensive and rely heavily on the user’s expertise, which can lead to inconsistent results. We propose SCSA, an automated tool for annotating cell types from single-cell RNA-seq data, based on a score annotation model that combines the confidence levels of differentially expressed genes and cellular
+markers in the database. Evaluation of real scRNA-seq datasets shows that SCSA is able to assign cells to the correct type with desired accuracy in a fully automated mode. <a class="reference external" href="https://www.frontiersin.org/articles/10.3389/fgene.2020.00490/full">https://www.frontiersin.org/articles/10.3389/fgene.2020.00490/full</a></p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">anno</span><span class="o">=</span><span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">cell_annotate</span><span class="p">(</span><span class="n">dat</span><span class="p">,</span><span class="n">foldchange</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span><span class="n">pvalue</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+                                        <span class="n">output</span><span class="o">=</span><span class="s1">&#39;temp/rna_anno.txt&#39;</span><span class="p">,</span><span class="n">outfmt</span><span class="o">=</span><span class="s1">&#39;txt&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+......Loading dataset from temp/whole.db
+......Auto annotate cell
+Version V1.1 [2020/07/03]
+DB load: 47347 3 3 48257 37440
+Namespace(Gensymbol=True, MarkerDB=None, celltype=&#39;normal&#39;, cluster=&#39;all&#39;, db=&#39;temp/whole.db&#39;, fc=&#39;/Users/fernandozeng/Library/Jupyter/runtime/kernel-27f433f3-add7-45cc-bde0-eedb07f187e1.json&#39;, foldchange=1.5, input=&#39;temp/rna.csv&#39;, list_tissue=False, noprint=True, norefdb=False, outfmt=&#39;txt&#39;, output=&#39;temp/rna_anno.txt&#39;, pvalue=0.01, source=&#39;scanpy&#39;, species=&#39;Human&#39;, target=&#39;cellmarker&#39;, tissue=&#39;All&#39;, weight=100.0)
+Version V1.1 [2020/07/03]
+DB load: 47347 3 3 48257 37440
+load markers: 45409
+Cluster 0 Gene number: 4
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1246
+Cluster 1 Gene number: 152
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1185
+Cluster 10 Gene number: 5
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1246
+Cluster 11 Gene number: 488
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1015
+Cluster 12 Gene number: 494
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 909
+Cluster 13 Gene number: 45
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1221
+Cluster 14 Gene number: 12
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1247
+Cluster 15 Gene number: 255
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1137
+Cluster 16 Gene number: 5
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1245
+Cluster 17 Gene number: 210
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1170
+Cluster 18 Gene number: 73
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1219
+Cluster 2 Gene number: 9
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1245
+Cluster 3 Gene number: 45
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1215
+Cluster 4 Gene number: 28
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1234
+Cluster 5 Gene number: 24
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1248
+Cluster 6 Gene number: 42
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1247
+Cluster 7 Gene number: 4
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1245
+!WARNING3:Zero marker sets found, type:marker
+!WARNING3:Change the threshold or tissue name and try again?
+!WARNING3:EnsemblID or GeneID,try &#39;-E&#39; command?
+Cluster 8 Gene number: 3
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+/Users/fernandozeng/Desktop/pyomic/Pyomic/Pyomic/single/_SCSA.py:228: FutureWarning: The frame.append method is deprecated and will be removed from pandas in a future version. Use pandas.concat instead.
+  all_outs = all_outs.append(outs)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Other Gene number: 1248
+!WARNING3:Zero marker sets found, type:marker
+!WARNING3:Change the threshold or tissue name and try again?
+!WARNING3:EnsemblID or GeneID,try &#39;-E&#39; command?
+Cluster 9 Gene number: 2
+Other Gene number: 1248
+#Cluster Type Celltype Score Times
+[&#39;0&#39;, &#39;?&#39;, &#39;Natural killer T (NKT) cell|T cell&#39;, &#39;2.447392444959642|2.2461911469116336&#39;, 1.089574432845863]
+[&#39;1&#39;, &#39;Good&#39;, &#39;B cell&#39;, 10.954903686447913, 8.677250051939577]
+[&#39;10&#39;, &#39;?&#39;, &#39;Meiotic prophase fetal germ cell|Oocyte&#39;, &#39;0.7302967433402214|0.7302967433402214&#39;, 1.0]
+[&#39;11&#39;, &#39;?&#39;, &#39;Macrophage|Monocyte&#39;, &#39;8.369949073369517|7.370814415247126&#39;, 1.1355528170748133]
+[&#39;12&#39;, &#39;?&#39;, &#39;Natural killer T (NKT) cell|Neural progenitor cell&#39;, &#39;8.34407144261642|4.555967568124907&#39;, 1.8314597981325351]
+[&#39;13&#39;, &#39;?&#39;, &#39;Epithelial cell|Stem cell&#39;, &#39;4.37028693226037|3.154595510368045&#39;, 1.385371569158954]
+[&#39;14&#39;, &#39;Good&#39;, &#39;B cell&#39;, 4.984011226848826, 6.443265575810934]
+[&#39;15&#39;, &#39;?&#39;, &#39;Myeloid dendritic cell|Natural killer T (NKT) cell&#39;, &#39;6.910322051184151|3.7755585461125585&#39;, 1.8302780811859611]
+[&#39;16&#39;, &#39;Good&#39;, &#39;Oogenesis phase fetal germ cell&#39;, 3.2270652069044625, 12.357776452304249]
+[&#39;17&#39;, &#39;Good&#39;, &#39;Plasmacytoid dendritic cell&#39;, 9.845745694780025, 3.471435593180278]
+[&#39;18&#39;, &#39;?&#39;, &#39;Mast cell|Mesenchymal stem cell&#39;, &#39;6.89321552056096|4.370950038214283&#39;, 1.5770520047804364]
+[&#39;2&#39;, &#39;?&#39;, &#39;Natural killer cell|T helper17 (Th17) cell&#39;, &#39;4.665951578149348|3.2675084877974796&#39;, 1.4279845318150994]
+[&#39;3&#39;, &#39;?&#39;, &#39;Natural killer cell|T cell&#39;, &#39;4.271491275129722|3.808532363699675&#39;, 1.1215583503615867]
+[&#39;4&#39;, &#39;Good&#39;, &#39;Regulatory T (Treg) cell&#39;, 6.791807050096626, 10.29594628279838]
+[&#39;5&#39;, &#39;Good&#39;, &#39;B cell&#39;, 7.692165224114249, 7.349980191686429]
+[&#39;6&#39;, &#39;Good&#39;, &#39;B cell&#39;, 8.11325164326611, 7.20754805244557]
+[&#39;7&#39;, &#39;Good&#39;, &#39;Meiotic prophase fetal germ cell&#39;, 1.4242345298173182, 5.632591837080429]
+[&#39;8&#39;, &#39;N&#39;, &#39;-&#39;, &#39;-&#39;, &#39;-&#39;]
+[&#39;9&#39;, &#39;N&#39;, &#39;-&#39;, &#39;-&#39;, &#39;-&#39;]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#print</span>
+<span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">cell_anno_print</span><span class="p">(</span><span class="n">anno</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cluster:0       Cell_type:Natural killer T (NKT) cell|T cell    Z-score:2.447|2.246
+Nice:Cluster:1  Cell_type:B cell        Z-score:10.955
+Cluster:2       Cell_type:Natural killer cell|T helper17 (Th17) cell    Z-score:4.666|3.268
+Cluster:3       Cell_type:Natural killer cell|T cell    Z-score:4.271|3.809
+Nice:Cluster:4  Cell_type:Regulatory T (Treg) cell      Z-score:6.792
+Nice:Cluster:5  Cell_type:B cell        Z-score:7.692
+Nice:Cluster:6  Cell_type:B cell        Z-score:8.113
+Nice:Cluster:7  Cell_type:Meiotic prophase fetal germ cell      Z-score:1.424
+Cluster:10      Cell_type:Meiotic prophase fetal germ cell|Oocyte       Z-score:0.73|0.73
+Cluster:11      Cell_type:Macrophage|Monocyte   Z-score:8.37|7.371
+Cluster:12      Cell_type:Natural killer T (NKT) cell|Neural progenitor cell    Z-score:8.344|4.556
+Cluster:13      Cell_type:Epithelial cell|Stem cell     Z-score:4.37|3.155
+Nice:Cluster:14 Cell_type:B cell        Z-score:4.984
+Cluster:15      Cell_type:Myeloid dendritic cell|Natural killer T (NKT) cell    Z-score:6.91|3.776
+Nice:Cluster:16 Cell_type:Oogenesis phase fetal germ cell       Z-score:3.227
+Nice:Cluster:17 Cell_type:Plasmacytoid dendritic cell   Z-score:9.846
+Cluster:18      Cell_type:Mast cell|Mesenchymal stem cell       Z-score:6.893|4.371
+</pre></div></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Nice</span></code> means that usually the first cell type is the annotation success</p>
+<p>Now that the results have annotated the cell types with leiden of 1, 14, 17, 4, 5, 6, 7, then the “?” type, how should we determine it? Here, we choose COSG algorithm to extract the marker gene of each leiden</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">cosg</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">key_added</span><span class="o">=</span><span class="s1">&#39;cosg&#39;</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;leiden&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+**finished identifying marker genes by COSG**
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#cosg</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">rank_genes_groups_dotplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;leiden&#39;</span><span class="p">,</span>
+                                <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Spectral_r&#39;</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">&#39;cosg&#39;</span><span class="p">,</span>
+                                <span class="n">standard_scale</span><span class="o">=</span><span class="s1">&#39;var&#39;</span><span class="p">,</span><span class="n">n_genes</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_35_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_35_0.png" style="width: 1506px; height: 604px;" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[28]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># create a dictionary to map cluster to annotation label</span>
+<span class="n">cluster2annotation</span> <span class="o">=</span> <span class="p">{</span>
+     <span class="s1">&#39;0&#39;</span><span class="p">:</span> <span class="s1">&#39;Germ-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;1&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;2&#39;</span><span class="p">:</span> <span class="s1">&#39;T-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;3&#39;</span><span class="p">:</span> <span class="s1">&#39;NK-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;4&#39;</span><span class="p">:</span> <span class="s1">&#39;T-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;5&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;6&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;7&#39;</span><span class="p">:</span> <span class="s1">&#39;Germ-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;8&#39;</span><span class="p">:</span> <span class="s1">&#39;Germ-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;9&#39;</span><span class="p">:</span> <span class="s1">&#39;Beta-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;10&#39;</span><span class="p">:</span> <span class="s1">&#39;Germ-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;11&#39;</span><span class="p">:</span> <span class="s1">&#39;Dendritic&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;12&#39;</span><span class="p">:</span> <span class="s1">&#39;T-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;13&#39;</span><span class="p">:</span> <span class="s1">&#39;Acinar-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;14&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;15&#39;</span><span class="p">:</span> <span class="s1">&#39;Dendritic&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;16&#39;</span><span class="p">:</span> <span class="s1">&#39;Germ-cell(Oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;17&#39;</span><span class="p">:</span> <span class="s1">&#39;Dendritic&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;18&#39;</span><span class="p">:</span> <span class="s1">&#39;Mast-cell&#39;</span><span class="p">,</span>
+
+<span class="p">}</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;major_celltype&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;leiden&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">cluster2annotation</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;major_celltype&#39;</span><span class="p">,</span><span class="s1">&#39;leiden&#39;</span><span class="p">],</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">palette</span><span class="o">=</span><span class="n">sc_color</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_37_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_37_0.png" style="width: 871px; height: 303px;" />
+</div>
+</div>
+</section>
+<section id="Part.3-Cell-sub-type-annotate">
+<h2>Part.3 Cell sub-type annotate<a class="headerlink" href="#Part.3-Cell-sub-type-annotate" title="Permalink to this heading"></a></h2>
+<p>In the previous step, we annotated the main cell types, but we noticed that each cell type is composed of different subtypes, and we need to further identify the cell subtypes, so we need to subdivide each cell type into categories according to the previous way</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># create a dictionary to map cluster to annotation label</span>
+<span class="n">clusterannotation</span> <span class="o">=</span> <span class="p">{</span>
+     <span class="s1">&#39;0&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-NK-Germ-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;1&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;2&#39;</span><span class="p">:</span> <span class="s1">&#39;Gamma-delta-T-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;3&#39;</span><span class="p">:</span> <span class="s1">&#39;NK-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;4&#39;</span><span class="p">:</span> <span class="s1">&#39;Treg-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;5&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;6&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;7&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-Meiotic-prophase-fetal-Germ-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;8&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-Meiotic-prophase-fetal-Germ-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;9&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-Beta-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;10&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-Meiotic-prophase-fetal-Germ-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;11&#39;</span><span class="p">:</span> <span class="s1">&#39;Dendritic-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;12&#39;</span><span class="p">:</span> <span class="s1">&#39;NKT-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;13&#39;</span><span class="p">:</span> <span class="s1">&#39;Acinar-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;14&#39;</span><span class="p">:</span> <span class="s1">&#39;B-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;15&#39;</span><span class="p">:</span> <span class="s1">&#39;Myeloid-dendritic-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;16&#39;</span><span class="p">:</span> <span class="s1">&#39;BRCA-Oogenesis-phase-fetal-Germ-cell(oid)&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;17&#39;</span><span class="p">:</span> <span class="s1">&#39;Plasmacytoid-dendritic-cell&#39;</span><span class="p">,</span>
+     <span class="s1">&#39;18&#39;</span><span class="p">:</span> <span class="s1">&#39;Mast-cell&#39;</span><span class="p">,</span>
+
+<span class="p">}</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;minor_celltype&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;leiden&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">clusterannotation</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[31]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;minor_celltype&#39;</span><span class="p">],</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">palette</span><span class="o">=</span><span class="n">sc_color</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_40_0.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_40_0.png" style="width: 603px; height: 303px;" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[32]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">marker_genes_dict1</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;Acinar-cell&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;AZGP1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;B-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;MS4A1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Beta-cell(oid)&#39;</span><span class="p">:[</span><span class="s1">&#39;AC245297.3&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Meiotic-prophase-fetal-Germ-cell(oid)&#39;</span><span class="p">:[</span><span class="s1">&#39;STAG3L3&#39;</span><span class="p">,</span><span class="s1">&#39;SPATA22&#39;</span><span class="p">,</span><span class="s1">&#39;NUFIP1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;NK-Germ-cell(oid)&#39;</span><span class="p">:[</span><span class="s1">&#39;RNU4-2&#39;</span><span class="p">,</span><span class="s1">&#39;AC005842.1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Oogenesis-phase-fetal-Germ-cell(oid)&#39;</span><span class="p">:[</span><span class="s1">&#39;POMZP3&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Dendritic-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;LYZ&#39;</span><span class="p">,</span><span class="s1">&#39;IL1B&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Gamma-delta-T-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;KLRB1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Mast-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;MS4A2&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Myeloid-dendritic-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;LAMP3&#39;</span><span class="p">,</span><span class="s1">&#39;GADD45A&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;NK-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;CCL5&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;NKT-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;MKI67&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Plasmacytoid-dendritic-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;GZMB&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Treg-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;CTLA4&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Epitheilial&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;EPCAM&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Proliferating&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;MKI67&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;T-cell&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;CD3D&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Myeloid&#39;</span><span class="p">:[</span><span class="s1">&#39;CD68&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;B-cell&#39;</span><span class="p">:[</span><span class="s1">&#39;MS4A1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;plasmablasts&#39;</span><span class="p">:[</span><span class="s1">&#39;JCHAIN&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Endothelial&#39;</span><span class="p">:[</span><span class="s1">&#39;PECAM1&#39;</span><span class="p">],</span>
+    <span class="s1">&#39;Mesenchymal&#39;</span><span class="p">:[</span><span class="s1">&#39;PDGFRB&#39;</span><span class="p">]</span>
+
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[33]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">marker_genes_dict1</span><span class="p">,</span> <span class="s1">&#39;leiden&#39;</span><span class="p">,</span> <span class="n">dendrogram</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+WARNING: Groups are not reordered because the `groupby` categories and the `var_group_labels` are different.
+categories: 0, 1, 2, etc.
+var_group_labels: Acinar-cell, B-cell, Beta-cell(oid), etc.
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_cellanno_42_1.png" class="no-scaled-link" src="../_images/Tutorials_t_cellanno_42_1.png" style="width: 788px; height: 771px;" />
+</div>
+</div>
+<p>The tutorial on cell type annotation is roughly over here, but it is quite complicated, so you can experience it yourselves. In addition to the computer side of the package, we also need to analyze and study why there are unexpected cells, and what is the biological significance of these cells, like here, we found a series of <strong>class cells</strong>, these cells have marker gene characteristics very similar to germ cells, but because they exist in the breast, so they are destined to be somatic cells, so
+these cells, we call them ** Rare cells**, further study of rare cells can reveal why breast cancer metastasizes, and so on and so forth can be further analyzed, in addition, how to ensure the aesthetics of the figure is also a problem that you need to further consider</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="t_wgcna.html" class="btn btn-neutral float-left" title="Bulk tutorial: WGCNA (Weighted gene co-expression network analysis) analysis" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../API_documentation.html" class="btn btn-neutral float-right" title="API documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, starlitnightly.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

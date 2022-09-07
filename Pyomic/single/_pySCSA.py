@@ -124,3 +124,39 @@ def cell_anno_print(anno):
         else:
             print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
                                                         ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+
+def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=2000,pct_counts_mt=10,
+                target_sum=1e4,min_mean=0.0125, max_mean=3, min_disp=0.5,max_value=10,
+                n_comps=100, svd_solver="auto",n_neighbors=15, random_state = 112, n_pcs=50,
+                ):
+    #filter cells and genes
+    sc.pp.filter_cells(adata, min_genes=min_genes)
+    sc.pp.filter_genes(adata, min_cells=min_cells)
+    #calculate the proportion of mito-genes
+    adata.var['mt'] = adata.var_names.str.startswith('MT-')  # annotate the group of mitochondrial genes as 'mt'
+    sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
+    adata = adata[adata.obs.n_genes_by_counts < n_genes_by_counts, :]
+    adata = adata[adata.obs.pct_counts_mt < pct_counts_mt, :]
+    #normalization, the max counts of total_counts is 20000 means the amount is 10e4
+    sc.pp.normalize_total(adata, target_sum=target_sum)
+    #log
+    sc.pp.log1p(adata)
+    #select high-variable genes
+    sc.pp.highly_variable_genes(adata, min_mean=min_mean, max_mean=max_mean, min_disp=min_disp)
+    #save and filter
+    adata.raw = adata
+    adata = adata[:, adata.var.highly_variable]
+    #regression：we use the proportion of mito-genes as control to revised the other expression of genes
+    sc.pp.regress_out(adata, ['total_counts', 'pct_counts_mt'])
+    #scale
+    sc.pp.scale(adata, max_value=max_value)
+    #pca analysis
+    sc.tl.pca(adata, n_comps=n_comps, svd_solver=svd_solver)
+    #cell neighbors graph construct
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, random_state = random_state, n_pcs=n_pcs)
+    #umap
+    sc.tl.leiden(adata)
+    sc.tl.paga(adata)
+    sc.pl.paga(adata, plot=False)  # remove `plot=False` if you want to see the coarse-grained graph
+    sc.tl.umap(adata, init_pos='paga')
+    return adata
