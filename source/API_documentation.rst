@@ -41,6 +41,7 @@ single (A omic framework for single cell omic analysis)
    Pyomic.single.data_preprocess
    Pyomic.single.cell_annotate
    Pyomic.single.cell_anno_print
+   Pyomic.single.scnocd
 
 
 
