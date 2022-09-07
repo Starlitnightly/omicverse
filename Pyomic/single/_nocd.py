@@ -1,4 +1,3 @@
-from .. import nocd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,6 +12,7 @@ except ImportError:
         'Please install the pytorch: `conda install -c conda-forge pytorch` or `pip install pytorch`.'
     )
 
+from .. import nocd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
