@@ -42,6 +42,10 @@ single (A omic framework for single cell omic analysis)
    Pyomic.single.cell_annotate
    Pyomic.single.cell_anno_print
    Pyomic.single.scnocd
+   Pyomic.single.mofa
+   Pyomic.single.factor_exact
+   Pyomic.single.factor_correlation
+   Pyomic.single.get_weights
 
 
 
