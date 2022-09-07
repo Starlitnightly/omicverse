@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Single Tutorial: Overlapping cell_type Detection with Graph Neural Networks &mdash; Pyomic 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/clipboard.min.js"></script>
+        <script src="../_static/copybutton.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> Pyomic
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">Installation guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Tutorials.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../API_documentation.html">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Example_dataset.html">Example dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Pyomic</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Single Tutorial: Overlapping cell_type Detection with Graph Neural Networks</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/Tutorials/t_nocd.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  
+<style>
+/* CSS for nbsphinx extension */
+
+/* remove conflicting styling from Sphinx themes */
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
+}
+
+/* avoid gaps between output lines */
+div.nboutput.container div[class*=highlight] pre {
+    line-height: normal;
+}
+
+/* input/output containers */
+div.nbinput.container,
+div.nboutput.container {
+    display: -webkit-flex;
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    width: 100%;
+}
+@media (max-width: 540px) {
+    div.nbinput.container,
+    div.nboutput.container {
+        flex-direction: column;
+    }
+}
+
+/* input container */
+div.nbinput.container {
+    padding-top: 5px;
+}
+
+/* last container */
+div.nblast.container {
+    padding-bottom: 5px;
+}
+
+/* input prompt */
+div.nbinput.container div.prompt pre {
+    color: #307FC1;
+}
+
+/* output prompt */
+div.nboutput.container div.prompt pre {
+    color: #BF5B3D;
+}
+
+/* all prompts */
+div.nbinput.container div.prompt,
+div.nboutput.container div.prompt {
+    width: 4.5ex;
+    padding-top: 5px;
+    position: relative;
+    user-select: none;
+}
+
+div.nbinput.container div.prompt > div,
+div.nboutput.container div.prompt > div {
+    position: absolute;
+    right: 0;
+    margin-right: 0.3ex;
+}
+
+@media (max-width: 540px) {
+    div.nbinput.container div.prompt,
+    div.nboutput.container div.prompt {
+        width: unset;
+        text-align: left;
+        padding: 0.4em;
+    }
+    div.nboutput.container div.prompt.empty {
+        padding: 0;
+    }
+
+    div.nbinput.container div.prompt > div,
+    div.nboutput.container div.prompt > div {
+        position: unset;
+    }
+}
+
+/* disable scrollbars on prompts */
+div.nbinput.container div.prompt pre,
+div.nboutput.container div.prompt pre {
+    overflow: hidden;
+}
+
+/* input/output area */
+div.nbinput.container div.input_area,
+div.nboutput.container div.output_area {
+    -webkit-flex: 1;
+    flex: 1;
+    overflow: auto;
+}
+@media (max-width: 540px) {
+    div.nbinput.container div.input_area,
+    div.nboutput.container div.output_area {
+        width: 100%;
+    }
+}
+
+/* input area */
+div.nbinput.container div.input_area {
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    /*background: #f5f5f5;*/
+}
+
+/* override MathJax center alignment in output cells */
+div.nboutput.container div[class*=MathJax] {
+    text-align: left !important;
+}
+
+/* override sphinx.ext.imgmath center alignment in output cells */
+div.nboutput.container div.math p {
+    text-align: left;
+}
+
+/* standard error */
+div.nboutput.container div.output_area.stderr {
+    background: #fdd;
+}
+
+/* ANSI colors */
+.ansi-black-fg { color: #3E424D; }
+.ansi-black-bg { background-color: #3E424D; }
+.ansi-black-intense-fg { color: #282C36; }
+.ansi-black-intense-bg { background-color: #282C36; }
+.ansi-red-fg { color: #E75C58; }
+.ansi-red-bg { background-color: #E75C58; }
+.ansi-red-intense-fg { color: #B22B31; }
+.ansi-red-intense-bg { background-color: #B22B31; }
+.ansi-green-fg { color: #00A250; }
+.ansi-green-bg { background-color: #00A250; }
+.ansi-green-intense-fg { color: #007427; }
+.ansi-green-intense-bg { background-color: #007427; }
+.ansi-yellow-fg { color: #DDB62B; }
+.ansi-yellow-bg { background-color: #DDB62B; }
+.ansi-yellow-intense-fg { color: #B27D12; }
+.ansi-yellow-intense-bg { background-color: #B27D12; }
+.ansi-blue-fg { color: #208FFB; }
+.ansi-blue-bg { background-color: #208FFB; }
+.ansi-blue-intense-fg { color: #0065CA; }
+.ansi-blue-intense-bg { background-color: #0065CA; }
+.ansi-magenta-fg { color: #D160C4; }
+.ansi-magenta-bg { background-color: #D160C4; }
+.ansi-magenta-intense-fg { color: #A03196; }
+.ansi-magenta-intense-bg { background-color: #A03196; }
+.ansi-cyan-fg { color: #60C6C8; }
+.ansi-cyan-bg { background-color: #60C6C8; }
+.ansi-cyan-intense-fg { color: #258F8F; }
+.ansi-cyan-intense-bg { background-color: #258F8F; }
+.ansi-white-fg { color: #C5C1B4; }
+.ansi-white-bg { background-color: #C5C1B4; }
+.ansi-white-intense-fg { color: #A1A6B2; }
+.ansi-white-intense-bg { background-color: #A1A6B2; }
+
+.ansi-default-inverse-fg { color: #FFFFFF; }
+.ansi-default-inverse-bg { background-color: #000000; }
+
+.ansi-bold { font-weight: bold; }
+.ansi-underline { text-decoration: underline; }
+
+
+div.nbinput.container div.input_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight].math,
+div.nboutput.container div.output_area.rendered_html,
+div.nboutput.container div.output_area > div.output_javascript,
+div.nboutput.container div.output_area:not(.rendered_html) > img{
+    padding: 5px;
+    margin: 0;
+}
+
+/* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
+div.nbinput.container div.input_area > div[class^='highlight'],
+div.nboutput.container div.output_area > div[class^='highlight']{
+    overflow-y: hidden;
+}
+
+/* hide copybtn icon on prompts (needed for 'sphinx_copybutton') */
+.prompt .copybtn {
+    display: none;
+}
+
+/* Some additional styling taken form the Jupyter notebook CSS */
+.jp-RenderedHTMLCommon table,
+div.rendered_html table {
+  border: none;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: black;
+  font-size: 12px;
+  table-layout: fixed;
+}
+.jp-RenderedHTMLCommon thead,
+div.rendered_html thead {
+  border-bottom: 1px solid black;
+  vertical-align: bottom;
+}
+.jp-RenderedHTMLCommon tr,
+.jp-RenderedHTMLCommon th,
+.jp-RenderedHTMLCommon td,
+div.rendered_html tr,
+div.rendered_html th,
+div.rendered_html td {
+  text-align: right;
+  vertical-align: middle;
+  padding: 0.5em 0.5em;
+  line-height: normal;
+  white-space: normal;
+  max-width: none;
+  border: none;
+}
+.jp-RenderedHTMLCommon th,
+div.rendered_html th {
+  font-weight: bold;
+}
+.jp-RenderedHTMLCommon tbody tr:nth-child(odd),
+div.rendered_html tbody tr:nth-child(odd) {
+  background: #f5f5f5;
+}
+.jp-RenderedHTMLCommon tbody tr:hover,
+div.rendered_html tbody tr:hover {
+  background: rgba(66, 165, 245, 0.2);
+}
+
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
+<section id="Single-Tutorial:-Overlapping-cell_type-Detection-with-Graph-Neural-Networks">
+<h1>Single Tutorial: Overlapping cell_type Detection with Graph Neural Networks<a class="headerlink" href="#Single-Tutorial:-Overlapping-cell_type-Detection-with-Graph-Neural-Networks" title="Permalink to this heading"></a></h1>
+<p>Droplet based single cell transcriptomics has recently enabled parallel screening of tens of thousands of single cells. Clustering methods that scale for such high dimensional data without compromising accuracy are scarce.</p>
+<p>This tutorial focuses on how to cluster the cell with overlapping and identify the cell with multi-fate</p>
+<section id="Part.1-Data-preprocess">
+<h2>Part.1 Data preprocess<a class="headerlink" href="#Part.1-Data-preprocess" title="Permalink to this heading"></a></h2>
+<p>In this part, we perform preliminary processing of the data, such as normalization and logarithmization, in order to make the data more interpretable</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">Pyomic</span>
+<span class="kn">import</span> <span class="nn">anndata</span>
+<span class="kn">import</span> <span class="nn">scanpy</span> <span class="k">as</span> <span class="nn">sc</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="o">%</span><span class="k">matplotlib</span> inline
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/miniforge3/envs/django/lib/python3.8/site-packages/tqdm/auto.py:22: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#param for visualization</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">verbosity</span> <span class="o">=</span> <span class="mi">3</span>             <span class="c1"># verbosity: errors (0), warnings (1), info (2), hints (3)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">set_figure_params</span><span class="p">(</span><span class="n">dpi</span><span class="o">=</span><span class="mi">80</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">LinearSegmentedColormap</span>
+<span class="n">sc_color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;#7CBB5F&#39;</span><span class="p">,</span><span class="s1">&#39;#368650&#39;</span><span class="p">,</span><span class="s1">&#39;#A499CC&#39;</span><span class="p">,</span><span class="s1">&#39;#5E4D9A&#39;</span><span class="p">,</span><span class="s1">&#39;#78C2ED&#39;</span><span class="p">,</span><span class="s1">&#39;#866017&#39;</span><span class="p">,</span> <span class="s1">&#39;#9F987F&#39;</span><span class="p">,</span><span class="s1">&#39;#E0DFED&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;#EF7B77&#39;</span><span class="p">,</span> <span class="s1">&#39;#279AD7&#39;</span><span class="p">,</span><span class="s1">&#39;#F0EEF0&#39;</span><span class="p">,</span> <span class="s1">&#39;#1F577B&#39;</span><span class="p">,</span> <span class="s1">&#39;#A56BA7&#39;</span><span class="p">,</span> <span class="s1">&#39;#E0A7C8&#39;</span><span class="p">,</span> <span class="s1">&#39;#E069A6&#39;</span><span class="p">,</span> <span class="s1">&#39;#941456&#39;</span><span class="p">,</span> <span class="s1">&#39;#FCBC10&#39;</span><span class="p">,</span>
+ <span class="s1">&#39;#EAEFC5&#39;</span><span class="p">,</span> <span class="s1">&#39;#01A0A7&#39;</span><span class="p">,</span> <span class="s1">&#39;#75C8CC&#39;</span><span class="p">,</span> <span class="s1">&#39;#F0D7BC&#39;</span><span class="p">,</span> <span class="s1">&#39;#D5B26C&#39;</span><span class="p">,</span> <span class="s1">&#39;#D5DA48&#39;</span><span class="p">,</span> <span class="s1">&#39;#B6B812&#39;</span><span class="p">,</span> <span class="s1">&#39;#9DC3C3&#39;</span><span class="p">,</span> <span class="s1">&#39;#A89C92&#39;</span><span class="p">,</span> <span class="s1">&#39;#FEE00C&#39;</span><span class="p">,</span> <span class="s1">&#39;#FEF2A1&#39;</span><span class="p">]</span>
+<span class="n">sc_color_cmap</span> <span class="o">=</span> <span class="n">LinearSegmentedColormap</span><span class="o">.</span><span class="n">from_list</span><span class="p">(</span><span class="s1">&#39;Custom&#39;</span><span class="p">,</span> <span class="n">sc_color</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sc_color</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span> <span class="o">=</span> <span class="n">anndata</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s1">&#39;sample/rna.h5ad&#39;</span><span class="p">)</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 22679 × 25596
+    obs: &#39;Type&#39;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">=</span><span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">scanpy_lazy</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+filtered out 1234 cells that have less than 200 genes expressed
+filtered out 4074 genes that are detected in less than 3 cells
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/fernandozeng/miniforge3/envs/django/lib/python3.8/site-packages/scanpy/preprocessing/_normalization.py:170: UserWarning: Received a view of an AnnData. Making a copy.
+  view_to_actual(adata)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+normalizing counts per cell
+    finished (0:00:00)
+extracting highly variable genes
+    finished (0:00:02)
+--&gt; added
+    &#39;highly_variable&#39;, boolean vector (adata.var)
+    &#39;means&#39;, float vector (adata.var)
+    &#39;dispersions&#39;, float vector (adata.var)
+    &#39;dispersions_norm&#39;, float vector (adata.var)
+regressing out [&#39;total_counts&#39;, &#39;pct_counts_mt&#39;]
+    finished (0:00:14)
+computing PCA
+Note that scikit-learn&#39;s randomized PCA might not be exactly reproducible across different computational platforms. For exact reproducibility, choose `svd_solver=&#39;arpack&#39;.`
+    on highly variable genes
+    with n_comps=100
+    finished (0:00:05)
+computing neighbors
+    using &#39;X_pca&#39; with n_pcs = 50
+    finished: added to `.uns[&#39;neighbors&#39;]`
+    `.obsp[&#39;distances&#39;]`, distances for each pair of neighbors
+    `.obsp[&#39;connectivities&#39;]`, weighted adjacency matrix (0:00:10)
+running Leiden clustering
+    finished: found 19 clusters and added
+    &#39;leiden&#39;, the cluster labels (adata.obs, categorical) (0:00:01)
+running PAGA
+    finished: added
+    &#39;paga/connectivities&#39;, connectivities adjacency (adata.uns)
+    &#39;paga/connectivities_tree&#39;, connectivities subtree (adata.uns) (0:00:00)
+--&gt; added &#39;pos&#39;, the PAGA positions (adata.uns[&#39;paga&#39;])
+computing UMAP
+    finished: added
+    &#39;X_umap&#39;, UMAP coordinates (adata.obsm) (0:00:07)
+</pre></div></div>
+</div>
+</section>
+<section id="Part.2-Overlapping-Community-Detection">
+<h2>Part.2 Overlapping Community Detection<a class="headerlink" href="#Part.2-Overlapping-Community-Detection" title="Permalink to this heading"></a></h2>
+<p>In this part, we perform a graph neural network (GNN) basedmodel for overlapping community detection in scRNA-seq.</p>
+<img alt="https://www.cs.cit.tum.de/fileadmin/w00cfj/daml/nocd/nocd.png" src="https://www.cs.cit.tum.de/fileadmin/w00cfj/daml/nocd/nocd.png" />
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">scbrca</span><span class="o">=</span><span class="n">Pyomic</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">scnocd</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">matrix_transform</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">matrix_normalize</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">GNN_configure</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">GNN_preprocess</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">GNN_model</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">GNN_result</span><span class="p">()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">GNN_plot</span><span class="p">()</span>
+<span class="c1">#scpbmc.calculate_nocd()</span>
+<span class="n">scbrca</span><span class="o">.</span><span class="n">cal_nocd</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Epoch    0, loss.full = 0.7881, nmi = 0.01
+Epoch   25, loss.full = 0.3860, nmi = 0.11
+Epoch   50, loss.full = 0.3193, nmi = 0.23
+Epoch   75, loss.full = 0.2935, nmi = 0.25
+Epoch  100, loss.full = 0.2822, nmi = 0.25
+Epoch  125, loss.full = 0.2747, nmi = 0.25
+Epoch  150, loss.full = 0.2723, nmi = 0.25
+Epoch  175, loss.full = 0.2716, nmi = 0.25
+Epoch  200, loss.full = 0.2701, nmi = 0.25
+Epoch  225, loss.full = 0.2693, nmi = 0.26
+Epoch  250, loss.full = 0.2689, nmi = 0.25
+Epoch  275, loss.full = 0.2700, nmi = 0.25
+Epoch  300, loss.full = 0.2690, nmi = 0.26
+Epoch  325, loss.full = 0.2688, nmi = 0.25
+Epoch  350, loss.full = 0.2680, nmi = 0.25
+Epoch  375, loss.full = 0.2680, nmi = 0.25
+Epoch  400, loss.full = 0.2671, nmi = 0.25
+Epoch  425, loss.full = 0.2669, nmi = 0.25
+Epoch  450, loss.full = 0.2669, nmi = 0.25
+Epoch  475, loss.full = 0.2685, nmi = 0.25
+Epoch  500, loss.full = 0.2667, nmi = 0.25
+Final nmi = 0.252
+......add nocd result to adata.obs
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_nocd_8_1.png" class="no-scaled-link" src="../_images/Tutorials_t_nocd_8_1.png" style="width: 674px; height: 668px;" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">scpbmc</span><span class="o">.</span><span class="n">calculate_nocd</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+......add nocd result to adata.obs
+</pre></div></div>
+</div>
+</section>
+<section id="Part.3-Visualization">
+<h2>Part.3 Visualization<a class="headerlink" href="#Part.3-Visualization" title="Permalink to this heading"></a></h2>
+<p>In this part, we visualized the overlapping and non-overlapping cell.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">scbrca</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;leiden&#39;</span><span class="p">,</span><span class="s1">&#39;nocd&#39;</span><span class="p">],</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span><span class="n">palette</span><span class="o">=</span><span class="n">sc_color</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_nocd_11_0.png" class="no-scaled-link" src="../_images/Tutorials_t_nocd_11_0.png" style="width: 756px; height: 299px;" />
+</div>
+</div>
+<p>zero means the cell related to overlap</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">scbrca</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;leiden&#39;</span><span class="p">,</span><span class="s1">&#39;nocd_n&#39;</span><span class="p">],</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span><span class="n">palette</span><span class="o">=</span><span class="n">sc_color</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+WARNING: Length of palette colors is smaller than the number of categories (palette length: 28, categories length: 575. Some categories will have the same color.
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/Tutorials_t_nocd_13_1.png" class="no-scaled-link" src="../_images/Tutorials_t_nocd_13_1.png" style="width: 1187px; height: 3893px;" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, starlitnightly.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
