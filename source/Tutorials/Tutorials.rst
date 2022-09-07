@@ -8,5 +8,6 @@ Tutorial
    t_wgcna
    t_cellanno
    t_nocd
+   t_mofa
 
 
