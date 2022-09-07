@@ -7,5 +7,6 @@ Tutorial
    t_network
    t_wgcna
    t_cellanno
+   t_nocd
 
 
