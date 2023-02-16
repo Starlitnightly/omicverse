@@ -1,11 +1,12 @@
 Metadata-Version: 2.1
 Name: Pyomic
-Version: 1.1.4
+Version: 1.1.6
 Summary: A python framework library for omics analysis
 Home-page: https://github.com/Starlitnightly/Pyomic
 Author: ZehuaZeng
 Author-email: Starlitnightly@163.com
 License: GNU License
+Platform: UNKNOWN
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -48,4 +49,6 @@ Langfelder P, Zhang B, Horvath S (2007) Defining clusters from a hierarchical cl
 ## Contact
 
 - Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com))
+
+
 
