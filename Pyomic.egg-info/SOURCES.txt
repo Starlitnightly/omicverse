@@ -1,4 +1,5 @@
 .DS_Store
+.gitignore
 .readthedocs.yaml
 LICENSE
 Makefile
@@ -6,7 +7,6 @@ README.md
 make.bat
 requirements.txt
 setup.py
-.ipynb_checkpoints/Untitled-checkpoint.ipynb
 .ipynb_checkpoints/t_mofa-checkpoint.ipynb
 .ipynb_checkpoints/t_nocd-checkpoint.ipynb
 Pyomic/.DS_Store
@@ -21,6 +21,7 @@ Pyomic/.ipynb_checkpoints/__init__-checkpoint.py
 Pyomic/__pycache__/__init__.cpython-38.pyc
 Pyomic/bulk/.DS_Store
 Pyomic/bulk/_DeGene.py
+Pyomic/bulk/_Deseq2.py
 Pyomic/bulk/_Enrichment.py
 Pyomic/bulk/_Gene_module.py
 Pyomic/bulk/__init__.py
@@ -28,10 +29,13 @@ Pyomic/bulk/_chm13.py
 Pyomic/bulk/_df_apply.py
 Pyomic/bulk/_dynamicTree.py
 Pyomic/bulk/_network.py
+Pyomic/bulk/_tcga.py
 Pyomic/bulk/__pycache__/_DeGene.cpython-38.pyc
+Pyomic/bulk/__pycache__/_Deseq2.cpython-38.pyc
 Pyomic/bulk/__pycache__/_Enrichment.cpython-38.pyc
 Pyomic/bulk/__pycache__/_Gene_module.cpython-38.pyc
 Pyomic/bulk/__pycache__/__init__.cpython-38.pyc
+Pyomic/bulk/__pycache__/_chm13.cpython-38.pyc
 Pyomic/bulk/__pycache__/_df_apply.cpython-38.pyc
 Pyomic/bulk/__pycache__/_dynamicTree.cpython-38.pyc
 Pyomic/bulk/__pycache__/_network.cpython-38.pyc
@@ -175,6 +179,8 @@ Pyomic/single/_cosg.py
 Pyomic/single/_mofa.py
 Pyomic/single/_nocd.py
 Pyomic/single/_pySCSA.py
+Pyomic/single/_scdrug.py
+Pyomic/single/_scgsea.py
 Pyomic/single/whole.db
 Pyomic/single/__pycache__/_SCSA.cpython-38.pyc
 Pyomic/single/__pycache__/__init__.cpython-38.pyc
@@ -182,9 +188,12 @@ Pyomic/single/__pycache__/_cosg.cpython-38.pyc
 Pyomic/single/__pycache__/_mofa.cpython-38.pyc
 Pyomic/single/__pycache__/_nocd.cpython-38.pyc
 Pyomic/single/__pycache__/_pySCSA.cpython-38.pyc
+Pyomic/utils/__init__.py
+Pyomic/utils/_data.py
 dist/.DS_Store
 dist/Pyomic-1.1.4-py3-none-any.whl
-dist/Pyomic-1.1.4.tar.gz
+dist/Pyomic-1.1.5-py3-none-any.whl
+dist/Pyomic-1.1.6-py3-none-any.whl
 sample/.DS_Store
 sample/DEG_result.csv
 sample/DER_fire.png
@@ -297,3 +306,5 @@ source/api/Pyomic.single.cosg.rst
 source/api/Pyomic.single.data_preprocess.rst
 source/api/Pyomic.single.rst
 source/api/Pyomic.single.scnocd.rst
+tutorial/tutorial_1.ipynb
+tutorial/tutorial_2.ipynb
