@@ -10,4 +10,5 @@ from ._Enrichment import enrichment_KEGG,enrichment_GO,enrichment_GSEA,Plot_GSEA
 from ._DeGene import find_DEG,ID_mapping,Drop_dupligene
 from ._network import string_interaction,string_map,generate_G
 from ._chm13 import get_chm13_gene,find_chm13_gene
-from ._Deseq2 import pyDEseq
+from ._Deseq2 import pyDEseq,deseq2_normalize
+from ._tcga import TCGA
