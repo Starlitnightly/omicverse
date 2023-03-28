@@ -16,6 +16,7 @@ class TCGA(object):
         exist_files=[i for i in os.listdir(gdc_download_files) if 'txt' not in i]
         
         self.sample_sheet=pd.read_csv(self.gdc_sample_sheep,sep='\t',index_col=0)
+        exist_files=list(set(exist_files) & set(self.sample_sheet.index))
         self.sample_sheet=self.sample_sheet.loc[exist_files]
         self.clinical_sheet=pd.read_csv('{}/clinical.tsv'.format(self.clinical_cart),sep='\t',index_col=0)
         #self.clinical_sheet=self.clinical_sheet.loc[exist_files]
@@ -54,6 +55,9 @@ class TCGA(object):
         obs_pd=obs_pd[~obs_pd.index.duplicated(keep='first')]
         adata.obs=obs_pd.loc[adata.obs.index]
         adata.var=var_pd
+        adata.var.index=adata.var['gene_name'].astype('str').values
+        adata.var_names_make_unique()
+        self.adata=adata
         return adata
         
     def survial_init(self):
@@ -64,6 +68,8 @@ class TCGA(object):
                 day_li.append(pd_c.loc[i,'days_to_last_follow_up'].iloc[0])
             elif pd_c.loc[i,'vital_status'].iloc[0]=='Dead':
                 day_li.append(pd_c.loc[i,'days_to_death'].iloc[0])
+            else:
+                day_li.append(pd_c.loc[i,'days_to_last_follow_up'].iloc[0])
         pd_c['days']=day_li
         
         s_pd=pd_c[["case_submitter_id",
@@ -80,6 +86,9 @@ class TCGA(object):
         self.adata.obs['vital_status']='Not Reported'
         self.adata.obs['days']=np.nan
         for i in self.adata.obs.index:
+            if self.adata.obs.loc[i,'Case ID'] not in s_pd.index:
+                self.adata=self.adata[self.adata.obs.index!=i]
+                continue
             self.adata.obs.loc[i,'vital_status']=s_pd.loc[self.adata.obs.loc[i,'Case ID'],'vital_status']
             self.adata.obs.loc[i,'days']=s_pd.loc[self.adata.obs.loc[i,'Case ID'],'days']
         
