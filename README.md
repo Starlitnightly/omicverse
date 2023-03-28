@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="README.assets/logo.svg" width="300">
+<img src="README.assets/logo.svg" width="400">
 </h1><br>
 
 [![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/Pyomic) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://pyomic.readthedocs.io/en/latest/?badge=latest) 
@@ -37,6 +37,7 @@ Please checkout the documentations and tutorials at [pyomic.readthedocs.io](http
 - [2] [scDrug](https://github.com/ailabstw/scDrug) was originally published in [*Computational and Structural Biotechnology Journal*](https://www.sciencedirect.com/science/article/pii/S2001037022005505)
 - [3] [MOFA](https://github.com/bioFAM/mofapy2) was originally published in [*Genome Biology*](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02015-1)
 - [4] [COSG](https://github.com/genecell/COSG) was originally published in [*Briefings in Bioinformatics*](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbab579/6511197?redirectedFrom=fulltext)
+- [5] [CellphoneDB](https://github.com/ventolab/CellphoneDB) was originally published in [*Nature*](https://www.nature.com/articles/s41586-018-0698-6)
 
 ## Contact
 
