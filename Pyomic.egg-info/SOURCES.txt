@@ -176,6 +176,7 @@ Pyomic/single/README.md
 Pyomic/single/_SCSA.py
 Pyomic/single/__init__.py
 Pyomic/single/_cosg.py
+Pyomic/single/_cpdb.py
 Pyomic/single/_mofa.py
 Pyomic/single/_nocd.py
 Pyomic/single/_pySCSA.py
