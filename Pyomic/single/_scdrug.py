@@ -106,8 +106,44 @@ def writeGEP(adata_GEP,path):
     GEP_df.to_csv(os.path.join(path, 'GEP.txt'), sep='\t')
     
 class Drug_Response:
+    r"""
+    Drug_Response class for drug response prediction.
+    The raw code could be found at https://github.com/ailabstw/scDrug
+    """
     def __init__(self,adata,scriptpath,modelpath,output='./',model='GDSC',clusters='All',
                  cell='A549',cpus=4,n_drugs=10):
+        r"""
+        Initializes the Drug_Response class.
+
+        Parameters
+        ----------
+        adata : AnnData object
+            Annotated data matrix with cells as rows and genes as columns.
+        scriptpath : str
+            Path to the directory containing the CaDRReS scripts for the analysis.
+            You need to download the scirpt according `git clone https://github.com/CSB5/CaDRReS-Sc.git`
+            and set the path to the directory.
+        modelpath : str
+            Path to the directory containing the pre-trained models.
+            You need to download the model according `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()`
+            and set the path to the directory.
+        output : str, optional (default: './')
+            Path to the directory where the output files will be saved.
+        model : str, optional (default: 'GDSC')
+            The name of the pre-trained model to be used for the analysis.
+        clusters : str, optional (default: 'All')
+            The cluster labels to be used for the analysis. Default is all cells.
+        cell : str, optional (default: 'A549')
+            The cell line to be analyzed.
+        cpus : int, optional (default: 4)
+            The number of CPUs to be used for the analysis.
+        n_drugs : int, optional (default: 10)
+            The number of top drugs to be selected based on the predicted sensitivity.
+
+        Returns
+        -------
+        None
+        """
         self.model = model
         self.adata=adata
         self.clusters=clusters

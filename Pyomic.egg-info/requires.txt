@@ -10,3 +10,4 @@ seaborn
 datetime
 statsmodels
 gseapy==0.10.8
+ktplotspy
