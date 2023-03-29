@@ -165,11 +165,10 @@ class TCGA(object):
 
     
     
-    def survival_analysis(self,gene,layer='raw',plot=False):
+    def survival_analysis(self,gene,layer='raw',plot=False,gene_threshold='median'):
         goal_gene=gene
         
         s_pd=self.s_pd
-        
         s_pd=s_pd.loc[self.adata.obs['Case ID']]
         if layer!='raw':
             if layer not in self.adata.layers.keys():
@@ -179,8 +178,12 @@ class TCGA(object):
             
         else:
             s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1).toarray()
-        
-        s_pd['{}_status'.format(goal_gene)]=['High' if i>s_pd[goal_gene].median() else 'Low' for i in s_pd[goal_gene] ]
+        if gene_threshold=='median':
+            s_pd['{}_status'.format(goal_gene)]=['High' if i>s_pd[goal_gene].median() else 'Low' for i in s_pd[goal_gene] ]
+        elif gene_threshold=='mean':
+            s_pd['{}_status'.format(goal_gene)]=['High' if i>s_pd[goal_gene].mean() else 'Low' for i in s_pd[goal_gene] ]
+        else:
+            s_pd['{}_status'.format(goal_gene)]=['High' if i>gene_threshold else 'Low' for i in s_pd[goal_gene] ]
         s_pd=s_pd.loc[s_pd['days']!="'--"]
         s_pd['fustat'] = [0 if 'Alive'==i else 1 for i in s_pd['vital_status']]
         s_pd['gene_fustat'] = [0 if 'High'==i else 1 for i in s_pd['{}_status'.format(goal_gene)]]
