@@ -190,7 +190,7 @@ def Plot_GSEA(data,num=0):
     # to save your figure, make sure that ofname is not None
     gseaplot(rank_metric=data.ranking, term=terms[num], **data.results[terms[num]])
 
-def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type='adjust',
+def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type='auto',
                        organism='Human',description='None',outdir='./enrichr',cutoff=0.5):
 
     
@@ -208,7 +208,14 @@ def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type
                  outdir=outdir,
                  cutoff=0.5 # test dataset, use lower value from range(0,1)
                 )
-    if pvalue_type=='adjust':
+    if pvalue_type=='auto':
+        if enr.res2d.shape[0]>100:
+            enrich_res=enr.res2d[enr.res2d['Adjusted P-value']<pvalue_threshold]
+            enrich_res['logp']=-np.log(enrich_res['Adjusted P-value'])
+        else:
+            enrich_res=enr.res2d[enr.res2d['P-value']<pvalue_threshold]
+            enrich_res['logp']=-np.log(enrich_res['P-value'])
+    elif pvalue_type=='adjust':
         enrich_res=enr.res2d[enr.res2d['Adjusted P-value']<pvalue_threshold]
         enrich_res['logp']=-np.log(enrich_res['Adjusted P-value'])
     else:
@@ -220,10 +227,11 @@ def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type
     return enrich_res
 
 def geneset_plot(enrich_res,num=10,node_size=[5,10,15],cax_loc=2,cax_fontsize=12,
-                 fig_title='',fig_xlabel='Fractions of genes',cmap='YlGnBu'):
+                 fig_title='',fig_xlabel='Fractions of genes',figsize=(2,4),cmap='YlGnBu'):
 
 
-    fig, ax = plt.subplots(figsize=(2,4))
+
+    fig, ax = plt.subplots(figsize=figsize)
     plot_data2=enrich_res.sort_values('P-value')[:num].sort_values('logc')
     st=ax.scatter(plot_data2['fraction'],range(len(plot_data2['logc'])),
             s=plot_data2['num']*10,linewidths=1,edgecolors='black',c=plot_data2['logp'],cmap=cmap)
