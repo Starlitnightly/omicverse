@@ -11,3 +11,9 @@ sphinx_markdown_tables
 sphinx_copybutton
 nbsphinx
 IPython
+ktplotspy
+ipywidgets
+lifelines
+boltons
+ctxcore
+multiprocess
