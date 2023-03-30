@@ -95,3 +95,54 @@ def download_GDSC_data():
         elif datasets_name == 'GDSC_exp':
             data_downloader(url=_datasets[datasets_name],path='models/{}.tsv.gz'.format(datasets_name),title=datasets_name)
     print('......GDSC data download finished!')
+
+def download_pathway_database():
+    r"""load pathway_database
+    """
+    _datasets = {
+        'GO_Biological_Process_2021':'https://figshare.com/ndownloader/files/39820720',
+        'GO_Cellular_Component_2021':'https://figshare.com/ndownloader/files/39820714',
+        'GO_Molecular_Function_2021':'https://figshare.com/ndownloader/files/39820711',
+        'WikiPathway_2021_Human':'https://figshare.com/ndownloader/files/39820705',
+        'WikiPathways_2019_Mouse':'https://figshare.com/ndownloader/files/39820717',
+        'Reactome_2022':'https://figshare.com/ndownloader/files/39820702',
+    }
+     
+    for datasets_name in _datasets.keys():
+        print('......Pathway Geneset download start:',datasets_name)
+        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
+    print('......Pathway Geneset download finished!')
+
+def download_geneid_annotation_pair():
+    r"""load geneid_annotation_pair
+    """
+    _datasets = {
+        'pair_GRCm39':'https://figshare.com/ndownloader/files/39820684',
+        'pair_T2TCHM13':'https://figshare.com/ndownloader/files/39820687',
+        'pair_GRCh38':'https://figshare.com/ndownloader/files/39820690',
+        'pair_GRCh37':'https://figshare.com/ndownloader/files/39820693',
+        'pair_danRer11':'https://figshare.com/ndownloader/files/39820696',
+        'pair_danRer7':'https://figshare.com/ndownloader/files/39820699',
+    }
+     
+    for datasets_name in _datasets.keys():
+        print('......Geneid Annotation Pair download start:',datasets_name)
+        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
+    print('......Geneid Annotation Pair download finished!')
+
+def geneset_prepare(geneset_path,organism='Human'):
+    go_bio_geneset=pd.read_csv(geneset_path,sep='\t\t',header=None)
+    go_bio_dict={}
+    if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
+        for i in go_bio_geneset.index:
+            go_bio_dict[go_bio_geneset.loc[i,0]]=[i.lower().capitalize() for i in go_bio_geneset.loc[i,1].split('\t')]
+    elif (organism == 'Human') or (organism == 'human') or (organism == 'hs'):
+        for i in go_bio_geneset.index:
+            go_bio_dict[go_bio_geneset.loc[i,0]]=[i.upper() for i in go_bio_geneset.loc[i,1].split('\t')]
+    else:
+        for i in go_bio_geneset.index:
+            go_bio_dict[go_bio_geneset.loc[i,0]]=[i.upper() for i in go_bio_geneset.loc[i,1].split('\t')]
+    return go_bio_dict
+
+
+    

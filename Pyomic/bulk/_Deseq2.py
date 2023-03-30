@@ -5,6 +5,19 @@ import statsmodels.api as sm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
+def Matrix_ID_mapping(data,gene_ref_path):
+    pair=pd.read_csv(gene_ref_path,sep='\t',index_col=0)
+    ret_gene=list(set(data.index.tolist()) & set(pair.index.tolist()))
+    data=data.loc[ret_gene]
+    new_index=[]
+    for i in ret_gene:
+        a=pair.loc[i,'symbol']
+        if str(a)=='nan':
+            new_index.append(i)
+        else:
+            new_index.append(a)
+    data.index=new_index
+    return data
 
 
 def deseq2_normalize(data):
