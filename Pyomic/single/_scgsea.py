@@ -164,3 +164,5 @@ def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,
     
     return ax
 
+
+
