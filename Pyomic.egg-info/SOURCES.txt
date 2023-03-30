@@ -175,6 +175,7 @@ Pyomic/single/.DS_Store
 Pyomic/single/README.md
 Pyomic/single/_SCSA.py
 Pyomic/single/__init__.py
+Pyomic/single/_aucell.py
 Pyomic/single/_cosg.py
 Pyomic/single/_cpdb.py
 Pyomic/single/_mofa.py
@@ -191,6 +192,7 @@ Pyomic/single/__pycache__/_nocd.cpython-38.pyc
 Pyomic/single/__pycache__/_pySCSA.cpython-38.pyc
 Pyomic/utils/__init__.py
 Pyomic/utils/_data.py
+Pyomic/utils/_plot.py
 dist/.DS_Store
 dist/Pyomic-1.1.4-py3-none-any.whl
 dist/Pyomic-1.1.5-py3-none-any.whl
