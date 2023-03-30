@@ -14,3 +14,5 @@ gseapy==0.10.8
 ktplotspy
 ipywidgets
 lifelines
+boltons
+ctxcore
