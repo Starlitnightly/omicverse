@@ -3,7 +3,7 @@ scanpy
 gseapy == 0.10.8
 matplotlib
 seaborn
-sklearn
+scikit-learn
 sphinx_autosummary_accessors
 sphinx_autodoc_typehints
 recommonmark
@@ -11,7 +11,6 @@ sphinx_markdown_tables
 sphinx_copybutton
 nbsphinx
 IPython
-ktplotspy
 ipywidgets
 lifelines
 boltons
