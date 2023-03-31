@@ -14,7 +14,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import Pyomic
+#import Pyomic
 # -- Project information -----------------------------------------------------
 
 project = 'Pyomic'
