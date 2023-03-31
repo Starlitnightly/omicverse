@@ -17,3 +17,4 @@ boltons
 ctxcore
 multiprocess
 ktplotspy
+jinja2 == 3.0.0
