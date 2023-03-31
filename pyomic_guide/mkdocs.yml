@@ -1,0 +1,63 @@
+site_name: Pyomic Readthedocs
+repo_url: https://github.com/Starlitnightly/Pyomic
+
+
+nav:
+- index: index.md
+- Installation guild: Installation_guild.md
+- Tutorial:
+    - Bulk tutorial Protein-Protein interaction (PPI) analysis by String-db: Tutorials/t_network.ipynb
+    - Bulk tutorial WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials/t_wgcna.ipynb
+- Release notes: Release_notes.md
+- Developer guild: Developer_guild.md
+
+  
+
+
+plugins:
+  - mkdocs-jupyter
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: img/ico.png
+  favicon: img/favicon.ico
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.indexes
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      linenums: true
+      linenums_style: pymdownx-inline
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.inlinehilite
+
+extra_javascript:
+  - javascripts/config.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
