@@ -16,3 +16,4 @@ lifelines
 boltons
 ctxcore
 multiprocess
+ktplotspy
