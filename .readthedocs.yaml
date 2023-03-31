@@ -15,6 +15,8 @@ build:
     # rust: "1.55"
     # golang: "1.17"
 
+mkdocs:
+  configuration: pyomic_guide/mkdocs.yml
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 # formats:
