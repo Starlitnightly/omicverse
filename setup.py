@@ -28,4 +28,4 @@ setup(
     python_requires='>=3.6',
     py_modules=['bulk','single'],
     # packages = find_packages(include=("*"),),  
-)  
+)

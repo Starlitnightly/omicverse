@@ -3,7 +3,7 @@ numpy
 scanpy
 pandas
 matplotlib
-sklearn
+scikit-learn
 scipy
 networkx
 multiprocess
@@ -11,7 +11,6 @@ seaborn
 datetime
 statsmodels
 gseapy==0.10.8
-ktplotspy
 ipywidgets
 lifelines
 boltons
