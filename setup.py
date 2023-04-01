@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 
 setup(  
     name = 'Pyomic',  
-    version = '1.1.7',
+    version = '1.1.8',
     # keywords = ('chinesename',),  
     description = 'A python framework library for omics analysis',  
     license = 'GNU License',  
@@ -25,7 +25,7 @@ setup(
     url = 'https://github.com/Starlitnightly/Pyomic',
     long_description=long_description,  
     long_description_content_type="text/markdown",  
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     py_modules=['bulk','single'],
     # packages = find_packages(include=("*"),),  
 )
