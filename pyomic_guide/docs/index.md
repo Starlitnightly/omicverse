@@ -19,5 +19,10 @@ For more details about the Pyomic framework, please check out our [publication](
     - [Celltype annotation with SCSA](Tutorials-single/t_cellanno)
     - [Pathway analysis with AUCell]()
     - [Drug response predict with scDrug](Tutorials-single/t_scdrug)
+    - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)
     - [Multi omics analysis by MOFA](Tutorials-single/t_mofa)
     - [Overlapping Celltype annotation with GNN](Tutorials-single/t_nocd)
+- Release notes
+- Developer guild
+
+

@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import matplotlib.patches as mpatches
+import scanpy as sc
 
 def cpdb_network_cal(adata,pvals,celltype_key):
     r"""
@@ -98,7 +99,10 @@ def cpdb_plot_network(adata,interaction_edges,celltype_key,nodecolor_dict=None,
         if '{}_colors'.format(celltype_key) in adata.uns:
             type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
         else:
-            type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+            if len(adata.obs[celltype_key].cat.categories)>28:
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+            else:
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
     
     #set G_nodes_dict
     nodes=[]
@@ -123,7 +127,7 @@ def cpdb_plot_network(adata,interaction_edges,celltype_key,nodecolor_dict=None,
     p=dict(G.nodes)
 
     nodesize=np.array([G_nodes_dict[u] for u in G.nodes()])/nodesize_scale
-    nodecolos=[type_color_all[u.split('_')[-1]] for u in G.nodes()]
+    nodecolos=[type_color_all[u] for u in G.nodes()]
     nx.draw_networkx_nodes(G, pos, nodelist=p,node_size=nodesize,node_color=nodecolos)
 
     edgewidth = np.array([G.get_edge_data(u, v)['weight'] for u, v in G.edges()])/edgeswidth_scale
@@ -139,8 +143,8 @@ def cpdb_plot_network(adata,interaction_edges,celltype_key,nodecolor_dict=None,
 
     labels = adata.obs[celltype_key].cat.categories
     #用label和color列表生成mpatches.Patch对象，它将作为句柄来生成legend
-    color = [type_color_all[u.split('_')[-1]] for u in labels]
-    patches = [mpatches.Patch(color=type_color_all[u.split('_')[-1]], label=u) for u in labels ] 
+    color = [type_color_all[u] for u in labels]
+    patches = [mpatches.Patch(color=type_color_all[u], label=u) for u in labels ] 
 
     #plt.xlim(-0.05, 1.05)
     #plt.ylim(-0.05, 1.05)
@@ -234,6 +238,15 @@ def cpdb_plot_interaction(adata,cell_type1,cell_type2,means,pvals,celltype_key,g
     fig.get_axes()[0].set_title(title,fontsize=title_fontsize)
     
     return fig.get_axes()[0]
+
+def cpdb_submeans_exacted(means,cell_names,cell_type='ligand'):
+    if cell_type=='ligand':
+        means_columns=means.columns[:11].tolist()+means.columns[means.columns.str.contains('{}\|'.format(cell_names))].tolist()
+    elif cell_type=='receptor':
+        means_columns=means.columns[:11].tolist()+means.columns[means.columns.str.contains('\|{}'.format(cell_names))].tolist()
+    else:
+        raise ValueError('cell_type must be ligand or receptor')
+    return means.loc[:,means_columns]
 
 def cpdb_interaction_filtered(adata,cell_type1,cell_type2,means,pvals,celltype_key,genes=None,
                          keep_significant_only=True,figsize = (0,0),

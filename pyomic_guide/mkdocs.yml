@@ -13,6 +13,7 @@ nav:
 - Tutorial-Single:
     - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
     - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
+    - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
     - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
     - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
 - Release notes: Release_notes.md
