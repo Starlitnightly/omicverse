@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="README.assets/logo.svg" width="400">
+<img src="https://raw.githubusercontent.com/Starlitnightly/Pyomic/master/README.assets/logo.svg" width="400">
 </h1><br>
 
 [![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/Pyomic) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://pyomic.readthedocs.io/en/latest/?badge=latest) 
