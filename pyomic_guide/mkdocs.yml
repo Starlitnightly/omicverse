@@ -1,5 +1,7 @@
 site_name: Pyomic Readthedocs
 repo_url: https://github.com/Starlitnightly/Pyomic
+site_author: "Zehua Zeng"
+copyright: "Copyright &copy; 2019-2023"
 
 
 nav:
@@ -24,6 +26,7 @@ nav:
 
 plugins:
   - mkdocs-jupyter
+  - glightbox
 
 theme:
   name: material
@@ -53,6 +56,7 @@ markdown_extensions:
   - pymdownx.details
   - attr_list
   - md_in_html
+
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.highlight:
