@@ -1,4 +1,12 @@
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
+sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
+ '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
+ '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
+sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
+
+def pyomic_palette():
+    return sc_color
 
 def plot_text_set(text,text_knock=2,text_maxsize=20):
     #print(text)

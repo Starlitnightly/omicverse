@@ -24,3 +24,17 @@ First public release
 
 - Fix the cpdb's error included `import error` and `color error of cpdb_plot_network`
 - Add the cpdb's method included `cpdb_submeans_exacted` that researchers can exact the sub network easily.
+
+## v 1.1.9
+
+### bulk2single module:
+
+- Add the `bulk2single` module
+- Fix the model load error from bulk2space
+- Fix the early stop from bulk2space
+- Add more friendly input method and visualisation
+- Add the loss history visualisation
+
+### utils module:
+
+- Add the `pyomic_palette` in plot module

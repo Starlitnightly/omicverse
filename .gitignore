@@ -5,3 +5,4 @@ tutorial
 models
 .DS_Store
 Pyomic.egg-info
+.ipynb_checkpoints
