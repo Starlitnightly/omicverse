@@ -39,6 +39,10 @@ Pyomic/bulk/__pycache__/_chm13.cpython-38.pyc
 Pyomic/bulk/__pycache__/_df_apply.cpython-38.pyc
 Pyomic/bulk/__pycache__/_dynamicTree.cpython-38.pyc
 Pyomic/bulk/__pycache__/_network.cpython-38.pyc
+Pyomic/bulk2single/__init__.py
+Pyomic/bulk2single/_bulk2single.py
+Pyomic/bulk2single/_utils.py
+Pyomic/bulk2single/_vae.py
 Pyomic/mofapy2/__init__.py
 Pyomic/mofapy2/config.py
 Pyomic/mofapy2/version.py
