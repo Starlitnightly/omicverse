@@ -32,7 +32,8 @@ For more details about the Pyomic framework, please check out our [publication](
     - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)
     - [Multi omics analysis by MOFA](Tutorials-single/t_mofa)
     - [Overlapping Celltype annotation with GNN](Tutorials-single/t_nocd)
-- Tutorial-Bulk2single (Under development)
+- Tutorial-Bulk2Single:
+    - [Bulk RNA-seq to Single RNA-seq](Tutorials-bulk2single/t_bulk2single)
 - [Release notes](Release_notes)
 - [Developer guild](Developer_guild)
 

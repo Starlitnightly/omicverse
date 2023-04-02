@@ -1,7 +1,7 @@
 site_name: Pyomic Readthedocs
 repo_url: https://github.com/Starlitnightly/Pyomic
 site_author: "Zehua Zeng"
-copyright: "Copyright &copy; 2019-2023"
+copyright: "Copyright &copy; 2019-2023, 112 Lab, USTB"
 
 
 nav:
@@ -18,6 +18,8 @@ nav:
     - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
     - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
     - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
+- Tutorial-Bulk2Single:
+    - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
 
