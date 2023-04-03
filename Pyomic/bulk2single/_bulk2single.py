@@ -12,8 +12,34 @@ warnings.filterwarnings("ignore")
 
 
 class Bulk2Single:
+    r"""
+    Bulk2Single class.
+    
+    """
     def __init__(self,bulk_data,single_data,celltype_key,
                  top_marker_num=500,ratio_num=1,gpu=0):
+        """
+        Initializes the Bulk2Single class.
+
+        Parameters
+        ----------
+        bulk_data: pandas.DataFrame
+            The bulk RNA-seq data.
+        single_data: pandas.DataFrame
+            The single-cell RNA-seq data.
+        celltype_key: str
+            The name of the column in the bulk data containing cell types.
+        top_marker_num: int, optional
+            The number of top markers to select per cell type. Default is 500.
+        ratio_num: float, optional
+            The ratio between the number of single cells and target number of converted cells. Default is 1.
+        gpu: int, optional
+            The ID of the GPU to use. Set to -1 to use CPU. Default is 0.
+
+        Returns
+        -------
+        None
+        """
         self.bulk_data=bulk_data
         self.single_data=single_data
         self.celltype_key=celltype_key
@@ -32,11 +58,35 @@ class Bulk2Single:
             hidden_size=256,
             epoch_num=5000,
             patience=50):
-        #used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
-        #input_data = load_data(input_bulk_path,
-        #                       input_sc_data_path,
-        #                       input_sc_meta_path,)
-        #cell_target_num = data_process(input_data, top_marker_num, ratio_num)
+        """
+        Trains the VAE model.
+
+        Parameters
+        ----------
+        vae_save_dir: str, optional
+            The directory to save the trained VAE model. Default is 'save_model'.
+        vae_save_name: str, optional
+            The name of the saved VAE model. Default is 'vae'.
+        generate_save_dir: str, optional
+            The directory to save the generated single-cell data. Default is 'output'.
+        generate_save_name: str, optional
+            The name of the saved generated single-cell data. Default is 'output'.
+        batch_size: int, optional
+            The batch size for training. Default is 512.
+        learning_rate: float, optional
+            The learning rate for training. Default is 1e-4.
+        hidden_size: int, optional
+            The hidden size for the encoder and decoder networks. Default is 256.
+        epoch_num: int, optional
+            The maximum number of epochs for training. Default is 5000.
+        patience: int, optional
+            The number of epochs to wait before early stopping. Default is 50.
+
+        Returns
+        -------
+        vae_net: torch.nn.Module
+            The trained VAE model.
+        """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print('...begin vae training')
@@ -70,6 +120,18 @@ class Bulk2Single:
         return sc_g
     
     def generate(self):
+        r"""
+        Generate the single-cell data.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        sc_g: anndata.AnnData
+            The generated single-cell data.
+        """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print('...generating')
@@ -82,6 +144,21 @@ class Bulk2Single:
         return sc_g
     
     def load(self,vae_load_dir,hidden_size=256):
+        r"""
+        load the trained VAE model of Bulk2Single.
+
+        Parameters
+        ----------
+        vae_load_dir: str
+            The directory to load the trained VAE model.
+        hidden_size: int, optional
+            The hidden size for the encoder and decoder networks. Default is 256.
+
+        Returns
+        -------
+        None
+
+        """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print(f'loading model from {vae_load_dir}')
@@ -91,11 +168,21 @@ class Bulk2Single:
     def load_and_generate(self,
                               vae_load_dir,  # load_dir
                               hidden_size=256):
-        #self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
-        #input_data = load_data(input_bulk_path,
-        #                       input_sc_data_path,
-        #                       input_sc_meta_path,)
-        #cell_target_num = data_process(input_data, top_marker_num, ratio_num)
+        r"""
+        load the trained VAE model of Bulk2Single and generate the single-cell data.
+
+        Parameters
+        ----------
+        vae_load_dir: str
+            The directory to load the trained VAE model.
+        hidden_size: int, optional
+            The hidden size for the encoder and decoder networks. Default is 256.
+        
+        Returns
+        -------
+        sc_g: anndata.AnnData
+            The generated single-cell data.
+        """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print(f'loading model from {vae_load_dir}')
@@ -113,6 +200,19 @@ class Bulk2Single:
         return sc_g
     
     def plot_loss(self,figsize=(4,4)):
+        r"""
+        plot the loss curve of the trained VAE model.
+
+        Parameters
+        ----------
+        figsize: tuple, optional
+            The size of the figure. Default is (4,4).
+        
+        Returns
+        -------
+        ax: matplotlib.axes._subplots.AxesSubplot
+            The axes of the figure.
+        """
         fig, ax = plt.subplots(figsize=figsize)
         ax.plot(range(len(self.history)),self.history)
         ax.set_title('Beta-VAE')

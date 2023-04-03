@@ -6,6 +6,20 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
 def Matrix_ID_mapping(data,gene_ref_path):
+    """
+    Maps gene IDs in the input data to gene symbols using a reference table.
+
+    Parameters:
+    data (pandas.DataFrame): 
+        The input data containing gene IDs as index.
+    gene_ref_path (str): 
+        The path to the reference table containing the mapping from gene IDs to gene symbols.
+
+    Returns:
+    data: pandas.DataFrame
+        The input data with gene IDs mapped to gene symbols.
+    """
+    
     pair=pd.read_csv(gene_ref_path,sep='\t',index_col=0)
     ret_gene=list(set(data.index.tolist()) & set(pair.index.tolist()))
     data=data.loc[ret_gene]
@@ -41,7 +55,26 @@ def deseq2_normalize(data):
     return data/scale
 
 def estimateSizeFactors(data):
-    
+    """
+    Estimate size factors for data normalization.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
+
+    Returns
+    -------
+    pandas.Series
+        A pandas Series of size factors, one for each sample.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> data = pd.DataFrame(np.random.rand(100, 10), columns=list('abcdefghij'))
+    >>> size_factors = estimateSizeFactors(data)
+    """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
     data1=data.loc[avg1.index]
     data_log=data1.apply(np.log,axis=1)
@@ -50,6 +83,20 @@ def estimateSizeFactors(data):
 
 
 def estimateDispersions(counts):
+    """
+    Estimates the dispersion parameter of the Negative Binomial distribution
+    for each gene in the input count matrix.
+
+    Parameters:
+    -----------
+    counts : array-like
+        Input count matrix with shape (n_genes, n_samples).
+
+    Returns:
+    --------
+    disp : array-like
+        Array of dispersion values for each gene in the input count matrix.
+    """
     # Step 1: Calculate mean and variance of counts for each gene
     mean_counts = np.mean(counts, axis=1)
     var_counts = np.var(counts, axis=1)
@@ -116,6 +163,23 @@ class pyDEseq(object):
         return self.data
     
     def foldchange_set(self,fc_threshold=-1,pval_threshold=0.05,logp_max=6,fold_threshold=0):
+        """
+        Sets fold-change and p-value thresholds to classify differentially expressed genes as up-regulated, down-regulated, or not significant.
+
+        Parameters
+        ----------
+        fc_threshold (float): 
+            Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes.
+        pval_threshold (float): 
+            p-value threshold for determining significance.
+        logp_max (float): 
+            Maximum value for log-transformed p-values.
+        fold_threshold (int): 
+            Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1).
+
+        Returns:
+            None
+        """
         if fc_threshold==-1:
             foldp=np.histogram(self.result['log2FC'])
             foldchange=(foldp[1][np.where(foldp[1]>0)[0][fold_threshold]]+foldp[1][np.where(foldp[1]>0)[0][fold_threshold+1]])/2
@@ -136,7 +200,43 @@ class pyDEseq(object):
                      legend_bbox=(0.8, -0.2),legend_ncol=2,legend_fontsize=12,
                      plot_genes=None,plot_genes_num=10,plot_genes_fontsize=10,
                      ticks_fontsize=12):
+        """
+        Generate a volcano plot for the differential gene expression analysis results.
 
+        Parameters:
+        -----------
+        figsize : tuple, optional
+            The size of the generated figure, by default (4,4).
+        title : str, optional
+            The title of the plot, by default ''.
+        titlefont : dict, optional
+            A dictionary of font properties for the plot title, by default {'weight':'normal','size':14,}.
+        up_color : str, optional
+            The color of the up-regulated genes in the plot, by default '#e25d5d'.
+        down_color : str, optional
+            The color of the down-regulated genes in the plot, by default '#7388c1'.
+        normal_color : str, optional
+            The color of the non-significant genes in the plot, by default '#d7d7d7'.
+        legend_bbox : tuple, optional
+            A tuple containing the coordinates of the legend's bounding box, by default (0.8, -0.2).
+        legend_ncol : int, optional
+            The number of columns in the legend, by default 2.
+        legend_fontsize : int, optional
+            The font size of the legend, by default 12.
+        plot_genes : list, optional
+            A list of gene names to highlight in the plot, by default None.
+        plot_genes_num : int, optional
+            The maximum number of genes to highlight in the plot, by default 10.
+        plot_genes_fontsize : int, optional
+            The font size of the gene labels in the plot, by default 10.
+        ticks_fontsize : int, optional
+            The font size of the axis ticks, by default 12.
+
+        Returns:
+        --------
+        ax : matplotlib Axes object
+            The Axes object containing the generated plot.
+        """
         fig, ax = plt.subplots(figsize=figsize)
         result=self.result.copy()
         #首先绘制正常基因
