@@ -10,7 +10,7 @@ def get_chm13_gene():
 
     Returns
     -------
-    data:pandas.DataFrame
+    - data: `pandas.DataFrame`
         index is CHM13 gene_id, columns=['closest GENCODE ID','Gene name',	'biotype','Novel region','GRCh38 issue','Either novel or issue',	'Intersects medically relevant name list']
     '''
     data=pd.DataFrame(chm13_dict)
@@ -25,7 +25,7 @@ def find_chm13_gene(search_gene_list):
 
     Returns
     -------
-    res:dict
+    - res: `dict`
         res['Novel']: The T2T-CHM13 novel genes
         res['GRCh38']: The GRCh38 issue genes
     '''

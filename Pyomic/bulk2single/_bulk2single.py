@@ -23,22 +23,22 @@ class Bulk2Single:
 
         Parameters
         ----------
-        bulk_data: pandas.DataFrame
+        - bulk_data: pandas.DataFrame
             The bulk RNA-seq data.
-        single_data: pandas.DataFrame
+        - single_data: pandas.DataFrame
             The single-cell RNA-seq data.
-        celltype_key: str
+        - celltype_key: str
             The name of the column in the bulk data containing cell types.
-        top_marker_num: int, optional
+        - top_marker_num: int, optional
             The number of top markers to select per cell type. Default is 500.
-        ratio_num: float, optional
+        - ratio_num: float, optional
             The ratio between the number of single cells and target number of converted cells. Default is 1.
-        gpu: int, optional
+        - gpu: int, optional
             The ID of the GPU to use. Set to -1 to use CPU. Default is 0.
 
         Returns
         -------
-        None
+        - None
         """
         self.bulk_data=bulk_data
         self.single_data=single_data
@@ -63,28 +63,28 @@ class Bulk2Single:
 
         Parameters
         ----------
-        vae_save_dir: str, optional
+        - vae_save_dir: `str`, optional
             The directory to save the trained VAE model. Default is 'save_model'.
-        vae_save_name: str, optional
+        - vae_save_name: `str`, optional
             The name of the saved VAE model. Default is 'vae'.
-        generate_save_dir: str, optional
+        - generate_save_dir: `str`, optional
             The directory to save the generated single-cell data. Default is 'output'.
-        generate_save_name: str, optional
+        - generate_save_name: `str`, optional
             The name of the saved generated single-cell data. Default is 'output'.
-        batch_size: int, optional
+        - batch_size: `int`, optional
             The batch size for training. Default is 512.
-        learning_rate: float, optional
+        - learning_rate: `float`, optional
             The learning rate for training. Default is 1e-4.
-        hidden_size: int, optional
+        - hidden_size: `int`, optional
             The hidden size for the encoder and decoder networks. Default is 256.
-        epoch_num: int, optional
+        - epoch_num: `int`, optional
             The maximum number of epochs for training. Default is 5000.
-        patience: int, optional
+        - patience: `int`, optional
             The number of epochs to wait before early stopping. Default is 50.
 
         Returns
         -------
-        vae_net: torch.nn.Module
+        - vae_net: `torch.nn.Module`
             The trained VAE model.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -125,11 +125,11 @@ class Bulk2Single:
 
         Parameters
         ----------
-        None
+        - None
 
         Returns
         -------
-        sc_g: anndata.AnnData
+        - sc_g: anndata.AnnData
             The generated single-cell data.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -149,14 +149,14 @@ class Bulk2Single:
 
         Parameters
         ----------
-        vae_load_dir: str
+        - vae_load_dir: str
             The directory to load the trained VAE model.
-        hidden_size: int, optional
+        - hidden_size: int, optional
             The hidden size for the encoder and decoder networks. Default is 256.
 
         Returns
         -------
-        None
+        - None
 
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -173,14 +173,14 @@ class Bulk2Single:
 
         Parameters
         ----------
-        vae_load_dir: str
+        - vae_load_dir: str
             The directory to load the trained VAE model.
-        hidden_size: int, optional
+        - hidden_size: int, optional
             The hidden size for the encoder and decoder networks. Default is 256.
         
         Returns
         -------
-        sc_g: anndata.AnnData
+        - sc_g: anndata.AnnData
             The generated single-cell data.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -205,12 +205,12 @@ class Bulk2Single:
 
         Parameters
         ----------
-        figsize: tuple, optional
+        - figsize: tuple, optional
             The size of the figure. Default is (4,4).
         
         Returns
         -------
-        ax: matplotlib.axes._subplots.AxesSubplot
+        - ax: matplotlib.axes._subplots.AxesSubplot
             The axes of the figure.
         """
         fig, ax = plt.subplots(figsize=figsize)

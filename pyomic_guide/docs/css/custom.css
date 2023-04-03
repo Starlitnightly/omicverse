@@ -1,0 +1,37 @@
+div.autodoc-docstring {
+    padding-left: 20px;
+    margin-bottom: 30px;
+    border-left: 5px solid rgba(230, 230, 230);
+  }
+  
+  div.autodoc-members {
+    padding-left: 20px;
+    margin-bottom: 15px;
+  }
+
+/* indent params in a long signature and put them on their own lines */
+.autodoc-signature__long .autodoc-param-definition {
+    display: block;
+    margin-left: 20px;
+  }
+  
+  /* indent the docstring below the signature */
+  .autodoc > div:not(:first-child) { margin-left: 10px;}
+  
+  
+  
+  
+  /* style the definitions such as class */
+  .autodoc-signature > em:first-child {font-weight: bold; font-style: initial}
+  
+  
+  /* style type annotations */
+  .autodoc-type-annotation {
+    font-weight: 500;
+    color: #9c6a0e;
+  }
+  
+  /* style defaults */
+  .autodoc-param-default {
+    color: gray;
+  }

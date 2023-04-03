@@ -8,9 +8,9 @@ def string_interaction(gene,species):
 
     Parameters
     ----------
-    gene
+    - gene: `list`
         The gene list to analysis PPI
-    species
+    - species: `str`
         NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
     
     Returns
@@ -73,9 +73,9 @@ def string_map(gene,species):
 
     Parameters
     ----------
-    gene
+    - gene: `list`
         The gene list to analysis PPI
-    species
+    - species: `str`
         NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
     
     Returns
@@ -136,16 +136,16 @@ def generate_G(gene,species,score=0.4):
 
     Parameters
     ----------
-    gene
+    - gene: `list`
         The gene list to analysis PPI
-    species
+    - species: `str`
         NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
-    score
+    - score: `float`
         The threshold of protein A and B interaction
     
     Returns
     -------
-    G
+    - G: `nx.graphml`
         the networkx object of PPI in query gene list
     
     """

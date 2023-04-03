@@ -8,8 +8,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 class TCGA(object):
-    
+    r"""
+    TCGA analysis module 
+    """
     def __init__(self,gdc_sample_sheep,gdc_download_files,clinical_cart):
+        r"""
+        Init the TCGA module
+
+        Parameters
+        ----------
+        - gdc_sample_sheep: `str`
+            Path of the Sample Sheet button of TCGA, and we can get tsv file from it
+        - gdc_download_files: `str`
+            Path of the Download/Cart button of TCGA, and we get tar.gz included all file you selected/
+        - clinical_cart: `str`
+            Path of the Clinical button of TCGA, and we can get tar.gz included all clinical of your files
+
+        Returns
+        -------
+
+        """
         self.gdc_sample_sheep=gdc_sample_sheep
         self.gdc_download_files=gdc_download_files
         self.clinical_cart=clinical_cart
@@ -32,6 +50,9 @@ class TCGA(object):
         
         
     def adata_read(self,path):
+        r"""
+        Read the 
+        """
         print('... anndata reading')
         self.adata=sc.read(path)
         
