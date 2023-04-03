@@ -20,6 +20,7 @@ nav:
     - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
 - Tutorial-Bulk2Single:
     - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
+- API documentation: API_reference.md
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
 
@@ -56,6 +57,7 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
+  - mkautodoc
   - attr_list
   - md_in_html
 
@@ -75,3 +77,6 @@ extra_javascript:
   - javascripts/config.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+    - css/custom.css

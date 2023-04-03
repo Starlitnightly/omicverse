@@ -23,7 +23,7 @@ import gseapy as gp
 from gseapy.plot import barplot, dotplot
 from ..utils import plot_text_set
 
-
+"""
 def enrichment_KEGG(gene_list,
                     gene_sets=['KEGG_2019_Human'],
                     organism='Human',
@@ -189,7 +189,7 @@ def Plot_GSEA(data,num=0):
     from gseapy.plot import gseaplot
     # to save your figure, make sure that ofname is not None
     gseaplot(rank_metric=data.ranking, term=terms[num], **data.results[terms[num]])
-
+"""
 def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type='auto',
                        organism='Human',description='None',outdir='./enrichr',cutoff=0.5):
     """
@@ -197,30 +197,30 @@ def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type
 
     Parameters
     ----------
-    gene_list : list
+    - gene_list : `list`
         List of gene symbols to be tested for enrichment.
-    pathways_dict : dict
+    - pathways_dict : `dict`
         Dictionary of pathway library names and corresponding Enrichr API URLs.
-    pvalue_threshold : float, optional
+    - pvalue_threshold : `float`, optional
         P-value threshold for significant pathways. Default is 0.05.
-    pvalue_type : str, optional
+    - pvalue_type : `str`, optional
         Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction
         for small gene sets (<500 genes) and Bonferroni correction for larger gene sets.
         'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction.
         Default is 'auto'.
-    organism : str, optional
+    - organism : `str`, optional
         Organism of the input gene list. Default is 'Human'.
-    description : str, optional
+    - description : `str`, optional
         Description of the input gene list. Default is 'None'.
-    outdir : str, optional
+    - outdir : `str`, optional
         Output directory for enrichment results. Default is './enrichr'.
-    cutoff : float, optional
+    - cutoff : `float`, optional
         Cutoff value for pathway ranking. Only pathways with combined score >= cutoff are
         considered significant. Default is 0.5.
 
     Returns
     -------
-    enrich_res : pandas.DataFrame
+    - enrich_res : `pandas.DataFrame`
         Dataframe containing significant enriched pathways and associated statistics.
 
     """
@@ -264,28 +264,28 @@ def geneset_plot(enrich_res,num=10,node_size=[5,10,15],cax_loc=2,cax_fontsize=12
 
     Parameters:
     -----------
-    enrich_res: pandas.DataFrame
+    - enrich_res: `pandas.DataFrame`
         The gene set enrichment result obtained from the geneset_enrichment function.
-    num: int, optional
+    - num: `int`, optional
         The number of enriched terms to plot. Default is 10.
-    node_size: list, optional
+    - node_size: `list`, optional
         A list of integers defining the size of nodes in the plot. Default is [5,10,15].
-    cax_loc: float, optional
+    - cax_loc: `float`, optional
         The location of the colorbar on the plot. Default is 2.
-    cax_fontsize: int, optional
+    - cax_fontsize: `int`, optional
         The fontsize of the colorbar label. Default is 12.
-    fig_title: str, optional
+    - fig_title: `str`, optional
         The title of the plot. Default is an empty string.
-    fig_xlabel: str, optional
+    - fig_xlabel: `str`, optional
         The label of the x-axis. Default is 'Fractions of genes'.
-    figsize: tuple, optional
+    - figsize: `tuple`, optional
         The size of the plot. Default is (2,4).
-    cmap: str, optional
+    - cmap: `str`, optional
         The colormap to use for the plot. Default is 'YlGnBu'.
 
     Returns:
     --------
-    ax: matplotlib.axes.Axes object
+    - ax: `matplotlib.axes.Axes` object
         The plot object.
     """
     fig, ax = plt.subplots(figsize=figsize)

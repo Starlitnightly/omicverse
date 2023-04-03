@@ -10,13 +10,13 @@ def Matrix_ID_mapping(data,gene_ref_path):
     Maps gene IDs in the input data to gene symbols using a reference table.
 
     Parameters:
-    data (pandas.DataFrame): 
+    - data: `pandas.DataFrame`
         The input data containing gene IDs as index.
-    gene_ref_path (str): 
+    - gene_ref_path: `str` 
         The path to the reference table containing the mapping from gene IDs to gene symbols.
 
     Returns:
-    data: pandas.DataFrame
+    - data: `pandas.DataFrame`
         The input data with gene IDs mapped to gene symbols.
     """
     
@@ -40,12 +40,12 @@ def deseq2_normalize(data):
 
     Parameters
     ----------
-    data: pandas.DataFrame
+    - data: `pandas.DataFrame`
         The data to be normalized.
 
     Returns
     -------
-    pandas.DataFrame
+    - data: `pandas.DataFrame`
         The normalized data.
     """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
@@ -60,12 +60,12 @@ def estimateSizeFactors(data):
 
     Parameters
     ----------
-    data : pandas.DataFrame
+    - data: `pandas.DataFrame`
         A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
 
     Returns
     -------
-    pandas.Series
+    - scale: `pandas.Series`
         A pandas Series of size factors, one for each sample.
 
     Examples
@@ -89,12 +89,12 @@ def estimateDispersions(counts):
 
     Parameters:
     -----------
-    counts : array-like
+    - counts : `array-like`
         Input count matrix with shape (n_genes, n_samples).
 
     Returns:
     --------
-    disp : array-like
+    - disp : `array-like`
         Array of dispersion values for each gene in the input count matrix.
     """
     # Step 1: Calculate mean and variance of counts for each gene
@@ -118,12 +118,12 @@ def data_drop_duplicates_index(data):
 
     Parameters
     ----------
-    data: pandas.DataFrame
+    - data: `pandas.DataFrame`
         The data to be processed.
 
     Returns
     -------
-    pandas.DataFrame
+    - data: `pandas.DataFrame`
         The data after dropping the duplicated index.
     """
     index=data.index
@@ -143,7 +143,7 @@ class pyDEseq(object):
 
         Returns
         -------
-        pandas.DataFrame
+        - data: `pandas.DataFrame`
             The data after dropping the duplicated index.
         """
         self.data=data_drop_duplicates_index(self.data)
@@ -155,7 +155,7 @@ class pyDEseq(object):
         
         Returns
         -------
-        pandas.DataFrame
+        - data: `pandas.DataFrame`
             The normalized data.
         """
         self.size_factors=estimateSizeFactors(self.data)
@@ -168,17 +168,17 @@ class pyDEseq(object):
 
         Parameters
         ----------
-        fc_threshold (float): 
+        - fc_threshold: `float` 
             Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes.
-        pval_threshold (float): 
+        - pval_threshold: `float` 
             p-value threshold for determining significance.
-        logp_max (float): 
+        - logp_max: `float` 
             Maximum value for log-transformed p-values.
-        fold_threshold (int): 
+        - fold_threshold: `int` 
             Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1).
 
-        Returns:
-            None
+        Returns
+        -------
         """
         if fc_threshold==-1:
             foldp=np.histogram(self.result['log2FC'])
@@ -205,36 +205,36 @@ class pyDEseq(object):
 
         Parameters:
         -----------
-        figsize : tuple, optional
+        - figsize : `tuple`, optional
             The size of the generated figure, by default (4,4).
-        title : str, optional
+        - title : `str`, optional
             The title of the plot, by default ''.
-        titlefont : dict, optional
+        - titlefont : `dict`, optional
             A dictionary of font properties for the plot title, by default {'weight':'normal','size':14,}.
-        up_color : str, optional
+        - up_color : `str`, optional
             The color of the up-regulated genes in the plot, by default '#e25d5d'.
-        down_color : str, optional
+        - down_color : `str`, optional
             The color of the down-regulated genes in the plot, by default '#7388c1'.
-        normal_color : str, optional
+        - normal_color : `str`, optional
             The color of the non-significant genes in the plot, by default '#d7d7d7'.
-        legend_bbox : tuple, optional
+        - legend_bbox : `tuple`, optional
             A tuple containing the coordinates of the legend's bounding box, by default (0.8, -0.2).
-        legend_ncol : int, optional
+        - legend_ncol : `int`, optional
             The number of columns in the legend, by default 2.
-        legend_fontsize : int, optional
+        - legend_fontsize : `int`, optional
             The font size of the legend, by default 12.
-        plot_genes : list, optional
+        - plot_genes : `list`, optional
             A list of gene names to highlight in the plot, by default None.
-        plot_genes_num : int, optional
+        - plot_genes_num : `int`, optional
             The maximum number of genes to highlight in the plot, by default 10.
-        plot_genes_fontsize : int, optional
+        - plot_genes_fontsize : `int`, optional
             The font size of the gene labels in the plot, by default 10.
-        ticks_fontsize : int, optional
+        - ticks_fontsize : `int`, optional
             The font size of the axis ticks, by default 12.
 
         Returns:
         --------
-        ax : matplotlib Axes object
+        - ax : `matplotlib Axes object`
             The Axes object containing the generated plot.
         """
         fig, ax = plt.subplots(figsize=figsize)
@@ -333,19 +333,19 @@ class pyDEseq(object):
 
         Parameters
         ----------
-        group1: list
+        - group1: `list`
             The first group to be compared.
-        group2: list
+        - group2: `list`
             The second group to be compared.
-        method: str
+        - method: `str`
             The method to be used for differential expression analysis.
             The default value is 'ttest'.
-        alpha: float
+        - alpha: `float`
             The threshold of p-value.
 
         Returns
         -------
-        pandas.DataFrame
+        - result: `pandas.DataFrame`
             The result of differential expression analysis.
         """
         if method=='ttest':

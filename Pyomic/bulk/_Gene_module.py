@@ -164,14 +164,14 @@ class pywgcna(object):
 
         Parameters
         ----------
-        character:pandas.DataFrame
+        - character: `pandas.DataFrame`
             DataFrame of sample's character, columns=character, index=['sample1','sample2',...]
-        save:bool
+        - save: `bool`
             save the result
 
         Returns
         -------
-        result:pandas.DataFrame
+        - result: `pandas.DataFrame`
             Character and module correlation matrix
         '''
         print("...PCA analysis have being done")
@@ -229,17 +229,17 @@ def Trans_corr_matrix(data,
 
     Parameters
     ----------
-    data:pandas.DataFrame
+    - data: `pandas.DataFrame`
         DataFrame of data points with each entry in the form:[sample1','sample2'...],index=gene_name
-    method:string
+    - method: `str`
         The method of calculating correlation coefficient
         method='pearson'/'kendall'/'spearman'
-    cmap:string
+    - cmap: `str`
         color Style of drawing
 
     Returns
     ----------
-    result:pandas.DataFrame
+    - result: `pandas.DataFrame`
         the gene's correlation adjacent matrix
     '''
 
@@ -334,21 +334,21 @@ def Select_module(data,
 
     Parameters
     ----------
-    data:pandas.DataFrame
+    - data: `pandas.DataFrame`
         DataFrame of data points with each entry in the form:[sample1','sample2'...],index=gene_name
-    linkage_method:string
+    - linkage_method: `str`
         The method of clustering
         method='ward'/'average'...
-    minClusterSize:int
+    - minClusterSize: `int`
         The least contained gene in each module
-    deepSplit:int
+    - deepSplit: `int`
         Degree of split
-    cmap:string
+    - cmap: `str`
         color style of figure
 
     Returns
     ----------
-    mol:pandas.DataFrame
+    - mol: `pandas.DataFrame`
         the gene's module
         columns=['ivl','module','name']
     '''
@@ -417,16 +417,16 @@ def Analysis_cocharacter(data,
 
     Parameters
     ----------
-    data:pandas.DataFrame
+    - data: `pandas.DataFrame`
         DataFrame of data points with each entry in the form:[sample1','sample2'...],index=gene_name
-    character:pandas.DataFrame
+    - character: `pandas.DataFrame`
         DataFrame of sample's character, columns=character, index=['sample1','sample2',...]
-    module:pandas.DataFrame
+    - module: `pandas.DataFrame`
         The result of the function Select_module
 
     Returns
     ----------
-    result:pandas.DataFrame
+    - result: `pandas.DataFrame`
         Character and module correlation matrix
     '''
     print("...PCA analysis have being done")
