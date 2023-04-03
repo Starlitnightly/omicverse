@@ -26,9 +26,19 @@ def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
     """
     Create a whole genome rankings dataframe from a single cell expression profile dataframe.
 
-    :param ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different
-        genes (n_cells x n_genes).
-    :return: A genome rankings dataframe (n_cells x n_genes).
+    Parameters
+    ----------
+    - ex_mtx : `pandas.DataFrame`
+        The expression profile matrix. The rows should correspond to different cells, the columns to different genes
+        (n_cells x n_genes).
+    - seed : `int`, optional (default: None)
+        The seed for the random number generator. If None, the seed is not set.
+
+    Returns
+    -------
+    - data: `pandas.DataFrame`
+        A genome rankings dataframe (n_cells x n_genes).
+
     """
     # Do a shuffle would be nice for exactly similar behaviour as R implementation.
     # 1. Ranks are assigned in the range of 1 to n, therefore we need to subtract 1.
