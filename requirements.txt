@@ -22,4 +22,6 @@ mkdocs
 mkdocs-jupyter
 mkdocs-material
 mkdocs-glightbox
-mkdocstrings
+mkdocstrings>=0.18
+mkdocs-gen-files
+mkdocstrings-python
