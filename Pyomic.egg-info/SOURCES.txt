@@ -20,7 +20,6 @@ Pyomic.egg-info/top_level.txt
 Pyomic/.ipynb_checkpoints/__init__-checkpoint.py
 Pyomic/__pycache__/__init__.cpython-38.pyc
 Pyomic/bulk/.DS_Store
-Pyomic/bulk/_DeGene.py
 Pyomic/bulk/_Deseq2.py
 Pyomic/bulk/_Enrichment.py
 Pyomic/bulk/_Gene_module.py
