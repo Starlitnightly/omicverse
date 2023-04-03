@@ -17,15 +17,15 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
 
     Parameters
     ----------
-    adata : AnnData object
+    - adata : `AnnData object`
         Annotated data matrix containing gene expression data.
-    geneset_name : str
+    - geneset_name : `str`
         Name of the gene set.
-    geneset : list of str
+    - geneset : `list` of `str`
         List of gene symbols for the gene set.
-    AUC_threshold : float, optional
+    - AUC_threshold : `float`, optional
         AUC threshold used to determine significant interactions (default is 0.01).
-    seed : int, optional
+    - seed : `int`, optional
         Seed used to initialize the random number generator (default is 42).
 
     Returns
@@ -58,15 +58,15 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
 
     Parameters
     ----------
-    adata : AnnData object
+    - adata : `AnnData object`
         AnnData object containing the data.
-    pathway_names : list of str
+    - pathway_names : `list` of `str`
         Names of the pathways to analyze.
-    pathways_dict : dict
+    - pathways_dict : `dict`
         Dictionary containing the gene sets for each pathway.
-    AUC_threshold : float, optional (default: 0.01)
+    - AUC_threshold : `float`, optional (default: 0.01)
         AUC threshold to use for determining significant gene-pathway associations.
-    seed : int, optional (default: 42)
+    - seed : `int`, optional (default: 42)
         Random seed for reproducibility.
 
     Returns
@@ -100,20 +100,20 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
 
     Parameters
     ----------
-    adata : AnnData object
+    - adata : `AnnData object`
         AnnData object containing the expression matrix.
-    pathways_dict : dict
+    - pathways_dict : `dict`
         A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-    AUC_threshold : float, optional
+    - AUC_threshold : `float`, optional
         The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. The default is 0.01.
-    seed : int, optional
+    - seed : `int`, optional
         The seed to use for the random number generator. The default is 42.
-    num_workers : int, optional
+    - num_workers : `int`, optional
         The number of workers to use for parallel processing. The default is 1.
 
     Returns
     -------
-    AnnData object
+    - adata_aucs: `AnnData object`
         AnnData object containing the pathway activity scores for each cell in the input AnnData object.
 
     """
@@ -137,26 +137,26 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     
     Parameters
     ----------
-    adata : AnnData
+    - adata : `anndata.AnnData`
         Annotated data matrix containing gene expression data.
-    pathways_dict : dict
+    - pathways_dict : `dict`
         A dictionary of gene sets with their gene members.
-    organism : str, optional (default: 'Human')
+    - organism : `str`, optional (default: 'Human')
         The organism to be used for the enrichment analysis. Can be either 'Human' or 'Mouse'.
-    group_by : str, optional (default: 'louvain')
+    - group_by : `str`, optional (default: 'louvain')
         The group label of the cells in adata.obs to perform the enrichment analysis on.
-    cutoff : float, optional (default: 0.05)
+    - cutoff : `float`, optional (default: 0.05)
         The adjusted p-value cutoff used to filter enriched pathways.
-    logfc_threshold : float, optional (default: 2)
+    - logfc_threshold : `float`, optional (default: 2)
         The log2 fold change cutoff used to define differentially expressed genes.
-    pvalue_type : str, optional (default: 'adjust')
+    - pvalue_type : `str`, optional (default: 'adjust')
         The type of p-value used for filtering enriched pathways. Can be either 'adjust' or 'raw'.
-    plot : bool, optional (default: True)
+    - plot : `bool`, optional (default: True)
         If True, generate a bar plot for each cluster of enriched pathways.
     
     Returns
     -------
-    enrich_res : pandas.DataFrame
+    - enrich_res : `pandas.DataFrame`
         A pandas dataframe containing the enriched pathways information including term name, 
         p-value, adjusted p-value, overlap genes, odds ratio, log2 fold change, and cluster name.
     
@@ -241,22 +241,22 @@ def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,
 
     Parameters:
     ----------
-    enrich_res : pandas DataFrame
+    - enrich_res : `pandas DataFrame`
         The output from the pathway_enrichment() function.
-    term_num : int, optional
+    - term_num : `int`, optional
         The number of enriched terms to display for each cluster. Default is 5.
-    return_table : bool, optional
+    - return_table : `bool`, optional
         Whether to return the heatmap table as a DataFrame. Default is False.
-    figsize : tuple, optional
+    - figsize : `tuple`, optional
         The size of the plot. Default is (3,10).
-    plot_title : str, optional
+    - plot_title : `str`, optional
         The title of the plot. Default is an empty string.
-    **kwds : optional
+    - **kwds : optional
         Other keyword arguments to pass to the seaborn heatmap function.
 
     Returns:
     -------
-    ax : matplotlib Axes object
+    - ax : `matplotlib Axes object`
         The heatmap plot.
 
     Examples:
