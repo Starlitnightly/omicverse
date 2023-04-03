@@ -4,6 +4,7 @@ import scanpy as sc
 import statsmodels.api as sm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+from ..utils import plot_boxplot
 
 def Matrix_ID_mapping(data,gene_ref_path):
     """
@@ -325,7 +326,33 @@ class pyDEseq(object):
               fontweight='normal'
               )
         return ax
-        
+    
+    def plot_boxplot(self,genes,treatment_groups,control_groups,
+                     figsize=(4,3),palette=["#a64d79","#674ea7"],
+                     title='Gene Expression',fontsize=12,legend_bbox=(1, 0.55),legend_ncol=1,
+                     **kwarg):
+        r"""
+        Plot the boxplot of genes from dds data
+        """
+        p_data=pd.DataFrame(columns=['Value','Gene','Type'])
+        for gene in genes:
+            plot_data1=pd.DataFrame()
+            plot_data1['Value']=self.data[treatment_groups].loc[gene].values
+            plot_data1['Gene']=gene
+            plot_data1['Type']='Treatment'
+
+            plot_data2=pd.DataFrame()
+            plot_data2['Value']=self.data[control_groups].loc[gene].values
+            plot_data2['Gene']=gene
+            plot_data2['Type']='Control'
+
+            plot_data=pd.concat([plot_data1,plot_data2],axis=0)
+            p_data=pd.concat([p_data,plot_data],axis=0)
+
+        fig,ax=plot_boxplot(p_data,hue='Type',x_value='Gene',y_value='Value',palette=palette,
+                          figsize=figsize,fontsize=fontsize,title=title,
+                          legend_bbox=legend_bbox,legend_ncol=legend_ncol, **kwarg)
+        return fig,ax
 
     def deg_analysis(self,group1,group2,method='ttest',alpha=0.05):
         r"""

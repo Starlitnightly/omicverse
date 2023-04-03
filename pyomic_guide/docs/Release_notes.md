@@ -38,3 +38,12 @@ First public release
 ### utils module:
 
 - Add the `pyomic_palette` in plot module
+
+## v 1.1.10
+
+Update all code reference
+
+- Fix the parameter non-vaild on `single.mofa.mofa_run` function 
+- Add the layer raw count addition on `single.scanpy_lazy` function
+- Add `utils.plot_boxplot` to plot the box plot with jittered points.
+- Add `bulk.pyDEseq.plot_boxplot` to plot the box plot with jittered points of specific Genes.
