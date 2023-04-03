@@ -24,6 +24,21 @@ import time
 def autoResolution(adata,cpus=4):
     r"""Automatically determine clustering resolution
 
+    Parameters
+    ----------
+    - adata : `scanpy.AnnData`
+        The single cell data.
+    - cpus : `int`, optional (default: 4)
+        The number of cpus used for parallel computing.
+    
+    Returns
+    -------
+    - adata : `scanpy.AnnData`
+        The single cell data with the clustering resolution.
+    - res : `float`
+        The clustering resolution.
+    - df_sil: `pandas.DataFrame`
+        The silhouette score of each clustering resolution.
     """
     print("Automatically determine clustering resolution...")
     start = time.time()
@@ -94,6 +109,19 @@ def autoResolution(adata,cpus=4):
     return adata, res, df_sil
 
 def writeGEP(adata_GEP,path):
+    r"""Write the gene expression profile to a file
+
+    Parameters
+    ----------
+    - adata_GEP : `scanpy.AnnData`
+        The single cell data with gene expression profile.
+    - path : `str`
+        The path to save the gene expression profile.
+    
+    Returns
+    -------
+
+    """
     print('Exporting GEP...')
     sc.pp.normalize_total(adata_GEP, target_sum=1e6)
     mat = adata_GEP.X.transpose()
@@ -117,27 +145,27 @@ class Drug_Response:
 
         Parameters
         ----------
-        adata : AnnData object
+        - adata : `AnnData object`
             Annotated data matrix with cells as rows and genes as columns.
-        scriptpath : str
+        - scriptpath : `str`
             Path to the directory containing the CaDRReS scripts for the analysis.
             You need to download the scirpt according `git clone https://github.com/CSB5/CaDRReS-Sc.git`
             and set the path to the directory.
-        modelpath : str
+        - modelpath : `str`
             Path to the directory containing the pre-trained models.
             You need to download the model according `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()`
             and set the path to the directory.
-        output : str, optional (default: './')
+        - output : `str`, optional (default: './')
             Path to the directory where the output files will be saved.
-        model : str, optional (default: 'GDSC')
+        - model : `str`, optional (default: 'GDSC')
             The name of the pre-trained model to be used for the analysis.
-        clusters : str, optional (default: 'All')
+        - clusters : `str`, optional (default: 'All')
             The cluster labels to be used for the analysis. Default is all cells.
-        cell : str, optional (default: 'A549')
+        - cell : `str`, optional (default: 'A549')
             The cell line to be analyzed.
-        cpus : int, optional (default: 4)
+        - cpus : `int`, optional (default: 4)
             The number of CPUs to be used for the analysis.
-        n_drugs : int, optional (default: 10)
+        - n_drugs : `int`, optional (default: 10)
             The number of top drugs to be selected based on the predicted sensitivity.
 
         Returns
@@ -171,6 +199,10 @@ class Drug_Response:
         self.figure_output()
 
     def load_model(self):
+        r"""
+        load the pre-trained model.
+
+        """
         from cadrres_sc import pp, model, evaluation, utility
         ### IC50/AUC prediction
         ## Read pre-trained model
@@ -187,6 +219,10 @@ class Drug_Response:
         self.cadrres_model = model.load_model(model_file)
 
     def drug_info(self):
+        r"""
+        read the drug information.
+
+        """
         ## Read drug information
         if self.model == 'GDSC':
             self.drug_info_df = pd.read_csv(self.scriptpath + '/preprocessed_data/GDSC/drug_stat.csv', index_col=0)
@@ -195,6 +231,10 @@ class Drug_Response:
             self.drug_info_df = pd.read_csv(self.scriptpath + '/preprocessed_data/PRISM/PRISM_drug_info.csv', index_col='broad_id')
         
     def bulk_exp(self):
+        r"""
+        extract the bulk gene expression data.
+
+        """
         ## Read test data
         if self.model == 'GDSC':
             #GDSC_exp exists in the data folder
@@ -210,6 +250,9 @@ class Drug_Response:
             self.gene_exp_df.index = [gene.split(sep=' (')[0] for gene in self.gene_exp_df.index]
 
     def sc_exp(self):
+        r"""
+        Load cluster-specific gene expression profile
+        """
         ## Load cluster-specific gene expression profile
         if self.clusters == 'All':
             clusters = sorted(self.adata.obs['louvain'].unique(), key=int)
@@ -222,6 +265,10 @@ class Drug_Response:
                                                  if np.sum(self.adata.raw.X[self.adata.obs['louvain']==cluster]) else 0.0
 
     def kernel_feature_preparartion(self):
+        r"""
+        kernel feature preparation
+
+        """
         from cadrres_sc import pp, model, evaluation, utility
         ## Read essential genes list
         if self.model == 'GDSC':
@@ -239,18 +286,26 @@ class Drug_Response:
         self.test_kernel_df = pp.gexp.calculate_kernel_feature(cluster_norm_exp_df, cell_line_log2_mean_fc_exp_df, ess_gene_list)
     
     def sensitivity_prediction(self):
+        r"""
+        Predict drug sensitivity
+        
+        """
         from cadrres_sc import pp, model, evaluation, utility
         ## Drug response prediction
         if self.model == 'GDSC':
-            print('Predicting drug response for using CaDRReS(GDSC): {}'.format(self.model_spec_name))
+            print('...Predicting drug response for using CaDRReS(GDSC): {}'.format(self.model_spec_name))
             self.pred_ic50_df, P_test_df= model.predict_from_model(self.cadrres_model, self.test_kernel_df, self.model_spec_name)
-            print('done!')
+            print('...done!')
         else:
-            print('Predicting drug response for using CaDRReS(PRISM): {}'.format(self.model_spec_name))
+            print('...Predicting drug response for using CaDRReS(PRISM): {}'.format(self.model_spec_name))
             self.pred_auc_df, P_test_df= model.predict_from_model(self.cadrres_model, self.test_kernel_df, self.model_spec_name)
-            print('done!')
+            print('...done!')
 
     def cell_death_proportion(self):
+        r"""
+        Predict cell death proportion and cell death percentage at the ref_type dosage
+
+        """
         ### Drug kill prediction
         ref_type = 'log2_median_ic50'
         self.drug_list = [x for x in self.pred_ic50_df.columns if not x in self.masked_drugs]
@@ -284,7 +339,20 @@ class Drug_Response:
             self.pred_auc_df.round(3).to_csv(os.path.join(self.output, 'PRISM_prediction.csv'))
     
     def draw_plot(self, df, n_drug=10, name='', figsize=()):
+        r"""
+        plot heatmap of drug response prediction
 
+        Parameters
+        ----------
+        - df : `pandas.DataFrame`
+            drug response prediction dataframe
+        - n_drug : `int`
+            number of drugs to be plotted
+        - name : `str`
+            name of the plot
+        - figsize : `tuple`
+            size of the plot
+        """
         def select_drug(df, n_drug):
             selected_drugs = []
             df_tmp = df.reset_index().set_index('Drug Name').iloc[:, 1:]
@@ -322,8 +390,11 @@ class Drug_Response:
             plt.close()
 
     def figure_output(self):
+        r"""
+        plot figures
 
-        print('Ploting...')
+        """
+        print('...Ploting figures...')
         ## GDSC figures
         if self.model == 'GDSC':
             tmp_pred_ic50_df = self.pred_ic50_df.T

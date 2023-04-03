@@ -13,13 +13,17 @@ def data_downloader(url,path,title):
     
     Arguments
     ---------
-    url
+    - url: `str`
         the download url of datasets
-    path
+    - path: `str`
         the save path of datasets
-    title
+    - title: `str`
         the name of datasets
     
+    Returns
+    -------
+    - path: `str`
+        the save path of datasets
     """
     if os.path.isfile(path):
         print("......Loading dataset from {}".format(path))
@@ -56,7 +60,7 @@ def data_downloader(url,path,title):
 def download_CaDRReS_model():
     r"""load CaDRReS_model
     
-    Arguments
+    Parameters
     ---------
 
     Returns
@@ -77,7 +81,7 @@ def download_CaDRReS_model():
 def download_GDSC_data():
     r"""load GDSC_data
     
-    Arguments
+    Parameters
     ---------
 
     Returns
@@ -98,6 +102,7 @@ def download_GDSC_data():
 
 def download_pathway_database():
     r"""load pathway_database
+
     """
     _datasets = {
         'GO_Biological_Process_2021':'https://figshare.com/ndownloader/files/39820720',
@@ -115,6 +120,7 @@ def download_pathway_database():
 
 def download_geneid_annotation_pair():
     r"""load geneid_annotation_pair
+
     """
     _datasets = {
         'pair_GRCm39':'https://figshare.com/ndownloader/files/39820684',
@@ -131,6 +137,20 @@ def download_geneid_annotation_pair():
     print('......Geneid Annotation Pair download finished!')
 
 def geneset_prepare(geneset_path,organism='Human'):
+    r"""load geneset
+
+    Parameters
+    ----------
+    - geneset_path: `str`
+        Path of geneset file.
+    - organism: `str`
+        Organism of geneset file. Default: 'Human'
+
+    Returns
+    -------
+    - go_bio_dict: `dict`
+        A dictionary of geneset.
+    """
     go_bio_geneset=pd.read_csv(geneset_path,sep='\t\t',header=None)
     go_bio_dict={}
     if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
