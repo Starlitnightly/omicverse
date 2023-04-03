@@ -23,18 +23,18 @@ class Bulk2Single:
 
         Parameters
         ----------
-        - bulk_data: pandas.DataFrame
+        - bulk_data: `pandas.DataFrame`
             The bulk RNA-seq data.
-        - single_data: pandas.DataFrame
+        - single_data: `pandas.DataFrame`
             The single-cell RNA-seq data.
-        - celltype_key: str
+        - celltype_key: `str`
             The name of the column in the bulk data containing cell types.
-        - top_marker_num: int, optional
+        - top_marker_num: `int`, optional
             The number of top markers to select per cell type. Default is 500.
-        - ratio_num: float, optional
+        - ratio_num: `float`, optional
             The ratio between the number of single cells and target number of converted cells. Default is 1.
-        - gpu: int, optional
-            The ID of the GPU to use. Set to -1 to use CPU. Default is 0.
+        - gpu: `int/str`, optional
+            The ID of the GPU to use. Set to -1 to use CPU. Default is 0. If set to 'mps', the MPS backend will be used.
 
         Returns
         -------
@@ -45,7 +45,11 @@ class Bulk2Single:
         self.celltype_key=celltype_key
         self.input_data=bulk2single_data_prepare(bulk_data,single_data,celltype_key)
         self.cell_target_num = data_process(self.input_data, top_marker_num, ratio_num)
-        self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
+        if gpu=='mps' and torch.backends.mps.is_available():
+            print('Note that mps may loss will be nan, used it when torch is supported')
+            self.used_device = torch.device("mps")
+        else:
+            self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
         self.history=[]
 
     def train(self,
@@ -125,11 +129,10 @@ class Bulk2Single:
 
         Parameters
         ----------
-        - None
 
         Returns
         -------
-        - sc_g: anndata.AnnData
+        - sc_g: `anndata.AnnData`
             The generated single-cell data.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -149,9 +152,9 @@ class Bulk2Single:
 
         Parameters
         ----------
-        - vae_load_dir: str
+        - vae_load_dir: `str`
             The directory to load the trained VAE model.
-        - hidden_size: int, optional
+        - hidden_size: `int`, optional
             The hidden size for the encoder and decoder networks. Default is 256.
 
         Returns
@@ -173,14 +176,14 @@ class Bulk2Single:
 
         Parameters
         ----------
-        - vae_load_dir: str
+        - vae_load_dir: `str`
             The directory to load the trained VAE model.
-        - hidden_size: int, optional
+        - hidden_size: `int`, optional
             The hidden size for the encoder and decoder networks. Default is 256.
         
         Returns
         -------
-        - sc_g: anndata.AnnData
+        - sc_g: `anndata.AnnData`
             The generated single-cell data.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -205,12 +208,12 @@ class Bulk2Single:
 
         Parameters
         ----------
-        - figsize: tuple, optional
+        - figsize: `tuple`, optional
             The size of the figure. Default is (4,4).
         
         Returns
         -------
-        - ax: matplotlib.axes._subplots.AxesSubplot
+        - ax: `matplotlib.axes._subplots.AxesSubplot`
             The axes of the figure.
         """
         fig, ax = plt.subplots(figsize=figsize)

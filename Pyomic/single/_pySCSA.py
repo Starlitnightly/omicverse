@@ -12,15 +12,19 @@ import requests
 def data_downloader(url,path,title):
     r"""datasets downloader
     
-    Arguments
-    ---------
-    url
+    Parameters
+    ----------
+    - url: `str`
         the download url of datasets
-    path
+    - path: `str`
         the save path of datasets
-    title
+    - title: `str`
         the name of datasets
     
+    Returns
+    -------
+    - path: `str`
+        the save path of datasets
     """
     if os.path.isfile(path):
         print("......Loading dataset from {}".format(path))
@@ -57,6 +61,20 @@ def data_downloader(url,path,title):
 
 
 def data_preprocess(adata,path='temp/rna.csv'):
+    r"""data preprocess for SCSA
+    
+    Parameters
+    ----------
+    - adata: `AnnData`
+        AnnData object
+    - path: `str`   
+        the save path of datasets
+
+    Returns
+    -------
+    - adata: `AnnData`
+        AnnData object
+    """
     dirname, _ = os.path.split(path)
     try:
         if not os.path.isdir(dirname):
@@ -79,6 +97,42 @@ def cell_annotate(data,
                 outfmt='txt',Gensymbol=True,
                 species='Human',weight=100,tissue='All',
                 celltype='normal',norefdb=False,noprint=True,list_tissue=False):
+    r"""cell annotation by SCSA
+    
+    Parameters
+    ----------
+    - data: `AnnData`
+        AnnData object
+    - foldchange: `float`
+        foldchange threshold
+    - pvalue: `float`
+        pvalue threshold
+    - output: `str`
+        the save path of annotation result
+    - outfmt: `str`
+        the format of annotation result
+    - Gensymbol: `bool`
+        whether to use gene symbol
+    - species: `str`
+        the species of datasets
+    - weight: `int`
+        the weight of datasets
+    - tissue: `str`
+        the tissue of datasets
+    - celltype: `str`
+        the celltype of datasets
+    - norefdb: `bool`
+        whether to use reference database
+    - noprint: `bool`
+        whether to print the result
+    - list_tissue: `bool`
+        whether to list the tissue of datasets
+    
+    Returns
+    -------
+    - result: `pandas.DataFrame`
+        the annotation result
+    """
     data.to_csv('temp/rna.csv')
 
     #https://figshare.com/ndownloader/files/37262710
@@ -116,6 +170,16 @@ def cell_annotate(data,
     return result
 
 def cell_anno_print(anno):
+    r"""print the annotation result
+    
+    Parameters
+    ----------
+    - anno: `pandas.DataFrame`
+        the annotation result
+    Returns
+    -------
+
+    """
     for i in set(anno['Cluster']):
         test=anno.loc[anno['Cluster']==i].iloc[:2]
         if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
@@ -125,10 +189,51 @@ def cell_anno_print(anno):
             print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
                                                         ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
 
-def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=2000,pct_counts_mt=10,
+def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=4300,pct_counts_mt=25,
                 target_sum=1e4,min_mean=0.0125, max_mean=3, min_disp=0.5,max_value=10,
                 n_comps=100, svd_solver="auto",n_neighbors=15, random_state = 112, n_pcs=50,
                 ):
+    r"""scanpy lazy analysis
+    
+    Parameters
+    ----------
+    - adata: `AnnData`
+        AnnData object
+    - min_genes: `int`
+        the min number of genes
+    - min_cells: `int`
+        the min number of cells
+    - n_genes_by_counts: `int`
+        the max number of genes
+    - pct_counts_mt: `int`
+        the max proportion of mito-genes
+    - target_sum: `int`
+        the max counts of total_counts
+    - min_mean: `float`
+        the min mean of genes
+    - max_mean: `float` 
+        the max mean of genes
+    - min_disp: `float`
+        the min dispersion of genes
+    - max_value: `float`
+        the max value of genes
+    - n_comps: `int`
+        the number of components
+    - svd_solver: `str`
+        the solver of svd
+    - n_neighbors: `int`
+        the number of neighbors
+    - random_state: `int`
+        the random state
+    - n_pcs: `int`
+        the number of pcs
+
+    Returns
+    ------- 
+    - adata: `AnnData`
+        AnnData object
+
+    """
     #filter cells and genes
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
@@ -137,6 +242,8 @@ def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=2000,pct_count
     sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
     adata = adata[adata.obs.n_genes_by_counts < n_genes_by_counts, :]
     adata = adata[adata.obs.pct_counts_mt < pct_counts_mt, :]
+    #save the raw counts
+    adata.layers["counts"] = adata.X.copy()
     #normalization, the max counts of total_counts is 20000 means the amount is 10e4
     sc.pp.normalize_total(adata, target_sum=target_sum)
     #log
@@ -146,8 +253,6 @@ def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=2000,pct_count
     #save and filter
     adata.raw = adata
     adata = adata[:, adata.var.highly_variable]
-    #regression：we use the proportion of mito-genes as control to revised the other expression of genes
-    sc.pp.regress_out(adata, ['total_counts', 'pct_counts_mt'])
     #scale
     sc.pp.scale(adata, max_value=max_value)
     #pca analysis

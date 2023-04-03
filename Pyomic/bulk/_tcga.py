@@ -51,7 +51,16 @@ class TCGA(object):
         
     def adata_read(self,path):
         r"""
-        Read the 
+        Read the anndata file
+
+        Parameters
+        ----------
+        - path: `str`
+            Path of the anndata file
+        
+        Returns
+        -------
+
         """
         print('... anndata reading')
         self.adata=sc.read(path)
@@ -63,6 +72,21 @@ class TCGA(object):
         
     def adata_meta_init(self,var_names=['gene_name','gene_type'],
                   obs_names=['Case ID','Sample Type']):
+        r"""
+        Init the anndata meta data
+
+        Parameters
+        ----------
+        - var_names: `list`
+            The column name of the var meta data
+        - obs_names: `list`
+            The column name of the obs meta data
+
+        Returns
+        -------
+        - adata: `anndata.AnnData`
+            The anndata object with meta data
+        """
         print('...anndata meta init',var_names,obs_names)
         adata=self.adata
         #var_pd=pd.DataFrame(index=self.adata.var.index)
@@ -82,6 +106,9 @@ class TCGA(object):
         return adata
         
     def survial_init(self):
+        r"""
+        Init the survial data
+        """
         day_li=[]
         pd_c=self.clinical_sheet
         for i in pd_c.index:
@@ -116,6 +143,9 @@ class TCGA(object):
         
         
     def index_init(self):
+        r"""
+        Init the index of the anndata object
+        """
         print('...index init')
         all_lncRNA_index=[]
         for sample_index in self.sample_sheet.index:
@@ -132,6 +162,9 @@ class TCGA(object):
         return all_lncRNA_index
     
     def expression_init(self):
+        r"""
+        Init the expression matrix of the anndata object
+        """
         print('... expression matrix init')
         data_pd_count=pd.DataFrame(index=self.tcga_index)
         data_pd_tpm=pd.DataFrame(index=self.tcga_index)
@@ -166,7 +199,9 @@ class TCGA(object):
         self.data_test=data_test
     
     def matrix_construct(self):
-       
+        r"""
+        Construct the anndata object
+        """
         print('...anndata construct')
         var_pd=pd.DataFrame(index=self.data_pd_count.index)
         obs_pd=pd.DataFrame(index=self.data_pd_count.columns)
@@ -178,6 +213,9 @@ class TCGA(object):
         return adata
     
     def matrix_normalize(self,data):
+        r"""
+        normalize the matrix by Deseq2 methods
+        """
         avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf, -np.inf], np.nan).dropna()
         data1=data.loc[avg1.index]
         data_log=data1.apply(np.log,axis=1)
@@ -187,6 +225,26 @@ class TCGA(object):
     
     
     def survival_analysis(self,gene,layer='raw',plot=False,gene_threshold='median'):
+        r"""
+        Analysis the survival of the gene
+
+        Parameters
+        ----------
+        - gene : `str`
+            The gene name
+        - layer : `str`
+            The layer of the anndata object
+        - plot : `bool`
+            Whether to plot the survival curve
+        - gene_threshold : `str`
+            The threshold of the gene expression, can be 'median' or 'mean'
+
+        Returns
+        -------
+        - s_pd : `pd.DataFrame`
+            The survival data frame
+
+        """
         goal_gene=gene
         
         s_pd=self.s_pd
@@ -237,6 +295,9 @@ class TCGA(object):
         return lr.p_value
     
     def survial_analysis_all(self):
+        r"""
+        analysis the survival of all the genes
+        """
         res_l_lnc=[]
         for i in self.adata.var.index:
             res_l_lnc.append(self.survival_analysis(i))

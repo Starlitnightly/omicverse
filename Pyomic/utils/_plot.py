@@ -11,9 +11,9 @@ def pyomic_palette():
 
     Returns
     -------
-    list
+    - sc_color: `list`
         List containing the hex codes as values.
-    """
+    """ 
     return sc_color
 
 def plot_text_set(text,text_knock=2,text_maxsize=20):
@@ -22,16 +22,16 @@ def plot_text_set(text,text_knock=2,text_maxsize=20):
 
     Parameters
     ----------
-    text : str
+    - text : `str`
         Text to format.
-    text_knock : int, optional
+    - text_knock : `int`, optional
         Number of words to skip between two line breaks, by default 2.
-    text_maxsize : int, optional
+    - text_maxsize : `int`, optional
         Maximum length of the text before formatting, by default 20.
 
     Returns
     -------
-    str
+    - text: `str`
         Formatted text.
     """
     #print(text)
