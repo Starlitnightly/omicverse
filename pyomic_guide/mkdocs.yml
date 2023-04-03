@@ -7,20 +7,21 @@ copyright: "Copyright &copy; 2019-2023, 112 Lab, USTB"
 nav:
 - Index: index.md
 - Installation: Installation_guild.md
-- Tutorial-Bulk:
-    - Different expression analysis: Tutorials-bulk/t_deg.ipynb
-    - Protein-Protein interaction (PPI) analysis by String-db: Tutorials-bulk/t_network.ipynb
-    - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
-    - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
-- Tutorial-Single:
-    - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
-    - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
-    - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
-    - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
-    - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
-- Tutorial-Bulk2Single:
-    - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
-- API documentation: API_reference.md
+- Tutorial:
+    - Bulk:
+        - Different expression analysis: Tutorials-bulk/t_deg.ipynb
+        - Protein-Protein interaction (PPI) analysis by String-db: Tutorials-bulk/t_network.ipynb
+        - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
+        - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
+    - Single:
+        - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
+        - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
+        - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
+        - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
+        - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
+    - Bulk2Single:
+        - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
+- API documentation: api/index.md
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
 
@@ -30,6 +31,17 @@ nav:
 plugins:
   - mkdocs-jupyter
   - glightbox
+  - gen-files:
+      scripts:
+      - docs/gen_ref_pages.py
+  - mkdocstrings:
+      enabled: !ENV [ENABLE_MKDOCSTRINGS, true]
+      custom_templates: templates
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: false
 
 theme:
   name: material
@@ -57,9 +69,11 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - mkautodoc
+  #- mkautodoc
   - attr_list
   - md_in_html
+  - toc:
+      permalink: true
 
   - pymdownx.arithmatex:
       generic: true

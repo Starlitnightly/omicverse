@@ -1,4 +1,3 @@
-# API documentation
 
 
 ::: Pyomic.bulk.TCGA
