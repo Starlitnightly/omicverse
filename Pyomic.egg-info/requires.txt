@@ -14,5 +14,6 @@ gseapy==0.10.8
 ipywidgets
 lifelines
 ktplotspy
+python-dotplot
 boltons
 ctxcore
