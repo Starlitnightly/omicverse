@@ -22,6 +22,7 @@ import os
 import gseapy as gp
 from gseapy.plot import barplot, dotplot
 from ..utils import plot_text_set
+import matplotlib
 
 """
 def enrichment_KEGG(gene_list,
@@ -190,38 +191,26 @@ def Plot_GSEA(data,num=0):
     # to save your figure, make sure that ofname is not None
     gseaplot(rank_metric=data.ranking, term=terms[num], **data.results[terms[num]])
 """
-def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type='auto',
-                       organism='Human',description='None',outdir='./enrichr',cutoff=0.5):
+def geneset_enrichment(gene_list:list,pathways_dict:dict,
+                       pvalue_threshold:float=0.05,pvalue_type:str='auto',
+                       organism:str='Human',description:str='None',
+                       outdir:str='./enrichr',cutoff:float=0.5)->pd.DataFrame:
     """
     Performs gene set enrichment analysis using Enrichr API.
 
-    Parameters
-    ----------
-    - gene_list : `list`
-        List of gene symbols to be tested for enrichment.
-    - pathways_dict : `dict`
-        Dictionary of pathway library names and corresponding Enrichr API URLs.
-    - pvalue_threshold : `float`, optional
-        P-value threshold for significant pathways. Default is 0.05.
-    - pvalue_type : `str`, optional
-        Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction
-        for small gene sets (<500 genes) and Bonferroni correction for larger gene sets.
-        'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction.
-        Default is 'auto'.
-    - organism : `str`, optional
-        Organism of the input gene list. Default is 'Human'.
-    - description : `str`, optional
-        Description of the input gene list. Default is 'None'.
-    - outdir : `str`, optional
-        Output directory for enrichment results. Default is './enrichr'.
-    - cutoff : `float`, optional
-        Cutoff value for pathway ranking. Only pathways with combined score >= cutoff are
-        considered significant. Default is 0.5.
+    Arguments:
+        gene_list: List of gene symbols to be tested for enrichment.
+        pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
+        pvalue_threshold: P-value threshold for significant pathways. Default is 0.05.
+        pvalue_type: Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction,for small gene sets (<500 genes) and Bonferroni correction for larger gene sets.,'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction.,Default is 'auto'.
+        organism: Organism of the input gene list. Default is 'Human'.
+        description: Description of the input gene list. Default is 'None'.
+        outdir: Output directory for Enrichr results. Default is './enrichr'.
+        cutoff: Show enriched terms which Adjusted P-value < cutoff. Default is 0.5.
 
-    Returns
-    -------
-    - enrich_res : `pandas.DataFrame`
-        Dataframe containing significant enriched pathways and associated statistics.
+    Returns:
+        enrich_res: A pandas DataFrame containing the enrichment results.
+
 
     """
     
@@ -237,7 +226,7 @@ def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type
                  description=description,
                  background=background,
                  outdir=outdir,
-                 cutoff=0.5 # test dataset, use lower value from range(0,1)
+                 cutoff=cutoff # test dataset, use lower value from range(0,1)
                 )
     if pvalue_type=='auto':
         if enr.res2d.shape[0]>100:
@@ -257,36 +246,26 @@ def geneset_enrichment(gene_list,pathways_dict,pvalue_threshold=0.05,pvalue_type
     enrich_res['fraction']=[int(i.split('/')[0])/int(i.split('/')[1]) for i in enrich_res['Overlap']]
     return enrich_res
 
-def geneset_plot(enrich_res,num=10,node_size=[5,10,15],cax_loc=2,cax_fontsize=12,
-                 fig_title='',fig_xlabel='Fractions of genes',figsize=(2,4),cmap='YlGnBu'):
+def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
+                        cax_loc:int=2,cax_fontsize:int=12,
+                        fig_title:str='',fig_xlabel:str='Fractions of genes',
+                        figsize:tuple=(2,4),cmap:str='YlGnBu')->matplotlib.axes._axes.Axes:
     """
     Plot the gene set enrichment result.
 
-    Parameters:
-    -----------
-    - enrich_res: `pandas.DataFrame`
-        The gene set enrichment result obtained from the geneset_enrichment function.
-    - num: `int`, optional
-        The number of enriched terms to plot. Default is 10.
-    - node_size: `list`, optional
-        A list of integers defining the size of nodes in the plot. Default is [5,10,15].
-    - cax_loc: `float`, optional
-        The location of the colorbar on the plot. Default is 2.
-    - cax_fontsize: `int`, optional
-        The fontsize of the colorbar label. Default is 12.
-    - fig_title: `str`, optional
-        The title of the plot. Default is an empty string.
-    - fig_xlabel: `str`, optional
-        The label of the x-axis. Default is 'Fractions of genes'.
-    - figsize: `tuple`, optional
-        The size of the plot. Default is (2,4).
-    - cmap: `str`, optional
-        The colormap to use for the plot. Default is 'YlGnBu'.
+    Arguments:
+        num: The number of enriched terms to plot. Default is 10.
+        node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
+        cax_loc: The location of the colorbar on the plot. Default is 2.
+        cax_fontsize: The fontsize of the colorbar label. Default is 12.
+        fig_title: The title of the plot. Default is an empty string.
+        fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
+        figsize: The size of the plot. Default is (2,4).
+        cmap: The colormap to use for the plot. Default is 'YlGnBu'.
 
     Returns:
-    --------
-    - ax: `matplotlib.axes.Axes` object
-        The plot object.
+        A matplotlib.axes.Axes object.
+    
     """
     fig, ax = plt.subplots(figsize=figsize)
     plot_data2=enrich_res.sort_values('P-value')[:num].sort_values('logc')
@@ -314,3 +293,65 @@ def geneset_plot(enrich_res,num=10,node_size=[5,10,15],cax_loc=2,cax_fontsize=12
         ncol=3,bbox_to_anchor=(-0.45, -13),
         fontsize=cax_fontsize)
     return ax
+
+class pyGSEA(object):
+
+    def __init__(self,gene_list:list,pathways_dict:dict,pvalue_threshold:float=0.05,pvalue_type:str='auto',
+                       organism:str='Human',description:str='None',outdir:str='./enrichr',cutoff:float=0.5) -> None:
+        """Initialize the pyGSEA class.
+
+        Arguments:
+            gene_list: A list of genes.
+            pathways_dict: A dictionary of pathways.
+            pvalue_threshold: The p-value threshold for enrichment. Default is 0.05.
+            pvalue_type: The p-value type. Default is 'auto'.
+            organism: The organism. Default is 'Human'.
+            description: The description. Default is 'None'.
+            outdir: The output directory. Default is './enrichr'.
+            cutoff: The cutoff for enrichment. Default is 0.5.
+        
+        """
+
+        self.gene_list=gene_list
+        self.pathways_dict=pathways_dict
+        self.pvalue_threshold=pvalue_threshold
+        self.pvalue_type=pvalue_type
+        self.organism=organism
+        self.description=description
+        self.outdir=outdir
+        self.cutoff=cutoff
+    
+    def enrichment(self):
+        """gene set enrichment analysis.
+        
+        Returns:
+            A pandas.DataFrame object containing the enrichment results.
+        """
+
+        enrich_res=geneset_enrichment(self.gene_list,self.pathways_dict,self.pvalue_threshold,self.pvalue_type,
+                                  self.organism,self.description,self.outdir,self.cutoff)
+        self.enrich_res=enrich_res
+        return enrich_res
+    
+    def plot_enrichment(self,num:int=10,node_size:list=[5,10,15],
+                        cax_loc:int=2,cax_fontsize:int=12,
+                        fig_title:str='',fig_xlabel:str='Fractions of genes',
+                        figsize:tuple=(2,4),cmap:str='YlGnBu')->matplotlib.axes._axes.Axes:
+        
+        """Plot the gene set enrichment result.
+        
+        Arguments:
+            num: The number of enriched terms to plot. Default is 10.
+            node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
+            cax_loc: The location of the colorbar on the plot. Default is 2.
+            cax_fontsize: The fontsize of the colorbar label. Default is 12.
+            fig_title: The title of the plot. Default is an empty string.
+            fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
+            figsize: The size of the plot. Default is (2,4).
+            cmap: The colormap to use for the plot. Default is 'YlGnBu'.
+
+        Returns:
+            A matplotlib.axes.Axes object.
+        """
+        return geneset_plot(self.enrich_res,num,node_size,cax_loc,cax_fontsize,
+                            fig_title,fig_xlabel,figsize,cmap)

@@ -7,6 +7,31 @@ import time
 import requests
 import os
 import pandas as pd
+import scanpy as sc
+
+
+def read(path):
+    if path.split('.')[-1]=='h5ad':
+        return sc.read(path)
+    elif path.split('.')[-1]=='csv':
+        return pd.read_csv(path)
+    elif path.split('.')[-1]=='tsv':
+        return pd.read_csv(path,sep='\t')
+    else:
+        raise ValueError('The type is not supported.')
+    
+def read_csv(**kwargs):
+    return pd.read_csv(**kwargs)
+
+def read_10x_mtx(**kwargs):
+    return sc.read_10x_mtx(**kwargs)
+
+def read_h5ad(**kwargs):
+    return sc.read_h5ad(**kwargs)
+
+def read_10x_h5(**kwargs):
+    return sc.read_10x_h5(**kwargs)
+
 
 def data_downloader(url,path,title):
     r"""datasets downloader

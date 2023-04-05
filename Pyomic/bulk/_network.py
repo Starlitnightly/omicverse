@@ -2,21 +2,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd 
 import networkx as nx
+import itertools
+from ..utils import plot_network
+from typing import Union,Tuple
+import matplotlib
 
-def string_interaction(gene,species):
+def string_interaction(gene:list,species:int) -> pd.DataFrame:
     r"""A Python library to analysis the protein-protein interaction network by string-db
-
-    Parameters
-    ----------
-    - gene: `list`
-        The gene list to analysis PPI
-    - species: `str`
-        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+  
+    Arguments:
+        gene: The gene list to analysis PPI
+        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
     
-    Returns
-    -------
-    res
-        the dataframe of protein-protein interaction
+    Returns:
+        res: the dataframe of protein-protein interaction
     
     """
     import requests ## python -m pip install requests
@@ -68,20 +67,15 @@ def string_interaction(gene,species):
 
 
 
-def string_map(gene,species):
+def string_map(gene:list,species:int)->pd.DataFrame:
     r"""A Python library to find the gene name in string-db
 
-    Parameters
-    ----------
-    - gene: `list`
-        The gene list to analysis PPI
-    - species: `str`
-        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+    Arguments:
+        gene: The gene list to analysis PPI
+        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
     
-    Returns
-    -------
-    res
-        the dataframe of query gene and new gene
+    Returns:
+        res: the dataframe of query gene and new gene
     
     """
     import requests ## python -m pip install requests
@@ -131,29 +125,22 @@ def max_interaction(gene,species):
     return res
     
 
-def generate_G(gene,species,score=0.4):
+def generate_G(gene:list,species:int,score:float=0.4) -> nx.Graph:
     r"""A Python library to get the PPI network in string-db
 
-    Parameters
-    ----------
-    - gene: `list`
-        The gene list to analysis PPI
-    - species: `str`
-        NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
-    - score: `float`
-        The threshold of protein A and B interaction
-    
-    Returns
-    -------
-    - G: `nx.graphml`
-        the networkx object of PPI in query gene list
+    Arguments:
+        gene: The gene list to analysis PPI
+        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+        score: The threshold of protein A and B interaction
+
+    Returns:
+        G: the networkx object of PPI in query gene list
     
     """
-    import itertools
+    
     a=string_interaction(gene,species)
     b=a.drop_duplicates()
     b.head()
-    import networkx as nx
     G = nx.Graph()
     G.add_nodes_from(set(b['preferredName_A'].tolist()+b['preferredName_B'].tolist()))
 
@@ -164,3 +151,46 @@ def generate_G(gene,species,score=0.4):
         if(float(b.loc[i]['score'])>score):
             G.add_edge(col_label,row_label)
     return G
+
+class pyPPI(object):
+
+    def __init__(self,gene: list,species: int,gene_type_dict: dict,gene_color_dict: dict,
+                 score: float = 0.4) -> None:
+        """Initialize the protein-protein interaction analysis.
+
+        Arguments:
+            gene: The gene list to analysis PPI
+            species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+            gene_type_dict: The gene type dict, the key is gene name, the value is gene type.
+            gene_color_dict: The gene color dict, the key is gene name, the value is gene color.
+            score: The threshold of protein A and B interaction
+        """
+        self.gene=gene 
+        self.species=species
+        self.score=score
+        self.gene_type_dict=gene_type_dict
+        self.gene_color_dict=gene_color_dict
+
+    def interaction_analysis(self) -> nx.Graph:
+        """Analysis the protein-protein interaction.
+        
+        Returns:
+            G: the networkx object of PPI in query gene list
+        """
+        G=generate_G(self.gene,
+                          self.species,
+                          self.score)
+        self.G=G 
+        return G
+    
+    def plot_network(self,**kwargs) -> Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
+        """Plot the protein-protein interaction network.
+
+        Returns:
+            fig: the figure of PPI network
+            ax: the AxesSubplot of PPI network
+        """
+        return plot_network(self.G,self.gene_type_dict,self.gene_color_dict,**kwargs)
+    
+    
+        

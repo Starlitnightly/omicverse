@@ -7,25 +7,18 @@ from lifelines.statistics import logrank_test
 import pandas as pd
 import matplotlib.pyplot as plt
 
-class TCGA(object):
+class pyTCGA(object):
     r"""
     TCGA analysis module 
     """
-    def __init__(self,gdc_sample_sheep,gdc_download_files,clinical_cart):
+    def __init__(self,gdc_sample_sheep:str,gdc_download_files:str,clinical_cart:str):
         r"""
         Init the TCGA module
 
-        Parameters
-        ----------
-        - gdc_sample_sheep: `str`
-            Path of the Sample Sheet button of TCGA, and we can get tsv file from it
-        - gdc_download_files: `str`
-            Path of the Download/Cart button of TCGA, and we get tar.gz included all file you selected/
-        - clinical_cart: `str`
-            Path of the Clinical button of TCGA, and we can get tar.gz included all clinical of your files
-
-        Returns
-        -------
+        Arguments:
+            gdc_sample_sheep: Path of the Sample Sheet button of TCGA, and we can get tsv file from it
+            gdc_download_files: Path of the Download/Cart button of TCGA, and we get tar.gz included all file you selected/
+            clinical_cart: Path of the Clinical button of TCGA, and we can get tar.gz included all clinical of your files
 
         """
         self.gdc_sample_sheep=gdc_sample_sheep
@@ -49,18 +42,12 @@ class TCGA(object):
         print('tcga module init success')
         
         
-    def adata_read(self,path):
+    def adata_read(self,path:str):
         r"""
         Read the anndata file
 
-        Parameters
-        ----------
-        - path: `str`
-            Path of the anndata file
-        
-        Returns
-        -------
-
+        Arguments:
+            path: Path of the anndata file
         """
         print('... anndata reading')
         self.adata=sc.read(path)
@@ -70,22 +57,18 @@ class TCGA(object):
         self.expression_init()
         self.matrix_construct()
         
-    def adata_meta_init(self,var_names=['gene_name','gene_type'],
-                  obs_names=['Case ID','Sample Type']):
+    def adata_meta_init(self,var_names:list=['gene_name','gene_type'],
+                  obs_names:list=['Case ID','Sample Type'])->anndata.AnnData:
         r"""
         Init the anndata meta data
 
-        Parameters
-        ----------
-        - var_names: `list`
-            The column name of the var meta data
-        - obs_names: `list`
-            The column name of the obs meta data
+        Arguments:
+            var_names: The column name of the var meta data
+            obs_names: The column name of the obs meta data
 
-        Returns
-        -------
-        - adata: `anndata.AnnData`
-            The anndata object with meta data
+        Returns:
+            adata: The anndata object with meta data
+
         """
         print('...anndata meta init',var_names,obs_names)
         adata=self.adata
@@ -142,9 +125,12 @@ class TCGA(object):
         
         
         
-    def index_init(self):
+    def index_init(self)->list:
         r"""
         Init the index of the anndata object
+
+        Returns:
+            all_lncRNA_index: The index of the anndata object
         """
         print('...index init')
         all_lncRNA_index=[]
@@ -212,9 +198,15 @@ class TCGA(object):
         self.adata=adata
         return adata
     
-    def matrix_normalize(self,data):
+    def matrix_normalize(self,data:pd.DataFrame)->pd.DataFrame:
         r"""
         normalize the matrix by Deseq2 methods
+
+        Arguments:
+            data: The matrix to be normalized
+
+        Returns:
+            data: The normalized matrix
         """
         avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf, -np.inf], np.nan).dropna()
         data1=data.loc[avg1.index]
@@ -224,25 +216,18 @@ class TCGA(object):
 
     
     
-    def survival_analysis(self,gene,layer='raw',plot=False,gene_threshold='median'):
+    def survival_analysis(self,gene:str,layer:str='raw',plot:bool=False,gene_threshold:str='median')->float:
         r"""
         Analysis the survival of the gene
 
-        Parameters
-        ----------
-        - gene : `str`
-            The gene name
-        - layer : `str`
-            The layer of the anndata object
-        - plot : `bool`
-            Whether to plot the survival curve
-        - gene_threshold : `str`
-            The threshold of the gene expression, can be 'median' or 'mean'
+        Arguments:
+            gene: The gene name
+            layer: The layer of the anndata object
+            plot: Whether to plot the survival curve
+            gene_threshold: The threshold of the gene expression, can be 'median' or 'mean'
 
-        Returns
-        -------
-        - s_pd : `pd.DataFrame`
-            The survival data frame
+        Returns:
+            s_pd: The survival pvalue
 
         """
         goal_gene=gene

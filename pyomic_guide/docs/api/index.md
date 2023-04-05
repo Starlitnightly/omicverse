@@ -10,11 +10,11 @@ import Pyomic
 
 |module|reference|
 | ---- | ---- |
-|[bulk.pyDEseq](bulk/api_deseq)|Different expression analysis|
-|[bulk.enrichment](bulk/api_enrichment)|Geneset enrichment analysis|
-|[bulk.tcga](bulk/api_tcga)|TCGA database preprocess|
-|[bulk.network](bulk/api_network)|Protein-Protein interaction (PPI) analysis by String-db|
-|[bulk.wgcna](bulk/api_module)|WGCNA (Weighted gene co-expression network analysis)|
+|[bulk.pyDEG](bulk/api_deseq)|Different expression analysis|
+|[bulk.pyGSEA](bulk/api_enrichment)|Geneset enrichment analysis|
+|[bulk.pyTCGA](bulk/api_tcga)|TCGA database preprocess|
+|[bulk.pyPPI](bulk/api_network)|Protein-Protein interaction (PPI) analysis by String-db|
+|[bulk.pyWGCNA](bulk/api_module)|WGCNA (Weighted gene co-expression network analysis)|
 
 ## Single
 

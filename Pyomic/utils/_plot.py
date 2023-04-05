@@ -3,10 +3,18 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import random
+import scanpy as sc
+import networkx as nx
+import pandas as pd
+
 sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
  '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
  '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
+
+def pyomic_plot_set(verbosity=3,dpi=80,facecolor='white'):
+    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
+    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
 
 def pyomic_palette():
     """
@@ -214,4 +222,65 @@ def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(True)
+    return fig,ax
+
+def plot_network(G,G_type_dict,G_color_dict,pos_type='spring',pos_dim=2,
+                figsize=(4,4),pos_scale=10,pos_k=None,pos_alpha=0.4,
+                node_size=50,node_alpha=0.6,node_linewidths=1,
+                plot_node=None,plot_node_num=20,
+                label_verticalalignment='center_baseline',label_fontsize=12,
+                label_fontfamily='Arial',label_fontweight='bold',label_bbox=None,
+                legend_bbox=(0.7, 0.05),legend_ncol=3,legend_fontsize=12,
+                legend_fontweight='bold'):
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    if pos_type=='spring':
+        pos = nx.spring_layout(G, scale=pos_scale, k=pos_k)
+    elif pos_type=='kamada_kawai':
+        pos=nx.kamada_kawai_layout(G,dim=pos_dim,scale=pos_scale)
+    degree_dict = dict(G.degree(G.nodes()))
+    
+    nx.draw_networkx_edges(G, pos,nodelist=list(G_color_dict.keys()), alpha=pos_alpha)
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        nodelist=list(G_color_dict.keys()),
+        node_size=[degree_dict[v]*node_size for v in G],
+        node_color=list(G_color_dict.values()),
+        alpha=node_alpha,
+        linewidths=node_linewidths,
+    )
+    if plot_node!=None:
+        hub_gene=plot_node
+    else:
+        hub_gene=[i[0] for i in sorted(degree_dict.items(),key=lambda x: x[1],reverse=True)[:plot_node_num]]
+    
+    pos1=dict()
+    for i in pos.keys():
+        pos1[i]=np.array([-1000,-1000])
+    for i in hub_gene:
+        pos1[i]=pos[i]
+    #label_options = {"ec": "white", "fc": "white", "alpha": 0.6}
+    nx.draw_networkx_labels(
+        G,pos1,verticalalignment=label_verticalalignment,
+        font_size=label_fontsize,font_family=label_fontfamily,
+        font_weight=label_fontweight,bbox=label_bbox,
+    )
+
+    ax.axis("off")
+    
+    t=pd.DataFrame(index=G_type_dict.keys())
+    t['gene_type_dict']=G_type_dict
+    t['gene_color_dict']=G_color_dict
+    type_color_dict={}
+    for i in t['gene_type_dict'].value_counts().index:
+        type_color_dict[i]=t.loc[t['gene_type_dict']==i,'gene_color_dict'].values[0]
+    
+    patches = [ mpatches.Patch(color=type_color_dict[i], label="{:s}".format(i) ) for i in type_color_dict.keys() ] 
+
+    plt.legend(handles=patches,bbox_to_anchor=legend_bbox, ncol=legend_ncol,fontsize=legend_fontsize)
+    leg = plt.gca().get_legend() #或leg=ax.get_legend()
+    ltext = leg.get_texts()
+    plt.setp(ltext, fontsize=legend_fontsize,fontweight=legend_fontweight)
+    
     return fig,ax
