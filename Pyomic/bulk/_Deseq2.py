@@ -8,21 +8,21 @@ import scanpy as sc
 import statsmodels.api as sm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib
+from typing import Union,Tuple
 from ..utils import plot_boxplot
 
-def Matrix_ID_mapping(data,gene_ref_path):
+def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
     Maps gene IDs in the input data to gene symbols using a reference table.
 
-    Parameters:
-    - data: `pandas.DataFrame`
-        The input data containing gene IDs as index.
-    - gene_ref_path: `str` 
-        The path to the reference table containing the mapping from gene IDs to gene symbols.
+    Arguments:
+        data: The input data containing gene IDs as index.
+        gene_ref_path: The path to the reference table containing the mapping from gene IDs to gene symbols.
 
     Returns:
-    - data: `pandas.DataFrame`
-        The input data with gene IDs mapped to gene symbols.
+        data: The input data with gene IDs mapped to gene symbols.
+
     """
     
     pair=pd.read_csv(gene_ref_path,sep='\t',index_col=0)
@@ -39,19 +39,16 @@ def Matrix_ID_mapping(data,gene_ref_path):
     return data
 
 
-def deseq2_normalize(data):
+def deseq2_normalize(data:pd.DataFrame)->pd.DataFrame:
     r"""
     Normalize the data using DESeq2 method:
 
-    Parameters
-    ----------
-    - data: `pandas.DataFrame`
-        The data to be normalized.
+    Arguments:
+        data: the data to be normalized.
+    
+    Returns:
+        data: the normalized data.
 
-    Returns
-    -------
-    - data: `pandas.DataFrame`
-        The normalized data.
     """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
     data1=data.loc[avg1.index]
@@ -59,26 +56,24 @@ def deseq2_normalize(data):
     scale=data_log.sub(avg1.values,axis=0).median(axis=0).apply(np.exp)
     return data/scale
 
-def estimateSizeFactors(data):
+def estimateSizeFactors(data:pd.DataFrame)->pd.Series:
     """
     Estimate size factors for data normalization.
 
-    Parameters
-    ----------
-    - data: `pandas.DataFrame`
-        A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
+    Arguments:
+        data:  A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
+    Returns:
+        scale: A pandas Series of size factors, one for each sample.
 
-    Returns
-    -------
-    - scale: `pandas.Series`
-        A pandas Series of size factors, one for each sample.
-
-    Examples
+    Examples:
     --------
-    >>> import pandas as pd
-    >>> import numpy as np
-    >>> data = pd.DataFrame(np.random.rand(100, 10), columns=list('abcdefghij'))
-    >>> size_factors = estimateSizeFactors(data)
+    ```python
+    import pandas as pd
+    import numpy as np
+    import Pyomic
+    data = pd.DataFrame(np.random.rand(100, 10), columns=list('abcdefghij'))
+    size_factors = Pyomic.bulk.estimateSizeFactors(data)
+    ```
     """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
     data1=data.loc[avg1.index]
@@ -87,20 +82,16 @@ def estimateSizeFactors(data):
     return scale
 
 
-def estimateDispersions(counts):
+def estimateDispersions(counts:pd.DataFrame)->pd.Series:
     """
     Estimates the dispersion parameter of the Negative Binomial distribution
     for each gene in the input count matrix.
 
-    Parameters:
-    -----------
-    - counts : `array-like`
-        Input count matrix with shape (n_genes, n_samples).
+    Arguments:
+        counts:Input count matrix with shape (n_genes, n_samples).
 
     Returns:
-    --------
-    - disp : `array-like`
-        Array of dispersion values for each gene in the input count matrix.
+        disp: Array of dispersion values for each gene in the input count matrix.
     """
     # Step 1: Calculate mean and variance of counts for each gene
     mean_counts = np.mean(counts, axis=1)
@@ -117,73 +108,64 @@ def estimateDispersions(counts):
     
     return disp
 
-def data_drop_duplicates_index(data):
+def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     r"""
     Drop the duplicated index of data.
 
-    Parameters
-    ----------
-    - data: `pandas.DataFrame`
-        The data to be processed.
+    Arguments:
+        data: The data to be processed.
 
-    Returns
-    -------
-    - data: `pandas.DataFrame`
-        The data after dropping the duplicated index.
+    Returns:
+        data: The data after dropping the duplicated index.
     """
     index=data.index
     data=data.loc[~index.duplicated(keep='first')]
     return data
 
-class pyDEseq(object):
+class pyDEG(object):
 
 
-    def __init__(self,raw_data) -> None:
+    def __init__(self,raw_data:pd.DataFrame) -> None:
+        """Initialize the pyDEG class.
+
+        Arguments:
+            raw_data: The raw data to be processed.
+        
+        """
         self.raw_data=raw_data
         self.data=raw_data.copy()
         
-    def drop_duplicates_index(self):
+    def drop_duplicates_index(self)->pd.DataFrame:
         r"""
         Drop the duplicated index of data.
 
         Returns
-        -------
-        - data: `pandas.DataFrame`
-            The data after dropping the duplicated index.
+            data: The data after dropping the duplicated index.
         """
         self.data=data_drop_duplicates_index(self.data)
         return self.data
 
-    def normalize(self):
+    def normalize(self)->pd.DataFrame:
         r"""
         Normalize the data using DESeq2 method.
         
         Returns
-        -------
-        - data: `pandas.DataFrame`
-            The normalized data.
+            data: The normalized data.
         """
         self.size_factors=estimateSizeFactors(self.data)
         self.data=deseq2_normalize(self.data)
         return self.data
     
-    def foldchange_set(self,fc_threshold=-1,pval_threshold=0.05,logp_max=6,fold_threshold=0):
+    def foldchange_set(self,fc_threshold:int=-1,pval_threshold:float=0.05,logp_max:int=6,fold_threshold:int=0):
         """
         Sets fold-change and p-value thresholds to classify differentially expressed genes as up-regulated, down-regulated, or not significant.
 
-        Parameters
-        ----------
-        - fc_threshold: `float` 
-            Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes.
-        - pval_threshold: `float` 
-            p-value threshold for determining significance.
-        - logp_max: `float` 
-            Maximum value for log-transformed p-values.
-        - fold_threshold: `int` 
-            Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1).
+        Arguments:
+            fc_threshold: Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes.
+            pval_threshold: p-value threshold for determining significance.
+            logp_max: Maximum value for log-transformed p-values.
+            fold_threshold: Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1).
 
-        Returns
-        -------
         """
         if fc_threshold==-1:
             foldp=np.histogram(self.result['log2FC'])
@@ -200,47 +182,32 @@ class pyDEseq(object):
         self.result.loc[self.result['-log(qvalue)']>logp_max,'-log(qvalue)']=logp_max
     
 
-    def plot_volcano(self,figsize=(4,4),title='',titlefont={'weight':'normal','size':14,},
-                     up_color='#e25d5d',down_color='#7388c1',normal_color='#d7d7d7',
-                     legend_bbox=(0.8, -0.2),legend_ncol=2,legend_fontsize=12,
-                     plot_genes=None,plot_genes_num=10,plot_genes_fontsize=10,
-                     ticks_fontsize=12):
+    def plot_volcano(self,figsize:tuple=(4,4),title:str='',titlefont:dict={'weight':'normal','size':14,},
+                     up_color:str='#e25d5d',down_color:str='#7388c1',normal_color:str='#d7d7d7',
+                     legend_bbox:tuple=(0.8, -0.2),legend_ncol:int=2,legend_fontsize:int=12,
+                     plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
+                     ticks_fontsize:int=12)->matplotlib.axes._axes.Axes:
         """
         Generate a volcano plot for the differential gene expression analysis results.
 
-        Parameters:
-        -----------
-        - figsize : `tuple`, optional
-            The size of the generated figure, by default (4,4).
-        - title : `str`, optional
-            The title of the plot, by default ''.
-        - titlefont : `dict`, optional
-            A dictionary of font properties for the plot title, by default {'weight':'normal','size':14,}.
-        - up_color : `str`, optional
-            The color of the up-regulated genes in the plot, by default '#e25d5d'.
-        - down_color : `str`, optional
-            The color of the down-regulated genes in the plot, by default '#7388c1'.
-        - normal_color : `str`, optional
-            The color of the non-significant genes in the plot, by default '#d7d7d7'.
-        - legend_bbox : `tuple`, optional
-            A tuple containing the coordinates of the legend's bounding box, by default (0.8, -0.2).
-        - legend_ncol : `int`, optional
-            The number of columns in the legend, by default 2.
-        - legend_fontsize : `int`, optional
-            The font size of the legend, by default 12.
-        - plot_genes : `list`, optional
-            A list of gene names to highlight in the plot, by default None.
-        - plot_genes_num : `int`, optional
-            The maximum number of genes to highlight in the plot, by default 10.
-        - plot_genes_fontsize : `int`, optional
-            The font size of the gene labels in the plot, by default 10.
-        - ticks_fontsize : `int`, optional
-            The font size of the axis ticks, by default 12.
+        Arguments:
+            figsize: The size of the generated figure, by default (4,4).
+            title: The title of the plot, by default ''.
+            titlefont: A dictionary of font properties for the plot title, by default {'weight':'normal','size':14,}.
+            up_color: The color of the up-regulated genes in the plot, by default '#e25d5d'.
+            down_color: The color of the down-regulated genes in the plot, by default '#7388c1'.
+            normal_color: The color of the non-significant genes in the plot, by default '#d7d7d7'.
+            legend_bbox: A tuple containing the coordinates of the legend's bounding box, by default (0.8, -0.2).
+            legend_ncol: The number of columns in the legend, by default 2.
+            legend_fontsize: The font size of the legend, by default 12.
+            plot_genes: A list of genes to be plotted on the volcano plot, by default None.
+            plot_genes_num: The number of genes to be plotted on the volcano plot, by default 10.
+            plot_genes_fontsize: The font size of the genes to be plotted on the volcano plot, by default 10.
+            ticks_fontsize: The font size of the ticks, by default 12.
 
         Returns:
-        --------
-        - ax : `matplotlib Axes object`
-            The Axes object containing the generated plot.
+            ax: The generated volcano plot.
+
         """
         fig, ax = plt.subplots(figsize=figsize)
         result=self.result.copy()
@@ -331,12 +298,28 @@ class pyDEseq(object):
               )
         return ax
     
-    def plot_boxplot(self,genes,treatment_groups,control_groups,
-                     figsize=(4,3),palette=["#a64d79","#674ea7"],
-                     title='Gene Expression',fontsize=12,legend_bbox=(1, 0.55),legend_ncol=1,
-                     **kwarg):
+    def plot_boxplot(self,genes:list,treatment_groups:list,control_groups:list,
+                     figsize:tuple=(4,3),palette:list=["#a64d79","#674ea7"],
+                     title:str='Gene Expression',fontsize:int=12,legend_bbox:tuple=(1, 0.55),legend_ncol:int=1,
+                     **kwarg)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         r"""
         Plot the boxplot of genes from dds data
+
+        Arguments:
+            genes: The genes to plot.
+            treatment_groups: The treatment groups.
+            control_groups: The control groups.
+            figsize: The figure size.
+            palette: The color palette.
+            title: The title of the plot.
+            fontsize: The fontsize of the plot.
+            legend_bbox: The bbox of the legend.
+            legend_ncol: The number of columns of the legend.
+            **kwarg: Other arguments for plot_boxplot function.
+        
+        Returns:
+            fig: The figure of the plot.
+            ax: The axis of the plot.
         """
         p_data=pd.DataFrame(columns=['Value','Gene','Type'])
         for gene in genes:
@@ -358,26 +341,18 @@ class pyDEseq(object):
                           legend_bbox=legend_bbox,legend_ncol=legend_ncol, **kwarg)
         return fig,ax
 
-    def deg_analysis(self,group1,group2,method='ttest',alpha=0.05):
+    def deg_analysis(self,group1:list,group2:list,method:str='ttest',alpha:float=0.05)->pd.DataFrame:
         r"""
         Differential expression analysis.
 
-        Parameters
-        ----------
-        - group1: `list`
-            The first group to be compared.
-        - group2: `list`
-            The second group to be compared.
-        - method: `str`
-            The method to be used for differential expression analysis.
-            The default value is 'ttest'.
-        - alpha: `float`
-            The threshold of p-value.
+        Arguments:
+            group1: The first group to be compared.
+            group2: The second group to be compared.
+            method: The method to be used for differential expression analysis.
+            alpha: The threshold of p-value.
 
         Returns
-        -------
-        - result: `pandas.DataFrame`
-            The result of differential expression analysis.
+            result: The result of differential expression analysis.
         """
         if method=='ttest':
             from scipy.stats import ttest_ind
@@ -411,6 +386,7 @@ class pyDEseq(object):
             self.result=result
             return result
         elif method=='wilcox':
+            raise ValueError('The method is not supported.')
             from scipy.stats import wilcoxon
             from statsmodels.stats.multitest import fdrcorrection
             data=self.data

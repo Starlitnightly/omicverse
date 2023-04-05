@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk.pywgcna
+::: Pyomic.bulk.pyWGCNA
     handler: python
     selection:
         options:
@@ -13,6 +13,11 @@
             - calculate_geneTree
             - calculate_dynamicMods
             - calculate_gene_module
-            - Analysis_cocharacter
+            - get_sub_module
+            - get_sub_network
+            - plot_sub_network
+            - analysis_meta_correlation
+            - plot_meta_correlation
+
         show_root_heading: true
         show_source: true

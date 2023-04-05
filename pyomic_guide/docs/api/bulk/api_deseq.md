@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk.pyDEseq
+::: Pyomic.bulk.pyDEG
     handler: python
     selection:
         options:

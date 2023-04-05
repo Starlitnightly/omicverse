@@ -25,3 +25,4 @@ mkdocs-glightbox
 mkdocstrings>=0.18
 mkdocs-gen-files
 mkdocstrings-python
+python-dotplot

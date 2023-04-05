@@ -47,3 +47,15 @@ Update all code reference
 - Add the layer raw count addition on `single.scanpy_lazy` function
 - Add `utils.plot_boxplot` to plot the box plot with jittered points.
 - Add `bulk.pyDEseq.plot_boxplot` to plot the box plot with jittered points of specific Genes.
+
+
+## v 1.2.0
+
+### bulk module:
+
+- Fix the `cutoff` parameter non-vaild on `bulk.geneset_enrichment`
+- Add `pyPPI`,`pyGSEA`,`pyWGCNA`,`pyTCGA`,`pyDEG` module.
+
+### bulk2single module:
+
+- Add the `bulk2single.save` to save model by manual

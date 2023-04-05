@@ -11,12 +11,12 @@ from setuptools import setup, find_packages
 
 setup(  
     name = 'Pyomic',  
-    version = '1.1.10',
+    version = '1.2.0',
     # keywords = ('chinesename',),  
     description = 'A python framework library for omics analysis',  
     license = 'GNU License',  
     install_requires = ['ERgene','numpy','scanpy','pandas','matplotlib','scikit-learn','scipy','networkx','multiprocess',
-                        'seaborn','datetime','statsmodels','gseapy==0.10.8','ipywidgets','lifelines','ktplotspy',
+                        'seaborn','datetime','statsmodels','gseapy==0.10.8','ipywidgets','lifelines','ktplotspy','python-dotplot',
                         'boltons','ctxcore'],  
     packages = find_packages(),  # 要打包的项目文件夹
     include_package_data=True,   # 自动打包文件夹内所有数据
@@ -26,6 +26,6 @@ setup(
     long_description=long_description,  
     long_description_content_type="text/markdown",  
     python_requires='>=3.8',
-    py_modules=['bulk','single'],
+    py_modules=['bulk','single','bulk2single','utils'],
     # packages = find_packages(include=("*"),),  
 )
