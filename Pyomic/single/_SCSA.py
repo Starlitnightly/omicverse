@@ -1263,7 +1263,7 @@ class Process(object):
         anno.load_pickle_module(rdbname)
         anno.get_list_tissue("Human")
         anno.get_list_tissue("Mouse")
-        sys.exit(0)
+        #sys.exit(0)
 
     @staticmethod
     def check_db(dbname):

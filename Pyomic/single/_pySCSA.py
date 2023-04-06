@@ -2,7 +2,7 @@ import os
 import scanpy as sc
 import pandas as pd
 import numpy as np
-from ._SCSA import Process
+from ._SCSA import Process,Annotator
 import sys
 import argparse
 import gzip
@@ -359,11 +359,11 @@ class pySCSA(object):
         parser.add_argument('-M', '--MarkerDB',)
 
         args = parser.parse_args()
-        p = Process()
-        try:
-            p.list_tissue(args)
-        except Exception as e:
-            print(e)
+        
+        anno = Annotator(args)
+        anno.load_pickle_module(self.model_path)
+        anno.get_list_tissue("Human")
+        anno.get_list_tissue("Mouse")
 
 
     def cell_anno(self,clustertype:str='leiden',cluster:str='all')->pd.DataFrame:
