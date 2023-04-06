@@ -1,4 +1,4 @@
-::: Pyomic.single.pySCSA
+::: Pyomic.single._pyscsa.pySCSA
     handler: python
     selection:
         options:
@@ -11,14 +11,14 @@
         show_root_heading: true
         show_source: true
 
-::: Pyomic.single.scanpy_lazy
+::: Pyomic.single._pyscsa.scanpy_lazy
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.single.scanpy_cellanno_from_dict
+::: Pyomic.single._pyscsa.scanpy_cellanno_from_dict
     handler: python
     selection:
         options:
