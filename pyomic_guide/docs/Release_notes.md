@@ -59,3 +59,13 @@ Update all code reference
 ### bulk2single module:
 
 - Add the `bulk2single.save` to save model by manual
+
+## v 1.2.1
+
+### single module:
+
+- Add `pySCSA` module included `cell_anno`, `cell_anno_print`, `cell_auto_anno`, `get_model_tissue`
+- Add filter the doublets cells of `single.scanpy_lazy`
+- Add `single.scanpy_cellanno_from_dict` to annotate easier
+- Updated the database of SCSA from [CellMarker2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/)
+- Fix the error database key `Ensembl_HGNC` and `Ensembl_Mouse` of SCSA 
