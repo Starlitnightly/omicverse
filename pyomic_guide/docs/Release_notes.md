@@ -60,7 +60,7 @@ Update all code reference
 
 - Add the `bulk2single.save` to save model by manual
 
-## v 1.2.1
+## v 1.2.1 & 1.2.2 & 1.2.3
 
 ### single module:
 
