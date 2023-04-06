@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 
 setup(  
     name = 'Pyomic',  
-    version = '1.2.3',
+    version = '1.2.4',
     # keywords = ('chinesename',),  
     description = 'A python framework library for omics analysis',  
     license = 'GNU License',  
