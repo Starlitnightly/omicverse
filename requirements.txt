@@ -19,7 +19,7 @@ multiprocess
 ktplotspy
 jinja2 == 3.1.2
 griffe == 0.26.0
-mkdocs
+mkdocs == 1.4.2
 mkdocs-jupyter
 mkdocs-material
 mkdocs-glightbox
