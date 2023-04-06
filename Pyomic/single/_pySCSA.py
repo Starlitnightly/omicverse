@@ -260,7 +260,7 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                anno_name:str='major',
                                clustertype:str='leiden',
                                ):
-    """add cell type annotation from dict to anndata object
+    r"""add cell type annotation from dict to anndata object
 
     Arguments:
         adata: AnnData object of scRNA-seq after preprocessing
@@ -284,7 +284,7 @@ class pySCSA(object):
                 species:str='Human',weight:int=100,tissue:str='All',target:str='cellmarker',
                 celltype:str='normal',norefdb:bool=False,noprint:bool=True,list_tissue:bool=False) -> None:
 
-        """Initialize the pySCSA class
+        r"""Initialize the pySCSA class
 
         Arguments:
             adata: AnnData object of scRNA-seq after preprocessing
@@ -334,7 +334,7 @@ class pySCSA(object):
             self.model_path=model_path
 
     def get_model_tissue(self,species:str="Human")->None:
-        """List all available tissues in the database.
+        r"""List all available tissues in the database.
         
         Arguments:
             species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
