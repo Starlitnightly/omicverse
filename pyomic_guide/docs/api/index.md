@@ -20,7 +20,7 @@ import Pyomic
 
 |module|reference|
 | ---- | ---- |
-|[single.pySCSA](single/api_scsa)|Celltype annotation with SCSA|
+|[single.pySCSA](https://starlitnightly.github.io/Pyomic/api/single/api_scsa/)|Celltype annotation with SCSA|
 |[single.COSG](single/api_cosg)|Marker genes filtered with COSG|
 |[single.scDrug](single/api_scdrug)|Drug response predict with scDrug|
 |[single.scGSEA](single/api_scgsea)|Pathway analysis with AUCell|
