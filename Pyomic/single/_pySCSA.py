@@ -279,7 +279,7 @@ class pySCSA(object):
     def __init__(self,adata:anndata.AnnData,
                 foldchange:float=1.5,pvalue:float=0.05,
                 output:str='temp/rna_anno.txt',
-                model_path:str=None,
+                model_path:str='',
                 outfmt:str='txt',Gensymbol:bool=True,
                 species:str='Human',weight:int=100,tissue:str='All',target:str='cellmarker',
                 celltype:str='normal',norefdb:bool=False,noprint:bool=True,list_tissue:bool=False) -> None:
@@ -327,15 +327,18 @@ class pySCSA(object):
         self.noprint=noprint
         self.list_tissue=list_tissue
         self.target=target
-        if model_path is None:
+        if model_path =='':
             self.model_path=data_downloader(url='https://figshare.com/ndownloader/files/40053640',
                                             path='temp/pySCSA_2023.db',title='whole')
         else:
             self.model_path=model_path
 
-    def get_model_tissue(self)->None:
+    def get_model_tissue(self,species:str="Human")->None:
         """List all available tissues in the database.
         
+        Arguments:
+            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
+
         """
         parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
         parser.add_argument('-i', '--input', default = "temp/rna.csv")
@@ -362,8 +365,7 @@ class pySCSA(object):
         
         anno = Annotator(args)
         anno.load_pickle_module(self.model_path)
-        anno.get_list_tissue("Human")
-        anno.get_list_tissue("Mouse")
+        anno.get_list_tissue(species)
 
 
     def cell_anno(self,clustertype:str='leiden',cluster:str='all')->pd.DataFrame:
