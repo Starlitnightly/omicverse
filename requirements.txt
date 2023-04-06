@@ -18,6 +18,7 @@ ctxcore
 multiprocess
 ktplotspy
 jinja2 == 3.1.2
+griffe == 0.26.0
 mkdocs
 mkdocs-jupyter
 mkdocs-material
