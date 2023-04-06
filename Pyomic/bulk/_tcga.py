@@ -6,6 +6,7 @@ from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import pandas as pd
 import matplotlib.pyplot as plt
+from typing import List, Dict, Tuple, Optional, Union
 
 class pyTCGA(object):
     r"""
@@ -216,7 +217,7 @@ class pyTCGA(object):
 
     
     
-    def survival_analysis(self,gene:str,layer:str='raw',plot:bool=False,gene_threshold:str='median')->float:
+    def survival_analysis(self,gene:str,layer:str='raw',plot:bool=False,gene_threshold:str='median')->Tuple[float,float]:
         r"""
         Analysis the survival of the gene
 
@@ -227,7 +228,8 @@ class pyTCGA(object):
             gene_threshold: The threshold of the gene expression, can be 'median' or 'mean'
 
         Returns:
-            s_pd: The survival pvalue
+            test_statistic: The test statistic
+            pvalue: The survival pvalue
 
         """
         goal_gene=gene
@@ -277,15 +279,18 @@ class pyTCGA(object):
             plt.title('Survial: {}\np-value: {}'.format(goal_gene,round(lr.p_value,3)))
             plt.grid(False)
             
-        return lr.p_value
+        return lr.test_statistic,lr.p_value
     
     def survial_analysis_all(self):
         r"""
         analysis the survival of all the genes
         """
         res_l_lnc=[]
+        res_l_tt=[]
         for i in self.adata.var.index:
-            res_l_lnc.append(self.survival_analysis(i))
+            res_l_tt.append(self.survival_analysis(i)[0])
+            res_l_lnc.append(self.survival_analysis(i)[1])
+        self.adata.var['survial_test_statistic']=res_l_tt
         self.adata.var['survial_p']=res_l_lnc
         
     

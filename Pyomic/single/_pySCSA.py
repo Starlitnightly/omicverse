@@ -8,6 +8,7 @@ import argparse
 import gzip
 import time
 import requests
+import anndata
 
 def data_downloader(url,path,title):
     r"""datasets downloader
@@ -60,7 +61,7 @@ def data_downloader(url,path,title):
     return path
 
 
-def data_preprocess(adata,path='temp/rna.csv'):
+def data_preprocess(adata,clustertype='leiden',path='temp/rna.csv'):
     r"""data preprocess for SCSA
     
     Parameters
@@ -84,7 +85,7 @@ def data_preprocess(adata,path='temp/rna.csv'):
         print("......Unable to create directory {}. Reason {}".format(dirname,e))
 
     sc.settings.verbosity = 2  # reduce the verbosity
-    sc.tl.rank_genes_groups(adata, 'leiden', method='wilcoxon')
+    sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
@@ -189,54 +190,45 @@ def cell_anno_print(anno):
             print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
                                                         ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
 
-def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=4300,pct_counts_mt=25,
-                target_sum=1e4,min_mean=0.0125, max_mean=3, min_disp=0.5,max_value=10,
-                n_comps=100, svd_solver="auto",n_neighbors=15, random_state = 112, n_pcs=50,
-                ):
+def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_doublet:bool=True,
+                n_genes_by_counts:int=4300,pct_counts_mt:int=25,
+                target_sum:float=1e4,min_mean:float=0.0125, max_mean:int=3, min_disp:float=0.5,max_value:int=10,
+                n_comps:int=100, svd_solver:str="auto",
+                n_neighbors:int=15, random_state:int = 112, n_pcs:int=50,
+                )->anndata.AnnData:
     r"""scanpy lazy analysis
     
-    Parameters
-    ----------
-    - adata: `AnnData`
-        AnnData object
-    - min_genes: `int`
-        the min number of genes
-    - min_cells: `int`
-        the min number of cells
-    - n_genes_by_counts: `int`
-        the max number of genes
-    - pct_counts_mt: `int`
-        the max proportion of mito-genes
-    - target_sum: `int`
-        the max counts of total_counts
-    - min_mean: `float`
-        the min mean of genes
-    - max_mean: `float` 
-        the max mean of genes
-    - min_disp: `float`
-        the min dispersion of genes
-    - max_value: `float`
-        the max value of genes
-    - n_comps: `int`
-        the number of components
-    - svd_solver: `str`
-        the solver of svd
-    - n_neighbors: `int`
-        the number of neighbors
-    - random_state: `int`
-        the random state
-    - n_pcs: `int`
-        the number of pcs
+    Arguments:
+        adata: AnnData object
+        min_genes: the min number of genes
+        min_cells: the min number of cells
+        drop_doublet: whether to drop doublet
+        n_genes_by_counts: the max number of genes
+        pct_counts_mt: the max proportion of mito-genes
+        target_sum: the max counts of total_counts
+        min_mean: the min mean of genes
+        max_mean: the max mean of genes
+        min_disp: the min dispersion of genes
+        max_value: the max value of genes
+        n_comps: the number of components
+        svd_solver: the solver of svd
+        n_neighbors: the number of neighbors
+        random_state: the random state
+        n_pcs: the number of pcs
 
-    Returns
-    ------- 
-    - adata: `AnnData`
-        AnnData object
+    Returns:
+        adata: AnnData object
 
+    Reference:
+        All paremeter reference can be found at https://scanpy.readthedocs.io/en/stable/api.html
     """
     #filter cells and genes
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
+    #filter the doublets cells
+    if drop_doublet:
+        sc.external.pp.scrublet(adata) #estimates doublets
+        adata = adata[adata.obs['predicted_doublet'] == False] #do the actual filtering
     #calculate the proportion of mito-genes
     adata.var['mt'] = adata.var_names.str.startswith('MT-')  # annotate the group of mitochondrial genes as 'mt'
     sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
@@ -265,3 +257,175 @@ def scanpy_lazy(adata,min_genes=200,min_cells=3,n_genes_by_counts=4300,pct_count
     sc.pl.paga(adata, plot=False)  # remove `plot=False` if you want to see the coarse-grained graph
     sc.tl.umap(adata, init_pos='paga')
     return adata
+
+def scanpy_cellanno_from_dict(adata:anndata.AnnData,
+                               anno_dict:dict,
+                               anno_name:str='major',
+                               clustertype:str='leiden',
+                               ):
+    """add cell type annotation from dict to anndata object
+
+    Arguments:
+        adata: AnnData object of scRNA-seq after preprocessing
+        anno_dict: dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`
+        anno_name: the name of annotation
+        clustertype: Clustering name used in scanpy. (leiden)
+
+    """
+
+    adata.obs[anno_name+'_celltype'] = adata.obs[clustertype].map(anno_dict).astype('category')
+    print('...cell type added to {}_celltype on obs of anndata'.format(anno_name))
+
+
+class pySCSA(object):
+
+    def __init__(self,adata:anndata.AnnData,
+                foldchange:float=1.5,pvalue:float=0.05,
+                output:str='temp/rna_anno.txt',
+                model_path:str=None,
+                outfmt:str='txt',Gensymbol:bool=True,
+                species:str='Human',weight:int=100,tissue:str='All',target:str='cellmarker',
+                celltype:str='normal',norefdb:bool=False,noprint:bool=True,list_tissue:bool=False) -> None:
+
+        """Initialize the pySCSA class
+
+        Arguments:
+            adata: AnnData object of scRNA-seq after preprocessing
+            foldchange: Fold change threshold for marker filtering. (2.0)
+            pvalue: P-value threshold for marker filtering. (0.05)
+            output: Output file for marker annotation.(temp/rna_anno.txt)
+            model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet.
+            outfmt: Output format for marker annotation. (txt)
+            Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation.
+            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
+            weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)
+            tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')
+            target: Target to annotation class in Database. (cellmarker,[cancersea])
+            celltype: Cell type for annotation. (normal,[cancer])
+            norefdb: Only using user-defined marker database for annotation.
+            noprint: Do not print any detail results.
+            list_tissue: List all available tissues in the database.
+        
+        """
+
+        #create temp directory
+        try:
+            if not os.path.isdir('temp'):
+                print("...Creating directory {}".format('temp'))
+                os.makedirs('temp', exist_ok=True)
+        except OSError as e:
+            print("...Unable to create directory {}. Reason {}".format('temp',e))
+
+        self.adata=adata
+        self.foldchange=foldchange
+        self.pvalue=pvalue
+        self.output=output
+        self.outfmt=outfmt
+        self.Gensymbol=Gensymbol
+        self.species=species
+        self.weight=weight
+        self.tissue=tissue
+        self.celltype=celltype
+        self.norefdb=norefdb
+        self.noprint=noprint
+        self.list_tissue=list_tissue
+        self.target=target
+        if model_path is None:
+            self.model_path=data_downloader(url='https://figshare.com/ndownloader/files/40053640',
+                                            path='temp/pySCSA_2023.db',title='whole')
+        else:
+            self.model_path=model_path
+
+    def get_model_tissue(self)->None:
+        """List all available tissues in the database.
+        
+        """
+        parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser.add_argument('-i', '--input', default = "temp/rna.csv")
+        parser.add_argument('-o', '--output',default=self.output)
+        parser.add_argument('-d', '--db', default = self.model_path,)
+        parser.add_argument('-s', '--source', default = "scanpy",)
+        parser.add_argument('-c', '--cluster', default = 'all',)
+        parser.add_argument('-f',"--fc",default = self.foldchange,)
+        parser.add_argument('-fc',"--foldchange",default =self.foldchange,)
+        parser.add_argument('-p',"--pvalue",default = self.pvalue,)
+        parser.add_argument('-w',"--weight",default = self.weight,)
+        parser.add_argument('-g',"--species",default = self.species,)
+        parser.add_argument('-k',"--tissue",default = self.tissue,)
+        parser.add_argument('-m', '--outfmt', default = self.outfmt, )
+        parser.add_argument('-T',"--celltype",default = self.celltype,)
+        parser.add_argument('-t', '--target', default = self.target,)
+        parser.add_argument('-E',"--Gensymbol",action = "store_true",default=self.Gensymbol,)
+        parser.add_argument('-N',"--norefdb",action = "store_true",default=self.norefdb,)
+        parser.add_argument('-b',"--noprint",action = "store_true",default=self.noprint,)
+        parser.add_argument('-l',"--list_tissue",action = "store_true",default = 'True',)
+        parser.add_argument('-M', '--MarkerDB',)
+        args = parser.parse_args()
+        p = Process()
+        p.list_tissue(args)
+
+    def cell_anno(self,clustertype:str='leiden',cluster:str='all')->pd.DataFrame:
+        """Annotate cell type for each cluster.
+        
+        Arguments:
+            clustertype: Clustering name used in scanpy. (leiden)
+            cluster: Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])
+        """
+
+        dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv')
+        dat.to_csv('temp/rna.csv')
+
+        print('...Auto annotate cell')
+        parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
+        parser.add_argument('-i', '--input', default = "temp/rna.csv")
+        parser.add_argument('-o', '--output',default=self.output)
+        parser.add_argument('-d', '--db', default = self.model_path,)
+        parser.add_argument('-s', '--source', default = "scanpy",)
+        parser.add_argument('-c', '--cluster', default = cluster,)
+        parser.add_argument('-f',"--fc",default = self.foldchange,)
+        parser.add_argument('-fc',"--foldchange",default =self.foldchange,)
+        parser.add_argument('-p',"--pvalue",default = self.pvalue,)
+        parser.add_argument('-w',"--weight",default = self.weight,)
+        parser.add_argument('-g',"--species",default = self.species,)
+        parser.add_argument('-k',"--tissue",default = self.tissue,)
+        parser.add_argument('-m', '--outfmt', default = self.outfmt, )
+        parser.add_argument('-T',"--celltype",default = self.celltype,)
+        parser.add_argument('-t', '--target', default = self.target,)
+        parser.add_argument('-E',"--Gensymbol",action = "store_true",default=self.Gensymbol,)
+        parser.add_argument('-N',"--norefdb",action = "store_true",default=self.norefdb,)
+        parser.add_argument('-b',"--noprint",action = "store_true",default=self.noprint,)
+        parser.add_argument('-l',"--list_tissue",action = "store_true",default = self.list_tissue,)
+        parser.add_argument('-M', '--MarkerDB',)
+        args = parser.parse_args()
+
+        p = Process()
+        p.run_cmd(args)
+
+        result=pd.read_csv('temp/rna_anno.txt',sep='\t')
+        self.result=result
+        return result
+    
+    def cell_anno_print(self)->None:
+        r"""print the annotation result
+        
+        """
+        for i in set(self.result['Cluster']):
+            test=self.result.loc[self.result['Cluster']==i].iloc[:2]
+            if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
+                print('Nice:Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
+                                                            np.around(test.iloc[0]['Z-score'],3)))
+            else:
+                print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
+                                                            ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+
+    def cell_auto_anno(self,adata:anndata.AnnData,clustertype:str='leiden')->None:
+        r"""Add cell type annotation to anndata.obs['scsa_celltype']
+        
+        Arguments:
+            adata: anndata object
+            clustertype: Clustering name used in scanpy. (leiden)
+        """
+        scsa_anno=dict(zip([str(i) for i in range(len(adata.obs[clustertype].value_counts().index))],
+            [self.result.loc[self.result['Cluster']==i].iloc[0]['Cell Type'] for i in range(len(adata.obs[clustertype].value_counts().index))]))
+        adata.obs['scsa_celltype'] = adata.obs['leiden'].map(scsa_anno).astype('category')
+        print('...cell type added to scsa_celltype on obs of anndata')
