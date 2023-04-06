@@ -37,8 +37,10 @@ Please checkout the documentations and tutorials at [pyomic.readthedocs.io](http
 - [3] [MOFA](https://github.com/bioFAM/mofapy2) was originally published in [*Genome Biology*](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02015-1)
 - [4] [COSG](https://github.com/genecell/COSG) was originally published in [*Briefings in Bioinformatics*](https://academic.oup.com/bib/advance-article-abstract/doi/10.1093/bib/bbab579/6511197?redirectedFrom=fulltext)
 - [5] [CellphoneDB](https://github.com/ventolab/CellphoneDB) was originally published in [*Nature*](https://www.nature.com/articles/s41586-018-0698-6)
-- [6] [AUCell](https://github.com/aertslab/AUCell) was originally available in [*Bioconductor*](https://bioconductor.org/packages/AUCell)*, and we use the script of Pyscenic to instead.
+- [6] [AUCell](https://github.com/aertslab/AUCell) was originally available in [*Bioconductor*](https://bioconductor.org/packages/AUCell), and we use the script of Pyscenic to instead.
 - [7] [Bulk2Space](https://github.com/ZJUFanLab/bulk2space) was originally available in [*Nature Communications*](https://www.nature.com/articles/s41467-022-34271-z)
+- [8] [SCSA](https://github.com/bioinfo-ibms-pumc/SCSA) was originally availabale in [*Front Genet*](https://doi.org/10.3389/fgene.2020.00490)
+- [9] [WGCNA](http://www.genetics.ucla.edu/labs/horvath/CoexpressionNetwork/Rpackages/WGCNA) was originally avaliable in [*BMC Bioinformatics*](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-559)
 
 ## Contact
 
