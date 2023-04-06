@@ -92,7 +92,7 @@ def data_preprocess(adata,clustertype='leiden',path='temp/rna.csv'):
     dat.to_csv(path)
     return dat
 
-def cell_annotate(data,
+def __cell_annotate(data,
                 foldchange=1.5,pvalue=0.05,
                 output='temp/rna_anno.txt',
                 outfmt='txt',Gensymbol=True,
@@ -170,7 +170,7 @@ def cell_annotate(data,
     result=pd.read_csv('temp/rna_anno.txt',sep='\t')
     return result
 
-def cell_anno_print(anno):
+def __cell_anno_print(anno):
     r"""print the annotation result
     
     Parameters
@@ -218,9 +218,6 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
 
     Returns:
         adata: AnnData object
-
-    Reference:
-        All paremeter reference can be found at https://scanpy.readthedocs.io/en/stable/api.html
     """
     #filter cells and genes
     sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -360,12 +357,17 @@ class pySCSA(object):
         parser.add_argument('-b',"--noprint",action = "store_true",default=self.noprint,)
         parser.add_argument('-l',"--list_tissue",action = "store_true",default = 'True',)
         parser.add_argument('-M', '--MarkerDB',)
+
         args = parser.parse_args()
         p = Process()
-        p.list_tissue(args)
+        try:
+            p.list_tissue(args)
+        except Exception as e:
+            print(e)
+
 
     def cell_anno(self,clustertype:str='leiden',cluster:str='all')->pd.DataFrame:
-        """Annotate cell type for each cluster.
+        r"""Annotate cell type for each cluster.
         
         Arguments:
             clustertype: Clustering name used in scanpy. (leiden)
