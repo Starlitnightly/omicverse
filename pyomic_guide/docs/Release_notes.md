@@ -77,3 +77,9 @@ Update all code reference
 - Add `pyVIA` module include `run`, `plot_piechart_graph`, `plot_stream`, `plot_trajectory_gams`, `plot_lineage_probability`, `plot_gene_trend`, `plot_gene_trend_heatmap`, `plot_clustergraph`
 - Fix the error of warning of `utils.pyomic_plot_set` 
 - Update the requirements included `pybind11`, `hnswlib`, `termcolor`, `pygam`, `pillow`, `gdown`
+
+## v 1.2.6
+
+### single module
+
+- Add `pyVIA.get_piechart_dict` and `pyVIA.get_pseudotime`

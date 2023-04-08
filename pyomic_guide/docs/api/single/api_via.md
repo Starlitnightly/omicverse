@@ -6,6 +6,8 @@
         members:
             - __init__
             - run
+            - get_piechart_dict
+            - get_pseudotime
             - plot_piechart_graph
             - plot_stream
             - plot_trajectory_gams
