@@ -141,6 +141,39 @@ class pyVIA(object):
         """
         self.model.run_VIA()
 
+    def get_piechart_dict(self,label:int=0,clusters:str='')->dict:
+        """
+        Cluster composition graph
+
+        Arguments:
+            label: int (default=0) cluster label of pie chart
+            clusters: the celltype you want interested
+        
+        Returns:
+            res_dict: cluster composition graph
+        """
+        if clusters=='':
+            clusters=self.clusters
+        self.adata.obs[clusters]=self.adata.obs[clusters].astype('category')
+        cluster_i_loc=np.where(np.asarray(self.model.labels) == label)[0]
+        res_dict=dict(self.adata.obs.iloc[cluster_i_loc].value_counts(clusters))
+        return res_dict
+    
+    def get_pseudotime(self,adata=None):
+        """
+        Extract the pseudotime of VIA
+
+        Arguments:
+            adata: an adata object of you interested,if None, it will be added to `self.adata.obs['pt_via']`
+
+        """
+
+        print('...the pseudotime of VIA added to AnnData obs named `pt_via`')
+        if adata is None:
+            self.adata.obs['pt_via']=self.model.single_cell_pt_markov
+        else:
+            adata.obs['pt_via']=self.model.single_cell_pt_markov
+
     def plot_piechart_graph(self,clusters:str='', type_data='pt',
                                 gene_exp:list=[], title='', 
                                 cmap:str=None, ax_text=True, figsize:tuple=(8,4),
