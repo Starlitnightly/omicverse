@@ -11,9 +11,8 @@ Pyomic is the fundamental package for multi omics included bulk and single cell 
 ````shell
 .
 ├── Pyomic                  # Main Python package
-├── sample                  # Experiments and case studies
-├── result                  # the test result by tutorial
 ├── pyomic_guide            # Documentation files
+├── sample                  # Some test data
 ├── LICENSE
 └── README.md
 ````
@@ -41,6 +40,7 @@ Please checkout the documentations and tutorials at [pyomic.readthedocs.io](http
 - [7] [Bulk2Space](https://github.com/ZJUFanLab/bulk2space) was originally available in [*Nature Communications*](https://www.nature.com/articles/s41467-022-34271-z)
 - [8] [SCSA](https://github.com/bioinfo-ibms-pumc/SCSA) was originally availabale in [*Front Genet*](https://doi.org/10.3389/fgene.2020.00490)
 - [9] [WGCNA](http://www.genetics.ucla.edu/labs/horvath/CoexpressionNetwork/Rpackages/WGCNA) was originally avaliable in [*BMC Bioinformatics*](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-559)
+- [10] [VIA](https://github.com/ShobiStassen/VIA) was originally avaliable in [*Nature Communications*](https://www.nature.com/articles/s41467-021-25773-3)
 
 ## Contact
 
