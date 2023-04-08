@@ -69,3 +69,11 @@ Update all code reference
 - Add `single.scanpy_cellanno_from_dict` to annotate easier
 - Updated the database of SCSA from [CellMarker2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/)
 - Fix the error database key `Ensembl_HGNC` and `Ensembl_Mouse` of SCSA 
+
+## v 1.2.5
+
+### single module:
+
+- Add `pyVIA` module include `run`, `plot_piechart_graph`, `plot_stream`, `plot_trajectory_gams`, `plot_lineage_probability`, `plot_gene_trend`, `plot_gene_trend_heatmap`, `plot_clustergraph`
+- Fix the error of warning of `utils.pyomic_plot_set` 
+- Update the requirements included `pybind11`, `hnswlib`, `termcolor`, `pygam`, `pillow`, `gdown`

@@ -27,6 +27,8 @@ For more details about the Pyomic framework, please check out our [publication](
     - [TCGA database preprocess](Tutorials-bulk/t_tcga/)
 - Tutorial-Single:
     - [Celltype annotation with SCSA](Tutorials-single/t_cellanno)
+    - [Trajectory Inference with VIA](Tutorials-single/t_via)
+    - [Trajectory Inference with VIA and scVelo](Tutorials-single/t_via_velo)
     - [Pathway analysis with AUCell](Tutorials-single/t_aucell)
     - [Drug response predict with scDrug](Tutorials-single/t_scdrug)
     - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)

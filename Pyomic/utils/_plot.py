@@ -15,15 +15,17 @@ sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_col
 def pyomic_plot_set(verbosity=3,dpi=80,facecolor='white'):
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
+    import warnings
+    warnings.simplefilter("ignore", category=UserWarning)
+    warnings.simplefilter("ignore", category=FutureWarning)
+    warnings.simplefilter("ignore", category=DeprecationWarning)
 
-def pyomic_palette():
+def pyomic_palette()->list:
     """
     Returns a dictionary of colors for various plots used in pyomic package.
 
-    Returns
-    -------
-    - sc_color: `list`
-        List containing the hex codes as values.
+    Returns:
+        sc_color: List containing the hex codes as values.
     """ 
     return sc_color
 

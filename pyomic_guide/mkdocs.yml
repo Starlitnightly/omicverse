@@ -15,6 +15,8 @@ nav:
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
         - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
+        - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
+        - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
         - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
         - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
         - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
