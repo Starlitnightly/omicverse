@@ -1,3 +1,5 @@
+pybind11
+hnswlib
 ERgene
 numpy
 scanpy
@@ -17,3 +19,7 @@ ktplotspy
 python-dotplot
 boltons
 ctxcore
+termcolor
+pygam
+pillow
+gdown
