@@ -3,7 +3,7 @@ hnswlib
 ERgene
 numpy
 scanpy
-pandas
+pandas==1.5.3
 matplotlib
 scikit-learn
 scipy
@@ -23,3 +23,11 @@ termcolor
 pygam
 pillow
 gdown
+igraph
+leidenalg
+s_gd2
+graphtools
+datashader
+phate
+wget
+deep-forest
