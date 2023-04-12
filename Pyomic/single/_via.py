@@ -272,7 +272,7 @@ class pyVIA(object):
             basis=self.basis
         self.adata.obs[clusters]=self.adata.obs[clusters].astype('category')
         embedding=self.adata.obsm[basis]
-        fig,ax = via_streamplot1(adata=self.adata,clusters=clusters,via_object=self.model, 
+        fig,ax = via_streamplot_pyomic(adata=self.adata,clusters=clusters,via_object=self.model, 
                                  embedding=embedding,density_grid=density_grid, arrow_size=arrow_size,
                                  arrow_color=arrow_color,arrow_style=arrow_style,  max_length=max_length,
                                  linewidth=linewidth,min_mass = min_mass, cutoff_perc=cutoff_perc,
@@ -323,7 +323,7 @@ class pyVIA(object):
             basis=self.basis
         self.adata.obs[clusters]=self.adata.obs[clusters].astype('category')
         embedding=self.adata.obsm[basis]
-        fig,ax1,ax2 = draw_trajectory_gams1(adata=self.adata,clusters=clusters,via_object=self.model, 
+        fig,ax1,ax2 = draw_trajectory_gams_pyomic(adata=self.adata,clusters=clusters,via_object=self.model, 
                                             via_fine=via_fine, embedding=embedding, idx=idx,
                                             title_str=title_str, draw_all_curves=draw_all_curves, arrow_width_scale_factor=arrow_width_scale_factor,
                                             scatter_size=scatter_size, scatter_alpha=scatter_alpha,figsize=figsize,
@@ -471,7 +471,7 @@ class pyVIA(object):
 
 
 
-def via_streamplot1(adata,clusters,via_object, embedding:np.ndarray=None , density_grid:float=0.5, arrow_size:float=0.7, arrow_color:str = 'k',
+def via_streamplot_pyomic(adata,clusters,via_object, embedding:np.ndarray=None , density_grid:float=0.5, arrow_size:float=0.7, arrow_color:str = 'k',
 arrow_style="-|>",  max_length:int=4, linewidth:float=1,min_mass = 1, cutoff_perc:int = 5,
                    scatter_size:int=500, scatter_alpha:float=0.5,marker_edgewidth:float=0.1, 
                    density_stream:int = 2, smooth_transition:int=1, smooth_grid:float=0.5, 
@@ -604,7 +604,7 @@ arrow_style="-|>",  max_length:int=4, linewidth:float=1,min_mass = 1, cutoff_per
     return fig, ax
 
 
-def draw_trajectory_gams1(adata,clusters,via_object, via_fine=None, embedding: np.ndarray=None, idx=None,
+def draw_trajectory_gams_pyomic(adata,clusters,via_object, via_fine=None, embedding: np.ndarray=None, idx=None,
                          title_str:str= "Pseudotime", draw_all_curves:bool=True, arrow_width_scale_factor:float=15.0,
                          scatter_size:float=50, scatter_alpha:float=0.5,figsize:tuple=(8,4),
                          linewidth:float=1.5, marker_edgewidth:float=1, cmap_pseudotime:str='viridis_r',dpi:int=80,highlight_terminal_states:bool=True, use_maxout_edgelist:bool =False):
