@@ -24,6 +24,7 @@ nav:
         - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
     - Bulk2Single:
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
+        - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
 - API documentation: api/index.md
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
