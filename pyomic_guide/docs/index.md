@@ -36,6 +36,7 @@ For more details about the Pyomic framework, please check out our [publication](
     - [Overlapping Celltype annotation with GNN (in progress)](Tutorials-single/t_nocd)
 - Tutorial-Bulk2Single:
     - [Bulk RNA-seq to Single RNA-seq](Tutorials-bulk2single/t_bulk2single)
+    - [Single RNA-seq to Spatial RNA-seq](Tutorials-bulk2single/t_single2spatial)
 - [Release notes](Release_notes)
 - [Developer guild](Developer_guild)
 
