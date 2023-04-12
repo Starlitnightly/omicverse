@@ -40,10 +40,12 @@ def bulk2single_data_prepare(bulk_data:pd.DataFrame,
     for i in input_data["sc_gene"]:
         if i in bulk_genes:
             intersection_genes.append(i)
+            
     input_data["intersect_gene"] = intersection_genes
     input_data["input_sc_data"] = single_data[:,input_data["intersect_gene"]].to_df().T
     input_data["input_bulk"] = bulk_data.loc[input_data["intersect_gene"]]
     
+
     return input_data
 
 def bulk2single_plot_cellprop(generate_single_data:anndata.AnnData,

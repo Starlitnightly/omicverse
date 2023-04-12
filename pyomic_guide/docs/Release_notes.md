@@ -83,3 +83,10 @@ Update all code reference
 ### single module
 
 - Add `pyVIA.get_piechart_dict` and `pyVIA.get_pseudotime`
+
+## v 1.2.7
+
+### bulk2single module
+
+- Add `Single2Spatial` module included `load`, `save`, `train`, `spot_assess`
+- Fix the error in install the packages in pip
