@@ -90,3 +90,13 @@ Update all code reference
 
 - Add `Single2Spatial` module included `load`, `save`, `train`, `spot_assess`
 - Fix the error in install the packages in pip
+
+## v 1.2.8
+
+- fix the error of pip in install
+
+### bulk2single module
+
+- Change the `deep-forest` of `Single2Spatial` to `Neuron Network` to perform classification task
+- The entire Single2Spatial inference process is accelerated using the GPU, and can be estimated at the batch level by modifying the set `predicted_size`, the original author's function is estimated spot by spot, which is very inefficient
+- Update the logical of `Single2Spatial.load` to accelerate model loading

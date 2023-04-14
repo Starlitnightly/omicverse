@@ -53,7 +53,8 @@ class Single2Spatial(object):
                     max_cell_in_diff_spot_ratio=None,
                     k:int=10,
                     random_seed:int=112,
-                    mul_train:int=1)->anndata.AnnData:
+                    mul_train:int=1,save=True,
+                    n_jobs:int=1,num_epochs=1000,batch_size=1000,predicted_size=32)->anndata.AnnData:
         """Train the model of single2spatial
 
         Arguments:
@@ -65,6 +66,7 @@ class Single2Spatial(object):
             k: the number of nearest neighbors
             random_seed: the random seed
             mul_train: the number of times to train the model
+            n_jobs: the number of jobs to run in parallel
 
         Returns:
             sp_adata: the anndata object of the predicted spatial data
@@ -79,9 +81,18 @@ class Single2Spatial(object):
                                      self.marker_used, mul_train)
         df_runner = DFRunner(self.input_data['input_sc_data'], self.input_data['input_sc_meta'], 
                              self.input_data['input_st_data'], self.input_data['input_st_meta'], 
-                             self.marker_used, self.top_marker_num, random_seed=random_seed)
-        df_meta, df_spot = df_runner.run(xtrain, ytrain, max_cell_in_diff_spot_ratio, k, df_save_dir, df_save_name)
+                             self.marker_used, self.top_marker_num, random_seed=random_seed,n_jobs=n_jobs,device=self.used_device)
         self.df_runner=df_runner
+        df_meta, df_spot = self.df_runner.run(xtrain, ytrain, max_cell_in_diff_spot_ratio, k, df_save_dir, 
+                                              df_save_name,num_epochs=num_epochs,batch_size=batch_size,predicted_size=predicted_size)
+        
+        if save:
+            path_save = os.path.join(df_save_dir, f"{df_save_name}.pth")
+            if not os.path.exists(df_save_dir):
+                os.makedirs(df_save_dir)
+            torch.save(df_runner.model.state_dict(), path_save)
+            print(f"...save trained net in {path_save}.")
+
         sp_adata=anndata.AnnData(df_spot.T)
         sp_adata.obs=df_meta
         sp_adata.obs.set_index(sp_adata.obs['Cell'],inplace=True)
@@ -109,17 +120,21 @@ class Single2Spatial(object):
             df_save_name: the name of the model
         """
 
-        self.df_runner._save_model(os.path.join(df_save_dir, f"{df_save_name}"))
-        print("Model have been saved to "+os.path.join(df_save_dir, f"{df_save_name}"))
+        path_save = os.path.join(df_save_dir, f"{df_save_name}.pth")
+        if not os.path.exists(df_save_dir):
+            os.makedirs(df_save_dir)
+        torch.save(self.df_runner.model.state_dict(), path_save)
+        print(f"...save trained net in {path_save}.")
+        #print("Model have been saved to "+os.path.join(df_save_dir, f"{df_save_name}"))
 
     
-    def load(self,spot_num:int,
-                    cell_num:int,
+    def load(self,modelsize,
                     df_load_dir:str='save_model/df',
+                    
                     max_cell_in_diff_spot_ratio=None,
                     k:int=10,
                     random_seed:int=112,
-                    mul_train:int=1)->anndata.AnnData:
+                    n_jobs:int=1,predicted_size=32)->anndata.AnnData:
         """Load the model of single2spatial
 
         Arguments:
@@ -135,15 +150,17 @@ class Single2Spatial(object):
             sp_adata: the anndata object of the predicted spatial data
         
         """
-        xtrain, ytrain = create_data(self.input_data['input_sc_meta'], 
-                                     self.input_data['input_sc_data'], self.input_data["input_st_data"], 
-                                     spot_num, cell_num,
-                                     self.top_marker_num,
-                                     self.marker_used, mul_train)
+        #xtrain, ytrain = create_data(self.input_data['input_sc_meta'], 
+        #                             self.input_data['input_sc_data'], self.input_data["input_st_data"], 
+        #                             spot_num, cell_num,
+        #                             self.top_marker_num,
+        #                             self.marker_used, mul_train)
         df_runner = DFRunner(self.input_data['input_sc_data'], self.input_data['input_sc_meta'], 
                              self.input_data['input_st_data'], self.input_data['input_st_meta'], 
-                             self.marker_used, self.top_marker_num, random_seed=random_seed)
-        df_meta, df_spot = df_runner.run(xtrain, ytrain, max_cell_in_diff_spot_ratio, k, None, None, df_load_dir)
+                             self.marker_used, self.top_marker_num, random_seed=random_seed,n_jobs=n_jobs)
+        self.df_runner=df_runner
+        df_meta, df_spot = self.df_runner.load(df_load_dir,modelsize,max_cell_in_diff_spot_ratio, k,
+                                              predicted_size=predicted_size)
 
         sp_adata=anndata.AnnData(df_spot.T)
         sp_adata.obs=df_meta

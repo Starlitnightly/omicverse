@@ -30,6 +30,7 @@ Pyomic/bulk/_tcga.py
 Pyomic/bulk2single/__init__.py
 Pyomic/bulk2single/_bulk2single.py
 Pyomic/bulk2single/_map_utils.py
+Pyomic/bulk2single/_map_utils1.py
 Pyomic/bulk2single/_single2spatial.py
 Pyomic/bulk2single/_utils.py
 Pyomic/bulk2single/_vae.py

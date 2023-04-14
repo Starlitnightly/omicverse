@@ -14,7 +14,6 @@ from collections import defaultdict
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm,trange
-from torch.utils.data import TensorDataset, DataLoader
 
 
 
@@ -210,35 +209,6 @@ def creat_pre_data(st, cell_name, spot_name, spot_indx, cfeat, return_np=False):
 
     return feat
 
-def creat_pre_data_batch(st, cell_name, spot_name, start_indx, end_indx, cfeat, return_np=False):
-    feats = []
-    for i in range(start_indx, end_indx):
-        spot = spot_name[i]
-        spot_feat = st[spot].values
-        tlist = np.isnan(spot_feat).tolist()
-        tlist = [j for j, x in enumerate(tlist) if x == True]
-        assert len(tlist) == 0
-
-        sfeat = np.tile(spot_feat, (len(cell_name), 1))
-        mfeat = sfeat - cfeat
-        feat = np.hstack((cfeat, sfeat))
-        feat = np.hstack((feat, mfeat))
-        feats.append(feat)
-
-    feats = np.array(feats)
-    if not return_np:
-        feats = torch.from_numpy(feats).type(torch.FloatTensor)
-
-    tlist = np.isnan(sfeat).tolist()
-    tlist = [i for i, x in enumerate(tlist) if x == True]
-    assert len(tlist) == 0
-
-    tlist = np.isnan(cfeat).tolist()
-    tlist = [i for i, x in enumerate(tlist) if x == True]
-    assert len(tlist) == 0
-
-    return feats
-
 
 def predict_for_one_spot(model, st_test, cell_name, spot_name, spot_indx, cfeat):
     feats = creat_pre_data(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
@@ -250,26 +220,10 @@ def predict_for_one_spot(model, st_test, cell_name, spot_name, spot_indx, cfeat)
 
 def predict_for_one_spot_svm(model, st_test, cell_name, spot_name, spot_indx, cfeat):
     feats = creat_pre_data(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
-    outputs = model(torch.tensor(feats)).detach().numpy()[:, 1]
+    outputs = model(feats)[:, 1]
     # outputs = np.where(outputs>0.5, 1, 0)
     predict = outputs.tolist()
     return spot_indx, predict
-
-def predict_for_one_spot_net(model, st_test, cell_name, spot_name, spot_indx, cfeat):
-    feats = creat_pre_data(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
-    outputs = model(torch.tensor(feats)).detach().numpy().reshape(-1)
-    # outputs = np.where(outputs>0.5, 1, 0)
-    predict = outputs.tolist()
-    return spot_indx, predict
-
-def predict_for_one_spot_net_batch(model, st_test, cell_name, spot_name, spot_indx, cfeat):
-    feats = creat_pre_data_batch(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
-    outputs = model(torch.tensor(feats)).detach().numpy().reshape(-1,len(cell_name))
-    return outputs
-    # outputs = np.where(outputs>0.5, 1, 0)
-    predict = outputs.tolist()
-    return spot_indx, predict
-
 
 
 # Define the model
@@ -281,23 +235,6 @@ class SVM(nn.Module):
 
     def forward(self, x):
         return self.linear(x)
-    
-# 定义神经网络模型
-class Net(nn.Module):
-    def __init__(self,size):
-        super(Net, self).__init__()
-        torch.manual_seed(2)
-        self.linear1 = nn.Linear(size, 256)
-        self.relu1 = nn.ReLU()
-        self.linear2 = nn.Linear(256, 1)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        x = self.linear1(x)
-        x = self.relu1(x)
-        x = self.linear2(x)
-        x = self.sigmoid(x)
-        return x
 
 class DFRunner:
     def __init__(self,
@@ -307,7 +244,7 @@ class DFRunner:
                  marker_used,
                  top_marker_num,
                  random_seed=0,
-                 n_jobs=1,device=None,):
+                 n_jobs=1,device=None):
 
         self.sc_test_allgene = generate_sc_data  # pandas.DataFrame, generated gene-cell expression data
         self.cell_type = generate_sc_meta  # pandas.DataFrame, cell type
@@ -323,7 +260,6 @@ class DFRunner:
         self.sc_test = self.sc_test.loc[intersect_gene]
         self.st_test = self.st_test.loc[intersect_gene]
         self.used_device=device
-        
 
         if marker_used:
             print('select top %d marker genes of each cell type...' % top_marker_num)
@@ -339,10 +275,9 @@ class DFRunner:
             self.sc_test = self.sc_test.loc[marker, :]
             self.st_test = self.st_test.loc[marker, :]
 
-        #self.model = CascadeForestClassifier(random_state=random_seed, n_jobs=n_jobs,
-        #                                     verbose=0)
+        self.model = CascadeForestClassifier(random_state=random_seed, n_jobs=n_jobs,
+                                             verbose=0)
         #self.model = KNN(k=2)
-        
 
         breed = self.cell_type['Cell_type']
         breed_np = breed.values
@@ -357,128 +292,49 @@ class DFRunner:
             self.cell2label[cell_name] = cell_type
             self.label2cell[cell_type].add(cell_name)
 
-    def run(self, xtrain, ytrain, max_cell_in_diff_spot_ratio, k, save_dir, save_name, load_path=None,
-            num_epochs=1000,batch_size=1000,predicted_size=32):
-        
-        self.model = Net(xtrain.shape[1]).to(self.used_device)
-        print('...The model size is %d' % xtrain.shape[1])
+    def run(self, xtrain, ytrain, max_cell_in_diff_spot_ratio, k, save_dir, save_name, load_path=None):
         if load_path is None:
-            print('...Net training')
-            #xtrain = torch.tensor(xtrain, dtype=torch.float32).to(self.used_device)
-            #ytrain = torch.tensor(ytrain, dtype=torch.float32).to(self.used_device)
-            # 定义损失函数和优化器
-            criterion = nn.BCELoss()
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
-
-            inputs = torch.tensor(xtrain, dtype=torch.float32).to(self.used_device)
-            labels = torch.tensor(ytrain.reshape(len(ytrain),1), dtype=torch.float32).to(self.used_device)
-
-
-            # 将数据分成小批量
-            batch_size = batch_size
-            dataset = TensorDataset(inputs, labels)
-            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-            # 训练模型
-            with trange(num_epochs) as t:
-                for epoch in t:
-                    running_loss = 0.0
-                    num_samples = 0
-                    for i, data in enumerate(dataloader):
-                        # 从数据集中获取输入和标签
-                        inputs, labels = data
-
-                        # 将输入和标签转换为 PyTorch 的变量
-                        inputs = inputs.requires_grad_()
-                        labels = labels.float()
-
-                        # 计算模型输出和损失
-                        outputs = self.model(inputs)
-                        loss = criterion(outputs, labels)
-
-                        # 反向传播和优化
-                        optimizer.zero_grad()
-                        loss.backward()
-                        optimizer.step()
-
-                        # 记录损失值
-                        running_loss += loss.item()*inputs.size(0)
-                        num_samples += inputs.size(0)
-
-                    # 输出平均损失值
-                    average_loss = running_loss / num_samples
-                    t.set_description('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, average_loss))
-
-            '''  
-            # 训练模型
-            num_epochs = 10000
-            for epoch in range(num_epochs):
-                # 计算模型输出和损失
-                output_tensor = self.model(inputs)
-                loss = criterion(output_tensor, labels)
-
-                # 反向传播和优化
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                
-                if epoch % 100 == 0:
-                    print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
-            '''
-            """
-            self.model = SVM(xtrain,2).to(self.used_device)
+            print('df training....')
+            #xtrain = torch.tensor(xtrain, dtype=torch.float32)
+            #ytrain = torch.tensor(ytrain, dtype=torch.long)
+            #self.model = SVM(xtrain,2)
 
             # Define the loss function
-            criterion = nn.MultiMarginLoss()
+            #criterion = nn.MultiMarginLoss()
 
             # Define the optimizer
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
+            #optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001)
 
             # Train the model
-            for epoch in range(10000):
-                optimizer.zero_grad()
-                y_pred = self.model(xtrain)
-                loss = criterion(y_pred, ytrain)
-                loss.backward()
-                optimizer.step()
-                if epoch % 100 == 0:
-                    print("Epoch: %d, Loss: %.4f" % (epoch, loss.item()))
-"""
-            #self.model.fit(xtrain, ytrain)  # train model
-            print('...Net training done!')
+            #for epoch in range(10000):
+            ##    optimizer.zero_grad()
+             #   y_pred = self.model(xtrain)
+            #    loss = criterion(y_pred, ytrain)
+            #    loss.backward()
+            #    optimizer.step()
+            #    if epoch % 100 == 0:
+            #        print("Epoch: %d, Loss: %.4f" % (epoch, loss.item()))
+
+            self.model.fit(xtrain, ytrain)  # train model
+            print('df training done!')
             
-            path_save = os.path.join(save_dir, f"{save_name}.pth")
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            torch.save(self.model.state_dict(), path_save)
-            print(f"...save trained net in {path_save}.")
-
+            self._save_model(os.path.join(save_dir, f"{save_name}"))
         else:
-            self.model.load_state_dict(torch.load(load_path,map_location=self.used_device))
-            #self._load_model(load_path)
+            self._load_model(load_path)
 
         #return self.cre_csv(max_cell_in_diff_spot_ratio, k)
-        df_meta, df_spot = self.cre_csv(max_cell_in_diff_spot_ratio, k,predicted_size)  # save predicted results.
+        df_meta, df_spot = self.cre_csv(max_cell_in_diff_spot_ratio, k)  # save predicted results.
         return df_meta, df_spot
 
-    def load(self, load_path,modelsize,max_cell_in_diff_spot_ratio, k,predicted_size):
-        
-        self.model = Net(modelsize).to(self.used_device)
-        self.model.load_state_dict(torch.load(load_path,map_location=self.used_device))
-        #self._load_model(load_path
-
-        df_meta, df_spot = self.cre_csv(max_cell_in_diff_spot_ratio, k,predicted_size)  # save predicted results.
-        return df_meta, df_spot
-
-
-    def cre_csv(self, max_cell_in_diff_spot_ratio, k,batch_size):
+    def cre_csv(self, max_cell_in_diff_spot_ratio, k):
         # data
         cell_name = self.sc_test.columns.values.tolist()
         spot_name = self.st_test.columns.tolist()  # list of spot name ['spot_1', 'spot_2', ...]
         cfeat = self.sc_test.values.T
         cell_num = len(cell_name)
         spot_num = len(spot_name)
-        batch_size=batch_size
         if max_cell_in_diff_spot_ratio is None:
             max_cell_in_diff_spot = None
         else:
@@ -489,56 +345,39 @@ class DFRunner:
             spot2cell = defaultdict(set)
             cell2spot = defaultdict(set)
             spot2ratio = dict()
+
             
+            re_list = []
+
+
             print('Calculating scores...')
-            #batch_size = batch_size  # adjust this value based on the available memory and the size of the data
-            batch_list = [(i, min(i+batch_size, spot_num)) for i in range(0, spot_num, batch_size)]
-
-            with trange(len(batch_list)) as t:
-                for batch_indx in t:
-                    start_indx, end_indx = batch_list[batch_indx]
-                    feat=creat_pre_data_batch(self.st_test, cell_name, spot_name, start_indx,end_indx, cfeat, return_np=True)
-                    predict=self.model(torch.tensor(feat, dtype=torch.float32).to(self.used_device)).cpu().detach().numpy().reshape(-1,len(cell_name))
-                    for spot_indx,spot_p_num in zip(range(start_indx, end_indx),range(len(spot_name[start_indx:end_indx]))):
-                        spot = spot_name[spot_indx]  # spotname
-                        for c, p in zip(cell_name,predict[spot_p_num]):
-                            score_triple_list.append((c, spot, p))
-                        spot2ratio[spot] = np.round(ratio[spot_indx] * k)
-                        t.set_description('Now calculating scores for spot %d/%d' % (spot_indx + 1, len(spot_name)))
-
-            '''
             with trange(len(spot_name)) as t:
                 for spot_indx in t:
                     t.set_description('Now calculating scores for spot %d/%d' % (spot_indx + 1, len(spot_name)))
                     spot = spot_name[spot_indx]
                     #re_list.append(predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat))
-                    spot_indx, predict=predict_for_one_spot_net(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)
+                    spot_indx, predict=predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)
                     spot = spot_name[spot_indx]  # spotname
                     for c, p in zip(cell_name, predict):
                         score_triple_list.append((c, spot, p))
                     spot2ratio[spot] = np.round(ratio[spot_indx] * k)
-                    '''
-            print('Calculating scores done.')
-
             '''
-            from multiprocessing.pool import Pool
-            re_list = []
-            process_pool = Pool(self.n_jobs)
 
-            print('Calculating scores...')
-            for spot_indx in range(len(spot_name)):
+            for spot_indx in tqdm(range(len(spot_name))):
+                print('Now calculating scores for spot %d/%d' % (spot_indx + 1, len(spot_name)))
                 spot = spot_name[spot_indx]  # spotname
                 #re_list.append(predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat))
-                re_list.append(process_pool.apply_async(predict_for_one_spot_svm, (
-                    self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)))
-            
-            process_pool.close()
-            process_pool.join()
+                spot_indx, predict=predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)
+                spot = spot_name[spot_indx]  # spotname
+                for c, p in zip(cell_name, predict):
+                    score_triple_list.append((c, spot, p))  # (cell, spot, score)
+                spot2ratio[spot] = np.round(ratio[spot_indx] * k)  # [n1, n2, ...]
+        '''
             print('Calculating scores done.')
 
 
 
-
+            '''
             #return re_list
             for r in re_list:
                 spot_indx, predict = r.get()
@@ -546,7 +385,7 @@ class DFRunner:
                 for c, p in zip(cell_name, predict):
                     score_triple_list.append((c, spot, p))  # (cell, spot, score)
                 spot2ratio[spot] = np.round(ratio[spot_indx] * k)  # [n1, n2, ...]
-            '''
+          '''
             # spot2ratio: map spot to cell type ratio in it.
             score_triple_list = sorted(score_triple_list, key=lambda x: x[2], reverse=True)
             # sort by score
