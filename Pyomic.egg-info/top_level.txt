@@ -1,5 +1,0 @@
-Pyomic
-bulk
-bulk2single
-single
-utils
