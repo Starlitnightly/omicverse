@@ -194,6 +194,7 @@ def Plot_GSEA(data,num=0):
 def geneset_enrichment(gene_list:list,pathways_dict:dict,
                        pvalue_threshold:float=0.05,pvalue_type:str='auto',
                        organism:str='Human',description:str='None',
+                       background:list=None,
                        outdir:str='./enrichr',cutoff:float=0.5)->pd.DataFrame:
     """
     Performs gene set enrichment analysis using Enrichr API.
@@ -205,6 +206,7 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
         pvalue_type: Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction,for small gene sets (<500 genes) and Bonferroni correction for larger gene sets.,'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction.,Default is 'auto'.
         organism: Organism of the input gene list. Default is 'Human'.
         description: Description of the input gene list. Default is 'None'.
+        background: Background gene list to use for enrichment analysis. Default is None. If None, the background gene list is automatically set to the organism-specific gene list.
         outdir: Output directory for Enrichr results. Default is './enrichr'.
         cutoff: Show enriched terms which Adjusted P-value < cutoff. Default is 0.5.
 
@@ -213,13 +215,12 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
 
 
     """
-    
-    if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
-        background='mmusculus_gene_ensembl'
-    elif (organism == 'Human') or (organism == 'human') or (organism == 'hs'):
-        background='hsapiens_gene_ensembl'
-    else:
-        raise ValueError('organism must be Human or Mouse')
+    if background is None:
+        if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
+            background='mmusculus_gene_ensembl'
+        elif (organism == 'Human') or (organism == 'human') or (organism == 'hs'):
+            background='hsapiens_gene_ensembl'
+
     enr = gp.enrichr(gene_list=gene_list,
                  gene_sets=pathways_dict,
                  organism=organism, # don't forget to set organism to the one you desired! e.g. Yeast
@@ -249,7 +250,8 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
 def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         cax_loc:int=2,cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
-                        figsize:tuple=(2,4),cmap:str='YlGnBu')->matplotlib.axes._axes.Axes:
+                        figsize:tuple=(2,4),cmap:str='YlGnBu',
+                        text_knock:int=2,text_maxsize:int=20)->matplotlib.axes._axes.Axes:
     """
     Plot the gene set enrichment result.
 
@@ -262,6 +264,8 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
         fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
         figsize: The size of the plot. Default is (2,4).
         cmap: The colormap to use for the plot. Default is 'YlGnBu'.
+        text_knock: The number of characters to knock off the end of the term name. Default is 2.
+        text_maxsize: The maximum fontsize of the term names. Default is 20.
 
     Returns:
         A matplotlib.axes.Axes object.
@@ -272,7 +276,7 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
     st=ax.scatter(plot_data2['fraction'],range(len(plot_data2['logc'])),
             s=plot_data2['num']*10,linewidths=1,edgecolors='black',c=plot_data2['logp'],cmap=cmap)
     ax.yaxis.tick_right()
-    plt.yticks(range(len(plot_data2['fraction'])),[plot_text_set(i.split('(')[0]) for i in plot_data2['Term']],
+    plt.yticks(range(len(plot_data2['fraction'])),[plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in plot_data2['Term']],
             fontsize=10,)
     plt.xticks(fontsize=12,)
     plt.title(fig_title,fontsize=12)

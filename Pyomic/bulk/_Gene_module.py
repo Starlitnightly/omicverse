@@ -283,8 +283,57 @@ class pyWGCNA(object):
                     G.add_weighted_edges_from([(i, j, gene_net1.loc[i,j])])
         return G
     
+    def plot_matrix(self,cmap='RdBu_r',save:bool=True,figsize:tuple=(8,9),
+                    legene_ncol:int=2,legene_bbox_to_anchor:tuple=(5, 2.95),legene_fontsize:int=12,):
+        """plot the matrix of correlation
+
+        Arguments:
+            cmap: The color of matrix
+            save: Whether to save the figure
+            figsize: The size of figure
+            legene_ncol: The number of column of legene
+            legene_bbox_to_anchor: The position of legene
+            legene_fontsize: The size of legene
+
+        Returns:
+            ax: The axis of figure
+        """
+
+        module_color=self.mol.copy()
+        module_color.index=module_color['name']
+        a=sns.clustermap(self.normal_corelation,#standard_scale=1,
+                    cmap=cmap,yticklabels=False,xticklabels=False,#method='ward',metric='euclidean',
+                    #row_cluster=False,col_cluster=False,
+                    col_linkage=self.geneTree,row_linkage=self.geneTree,
+                    col_colors=module_color.loc[self.normal_corelation.index,'color'].values,
+                    row_colors=module_color.loc[self.normal_corelation.index,'color'].values,
+                    cbar_kws={"shrink": .5},square=True,
+                    dendrogram_ratio=(.1, .2),
+                    cbar_pos=(-.1, .32, .03, .2),figsize=figsize
+        )
+        #add the color of the module
+        for i in range(len(set(self.mol['module']))):
+            t1=self.mol.loc[self.mol['module']==i+1]
+            a.ax_heatmap.add_patch(plt.Rectangle((t1.index[0],t1.index[0]),len(t1),len(t1),fill=False,color='black',lw=1))
+
+        color=[]
+        labels=[]
+        for i in module_color['module'].unique():
+            t1=module_color.loc[module_color['module']==i].iloc[0]
+            color.append(t1['color'])
+            labels.append(i)
+        from matplotlib import patches as mpatches
+        #用label和color列表生成mpatches.Patch对象，它将作为句柄来生成legend
+        patches = [ mpatches.Patch(color=color[i], label="ME-{}".format(labels[i]) ) for i in range(len(labels)) ] 
+        plt.legend(handles=patches,bbox_to_anchor=legene_bbox_to_anchor, ncol=legene_ncol,fontsize=legene_fontsize)
+        if save==True:
+            plt.savefig(self.save_path+'/'+'module_matrix.png',dpi=300)
+        return a
+
+    
     def plot_sub_network(self,mod_list:list,
                          correlation_threshold:float=0.95,
+                         plot_genes=None,
                          plot_gene_num:int=5,**kwargs)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         '''
         plot sub-network of a module
@@ -292,6 +341,7 @@ class pyWGCNA(object):
         Arguments:
             mod_list: module number
             correlation_threshold: correlation threshold
+            plot_genes: genes to plot in the sub-network. If None, the hub genes will be ploted
             plot_gene_num: number of genes to plot
 
         Returns:
@@ -306,9 +356,13 @@ class pyWGCNA(object):
         degree_dict = dict(G.degree(G.nodes()))
         de_pd=pd.DataFrame(degree_dict.values(),index=degree_dict.keys(),columns=['Degree'])
         hub_gene=[]
-        for i in mod_list:
-            hub_gene1=de_pd.loc[module1.loc[module1['module']==i]['name'],'Degree'].sort_values(ascending=False)[:plot_gene_num].index.tolist()
-            hub_gene+=hub_gene1
+        if plot_genes!=None:
+            hub_gene=plot_genes
+        else:
+            for i in mod_list:
+                ret_gene=list(set(de_pd.index) & set(module1.loc[module1['module']==i]['name'].tolist()))
+                hub_gene1=de_pd.loc[ret_gene,'Degree'].sort_values(ascending=False)[:plot_gene_num].index.tolist()
+                hub_gene+=hub_gene1
 
         fig,ax=plot_network(G,G_type_dict,G_color_dict,plot_node=hub_gene,**kwargs)
         return fig,ax

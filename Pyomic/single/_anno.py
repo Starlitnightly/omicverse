@@ -85,7 +85,8 @@ def data_preprocess(adata,clustertype='leiden',path='temp/rna.csv'):
         print("......Unable to create directory {}. Reason {}".format(dirname,e))
 
     sc.settings.verbosity = 2  # reduce the verbosity
-    sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+    if 'rank_genes_groups' not in adata.uns.keys():
+        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
@@ -433,3 +434,29 @@ class pySCSA(object):
             [self.result.loc[self.result['Cluster']==i].iloc[0]['Cell Type'] for i in range(len(adata.obs[clustertype].value_counts().index))]))
         adata.obs['scsa_celltype'] = adata.obs['leiden'].map(scsa_anno).astype('category')
         print('...cell type added to scsa_celltype on obs of anndata')
+
+    def get_celltype_marker(self,adata:anndata.AnnData,
+                            clustertype:str='leiden',
+                            log2fc_min:int=2,
+                            pval_cutoff:float=0.05)->dict:
+        r"""Get marker genes for each clusters.
+        
+        Arguments:
+            adata: anndata object
+            clustertype: Clustering name used in scanpy. (leiden)
+        """
+        print('...get cell type marker')
+        celltypes = sorted(adata.obs[clustertype].unique())
+        cell_marker_dict={}
+        if 'rank_genes_groups' not in adata.uns.keys():
+            sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+        for celltype in celltypes:
+            degs = sc.get.rank_genes_groups_df(adata, group=celltype, key='rank_genes_groups', log2fc_min=log2fc_min, 
+                                            pval_cutoff=pval_cutoff)
+            foldp=np.histogram(degs['scores'])
+            foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+            
+            cellmarker=degs.loc[degs['scores']>foldchange]['names'].values
+            cell_marker_dict[celltype]=cellmarker
+
+        return cell_marker_dict

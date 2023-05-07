@@ -100,3 +100,22 @@ Update all code reference
 - Change the `deep-forest` of `Single2Spatial` to `Neuron Network` to perform classification task
 - The entire Single2Spatial inference process is accelerated using the GPU, and can be estimated at the batch level by modifying the set `predicted_size`, the original author's function is estimated spot by spot, which is very inefficient
 - Update the logical of `Single2Spatial.load` to accelerate model loading
+
+## v 1.2.9
+
+### bulk module
+
+- fix the duplicates_index mapping of `Matrix_ID_mapping`
+- fix the hub genes plot of `pyWGCNA.plot_sub_network`
+- fix the backupgene of `pyGSEA.geneset_enrichment` to support the rare species
+- add the module matrix plot in `pyWGCNA.plot_matrix`
+
+### single module
+
+- add the `rank_genes_groups` check in `pySCSA`
+
+### bulk2single module
+
+- fix the import error of `deepforest`
+
+

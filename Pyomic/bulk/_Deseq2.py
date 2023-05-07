@@ -28,6 +28,7 @@ def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     pair=pd.read_csv(gene_ref_path,sep='\t',index_col=0)
     ret_gene=list(set(data.index.tolist()) & set(pair.index.tolist()))
     data=data.loc[ret_gene]
+    data=data_drop_duplicates_index(data)
     new_index=[]
     for i in ret_gene:
         a=pair.loc[i,'symbol']
