@@ -18,6 +18,7 @@
             - plot_sub_network
             - analysis_meta_correlation
             - plot_meta_correlation
+            - plot_matrix
 
         show_root_heading: true
         show_source: true
