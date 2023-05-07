@@ -3,7 +3,7 @@ import random
 import scanpy
 import numpy as np
 import torch
-from deepforest import CascadeForestClassifier
+#from deepforest import CascadeForestClassifier
 from sklearn.neighbors import NearestNeighbors
 from scipy.linalg import solve
 from sklearn.neighbors import KDTree

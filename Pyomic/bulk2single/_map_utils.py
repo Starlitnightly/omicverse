@@ -3,7 +3,7 @@ import random
 import scanpy
 import numpy as np
 import torch
-from deepforest import CascadeForestClassifier
+#from deepforest import CascadeForestClassifier
 from sklearn.neighbors import NearestNeighbors
 from scipy.linalg import solve
 from sklearn.neighbors import KDTree
@@ -506,47 +506,8 @@ class DFRunner:
                         spot2ratio[spot] = np.round(ratio[spot_indx] * k)
                         t.set_description('Now calculating scores for spot %d/%d' % (spot_indx + 1, len(spot_name)))
 
-            '''
-            with trange(len(spot_name)) as t:
-                for spot_indx in t:
-                    t.set_description('Now calculating scores for spot %d/%d' % (spot_indx + 1, len(spot_name)))
-                    spot = spot_name[spot_indx]
-                    #re_list.append(predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat))
-                    spot_indx, predict=predict_for_one_spot_net(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)
-                    spot = spot_name[spot_indx]  # spotname
-                    for c, p in zip(cell_name, predict):
-                        score_triple_list.append((c, spot, p))
-                    spot2ratio[spot] = np.round(ratio[spot_indx] * k)
-                    '''
             print('Calculating scores done.')
 
-            '''
-            from multiprocessing.pool import Pool
-            re_list = []
-            process_pool = Pool(self.n_jobs)
-
-            print('Calculating scores...')
-            for spot_indx in range(len(spot_name)):
-                spot = spot_name[spot_indx]  # spotname
-                #re_list.append(predict_for_one_spot(self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat))
-                re_list.append(process_pool.apply_async(predict_for_one_spot_svm, (
-                    self.model, self.st_test, cell_name, spot_name, spot_indx, cfeat)))
-            
-            process_pool.close()
-            process_pool.join()
-            print('Calculating scores done.')
-
-
-
-
-            #return re_list
-            for r in re_list:
-                spot_indx, predict = r.get()
-                spot = spot_name[spot_indx]  # spotname
-                for c, p in zip(cell_name, predict):
-                    score_triple_list.append((c, spot, p))  # (cell, spot, score)
-                spot2ratio[spot] = np.round(ratio[spot_indx] * k)  # [n1, n2, ...]
-            '''
             # spot2ratio: map spot to cell type ratio in it.
             score_triple_list = sorted(score_triple_list, key=lambda x: x[2], reverse=True)
             # sort by score
