@@ -260,7 +260,7 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                anno_dict:dict,
                                anno_name:str='major',
                                clustertype:str='leiden',
-                               ):
+                               )->None:
     r"""add cell type annotation from dict to anndata object
 
     Arguments:
