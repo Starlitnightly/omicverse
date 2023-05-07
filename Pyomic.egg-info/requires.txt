@@ -30,4 +30,3 @@ graphtools
 datashader
 phate
 wget
-deep-forest
