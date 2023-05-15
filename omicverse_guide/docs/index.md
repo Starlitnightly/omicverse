@@ -1,9 +1,9 @@
-# Welcome to Pyomic’s documentation!
+# Welcome to Omicverse’s documentation!
 
 
 <div class="result" markdown>
 
-![Image title](img/logo.svg){ align=right width=300 }
+![Image title](img/logo.png){ align=right width=300 }
 
 Pyomic is the fundamental package for multi omics included bulk and single cell analysis with Python.
 
