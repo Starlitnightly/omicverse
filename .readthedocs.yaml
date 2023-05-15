@@ -16,7 +16,7 @@ build:
     # golang: "1.17"
 
 mkdocs:
-  configuration: pyomic_guide/mkdocs.yml
+  configuration: omicverse_guide/mkdocs.yml
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 # formats:
