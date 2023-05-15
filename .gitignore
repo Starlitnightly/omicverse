@@ -4,5 +4,5 @@ build
 tutorial
 models
 .DS_Store
-Pyomic.egg-info
+omicverse.egg-info
 .ipynb_checkpoints
