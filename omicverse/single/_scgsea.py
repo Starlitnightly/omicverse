@@ -277,7 +277,7 @@ def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,
                 plot_heatmap.loc[celltype,i]=enrich_res.loc[(enrich_res['Cluster']==celltype)&(enrich_res['Term']==i),'logp'].values[0]
             else:
                 plot_heatmap.loc[celltype,i]=0
-    plot_heatmap.fillna(0)
+    plot_heatmap.fillna(0,inplace=True)
     if return_table==True:
         return plot_heatmap
     
