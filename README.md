@@ -2,16 +2,16 @@
 <img src="https://raw.githubusercontent.com/Starlitnightly/Pyomic/master/README.assets/logo.svg" width="400">
 </h1><br>
 
-[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/Pyomic)](https://pypi.org/project/Pyomic) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://pyomic.readthedocs.io/en/latest/?badge=latest) 
+[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) 
 
-Pyomic is the fundamental package for multi omics included bulk and single cell analysis with Python.
+OmicVerse is the fundamental package for multi omics included bulk and single cell analysis with Python.
 
 ## Directory structure
 
 ````shell
 .
-├── Pyomic                  # Main Python package
-├── pyomic_guide            # Documentation files
+├── omicverse                  # Main Python package
+├── omicverse_guide            # Documentation files
 ├── sample                  # Some test data
 ├── LICENSE
 └── README.md
@@ -22,12 +22,12 @@ Pyomic is the fundamental package for multi omics included bulk and single cell 
 Binary installers for the latest released version are available at the pypi
 
 ```shell
-pip install -U Pyomic
+pip install -U omicverse
 ```
 
 ## Usage
 
-Please checkout the documentations and tutorials at [pyomic.readthedocs.io](https://pyomic.readthedocs.io/en/latest/index.html).
+Please checkout the documentations and tutorials at [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
 ## Reference
 
