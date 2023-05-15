@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-OmicVerse now only can be installed by pypi and you need to install `pytorch` and `deepforest` at first
+OmicVerse now only can be installed by pypi and you need to install `pytorch` at first
 
 !!! note 
     To avoid potential dependency conflicts, installing within a pip environment is recommended.
@@ -32,7 +32,7 @@ pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --e
 pip install torch==1.13.1+cpu torchvision==0.14.1+cpu torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 
-More about the installation can be found at [PyTorch](https://pytorch.org/get-started/locally/). After the installation of pytorch, we can start to install `Pyomic` by `pip`
+More about the installation can be found at [PyTorch](https://pytorch.org/get-started/locally/). After the installation of pytorch, we can start to install `omicverse` by `pip`
 
 
 ```shell

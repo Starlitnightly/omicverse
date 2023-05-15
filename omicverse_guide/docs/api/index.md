@@ -1,9 +1,9 @@
 # User
 
-Import Pyomic as:
+Import omicverse as:
 
 ```python
-import Pyomic
+import omicverse as ov
 ```
 
 ## Bulk
