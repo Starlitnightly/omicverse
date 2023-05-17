@@ -2,7 +2,8 @@
 <img src="https://raw.githubusercontent.com/Starlitnightly/omicverse/master/README.assets/logo.png" width="400">
 </h1><br>
 
-[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/pyomic/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) 
+[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest)
+
 
 OmicVerse is the fundamental package for multi omics included bulk and single cell analysis with Python.
 
@@ -41,6 +42,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [8] [SCSA](https://github.com/bioinfo-ibms-pumc/SCSA) was originally availabale in [*Front Genet*](https://doi.org/10.3389/fgene.2020.00490)
 - [9] [WGCNA](http://www.genetics.ucla.edu/labs/horvath/CoexpressionNetwork/Rpackages/WGCNA) was originally avaliable in [*BMC Bioinformatics*](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-559)
 - [10] [VIA](https://github.com/ShobiStassen/VIA) was originally avaliable in [*Nature Communications*](https://www.nature.com/articles/s41467-021-25773-3)
+- [11] [pyDEseq2](https://github.com/owkin/PyDESeq2) was originally avaliable in [*biorxiv*](https://www.biorxiv.org/content/10.1101/2022.12.14.520412v1)
 
 ## Contact
 
