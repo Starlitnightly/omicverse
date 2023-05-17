@@ -10,6 +10,7 @@ nav:
 - Tutorial:
     - Bulk:
         - Different expression analysis: Tutorials-bulk/t_deg.ipynb
+        - Different expression analysis with DEseq2: Tutorials-bulk/t_deseq2.ipynb
         - Protein-Protein interaction (PPI) analysis by String-db: Tutorials-bulk/t_network.ipynb
         - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb

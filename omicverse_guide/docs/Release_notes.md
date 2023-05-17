@@ -140,5 +140,14 @@ renamed the package to `omicverse`
 - fix the category correlation failed by ont-hot in `pyWGCNA.analysis_meta_correlation`
 - fix the network display failed in `pyWGCNA.plot_sub_network` and updated the `utils.plot_network` to avoid this error.
 
+## v 1.3.0
+
+### bulk module
+
+- add `DEseq2` method to `pyDEG.deg_analysis`
+- add `pyGSEA` module in `bulk`
+- change the name of raw `pyGSEA` to `pyGSE` in `bulk`
+- add `get_gene_annotation` of `utils` to perform gene_name transformation
+
 
 
