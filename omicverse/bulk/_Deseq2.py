@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
+from pydeseq2.dds import DeseqDataSet
+from pydeseq2.ds import DeseqStats
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
@@ -169,7 +171,7 @@ class pyDEG(object):
 
         """
         if fc_threshold==-1:
-            foldp=np.histogram(self.result['log2FC'])
+            foldp=np.histogram(self.result['log2FC'].dropna())
             foldchange=(foldp[1][np.where(foldp[1]>0)[0][fold_threshold]]+foldp[1][np.where(foldp[1]>0)[0][fold_threshold+1]])/2
         else:
             foldchange=fc_threshold
@@ -342,10 +344,48 @@ class pyDEG(object):
                           figsize=figsize,fontsize=fontsize,title=title,
                           legend_bbox=legend_bbox,legend_ncol=legend_ncol, **kwarg)
         return fig,ax
+    
+    def ranking2gsea(self,rank_max:int=200,rank_min:int=274)->pd.DataFrame:
+        r"""
+        Ranking the result of dds data for gsea analysis
+
+        Arguments:
+            rank_max: The max rank of the result.
+            rank_min: The min rank of the result.
+
+        Returns:
+            rnk: The ranking result.
+
+        """
+
+
+        result=self.result.copy()
+        result['fcsign']=np.sign(result['log2FC'])
+        result['logp']=-np.log10(result['pvalue'])
+        result['metric']=result['logp']/result['fcsign']
+        rnk=pd.DataFrame()
+        rnk['gene_name']=result.index
+        rnk['rnk']=result['metric'].values
+        rnk=rnk.sort_values(by=['rnk'],ascending=False)
+        k=1
+        total=0
+        for i in range(len(rnk)):
+            if rnk.loc[i,'rnk']==np.inf: 
+                total+=1
+        #200跟274根据你的数据进行更改，保证inf比你数据最大的大，-inf比数据最小的小就好
+        for i in range(len(rnk)):
+            if rnk.loc[i,'rnk']==np.inf: 
+                rnk.loc[i,'rnk']=rank_max+(total-k)
+                k+=1
+            elif rnk.loc[i,'rnk']==-np.inf: 
+                rnk.loc[i,'rnk']=-(rank_min+k)
+                k+=1
+        return rnk
 
     def deg_analysis(self,group1:list,group2:list,
-                     method:str='ttest',alpha:float=0.05,
-                     multipletests_method:str='fdr_bh')->pd.DataFrame:
+                     method:str='DEseq2',alpha:float=0.05,
+                     multipletests_method:str='fdr_bh',n_cpus:int=8,
+                     cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
         r"""
         Differential expression analysis.
 
@@ -353,6 +393,7 @@ class pyDEG(object):
             group1: The first group to be compared.
             group2: The second group to be compared.
             method: The method to be used for differential expression analysis.
+                - `DEseq2`: DEseq2
                 - `ttest`: ttest
                 - `wilcox`: wilconx test
             alpha: The threshold of p-value.
@@ -389,10 +430,10 @@ class pyDEG(object):
             #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
             genearray = np.asarray(pvalue)
             result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
-            
+            result=result.loc[~result['pvalue'].isnull()]
             result['-log(pvalue)'] = -np.log10(result['pvalue'])
             result['-log(qvalue)'] = -np.log10(result['qvalue'])
-            result['BaseMean']=g1_mean+g2_mean
+            result['BaseMean']=(g1_mean+g2_mean)/2
             result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
             result['log2FC'] = np.log2(result['FoldChange'])
             result['abs(log2FC)'] = abs(np.log2(result['FoldChange']))
@@ -421,10 +462,10 @@ class pyDEG(object):
                                method=multipletests_method, is_sorted=False, returnsorted=False)
             genearray = np.asarray(pvalue)
             result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
-            
+            result=result.loc[~result['pvalue'].isnull()]
             result['-log(pvalue)'] = -np.log10(result['pvalue'])
             result['-log(qvalue)'] = -np.log10(result['qvalue'])
-            result['BaseMean']=g1_mean+g2_mean
+            result['BaseMean']=(g1_mean+g2_mean)/2
             result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
             result['log2FC'] = np.log2(result['FoldChange'])
             result['abs(log2FC)'] = abs(np.log2(result['FoldChange']))
@@ -434,6 +475,55 @@ class pyDEG(object):
             result.loc[result['qvalue']<alpha,'sig']='sig'
             self.result=result
             return result
-
+        elif method=='DEseq2':
+            counts_df=self.data[group1+group2].T
+            clinical_df=pd.DataFrame(index=group1+group2)
+            clinical_df['condition']=['Treatment']*len(group1)+['Control']*len(group2)
+            dds = DeseqDataSet(
+                counts=counts_df,
+                clinical=clinical_df,
+                design_factors="condition",  # compare samples based on the "condition"
+                ref_level=["condition", "Control"],
+                # column ("B" vs "A")
+                refit_cooks=True,
+                n_cpus=n_cpus,
+            )
+            dds.fit_size_factors()
+            dds.fit_genewise_dispersions()
+            dds.fit_dispersion_trend()
+            dds.fit_dispersion_prior()
+            print(
+                f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}"
+            )
+            dds.fit_MAP_dispersions()
+            dds.fit_LFC()
+            dds.calculate_cooks()
+            if dds.refit_cooks:
+                # Replace outlier counts
+                dds.refit()
+            stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+            stat_res.run_wald_test()
+            if stat_res.cooks_filter:
+                stat_res._cooks_filtering()
+            if stat_res.independent_filter:
+                stat_res._independent_filtering()
+            else:
+                stat_res._p_value_adjustment()
+            self.stat_res=stat_res
+            stat_res.summary()
+            result=stat_res.results_df
+            result['qvalue']=result['padj']
+            result['-log(pvalue)'] = -np.log10(result['pvalue'])
+            result['-log(qvalue)'] = -np.log10(result['padj'])
+            result['BaseMean']=result['baseMean']
+            result['log2(BaseMean)']=np.log2(result['baseMean']+1)
+            result['log2FC'] = result['log2FoldChange']
+            result['abs(log2FC)'] = abs(result['log2FC'])
+            #result['size']  =np.abs(result['FoldChange'])/10
+            #result=result[result['padj']<alpha]
+            result['sig']='normal'
+            result.loc[result['qvalue']<alpha,'sig']='sig'
+            self.result=result
+            return result
         else:
             raise ValueError('The method is not supported.')
