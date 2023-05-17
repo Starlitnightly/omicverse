@@ -130,4 +130,14 @@ renamed the package to `omicverse`
 
 - update the plot argument of `bulk2single`
 
+## v 1.2.11
+
+### bulk module
+
+- fix `wilcoxon` method in `pyDEG.deg_analysis`
+- add the parameter setting of treatment and control group's name in `pyDEG.plot_boxplot`
+- fix the figure display not entire of `pyWGCNA.plot_matrix`
+- fix the category correlation failed by ont-hot in `pyWGCNA.analysis_meta_correlation`
+- fix the network display failed in `pyWGCNA.plot_sub_network` and updated the `utils.plot_network` to avoid this error.
+
 

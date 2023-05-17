@@ -300,6 +300,7 @@ class pyDEG(object):
         return ax
     
     def plot_boxplot(self,genes:list,treatment_groups:list,control_groups:list,
+                     treatment_name:str='Treatment',control_name:str='Control',
                      figsize:tuple=(4,3),palette:list=["#a64d79","#674ea7"],
                      title:str='Gene Expression',fontsize:int=12,legend_bbox:tuple=(1, 0.55),legend_ncol:int=1,
                      **kwarg)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
@@ -327,12 +328,12 @@ class pyDEG(object):
             plot_data1=pd.DataFrame()
             plot_data1['Value']=self.data[treatment_groups].loc[gene].values
             plot_data1['Gene']=gene
-            plot_data1['Type']='Treatment'
+            plot_data1['Type']=treatment_name
 
             plot_data2=pd.DataFrame()
             plot_data2['Value']=self.data[control_groups].loc[gene].values
             plot_data2['Gene']=gene
-            plot_data2['Type']='Control'
+            plot_data2['Type']=control_name
 
             plot_data=pd.concat([plot_data1,plot_data2],axis=0)
             p_data=pd.concat([p_data,plot_data],axis=0)
@@ -342,7 +343,9 @@ class pyDEG(object):
                           legend_bbox=legend_bbox,legend_ncol=legend_ncol, **kwarg)
         return fig,ax
 
-    def deg_analysis(self,group1:list,group2:list,method:str='ttest',alpha:float=0.05)->pd.DataFrame:
+    def deg_analysis(self,group1:list,group2:list,
+                     method:str='ttest',alpha:float=0.05,
+                     multipletests_method:str='fdr_bh')->pd.DataFrame:
         r"""
         Differential expression analysis.
 
@@ -350,14 +353,27 @@ class pyDEG(object):
             group1: The first group to be compared.
             group2: The second group to be compared.
             method: The method to be used for differential expression analysis.
+                - `ttest`: ttest
+                - `wilcox`: wilconx test
             alpha: The threshold of p-value.
+            multipletests_method:
+                - `bonferroni` : one-step correction
+                - `sidak` : one-step correction
+                - `holm-sidak` : step down method using Sidak adjustments
+                - `holm` : step-down method using Bonferroni adjustments
+                - `simes-hochberg` : step-up method  (independent)
+                - `hommel` : closed method based on Simes tests (non-negative)
+                - `fdr_bh` : Benjamini/Hochberg  (non-negative)
+                - `fdr_by` : Benjamini/Yekutieli (negative)
+                - `fdr_tsbh` : two stage fdr correction (non-negative)
+                - `fdr_tsbky` : two stage fdr correction (non-negative)
 
         Returns
             result: The result of differential expression analysis.
         """
         if method=='ttest':
             from scipy.stats import ttest_ind
-            from statsmodels.stats.multitest import fdrcorrection
+            from statsmodels.stats.multitest import multipletests
             data=self.data
 
             g1_mean=data[group1].mean(axis=1)
@@ -365,11 +381,12 @@ class pyDEG(object):
             g=(g2_mean+g1_mean)/2
             g=g.loc[g>0].min()
             fold=(g1_mean+g)/(g2_mean+g)
-            log2fold=np.log2(fold+1)
+            #log2fold=np.log2(fold)
             ttest = ttest_ind(data[group1].T.values, data[group2].T.values)
             pvalue=ttest[1]
-
-            qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
+            qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
+                               method=multipletests_method, is_sorted=False, returnsorted=False)
+            #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
             genearray = np.asarray(pvalue)
             result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
             
@@ -387,19 +404,21 @@ class pyDEG(object):
             self.result=result
             return result
         elif method=='wilcox':
-            raise ValueError('The method is not supported.')
-            from scipy.stats import wilcoxon
-            from statsmodels.stats.multitest import fdrcorrection
+            #raise ValueError('The method is not supported.')
+            from scipy.stats import ranksums
+            from statsmodels.stats.multitest import multipletests
             data=self.data
 
             g1_mean=data[group1].mean(axis=1)
             g2_mean=data[group2].mean(axis=1)
             fold=(g1_mean+0.00001)/(g2_mean+0.00001)
-            log2fold=np.log2(fold+1)
-            wilcox = wilcoxon(data[group1].T.values, data[group2].T.values)
+            #log2fold=np.log2(fold)
+            wilcox = ranksums(data[group1].T.values, data[group2].T.values)
             pvalue=wilcox[1]
 
-            qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
+            #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
+            qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
+                               method=multipletests_method, is_sorted=False, returnsorted=False)
             genearray = np.asarray(pvalue)
             result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
             
