@@ -1,5 +1,5 @@
 
-::: Pyomic.single.pyVIA
+::: omicverse.single.pyVIA
     handler: python
     selection:
         options:

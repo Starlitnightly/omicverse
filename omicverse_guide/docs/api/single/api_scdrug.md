@@ -1,6 +1,6 @@
 
 
-::: Pyomic.single.Drug_Response
+::: omicverse.single.Drug_Response
     handler: python
     selection:
         options:
@@ -13,14 +13,14 @@
         show_root_heading: true
         show_source: true
 
-::: Pyomic.single.autoResolution
+::: omicverse.single.autoResolution
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.single.writeGEP
+::: omicverse.single.writeGEP
     handler: python
     selection:
         options:

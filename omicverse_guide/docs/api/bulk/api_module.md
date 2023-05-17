@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk.pyWGCNA
+::: omicverse.bulk.pyWGCNA
     handler: python
     selection:
         options:

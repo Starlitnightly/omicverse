@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk2single.Bulk2Single
+::: omicverse.bulk2single.Bulk2Single
     handler: python
     selection:
         options:

@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk.pyPPI
+::: omicverse.bulk.pyPPI
     handler: python
     selection:
         options:
@@ -10,21 +10,21 @@
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.string_interaction
+::: omicverse.bulk.string_interaction
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.string_map
+::: omicverse.bulk.string_map
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.generate_G
+::: omicverse.bulk.generate_G
     handler: python
     selection:
         options:

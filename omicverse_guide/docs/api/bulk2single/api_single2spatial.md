@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk2single.Single2Spatial
+::: omicverse.bulk2single.Single2Spatial
     handler: python
     selection:
         options:
