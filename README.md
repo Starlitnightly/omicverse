@@ -12,7 +12,7 @@ OmicVerse is the fundamental package for multi omics included bulk and single ce
 .
 ├── omicverse                  # Main Python package
 ├── omicverse_guide            # Documentation files
-├── sample                  # Some test data
+├── sample                     # Some test data
 ├── LICENSE
 └── README.md
 ````
