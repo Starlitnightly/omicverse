@@ -22,6 +22,7 @@ For more details about the Pyomic framework, please check out our [publication](
 - [Installation guild](Installation_guild)
 - Tutorial-Bulk:
     - [Different expression analysis](Tutorials-bulk/t_deg)
+    - [Different expression analysis with DEseq2](Tutorials-bulk/t_deseq2)
     - [Protein-Protein interaction (PPI) analysis by String-db](Tutorials-bulk/t_network/)
     - [WGCNA (Weighted gene co-expression network analysis)](Tutorials-bulk/t_wgcna/)
     - [TCGA database preprocess](Tutorials-bulk/t_tcga/)

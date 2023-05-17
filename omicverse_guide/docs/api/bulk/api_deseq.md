@@ -9,6 +9,7 @@
             - normalize
             - foldchange_set
             - deg_analysis
+            - ranking2gsea
             - plot_volcano
             - plot_boxplot
         show_root_heading: true
@@ -41,3 +42,4 @@
         options:
         show_root_heading: true
         show_source: true
+
