@@ -327,7 +327,7 @@ class pyWGCNA(object):
         patches = [ mpatches.Patch(color=color[i], label="ME-{}".format(labels[i]) ) for i in range(len(labels)) ] 
         plt.legend(handles=patches,bbox_to_anchor=legene_bbox_to_anchor, ncol=legene_ncol,fontsize=legene_fontsize)
         if save==True:
-            plt.savefig(self.save_path+'/'+'module_matrix.png',dpi=300)
+            plt.savefig(self.save_path+'/'+'module_matrix.png',dpi=300,bbox_inches = 'tight')
         return a
 
     
@@ -353,6 +353,9 @@ class pyWGCNA(object):
         G_type_dict=dict(zip(module1['name'],[str(i) for i in module1['module']]))
         G_color_dict=dict(zip(module1['name'],module1['color']))
         G=self.get_sub_network(mod_list,correlation_threshold)
+        G_color_dict=dict(zip(G.nodes,[G_color_dict[i] for i in G.nodes]))
+        G_type_dict=dict(zip(G.nodes,[G_type_dict[i] for i in G.nodes]))
+
         degree_dict = dict(G.degree(G.nodes()))
         de_pd=pd.DataFrame(degree_dict.values(),index=degree_dict.keys(),columns=['Degree'])
         hub_gene=[]
@@ -398,14 +401,28 @@ class pyWGCNA(object):
         from scipy.stats import spearmanr,pearsonr,kendalltau
         # seed random number generator
         # calculate spearman's correlation
-        result_1=pd.DataFrame(columns=meta_data.columns)
-        result_p=pd.DataFrame(columns=meta_data.columns)
+        new_meta=pd.DataFrame()
+        new_meta.index=meta_data.index
         for j in meta_data.columns:
+            if meta_data[j].dtype=='int64':
+                new_meta=pd.concat([new_meta,meta_data[j]],axis=1)
+            elif meta_data[j].dtype!='float32': 
+                new_meta=pd.concat([new_meta,meta_data[j]],axis=1)
+            elif meta_data[j].dtype!='float64':
+                new_meta=pd.concat([new_meta,meta_data[j]],axis=1)
+            else:
+                one_hot = pd.get_dummies(meta_data[j], prefix=j)
+                new_meta=pd.concat([new_meta,one_hot],axis=1)
+                
+
+        result_1=pd.DataFrame(columns=new_meta.columns)
+        result_p=pd.DataFrame(columns=new_meta.columns)
+        for j in new_meta.columns:
             co=[]
             pvv=[]
             for i in range(len(pcamol)):   
                 tempcor=pd.DataFrame(columns=['x','y'])
-                tempcor['x']=list(meta_data[j])
+                tempcor['x']=list(new_meta[j])
                 tempcor['y']=list(pcamol.iloc[i])
                 tempcor=tempcor.dropna()
                 coef,pv=pearsonr(tempcor['x'],tempcor['y'])

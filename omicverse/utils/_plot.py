@@ -20,6 +20,14 @@ def pyomic_plot_set(verbosity=3,dpi=80,facecolor='white'):
     warnings.simplefilter("ignore", category=FutureWarning)
     warnings.simplefilter("ignore", category=DeprecationWarning)
 
+def ov_plot_set(verbosity=3,dpi=80,facecolor='white'):
+    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
+    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
+    import warnings
+    warnings.simplefilter("ignore", category=UserWarning)
+    warnings.simplefilter("ignore", category=FutureWarning)
+    warnings.simplefilter("ignore", category=DeprecationWarning)
+
 def pyomic_palette()->list:
     """
     Returns a dictionary of colors for various plots used in pyomic package.
@@ -242,6 +250,9 @@ def plot_network(G,G_type_dict,G_color_dict,pos_type='spring',pos_dim=2,
         pos=nx.kamada_kawai_layout(G,dim=pos_dim,scale=pos_scale)
     degree_dict = dict(G.degree(G.nodes()))
     
+    G_color_dict=dict(zip(G.nodes,[G_color_dict[i] for i in G.nodes]))
+    G_type_dict=dict(zip(G.nodes,[G_type_dict[i] for i in G.nodes]))
+
     nx.draw_networkx_edges(G, pos,nodelist=list(G_color_dict.keys()), alpha=pos_alpha)
     nx.draw_networkx_nodes(
         G,
