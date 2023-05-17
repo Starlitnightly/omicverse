@@ -1,5 +1,5 @@
 
-::: Pyomic.bulk.pyDEG
+::: omicverse.bulk.pyDEG
     handler: python
     selection:
         options:
@@ -14,28 +14,28 @@
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.deseq2_normalize
+::: omicverse.bulk.deseq2_normalize
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.estimateSizeFactors
+::: omicverse.bulk.estimateSizeFactors
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.estimateDispersions
+::: omicverse.bulk.estimateDispersions
     handler: python
     selection:
         options:
         show_root_heading: true
         show_source: true
 
-::: Pyomic.bulk.Matrix_ID_mapping
+::: omicverse.bulk.Matrix_ID_mapping
     handler: python
     selection:
         options:

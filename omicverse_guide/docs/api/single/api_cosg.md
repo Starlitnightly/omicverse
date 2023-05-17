@@ -1,5 +1,5 @@
 
-::: Pyomic.single.cosg
+::: omicverse.single.cosg
     handler: python
     selection:
         options:

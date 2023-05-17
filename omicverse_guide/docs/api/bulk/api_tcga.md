@@ -1,6 +1,6 @@
 
 
-::: Pyomic.bulk.pyTCGA
+::: omicverse.bulk.pyTCGA
     handler: python
     selection:
         options:
