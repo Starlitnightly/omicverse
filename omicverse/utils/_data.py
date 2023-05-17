@@ -8,6 +8,10 @@ import requests
 import os
 import pandas as pd
 import scanpy as sc
+from ._genomics import read_gtf,Gtf
+import anndata
+import numpy as np
+from typing import Callable, List, Mapping, Optional
 
 
 def read(path,**kwargs):
@@ -15,7 +19,7 @@ def read(path,**kwargs):
         return sc.read(path,**kwargs)
     elif path.split('.')[-1]=='csv':
         return pd.read_csv(path,**kwargs)
-    elif path.split('.')[-1]=='tsv':
+    elif path.split('.')[-1]=='tsv' or path.split('.')[-1]=='txt':
         return pd.read_csv(path,sep='\t',**kwargs)
     else:
         raise ValueError('The type is not supported.')
@@ -190,5 +194,46 @@ def geneset_prepare(geneset_path,organism='Human'):
             go_bio_dict[go_bio_geneset.loc[i,0]]=[i for i in go_bio_geneset.loc[i,1].split('\t')]
     return go_bio_dict
 
+def get_gene_annotation(
+        adata: anndata.AnnData, var_by: str = None,
+        gtf: os.PathLike = None, gtf_by: str = None,
+        by_func: Optional[Callable] = None
+) -> None:
+    r"""
+    Get genomic annotation of genes by joining with a GTF file.
+    It was writed by scglue, and I just copy it.
 
+    Arguments:
+        adata: Input dataset.
+        var_by: Specify a column in ``adata.var`` used to merge with GTF attributes, 
+            otherwise ``adata.var_names`` is used by default.
+        gtf: Path to the GTF file.
+        gtf_by: Specify a field in the GTF attributes used to merge with ``adata.var``,
+            e.g. "gene_id", "gene_name".
+        by_func: Specify an element-wise function used to transform merging fields,
+            e.g. removing suffix in gene IDs.
+
+    Note:
+        The genomic locations are converted to 0-based as specified
+        in bed format rather than 1-based as specified in GTF format.
+
+    """
+    if gtf is None:
+        raise ValueError("Missing required argument `gtf`!")
+    if gtf_by is None:
+        raise ValueError("Missing required argument `gtf_by`!")
+    var_by = adata.var_names if var_by is None else adata.var[var_by]
+    gtf = read_gtf(gtf).query("feature == 'gene'").split_attribute()
+    if by_func:
+        by_func = np.vectorize(by_func)
+        var_by = by_func(var_by)
+        gtf[gtf_by] = by_func(gtf[gtf_by])  # Safe inplace modification
+    gtf = gtf.sort_values("seqname").drop_duplicates(
+        subset=[gtf_by], keep="last"
+    )  # Typically, scaffolds come first, chromosomes come last
+    merge_df = pd.concat([
+        pd.DataFrame(gtf.to_bed(name=gtf_by)),
+        pd.DataFrame(gtf).drop(columns=Gtf.COLUMNS)  # Only use the splitted attributes
+    ], axis=1).set_index(gtf_by).reindex(var_by).set_index(adata.var.index)
+    adata.var = adata.var.assign(**merge_df)
     

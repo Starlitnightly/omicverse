@@ -11,6 +11,7 @@ import pandas as pd
 from scipy.cluster import hierarchy  
 from scipy import cluster   
 from sklearn import decomposition as skldec 
+from gseapy.plot import gseaplot,GSEAPlot
 
 
 from scipy.spatial.distance import pdist
@@ -247,6 +248,43 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
     enrich_res['fraction']=[int(i.split('/')[0])/int(i.split('/')[1]) for i in enrich_res['Overlap']]
     return enrich_res
 
+
+
+def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
+                            processes:int=8,
+                     permutation_num:int=100, # reduce number to speed up testing
+                     outdir:str='./enrichr_gsea', format:str='png', seed:int=112)->dict:
+    """
+    Enrichment analysis using GSEA
+
+    Arguments:
+        gene_rnk: pre-ranked correlation table or pandas DataFrame. Same input with ``GSEA`` .rnk file.
+        pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
+        processes: Number of Processes you are going to use. Default: 8.
+        permutation_num: Number of permutations for significance computation. Default: 100.
+        outdir: Output directory for Enrichr results. Default is './enrichr_gsea'.
+        format: Matplotlib figure format. Default: 'png'.
+        seed: Random seed. Default: 112.
+
+    Returns:
+        pre_res: A prerank object containing the enrichment results.
+    
+    """
+    pre_res = gp.prerank(rnk=gene_rnk, gene_sets=pathways_dict,
+                     processes=processes,
+                     permutation_num=permutation_num, # reduce number to speed up testing
+                     outdir=outdir, format=format, seed=seed)
+    return pre_res
+    enrich_res=pre_res.res2d[pre_res.res2d['fdr']<0.05]
+    enrich_res['logp']=-np.log(enrich_res['fdr']+0.0001)
+    enrich_res['logc']=enrich_res['nes']
+    enrich_res['num']=enrich_res['matched_size']
+    enrich_res['fraction']=enrich_res['matched_size']/enrich_res['geneset_size']
+    enrich_res['Term']=enrich_res.index.tolist()
+    enrich_res['P-value']=enrich_res['fdr']
+    return enrich_res
+
+
 def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         cax_loc:int=2,cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
@@ -298,10 +336,10 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
         fontsize=cax_fontsize)
     return ax
 
-class pyGSEA(object):
+class pyGSE(object):
 
     def __init__(self,gene_list:list,pathways_dict:dict,pvalue_threshold:float=0.05,pvalue_type:str='auto',
-                       organism:str='Human',description:str='None',outdir:str='./enrichr',cutoff:float=0.5) -> None:
+                 background=None,organism:str='Human',description:str='None',outdir:str='./enrichr',cutoff:float=0.5) -> None:
         """Initialize the pyGSEA class.
 
         Arguments:
@@ -324,6 +362,14 @@ class pyGSEA(object):
         self.description=description
         self.outdir=outdir
         self.cutoff=cutoff
+        if background is None:
+            if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
+                background='mmusculus_gene_ensembl'
+            elif (organism == 'Human') or (organism == 'human') or (organism == 'hs'):
+                background='hsapiens_gene_ensembl'
+            self.background=background
+        else:
+            self.background=background
     
     def enrichment(self):
         """gene set enrichment analysis.
@@ -333,14 +379,15 @@ class pyGSEA(object):
         """
 
         enrich_res=geneset_enrichment(self.gene_list,self.pathways_dict,self.pvalue_threshold,self.pvalue_type,
-                                  self.organism,self.description,self.outdir,self.cutoff)
+                                  self.organism,self.description,self.background,self.outdir,self.cutoff)
         self.enrich_res=enrich_res
         return enrich_res
+    
     
     def plot_enrichment(self,num:int=10,node_size:list=[5,10,15],
                         cax_loc:int=2,cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
-                        figsize:tuple=(2,4),cmap:str='YlGnBu')->matplotlib.axes._axes.Axes:
+                        figsize:tuple=(2,4),cmap:str='YlGnBu',text_knock:int=2,text_maxsize:int=20)->matplotlib.axes._axes.Axes:
         
         """Plot the gene set enrichment result.
         
@@ -358,4 +405,113 @@ class pyGSEA(object):
             A matplotlib.axes.Axes object.
         """
         return geneset_plot(self.enrich_res,num,node_size,cax_loc,cax_fontsize,
-                            fig_title,fig_xlabel,figsize,cmap)
+                            fig_title,fig_xlabel,figsize,cmap,text_knock,text_maxsize)
+    
+class pyGSEA(object):
+
+    def __init__(self,gene_rnk:pd.DataFrame,pathways_dict:dict,
+                 processes:int=8,permutation_num:int=100,
+                 outdir:str='./enrichr_gsea',cutoff:float=0.5) -> None:
+        """Initialize the pyGSEA class.
+
+        Arguments:
+            gene_rnk: pre-ranked correlation table or pandas DataFrame. Same input with ``GSEA`` .rnk file.
+            pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
+            processes: Number of Processes you are going to use. Default: 8.
+            permutation_num: Number of permutations for significance computation. Default: 100.
+            outdir: Output directory for Enrichr results. Default is './enrichr_gsea'.
+            cutoff: The cutoff for enrichment. Default is 0.5.
+        """
+
+        self.gene_rnk=gene_rnk
+        self.pathways_dict=pathways_dict
+        self.processes=processes
+        self.permutation_num=permutation_num
+        self.outdir=outdir
+        self.cutoff=cutoff
+    
+    
+    def enrichment(self,format:str='png', seed:int=112)->pd.DataFrame:
+        """gene set enrichment analysis.
+        
+        Arguments:
+            format: Matplotlib figure format. Default: 'png'.
+            seed: Random seed. Default: 112.
+        
+        Returns:
+            enrich_res:A pandas.DataFrame object containing the enrichment results.
+        """
+
+        
+        pre_res=geneset_enrichment_GSEA(self.gene_rnk,self.pathways_dict,
+                                           self.processes,self.permutation_num,
+                                           self.outdir,format,seed)
+        self.pre_res=pre_res
+        enrich_res=pre_res.res2d[pre_res.res2d['fdr']<0.05]
+        enrich_res['logp']=-np.log(enrich_res['fdr']+0.0001)
+        enrich_res['logc']=enrich_res['nes']
+        enrich_res['num']=enrich_res['matched_size']
+        enrich_res['fraction']=enrich_res['matched_size']/enrich_res['geneset_size']
+        enrich_res['Term']=enrich_res.index.tolist()
+        enrich_res['P-value']=enrich_res['fdr']
+        self.enrich_res=enrich_res
+        return enrich_res
+    
+    def plot_gsea(self,term_num:int=0,
+                  gene_set_title:str='',
+                  figsize:tuple=(3,4),
+                  cmap:str='RdBu_r',
+                  title_fontsize:int=12,
+                  title_y:float=0.95)->matplotlib.figure.Figure:
+        """Plot the gene set enrichment result.
+        
+        Arguments:
+            term_num: The number of enriched terms to plot. Default is 0.
+            gene_set_title: The title of the plot. Default is an empty string.
+            figsize: The size of the plot. Default is (3,4).
+            cmap: The colormap to use for the plot. Default is 'RdBu_r'.
+            title_fontsize: The fontsize of the title. Default is 12.
+            title_y: The y coordinate of the title. Default is 0.95.
+
+        Returns:
+            fig: A matplotlib.figure.Figure object.
+        """
+        
+        terms = self.enrich_res.index
+        g = GSEAPlot(
+        rank_metric=self.pre_res.ranking, term=terms[term_num],figsize=figsize,cmap=cmap,
+            **self.pre_res.results[terms[term_num]]
+            )
+        if gene_set_title=='':
+            g.fig.suptitle(terms[term_num],fontsize=title_fontsize,y=title_y)
+        else:
+            g.fig.suptitle(gene_set_title,fontsize=title_fontsize,y=title_y)
+        g.add_axes()
+        return g.fig
+    
+    
+    def plot_enrichment(self,num:int=10,node_size:list=[5,10,15],
+                        cax_loc:int=2,cax_fontsize:int=12,
+                        fig_title:str='',fig_xlabel:str='Fractions of genes',
+                        figsize:tuple=(2,4),cmap:str='YlGnBu',
+                        text_knock:int=2,text_maxsize:int=20)->matplotlib.axes._axes.Axes:
+        
+        """Plot the gene set enrichment result.
+        
+        Arguments:
+            num: The number of enriched terms to plot. Default is 10.
+            node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
+            cax_loc: The location of the colorbar on the plot. Default is 2.
+            cax_fontsize: The fontsize of the colorbar label. Default is 12.
+            fig_title: The title of the plot. Default is an empty string.
+            fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
+            figsize: The size of the plot. Default is (2,4).
+            cmap: The colormap to use for the plot. Default is 'YlGnBu'.
+            text_knock: The number of terms to knock out for text labels. Default is 2.
+            text_maxsize: The maximum fontsize of text labels. Default is 20.
+
+        Returns:
+            ax: A matplotlib.axes.Axes object.
+        """
+        return geneset_plot(self.enrich_res,num,node_size,cax_loc,cax_fontsize,
+                            fig_title,fig_xlabel,figsize,cmap,text_knock,text_maxsize)
