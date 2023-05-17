@@ -10,13 +10,13 @@ import pandas as pd
 import scanpy as sc
 
 
-def read(path):
+def read(path,**kwargs):
     if path.split('.')[-1]=='h5ad':
-        return sc.read(path)
+        return sc.read(path,**kwargs)
     elif path.split('.')[-1]=='csv':
-        return pd.read_csv(path)
+        return pd.read_csv(path,**kwargs)
     elif path.split('.')[-1]=='tsv':
-        return pd.read_csv(path,sep='\t')
+        return pd.read_csv(path,sep='\t',**kwargs)
     else:
         raise ValueError('The type is not supported.')
     
@@ -142,6 +142,7 @@ def download_pathway_database():
         print('......Pathway Geneset download start:',datasets_name)
         model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
     print('......Pathway Geneset download finished!')
+    print('......Other Genesets can be dowload in `https://maayanlab.cloud/Enrichr/#libraries`')
 
 def download_geneid_annotation_pair():
     r"""load geneid_annotation_pair
@@ -186,7 +187,7 @@ def geneset_prepare(geneset_path,organism='Human'):
             go_bio_dict[go_bio_geneset.loc[i,0]]=[i.upper() for i in go_bio_geneset.loc[i,1].split('\t')]
     else:
         for i in go_bio_geneset.index:
-            go_bio_dict[go_bio_geneset.loc[i,0]]=[i.upper() for i in go_bio_geneset.loc[i,1].split('\t')]
+            go_bio_dict[go_bio_geneset.loc[i,0]]=[i for i in go_bio_geneset.loc[i,1].split('\t')]
     return go_bio_dict
 
 
