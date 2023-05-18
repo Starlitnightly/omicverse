@@ -22,6 +22,7 @@ nav:
         - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
         - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
         - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
+        - Multi omics analysis by MOFA and GLUE: Tutorials-single/t_mofa_glue.ipynb
         - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
     - Bulk2Single:
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
