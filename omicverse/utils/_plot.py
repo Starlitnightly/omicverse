@@ -37,6 +37,15 @@ def pyomic_palette()->list:
     """ 
     return sc_color
 
+def palette()->list:
+    """
+    Returns a dictionary of colors for various plots used in pyomic package.
+
+    Returns:
+        sc_color: List containing the hex codes as values.
+    """ 
+    return sc_color
+
 def plot_text_set(text,text_knock=2,text_maxsize=20):
     """
     Formats the text to fit in a plot by adding line breaks.

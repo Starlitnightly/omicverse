@@ -34,6 +34,7 @@ For more details about the Pyomic framework, please check out our [publication](
     - [Drug response predict with scDrug](Tutorials-single/t_scdrug)
     - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)
     - [Multi omics analysis by MOFA](Tutorials-single/t_mofa)
+    - [Multi omics analysis by MOFA and GLUE](Tutorials-single/t_mofa_glue)
     - [Overlapping Celltype annotation with GNN (in progress)](Tutorials-single/t_nocd)
 - Tutorial-Bulk2Single:
     - [Bulk RNA-seq to Single RNA-seq](Tutorials-bulk2single/t_bulk2single)

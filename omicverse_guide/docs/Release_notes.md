@@ -149,5 +149,13 @@ renamed the package to `omicverse`
 - change the name of raw `pyGSEA` to `pyGSE` in `bulk`
 - add `get_gene_annotation` of `utils` to perform gene_name transformation
 
+## v 1.3.1
+
+### single module
+
+- add `get_celltype_marker` method in `single`
+- add `GLUE_pair`, `pyMOFA`, `pyMOFAART` module in `single`
+- add tutorial of `Multi omics analysis by MOFA and GLUE`
+- update tutorial of `Multi omics analysis by MOFA`
 
 
