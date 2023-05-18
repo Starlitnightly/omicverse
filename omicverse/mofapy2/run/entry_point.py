@@ -671,6 +671,7 @@ class entry_point(object):
         if gpu_mode:
             try:
                 import cupy as cp
+
                 print("\nGPU mode is activated\n")
             except ImportError:
                 print("\nGPU mode is activated, but GPU not found... switching to CPU mode")
