@@ -5,11 +5,11 @@
 
 ![Image title](img/logo.png){ align=right width=300 }
 
-Pyomic is the fundamental package for multi omics included bulk and single cell analysis with Python.
+Omicverse is the fundamental package for multi omics included bulk and single cell analysis with Python.
 
-To get started with `omicverse`, check out the [Installation](Installation_guild) and [Tutorials]().
+To get started with `omicverse`, check out the [Installation](Installation_guild) and [Tutorials](Tutorials-single/t_cellanno).
 
-For more details about the Pyomic framework, please check out our [publication]().
+For more details about the omicverse framework, please check out our [publication]().
 
 </div>
 
@@ -31,6 +31,7 @@ For more details about the Pyomic framework, please check out our [publication](
     - [Trajectory Inference with VIA](Tutorials-single/t_via)
     - [Trajectory Inference with VIA and scVelo](Tutorials-single/t_via_velo)
     - [Pathway analysis with AUCell](Tutorials-single/t_aucell)
+    - [Different expression analysis in scRNA-seq](Tutorials-single/t_scdeg)
     - [Drug response predict with scDrug](Tutorials-single/t_scdrug)
     - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)
     - [Multi omics analysis by MOFA](Tutorials-single/t_mofa)
