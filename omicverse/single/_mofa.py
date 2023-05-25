@@ -116,6 +116,13 @@ class GLUE_pair(object):
         result.index=['cell_{}'.format(i) for i in range(len(result))]
         self.pair_res=result
         return result
+    
+    def pair_omic(self,omic1,omic2):
+        rna1=omic1[self.res_pair['omic_1']].copy()
+        atac1=omic2[self.res_pair['omic_2']].copy()
+        rna1.obs.index=self.res_pair.index
+        atac1.obs.index=self.res_pair.index
+        return rna1,atac1
 
 
 def glue_pair(rna:anndata.AnnData,
