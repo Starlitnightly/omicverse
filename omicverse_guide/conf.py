@@ -22,5 +22,5 @@ copyright = '2022, starlitnightly'
 author = 'starlitnightly'
 
 # The full version, including alpha/beta/rc tags
-release = '1.2.11'
+release = '1.3.1'
 

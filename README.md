@@ -48,7 +48,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 
 ## Contact
 
-- Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com))
+- Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com) or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 
 ## Other
 

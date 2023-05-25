@@ -12,7 +12,7 @@ OmicVerse now only can be installed by pypi and you need to install `pytorch` at
 - Install Python, we prefer the pyenv version management system, along with pyenv-virtualenv.
 
 ### Apple silicon prerequisites
-Installing Pyomic on a Mac with Apple Silicon is only possible using a native version of python. A native version of python can be installed with an Apple Silicon version of mambaforge (which can be installed from a native version of homebrew via `brew install --cask mambaforge`). 
+Installing omicverse on a Mac with Apple Silicon is only possible using a native version of python. A native version of python can be installed with an Apple Silicon version of mambaforge (which can be installed from a native version of homebrew via `brew install --cask mambaforge`). 
 
 ## Pip
 
