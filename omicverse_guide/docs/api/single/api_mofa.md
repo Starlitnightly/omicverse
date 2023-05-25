@@ -39,6 +39,7 @@
             - __init__
             - correlation
             - find_neighbor_cell
+            - pair_omic
         show_root_heading: true
         show_source: true
 

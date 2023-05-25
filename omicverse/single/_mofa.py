@@ -117,7 +117,19 @@ class GLUE_pair(object):
         self.pair_res=result
         return result
     
-    def pair_omic(self,omic1,omic2):
+    def pair_omic(self,omic1:anndata.AnnData,omic2:anndata.AnnData)->Tuple[anndata.AnnData,anndata.AnnData]:
+        """
+        Pair the omics using the result of find_neighbor_cell
+
+        Arguments:
+            omic1: the AnnData of omic1.
+            omic2: the AnnData of omic2.
+
+        Returns:
+            rna1: the paired AnnData of omic1.
+            atac1: the paired AnnData of omic2.
+
+        """
         rna1=omic1[self.res_pair['omic_1']].copy()
         atac1=omic2[self.res_pair['omic_2']].copy()
         rna1.obs.index=self.res_pair.index
