@@ -26,6 +26,7 @@ nav:
         - Multi omics analysis by MOFA and GLUE: Tutorials-single/t_mofa_glue.ipynb
         - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
     - Bulk2Single:
+        - Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq: Tutorials-bulk2single/t_bulktrajblend.ipynb
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
         - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
 - API documentation: api/index.md
