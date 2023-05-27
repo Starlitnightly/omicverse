@@ -19,9 +19,9 @@ import pygam as pg
 from termcolor import colored
 from collections import Counter
 from typing import Optional, Union
-from .plotting_via import *
-from .utils_via import _construct_knn, sequential_knn
-from .utils_via import *
+from pyVIA.plotting_via import *
+from pyVIA.utils_via import _construct_knn, sequential_knn
+from pyVIA.utils_via import *
 #from plotting_via import * #
 #from utils_via import *
 #from utils_via import _construct_knn, sequential_knn
@@ -345,7 +345,7 @@ class VIA:
     single_cell_bp: ndarray
         [n_lineages x n_samples] array of single cell branching probabilities towards each lineage (lineage normalized).
         Each column corresponds to a terminal state, in the order presented by the terminal_clusters attribute
-    single_cell_bp_normed: ndarray
+    single_cell_bp_rownormed: ndarray
         [n_lineages x n_samples] array of single cell branching probabilities towards each lineage (cell normalized).
         Each column corresponds to a terminal state, in the order presented by the terminal_clusters attribute
     terminal_clusters: list
@@ -790,7 +790,12 @@ class VIA:
         return list(prob_)[0]
 
     def simulate_markov(self, A, root):
+        '''
 
+        :param A: cluster graph adjacency matrix (forward biased)
+        :param root:
+        :return: mcmc hitting times
+        '''
         n_states = A.shape[0]
         P = A / A.sum(axis=1).reshape((n_states, 1))
         # print('row normed P',P.shape, P, P.sum(axis=1))
@@ -1923,7 +1928,7 @@ class VIA:
                 # temp_pca = csr_matrix(self.data)
                 # X_diffused_data = row_stoch * temp_pca  # matrix multiplication to diffuse the pcs
                 # X_input=self.data
-                for random_state in [self.random_seed]:
+                for random_state in [25, self.random_seed,0]:
                     for min_dist in [0.1]:
                         for rw2_comp in [self.ncomp]:
                             distance_metric = 'euclidean'  # 'cosine'
@@ -1933,19 +1938,21 @@ class VIA:
                             # '/home/shobi/Trajectory/Datasets/EB_Phate/RW2_sparse_matrix510Pp1p5_R2Wemd.csv'
 
                             #r2w_input = pd.read_csv( '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/RW2/RW2_sparse_matrix5094_pc30_knn30_krev15_kseq15_rs0.csv')
-                            #r2w_input = pd.read_csv(                            '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/RW2/RW2_sparse_matrix5820_pc20_knn30_krev15_kseq15_rs0.csv')
-                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/WagnerZebrafish/RW2/knn100_pc30_kseq50RW2_sparse_matrix445.csv')
-                            #r2w_input = pd.read_csv(                            '/home/shobi/Trajectory/Datasets/EB_Phate/RW2/RW2_emd5919_knn30,kseq30krev30_pc30_rs24.csv')
-                            #r2w_input = pd.read_csv(                                '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/RW2/pc30_knn30kseq15krev15RW2_emd_122.csv')
-                            #r2w_input = pd.read_csv(        '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/RW2/pc30_knn30kseq15krev15RW2_emd_122.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/Cao_ProtoVert/RW2/RW2_P1_Q1_sparse_matrix5820_pc20_knn30_krev15_kseq15_rs0.csv')
+                            r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/WagnerZebrafish/RW2/knn100_pc30_kseq50RW2_sparse_matrix5820.csv')
+                            #r2w_input = pd.read_csv( '/home/shobi/Trajectory/Datasets/EB_Phate/RW2/pc20_knn100kseq50krev50RW2_emd029.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/RW2/pc30_knn30kseq15krev15RW2_emd_122.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/RW2/pc30_P1_Qp001_knn30kseq15krev15RW2_sparse_matrix_122.csv')
 
-                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn20kseq0krev0RW2_887_P20Q20.csv')#
-                            #r2w_input = pd.read_csv(                                '/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn50kseq0krev0RW2_gaussTrue_051_P1Q1.csv')  #
-                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn20kseq0krev0RW2_887.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn20kseq0krev0RW2_887_P20Q20.csv')# not this
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn50kseq0krev0RW2_gaussTrue_051_P1Q1.csv')  # not this
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_knn20kseq0krev0RW2_887.csv') not this
 
-                            #r2w_input = pd.read_csv(                                '/home/shobi/Trajectory/Datasets/EB_Phate/RW2/pc20_knn100kseq50krev50RW2_emd029.csv')
+                            #r2w_input = pd.read_csv( '/home/shobi/Trajectory/Datasets/EB_Phate/RW2/pc20_knn100kseq50krev50RW2_sparse_matrix029_P1_Qp001_numwalk20.csv')
                             #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/EB_Phate/RW2/pc20_knn100kseq50krev50RW2_sparse_matrix029_P1_Q100_numwalk20.csv')
-                            r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_P1_Q10_knn50kseq10krev10RW2_988.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_P1_Q1000_knn50kseq10krev10RW2_988.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/RW2/pc30_P1_Q1_knn50kseq10krev10RW2_988.csv')
+                            #r2w_input = pd.read_csv('/home/shobi/Trajectory/Datasets/2MOrgan/RW2/pc50_knn30kseq10krev0RW2_970_P1_Q10_rs42_tdiffstep2_gaussFalse_970.csv')
                             r2w_input = r2w_input.drop(['Unnamed: 0'], axis=1).values
                             input = r2w_input[:, 0:rw2_comp]
                             '''
@@ -1960,10 +1967,18 @@ class VIA:
     
                             input = row_stoch * temp  # matrix multiplication
                             '''
-
-                            self.embedding = via_umap(X_input=self.data, graph=self.csr_full_graph, n_epochs=100, spread=1,
+                            do_initVia = True
+                            n_epochs=100 #100 usually
+                            #input = self.data
+                            if do_initVia:
+                                self.embedding = via_umap(X_input=input, graph=self.csr_full_graph, n_epochs=n_epochs, spread=1,
                                                       distance_metric=distance_metric, min_dist=min_dist, saveto='',
-                                                      random_state=random_state)#,init_pos='via',  cluster_membership=self.labels, layout=layout.coords )
+                                                      random_state=random_state,init_pos='via',  cluster_membership=self.labels, layout=layout.coords )
+                            else:
+                                self.embedding = via_umap(X_input=input, graph=self.csr_full_graph, n_epochs=n_epochs,
+                                                          spread=1,
+                                                          distance_metric=distance_metric, min_dist=min_dist, saveto='',
+                                                          random_state=random_state)
 
                             print(f'{datetime.now()}\tCompleted via-umap')
                             title_umap = 'via-umap knn/pc/knnseq:' + str(self.knn) + '/' + str(
@@ -1979,26 +1994,32 @@ class VIA:
                                 f1.set_size_inches(10, 10)
 
                                 str_date = str(str(datetime.now())[-3:])
-                                #save_str = '/home/shobi/Trajectory/Datasets/WagnerZebrafish/viaumap_RW2_5820_k' + str(                                self.knn) + 'kseq' + str(self.knn_sequential) + '_knnreverse' + str(                                self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                random_state) + '_rsVIA' + str(self.random_seed) + 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) + 'viaInitLayout' + str_date
+                                save_str = '/home/shobi/Trajectory/Datasets/WagnerZebrafish/viaumap_RW2_5820_k' + str(self.knn) + 'TimeseriesAug'+str(self.time_series)+ '_kseq' + str(self.knn_sequential) + '_knnreverse' + str(  self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                random_state) + '_rsVIA' + str(self.random_seed) + 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) + 'viaInit' +str(do_initVia)+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/WagnerZebrafish/viaumap_PCA_k' + str(self.knn) + 'TimeseriesAug'+str(self.time_series)+ '_kseq' + str(self.knn_sequential) + '_knnreverse' + str(  self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                random_state) + '_rsVIA' + str(self.random_seed) + 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) + 'viaInit'+str(do_initVia)+ str_date
                                 # save_str = '/home/shobi/Trajectory/Datasets/MEF_Schiebinger/viaumap_k' + str(                                self.knn) + 'kseq' + str(self.knn_sequential) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                self.random_seed) + 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) + str_date + 'stage'
-                                #
-                                #save_str = '/home/shobi/Trajectory/Datasets/EB_Phate/viaumap_R2W_029_P1_Q100_k' + str( self.knn) + 'kseq' + str(self.knn_sequential) +'_knnreverse'+str(self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(random_state) + 'doGauss' + str( self.do_gaussian_kernel_edgeweights) + str_date
-                                #save_str = '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/viaumap_RW2_5820_k' + str(                                self.knn) + 'kseq' + str(self.knn_sequential) + '_knnreverse' + str(                                self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                random_state) +'_rsVIA'+str(self.random_seed)+ 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) +'viaInitLayout'+ str_date
-                                #save_str = '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/viaumap_RW2_rw2comp'+str(rw2_comp)+'_122_k' + str(                                    self.knn) + 'kseq' + str(self.knn_sequential) +'_knnreverse'+str(self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                    random_state) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights) + str_date + 'stage'
-                                save_str = '/home/shobi/Trajectory/Datasets/MouseNeuron/viaumap_RW2_P1_Q10_rw2comp' + str(rw2_comp) + '_988_P1_Q10_k' + str(self.knn) + 'kseq' + str(                                    self.knn_sequential) + '_knnreverse' + str(                                    self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                    random_state) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights) + str_date + 'stage'
 
-                                # df_umap.to_csv('/home/shobi/Trajectory/Datasets/EB_Phate/viaumap_k'+str(self.knn)+'kseq'+str(self.knn_sequential)+'nps'+str(self.ncomp)+'tdiff'+str(self.t_diff_step)+'mindist'+str(min_dist)+'rs'+str(self.random_seed)+'stage'+str_date+".csv")
+                                #save_str = '/home/shobi/Trajectory/Datasets/EB_Phate/viaumap_R2W_029_P1_Qp001_k' + str( self.knn) +'TimeseriesAug'+str(self.time_series)+ 'kseq' + str(self.knn_sequential) +'_knnreverse'+str(self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + '_mainRS'+str(self.random_seed)+'mindist' + str(min_dist) + 'rsUmap' + str(random_state) + 'doGauss' + str( self.do_gaussian_kernel_edgeweights) +'_ViaInitLayout'+str(do_initVia)+'_nEpochs'+str(n_epochs)+'_'+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/EB_Phate/viaumap_PCA_k' + str(                                    self.knn) + 'TimeseriesAug' + str(self.time_series) + 'kseq' + str(                                    self.knn_sequential) + '_knnreverse' + str(                                    self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + '_mainRS' + str(self.random_seed) + 'mindist' + str(                                    min_dist) + 'rsUmap' + str(random_state) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights) + '_ViaInitLayout' + str(                                    do_initVia) + '_nEpochs' + str(n_epochs) + '_' + str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/viaumap_RW2_P1_Q1_5820_k' + str( self.knn) + 'TimeseriesAug'+str(self.time_series)+ '_kseq' + str(self.knn_sequential) + '_knnreverse' + str(                                self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                random_state) +'_rsVIA'+str(self.random_seed)+ 'doGauss' + str(                                self.do_gaussian_kernel_edgeweights) +'viaInitLayout'+str(do_initVia)+'_nEpochs'+str(n_epochs)+'_'+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/viaumap_PCA_k' + str(                                    self.knn) + 'TimeseriesAug' + str(self.time_series) + '_kseq' + str(                                    self.knn_sequential) + '_knnreverse' + str(                                    self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + '_rsUmap' + str(                                    random_state) + '_rsVIA' + str(self.random_seed) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights) + 'viaInitLayout' + str(                                    do_initVia) + '_nEpochs' + str(n_epochs) + '_' + str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/viaumap_RW2_P1_Qp001_rw2comp'+str(rw2_comp)+'_122_k' + str(                                    self.knn) +'_TimeAug'+str(self.time_series)+ '_kseq' + str(self.knn_sequential) +'_knnreverse'+str(self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                    random_state) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights) + str_date +'_viaInitTrue'
+                                #save_str = '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/viaumap_PCA_k' + str(self.knn) + '_TimeAug' + str(                                    self.time_series) + '_kseq' + str(self.knn_sequential) + '_knnreverse' + str(                                    self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                    random_state) + 'doGauss' + str(                                    self.do_gaussian_kernel_edgeweights)+'_viaInit'+str(do_initVia)      +str(n_epochs)+'_'+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/MouseNeuron/viaumap_RW2_P1_Q1000_rw2comp' + str(rw2_comp) + '_988_k' + str(self.knn) + 'TimeseriesAug'+str(self.time_series)+'_kseq' + str(self.knn_sequential) + '_knnreverse' + str( self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(self.t_diff_step) + 'mindist' + str(min_dist) +'_rsMain'+str(self.random_seed)+ '_rs' + str(random_state) + 'doGauss' + str( self.do_gaussian_kernel_edgeweights) +'_viaInitLayout'+str(do_initVia)+'_nEpochs'+str(n_epochs)+'_'+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/MouseNeuron/viaumap_PCA_k' + str(self.knn) + 'TimeseriesAug'+str(self.time_series)+'_kseq' + str(self.knn_sequential) + '_knnreverse' + str( self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(self.t_diff_step) + 'mindist' + str(min_dist) +'_rsMain'+str(self.random_seed)+ '_rs' + str(random_state) + 'doGauss' + str( self.do_gaussian_kernel_edgeweights) +'_viaInitLayout'+str(do_initVia)+'_nEpochs'+str(n_epochs)+'_'+ str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/2MOrgan/viaumap_RW2_P1_Q10_rw2comp' + str(                                    rw2_comp) + '_970_k' + str(self.knn) + 'kseq' + str(                                    self.knn_sequential) + '_knnreverse' + str(                                    self.knn_sequential_reverse) + 'npc' + str(self.ncomp) + 'tdiff' + str(                                    self.t_diff_step) + 'mindist' + str(min_dist) + 'rs' + str(                                    random_state) + 'doGauss' + str(self.do_gaussian_kernel_edgeweights) +'viaInitTrue'+ str_date
+
+
                                 # df_umap.to_csv('/home/shobi/Trajectory/Datasets/MouseNeuron/2000hvg_viaumap_k'+str(self.knn)+'kseq'+str(self.knn_sequential)+'nps'+str(self.ncomp)+'tdiff'+str(self.t_diff_step)+'mindist'+str(min_dist)+'rs'+str(self.random_seed)+'stage'+str_date+".csv")
-                                # savefig_ = '/home/shobi/Trajectory/Datasets/MouseNeuron/2000hvg_viaumap_k'+str(self.knn)+'kseq'+str(self.knn_sequential)+'nps'+str(self.ncomp)+'tdiff'+str(self.t_diff_step)+'mindist'+str(min_dist)+'rs'+str(self.random_seed)+str_date+'stage.png'
-                                #df_umap = pd.DataFrame(self.embedding)
-                                #df_umap.to_csv(save_str + '.csv')
-                                #f1.savefig(save_str + 'stage.png', facecolor='white', transparent=False)
+                                #savefig_ = '/home/shobi/Trajectory/Datasets/MouseNeuron/2000hvg_viaumap_k'+str(self.knn)+'kseq'+str(self.knn_sequential)+'nps'+str(self.ncomp)+'tdiff'+str(self.t_diff_step)+'mindist'+str(min_dist)+'rs'+str(self.random_seed)+str_date+'stage.png'
+                                df_umap = pd.DataFrame(self.embedding)
+                                df_umap.to_csv(save_str + '.csv')
+                                f1.savefig(save_str + 'stage.png', facecolor='white', transparent=False)
 
                             # savefig_ = '/home/shobi/Trajectory/Datasets/MouseNeuron/2000hvg_viaumap_k'+str(self.knn)+'kseq'+str(self.knn_sequential)+'nps'+str(self.ncomp)+'tdiff'+str(self.t_diff_step)+'mindist'+str(min_dist)+'rs'+str(self.random_seed)+str_date+'celltype.png'
-                            #f2, ax = plot_scatter(embedding=self.embedding, labels=self.true_label, title=title_umap,
-                            #                      alpha=0.5, s=5, color_dict=self.color_dict)
-                            #f2.set_size_inches(10, 10)
-                            #f2.savefig(save_str + 'celltype.png', facecolor='white', transparent=False)
+                            f2, ax = plot_scatter(embedding=self.embedding, labels=self.true_label, title=title_umap,
+                                                  alpha=0.5, s=5, color_dict=self.color_dict)
+                            f2.set_size_inches(10, 10)
+                            f2.savefig(save_str + 'celltype.png', facecolor='white', transparent=False)
                             #plt.show()
 
 
@@ -2009,7 +2030,7 @@ class VIA:
                 # n_milestones = min(self.nsamples, max(10000, int(0.1*self.nsamples)))
 
                 for diffusion_i in [5]:
-                    for k_seq_i in [10]:
+                    for k_seq_i in [5]:
                         for k_mds_i in [10]:
                             for rs_i in [self.random_seed]:
                                 t_difference = 2  # self.t_diff_step
@@ -2018,25 +2039,17 @@ class VIA:
 
                                 self.embedding = via_mds(X_pca=self.data, n_milestones=n_milestones_mds, k=k_mds_i,
                                                          knn_seq=k_seq_i, k_project_milestones=k_project_milestones,
-                                                         neighbors_distances=self.full_neighbor_array,
+
                                                          diffusion_op=diffusion_i, random_seed=rs_i,
                                                          viagraph_full=self.csr_full_graph, t_difference=t_difference,
                                                          time_series_labels=self.time_series_labels, saveto='',
                                                          double_diffusion=False)
                                 shape_data = self.data.shape[1]
                                 str_date = str(str(datetime.now())[-3:])
-                                # save_str = '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/mds/viamds_singlediffusion_pcs'+str(shape_data)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_step'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_nps' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_RsMds'+str(rs_i)+'_'+str_date
+                                save_str = '/home/shobi/Trajectory/Datasets/Pijuan_Gastrulation/mds/viamds_singlediffusion_pcs'+str(shape_data)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_step'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_nps' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_RsMds'+str(rs_i)+'_'+str_date
                                 # save_str = '/home/shobi/Trajectory/Datasets/WagnerZebrafish/2000hvg/mds/singlediffusion_viamds/2000hvg_viamds_singlediffusion_pcs'+str(shape_data)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_step'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_nps' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_RsMds'+str(rs_i)+'_'+str_date
-                                # save_str = '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/mds_theseare1000hvg/singlediffusion_viamds/1000hvg_viamds_singlediffusion_doExp'+str(self.do_gaussian_kernel_edgeweights)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_stepmds'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_nps' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_rsMds'+str(rs_i)+'_'+str_date
-                                save_str = '/home/shobi/Trajectory/Datasets/EB_Phate/viamds_R2W_029_P1_Q10_singlediffusion_prescaled_doExp' + str(
-                                    self.do_gaussian_kernel_edgeweights) + '_k' + str(self.knn) + '_milestones' + str(
-                                    n_milestones_mds) + '_kprojectmilestones' + str(
-                                    k_project_milestones) + 't_stepmds' + str(t_difference) + '_knnmds' + str(
-                                    k_mds_i) + '_kseqmds' + str(k_seq_i) + '_kseq' + str(
-                                    self.knn_sequential) + '_npc' + str(self.ncomp) + '_tdiff' + str(
-                                    self.t_diff_step) + '_randseed' + str(self.random_seed) + '_diffusionop' + str(
-                                    diffusion_i) + '_rsMds' + str(rs_i) + '_' + str_date
-                                # save_str = '/home/shobi/Trajectory/Datasets/MEF_Schiebinger/viamds_singlediffusion_prescaled_doExp'+str(self.do_gaussian_kernel_edgeweights)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_stepmds'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_npc' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_rsMds'+str(rs_i)+'_'+str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/Cao_ProtoVert/mds_theseare1000hvg/singlediffusion_viamds/1000hvg_viamds_singlediffusion_doExp'+str(self.do_gaussian_kernel_edgeweights)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_stepmds'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_nps' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_rsMds'+str(rs_i)+'_'+str_date
+                                #save_str = '/home/shobi/Trajectory/Datasets/EB_Phate/viamds_R2W_029_P1_Qp001_singlediffusion_prescaled_doExp' + str(                                    self.do_gaussian_kernel_edgeweights) + '_k' + str(self.knn) + '_milestones' + str(                                    n_milestones_mds) + '_kprojectmilestones' + str(                                    k_project_milestones) + 't_stepmds' + str(t_difference) + '_knnmds' + str(                                    k_mds_i) + '_kseqmds' + str(k_seq_i) + '_kseq' + str(                                    self.knn_sequential) + '_npc' + str(self.ncomp) + '_tdiff' + str(                                    self.t_diff_step) + '_randseed' + str(self.random_seed) + '_diffusionop' + str(                                    diffusion_i) + '_rsMds' + str(rs_i) + '_' + str_date                                # save_str = '/home/shobi/Trajectory/Datasets/MEF_Schiebinger/viamds_singlediffusion_prescaled_doExp'+str(self.do_gaussian_kernel_edgeweights)+'_k' + str(self.knn) + '_milestones'+str(n_milestones_mds)+'_kprojectmilestones'+str(k_project_milestones)+'t_stepmds'+str(t_difference)+'_knnmds' + str(k_mds_i) +'_kseqmds' + str(k_seq_i) +'_kseq'+str(self.knn_sequential)+'_npc' + str(self.ncomp) + '_tdiff' + str(self.t_diff_step)+'_randseed'+str(self.random_seed)+ '_diffusionop'+str(diffusion_i)+'_rsMds'+str(rs_i)+'_'+str_date
                                 print(f'{datetime.now()}\tCompleted via-mds')
                                 #df_mds = pd.DataFrame(self.embedding)
                                 #df_mds.to_csv(save_str + ".csv")
@@ -2049,16 +2062,16 @@ class VIA:
                                     categorical = True
                                 else:
                                     categorical = False
-                                #f1, ax = plot_scatter(embedding=self.embedding, labels=color_labels, title='via-mds',
-                                #                      categorical=categorical, alpha=0.5)
-                                #savefig_ = save_str + 'stage.png'
-                                #f1.set_size_inches(10, 10)
+                                f1, ax = plot_scatter(embedding=self.embedding, labels=color_labels, title='via-mds',
+                                                      categorical=categorical, alpha=0.5)
+                                savefig_ = save_str + 'stage.png'
+                                f1.set_size_inches(10, 10)
                                 #f1.savefig(savefig_, facecolor='white', transparent=False)
 
-                                #if self.time_series_labels is not None:
-                                    #f2, ax2 = plot_scatter(embedding=self.embedding, labels=self.true_label, title='via-mds', categorical=True, alpha=0.5)
-                                    #savefig_ = save_str + 'celltype.png'
-                                    #f2.set_size_inches(10, 10)
+                                if self.time_series_labels is not None:
+                                    f2, ax2 = plot_scatter(embedding=self.embedding, labels=self.true_label, title='via-mds', categorical=True, alpha=0.5)
+                                    savefig_ = save_str + 'celltype.png'
+                                    f2.set_size_inches(10, 10)
                                     # f2.savefig(savefig_, facecolor='white', transparent=False)
 
 
@@ -2078,9 +2091,9 @@ class VIA:
                 else:
                     categorical = False
 
-                #plot_scatter(embedding=self.embedding, labels=color_labels, title='via-force', categorical=categorical)
-                #plot_scatter(embedding=self.embedding, labels=self.true_label, title='via-mds', categorical=True)
-                #plt.show()
+                plot_scatter(embedding=self.embedding, labels=color_labels, title='via-force', categorical=categorical)
+                plot_scatter(embedding=self.embedding, labels=self.true_label, title='via-mds', categorical=True)
+                plt.show()
             else:
                 print(
                     f'{datetime.now()}\tNo embedding will be computed: if you wish to compute a via-embedding specify one of via-force, via-mds or via-umap')
@@ -2105,7 +2118,7 @@ class VIA:
 
         if (self.velocity_matrix is not None) & (self.gene_matrix is not None):
             df_velocity = pd.DataFrame(self.velocity_matrix)
-            print('size velocity matrix', len(self.labels), self.velocity_matrix.shape)
+
             df_velocity['labels'] = self.labels
             velocity_mean =df_velocity.groupby('labels', as_index=True).mean().to_numpy()
             gene_mean =pd.DataFrame(self.gene_matrix)
@@ -2187,13 +2200,13 @@ class VIA:
             elif (self.dataset in ['toy','faced','mESC','iPSC','group']) and (self.root_user is not None):#((self.dataset == 'toy') | (self.dataset == 'faced')):
                 root_user_=None
                 for ri in self.root_user:
-                    print('group root method')
+                    print(f"{datetime.now()}\group root method")
                     if ri in sc_truelabels_subi:
                         root_user_ = ri
-                        print(f'for component {comp_i}, the root is {root_user_} and ri {ri}')
+                        print(f"{datetime.now()}\for component {comp_i}, the root is {root_user_} and ri {ri}")
                 if root_user_ is None:
                         root_user_=sc_truelabels_subi[0]
-                        print('setting a dummy root')
+                        print(f"{datetime.now()}\setting a dummy root")
                 if self.super_cluster_labels == True: #entering a fine-grained iteration of via - therefore using information from coarse via iteration
                     # find which sub-cluster has the super-cluster root
 
@@ -2335,6 +2348,7 @@ class VIA:
                 temp_terminal_clus_ai = []
                 threshold_ =np.percentile(np.asarray(markov_hitting_times_ai),self.pseudotime_threshold_TS)
                 for i in terminal_clus_ai:
+                    print('remove the [0:2] just using to speed up testing')
                     if markov_hitting_times_ai[i] > threshold_:
                         terminal_clus.append(cluster_labels_subi[i])
                         temp_terminal_clus_ai.append(i)
@@ -2446,6 +2460,7 @@ class VIA:
 
             #print('final terminal clus', terminal_clus)
             for target_terminal in terminal_clus_ai:
+
 
                 prob_ai = self.simulate_branch_probability(target_terminal,
                                                            adjacency_matrix2_ai,
@@ -2675,15 +2690,16 @@ class VIA:
 
             tsi_list.append(labelsq[0][0])
 
-
-        #if self.embedding is not None:
+        """
+        if self.embedding is not None:
             
-            #plot_scatter(embedding=self.embedding, labels = self.single_cell_pt_markov, sc_index_terminal_states = tsi_list, title='pseudotime and terminal states', cmap='plasma', true_labels=self.true_label )
+            plot_scatter(embedding=self.embedding, labels = self.single_cell_pt_markov, sc_index_terminal_states = tsi_list, title='pseudotime and terminal states', cmap='plasma', true_labels=self.true_label )
 
-            #plot_scatter(embedding=self.embedding, labels=self.true_label,
-            #             sc_index_terminal_states=tsi_list, title='lineage and terminal states', cmap='rainbow',
-            #             true_labels=self.labels)
-            #plt.show()
+            plot_scatter(embedding=self.embedding, labels=self.true_label,
+                         sc_index_terminal_states=tsi_list, title='lineage and terminal states', cmap='rainbow',
+                         true_labels=self.labels)
+            plt.show()
+        """
 
         return
 
@@ -3161,4 +3177,3 @@ class VIA:
             self.f1_accumulated = f1_accumulated
             self.f1_mean = f1_mean
             self.stats_df = df_accuracy
-

@@ -38,8 +38,9 @@ For more details about the omicverse framework, please check out our [publicatio
     - [Multi omics analysis by MOFA and GLUE](Tutorials-single/t_mofa_glue)
     - [Overlapping Celltype annotation with GNN (in progress)](Tutorials-single/t_nocd)
 - Tutorial-Bulk2Single:
-    - [Bulk RNA-seq to Single RNA-seq](Tutorials-bulk2single/t_bulk2single)
-    - [Single RNA-seq to Spatial RNA-seq](Tutorials-bulk2single/t_single2spatial)
+    - [Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq](Tutorials-bulk2single/t_bulktrajblend)
+    - [Bulk RNA-seq to scRNA-seq](Tutorials-bulk2single/t_bulk2single)
+    - [scRNA-seq to Spatial RNA-seq](Tutorials-bulk2single/t_single2spatial)
 - [Release notes](Release_notes)
 - [Developer guild](Developer_guild)
 

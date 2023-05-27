@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 
 setup(  
     name = 'omicverse',  
-    version = '1.3.1',
+    version = '1.4.0',
     # keywords = ('chinesename',),  
     description = 'OmicVerse: A single pipeline for exploring the entire transcriptome universe',  
     license = 'GNU License',  

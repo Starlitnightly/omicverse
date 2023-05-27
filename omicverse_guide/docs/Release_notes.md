@@ -158,4 +158,21 @@ renamed the package to `omicverse`
 - add tutorial of `Multi omics analysis by MOFA and GLUE`
 - update tutorial of `Multi omics analysis by MOFA`
 
+## v 1.4.0
+
+### bulk2single module
+
+- add `BulkTrajBlend` method in `bulk2single`
+
+### single module
+
+- fix the error of `scnocd` model
+- add `save`, `load`, and `get_pair_dict` of `scnocd` model
+
+### utils
+
+- add `mde` method in utils
+- add `gz` format support for `utils.read`
+
+
 

@@ -32,5 +32,6 @@ import omicverse as ov
 
 |module|reference|
 | ---- | ---- |
+|[bulk2single.BulkTrajBlend](bulk2single/api_bulktrajblend)|bulk RNA-seq generate interrupt cell in scRNA-seq|
 |[bulk2single.Bulk2Single](bulk2single/api_bulk2single)|Bulk RNA-seq to Single RNA-seq|
 |[bulk2single.Single2Spatial](bulk2single/api_single2spatial)|Single RNA-seq to Spatial RNA-seq|

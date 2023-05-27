@@ -21,6 +21,11 @@ def read(path,**kwargs):
         return pd.read_csv(path,**kwargs)
     elif path.split('.')[-1]=='tsv' or path.split('.')[-1]=='txt':
         return pd.read_csv(path,sep='\t',**kwargs)
+    elif path.split('.')[-1]=='gz':
+        if path.split('.')[-2]=='csv':
+            return pd.read_csv(path,**kwargs)
+        elif path.split('.')[-2]=='tsv' or path.split('.')[-2]=='txt':
+            return pd.read_csv(path,sep='\t',**kwargs)
     else:
         raise ValueError('The type is not supported.')
     
