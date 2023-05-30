@@ -15,6 +15,7 @@ nav:
         - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
+        - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
         - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
         - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
         - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb

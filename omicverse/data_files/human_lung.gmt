@@ -1,0 +1,22 @@
+Epithelial	Epithelial markers from HTAPP paper	KRT8	KRT18	EPCAM	CD24
+Endothelial	Endothelial shared markers from Xing et al. Science Advances 2021, Tony et al. Nature 2021 and Schupp et al. Circulation 2021	PECAM1	CLDN5	CDH5	ERG
+Fibroblast	Fibroblast/Myofibroblast shared markers from Travaglini et al.	COL1A1	COL1A2	PDGFRA	ELN	BGN
+Macrophage	Macro	CD68	CD163	C1QA	MRC1	MS4A6A	MSR1	MERTK
+SMC	SMC from Muus et al., Braga et al. and Schupp et al.	MYH11	TAGLN	ACTG2	CNN1	PLN
+Pericyte	Pericyte from Schupp et al. and Travaglini et al.	TRPC6	CSPG4	FAM162B	GJA4	GJC1	HIGD1B	CDH6	LAMC3	FHL5
+T cell	T cell markers	CD3D	CD3E	CD3G	TRAC
+B cell	B cell markers	CD19	MS4A1	CD79A	CD79B
+Plasma cell	Plasma cell markers	CD38	XBP1	CD27	SLAMF7	TNFRSF17	TNFRSF13B
+Mast cell	Mast cell markers	KIT	CPA3	TPSB2	TPSAB1	AREG	RGS1	RGS2
+ProNeu	Pro-Neutrophil markers validated using 10x public whole blood dataset	DEFA3	DEFA4	AZU1	MS4A3	ELANE	SLPI	CEACAM6	RNASE3	PRTN3	MPO	AC104232.1	CTSG
+PreNeu	Pre-Neutrophil markers validated using 10x public whole blood dataset	LTF	LCN2	MMP8	CRISP3	CAMP	PGLYRP1	CD177	HP
+Neutrophil	Neutrophil markers	CSF3R	G0S2	LUCAT1	EPHB1	TNFRSF10C	IL1R2	KCNJ15	FCGR3B	AC007032.1	HSD11B1-AS1
+AT1	AT1 markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	AGER	SPOCK2	RTKN2	TNNC1	SCEL	CLIC5	NCKAP5	ARHGEF26	GGTLC1	ITLN2	MS4A15
+AT2	AT2 markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	SFTPA1	SFTPA2	SFTPC	PGC	LAMP3	FASN	HHIP	ETV5	RASGRF1	ABCA3
+Basal	Basal cell markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	KRT17	S100A2	MIR205HG	KRT15	KRT5	DLK2	CDH3	TP63	TNS4
+Club	Club cell markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	SCGB3A2	MGP	CTSE
+Ciliated	Ciliated cell markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	ERICH3	ARMC3	DNAI2	ZBBX	VWA3B	RGS22	TTC29	CDHR4	PPP1R42	CFAP46	CFAP52	CFAP73	CFAP77	CFAP157	DNAH3	DNAH9	ADGB	SNTN	CCDC170	C6orf118
+Goblet	Goblet cell markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	MUC5AC	MUC5B	BPIFB1	MSMB	SERPINB11	CYP2F1
+Ionocyte	Ionocyte markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	ASCL3	CLCNKB	FOXI1	ATP6V1G3	TMPRSS11E	BSND	LINC01187	CLDN25
+PNEC	Plumonary neuroendocrine cell markers inferred from Travaglini et al. Nature 2020 and confirmed by Schupp et al. Circulation 2021	CHGA	CHGB	SCGN	SCG5	CPLX2	GRP	ASCL1	INSM1
+SMG	SMG serous cell markers inferred from Travaglini et al. Nature 2020	PRR4	TCN1	C6orf58	PRB3	LPO	PRB1	PRH2	PRH1	ODAM
