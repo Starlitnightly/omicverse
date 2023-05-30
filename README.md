@@ -47,6 +47,11 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [11] [pyDEseq2](https://github.com/owkin/PyDESeq2) was originally avaliable in [*biorxiv*](https://www.biorxiv.org/content/10.1101/2022.12.14.520412v1)
 - [12] [NOCD](https://github.com/shchur/overlapping-community-detection) was originally avaliable in [*Deep Learning on Graphs Workshop, KDD*](https://arxiv.org/abs/1909.12201)
 
+## Included Package not published or preprint
+
+- [1] [Cellula](https://github.com/andrecossa5/Cellula/) is to provide a toolkit for the exploration of scRNA-seq. These tools perform common single-cell analysis tasks
+- [2] [pegasus](https://github.com/lilab-bcb/pegasus/) is a tool for analyzing transcriptomes of millions of single cells. It is a command line tool, a python package and a base for Cloud-based analysis workflows.
+
 ## Contact
 
 - Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com) or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
