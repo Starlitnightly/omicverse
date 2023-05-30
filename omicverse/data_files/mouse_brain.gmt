@@ -1,0 +1,11 @@
+GlutamatergicNeuron	Glutamatergic neuron	Slc17a7	Slc17a6	Neurod6	Neurod2	
+GABAergicNeuron	GABAergic neuron	Gad1	Gad2	Slc32a1
+Oligodendrocyte	Oligodendrocyte	Plp1	Cnp	Fa2h	St18	Mbp
+OPC	Oligodendrocyte progenitor cell	Pdgfra	Cspg4	Emid1	Fabp7
+SMC	Smooth muscle cell	Atca2	Myh11	Tagln	Pln	Mylk
+Pericyte	Pericyte	Vtn	Atp13a5	Abcc9	Kcnj8	Art3
+Endo	Endothelial cell	Flt1	Pecam1	Ly6a	Slco1a4	Mecom	Ptprb	Id1
+Microglia	Microglia cell	Hexb	Siglech	Selplg	Tmem119	Ctss	P2ry12	Cx3cr1	Trem2	Fcrls	Csf1r
+Astrocyte	Astrocyte	Mt2	Gja1	Prdx6	Htra1	Ntsr2	Aldoc	Apoe	Prex2	Aqp4	Gpr37l1
+PVM	Perivascular macrophages	Mrc1	Stab1	Lyz2	Ms4a6c	F13a1	Pf4
+VLMC	Vascular leptomeningeal cells	Slc7a11	Slc6a13	Bmp6	Igfbp2	Fmod	Ranbp3l
