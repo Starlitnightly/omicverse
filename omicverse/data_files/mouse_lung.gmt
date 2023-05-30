@@ -1,0 +1,31 @@
+AT1	AT1 markers from Hurskainen et al. Nat. Commun. 2021 and Negretti et al. Development 2021	Akap5	Rtkn2	Ndnf	Col4a3	Spock2
+AT2	AT2 markers from Hurskainen et al. Nat. Commun. 2021 and Negretti et al. Development 2021	Sftpc	Sftpa1	Lamp3	Hc	Slc34a2 
+Ciliated	Ciliated cell markers from Hurskainen et al. Nat. Commun. 2021 and Negretti et al. Development 2021	Dynlrb2	Tmem212	Foxj1	Ccdc153	Nme5
+Club	Club cell markers from Hurskainen et al. Nat. Commun. 2021 and Negretti et al. Development 2021	Scgb1a1	Scgb3a2	Cckar	Gabrp	Slc16a11
+Basal	Basal cell markers from Montoro et al. Nature 2018 Extended Data Fig. 1d	Aqp3	Krt5	Dapl1	Hspa1a	Trp63
+Goblet	Goblet cell markers from Montoro et al. Nature 2018 Supp Table 1	Scgb3a1	Muc5b	Serpinb11	Gp2	Dmbt1
+Tuft	Tuft cell markers from Sun et al. Dev. Cell 2022 and Montoro et al. Nature 2018 Extended Data Fig. 3b	Pou2f3	Ascl2	Dclk1	Lrmp	Ltc4s	Trpm5	Gnb3	Rgs13
+PNEC	Plumonary neuroendocrine cell markers from Montoro et al. Nature 2018 Extended Data Fig. 3b & 3c	Ascl1	Chga	Calca	Scg2	Scg5
+Ionocyte	Ionocyte markers from Montoro et al. Nature 2018 Fig. 5a	Foxi1	Ascl3	Smbd1	Moxd1	Atp6v0d2
+Endothelial	Endothelial cell markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Egfl7	Cldn5	Cdh5	Pecam1	Calcrl	Ecscr	Icam2
+Mesothelial	Mesothelial cell markers inferred from Hurskainen et al. Nat. Commun. 2021	Wt1	Upk3b	Rspo1	C2	Sbsn	Aldh1a2	Lrrn4	Cldn15
+Pericyte	Pericyte markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Notch3	Heyl	Parm1	Ndufa4l2	Cox4i2
+Fibroblast	Fibroblast markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Dpt	Clec3b	Pcolce2	Vegfd	Vcam1
+Myofibroblast	Myofibroblast markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Egfem1	Agt	Prag1	Etv1	Trim67
+SMC	Smooth muscle cell markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Tnnt2	Sgcg	Sntg2	Nrtn	Mrvi1	Sbspon
+AlvMf	Alveolar macrophage markers inferred from Hurskainen et al. Nat. Commun. 2021	Atp6v0d2	Olr1	F7	Ear1	Tfec	Gpnmb	Lrp12	Marco
+IntMf	Interstitial macrophage markers inferred from Hurskainen et al. Nat. Commun. 2021	C1qa	C1qb	C1qc	Pf4	Ms4a7	Fcrls
+ILC2	Innate lymphoid cell type 2 markers inferred from Hurskainen et al. Nat. Commun. 2021 data	Gata3	Il1rl1	Arg1	Areg	Il2ra	Csf2	Ccl1	Ccdc184	Calca	Il5
+T	T cell markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Cd3d	Cd3e	Lat	Thy1	Lef1	Trac	Cd28
+B	B cell markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Cd19	Ms4a1	Cd79a	Cd79b	Ebf1	Pax5	Fcmr	Bank1
+NK	NK cell markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Gzma	Klrb1c	Ncr1	Klre1	Klrc2	Eomes	Cma1	Klra4	Klra7	Klra8
+cDC1	cDC1 markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Xcr1	Ifi205	Rab7b	Tlr3	Sept3	Hepacam2	Gcsam	Snx22	Itgae	Xlr
+cDC2	cDC2 markers from Kaptein et al. Cell 2022	Cd209a	Ltb4r1	Mgl2	Tnip3	Bex6
+migDC	Migoritory DC markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Cacnb3	Nudt17	Ccl22	Apol7c	Slco5a1	Ccr7	Fscn1	Il4i1	Mreg	Bcl2l14
+pDC	Plasmacytoid dendritic cell markers from Kaptein et al. Cell 2022	Siglech	Ccr9	Cox6a2	Cd300c	Klk1
+MonoI	Inflammatory monocyte markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Ly6c2	F13a1	Ms4a4c	Ccr2	Gm9733	Mcub 
+MonoP	Patrolling monocyte markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	Ace	Eno3	Ear2	Treml4	Spn	Fcgr4	Lair1	Cd300e	Cd300ld	Adgre4
+Neutrophil	Neutrophil markers inferred from Kaptein et al. Cell 2022 and Hurskainen et al. Nat. Commun. 2021 data	S100a8	S100a9	Retnlg	Mmp9	Csf3r	Wfdc21	Il1r2	Cxcr2
+Basophil	Basophil markers inferred from Matsumara et al. Nat. Commun. 2022 data	Cd200r3	Aqp9	Il6	Hgf	Adora2b	Il4	L1cam	Grm6
+Eosinophil	Eosinophil markers inferred from Matsumara et al. Nat. Commun. 2022 data	Epx	Prg3	Eml5	Il5ra	Qsox2	L2hgdh
+Mast	Mast cell markers inferred from Matsumara et al. Nat. Commun. 2022 data	Tph1	Clnk	Hs6st2	Plcg1
