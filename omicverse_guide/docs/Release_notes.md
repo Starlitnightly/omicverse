@@ -174,5 +174,12 @@ renamed the package to `omicverse`
 - add `mde` method in utils
 - add `gz` format support for `utils.read`
 
+## v 1.4.1
+
+### preprocess module
+
+- add `pp`(preprocess) module included `qc`(quantity control), `hvg`(high variable feature), `pca` 
+- add `data_files` for cell cycle calculate from [Cellula](https://github.com/andrecossa5/Cellula/) and [pegasus](https://github.com/lilab-bcb/pegasus/)
+
 
 

@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools", "wheel", "flit_core >=3.4,<4","Cython"]
+build-backend = "flit_core.buildapi"
+
+
+
+[project]
+name = "omicverse"
+version = "1.4.1"
+description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "GPLv3+" }
+authors = [
+    {name = "Zehua Zeng", email = "starlitnightly@163.com"},
+]
+keywords = ["bioinformatics", "deep-learning", "single-cell", "bulk RNA-seq"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Bio-Informatics"
+]
+dependencies = [
+    'pybind11>=2.10',
+    'hnswlib>=0.7',
+    'ERgene>=1.2',
+    'numpy>=1.23',
+    'scanpy>=1.9',
+    'pandas==1.5.3',
+    'matplotlib>=3.7',
+    'scikit-learn>=1.2',
+    'scipy>=1.9',
+    'networkx>=3.1',
+    'multiprocess>=0.70',
+    'seaborn>=0.12',
+    'datetime>=4.7',
+    'statsmodels>=0.13',
+    'gseapy==0.10.8',
+    'ipywidgets>=8.0',
+    'lifelines>=0.27',
+    'ktplotspy>=0.1',
+    'python-dotplot>=0.0.1',
+    'pybedtools>=0.8.1',
+    'boltons>=23.0',
+    'ctxcore>=0.2',
+    'termcolor>=2.1',
+    'pygam==0.8.0',
+    'pillow>=9.4',
+    'gdown>=4.6',
+    'igraph>=0.10',
+    'leidenalg>=0.9',
+    's_gd2>=1.8',
+    'graphtools>=1.5',
+    'datashader>=0.14',
+    'phate>=1.0',
+    'wget>=3.2',
+    'tqdm>=4.64',
+    'pydeseq2>=0.3',
+    'mofax>=0.3',
+    'adjustText>=0.8',
+]
+
+
+
+
+[project.urls]
+Github = 'https://github.com/Starlitnightly/omicverse'
+
+[tool.flit.sdist]
+exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
+

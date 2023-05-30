@@ -1,0 +1,28 @@
+Endo	Endothelial cell	Mmrn2	Cldn5	Adgrl4	Tek	Myct1
+Stellate	Stellate cell	Colec10	Rspo3	Mapt	Lama1	Bmp10
+VSMC	Vascular smooth muscle cell	Cacna1c	Myh11	Notch3	Lmod1	Tagln
+Meso	Mesothelial cell	Ephb1	Cadm2	Prss12	Myl7	Prph
+Fibro	Fibroblast	Col1a1	Mrc2	Plcxd3	Fndc1	Cpxm1
+Hepatocyte	Hepatocye	Acaa1b	Arg1	Sult2a8	Hgd	Otc
+Cholangiocyte	Cholangiocyte	Spp1	Ddit4l	Sox9	Fgfr3	Plet1
+HSPC	Hepatic stem and progenitor cell	Chrm3	Dmbt1	Slc4a4	Parm1	Pcdh11x	
+T	T cell	Cd3d	Cd3e	Lat	Thy1	Lef1	Trac	Cd28
+B	B cell	Cd19	Ms4a1	Cd79a	Cd79b	Ebf1	Pax5	Fcmr	Bank1
+NK	NK cell	Eomes	Cma1	Klra4	Klra7	Klra8
+ILC1	Innate lymphoid cell type 1	Xcl1	Cd160	Klrc1	Cd200r2	Gzmc
+cDC1	cDC1	Xcr1	Ifi205	Rab7b	Tlr3	Sept3	Hepacam2	Gcsam	Snx22	Itgae	Xlr
+cDC2	cDC2	Cd209a	Ltb4r1	Mgl2	Tnip3	Bex6
+migDC	Migoritory DC	Cacnb3	Nudt17	Ccl22	Apol7c	Slco5a1	Ccr7	Fscn1	Il4i1	Mreg	Bcl2l14
+pDC	Plasmacytoid dendritic cell	Siglech	Ccr9	Cox6a2	Cd300c	Klk1
+MonoI	Inflammatory monocyte	Ly6c2	F13a1	Ms4a4c	Ccr2	Gm9733	Mcub
+MonoP	Patrolling monocyte	Ace	Eno3	Ear2	Treml4	Spn	Fcgr4	Lair1	Cd300e	Cd300ld	Adgre4
+PeriMac	Peritoneal macrophage	Lyz1	Saa3	Prg4	Retnla	Cbr2
+Mac	Macrophage	Cd14	Ms4a7	Cx3cr1	Trem2	Hpgds
+Kupffer	Kupffer cell	Cd5l	Clec4f	Vsig4	Folr2	Timd4
+Neutrophil	Neutrophil	S100a8	S100a9	Retnlg	Mmp9	Csf3r	Wfdc21	Il1r2	Cxcr2
+Basophil	Basophil	Cd200r3	Aqp9	Il6	Hgf	Adora2b	Il4	L1cam	Grm6
+Eosinophil	Eosinophil	Epx	Prg3	Eml5	Il5ra	Qsox2	L2hgdh
+Mast	Mast cell	Tph1	Clnk	Hs6st2	Plcg1
+Pericentral	Pericentral liver zonation markers from Halpern et al. Nature 2017 and Guilliams et al. Cell 2022	Mup11	Oat	Rgn	Glul	Cyp2e1	Axin2	Cyp1a2	Gstm3	Psmd4
+Periportal	Periportal liver zonation markers from Halpern et al. Nature 2017 and Guilliams et al. Cell 2022	Cyp2f2	Hal	Sds	Ass1	Asl	Alb	Arg1	Pck1	C2	Sdhd
+Midlobular	Mid-lobular liver zonation markers picked from Fig. 3 and Extended Data Fig 10a of Halpern et al. Nature 2017	Hamp	Igfbp2	Cyp8b1	Mup3	Hamp2	Hsbp8	Ces1d	Cebpa	Fkbp8	Clpp

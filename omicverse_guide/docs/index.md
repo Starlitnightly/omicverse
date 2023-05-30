@@ -27,6 +27,7 @@ For more details about the omicverse framework, please check out our [publicatio
     - [WGCNA (Weighted gene co-expression network analysis)](Tutorials-bulk/t_wgcna/)
     - [TCGA database preprocess](Tutorials-bulk/t_tcga/)
 - Tutorial-Single:
+    - [Preprocessing the data of scRNA-seq](Tutorials-single/t_preprocess)
     - [Celltype annotation with SCSA](Tutorials-single/t_cellanno)
     - [Trajectory Inference with VIA](Tutorials-single/t_via)
     - [Trajectory Inference with VIA and scVelo](Tutorials-single/t_via_velo)
