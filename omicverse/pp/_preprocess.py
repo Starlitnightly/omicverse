@@ -47,10 +47,10 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
 def calc_mean_and_var(X: Union[csr_matrix, np.ndarray], axis: int) -> Tuple[np.ndarray, np.ndarray]:
     if issparse(X):
-        from omicverse.cylib.fast_utils import calc_mean_and_var_sparse
+        from ..cylib.fast_utils import calc_mean_and_var_sparse
         return calc_mean_and_var_sparse(X.shape[0], X.shape[1], X.data, X.indices, X.indptr, axis)
     else:
-        from omicverse.cylib.fast_utils import calc_mean_and_var_dense
+        from ..cylib.fast_utils import calc_mean_and_var_dense
         return calc_mean_and_var_dense(X.shape[0], X.shape[1], X, axis)
     
 def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: Union[pd.Categorical, np.ndarray, list]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -63,10 +63,10 @@ def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: Union[pd.Catego
         nbatch = codes.max() + 1 # assume cluster label starts from 0
 
     if issparse(X):
-        from omicverse.cylib.fast_utils import calc_stat_per_batch_sparse
+        from ..cylib.fast_utils import calc_stat_per_batch_sparse
         return calc_stat_per_batch_sparse(X.shape[0], X.shape[1], X.data, X.indices, X.indptr, nbatch, codes)
     else:
-        from omicverse.cylib.fast_utils import calc_stat_per_batch_dense
+        from ..cylib.fast_utils import calc_stat_per_batch_dense
         return calc_stat_per_batch_dense(X.shape[0], X.shape[1], X, nbatch, codes)
 
 def estimate_feature_statistics(data: anndata.AnnData, batch: str) -> None:
