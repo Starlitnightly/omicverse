@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.4.1"
+version = "1.4.2"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -34,13 +34,13 @@ dependencies = [
     'numpy>=1.23',
     'scanpy>=1.9',
     'pandas==1.5.3',
-    'matplotlib>=3.7',
+    'matplotlib>=3.6<3.7',
     'scikit-learn>=1.2',
-    'scipy>=1.9',
-    'networkx>=3.1',
+    'scipy>=1.8',
+    'networkx>=2.8',
     'multiprocess>=0.70',
-    'seaborn>=0.12',
-    'datetime>=4.7',
+    'seaborn>=0.11',
+    'datetime>=4.5',
     'statsmodels>=0.13',
     'gseapy==0.10.8',
     'ipywidgets>=8.0',
@@ -52,7 +52,7 @@ dependencies = [
     'ctxcore>=0.2',
     'termcolor>=2.1',
     'pygam==0.8.0',
-    'pillow>=9.4',
+    'pillow>=9.0',
     'gdown>=4.6',
     'igraph>=0.10',
     'leidenalg>=0.9',
