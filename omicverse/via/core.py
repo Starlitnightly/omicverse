@@ -19,9 +19,9 @@ import pygam as pg
 from termcolor import colored
 from collections import Counter
 from typing import Optional, Union
-from pyVIA.plotting_via import *
-from pyVIA.utils_via import _construct_knn, sequential_knn
-from pyVIA.utils_via import *
+from .plotting_via import *
+from .utils_via import _construct_knn, sequential_knn
+from .utils_via import *
 #from plotting_via import * #
 #from utils_via import *
 #from utils_via import _construct_knn, sequential_knn

@@ -115,6 +115,10 @@ class pyVIA(object):
         self.clusters=clusters
         self.basis=basis
         
+        if root_user is not None:
+             dataset='group'
+
+        
 
         self.model=VIA(data=data,true_label=true_label,
                  dist_std_local=dist_std_local,jac_std_global=jac_std_global,labels=labels,
