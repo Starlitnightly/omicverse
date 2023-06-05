@@ -17,6 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import rcParams
 import seaborn as sns
 from typing import Union, Optional, Sequence, Tuple, List, Dict
+from scipy.sparse import issparse
 
 
 def mads(meta, cov, nmads=5, lt=None): 
@@ -90,9 +91,14 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         print('Calculate QC metrics')
         adata.var_names_make_unique()
         adata.var["mt"] = adata.var_names.str.startswith("MT-")
-        adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
-        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
-        adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+        if issparse(adata.X):
+            adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
+            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
+            adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+        else:
+            adata.obs['nUMIs'] = adata.X.sum(axis=1)  
+            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / adata.obs['nUMIs'].values
+            adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)  
         adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
         print(f'End calculation of QC metrics.')
 
@@ -203,9 +209,14 @@ def qc(adata:anndata.AnnData, mode='seurat', min_cells=3, min_genes=200, nmads=5
     print('Calculate QC metrics')
     adata.var_names_make_unique()
     adata.var["mt"] = adata.var_names.str.startswith("MT-")
-    adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
-    adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
-    adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+    if issparse(adata.X):
+        adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
+        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
+        adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+    else:
+        adata.obs['nUMIs'] = adata.X.sum(axis=1)  
+        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / adata.obs['nUMIs'].values
+        adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)  
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
     print(f'End calculation of QC metrics.')
 

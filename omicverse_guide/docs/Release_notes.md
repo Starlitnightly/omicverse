@@ -181,5 +181,13 @@ renamed the package to `omicverse`
 - add `pp`(preprocess) module included `qc`(quantity control), `hvg`(high variable feature), `pca` 
 - add `data_files` for cell cycle calculate from [Cellula](https://github.com/andrecossa5/Cellula/) and [pegasus](https://github.com/lilab-bcb/pegasus/)
 
+## v 1.4.3
+
+### preprocess module
+
+- fix sparse preprocess error of `pp`
+- fix the trajectory import error of `via`
+- add the gene correlation analysis of trajectory 
+
 
 
