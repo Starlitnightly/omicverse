@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.4.3"
+version = "1.4.4"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -31,7 +31,7 @@ dependencies = [
     'pybind11>=2.10',
     'hnswlib>=0.7',
     'ERgene>=1.2',
-    'numpy>=1.23',
+    'numpy>=1.22, <1.24',
     'scanpy>=1.9',
     'pandas>=1.0.3, <=1.5.3',
     'matplotlib<3.7',

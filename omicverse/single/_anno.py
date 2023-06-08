@@ -9,6 +9,7 @@ import gzip
 import time
 import requests
 import anndata
+from ..pp._preprocess import scale
 
 def data_downloader(url,path,title):
     r"""datasets downloader
@@ -61,7 +62,8 @@ def data_downloader(url,path,title):
     return path
 
 
-def data_preprocess(adata,clustertype='leiden',path='temp/rna.csv'):
+def data_preprocess(adata,clustertype='leiden',
+                    path='temp/rna.csv',layer='scaled'):
     r"""data preprocess for SCSA
     
     Parameters
@@ -86,7 +88,7 @@ def data_preprocess(adata,clustertype='leiden',path='temp/rna.csv'):
 
     sc.settings.verbosity = 2  # reduce the verbosity
     if 'rank_genes_groups' not in adata.uns.keys():
-        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon',layer=layer)
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
@@ -245,9 +247,11 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
     adata.raw = adata
     adata = adata[:, adata.var.highly_variable]
     #scale
+    #scale(adata, max_value=max_value)
     sc.pp.scale(adata, max_value=max_value)
     #pca analysis
     sc.tl.pca(adata, n_comps=n_comps, svd_solver=svd_solver)
+    #pca(adata,layer='scaled',n_pcs=50)
     #cell neighbors graph construct
     sc.pp.neighbors(adata, n_neighbors=n_neighbors, random_state = random_state, n_pcs=n_pcs)
     #umap

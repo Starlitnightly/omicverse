@@ -403,7 +403,7 @@ def highly_variable_genes(adata,**kwargs):
         adata, kwargs,
     )
 
-def scale(adata):
+def scale(adata,max_value=10):
     """
     Scale the input AnnData object.
 
@@ -415,9 +415,9 @@ def scale(adata):
             the expression matrix that has been scaled to unit variance and zero mean.
 
     """
-    adata_mock = sc.pp.scale(adata, copy=True)
-    adata.layers['scaled'] = adata_mock.X
-    return adata
+    adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value)
+    adata.layers['scaled'] = adata_mock.X.copy()
+    del adata_mock
 
 def regress(adata):
     """
