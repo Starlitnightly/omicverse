@@ -9,7 +9,7 @@ Omicverse is the fundamental package for multi omics included bulk and single ce
 
 To get started with `omicverse`, check out the [Installation](Installation_guild) and [Tutorials](Tutorials-single/t_cellanno).
 
-For more details about the omicverse framework, please check out our [publication]().
+For more details about the omicverse framework, please check out our [publication](https://doi.org/10.1101/2023.06.06.543913).
 
 </div>
 
