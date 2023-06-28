@@ -63,7 +63,7 @@ def data_downloader(url,path,title):
 
 
 def data_preprocess(adata,clustertype='leiden',
-                    path='temp/rna.csv',layer='scaled'):
+                    path='temp/rna.csv',layer='scaled',rank_rep=False):
     r"""data preprocess for SCSA
     
     Parameters
@@ -87,8 +87,10 @@ def data_preprocess(adata,clustertype='leiden',
         print("......Unable to create directory {}. Reason {}".format(dirname,e))
 
     sc.settings.verbosity = 2  # reduce the verbosity
-    if 'rank_genes_groups' not in adata.uns.keys():
-        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon',layer=layer)
+    if rank_rep==False and 'rank_genes_groups' not in adata.uns.keys():
+        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+    else:
+        sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
@@ -320,7 +322,8 @@ class pySCSA(object):
                 model_path:str='',
                 outfmt:str='txt',Gensymbol:bool=True,
                 species:str='Human',weight:int=100,tissue:str='All',target:str='cellmarker',
-                celltype:str='normal',norefdb:bool=False,noprint:bool=True,list_tissue:bool=False) -> None:
+                celltype:str='normal',norefdb:bool=False,cellrange:str=None,
+                noprint:bool=True,list_tissue:bool=False) -> None:
 
         r"""Initialize the pySCSA class
 
@@ -335,11 +338,12 @@ class pySCSA(object):
             species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
             weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)
             tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')
-            target: Target to annotation class in Database. (cellmarker,[cancersea])
+            target: Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])
             celltype: Cell type for annotation. (normal,[cancer])
             norefdb: Only using user-defined marker database for annotation.
             noprint: Do not print any detail results.
             list_tissue: List all available tissues in the database.
+            cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.)
         
         """
 
@@ -365,9 +369,10 @@ class pySCSA(object):
         self.noprint=noprint
         self.list_tissue=list_tissue
         self.target=target
+        self.cellrange=cellrange
         if model_path =='':
-            self.model_path=data_downloader(url='https://figshare.com/ndownloader/files/40053640',
-                                            path='temp/pySCSA_2023.db',title='whole')
+            self.model_path=data_downloader(url='https://figshare.com/ndownloader/files/41369037',
+                                            path='temp/pySCSA_2023_v2_plus.db',title='whole')
         else:
             self.model_path=model_path
 
@@ -397,13 +402,14 @@ class pySCSA(object):
                     outfmt=self.outfmt,
                     celltype=self.celltype,
                     Gensymbol=self.Gensymbol,
-                    list_tissue=self.list_tissue,)
+                    list_tissue=self.list_tissue,
+                    cellrange=self.cellrange)
         anno.load_pickle_module(self.model_path)
         anno.get_list_tissue(species)
 
 
     def cell_anno(self,clustertype:str='leiden',
-                  cluster:str='all')->pd.DataFrame:
+                  cluster:str='all',rank_rep=False)->pd.DataFrame:
         r"""Annotate cell type for each cluster.
         
         Arguments:
@@ -411,7 +417,7 @@ class pySCSA(object):
             cluster: Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])
         """
 
-        dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv')
+        dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv',rank_rep=rank_rep)
         dat.to_csv('temp/rna.csv')
 
         print('...Auto annotate cell')
@@ -435,7 +441,8 @@ class pySCSA(object):
                     outfmt=self.outfmt,
                     celltype=self.celltype,
                     Gensymbol=self.Gensymbol,
-                    list_tissue=self.list_tissue,)
+                    list_tissue=self.list_tissue,
+                    cellrange=self.cellrange)
         
 
         result=pd.read_csv('temp/rna_anno.txt',sep='\t')
@@ -455,17 +462,24 @@ class pySCSA(object):
                 print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
                                                             ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
 
-    def cell_auto_anno(self,adata:anndata.AnnData,clustertype:str='leiden')->None:
+    def cell_auto_anno(self,adata:anndata.AnnData,
+                       clustertype:str='leiden',key='scsa_celltype')->None:
         r"""Add cell type annotation to anndata.obs['scsa_celltype']
         
         Arguments:
             adata: anndata object
             clustertype: Clustering name used in scanpy. (leiden)
         """
-        scsa_anno=dict(zip([str(i) for i in range(len(adata.obs[clustertype].value_counts().index))],
-            [self.result.loc[self.result['Cluster']==i].iloc[0]['Cell Type'] for i in range(len(adata.obs[clustertype].value_counts().index))]))
-        adata.obs['scsa_celltype'] = adata.obs['leiden'].map(scsa_anno).astype('category')
-        print('...cell type added to scsa_celltype on obs of anndata')
+        test_li=[]
+        for i in adata.obs[clustertype].value_counts().index:
+            if int(i) in self.result['Cluster'].values:
+                test_li.append(self.result.loc[self.result['Cluster']==int(i)].iloc[0]['Cell Type'])
+            else:
+                test_li.append('Unknown')
+        scsa_anno=dict(zip([str(i) for i in adata.obs[clustertype].value_counts().index],
+            test_li))
+        adata.obs[key] = adata.obs[clustertype].map(scsa_anno).astype('category')
+        print('...cell type added to {} on obs of anndata'.format(key))
 
     def get_celltype_marker(self,adata:anndata.AnnData,
                             clustertype:str='leiden',

@@ -23,7 +23,7 @@ class Annotator(object):
                  pvalue,tissue,species,
                  target,norefdb,MarkerDB,db,
                  noprint,input,output,source,cluster,fc,
-                 outfmt,celltype,Gensymbol,list_tissue,):
+                 outfmt,celltype,Gensymbol,list_tissue,cellrange):
         #self = args
         self.input=input
         self.output=output
@@ -44,6 +44,7 @@ class Annotator(object):
         self.norefdb=norefdb 
         self.MarkerDB=MarkerDB
         self.noprint=noprint
+        self.cellrange=cellrange
         
         pass
 
@@ -267,11 +268,14 @@ class Annotator(object):
         gcol = "gene" if hgvc == True else "ensemblID"
         ccol = "cellName"
 
-        if self.target.lower() not in ["cancersea","cellmarker"]:
-            print("Error target : -t, --target,(cellmarker,[cancersea])")
+        if self.target.lower() not in ["cancersea","cellmarker","panglaodb"]:
+            print("Error target : -t, --target,(cellmarker,[cancersea,panglaodb])")
             sys.exit(0)
 
         if self.target.lower() == "cancersea":
+            gcol = "gene" if hgvc == True else "ensemblID"
+            ccol = "name"
+        if self.target.lower() == "panglaodb":
             gcol = "gene" if hgvc == True else "ensemblID"
             ccol = "name"
 
@@ -379,6 +383,13 @@ class Annotator(object):
                         #print("WARNING3:Change the threshold and try again?")
                         continue
                     other_gene_names |= set(tcolnames)
+                elif self.target.lower() == "panglaodb":
+                    tfc,trownames,trownum,tcolnames,tcolnum = self.get_cell_gene_names(otherexps,self.pmarkers,fid,gcol,ccol,"other")
+                    if not trownames:
+                        #print("WARNING3:Zero gene sets found for the cluster" + str(j))
+                        #print("WARNING3:Change the threshold and try again?")
+                        continue
+                    other_gene_names |= set(tcolnames)
             #print("Other Gene number:",len(other_gene_names))
             self.deal_with_badtype(cname,other_gene_names,colnames)
         if self.output:
@@ -400,11 +411,14 @@ class Annotator(object):
         gcol = "gene" if hgvc == True else "ensemblID"
         ccol = "cellName"
 
-        if self.target.lower() not in ["cancersea","cellmarker"]:
-            print("Error target : -t, --target,(cellmarker,[cancersea])")
+        if self.target.lower() not in ["cancersea","cellmarker","panglaodb"]:
+            print("Error target : -t, --target,(cellmarker,[cancersea,panglaodb])")
             sys.exit(0)
 
         if self.target.lower() == "cancersea":
+            gcol = "gene" if hgvc == True else "ensemblID"
+            ccol = "name"
+        if self.target.lower() == "panglaodb":
             gcol = "gene" if hgvc == True else "ensemblID"
             ccol = "name"
 
@@ -482,6 +496,11 @@ class Annotator(object):
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
+            elif self.target.lower() == "panglaodb":
+                tfc,trownames,trownum,tcolnames,tcolnum = self.get_cell_gene_names(otherexps,self.pmarkers,fid,gcol,ccol,'other')
+                if not trownames:continue
+                other_gene_names = set(tcolnames)
+                self.deal_with_badtype(cname,other_gene_names,colnames)
             print("Other Gene number:",len(other_gene_names))
         if self.output:
             self.wb.close()
@@ -518,11 +537,14 @@ class Annotator(object):
         gcol = "gene" if hgvc == True else "ensemblID"
         ccol = "cellName"
 
-        if self.target.lower() not in ["cancersea","cellmarker"]:
-            print("Error target : -t, --target,(cellmarker,[cancersea])")
+        if self.target.lower() not in ["cancersea","cellmarker","panglaodb"]:
+            print("Error target : -t, --target,(cellmarker,[cancersea,panglaodb])")
             sys.exit(0)
 
         if self.target.lower() == "cancersea":
+            gcol = "gene" if hgvc == True else "ensemblID"
+            ccol = "name"
+        if self.target.lower() == "panglaodb":
             gcol = "gene" if hgvc == True else "ensemblID"
             ccol = "name"
 
@@ -619,6 +641,11 @@ class Annotator(object):
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
+            elif self.target.lower() == "panglaodb":
+                tfc,trownames,trownum,tcolnames,tcolnum = self.get_cell_gene_names(otherexps,self.pmarkers,ofid,gcol,ccol,'other')
+                if not trownames:continue
+                other_gene_names = set(tcolnames)
+                self.deal_with_badtype(cname,other_gene_names,colnames)
             print("Other Gene number:",len(other_gene_names))
         if self.output:
             self.wb.close()
@@ -652,11 +679,15 @@ class Annotator(object):
         gcol = "gene" if hgvc == True else "ensemblID"
         ccol = "cellName"
 
-        if self.target.lower() not in ["cancersea","cellmarker"]:
-            print("Error target : -t, --target,(cellmarker,[cancersea])")
+        if self.target.lower() not in ["cancersea","cellmarker","panglaodb"]:
+            print("Error target : -t, --target,(cellmarker,[cancersea,panglaodb])")
             sys.exit(0)
 
         if self.target.lower() == "cancersea":
+            gcol = "gene" if hgvc == True else "ensemblID"
+            ccol = "name"
+
+        if self.target.lower() == "panglaodb":
             gcol = "gene" if hgvc == True else "ensemblID"
             ccol = "name"
 
@@ -750,6 +781,11 @@ class Annotator(object):
                 self.deal_with_badtype(cname,other_gene_names,colnames)
             elif self.target.lower() == "cancersea":
                 tfc,trownames,trownum,tcolnames,tcolnum = self.get_cell_gene_names(otherexps,self.smarkers,ofid,gcol,ccol,'other')
+                if not trownames:continue
+                other_gene_names = set(tcolnames)
+                self.deal_with_badtype(cname,other_gene_names,colnames)
+            elif self.target.lower() == "panglaodb":
+                tfc,trownames,trownum,tcolnames,tcolnum = self.get_cell_gene_names(otherexps,self.pmarkers,ofid,gcol,ccol,'other')
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
@@ -849,7 +885,7 @@ class Annotator(object):
         """find expressed markers according to the markers and expressed matrix."""
         #print(fid)
         whole_gsets = set(exps[fid])
-        if self.target.lower() == "cancersea":
+        if self.target.lower() == "cancersea" or self.target.lower() == "panglaodb":
             #whole_fil = markers['EnsembleID'].isin(whole_gsets)
             markers['weight'] = 1
             if self.Gensymbol == True:
@@ -1024,6 +1060,8 @@ class Annotator(object):
             markers = self.cmarkers
         elif self.target == "cancersea":
             markers = self.smarkers
+        elif self.target == "panglaodb":
+            markers = self.pmarkers
 
         #print(markers.columns)
 
@@ -1098,18 +1136,30 @@ class Annotator(object):
         self.snames = load(handler)
         self.ensem_hgncs = load(handler)
         self.ensem_mouse = load(handler)
+        if 'plus' in db:
+            self.pmarkers = load(handler)
+        else:
+            self.pmarkers = self.smarkers.copy()
         self.hgncs_ensem = dict(zip(self.ensem_hgncs.values(),self.ensem_hgncs.keys()))
         fil = []
         #fil = ['Cancer stem cell', 'Cancer cell']
         #print(self.cmarkers)
         #exit()
         self.cmarkers = self.cmarkers[~self.cmarkers['cellName'].isin(fil)]
+        if self.cellrange!=None:
+            self.cmarkers = self.cmarkers[self.cmarkers['cellName'].str.contains(self.cellrange)]
+        #self.smarkers = self.smarkers[~self.smarkers['cellName'].isin(fil)]
 
         #if self.noprint == False:
-        print("Version V2.0 [2023/04/07]")
-        print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
-                len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
-        )
+        print("Version V2.1 [2023/06/27]")
+        if 'plus' not in db:
+            print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
+                    len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
+            )
+        else:
+            print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},PanglaoDB:{}\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
+                    len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.pmarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
+            )
 
     def read_tissues_species(self,tissue="All",species="Human",celltype="normal"):
         """read markers according to certain tissue and certain species"""
@@ -1244,7 +1294,7 @@ class Process(object):
         parser.add_argument('-k',"--tissue",default = 'All',help="Tissue for annotation. Only used for cellmarker database. Multiple tissues should be seperated by commas. Run '-l' option to see all tissues. ('All',['Bone marrow'],['Bone marrow,Brain,Blood'][...])")
         parser.add_argument('-m', '--outfmt', default = "ms-excel", help="Output file format for marker annotation. (ms-excel,[txt])")
         parser.add_argument('-T',"--celltype",default = "normal",help="Cell type for annotation. (normal,[cancer])")
-        parser.add_argument('-t', '--target', default = "cellmarker",help="Target to annotation class in Database. (cellmarker,[cancersea])")
+        parser.add_argument('-t', '--target', default = "cellmarker",help="Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])")
         parser.add_argument('-E',"--Gensymbol",action = "store_true",default=False,help="Using gene symbol ID instead of ensembl ID in input file for calculation.")
         parser.add_argument('-N',"--norefdb",action = "store_true",default=False,help="Only using user-defined marker database for annotation.")
         parser.add_argument('-b',"--noprint",action = "store_true",default=False,help="Do not print any detail results.")
@@ -1264,7 +1314,7 @@ class Process(object):
         else:
             args.tissue = str.capitalize(args.tissue)
         args.species = str.capitalize(args.species)
-        if args.species == "Mouse" and args.target == "cancersea":
+        if args.species == "Mouse" and (args.target == "cancersea" or args.target == "panglaodb"):
             print("Error target database for mouse genome. Cancersea can't used on mouse genomes. Please use cellmarker database instead.")
             exit(0)
         if args.norefdb and not args.MarkerDB:
@@ -1283,7 +1333,7 @@ class Process(object):
                  pvalue,tissue,species,
                  target,norefdb,MarkerDB,db,
                  noprint,input,output,source,cluster,fc,
-                 outfmt,celltype,Gensymbol,list_tissue,):
+                 outfmt,celltype,Gensymbol,list_tissue,cellrange):
         if tissue.find(",")>-1:
             temptis=[]
             for tis in tissue.split(','):
@@ -1292,7 +1342,7 @@ class Process(object):
         else:
             tissue=str.capitalize(tissue)
         species=str.capitalize(species)
-        if species=="Mouse" and target=="cancersea":
+        if species=="Mouse" and (target=="cancersea" or target=="panglaodb"):
             print("Error target database for mouse genome. Cancersea can't used on mouse genomes. Please use cellmarker database instead.")
             return 0
         if norefdb and not MarkerDB:
@@ -1303,7 +1353,7 @@ class Process(object):
                  pvalue,tissue,species,
                  target,norefdb,MarkerDB,db,
                  noprint,input,output,source,cluster,fc,
-                 outfmt,celltype,Gensymbol,list_tissue,)
+                 outfmt,celltype,Gensymbol,list_tissue,cellrange)
         anno.load_pickle_module(rdbname)
         outs=anno.run_detail_cmd()
         print("#Cluster","Type","Celltype","Score","Times")

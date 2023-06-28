@@ -189,5 +189,13 @@ renamed the package to `omicverse`
 - fix the trajectory import error of `via`
 - add the gene correlation analysis of trajectory 
 
+## v 1.4.4
+
+### single module
+
+- add `panglaodb` database to `pySCSA` module
+- fix the error of `pyscsa.cell_auto_anno` when some celltype not found in clusters
+- fix the error of `pyscsa.cell_anno` when `rank_genes_groups` not consisted with clusters
+
 
 
