@@ -10,6 +10,12 @@ import pandas as pd
 sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
  '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
  '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
+
+red_color=['#F0C3C3','#E07370','#CB3E35','#A22E2A','#5A1713','#D3396D','#DBC3DC','#85539B','#5C2B80','#5C4694']
+green_color=['#91C79D','#8FC155','#56AB56','#2D5C33','#BBCD91','#6E944A','#A5C953','#3B4A25','#010000']
+orange_color=['#EFBD49','#D48F3E','#AC8A3E','#7D7237','#745228','#E1C085','#CEBC49','#EBE3A1','#6C6331','#8C9A48','#D7DE61']
+blue_color=['#347862','#6BBBA0','#81C0DD','#3E8CB1','#88C8D2','#52B3AD','#265B58','#B2B0D4','#5860A7','#312C6C']
+
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
 def pyomic_plot_set(verbosity=3,dpi=80,facecolor='white'):
@@ -306,3 +312,4 @@ def plot_network(G,G_type_dict,G_color_dict,pos_type='spring',pos_dim=2,
     plt.setp(ltext, fontsize=legend_fontsize,fontweight=legend_fontweight)
     
     return fig,ax
+
