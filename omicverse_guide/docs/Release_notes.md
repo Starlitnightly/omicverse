@@ -197,6 +197,9 @@ renamed the package to `omicverse`
 - fix the error of `pySCSA.cell_auto_anno` when some celltype not found in clusters
 - fix the error of `pySCSA.cell_anno` when `rank_genes_groups` not consisted with clusters
 - add `pySIMBA` module in single to perform batch correction
+
+### preprocess module
+
 - add `store_layers` and `retrieve_layers` in `ov.utils`
 - add `plot_embedding_celltype` and `plot_cellproportion` in `ov.utils`
 
