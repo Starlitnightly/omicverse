@@ -538,3 +538,12 @@ def red(adata):
     adata.layers['lognorm'] = adata.X
     adata.layers['raw'] = adata.raw.to_adata()[:, adata.var_names].X
     return adata
+
+def counts_store(adata,layers):
+    adata.uns[layers] = adata.X.to_df().copy()
+
+def counts_retrieve(adata,layers):
+    cell_idx=adata.obs.index
+    adata.uns['raw_store'] = adata.X.to_df().copy()
+    adata.X=adata.uns[layers].loc[cell_idx,:].values
+
