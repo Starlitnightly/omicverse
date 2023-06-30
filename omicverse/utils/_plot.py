@@ -6,6 +6,7 @@ import random
 import scanpy as sc
 import networkx as nx
 import pandas as pd
+import anndata
 
 sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
  '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
@@ -51,6 +52,42 @@ def palette()->list:
         sc_color: List containing the hex codes as values.
     """ 
     return sc_color
+
+def red_palette()->list:
+    """
+    Returns a dictionary of colors for various plots used in pyomic package.
+
+    Returns:
+        sc_color: List containing the hex codes as values.
+    """ 
+    return red_color
+
+def green_palette()->list:
+    """
+    Returns a dictionary of colors for various plots used in pyomic package.
+
+    Returns:
+        sc_color: List containing the hex codes as values.
+    """ 
+    return green_color
+
+def orange_palette()->list:
+    """
+    Returns a dictionary of colors for various plots used in pyomic package.
+
+    Returns:
+        sc_color: List containing the hex codes as values.
+    """ 
+    return orange_color
+
+def blue_palette()->list:
+    """
+    Returns a dictionary of colors for various plots used in pyomic package.
+
+    Returns:
+        sc_color: List containing the hex codes as values.
+    """ 
+    return blue_color
 
 def plot_text_set(text,text_knock=2,text_maxsize=20):
     """
@@ -249,14 +286,44 @@ def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
     ax.spines['left'].set_visible(True)
     return fig,ax
 
-def plot_network(G,G_type_dict,G_color_dict,pos_type='spring',pos_dim=2,
-                figsize=(4,4),pos_scale=10,pos_k=None,pos_alpha=0.4,
-                node_size=50,node_alpha=0.6,node_linewidths=1,
-                plot_node=None,plot_node_num=20,
-                label_verticalalignment='center_baseline',label_fontsize=12,
-                label_fontfamily='Arial',label_fontweight='bold',label_bbox=None,
-                legend_bbox=(0.7, 0.05),legend_ncol=3,legend_fontsize=12,
-                legend_fontweight='bold'):
+def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spring',pos_dim:int=2,
+                figsize:tuple=(4,4),pos_scale:int=10,pos_k=None,pos_alpha:float=0.4,
+                node_size:int=50,node_alpha:float=0.6,node_linewidths:int=1,
+                plot_node=None,plot_node_num:int=20,
+                label_verticalalignment:str='center_baseline',label_fontsize:int=12,
+                label_fontfamily:str='Arial',label_fontweight:str='bold',label_bbox=None,
+                legend_bbox:tuple=(0.7, 0.05),legend_ncol:int=3,legend_fontsize:int=12,
+                legend_fontweight:str='bold'):
+    """
+    Plot network graph.
+
+    Arguments:
+        G: networkx graph
+        G_type_dict: dict, node type dict
+        G_color_dict: dict, node color dict
+        pos_type: str, node position type, 'spring' or 'kamada_kawai'
+        pos_dim: int, node position dimension, 2 or 3
+        figsize: tuple, figure size
+        pos_scale: int, node position scale
+        pos_k: float, node position k
+        pos_alpha: float, node position alpha
+        node_size: int, node size
+        node_alpha: float, node alpha
+        node_linewidths: float, node linewidths
+        plot_node: list, plot node list
+        plot_node_num: int, plot node number
+        label_verticalalignment: str, label verticalalignment
+        label_fontsize: int, label fontsize
+        label_fontfamily: str, label fontfamily
+        label_fontweight: str, label fontweight
+        label_bbox: tuple, label bbox
+        legend_bbox: tuple, legend bbox
+        legend_ncol: int, legend ncol
+        legend_fontsize: int, legend fontsize
+        legend_fontweight: str, legend fontweight
+
+    
+    """
     
     fig, ax = plt.subplots(figsize=figsize)
     if pos_type=='spring':
@@ -313,3 +380,173 @@ def plot_network(G,G_type_dict,G_color_dict,pos_type='spring',pos_dim=2,
     
     return fig,ax
 
+def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clusters:str,
+                       visual_li=None,visual_name:str='',figsize:tuple=(4,6),
+                       ticks_fontsize:int=12,labels_fontsize:int=12,
+                       legend:bool=False):
+    """
+    Plot cell proportion of each cell type in each visual cluster.
+
+    Arguments:
+        adata: AnnData object.
+        celltype_clusters: Cell type clusters.
+        visual_clusters: Visual clusters.
+        visual_li: Visual cluster list.
+        visual_name: Visual cluster name.
+        figsize: Figure size.
+        ticks_fontsize: Ticks fontsize.
+        labels_fontsize: Labels fontsize.
+        legend: Whether to show legend.
+    
+    
+    """
+
+    b=pd.DataFrame(columns=['cell_type','value','Week'])
+    
+    if visual_li==None:
+        adata.obs[visual_clusters]=adata.obs[visual_clusters].astype('category')
+        visual_li=adata.obs[visual_clusters].cat.categories
+    
+    for i in visual_li:
+        b1=pd.DataFrame()
+        test=adata.obs.loc[adata.obs[visual_clusters]==i,celltype_clusters].value_counts()
+        b1['cell_type']=test.index
+        b1['value']=test.values/test.sum()
+        b1['Week']=i.replace('Retinoblastoma_','')
+        b=pd.concat([b,b1])
+    
+    plt_data2=adata.obs[celltype_clusters].value_counts()
+    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
+    plt_data3=adata.obs[visual_clusters].value_counts()
+    plot_data3_color_dict=dict(zip([i.replace('Retinoblastoma_','') for i in adata.obs[visual_clusters].cat.categories],adata.uns['{}_colors'.format(visual_clusters)]))
+    b['cell_type_color'] = b['cell_type'].map(plot_data2_color_dict)
+    b['stage_color']=b['Week'].map(plot_data3_color_dict)
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    #用ax控制图片
+    #sns.set_theme(style="whitegrid")
+    #sns.set_theme(style="ticks")
+    n=0
+    all_celltype=adata.obs[celltype_clusters].cat.categories
+    for i in all_celltype:
+        if n==0:
+            test1=b[b['cell_type']==i]
+            ax.bar(x=test1['Week'],height=test1['value'],width=0.8,color=list(set(test1['cell_type_color']))[0], label=i)
+            bottoms=test1['value'].values
+        else:
+            test2=b[b['cell_type']==i]
+            ax.bar(x=test2['Week'],height=test2['value'],bottom=bottoms,width=0.8,color=list(set(test2['cell_type_color']))[0], label=i)
+            test1=test2
+            bottoms+=test1['value'].values
+        n+=1
+    if legend!=False:
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
+    
+    plt.grid(False)
+    
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+
+    # 设置左边和下边的坐标刻度为透明色
+    #ax.yaxis.tick_left()
+    #ax.xaxis.tick_bottom()
+    #ax.xaxis.set_tick_params(color='none')
+    #ax.yaxis.set_tick_params(color='none')
+
+    # 设置左边和下边的坐标轴线为独立的线段
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+
+    plt.xticks(fontsize=ticks_fontsize,rotation=90)
+    plt.yticks(fontsize=ticks_fontsize)
+    plt.xlabel(visual_name,fontsize=labels_fontsize)
+    plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
+    fig.tight_layout()
+    return fig,ax
+
+def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str='umap',
+                            celltype_key:str='major_celltype',title:str=None,
+                            celltype_range:tuple=(2,9),
+                            embedding_range:tuple=(3,10),
+                            xlim:int=-1000)->tuple:
+    """
+    Plot embedding with celltype color by omicverse
+
+    Arguments:
+        adata: AnnData object  
+        figsize: figure size
+        basis: embedding method
+        celltype_key: celltype key in adata.obs
+        title: figure title
+        celltype_range: celltype range to plot
+        embedding_range: embedding range to plot
+        xlim: x axis limit
+
+    Returns:
+        fig : figure and axis
+        ax: axis
+    
+    """
+
+
+    cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
+    if '{}_colors'.format(celltype_key) in adata.uns.keys():
+        cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories.tolist(),
+                        adata.uns['{}_colors'.format(celltype_key)]))
+    else:
+        if len(adata.obs[celltype_key].cat.categories)>28:
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+        else:
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+
+    if figsize==None:
+        if len(adata.obs[celltype_key].cat.categories)<10:
+            fig = plt.figure(figsize=(6,4))
+        else:
+            print('The number of cell types is too large, please set the figsize parameter')
+            return
+    else:
+        fig = plt.figure(figsize=figsize)
+    grid = plt.GridSpec(10, 10)
+    ax1 = fig.add_subplot(grid[:, embedding_range[0]:embedding_range[1]])       # 占据第一行的所有列
+    ax2 = fig.add_subplot(grid[celltype_range[0]:celltype_range[1], :2]) 
+    # 定义子图的大小和位置
+         # 占据第二行的前两列
+    #ax3 = fig.add_subplot(grid[1:, 2])      # 占据第二行及以后的最后一列
+    #ax4 = fig.add_subplot(grid[2, 0])       # 占据最后一行的第一列
+    #ax5 = fig.add_subplot(grid[2, 1])       # 占据最后一行的第二列
+
+    sc.pl.embedding(
+        adata,
+        basis=basis,
+        color=[celltype_key],
+        title='',
+        frameon=False,
+        #wspace=0.65,
+        ncols=3,
+        ax=ax1,
+        legend_loc=False,
+        show=False
+    )
+
+    for idx,cell in zip(range(cell_num_pd.shape[0]),
+                        adata.obs[celltype_key].cat.categories):
+        ax2.scatter(100,
+                cell,c=cell_color_dict[cell],s=50)
+        ax2.plot((100,cell_num_pd.loc[cell,celltype_key]),(idx,idx),
+                c=cell_color_dict[cell],lw=4)
+        ax2.text(100,idx+0.2,
+                cell+'('+str("{:,}".format(cell_num_pd.loc[cell,celltype_key]))+')',fontsize=11)
+    ax2.set_xlim(xlim,cell_num_pd.iloc[1].values[0]) 
+    ax2.text(xlim,idx+1,title,fontsize=12)
+    ax2.grid(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_visible(False)
+    ax2.spines['left'].set_visible(False)
+    ax2.axis('off')
+
+    return fig,[ax1,ax2]

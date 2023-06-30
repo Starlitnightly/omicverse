@@ -194,8 +194,11 @@ renamed the package to `omicverse`
 ### single module
 
 - add `panglaodb` database to `pySCSA` module
-- fix the error of `pyscsa.cell_auto_anno` when some celltype not found in clusters
-- fix the error of `pyscsa.cell_anno` when `rank_genes_groups` not consisted with clusters
+- fix the error of `pySCSA.cell_auto_anno` when some celltype not found in clusters
+- fix the error of `pySCSA.cell_anno` when `rank_genes_groups` not consisted with clusters
+- add `pySIMBA` module in single to perform batch correction
+- add `store_layers` and `retrieve_layers` in `ov.utils`
+- add `plot_embedding_celltype` and `plot_cellproportion` in `ov.utils`
 
 
 

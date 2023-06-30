@@ -497,7 +497,71 @@ def _perm_test(
     return pvals, corr_bs
 
 def anndata_sparse(adata):
+    """
+    Set adata.X to csr_matrix
+
+    Arguments:
+        adata: AnnData
+
+    Returns:
+        adata: AnnData
+
+    """
+
     from scipy.sparse import csr_matrix
     x = csr_matrix(adata.X.copy())
     adata.X=x
     return adata
+
+def store_layers(adata,layers='counts'):
+    """
+    Store the X of adata in adata.uns['layers_{}'.format(layers)]
+
+    Arguments:
+        adata: AnnData
+        layers: the layers name to store, default 'counts'
+    """
+
+
+    if issparse(adata.X) and not isspmatrix_csr(adata.X):
+        adata.uns['layers_{}'.format(layers)]=anndata.AnnData(csr_matrix(adata.X.copy()),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                          var=pd.DataFrame(index=adata.var.index),)
+    elif issparse(adata.X):
+        adata.uns['layers_{}'.format(layers)]=anndata.AnnData(adata.X.copy(),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                           var=pd.DataFrame(index=adata.var.index),)
+    else:
+        adata.uns['layers_{}'.format(layers)]=anndata.AnnData(csr_matrix(adata.X.copy()),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                          var=pd.DataFrame(index=adata.var.index),)
+    print('......The X of adata have been stored in {}'.format(layers))
+def retrieve_layers(adata,layers='counts'):
+    """
+    Retrieve the X of adata from adata.uns['layers_{}'.format(layers)]
+
+    Arguments:
+        adata: AnnData
+        layers: the layers name to retrieve, default 'counts'
+    
+    """
+
+    adata_test=adata.uns['layers_{}'.format(layers)].copy()
+    adata_test=adata_test[adata.obs.index,adata.var.index]
+    
+    if issparse(adata.X) and not isspmatrix_csr(adata.X):
+        adata.uns['layers_raw'.format(layers)]=anndata.AnnData(csr_matrix(adata.X.copy()),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                          var=pd.DataFrame(index=adata.var.index),)
+    elif issparse(adata.X):
+        adata.uns['layers_raw'.format(layers)]=anndata.AnnData(adata.X.copy(),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                           var=pd.DataFrame(index=adata.var.index),)
+    else:
+        adata.uns['layers_raw'.format(layers)]=anndata.AnnData(csr_matrix(adata.X.copy()),
+                                           obs=pd.DataFrame(index=adata.obs.index),
+                                          var=pd.DataFrame(index=adata.var.index),)
+    print('......The X of adata have been stored in raw')
+    adata.X=adata_test.X.copy()
+    print('......The layers {} of adata have been retreved'.format(layers))
+    del adata_test

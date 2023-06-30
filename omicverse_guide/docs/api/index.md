@@ -27,6 +27,7 @@ import omicverse as ov
 |[single.scGSEA](single/api_scgsea)|Pathway analysis with AUCell|
 |[single.cpdb](single/api_cpdb)|Cell interaction with CellPhoneDB|
 |[single.MOFA](single/api_mofa)|Multi omics analysis by MOFA|
+|[single.pySIMBA](single/api_simba)|Batch correction with SIMBA|
 
 ## Bulk2Single
 
@@ -41,3 +42,4 @@ import omicverse as ov
 | ---- | ---- |
 |[pp](utils/api_pp)|preprocessing the scRNA-seq|
 |[qc](utils/api_qc)|quantity control the scRNA-seq|
+|[plot](utils/api_plot)|plot function|

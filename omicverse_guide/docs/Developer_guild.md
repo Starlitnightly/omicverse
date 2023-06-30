@@ -8,7 +8,7 @@ Below we describe main components of the framework, and how to extend the existi
 
 ## Main components
 
-A omicverse framework is primarily composed of 2 components.
+A omicverse framework is primarily composed of 3 components.
 
 - bulk omic: to analysis the bulk omic-seq like RNA-seq or Proper-seq.
 - single cell omic: to analysis the single cell omic-seq like scRNA-seq or scATAC-seq

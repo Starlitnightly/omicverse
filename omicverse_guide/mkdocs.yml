@@ -21,6 +21,7 @@ nav:
         - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
         - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
         - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
+        - Batch Correction with SIMBA: Tutorials-single/t_simba.ipynb
         - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
         - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
         - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb

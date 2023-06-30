@@ -33,6 +33,7 @@ For more details about the omicverse framework, please check out our [publicatio
     - [Trajectory Inference with VIA and scVelo](Tutorials-single/t_via_velo)
     - [Pathway analysis with AUCell](Tutorials-single/t_aucell)
     - [Different expression analysis in scRNA-seq](Tutorials-single/t_scdeg)
+    - [Batch Correction with SIMBA](Tutorials-singe/t_simba)
     - [Drug response predict with scDrug](Tutorials-single/t_scdrug)
     - [Cell interaction with CellPhoneDB](Tutorials-single/t_cellphonedb)
     - [Multi omics analysis by MOFA](Tutorials-single/t_mofa)
