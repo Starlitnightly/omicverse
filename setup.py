@@ -19,7 +19,7 @@ extensions = [
 
 setup(  
     name = 'omicverse',  
-    version = '1.4.1',
+    version = '1.4.4',
     # keywords = ('chinesename',),  
     description = 'OmicVerse: A single pipeline for exploring the entire transcriptome universe',  
     license = 'GNU License',  
