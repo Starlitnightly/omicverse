@@ -46,6 +46,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [10] [VIA](https://github.com/ShobiStassen/VIA) was originally avaliable in [*Nature Communications*](https://www.nature.com/articles/s41467-021-25773-3)
 - [11] [pyDEseq2](https://github.com/owkin/PyDESeq2) was originally avaliable in [*biorxiv*](https://www.biorxiv.org/content/10.1101/2022.12.14.520412v1)
 - [12] [NOCD](https://github.com/shchur/overlapping-community-detection) was originally avaliable in [*Deep Learning on Graphs Workshop, KDD*](https://arxiv.org/abs/1909.12201)
+- [13] [SIMBA](https://github.com/pinellolab/simba) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-023-01899-8)
 
 ## Included Package not published or preprint
 
