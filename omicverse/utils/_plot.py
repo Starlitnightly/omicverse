@@ -550,3 +550,31 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
     ax2.axis('off')
 
     return fig,[ax1,ax2]
+
+def gen_mpl_labels(
+    adata, groupby, exclude=(), 
+    basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
+):
+    """ 
+    Get locations of cluster median . Borrowed from scanpy github forum.
+    """
+    if adjust_kwargs is None:
+        adjust_kwargs = {"text_from_points": False}
+    if text_kwargs is None:
+        text_kwargs = {}
+
+    medians = {}
+
+    for g, g_idx in adata.obs.groupby(groupby).groups.items():
+        if g in exclude:
+            continue
+        medians[g] = np.median(adata[g_idx].obsm[basis], axis=0)
+
+    if ax is None:
+        texts = [
+            plt.text(x=x, y=y, s=k, **text_kwargs) for k, (x, y) in medians.items()
+        ]
+    else:
+        texts = [ax.text(x=x, y=y, s=k, **text_kwargs) for k, (x, y) in medians.items()]
+    from adjustText import adjust_text
+    adjust_text(texts, **adjust_kwargs)
