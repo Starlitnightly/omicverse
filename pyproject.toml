@@ -65,7 +65,8 @@ dependencies = [
     'pydeseq2>=0.3',
     'mofax>=0.3',
     'adjustText>=0.8',
-    'scikit-misc>=0.1'
+    'scikit-misc>=0.1',
+    'metatime>=1.3.0'
 ]
 
 
