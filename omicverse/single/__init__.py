@@ -3,7 +3,7 @@ single (A omic framework for single cell omic analysis)
 """
 
 from ._cosg import cosg
-from ._anno import pySCSA,scanpy_lazy,scanpy_cellanno_from_dict,get_celltype_marker
+from ._anno import pySCSA,MetaTiME,scanpy_lazy,scanpy_cellanno_from_dict,get_celltype_marker
 from ._nocd import scnocd
 from ._mofa import pyMOFAART,pyMOFA,GLUE_pair,factor_exact,factor_correlation,get_weights,glue_pair
 from ._scdrug import autoResolution,writeGEP,Drug_Response

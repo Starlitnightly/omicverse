@@ -20,7 +20,8 @@ import omicverse as ov
 
 |module|reference|
 | ---- | ---- |
-|[single.pySCSA](single/api_scsa)|Celltype annotation with SCSA|
+|[single.pySCSA](single/api_scsa)|Celltype auto annotation with SCSA|
+|[single.MetaTiME](single/api_metatime)|Celltype auto annotation with MetaTiME|
 |[single.pyVIA](single/api_via)|Trajectory calculated with VIA|
 |[single.COSG](single/api_cosg)|Marker genes filtered with COSG|
 |[single.scDrug](single/api_scdrug)|Drug response predict with scDrug|

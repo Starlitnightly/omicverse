@@ -203,5 +203,12 @@ renamed the package to `omicverse`
 - add `store_layers` and `retrieve_layers` in `ov.utils`
 - add `plot_embedding_celltype` and `plot_cellproportion` in `ov.utils`
 
+## v 1.4.5
+
+### single module
+
+- add `MetaTiME` module in singel to perform celltype annotation automatically in TME
+
+
 
 

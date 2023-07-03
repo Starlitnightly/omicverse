@@ -10,6 +10,17 @@ import time
 import requests
 import anndata
 from ..pp._preprocess import scale
+from ..utils import gen_mpl_labels
+
+import metatime
+from metatime import config
+from metatime import loaddata
+from metatime import mecmapper
+from metatime import mecs
+from metatime import annotator
+from metatime import plmapper
+from metatime import dmec
+
 
 def data_downloader(url,path,title):
     r"""datasets downloader
@@ -505,3 +516,139 @@ class pySCSA(object):
                             pval_cutoff=pval_cutoff,rank=rank)
 
         return cell_marker_dict
+    
+class MetaTiME(object):
+    """
+    MetaTiME: Meta-components in Tumor immune MicroEnvironment
+
+    Github: https://github.com/yi-zhang/MetaTiME/
+    
+    """
+    
+    def __init__(self,adata:anndata.AnnData,mode:str='table'):
+        """
+        Initialize MetaTiME model
+
+        Arguments:
+            adata: anndata object
+            mode: choose from ['mecnamedict', 'table', 'meciddict']
+                    load manual assigned name for easy understanding of assigned names
+                    from file: MeC_anno_name.tsv under mecDIR.
+                    Required columns: `['MeC_id', 'Annotation', 'UseForCellStateAnno']` 
+                    Required seperator: tab
+                    Annotation column NA will be filtered.
+                    If you want to use your own annotation, please follow the format of MeC_anno_name.tsv
+
+        """
+        self.adata=adata
+        # Load the pre-trained MeCs
+        print('...load pre-trained MeCs')
+        self.mecmodel = mecs.MetatimeMecs.load_mec_precomputed()
+
+        # Load functional annotation for MetaTiME-TME
+        print('...load functional annotation for MetaTiME-TME')
+        self.mectable = mecs.load_mecname(mecDIR = config.SCMECDIR, mode =mode )
+        self.mecnamedict = mecs.getmecnamedict_ct(self.mectable) 
+        
+        
+    
+    def overcluster(self,resolution : float=8, 
+                random_state: int= 0, 
+                clustercol :str = 'overcluster'):
+        """
+        Overcluster single cell data to get cluster level cell state annotation
+
+        Arguments:
+            resolution: resolution for leiden clustering
+            random_state: random state for leiden clustering
+            clustercol: column name for cluster level cell state annotation
+        
+        """
+
+        print('...overclustering using leiden')
+        sc.tl.leiden(self.adata, resolution=resolution, key_added = clustercol, random_state=random_state)
+        self.clustercol=clustercol
+        #self.adata = annotator.overcluster(self.adata,resolution,random_state,clustercol) # this generates a 'overcluster' columns in adata.obs
+        
+    def predictTiME(self,save_obs_name:str='MetaTiME'):
+        """
+        Predict TiME celtype for each cell
+
+        Arguments:
+            save_obs_name: column name for cell type annotation in adata.obs
+        
+        """
+        print('...projecting MeC scores')
+        self.pdata=mecmapper.projectMecAnn(self.adata, self.mecmodel.mec_score)
+        projmat, mecscores = annotator.pdataToTable(self.pdata, self.mectable, gcol = self.clustercol)
+        projmat, gpred, gpreddict = annotator.annotator(projmat,  self.mecnamedict, gcol = self.clustercol)
+        self.adata = annotator.saveToAdata( self.adata, projmat )
+        #self.pdata = annotator.saveToPdata( self.pdata, self.adata, projmat )
+        self.adata.obs[save_obs_name] = self.adata.obs['{}_{}'.format(save_obs_name,self.clustercol)].str.split(': ').str.get(1)
+        #self.pdata.obs[save_obs_name] = self.pdata.obs['{}_{}'.format(save_obs_name,self.clustercol)].str.split(': ').str.get(1)
+        self.adata.obs['Major_{}'.format(save_obs_name)]=[i.split('_')[0] for i in self.adata.obs[save_obs_name]]
+        #self.pdata.obs['Major_{}'.format(save_obs_name)]=[i.split('_')[0] for i in self.pdata.obs[save_obs_name]]
+        print('......The predicted celltype have been saved in obs.{}'.format(save_obs_name))
+        print('......The predicted major celltype have been saved in obs.Major_{}'.format(save_obs_name))
+        return self.adata
+    
+    def plot(self,basis:str='X_umap',cluster_key:str='MetaTiME',fontsize:int=8, 
+             min_cell:int=5, title=None,figsize:tuple=(6,6),
+             dpi:int=80,frameon:bool=False,legend_loc=None,palette=None):
+        """
+        Plot annotated cells with  non-overlapping fonts.
+
+        Arguments:
+            basis: basis for plotting
+            cluster_key: column name for cell type annotation in adata.obs
+            fontsize: fontsize for plotting
+            min_cell: minimum number of cells for plotting
+            title: title for plotting
+            figsize: figure size for plotting
+            dpi: dpi for plotting
+            frameon: frameon for plotting
+            legend_loc: legend_loc for plotting
+            palette: palette for plotting
+
+        Returns:
+            fig: figure object
+            ax: axis object
+        
+        """
+        import matplotlib.pyplot as plt
+        if not title:
+            title = cluster_key
+
+        if( min_cell >0 ):
+            groupcounts = self.adata.obs.groupby( cluster_key ).count()
+            groupcounts = groupcounts[groupcounts.columns[0]]
+            group_with_good_counts = groupcounts[groupcounts>= min_cell ].index.tolist()
+            self.adata = self.adata[ self.adata.obs[ cluster_key ].isin( group_with_good_counts ) ]
+
+        if palette ==None:
+            palette=plt.cycler("color",plt.cm.tab20(np.linspace(0,1,20)))
+
+        with plt.rc_context({"figure.figsize": figsize, "figure.dpi": dpi, "figure.frameon": frameon}):
+            #ax = sc.pl.umap(pdata, color="MetaTiME_overcluster", show=False, legend_loc=None, frameon=False, size=30)
+            ax = sc.pl.embedding(self.adata, basis=basis,color= cluster_key , show=False, legend_loc=None, add_outline=False, 
+                    #legend_loc='on data',legend_fontsize=6, legend_fontoutline=2,
+                    title= title, 
+                    palette=palette, 
+                    #palette=plt.cycler("color",plt.cm.Set1(np.linspace(0,1,9))), 
+                    frameon=frameon
+                    )
+            gen_mpl_labels(
+                self.adata,
+                cluster_key,
+                exclude=("None",),  
+                basis=basis,
+                ax=ax,
+                adjust_kwargs=dict(arrowprops=dict(arrowstyle='-', color='black')),
+                text_kwargs=dict(fontsize= fontsize ,weight='bold'),
+            )
+            fig = ax.get_figure()
+            fig.tight_layout()
+            #plt.show()
+            return( fig,ax )
+
+        

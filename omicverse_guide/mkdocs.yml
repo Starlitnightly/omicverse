@@ -16,7 +16,8 @@ nav:
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
         - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
-        - Celltype annotation with SCSA: Tutorials-single/t_cellanno.ipynb
+        - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
+        - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
         - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
         - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
         - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
@@ -26,7 +27,6 @@ nav:
         - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
         - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
         - Multi omics analysis by MOFA and GLUE: Tutorials-single/t_mofa_glue.ipynb
-        - Overlapping Celltype annotation with GNN: Tutorials-single/t_nocd.ipynb
     - Bulk2Single:
         - Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq: Tutorials-bulk2single/t_bulktrajblend.ipynb
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
