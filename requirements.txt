@@ -34,3 +34,4 @@ mkdocstrings == 0.20.0
 mkdocs-gen-files ==0.4.0
 mkdocstrings-python
 python-dotplot
+metatime
