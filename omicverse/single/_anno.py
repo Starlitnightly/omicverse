@@ -12,14 +12,28 @@ import anndata
 from ..pp._preprocess import scale
 from ..utils import gen_mpl_labels
 
-import metatime
-from metatime import config
-from metatime import loaddata
-from metatime import mecmapper
-from metatime import mecs
-from metatime import annotator
-from metatime import plmapper
-from metatime import dmec
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
+
+metatime_install=False
+def check_metatime():
+    """
+    
+    """
+    global metatime_install
+    try:
+        import metatime
+        metatime_install=True
+        print('metatime have been install version:',metatime.__version__)
+    except ImportError:
+        raise ImportError(
+            'Please install the metatime: `pip install metatime`.'
+        )
 
 
 def data_downloader(url,path,title):
@@ -325,6 +339,11 @@ def get_celltype_marker(adata:anndata.AnnData,
 
         return cell_marker_dict
 
+
+
+
+
+
 class pySCSA(object):
 
     def __init__(self,adata:anndata.AnnData,
@@ -517,6 +536,8 @@ class pySCSA(object):
 
         return cell_marker_dict
     
+
+
 class MetaTiME(object):
     """
     MetaTiME: Meta-components in Tumor immune MicroEnvironment
@@ -540,6 +561,18 @@ class MetaTiME(object):
                     If you want to use your own annotation, please follow the format of MeC_anno_name.tsv
 
         """
+        check_metatime()
+        global metatime_install
+        if metatime_install==True:
+            global mecs
+            global mecmapper
+            global annotator
+            global config
+            from metatime import mecs
+            from metatime import mecmapper
+            from metatime import annotator
+            from metatime import config
+
         self.adata=adata
         # Load the pre-trained MeCs
         print('...load pre-trained MeCs')
@@ -582,11 +615,15 @@ class MetaTiME(object):
         self.pdata=mecmapper.projectMecAnn(self.adata, self.mecmodel.mec_score)
         projmat, mecscores = annotator.pdataToTable(self.pdata, self.mectable, gcol = self.clustercol)
         projmat, gpred, gpreddict = annotator.annotator(projmat,  self.mecnamedict, gcol = self.clustercol)
-        self.adata = annotator.saveToAdata( self.adata, projmat )
+        self.adata = annotator.saveToAdata( self.adata, projmat)
         #self.pdata = annotator.saveToPdata( self.pdata, self.adata, projmat )
         self.adata.obs[save_obs_name] = self.adata.obs['{}_{}'.format(save_obs_name,self.clustercol)].str.split(': ').str.get(1)
         #self.pdata.obs[save_obs_name] = self.pdata.obs['{}_{}'.format(save_obs_name,self.clustercol)].str.split(': ').str.get(1)
+        self.adata.obs['MetaTiME']=self.adata.obs['MetaTiME'].fillna('Unknown')
         self.adata.obs['Major_{}'.format(save_obs_name)]=[i.split('_')[0] for i in self.adata.obs[save_obs_name]]
+        for i in self.adata.obs.columns:
+            if 'MeC_' in i:
+                del self.adata.obs[i]
         #self.pdata.obs['Major_{}'.format(save_obs_name)]=[i.split('_')[0] for i in self.pdata.obs[save_obs_name]]
         print('......The predicted celltype have been saved in obs.{}'.format(save_obs_name))
         print('......The predicted major celltype have been saved in obs.Major_{}'.format(save_obs_name))

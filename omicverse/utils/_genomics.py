@@ -15,13 +15,10 @@ from typing import Any, Callable, List, Mapping, Optional, Union
 import networkx as nx
 import numpy as np
 import pandas as pd
-import pybedtools
 import scipy.sparse
 import scipy.stats
 from anndata import AnnData
 from networkx.algorithms.bipartite import biadjacency_matrix
-from pybedtools import BedTool
-from pybedtools.cbedtools import Interval
 from statsmodels.stats.multitest import fdrcorrection
 from tqdm.auto import tqdm
 
@@ -172,7 +169,7 @@ class Bed(ConstrainedDataFrame):
         df = self.df.iloc[:, :ncols] if ncols else self
         df.to_csv(fname, sep="\t", header=False, index=False)
 
-    def to_bedtool(self) -> pybedtools.BedTool:
+    def to_bedtool(self):
         r"""
         Convert to a :class:`pybedtools.BedTool` object
 
@@ -181,6 +178,8 @@ class Bed(ConstrainedDataFrame):
         bedtool
             Converted :class:`pybedtools.BedTool` object
         """
+        from pybedtools import BedTool
+        from pybedtools.cbedtools import Interval
         return BedTool(Interval(
             row["chrom"], row["chromStart"], row["chromEnd"],
             name=row["name"], score=row["score"], strand=row["strand"]
@@ -200,6 +199,7 @@ class Bed(ConstrainedDataFrame):
         nucleotide_stat
             Data frame containing nucleotide content statistics for each region
         """
+        import pybedtools
         result = self.to_bedtool().nucleotide_content(fi=os.fspath(fasta), s=True)  # pylint: disable=unexpected-keyword-arg
         result = pd.DataFrame(
             np.stack([interval.fields[6:15] for interval in result]),
@@ -415,7 +415,7 @@ class Gtf(ConstrainedDataFrame):  # gffutils is too slow
         return Bed(bed_df)
 
 
-def interval_dist(x: Interval, y: Interval) -> int:
+def interval_dist(x, y) -> int:
     r"""
     Compute distance and relative position between two bed intervals
 
@@ -444,7 +444,7 @@ def interval_dist(x: Interval, y: Interval) -> int:
 def window_graph(
         left: Union[Bed, str], right: Union[Bed, str], window_size: int,
         left_sorted: bool = False, right_sorted: bool = False,
-        attr_fn: Optional[Callable[[Interval, Interval, float], Mapping[str, Any]]] = None
+        attr_fn= None
 ) -> nx.MultiDiGraph:
     r"""
     Construct a window graph between two sets of genomic features, where
@@ -477,7 +477,7 @@ def window_graph(
     graph
         Window graph
     """
-
+    import pybedtools
     if isinstance(left, Bed):
         pbar_total = len(left)
         left = left.to_bedtool()

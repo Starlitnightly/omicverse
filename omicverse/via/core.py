@@ -16,7 +16,6 @@ import matplotlib.cm as cm
 from matplotlib.path import get_path_collection_extents
 import multiprocessing
 import pygam as pg
-from termcolor import colored
 from collections import Counter
 from typing import Optional, Union
 from .plotting_via import *

@@ -2,26 +2,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import linear_model
-from scipy.stats import norm
-from scipy import stats
 import networkx as nx
-import datetime
 import seaborn as sns
 import pandas as pd
-from scipy.cluster import hierarchy  
-from scipy import cluster   
 from sklearn import decomposition as skldec 
-from gseapy.plot import gseaplot,GSEAPlot
 
-
-from scipy.spatial.distance import pdist
-from scipy.cluster.hierarchy import linkage,dendrogram
-
-import ERgene
-import os
-
-import gseapy as gp
-from gseapy.plot import barplot, dotplot
 from ..utils import plot_text_set
 import matplotlib
 
@@ -216,6 +201,7 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
 
 
     """
+    import gseapy as gp
     if background is None:
         if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
             background='mmusculus_gene_ensembl'
@@ -270,6 +256,7 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
         pre_res: A prerank object containing the enrichment results.
     
     """
+    import gseapy as gp
     pre_res = gp.prerank(rnk=gene_rnk, gene_sets=pathways_dict,
                      processes=processes,
                      permutation_num=permutation_num, # reduce number to speed up testing
@@ -476,7 +463,7 @@ class pyGSEA(object):
         Returns:
             fig: A matplotlib.figure.Figure object.
         """
-        
+        from gseapy.plot import GSEAPlot
         terms = self.enrich_res.index
         g = GSEAPlot(
         rank_metric=self.pre_res.ranking, term=terms[term_num],figsize=figsize,cmap=cmap,

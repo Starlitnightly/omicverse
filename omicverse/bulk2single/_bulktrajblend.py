@@ -1,7 +1,6 @@
 
 import pandas as pd
 import numpy as np
-import os
 import anndata
 import scanpy as sc
 import torch

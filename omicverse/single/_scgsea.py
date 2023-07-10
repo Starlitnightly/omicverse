@@ -6,10 +6,33 @@ import anndata
 import seaborn as sns
 
 from ._aucell import derive_auc_threshold,create_rankings,aucell
-from ctxcore.recovery import enrichment4cells,aucs
-from ctxcore.genesig import GeneSignature
+#from ctxcore.recovery import enrichment4cells,aucs
+#from ctxcore.genesig import GeneSignature
 from ..utils import plot_text_set
-import gseapy as gp
+
+ctxcore_install=False
+
+def check_ctxcore():
+    """
+    
+    """
+    global ctxcore_install
+    try:
+        import ctxcore
+        ctxcore_install=True
+        print('ctxcore have been install version:',ctxcore.__version__)
+    except ImportError:
+        raise ImportError(
+            'Please install the ctxcore: `pip install ctxcore`.'
+        )
+
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
 
 def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
     """
@@ -33,6 +56,15 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
     None
         Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
     """
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
+
     matrix = adata.to_df()
     percentiles = derive_auc_threshold(matrix)
     auc_threshold = percentiles[AUC_threshold]
@@ -74,6 +106,14 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
     None
         The function modifies the `adata.obs` attribute of the input AnnData object.
     """
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
     matrix = adata.to_df()
     percentiles = derive_auc_threshold(matrix)
     auc_threshold = percentiles[AUC_threshold]
@@ -117,6 +157,14 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
         AnnData object containing the pathway activity scores for each cell in the input AnnData object.
 
     """
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+        
     test_gmt=[]
     for i in pathways_dict.keys():
         test_gmt.append(GeneSignature(name=i,gene2weight=dict(zip(pathways_dict[i],[1 for i in pathways_dict[i]]))))
@@ -170,6 +218,7 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     The code for pathway_enrichment() function was adapted from scanpy workflows: 
     https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html#Gene-set-enrichment-analysis.
     """
+    import gseapy as gp
     df_list = []
     cluster_list = []
     celltypes = sorted(adata.obs[group_by].unique())
