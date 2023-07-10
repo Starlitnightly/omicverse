@@ -17,7 +17,6 @@ import matplotlib
 import igraph as ig
 import matplotlib.pyplot as plt
 from matplotlib.path import get_path_collection_extents
-import s_gd2
 from scipy.spatial.distance import pdist, squareform
 from sklearn.preprocessing import normalize
 import random
@@ -28,11 +27,16 @@ from scipy.sparse.csgraph import minimum_spanning_tree, connected_components
 #import utils_sampling
 from matplotlib.animation import FuncAnimation, writers
 
-import graphtools
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
 
-
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
 
 def DEMaP(data, embedding, knn=30, subsample_idx=None):
     # https://github.com/scottgigante/DEMaP/blob/master/demap/demap.py
@@ -448,8 +452,10 @@ def sgd(D, n_components=2, random_state=None, init=None):
     N = D.shape[0]
     D = squareform(D)
     # Metric MDS from s_gd2
+    global_imports("s_gd2")
     Y = s_gd2.mds_direct(N, D, init=init, random_seed=random_state)
     return Y
+
 def classic(D, n_components=2, random_state=None):
 
     """Fast CMDS using random SVD

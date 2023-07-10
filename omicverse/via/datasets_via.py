@@ -1,6 +1,7 @@
 import pandas as pd
 import scanpy as sc
-import wget
+#import wget
+from ..utils import data_downloader
 import gdown
 import os
 from scipy.io import loadmat
@@ -27,11 +28,13 @@ def toy_multifurcating(foldername="./"):
 
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_multifurcating_M8_n1000d1000.csv"
-        wget.download(data_url, data_path)
+        data_path=data_downloader(data_url, path=data_path,title=data_path.split('.')[0])
+        #wget.download(data_url, data_path)
 
     if not os.path.isfile(ids_path):
         ids_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_multifurcating_M8_n1000d1000_ids_with_truetime.csv"
-        wget.download(ids_url, ids_path)
+        #wget.download(ids_url, ids_path)
+        ids_path=data_downloader(ids_url, path=ids_path,title=ids_path.split('.')[0])
 
     df_counts = pd.read_csv(data_path)
     df_ids = pd.read_csv(ids_path)
@@ -67,11 +70,13 @@ def toy_disconnected(foldername="./"):
 
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_disconnected_M9_n1000d1000.csv"
-        wget.download(data_url, data_path)
+        data_path=data_downloader(data_url, path=data_path,title=data_path.split('.')[0])
+        #wget.download(data_url, data_path)
 
     if not os.path.isfile(ids_path):
         ids_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_disconnected_M9_n1000d1000_ids_with_truetime.csv"
-        wget.download(ids_url, ids_path)
+        #wget.download(ids_url, ids_path)
+        ids_path=data_downloader(ids_url, path=ids_path,title=ids_path.split('.')[0])
 
     df_counts = pd.read_csv(data_path)
     df_ids = pd.read_csv(ids_path)
@@ -111,7 +116,8 @@ def scRNA_hematopoiesis(foldername="./"):
 
     if not os.path.isfile(ids_path):
         ids_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/Nover_Cor_PredFine_notLogNorm.csv"
-        wget.download(ids_url, ids_path)
+        ids_path=data_downloader(ids_url, path=ids_path,title=ids_path.split('.')[0])
+        #wget.download(ids_url, ids_path)
 
     ad = sc.read(data_path)
     nover_labels = pd.read_csv(ids_path)['x'].values.tolist()
@@ -158,7 +164,8 @@ def scATAC_hematopoiesis(foldername="./"):
 
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/scATAC_hemato_Buenrostro.csv"
-        wget.download(data_url, data_path)
+        data_path=data_downloader(data_url, path=data_path,title=data_path.split('.')[0])
+        #wget.download(data_url, data_path)
 
     df = pd.read_csv(data_path)
     print('number cells', df.shape[0])
@@ -205,11 +212,13 @@ def cell_cycle(foldername="./"):
 
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/mcf7_38features.csv"
-        wget.download(data_url, data_path)
+        data_path=data_downloader(data_url, path=data_path,title=data_path.split('.')[0])
+        #wget.download(data_url, data_path)
 
     if not os.path.isfile(ids_path):
         ids_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/mcf7_phases.csv"
-        wget.download(ids_url, ids_path)
+        ids_path=data_downloader(ids_url, path=ids_path,title=ids_path.split('.')[0])
+        #wget.download(ids_url, ids_path)
 
     df = pd.read_csv(data_path)
     df = df.drop('Unnamed: 0', 1)
@@ -243,7 +252,8 @@ def embryoid_body(foldername="./"):
 
     if not os.path.isfile(emb_path):
         emb_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/EB_phate_embedding.csv"
-        wget.download(emb_url, emb_path)
+        emb_path=data_downloader(emb_url, path=emb_path,title=emb_path.split('.')[0])
+        #wget.download(emb_url, emb_path)
 
     annots = loadmat(data_path)
     data = annots[

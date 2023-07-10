@@ -11,10 +11,33 @@ import anndata
 from tqdm import tqdm,trange
 import matplotlib.pyplot as plt
 import seaborn as sns
-import mofax as mfx
 import scanpy as sc
 from typing import Union,Tuple
 import matplotlib
+
+mofax_install=False
+
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
+
+def check_mofax():
+    """
+    
+    """
+    global mofax_install
+    try:
+        import mofax as mfx
+        mofax_install=True
+        print('mofax have been install version:',mfx.__version__)
+    except ImportError:
+        raise ImportError(
+            'Please install the mofax: `pip install mofax`.'
+        )
 
 class GLUE_pair(object):
 
@@ -410,7 +433,11 @@ class pyMOFAART(object):
         Arguments:
             model_path: The path of MOFA model.
         """
-
+        check_mofax()
+        global mofax_install
+        if mofax_install==True:
+            global_imports("mofax","mfx")
+        
         self.model_path=model_path
         mfx_model=mfx.mofa_model(model_path)
         self.factors=mfx_model.get_factors()

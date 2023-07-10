@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
-from pydeseq2.dds import DeseqDataSet
-from pydeseq2.ds import DeseqStats
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
@@ -412,6 +410,8 @@ class pyDEG(object):
         Returns
             result: The result of differential expression analysis.
         """
+        from pydeseq2.dds import DeseqDataSet
+        from pydeseq2.ds import DeseqStats
         if method=='ttest':
             from scipy.stats import ttest_ind
             from statsmodels.stats.multitest import multipletests

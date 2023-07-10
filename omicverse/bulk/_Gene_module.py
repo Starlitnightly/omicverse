@@ -4,13 +4,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import linear_model
-from scipy.stats import norm
 from scipy import stats
 import networkx as nx
 import datetime
 import seaborn as sns
-from scipy.cluster import hierarchy  
-from scipy import cluster   
+from scipy.cluster import hierarchy   
 from sklearn import decomposition as skldec 
 from matplotlib.colors import LinearSegmentedColormap
 import scanpy as sc

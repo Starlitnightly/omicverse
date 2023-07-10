@@ -578,3 +578,11 @@ def gen_mpl_labels(
         texts = [ax.text(x=x, y=y, s=k, **text_kwargs) for k, (x, y) in medians.items()]
     from adjustText import adjust_text
     adjust_text(texts, **adjust_kwargs)
+
+def plot_embedding(adata,basis,color,color_dict={},
+                   figsize:tuple=(4,4),):
+    fig,ax=plt.subplots(1,1,figsize=figsize)
+    sc.pl.embedding(adata,basis=basis,
+                    color=color,
+                    ax=ax,show=False)
+    return fig,ax
