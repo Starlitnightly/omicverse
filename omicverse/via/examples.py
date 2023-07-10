@@ -7,7 +7,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import euclidean_distances
 import umap
-import phate
 
 import os.path
 
@@ -21,7 +20,7 @@ from .datasets_via import *
 import matplotlib as mpl
 #import pyVIA.core as via
 #print(os.path.abspath(via.__file__))
-print(os.path.abspath(phate.__file__))
+
 
 sc.settings.set_figure_params(dpi=120, facecolor='white') #or whichever facecolor e.g. black, 'white'
 def cellrank_Human(ncomps=80, knn=30, v0_random_seed=7):
@@ -715,7 +714,7 @@ def main_Toy_comparisons(ncomps=10, knn=30, random_seed=42, dataset='Toy3', root
 def main_Toy(ncomps=10, knn=30, random_seed=41, dataset='Toy3', root_user=['M1'],
              cluster_graph_pruning_std=1, foldername="/home/shobi/Trajectory/Datasets/"):
     print('dataset, ncomps, knn, seed', dataset, ncomps, knn, random_seed)
-
+    import phate
     if dataset == "Toy3":
         print('inside Toy3')
         #df_counts = pd.read_csv(foldername + "toy_multifurcating_M8_n1000d1000.csv", delimiter=",")
@@ -1327,7 +1326,7 @@ def plot_EB():
 
 def main_EB_clean(ncomps=30, knn=20, v0_random_seed=24, cluster_graph_pruning_std=.15,
                   foldername='/home/shobi/Trajectory/Datasets/EB_Phate/'):
-
+    import phate
     true_time_labels = pd.read_csv(foldername+'EB_true_time_labels.csv')
     true_time_labels = true_time_labels.drop(['Unnamed: 0'], axis=1)
     true_time_labels = true_time_labels['true_time_labels']
@@ -2949,6 +2948,7 @@ def main_faced(cell_line='mcf7', cluster_graph_pruning_std=1.):
     from sklearn.tree import DecisionTreeClassifier
     from sklearn.model_selection import train_test_split
     from sklearn import metrics
+    import phate
     # Split dataset into training set and test set
     X_train, X_test, y_train, y_test = train_test_split(ad.X, phases, test_size=0.3, random_state=1)
     clf = DecisionTreeClassifier(criterion='gini', max_depth=3)

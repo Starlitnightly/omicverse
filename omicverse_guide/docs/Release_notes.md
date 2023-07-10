@@ -207,7 +207,17 @@ renamed the package to `omicverse`
 
 ### single module
 
-- add `MetaTiME` module in singel to perform celltype annotation automatically in TME
+- add `MetaTiME` module in single to perform celltype annotation automatically in TME
+
+## v 1.4.12
+
+update `conda install omicverse -c conda-forge`
+
+### single module
+
+- add `pyTOSICA` module in single to perform celltype migration from reference scRNA-seq in Tranformer model
+- add `atac_concat_get_index`,`atac_concat_inner`,`atac_concat_outer` function to merge/concat the scATAC data.
+- fix `MetaTime.predicted` when Unknown cell type appear
 
 
 

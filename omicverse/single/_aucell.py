@@ -11,8 +11,6 @@ from typing import Sequence, Type
 import numpy as np
 import pandas as pd
 from boltons.iterutils import chunked
-from ctxcore.genesig import GeneSignature
-from ctxcore.recovery import enrichment4cells
 from tqdm import tqdm
 
 LOGGER = logging.getLogger(__name__)
@@ -21,6 +19,29 @@ LOGGER = logging.getLogger(__name__)
 DTYPE = "uint32"
 DTYPE_C = c_uint32
 
+ctxcore_install=False
+
+def check_ctxcore():
+    """
+    
+    """
+    global ctxcore_install
+    try:
+        import ctxcore
+        ctxcore_install=True
+        print('ctxcore have been install version:',ctxcore.__version__)
+    except ImportError:
+        raise ImportError(
+            'Please install the ctxcore: `pip install ctxcore`.'
+        )
+
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
 
 def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
     """
@@ -82,12 +103,16 @@ def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-enrichment = enrichment4cells
-
 
 def _enrichment(
     shared_ro_memory_array, modules, genes, cells, auc_threshold, auc_mtx, offset
 ):
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global enrichment4cells
+        from ctxcore.recovery import enrichment4cells
+
     # The rankings dataframe is properly reconstructed (checked this).
     df_rnk = pd.DataFrame(
         data=np.frombuffer(shared_ro_memory_array, dtype=DTYPE).reshape(
@@ -107,7 +132,7 @@ def _enrichment(
 
 def aucell4r(
     df_rnk: pd.DataFrame,
-    signatures: Sequence[Type[GeneSignature]],
+    signatures,
     auc_threshold: float = 0.05,
     noweights: bool = False,
     normalize: bool = False,
@@ -125,6 +150,13 @@ def aucell4r(
     :param num_workers: The number of cores to use.
     :return: A dataframe with the AUCs (n_cells x n_modules).
     """
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global enrichment4cells
+        from ctxcore.recovery import enrichment4cells
+
+
     if num_workers == 1:
         # Show progress bar ...
         aucs = pd.concat(
@@ -194,7 +226,7 @@ def aucell4r(
 
 def aucell(
     exp_mtx: pd.DataFrame,
-    signatures: Sequence[Type[GeneSignature]],
+    signatures,
     auc_threshold: float = 0.05,
     noweights: bool = False,
     normalize: bool = False,

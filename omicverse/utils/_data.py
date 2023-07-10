@@ -175,6 +175,25 @@ def download_geneid_annotation_pair():
         model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
     print('......Geneid Annotation Pair download finished!')
 
+def download_tosica_gmt():
+    r"""load TOSICA gmt dataset
+
+    """
+    _datasets = {
+        'GO_bp':'https://figshare.com/ndownloader/files/41460072',
+        'TF':'https://figshare.com/ndownloader/files/41460066',
+        'reactome':'https://figshare.com/ndownloader/files/41460051',
+        'm_GO_bp':'https://figshare.com/ndownloader/files/41460060',
+        'm_TF':'https://figshare.com/ndownloader/files/41460057',
+        'm_reactome':'https://figshare.com/ndownloader/files/41460054',
+        'immune':'https://figshare.com/ndownloader/files/41460063',
+    }
+     
+    for datasets_name in _datasets.keys():
+        print('......TOSICA gmt dataset download start:',datasets_name)
+        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
+    print('......TOSICA gmt dataset download finished!')
+
 def geneset_prepare(geneset_path,organism='Human'):
     r"""load geneset
 
