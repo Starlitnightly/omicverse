@@ -8,3 +8,8 @@ omicverse.egg-info
 .ipynb_checkpoints
 __pycache__
 meta.yaml
+data
+genesets
+temp
+result_simba
+enrichr
