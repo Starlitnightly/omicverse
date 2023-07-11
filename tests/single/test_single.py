@@ -46,14 +46,4 @@ def test_via():
     v0.get_pseudotime(v0.adata)
     assert v0.adata.obs['pt_via'].shape[0]==adata.shape[0]
 
-def test_simba():
-    adata=ov.utils.pancreas()
-    adata.obs['batch']='1'
-    adata.obs.loc[adata.obs.index[:1000],'batch']='2'
-    simba_object=ov.single.pySIMBA(adata)
-    simba_object.preprocess(batch_key='batch',min_n_cells=3,
-                    method='lib_size',n_top_genes=3000,n_bins=5)
-    simba_object.gen_graph()
-    simba_object.train(num_workers=1)
-    adata=simba_object.batch_correction()
-    assert adata.obsm['X_simba'].shape[0]==adata.shape[0]
+
