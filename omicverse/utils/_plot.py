@@ -579,10 +579,43 @@ def gen_mpl_labels(
     from adjustText import adjust_text
     adjust_text(texts, **adjust_kwargs)
 
-def plot_embedding(adata,basis,color,color_dict={},
-                   figsize:tuple=(4,4),):
+def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
+                   figsize:tuple=(4,4),**kwargs):
+    
+    """
+    Plot embedding with celltype color by omicverse
+
+    Arguments:
+        adata: AnnData object
+        basis: embedding method
+        color: celltype key in adata.obs
+        figsize: figure size
+        kwargs: other parameters for sc.pl.embedding
+
+    Returns:
+        fig : figure
+        ax: axes
+    
+    """
+    if type(color)!=str:
+        print("Only one color could be input, don't input list")
+        return
     fig,ax=plt.subplots(1,1,figsize=figsize)
+    adata.obs[color]=adata.obs[color].astype('category')
+
+    if '{}_colors'.format(color) in adata.uns.keys():
+        print('{}_colors'.format(color))
+        type_color_all=dict(zip(adata.obs[color].cat.categories,adata.uns['{}_colors'.format(color)]))
+    else:
+        if len(adata.obs[color].cat.categories)>28:
+            type_color_all=dict(zip(adata.obs[color].cat.categories,sc.pl.palettes.default_102))
+        else:
+            type_color_all=dict(zip(adata.obs[color].cat.categories,sc.pl.palettes.zeileis_28))
+    if color_dict is not None:
+        for color_key in color_dict.keys():
+            type_color_all[color_key]=color_dict[color_key]
+    
+    adata.uns['{}_colors'.format(color)]=np.array([i for i in type_color_all.values()])
     sc.pl.embedding(adata,basis=basis,
-                    color=color,
-                    ax=ax,show=False)
+                    color=color,ax=ax,**kwargs)
     return fig,ax
