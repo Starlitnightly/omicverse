@@ -235,7 +235,8 @@ def atac_concat_outer(adata1,adata2,pair_index):
     adata2.var_names_make_unique()
     adata_pair = ad.concat([adata1,adata2],axis=0,join='outer',fill_value=0)
     adata_pair.obs_names_make_unique()
-    adata_pair
+    adata_pair=adata_pair[:,[i for i in adata_pair.var_name if '-' not in i]]
+
 
     gc.collect()
     return adata_pair
