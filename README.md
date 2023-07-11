@@ -23,11 +23,9 @@ BulkTrajBlend algorithm in OmicVerse that combines Beta-Variational AutoEncoder 
 
 ## Where to get it
 
-Binary installers for the latest released version are available at the pypi
+OmicVerse can be installed via conda or pypi and you need to install `pytorch` at first. Please refer to the [installation tutorial](https://omicverse.readthedocs.io/en/stable/Installation_guild/) for more detailed installation steps and adaptations for different platforms (`Windows`, `Linux` or `Mac OS`).
 
-```shell
-pip install -U omicverse
-```
+You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
 
 ## Usage
 
@@ -58,6 +56,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [14] [SIMBA](https://github.com/pinellolab/simba) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-023-01899-8)
 - [15] [GLUE](https://github.com/gao-lab/GLUE) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-022-01284-4)
 - [16] [MetaTiME](https://github.com/yi-zhang/MetaTiME) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-38333-8)
+- [17] [TOSICA](https://github.com/JackieHanLab/TOSICA) was originally published in [*Nature Communications*](https://doi.org/10.1038/s41467-023-35923-4)
 
 
 ## Included Package not published or preprint
