@@ -219,6 +219,9 @@ update `conda install omicverse -c conda-forge`
 - add `atac_concat_get_index`,`atac_concat_inner`,`atac_concat_outer` function to merge/concat the scATAC data.
 - fix `MetaTime.predicted` when Unknown cell type appear
 
+### preprocess module
+
+- add `plot_embedding` in `ov.utils` to plot umap in special color dict
 
 
 

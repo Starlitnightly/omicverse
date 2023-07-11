@@ -46,3 +46,10 @@
         options:
         show_root_heading: true
         show_source: true      
+
+::: omicverse.utils.plot_embedding
+    handler: python
+    selection:
+        options:
+        show_root_heading: true
+        show_source: true   

@@ -29,6 +29,7 @@ import omicverse as ov
 |[single.cpdb](single/api_cpdb)|Cell interaction with CellPhoneDB|
 |[single.MOFA](single/api_mofa)|Multi omics analysis by MOFA|
 |[single.pySIMBA](single/api_simba)|Batch correction with SIMBA|
+|[single.pyTOSICA](single/api_tosica)|Celltype predicted from reference scRNA-seq|
 
 ## Bulk2Single
 
