@@ -33,36 +33,20 @@ def string_interaction(gene:list,species:int) -> pd.DataFrame:
 
     }
     response = requests.post(request_url, data=params)
-    res=pd.DataFrame(columns=['stringId_A',\
-                             'stringId_B',\
-                             'preferredName_A',\
-                             'preferredName_B',\
-                             'ncbiTaxonId',\
-                             'score',\
-                             'nscore',\
-                             'fscore',\
-                             'pscore',\
-                             'ascore',\
-                             'escore',\
-                             'dscore',\
-                             'tscore'])
-    num=0
-    for line in response.text.strip().split("\n"):
-        l = line.strip().split("\t")
-        res.loc[num]={'stringId_A':l[0],\
-                             'stringId_B':l[1],\
-                             'preferredName_A':l[2],\
-                             'preferredName_B':l[3],\
-                             'ncbiTaxonId':l[4],\
-                             'score':l[5],\
-                             'nscore':l[6],\
-                             'fscore':l[7],\
-                             'pscore':l[8],\
-                             'ascore':l[9],\
-                             'escore':l[10],\
-                             'dscore':l[11],\
-                             'tscore':l[12]}
-        num+=1
+    res=pd.DataFrame()
+    res['stringId_A']=[j.strip().split("\t")[0] for j in response.text.strip().split("\n")]
+    res['stringId_B']=[j.strip().split("\t")[1] for j in response.text.strip().split("\n")]
+    res['preferredName_A']=[j.strip().split("\t")[2] for j in response.text.strip().split("\n")]
+    res['preferredName_B']=[j.strip().split("\t")[3] for j in response.text.strip().split("\n")]
+    res['ncbiTaxonId']=[j.strip().split("\t")[4] for j in response.text.strip().split("\n")]
+    res['score']=[j.strip().split("\t")[5] for j in response.text.strip().split("\n")]
+    res['nscore']=[j.strip().split("\t")[6] for j in response.text.strip().split("\n")]
+    res['fscore']=[j.strip().split("\t")[7] for j in response.text.strip().split("\n")]
+    res['pscore']=[j.strip().split("\t")[8] for j in response.text.strip().split("\n")]
+    res['ascore']=[j.strip().split("\t")[9] for j in response.text.strip().split("\n")]
+    res['escore']=[j.strip().split("\t")[10] for j in response.text.strip().split("\n")]
+    res['dscore']=[j.strip().split("\t")[11] for j in response.text.strip().split("\n")]
+    res['tscore']=[j.strip().split("\t")[12] for j in response.text.strip().split("\n")]
     return res
 
 
@@ -92,19 +76,16 @@ def string_map(gene:list,species:int)->pd.DataFrame:
 
     }
     request_url = "/".join([string_api_url, output_format, method])
-    results = requests.post(request_url, data=params)
+    response = requests.post(request_url, data=params)
     res=pd.DataFrame(columns=['queryItem','queryIndex','stringId','ncbiTaxonId','taxonName','preferredName','annotation'])
-    num=0
-    for line in results.text.strip().split("\n"):
-        l = line.split("\t")
-        res.loc[num]={'queryItem':l[0],\
-          'queryIndex':l[1],\
-          'stringId':l[2],\
-          'ncbiTaxonId':l[3],\
-          'taxonName':l[4],\
-          'preferredName':l[5],\
-          'annotation':l[6]}
-        num+=1
+    res['queryItem']=[j.strip().split("\t")[0] for j in response.text.strip().split("\n")]
+    res['queryIndex']=[j.strip().split("\t")[1] for j in response.text.strip().split("\n")]
+    res['stringId']=[j.strip().split("\t")[2] for j in response.text.strip().split("\n")]
+    res['ncbiTaxonId']=[j.strip().split("\t")[3] for j in response.text.strip().split("\n")]
+    res['taxonName']=[j.strip().split("\t")[4] for j in response.text.strip().split("\n")]
+    res['preferredName']=[j.strip().split("\t")[5] for j in response.text.strip().split("\n")]
+    res['annotation']=[j.strip().split("\t")[6] for j in response.text.strip().split("\n")]
+
     return res
 
 

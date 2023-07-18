@@ -38,6 +38,18 @@ class pyWGCNA(object):
         self.data_index=data.index
         self.save_path=save_path
 
+    def mad_filtered(self,gene_num:int=5000):
+        """
+        Filter genes by MAD to construct a scale-free network
+
+        Arguments:
+            gene_num: The number of genes to be saved
+        
+        """
+        from statsmodels import robust #import package
+        gene_mad=self.data.T.apply(robust.mad) #use function to calculate MAD
+        self.data=self.data.loc[gene_mad.sort_values(ascending=False).index[:gene_num]]
+
     def calculate_correlation_direct(self,method:str='pearson',save:bool=False):
         """calculate the correlation coefficient matrix
 

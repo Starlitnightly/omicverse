@@ -215,6 +215,7 @@ class scnocd(object):
         nocd.utils.plot_sparse_clustered_adjacency(self.A, self.K, z, o, markersize=markersize)
 
        
+       
     def calculate_nocd(self):
         zpred=self.Z_pred+0
         pr=np.argmax(zpred, axis=-1)
