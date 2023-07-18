@@ -14,6 +14,7 @@
     - [Preprocessing the data of scRNA-seq](../Tutorials-single/t_preprocess)
     - [Celltype auto annotation with SCSA](../Tutorials-single/t_cellanno)
     - [Celltype auto annotation with MetaTiME](../Tutorials-single/t_metatime)
+    - [Celltype annotation migration(mapping) with TOSICA](../Tutorials-single/t_tosica)
     - [Trajectory Inference with VIA](../Tutorials-single/t_via)
     - [Trajectory Inference with VIA and scVelo](../Tutorials-single/t_via_velo)
     - [Pathway analysis with AUCell](../Tutorials-single/t_aucell)

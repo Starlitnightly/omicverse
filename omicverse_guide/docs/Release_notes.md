@@ -223,5 +223,12 @@ update `conda install omicverse -c conda-forge`
 
 - add `plot_embedding` in `ov.utils` to plot umap in special color dict
 
+## v 1.4.13
+
+### bulk module 
+
+- add `mad_filtered` to filtered the robust genes when calculated the network in `ov.bulk.pyWGCNA` module
+- fix `string_interaction` in `ov.bulk.pyPPI` for string-db updated.
+
 
 
