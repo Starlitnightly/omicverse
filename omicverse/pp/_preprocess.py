@@ -547,3 +547,10 @@ def counts_retrieve(adata,layers):
     adata.uns['raw_store'] = adata.X.to_df().copy()
     adata.X=adata.uns[layers].loc[cell_idx,:].values
 
+from scipy.stats import median_abs_deviation
+def is_outlier(adata, metric: str, nmads: int):
+    M = adata.obs[metric]
+    outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (
+        np.median(M) + nmads * median_abs_deviation(M) < M
+    )
+    return outlier
