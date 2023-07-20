@@ -69,6 +69,10 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com) or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 - Lei Hu ([hulei@westlake.edu.cn](mailto:hulei@westlake.edu.cn))
 
+## Developer Guild
+
+If you would like to contribute to omicverse, please refer to our [developer documentation](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
+
 ## Acknowledgements
 
 We would like to thank the following WeChat Official Accounts for promoting Omicverse.
