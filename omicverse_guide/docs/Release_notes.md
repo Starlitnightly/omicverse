@@ -229,6 +229,8 @@ update `conda install omicverse -c conda-forge`
 
 - add `mad_filtered` to filtered the robust genes when calculated the network in `ov.bulk.pyWGCNA` module
 - fix `string_interaction` in `ov.bulk.pyPPI` for string-db updated.
+- change `mode` arguement of `pp.preprocess`, normalize|HVGs：We use | to control the preprocessing step, | before for the normalisation step, either `shiftlog` or `pearson`, and | after for the highly variable gene calculation step, either `pearson` or `seurat`. Our default is `shiftlog|pearson`.
+- 
 
 
 

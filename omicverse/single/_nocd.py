@@ -266,4 +266,5 @@ class scnocd(object):
         self.cal_nocd()
         return dict(zip(self.adata[~self.adata.obs['nocd_n'].str.contains('-')].obs[[self.clustertype]].values.reshape(-1),
         self.adata[~self.adata.obs['nocd_n'].str.contains('-')].obs[['nocd_n']].values.reshape(-1)))
+    
         
