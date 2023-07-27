@@ -338,7 +338,7 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
 from sklearn.cluster import KMeans  
 
 
-def preprocess(adata, mode='scanpy', target_sum=50*1e4, n_HVGs=2000,
+def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     organism='human', no_cc=False):
     """
     Preprocesses the AnnData object adata using either a scanpy or a pearson residuals workflow for size normalization
@@ -360,13 +360,16 @@ def preprocess(adata, mode='scanpy', target_sum=50*1e4, n_HVGs=2000,
     """
 
     # Log-normalization, HVGs identification
-    print('Begin log-normalization, HVGs identification')
+    print('Begin robust gene identification')
     adata.raw = adata.copy()
     identify_robust_genes(adata, percent_cells=0.05)
     adata = adata[:, adata.var['robust']]
-    print(f'End of log-normalization, HVGs identification.')
-    print('Begin size normalization and pegasus batch aware HVGs selection or Perason residuals workflow')
-    if mode == 'scanpy': # Size normalization + pegasus batch aware HVGs selection
+    print(f'End of robust gene identification.')
+    method_list = mode.split('|')
+    print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
+    adata.layers['counts'] = adata.X.copy()
+
+    if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
         sc.pp.normalize_total(
             adata, 
             target_sum=target_sum,
@@ -374,25 +377,35 @@ def preprocess(adata, mode='scanpy', target_sum=50*1e4, n_HVGs=2000,
             max_fraction=0.2
         )
         sc.pp.log1p(adata)
-        highly_variable_features(adata, batch=None, n_top=n_HVGs)
-        if no_cc:
-            remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
-    elif mode == 'pearson':
+    elif method_list[0] == 'pearson':
         # Perason residuals workflow
+        sc.experimental.pp.normalize_pearson_residuals(adata)
+
+    if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
         sc.experimental.pp.highly_variable_genes(
-                adata, flavor="pearson_residuals", n_top_genes=n_HVGs
+            adata, 
+            flavor="pearson_residuals",
+            layer='counts',
+            n_top_genes=n_HVGs,
         )
         if no_cc:
             remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
-        sc.experimental.pp.normalize_pearson_residuals(adata)
-        adata.var = adata.var.drop(columns=['highly_variable_features'])
-        adata.var['highly_variable_features'] = adata.var['highly_variable']
-        adata.var = adata.var.drop(columns=['highly_variable'])
-        adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
+    elif method_list[1] == 'seurat':
+        sc.pp.highly_variable_genes(
+            adata,
+            flavor="seurat_v3",
+            layer='counts',
+            n_top_genes=n_HVGs,
+        )
+        if no_cc:
+            remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
 
-    print(f'End of size normalization and pegasus batch aware HVGs selection or Perason residuals workflow.')
+    adata.var = adata.var.drop(columns=['highly_variable_features'])
+    adata.var['highly_variable_features'] = adata.var['highly_variable']
+    adata.var = adata.var.drop(columns=['highly_variable'])
+    adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
+    print(f'End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
    
-
     return adata 
 
 def normalize_pearson_residuals(adata,**kwargs):
@@ -489,7 +502,7 @@ class my_PCA:
 
         return self
 
-def pca(adata, n_pcs=50, layer='scaled'):
+def pca(adata, n_pcs=50, layer='scaled',inplace=True):
     """
     Performs Principal Component Analysis (PCA) on the data stored in a scanpy AnnData object.
 
@@ -517,8 +530,10 @@ def pca(adata, n_pcs=50, layer='scaled'):
     adata.varm[key + '|pca_loadings'] = model.loads
     adata.uns[key + '|pca_var_ratios'] = model.var_ratios
     adata.uns[key + '|cum_sum_eigenvalues'] = np.cumsum(model.var_ratios)
-
-    return adata  
+    if inplace:
+        return None
+    else:
+        return adata  
 
 def red(adata):
     """
