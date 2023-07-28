@@ -8,7 +8,7 @@ def test_pp():
     adata=ov.pp.qc(adata,
               tresh={'mito_perc': 0.05, 'nUMIs': 500, 'detected_genes': 250})
     ov.utils.store_layers(adata,layers='counts')
-    adata=ov.pp.preprocess(adata,mode='pearson',n_HVGs=2000,)
+    adata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)
     ov.pp.scale(adata)
     adata=ov.pp.pca(adata,layer='scaled',n_pcs=50)
     assert adata.obsm['X_pca'].shape[1]==50
