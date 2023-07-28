@@ -569,3 +569,119 @@ def is_outlier(adata, metric: str, nmads: int):
         np.median(M) + nmads * median_abs_deviation(M) < M
     )
     return outlier
+
+
+from types import MappingProxyType
+from typing import (
+    Union,
+    Optional,
+    Any,
+    Mapping,
+    Callable,
+    NamedTuple,
+    Generator,
+    Tuple,
+    Literal,
+)
+N_DCS = 15  # default number of diffusion components
+
+_Method = Literal['umap', 'gauss', 'rapids']
+_MetricFn = Callable[[np.ndarray, np.ndarray], float]
+# from sklearn.metrics.pairwise_distances.__doc__:
+_MetricSparseCapable = Literal[
+    'cityblock', 'cosine', 'euclidean', 'l1', 'l2', 'manhattan'
+]
+_MetricScipySpatial = Literal[
+    'braycurtis',
+    'canberra',
+    'chebyshev',
+    'correlation',
+    'dice',
+    'hamming',
+    'jaccard',
+    'kulsinski',
+    'mahalanobis',
+    'minkowski',
+    'rogerstanimoto',
+    'russellrao',
+    'seuclidean',
+    'sokalmichener',
+    'sokalsneath',
+    'sqeuclidean',
+    'yule',
+]
+_Metric = Union[_MetricSparseCapable, _MetricScipySpatial]
+
+
+def neighbors(
+    adata: anndata.AnnData,
+    n_neighbors: int = 15,
+    n_pcs: Optional[int] = None,
+    use_rep: Optional[str] = None,
+    knn: bool = True,
+    random_state: int= 0,
+    method: Optional[_Method] = 'umap',
+    metric: Union[_Metric, _MetricFn] = 'euclidean',
+    metric_kwds: Mapping[str, Any] = MappingProxyType({}),
+    key_added: Optional[str] = None,
+    copy: bool = False,
+) -> Optional[anndata.AnnData]:
+    """
+    Compute a neighborhood graph of observations [McInnes18]_.
+
+    The neighbor search efficiency of this heavily relies on UMAP [McInnes18]_,
+    which also provides a method for estimating connectivities of data points -
+    the connectivity of the manifold (`method=='umap'`). If `method=='gauss'`,
+    connectivities are computed according to [Coifman05]_, in the adaption of
+    [Haghverdi16]_.
+
+    Arguments:
+        adata: Annotated data matrix.
+        n_neighbors: The size of local neighborhood (in terms of number of neighboring data
+            points) used for manifold approximation. Larger values result in more
+            global views of the manifold, while smaller values result in more local
+            data being preserved. In general values should be in the range 2 to 100.
+            If `knn` is `True`, number of nearest neighbors to be searched. If `knn`
+            is `False`, a Gaussian kernel width is set to the distance of the
+            `n_neighbors` neighbor.
+        knn: If `True`, use a hard threshold to restrict the number of neighbors to
+            `n_neighbors`, that is, consider a knn graph. Otherwise, use a Gaussian
+            Kernel to assign low weights to neighbors more distant than the
+            `n_neighbors` nearest neighbor.
+        random_state: A numpy random seed.
+        method: Use 'umap' [McInnes18]_ or 'gauss' (Gauss kernel following [Coifman05]_
+            with adaptive width [Haghverdi16]_) for computing connectivities.
+            Use 'rapids' for the RAPIDS implementation of UMAP (experimental, GPU
+            only).
+        metric: A known metric’s name or a callable that returns a distance.
+        metric_kwds: Options for the metric.
+        key_added: If not specified, the neighbors data is stored in .uns['neighbors'],
+            distances and connectivities are stored in .obsp['distances'] and
+            .obsp['connectivities'] respectively.
+            If specified, the neighbors data is added to .uns[key_added],
+            distances are stored in .obsp[key_added+'_distances'] and
+            connectivities in .obsp[key_added+'_connectivities'].
+        copy: Return a copy instead of writing to adata.
+
+    Returns: Depending on `copy`, updates or returns `adata` with the following:
+
+    See `key_added` parameter description for the storage path of
+    connectivities and distances.
+
+    **connectivities** : sparse matrix of dtype `float32`.
+        Weighted adjacency matrix of the neighborhood graph of data
+        points. Weights should be interpreted as connectivities.
+    **distances** : sparse matrix of dtype `float32`.
+        Instead of decaying weights, this stores distances for each pair of
+        neighbors.
+
+    Notes
+    -----
+    If `method='umap'`, it's highly recommended to install pynndescent ``pip install pynndescent``.
+    Installing `pynndescent` can significantly increase performance,
+    and in later versions it will become a hard dependency.
+    
+    """
+    return sc.pp.neighbors(adata,n_neighbors,
+                           n_pcs,use_rep,knn,random_state,
+                           method,metric,metric_kwds,key_added) if copy else None

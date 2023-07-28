@@ -619,3 +619,118 @@ def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
     sc.pl.embedding(adata,basis=basis,
                     color=color,ax=ax,**kwargs)
     return fig,ax
+
+from sklearn.preprocessing import MinMaxScaler
+
+def normalize_to_minus_one_to_one(arr):
+    # 将数组reshape为二维数组，因为MinMaxScaler接受二维数据
+    arr = arr.reshape(-1, 1)
+    
+    # 创建MinMaxScaler对象，并设定归一化的范围为[-1, 1]
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    
+    # 对数据进行归一化处理
+    normalized_arr = scaler.fit_transform(arr)
+    
+    # 将结果转换回一维数组
+    normalized_arr = normalized_arr.flatten()
+    
+    return normalized_arr
+
+def stacking_vol(data_dict:dict,color_dict:dict,
+                 pval_threshold:float=0.01,
+                 log2fc_threshold:int=2,
+                 figsize:tuple=(8,4),
+                 sig_color:str='#a51616',
+                 normal_color:str='#c7c7c7',
+                 plot_genes_num:int=10,
+                 plot_genes_fontsize:int=8,
+                plot_genes_weight:str='bold')->tuple:
+    """
+    Plot the stacking volcano plot for multiple omics
+
+    Arguments:
+        data_dict: dict, in each key, there is a dataframe with columns of ['logfoldchanges','pvals_adj','names']
+        color_dict: dict, in each key, there is a color for each omic
+        pval_threshold: float, pvalue threshold for significant genes
+        log2fc_threshold: float, log2fc threshold for significant genes
+        figsize: tuple, figure size
+        sig_color: str, color for significant genes
+        normal_color: str, color for non-significant genes
+        plot_genes_num: int, number of genes to plot
+        plot_genes_fontsize: int, fontsize for gene names
+        plot_genes_weight: str, weight for gene names
+    
+    Returns:
+        fig: figure
+        axes: the dict of axes
+    
+    """
+    
+    fig = plt.figure(figsize=figsize)
+    grid = plt.GridSpec(len(data_dict.keys())*2, len(data_dict.keys())*2)
+    axes={}
+    j_before=0
+    y_min,y_max=0,0
+    for i in data_dict.keys():
+        y_min=min(y_min,data_dict[i]['logfoldchanges'].min())
+        y_max=max(y_max,data_dict[i]['logfoldchanges'].max())
+
+    for i,j in zip(data_dict.keys(),
+               range(2,len(data_dict.keys())*2+2,2)):
+        print(j_before,j)
+        axes[i]=fig.add_subplot(grid[:, j_before:j])
+        j_before+=2
+    
+        x=np.random.normal(0, 1, data_dict[i].shape[0])
+        x=normalize_to_minus_one_to_one(x)
+
+        plot_data=pd.DataFrame()
+        plot_data['logfoldchanges']=data_dict[i]['logfoldchanges']
+        plot_data['pvals_adj']=data_dict[i]['pvals_adj']
+        plot_data['abslogfoldchanges']=abs(data_dict[i]['logfoldchanges'])
+        plot_data['sig']='normal'
+        plot_data.loc[(plot_data['pvals_adj']<pval_threshold)&(plot_data['abslogfoldchanges']>log2fc_threshold),'sig']='sig'
+        plot_data['x']=x
+        plot_data.index=data_dict[i]['names']
+
+
+        axes[i].scatter(plot_data.loc[plot_data['sig']!='sig','x'],
+                   plot_data.loc[plot_data['sig']!='sig','logfoldchanges'],
+                   color=normal_color,alpha=0.5)
+
+        axes[i].scatter(plot_data.loc[plot_data['sig']=='sig','x'],
+                   plot_data.loc[plot_data['sig']=='sig','logfoldchanges'],
+                   color=sig_color,alpha=0.8)
+
+        axes[i].axhspan(0-log2fc_threshold/2, log2fc_threshold/2, 
+                        facecolor=color_dict[i], alpha=1)
+
+        
+        axes[i].set_ylim(y_min,y_max)
+
+        plt.grid(False)
+        plt.yticks(fontsize=12)
+
+        axes[i].spines['top'].set_visible(False)
+        if j_before!=2:
+            axes[i].spines['left'].set_visible(False)
+            axes[i].axis('off')
+        axes[i].spines['bottom'].set_visible(False)
+        axes[i].spines['right'].set_visible(False)
+        axes[i].set_ylim(-15,15)
+        axes[i].set_xticks([])
+        
+        hub_gene=plot_data.loc[plot_data['sig']=='sig'].sort_values('abslogfoldchanges',
+                                                                    ascending=False).index[:plot_genes_num]
+        from adjustText import adjust_text
+        texts=[axes[i].text(plot_data.loc[gene,'x'], 
+                            plot_data.loc[gene,'logfoldchanges'],
+                            gene,
+                            fontdict={'size':plot_genes_fontsize,
+                                    'weight':plot_genes_weight,
+                                     'color':'black'}) 
+               for gene in hub_gene]
+        adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+            
+    return fig,axes
