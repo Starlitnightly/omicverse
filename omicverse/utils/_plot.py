@@ -718,7 +718,7 @@ def stacking_vol(data_dict:dict,color_dict:dict,
             axes[i].axis('off')
         axes[i].spines['bottom'].set_visible(False)
         axes[i].spines['right'].set_visible(False)
-        axes[i].set_ylim(-15,15)
+        axes[i].set_ylim(y_min,y_max)
         axes[i].set_xticks([])
         
         hub_gene=plot_data.loc[plot_data['sig']=='sig'].sort_values('abslogfoldchanges',
