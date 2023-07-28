@@ -10,8 +10,8 @@ def test_pp():
     ov.utils.store_layers(adata,layers='counts')
     adata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)
     ov.pp.scale(adata)
-    adata=ov.pp.pca(adata,layer='scaled',n_pcs=50)
-    assert adata.obsm['X_pca'].shape[1]==50
+    ov.pp.pca(adata,layer='scaled',n_pcs=50)
+    assert adata.obsm['scaled|original|X_pca'].shape[1]==50
 
 
 def test_anno():
