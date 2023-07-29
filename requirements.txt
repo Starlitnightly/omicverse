@@ -19,7 +19,6 @@ ctxcore
 multiprocess
 ktplotspy
 leidenalg
-s_gd2
 datashader
 graphtools
 igraph
