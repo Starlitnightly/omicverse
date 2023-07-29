@@ -75,7 +75,15 @@ The `omicverse` package can be installed via pip using one of the following comm
    - Nightly version - clone this [repo](https://github.com/Starlitnightly/omicverse) and run: `pip install .`
    - Using `pip install git+https://github.com/Starlitnightly/omicverse.git`
 
+## Others
 
+if you using M1/M2 silicon, perhaps the following code will be helped:
+
+```shell
+conda install s_gd2 -c conda-forge
+pip install -U omicverse 
+conda install pytorch::pytorch torchvision torchaudio -c pytorch
+```
 
 ## Development
 

@@ -452,7 +452,14 @@ def sgd(D, n_components=2, random_state=None, init=None):
     N = D.shape[0]
     D = squareform(D)
     # Metric MDS from s_gd2
-    global_imports("s_gd2")
+    try:
+        import s_gd2
+        print('s_gd2 have been install')
+    except ImportError:
+        raise ImportError(
+            'Please install the s_gd2: `conda install -c conda-forge s_gd2` or `pip install s_gd2`.'
+        )
+    #global_imports("s_gd2")
     Y = s_gd2.mds_direct(N, D, init=init, random_seed=random_state)
     return Y
 
