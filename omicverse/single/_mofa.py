@@ -33,7 +33,7 @@ def check_mofax():
     try:
         import mofax as mfx
         mofax_install=True
-        print('mofax have been install version:',mfx.__version__)
+        #print('mofax have been install version:',mfx.__version__)
     except ImportError:
         raise ImportError(
             'Please install the mofax: `pip install mofax`.'
@@ -99,7 +99,7 @@ class GLUE_pair(object):
         self.rna_pd=p_pd
         self.atac_pd=n_pd
 
-    def find_neighbor_cell(self,depth:int=10)->pd.DataFrame:
+    def find_neighbor_cell(self,depth:int=10,cor:float=0.9)->pd.DataFrame:
         """
         Find the neighbor cells between two omics using pearson
         
@@ -121,7 +121,7 @@ class GLUE_pair(object):
         n_pd=self.atac_pd.copy()
         with trange(depth) as dt:
             for d in dt:
-                p_pd=p_pd.loc[p_pd['rank_{}'.format(d)]>0.9]
+                p_pd=p_pd.loc[p_pd['rank_{}'.format(d)]>cor]
                 p_pd=p_pd.sort_values('rank_{}'.format(d),ascending=False)
                 for i in p_pd.index:
                     name=n_pd.loc[i,'rank_{}'.format(d)]

@@ -173,7 +173,10 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
     return adata, removed_cells
 
 
-def qc(adata:anndata.AnnData, mode='seurat', min_cells=3, min_genes=200, nmads=5, path_viz=None, tresh=None):
+def qc(adata:anndata.AnnData, mode='seurat', 
+       min_cells=3, min_genes=200, nmads=5, 
+       batch_key=None,
+       path_viz=None, tresh=None):
     """
     Perform quality control on a dictionary of AnnData objects.
     
@@ -226,7 +229,7 @@ def qc(adata:anndata.AnnData, mode='seurat', min_cells=3, min_genes=200, nmads=5
 
     # Post doublets removal QC plot
     print('Begin of post doublets removal and QC plot')
-    sc.external.pp.scrublet(adata, random_state=1234)
+    sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
     adata_remove = adata[adata.obs['predicted_doublet'], :]
     removed_cells.extend(list(adata_remove.obs_names))
     adata = adata[~adata.obs['predicted_doublet'], :].copy()
