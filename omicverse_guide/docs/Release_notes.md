@@ -235,5 +235,20 @@ update `conda install omicverse -c conda-forge`
 - change `mode` arguement of `pp.preprocess`, normalize|HVGs：We use | to control the preprocessing step, | before for the normalisation step, either `shiftlog` or `pearson`, and | after for the highly variable gene calculation step, either `pearson` or `seurat`. Our default is `shiftlog|pearson`.
 - add `ov.utils.embedding`,`ov.utils.neighbors`, and `ov.utils.stacking_vol`
 
+## v 1.4.14
+
+### preprocess module
+
+- add `batch_key` in `pp.preprocess` and `pp.qc`
+
+### utils module
+
+- add `plot_ConvexHull` to visualize the boundary of clusters
+- add `weighted_knn_trainer` and `weighted_knn_transfer` for multi adata integrate
+  
+### single module
+
+- fix the error of import of `mofa` 
+
 
 
