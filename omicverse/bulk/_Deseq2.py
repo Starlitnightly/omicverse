@@ -481,9 +481,9 @@ class pyDEG(object):
             clinical_df['condition']=['Treatment']*len(group1)+['Control']*len(group2)
             dds = DeseqDataSet(
                 counts=counts_df,
-                clinical=clinical_df,
+                metadata=clinical_df,
                 design_factors="condition",  # compare samples based on the "condition"
-                ref_level=["condition", "Control"],
+                #ref_level=["condition", "Control"],
                 # column ("B" vs "A")
                 refit_cooks=True,
                 n_cpus=n_cpus,
