@@ -476,18 +476,34 @@ class pyDEG(object):
             self.result=result
             return result
         elif method=='DEseq2':
+            import pydeseq2
             counts_df=self.data[group1+group2].T
             clinical_df=pd.DataFrame(index=group1+group2)
             clinical_df['condition']=['Treatment']*len(group1)+['Control']*len(group2)
-            dds = DeseqDataSet(
-                counts=counts_df,
-                metadata=clinical_df,
-                design_factors="condition",  # compare samples based on the "condition"
-                #ref_level=["condition", "Control"],
-                # column ("B" vs "A")
-                refit_cooks=True,
-                n_cpus=n_cpus,
-            )
+
+            #Determining the version of pydeseq2 smaller than 0.4
+            if pydeseq2.__version__<='0.3.5':
+                dds = DeseqDataSet(
+                    counts=counts_df,
+                    clinical=clinical_df,
+                    design_factors="condition",  # compare samples based on the "condition"
+                    ref_level=["condition", "Control"],
+                    # column ("B" vs "A")
+                    refit_cooks=True,
+                    n_cpus=n_cpus,
+                )
+            else:
+                dds = DeseqDataSet(
+                    counts=counts_df,
+                    metadata=clinical_df,
+                    design_factors="condition",  # compare samples based on the "condition"
+                    #ref_level=["condition", "Control"],
+                    # column ("B" vs "A")
+                    refit_cooks=True,
+                    n_cpus=n_cpus,
+                )
+
+            
             dds.fit_size_factors()
             dds.fit_genewise_dispersions()
             dds.fit_dispersion_trend()
