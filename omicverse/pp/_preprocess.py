@@ -374,7 +374,6 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             target_sum=target_sum,
             exclude_highly_expressed=True,
             max_fraction=0.2,
-            batch_key=batch_key,
         )
         sc.pp.log1p(adata)
     elif method_list[0] == 'pearson':
