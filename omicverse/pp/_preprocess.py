@@ -339,7 +339,7 @@ from sklearn.cluster import KMeans
 
 
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
-    organism='human', no_cc=False):
+    organism='human', no_cc=False,batch_key=None):
     """
     Preprocesses the AnnData object adata using either a scanpy or a pearson residuals workflow for size normalization
     and highly variable genes (HVGs) selection, and calculates signature scores if necessary. 
@@ -361,7 +361,6 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
 
     # Log-normalization, HVGs identification
     print('Begin robust gene identification')
-    adata.raw = adata.copy()
     identify_robust_genes(adata, percent_cells=0.05)
     adata = adata[:, adata.var['robust']]
     print(f'End of robust gene identification.')
@@ -374,7 +373,8 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             adata, 
             target_sum=target_sum,
             exclude_highly_expressed=True,
-            max_fraction=0.2
+            max_fraction=0.2,
+            batch_key=batch_key,
         )
         sc.pp.log1p(adata)
     elif method_list[0] == 'pearson':
@@ -387,6 +387,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             flavor="pearson_residuals",
             layer='counts',
             n_top_genes=n_HVGs,
+            batch_key=batch_key,
         )
         if no_cc:
             remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
@@ -396,6 +397,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             flavor="seurat_v3",
             layer='counts',
             n_top_genes=n_HVGs,
+            batch_key=batch_key,
         )
         if no_cc:
             remove_cc_genes(adata, organism=organism, corr_threshold=0.1)

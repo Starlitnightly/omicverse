@@ -9,3 +9,4 @@ from ._plot import *
 from ._mde import *
 from ._syn import *
 from ._scatterplot import *
+from ._knn import *

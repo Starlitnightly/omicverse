@@ -7,6 +7,8 @@ import scanpy as sc
 import networkx as nx
 import pandas as pd
 import anndata
+from sklearn.cluster import KMeans
+from scipy.spatial import ConvexHull
 
 sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
  '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
@@ -734,3 +736,45 @@ def stacking_vol(data_dict:dict,color_dict:dict,
         adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
             
     return fig,axes
+
+
+def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
+                    hull_cluster:str,ax,color=None,alpha:float=0.2):
+    """
+    Plot the ConvexHull for a cluster in embedding
+
+    Arguments:
+        adata: AnnData object
+        basis: embedding method in adata.obsm
+        cluster_key: cluster key in adata.obs
+        hull_cluster: cluster to plot for ConvexHull
+        ax: axes
+        color: color for ConvexHull
+        alpha: alpha for ConvexHull
+
+    Returns:
+        ax: axes
+    
+    """
+    
+    adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
+    if '{}_colors'.format(cluster_key) in adata.uns.keys():
+        print('{}_colors'.format(cluster_key))
+        type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns['{}_colors'.format(cluster_key)]))
+    else:
+        if len(adata.obs[cluster_key].cat.categories)>28:
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.default_102))
+        else:
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
+    
+    #color_dict=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns[f'{cluster_key}_colors']))
+    points=adata[adata.obs[cluster_key]==hull_cluster].obsm[basis]
+    hull = ConvexHull(points)
+    vert = np.append(hull.vertices, hull.vertices[0])  # close the polygon by appending the first point at the end
+    if color==None:
+        ax.plot(points[vert, 0], points[vert, 1], '--', c=type_color_all[hull_cluster])
+        ax.fill(points[vert, 0], points[vert, 1], c=type_color_all[hull_cluster], alpha=alpha)
+    else:
+        ax.plot(points[vert, 0], points[vert, 1], '--', c=color)
+        ax.fill(points[vert, 0], points[vert, 1], c=color, alpha=alpha)
+    return ax
