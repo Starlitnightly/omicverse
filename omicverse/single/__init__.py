@@ -13,3 +13,4 @@ from ._via import pyVIA,scRNA_hematopoiesis
 from ._simba import pySIMBA
 from ._tosica import pyTOSICA
 from ._atac import atac_concat_get_index,atac_concat_inner,atac_concat_outer
+from ._batch import batch_correction
