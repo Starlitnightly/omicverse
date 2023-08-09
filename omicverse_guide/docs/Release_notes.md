@@ -250,5 +250,20 @@ update `conda install omicverse -c conda-forge`
 
 - fix the error of import of `mofa` 
 
+## v 1.4.17
+
+### bulk module
+
+- fix the compatibility of `pydeseq2` while version is `0.4.0`
+- add `bulk.batch_correction` for multi bulk RNA-seq/microarray sample
+
+### single module
+
+- add `single.batch_correction` for multi single cell datasets
+
+### preprocess module
+
+- add parameter `layers_add` in `pp.scale`
+
 
 

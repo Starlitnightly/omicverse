@@ -57,6 +57,9 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [15] [GLUE](https://github.com/gao-lab/GLUE) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-022-01284-4)
 - [16] [MetaTiME](https://github.com/yi-zhang/MetaTiME) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-38333-8)
 - [17] [TOSICA](https://github.com/JackieHanLab/TOSICA) was originally published in [*Nature Communications*](https://doi.org/10.1038/s41467-023-35923-4)
+- [18] [Harmony](https://github.com/slowkow/harmonypy/) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-019-0619-0)
+- [19] [Scanorama](https://github.com/brianhie/scanorama) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-019-0113-3)
+- [20] [Combat](https://github.com/epigenelabs/pyComBat/) was originally published in [*biorxiv*](https://doi.org/10.1101/2020.03.17.995431)
 
 
 ## Included Package not published or preprint

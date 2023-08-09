@@ -5,6 +5,7 @@
 ## Contents
 
 - [Tutorial-Bulk](../Tutorials-bulk):
+    - [Batch correction in Bulk RNA-seq or microarray data](../Tutorials-bulk/t_bulk_combat)
     - [Different expression analysis](../Tutorials-bulk/t_deg)
     - [Different expression analysis with DEseq2](../Tutorials-bulk/t_deseq2)
     - [Protein-Protein interaction (PPI) analysis by String-db](../Tutorials-bulk/t_network/)
