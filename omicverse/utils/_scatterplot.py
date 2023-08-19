@@ -2,6 +2,7 @@ import collections.abc as cabc
 from copy import copy
 from numbers import Integral
 from itertools import combinations, product
+import matplotlib
 from typing import (
     Collection,
     Union,
@@ -155,8 +156,14 @@ def embedding(
             raise ValueError("Cannot specify both `color_map` and `cmap`.")
         else:
             cmap = color_map
-    cmap = copy(colormaps.get_cmap(cmap))
-    cmap.set_bad(na_color)
+    if matplotlib.__version__ < "3.7.0":
+        cmap = copy(colormaps.get_cmap(cmap))
+        cmap.set_bad(na_color)
+    else:
+        cmap = copy(matplotlib.colormaps[cmap])
+        cmap.set_bad(na_color)
+
+    
     kwargs["cmap"] = cmap
     # Prevents warnings during legend creation
     na_color = colors.to_hex(na_color, keep_alpha=True)
