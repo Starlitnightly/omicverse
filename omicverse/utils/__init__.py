@@ -10,3 +10,4 @@ from ._mde import *
 from ._syn import *
 from ._scatterplot import *
 from ._knn import *
+from ._heatmap import *
