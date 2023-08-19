@@ -9,6 +9,7 @@ import pandas as pd
 import anndata
 from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
+import seaborn as sns
 
 sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
  '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
@@ -493,7 +494,7 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
     
     """
 
-
+    adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
     cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
     if '{}_colors'.format(celltype_key) in adata.uns.keys():
         cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories.tolist(),
@@ -778,3 +779,187 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
         ax.plot(points[vert, 0], points[vert, 1], '--', c=color)
         ax.fill(points[vert, 0], points[vert, 1], c=color, alpha=alpha)
     return ax
+
+
+
+
+
+class geneset_wordcloud(object):
+
+    def __init__(self,adata,cluster_key,pseudotime,resolution=1000,figsize=(4,10)):
+        self.adata=adata
+        self.cluster_key=cluster_key
+        self.pseudotime=pseudotime
+        self.figsize=figsize
+        self.resolution=resolution
+
+    def get(self,):
+        from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+        #Get the DataFrame of anndata
+        test_df=self.adata.to_df()
+        
+        #Calculate the mean of each cluster
+        ct_pd=pd.DataFrame(columns=test_df.columns)
+        for ct in self.adata.obs[self.cluster_key].unique():
+            ct_pd.loc[ct]=test_df.loc[self.adata.obs.loc[self.adata.obs[self.cluster_key]==ct].index].mean(axis=0)
+    
+        # 遍历每个基因，找到最高表达的细胞类型
+        max_expr_cell_types = []
+        for gene in ct_pd.columns:
+            max_expr_cell_type = ct_pd[gene].idxmax()
+            max_expr_cell_types.append((gene, max_expr_cell_type))
+        
+        # 将结果转换为数据框
+        result_df = pd.DataFrame(max_expr_cell_types, columns=['Gene', 'Max_Expression_Cell_Type'])
+    
+        
+        size_dict=dict(result_df['Max_Expression_Cell_Type'].value_counts()/result_df.shape[0])
+
+        self.adata.obs[self.cluster_key]=self.adata.obs[self.cluster_key].astype('category')
+        if '{}_colors'.format(self.cluster_key) in self.adata.uns.keys():
+            cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories.tolist(),
+                            self.adata.uns['{}_colors'.format(self.cluster_key)]))
+        else:
+            if len(self.adata.obs[self.cluster_key].cat.categories)>28:
+                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories,sc.pl.palettes.default_102))
+            else:
+                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
+
+
+        wc_dict={}
+        for ct in self.adata.obs[self.cluster_key].unique():
+            #print(ct)
+            word_li=result_df.loc[result_df['Max_Expression_Cell_Type']==ct,'Gene'].values.tolist()
+            print(ct,100*self.figsize[0],
+                  int(100*size_dict[ct]*self.figsize[1]))
+            wc = WordCloud(background_color="#FFFFFF",min_font_size=12,max_font_size=700, max_words=30,
+                           width=100*self.figsize[0],
+                           height=int(100*size_dict[ct]*self.figsize[1]),
+                           contour_width=3, contour_color='firebrick')
+            # 生成词云
+            wc.generate(''.join([i.split(' (')[0] for i in word_li]))
+            wc_dict[ct]=wc
+
+        self.wc_dict=wc_dict.copy()
+        self.size_dict=size_dict
+        self.result_df=result_df
+        self.color_dict=cell_color_dict
+        return wc_dict
+
+    def get_geneset(self):
+        return self.result_df
+
+    def get_wordcloud(self):
+        return self.wc_dict
+
+    def plot(self):
+        fig = plt.figure(figsize=self.figsize)
+        grid = plt.GridSpec(self.resolution, 10)
+        
+        import matplotlib.colors as mcolors
+        
+        last_idx=0
+        
+        for idx,ct in zip(range(len(self.adata.obs[self.cluster_key].unique())),
+                          self.adata.obs.groupby(self.cluster_key)[self.pseudotime].mean().sort_values().index):
+            next_idx=last_idx+self.size_dict[ct]
+            print(ct,round(last_idx*self.resolution),round(next_idx*self.resolution))
+            ax=fig.add_subplot(grid[round(last_idx*self.resolution):round(next_idx*self.resolution), :])      # 占据第二行的前两列
+        
+            colors=['#FFFFFF',self.color_dict[ct]]
+            xcmap = mcolors.LinearSegmentedColormap.from_list('test_cmap', colors, N=100)
+            
+            ax.imshow(self.wc_dict[ct].recolor(colormap=xcmap), interpolation='bilinear')
+            last_idx+=self.size_dict[ct]
+            #ax.grid(False)
+            if idx!=0:
+                ax.axhline(y=0, c="#000000")
+            ax.axis(False)
+            # 绘制边框
+            ax.spines['top'].set_visible(True)
+            ax.spines['bottom'].set_visible(True)
+            ax.spines['left'].set_visible(True)
+            ax.spines['right'].set_visible(True)
+
+        return fig
+    def plot_heatmap(self,n_convolve=10,figwidth=10,cmap='RdBu_r',
+                     cbar=False,cbar_kws=None,cbar_fontsize=12):
+        if cbar_kws==None:
+            cbar_kws={'shrink':0.5,'location':'left'}
+
+        fig = plt.figure(figsize=(figwidth,self.figsize[1]))
+        grid = plt.GridSpec(self.resolution, 10)
+        
+        import matplotlib.colors as mcolors
+        
+        last_idx=0
+        
+        for idx,ct in zip(range(len(self.adata.obs[self.cluster_key].unique())),
+                          self.adata.obs.groupby(self.cluster_key)[self.pseudotime].mean().sort_values().index):
+            next_idx=last_idx+self.size_dict[ct]
+            #print(ct,round(last_idx*self.resolution),round(next_idx*self.resolution))
+            ax=fig.add_subplot(grid[round(last_idx*self.resolution):round(next_idx*self.resolution), figwidth-self.figsize[0]:])      # 占据第二行的前两列
+        
+            colors=['#FFFFFF',self.color_dict[ct]]
+            xcmap = mcolors.LinearSegmentedColormap.from_list('test_cmap', colors, N=100)
+            
+            ax.imshow(self.wc_dict[ct].recolor(colormap=xcmap), interpolation='bilinear')
+            last_idx+=self.size_dict[ct]
+            #ax.grid(False)
+            if idx!=0:
+                ax.axhline(y=0, c="#000000")
+            ax.axis(False)
+            # 绘制边框
+            ax.spines['top'].set_visible(True)
+            ax.spines['bottom'].set_visible(True)
+            ax.spines['left'].set_visible(True)
+            ax.spines['right'].set_visible(True)
+
+
+        #sort time
+        time = self.adata.obs[self.pseudotime].values
+        time = time[np.isfinite(time)]
+        
+        from scipy.sparse import issparse
+        X = self.adata.X
+        if issparse(X):
+            X = X.A
+        df = pd.DataFrame(X[np.argsort(time)], columns=self.adata.var_names)
+
+        #convolve
+        
+        if n_convolve is not None:
+            weights = np.ones(n_convolve) / n_convolve
+            for gene in self.adata.var_names:
+                # TODO: Handle exception properly
+                try:
+                    df[gene] = np.convolve(df[gene].values, weights, mode="same")
+                except ValueError as e:
+                    print(f"Skipping variable {gene}: {e}")
+        max_sort = np.argsort(np.argmax(df.values, axis=0))
+        df = pd.DataFrame(df.values[:, max_sort], columns=df.columns[max_sort])
+
+        from sklearn.preprocessing import MinMaxScaler
+        
+        scaler = MinMaxScaler()
+        normalized_data = scaler.fit_transform(df)
+        
+        ax2=fig.add_subplot(grid[:, :figwidth-self.figsize[0]])
+        sns.heatmap(normalized_data.T,cmap=cmap,ax=ax2,cbar=cbar,cbar_kws=cbar_kws)
+        # use matplotlib.colorbar.Colorbar object
+        if cbar!=False:
+            cbar1 = ax2.collections[0].colorbar
+            # here set the labelsize by 20
+            cbar1.ax.tick_params(labelsize=cbar_fontsize)
+        #ax2.imshow(normalized_data.T,cmap='RdBu_r',)
+        ax2.grid(False)
+        ax2.axis(False)
+        
+        #ax3=fig.add_subplot(grid[:10, :8])
+        # 添加类别可视化（以不同颜色的矩形表示）
+        category_colors = self.adata.obs[self.cluster_key].map(self.color_dict).values[np.argsort(time)]
+        for i, color in enumerate(category_colors):
+            rect = plt.Rectangle((i, 0), 2, 2, color=color)
+            ax2.add_patch(rect)
+
+        return fig

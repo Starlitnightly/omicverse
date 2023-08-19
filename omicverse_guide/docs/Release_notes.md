@@ -265,5 +265,20 @@ update `conda install omicverse -c conda-forge`
 
 - add parameter `layers_add` in `pp.scale`
 
+## v 1.5.0
+
+### single module
+
+- add `cellfategenie` to calculate the timing-associated genes/genesets
+- fix the name error of `atac_concat_outer`
+- add more kwargs of `batch_correction`
+
+### utils module
+
+- add `plot_heatmap` to visualize the heatmap of pseudotime
+- fix the `embedding` when the version of mpl larger than 3.7.0
+- add `geneset_wordcloud` to visualize the genesets heatmap of pseudotime
+- 
+
 
 

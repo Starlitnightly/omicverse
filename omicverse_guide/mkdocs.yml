@@ -23,6 +23,8 @@ nav:
         - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
         - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
         - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
+        - Timing-associated genes analysis with cellfategenie: Tutorials-single/t_cellfate_gene.ipynb
+        - Timing-associated genesets analysis with cellfategenie: Tutorials-single/t_cellfate_genesets.ipynb
         - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
         - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
         - Batch Correction with SIMBA: Tutorials-single/t_simba.ipynb
