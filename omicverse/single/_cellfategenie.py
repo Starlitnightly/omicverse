@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import scanpy as sc
 import anndata 
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 
 
 
@@ -69,9 +70,35 @@ class cellfategenie(object):
 
         self.coef=res_pd_ievt
         return res_pd_ievt
+    
+    def atac_init(self,columns,gene_name='neargene'):
+        """
+        Initialize the atac model
+
+        if you want to use atac data to fit the model, you should use this function first
+
+        Arguments:
+            columns: list, the columns of atac data
+            gene_name: str, the column name of gene name in adata.var
+        
+        """
+        self.atac_gene_name=gene_name
+        self.peak_pd=self.adata.var[columns].copy()
+
+    #peak_pd=adata.var[['peaktype','neargene']].copy()
+    def get_related_peak(self,peak):
+        """
+        Get the related peak of gene
+
+        Arguments:
+            peak: str, the peak name
+        
+        """
+        related_genes=self.peak_pd.loc[peak,self.atac_gene_name].unique()
+        return self.peak_pd.loc[self.peak_pd[self.atac_gene_name].isin(related_genes)].index.tolist()
 
     def ATR(self,test_size:float=0.4,random_state:int=112,
-            alpha:float=0.1,stop:int=100)->pd.DataFrame:
+            alpha:float=0.1,stop:int=100,flux=0.01,related=False)->pd.DataFrame:
         """
         Adaptive Threshold Regression
 
@@ -80,6 +107,8 @@ class cellfategenie(object):
             random_state: int, random seed
             alpha: float, the regularization strength of Ridge regression
             stop: int, the maximum number of iterations
+            flux: float, the flux of r2
+            related: bool, whether to use the related peak if you use atac data
 
         Returns:
             res_pd: pd.DataFrame, the result of ridge model
@@ -92,6 +121,9 @@ class cellfategenie(object):
         for i in self.coef['abs(coef)'].values[1:]:
             coef_threshold_li.append(i)
             train_idx=self.coef.loc[self.coef['abs(coef)']>i].index.values
+            if related == True:
+                train_idx=self.get_related_peak(train_idx)
+
             adata_t=self.adata[:,train_idx]
 
             X = adata_t.to_df()
@@ -119,7 +151,7 @@ class cellfategenie(object):
         res_pd['r2']=r2_li
 
         for i in res_pd.index:
-            if res_pd.loc[i,'r2']>=self.raw_r2:
+            if res_pd.loc[i,'r2']>=self.raw_r2-flux:
                 self.coef_threshold=res_pd.loc[i,'coef_threshold']
                 print("coef_threshold:{}, r2:{}".format(res_pd.loc[i,'coef_threshold'],res_pd.loc[i,'r2']))
                 break
@@ -128,7 +160,8 @@ class cellfategenie(object):
         return res_pd
 
     def model_fit(self,test_size:float=0.3,
-                   random_state:int=112,alpha:float=0.1)->pd.DataFrame:
+                   random_state:int=112,
+                   alpha:float=0.1,related=False)->pd.DataFrame:
         """
         Fit the model
 
@@ -142,6 +175,8 @@ class cellfategenie(object):
         
         """
         train_idx=self.coef.loc[self.coef['abs(coef)']>self.coef_threshold].index.values
+        if related == True:
+            train_idx=self.get_related_peak(train_idx)
         adata_t=self.adata[:,train_idx]
         X = adata_t.to_df()
         y = adata_t.obs.loc[:,self.pseudotime]
@@ -368,7 +403,7 @@ class cellfategenie(object):
     
     def plot_color_fitting(self,type:str='raw',cluster_key:str='clusters',
                      figsize:tuple=(3,3),color:str='#6BBBA0',
-                    fontsize:int=12,legend_loc:list=[0.2,0.1,0])->tuple:
+                    fontsize:int=12,legend_loc:list=[0.2,0.1,0],omics='RNA')->tuple:
         """
         Plot the colorful of clusters fitting result
 
@@ -379,6 +414,7 @@ class cellfategenie(object):
             color: str, the color of scatter
             fontsize: int, the size of text
             legend_loc: list, the location of r2,mae,mse
+            omics: str, the type of omics
 
         Returns:
             fig: matplotlib.pyplot.figure, the figure of fitting result
@@ -453,24 +489,39 @@ class cellfategenie(object):
         ax.text(1,legend_loc[2],'$MAE={:.2}$'.format(mae),fontsize=fontsize+1,horizontalalignment='right')
 
         if type=='filter':
-            ax.set_title(f'Regression Genes\nDimension: {self.filter_coef.shape[0]}',
+            ax.set_title(f'Regression {omics}\nDimension: {self.filter_coef.shape[0]}',
                          fontsize=fontsize+1)
         elif type=='raw':
-            ax.set_title(f'Regression Genes\nDimension: {self.coef.shape[0]}',
+            ax.set_title(f'Regression {omics}\nDimension: {self.coef.shape[0]}',
                          fontsize=fontsize+1)
         return fig,ax
 
-    
-from sklearn.preprocessing import MinMaxScaler
+
 class gene_trends(object):
 
     def __init__(self,adata,pseudotime,var_names):
+        """
+        Initialize the gene_trends analysis based on pseudotime
+
+        Arguments:
+            adata: AnnData object
+            pseudotime: str, the column name of pseudotime in adata.obs
+            var_names: list, the list of gene name to calculate
+        
+        """
         self.adata=adata
         self.pseudotime=pseudotime
         self.var_names=var_names
 
 
     def calculate(self,n_convolve=None):
+        """
+        Calculate the trends of gene with pseudotime
+
+        Arguments:
+            n_convolve: int, the number of convolve to smooth the trends
+        
+        """
         import numpy as np
         from scipy.spatial.distance import euclidean
         
@@ -490,6 +541,7 @@ class gene_trends(object):
             X = X.A
         df = pd.DataFrame(X[np.argsort(time)], columns=var_names)
         
+
         if n_convolve is not None:
             weights = np.ones(n_convolve) / n_convolve
             for gene in var_names:
@@ -504,6 +556,7 @@ class gene_trends(object):
         df = pd.DataFrame(df.values[:, max_sort], columns=df.columns[max_sort])
         scaler = MinMaxScaler()
         normalized_data = scaler.fit_transform(df)
+        self.normalized_pd=pd.DataFrame(normalized_data,columns=df.columns,index=adata.obs[pseudotime].sort_values().index)
         self.normalized_data=normalized_data
         from statsmodels.tsa.stattools import adfuller
     
@@ -528,19 +581,239 @@ class gene_trends(object):
         self.lr=linregress(range(len(max_avg_li)),np.array(max_avg_li))
 
     def get_heatmap(self):
+        """
+        Get the data of heatmap of trends
+        
+        """
         return self.normalized_data
     
     def get_kendalltau(self):
+        """
+        Get the kendalltau of trends
+        
+        """
         return self.kt
     
     def get_linregress(self):
+        """
+        Get the linregress of trends
+        
+        """
         return self.lr
     
+    def cal_border_cell(self,adata:anndata.AnnData,
+                        pseudotime:str,cluster_key:str,
+                        threshold:float=0.1):
+        """
+        Calculate the border cell of each cluster
+
+        Arguments:
+            adata: AnnData object
+            pseudotime: str, the column name of pseudotime in adata.obs
+            cluster_key: str, the column name of cluster in adata.obs
+            threshold: float, the threshold of border cell
+        
+        """
+        adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
+        adata.obs['border']=False
+        adata.obs['border_type']='normal'
+        for cluster in adata.obs[cluster_key].cat.categories:
+            cluster_obs=adata.obs.loc[adata.obs[cluster_key]==cluster,:]
+            pseudotime_min=np.min(adata.obs.loc[adata.obs[cluster_key]==cluster,pseudotime])
+            pseudotime_max=np.max(adata.obs.loc[adata.obs[cluster_key]==cluster,pseudotime])
+            ## set smaller than 10% and larger than 90% as border cells
+            border_idx=cluster_obs.loc[(cluster_obs[pseudotime]<pseudotime_min+threshold*(pseudotime_max-pseudotime_min))|
+                                        (cluster_obs[pseudotime]>pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
+            adata.obs.loc[border_idx,'border']=True
+
+            low_border_idx=cluster_obs.loc[(cluster_obs[pseudotime]<pseudotime_min+threshold*(pseudotime_max-pseudotime_min)),:].index
+            high_border_idx=cluster_obs.loc[(cluster_obs[pseudotime]>pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
+            adata.obs.loc[low_border_idx,'border_type']='low'
+            adata.obs.loc[high_border_idx,'border_type']='high'
+        print("adding ['border','border_type'] annotation to adata.obs")
+    
+    def get_border_gene(self,adata:anndata.AnnData,
+                        cluster_key:str,cluster1:str,cluster2:str,
+                        num_gene:int=10,threshold=None):
+        """
+        Get the border gene between two clusters
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            cluster1: str, the name of cluster1
+            cluster2: str, the name of cluster2
+            num_gene: int, the number of border gene
+            threshold: float, the threshold of border gene
+
+        Returns:
+            border_gene: list, the list of border gene
+        
+        """
+        if threshold is None:
+            threshold=self.normalized_pd.mean().mean()
+        cluster1_mean=np.mean(adata.obs.loc[adata.obs[cluster_key]==cluster1,self.pseudotime])
+        cluster2_mean=np.mean(adata.obs.loc[adata.obs[cluster_key]==cluster2,self.pseudotime])
+        if cluster1_mean>cluster2_mean:
+            cluster1,cluster2=cluster2,cluster1
+        max_cell_idx=adata.obs[(adata.obs[cluster_key]==cluster1)&(adata.obs['border_type']=='high')].index.tolist()
+        min_cell_idx=adata.obs[(adata.obs[cluster_key]==cluster2)&(adata.obs['border_type']=='low')].index.tolist()
+        #cell_idx=adata.obs[(adata.obs[cluster_key].isin([cluster1,cluster2])&(adata.obs['border']==True))].index
+        data=self.normalized_pd.loc[min_cell_idx+max_cell_idx,:]
+        #border_gene=data.mean().sort_values(ascending=False).index[:num_gene]
+        # border_gene must larger than threshold
+        border_gene=data.mean()[data.mean()>threshold].sort_values(ascending=False).index[:num_gene]
+        return border_gene
+        
+    def get_multi_border_gene(self,adata:anndata.AnnData,
+                        cluster_key:str,
+                        num_gene:int=10,threshold=None):
+        """
+        Get the border gene between two clusters for all clusters
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            num_gene: int, the number of border gene
+            threshold: float, the threshold of border gene
+
+        Returns:
+            border_gene_dict: dict, the dict of border gene
+        
+        """
+        border_gene_dict={}
+        for cluster1 in adata.obs[cluster_key].cat.categories:
+            for cluster2 in adata.obs[cluster_key].cat.categories:
+                if f"{cluster2}_{cluster1}" in border_gene_dict.keys():
+                    continue
+                else:
+                    if cluster1!=cluster2:
+                        border_gene_dict[cluster1+'_'+cluster2]=self.get_border_gene(adata,
+                            cluster_key,cluster1,cluster2,
+                            num_gene=num_gene,threshold=threshold)
+        return border_gene_dict
+    
+    def get_special_border_gene(self, adata:anndata.AnnData,
+                                cluster_key:str,cluster1:str,cluster2:str,):
+        """
+        Get the special border gene between two clusters
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            cluster1: str, the name of cluster1
+            cluster2: str, the name of cluster2
+
+        Returns:
+            border_gene: list, the list of border gene
+        
+        """
+        # the border gene can't appear in other cluster
+        border_gene_dict=self.get_multi_border_gene(adata,cluster_key,num_gene=10)
+        cluster_name=f"{cluster1}_{cluster2}"
+        if cluster_name not in border_gene_dict.keys():
+            cluster_name=f"{cluster2}_{cluster1}"
+
+        border_genes=border_gene_dict[cluster_name]
+        for cluster in border_gene_dict.keys():
+            if (cluster!=cluster1+'_'+cluster2)&(cluster!=cluster2+'_'+cluster1):
+                for border_gene in border_gene_dict[cluster]:
+                    if border_gene in border_genes:
+                        border_genes=border_genes.drop(border_gene)
+        return border_genes
+    
+    def get_kernel_gene(self,adata:anndata.AnnData,cluster_key:str,cluster:str,
+                        num_gene:int=10,threshold=None):
+        """
+        Get the kernel gene of cluster
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            cluster: str, the name of cluster
+            num_gene: int, the number of kernel gene
+            threshold: float, the threshold of kernel gene
+
+        Returns:
+            kernel_gene: list, the list of kernel gene
+        
+        """
+        if threshold is None:
+            threshold=self.normalized_pd.mean().mean()
+        cell_idx=adata.obs[(adata.obs[cluster_key].isin([cluster])&(adata.obs['border']==False))].index
+        data=self.normalized_pd.loc[cell_idx,:]
+        #border_gene=data.mean().sort_values(ascending=False).index[:num_gene]
+        # border_gene must larger than threshold
+        border_gene=data.mean()[data.mean()>threshold].sort_values(ascending=False).index[:num_gene]
+        return border_gene
+    
+    def get_multi_kernel_gene(self,adata:anndata.AnnData,
+                        cluster_key:str,num_gene:int=10,threshold=None):
+        """
+        Get the kernel gene of cluster for all clusters
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            num_gene: int, the number of kernel gene
+            threshold: float, the threshold of kernel gene
+
+        Returns:
+            kernel_gene_dict: dict, the dict of kernel gene
+        
+        """
+        kernel_gene_dict={}
+        for cluster in adata.obs[cluster_key].cat.categories:
+            kernel_gene_dict[cluster]=self.get_kernel_gene(adata,
+                            cluster_key,cluster,
+                            num_gene=num_gene,threshold=threshold)
+            
+        return kernel_gene_dict
+    
+    def get_special_kernel_gene(self, adata:anndata.AnnData,
+                                cluster_key:str,cluster:str,num_gene:int=10,):
+        """
+        Get the special kernel gene of cluster
+
+        Arguments:
+            adata: AnnData object
+            cluster_key: str, the column name of cluster in adata.obs
+            cluster: str, the name of cluster
+            num_gene: int, the number of kernel gene
+
+        Returns:
+            kernel_gene: list, the list of kernel gene
+        """
+        # the border gene can't appear in other cluster
+        kernel_gene_dict=self.get_multi_kernel_gene(adata,cluster_key,num_gene=num_gene)
+        kernel_genes=kernel_gene_dict[cluster]
+        for cluster in kernel_gene_dict.keys():
+            if cluster!=cluster:
+                for kernel_gene in kernel_gene_dict[cluster]:
+                    if kernel_gene in kernel_genes:
+                        kernel_genes=kernel_genes.drop(kernel_gene)
+        return kernel_genes
 
 
-    def plot_trend(self,figsize=(3,3),max_threshold=0.8,
-                   color='#a51616',xlabel='pseudotime',
-                  ylabel='Genes',fontsize=12):
+    def plot_trend(self,figsize:tuple=(3,3),max_threshold:float=0.8,
+                   color:str='#a51616',xlabel:str='pseudotime',
+                  ylabel:str='Genes',fontsize:int=12):
+        """
+        Plot the trends of gene with pseudotime
+
+        Arguments:
+            figsize: tuple, the size of figure
+            max_threshold: float, the threshold of max value
+            color: str, the color of scatter
+            xlabel: str, the label of x axis
+            ylabel: str, the label of y axis
+            fontsize: int, the size of text
+
+        Returns:
+            fig: matplotlib.pyplot.figure, the figure of trends
+            ax: matplotlib.pyplot.axis, the axis of trends
+        
+        """
         fig, ax = plt.subplots(figsize=figsize)
         # 执行Cox-Stuart检验
         max_avg_li=[]
