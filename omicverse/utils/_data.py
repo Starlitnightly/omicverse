@@ -584,3 +584,12 @@ def retrieve_layers(adata,layers='counts'):
     adata.X=adata_test.X.copy()
     print('......The layers {} of adata have been retreved'.format(layers))
     del adata_test
+
+
+class easter_egg(object):
+
+    def __init__(self,):
+        print('Easter egg is ready to be hatched!')
+
+    def O(self):
+        print('尊嘟假嘟')
