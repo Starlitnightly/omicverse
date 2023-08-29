@@ -13,3 +13,4 @@ genesets
 temp
 result_simba
 enrichr
+.pytest*
