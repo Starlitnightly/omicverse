@@ -16,22 +16,28 @@ nav:
         - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
-        - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
-        - Data integration and batch correction with SIMBA: Tutorials-single/t_single_batch.ipynb
-        - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
-        - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
-        - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
-        - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
-        - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
-        - Timing-associated genes analysis with cellfategenie: Tutorials-single/t_cellfate_gene.ipynb
-        - Timing-associated genesets analysis with cellfategenie: Tutorials-single/t_cellfate_genesets.ipynb
-        - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
-        - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
-        - Batch Correction with SIMBA: Tutorials-single/t_simba.ipynb
-        - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
-        - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
-        - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
-        - Multi omics analysis by MOFA and GLUE: Tutorials-single/t_mofa_glue.ipynb
+        - Preprocessing:
+            - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
+            - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
+        - Annotation: 
+            - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
+            - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
+            - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
+        - Trajectory:
+            - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
+            - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
+            - Timing-associated genes analysis with cellfategenie: Tutorials-single/t_cellfate_gene.ipynb
+            - Timing-associated genesets analysis with cellfategenie: Tutorials-single/t_cellfate_genesets.ipynb
+        - Cell Structure:
+            - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
+            - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
+            - Batch Correction with SIMBA: Tutorials-single/t_simba.ipynb
+            - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb
+            - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
+        - Multi omics: 
+            - Multi omics analysis by MOFA: Tutorials-single/t_mofa.ipynb
+            - Multi omics analysis by MOFA and GLUE: Tutorials-single/t_mofa_glue.ipynb
+            - Celltype annotation transfer in multi-omics: Tutorials-single/t_anno_trans.ipynb
     - Bulk2Single:
         - Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq: Tutorials-bulk2single/t_bulktrajblend.ipynb
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb

@@ -555,6 +555,7 @@ def store_layers(adata,layers='counts'):
                                            obs=pd.DataFrame(index=adata.obs.index),
                                           var=pd.DataFrame(index=adata.var.index),)
     print('......The X of adata have been stored in {}'.format(layers))
+
 def retrieve_layers(adata,layers='counts'):
     """
     Retrieve the X of adata from adata.uns['layers_{}'.format(layers)]

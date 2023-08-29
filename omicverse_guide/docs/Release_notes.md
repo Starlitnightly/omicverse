@@ -278,7 +278,12 @@ update `conda install omicverse -c conda-forge`
 - add `plot_heatmap` to visualize the heatmap of pseudotime
 - fix the `embedding` when the version of mpl larger than 3.7.0
 - add `geneset_wordcloud` to visualize the genesets heatmap of pseudotime
-- 
+
+## v 1.5.1
+
+### single module
+
+- add `scLTNN` to infer the cell trajectory
 
 
 
