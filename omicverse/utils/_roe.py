@@ -45,9 +45,8 @@ def roe(
         adata.uns['unsig_roe_results'] = roe_ratio
 
 
-
-
-def plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value: float = 1.0, color_scheme: str = 'cool',
+def roe_plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value: float = 1.0,
+                     color_scheme: str = 'cool',
                  custom_colors: list = None, save_path: str = None, batch_order: list = None):
     # 检查是否有显著的结果
     if 'sig_roe_results' in adata.uns:
