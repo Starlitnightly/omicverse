@@ -11,3 +11,4 @@ from ._syn import *
 from ._scatterplot import *
 from ._knn import *
 from ._heatmap import *
+from ._roe import *
