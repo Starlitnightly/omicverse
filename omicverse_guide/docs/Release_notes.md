@@ -285,5 +285,9 @@ update `conda install omicverse -c conda-forge`
 
 - add `scLTNN` to infer the cell trajectory
 
+### utils module
+
+- add `Ro/e` calculated (by:Haihao Zhang)
+
 
 

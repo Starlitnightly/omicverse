@@ -15,18 +15,34 @@ def roe(
         pval_threshold: float = 0.05,
         expected_value_threshold: float = 5,
         order="F"
-):
-    # 创建交叉表
+) -> pd.DataFrame:
+    """
+    Calculate the ratio of observed cell number to expected cell number (Ro/e) for each cell type in each sample.
+
+    Arguments:
+        adata: AnnData object.
+        sample_key: Key for sample information in adata.obs.
+        cell_type_key: Key for cell type information in adata.obs.
+        pval_threshold: Threshold for p-value. Default: 0.05.
+        expected_value_threshold: Threshold for expected value. Default: 5.
+        order: Order of columns in the contingency table. Default: "F".
+
+    Returns:
+        Ro/e: results in a DataFrame.
+    
+    """
+    
+    # Create a contingency table
     num_cell = pd.crosstab(index=adata.obs[cell_type_key], columns=adata.obs[sample_key])
     num_cell.index.name = "cluster"
-    # 如果需要，按给定顺序重新排序列
+    # If necessary, reorder columns based on the given order
     if order != "F":
         col_order = order.split(',')
         num_cell = num_cell[col_order]
-    # 进行卡方检验
+    # Perform chi-square test
     chi2, p, dof, expected = chi2_contingency(num_cell)
-    print(f"卡方值为{chi2}，自由度为{dof}，p值为{p}")
-    # 检查p值
+    print(f"chi2: {chi2}, dof: {dof}, pvalue: {p}")
+    # Check p-value
     if p <= pval_threshold:
         if all(item > expected_value_threshold for item in expected.flatten()):
             expected_data = pd.DataFrame(expected, index=num_cell.index, columns=num_cell.columns)
@@ -43,6 +59,12 @@ def roe(
         print("P-value is greater than 0.05, there is no statistical significance")
         roe_ratio = num_cell / expected
         adata.uns['unsig_roe_results'] = roe_ratio
+
+    if 'sig_roe_results' in adata.uns:
+        return adata.uns['sig_roe_results']
+    else:
+        return adata.uns['unsig_roe_results']
+
 
 
 def roe_plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value: float = 1.0,
@@ -103,7 +125,7 @@ def transform_roe_values(roe):
     # 将roe DataFrame转换为字符串格式，用于标注
     transformed_roe = roe.copy()
     transformed_roe = transformed_roe.applymap(
-        lambda x: '+++' if x >= 3 else ('++' if x >= 1.5 else ('+' if x >= 1 else '±')))
+        lambda x: '+++' if x >= 2 else ('++' if x >= 1.5 else ('+' if x >= 1 else '+/-')))
     return transformed_roe
 
 # roe(adata, sample_key='batch', cell_type_key='celltypist_cell_label_coarse')
