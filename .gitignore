@@ -14,3 +14,4 @@ temp
 result_simba
 enrichr
 .pytest*
+.idea/
