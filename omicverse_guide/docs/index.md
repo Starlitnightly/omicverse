@@ -1,5 +1,6 @@
 # Welcome to Omicverse’s documentation!
 
+![Image title](img/omicverse.png)
 
 <div class="result" markdown>
 
