@@ -10,7 +10,9 @@ The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/
 
 BulkTrajBlend algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of “interrupted” cells in the original scRNA-seq data.
 
-![omicverse](omicverse_guide/docs/img/omicverse.png)
+![omicverse-light](omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
+![omicverse-dark](omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
+
 
 ## Directory structure
 
