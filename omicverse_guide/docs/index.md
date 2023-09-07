@@ -1,6 +1,8 @@
 # Welcome to Omicverse’s documentation!
 
-![Image title](img/omicverse.png)
+![omicverse-light](img/omicverse.png#gh-light-mode-only)
+![omicverse-dark](img/omicverse_dark.png#gh-dark-mode-only)
+
 
 <div class="result" markdown>
 
