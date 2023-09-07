@@ -114,6 +114,21 @@ pip install -U omicverse
 conda install pytorch::pytorch torchvision torchaudio -c pytorch
 ```
 
+## Jupyter-lab
+
+For the best interactive analysis experience, we highly recommend installing jupyter-lab so that you can interactively edit the code and get the analysis results and visualizations right away.
+
+```shell
+pip install jupyter-lab
+```
+
+After you have finished the installation, in your terminal (note that you must be in the omicverse environment, not the base environment), type `jupyter-lab`, a URL will appear, we can open this URL in the browser to start our analysis journey!
+
+![jupyter](img/jupyter.jpg)
+
+![jupyter-light](img/light_jupyter.jpg#gh-light-mode-only)
+![jupyter-dark](img/dark_jupyter.jpg#gh-dark-mode-only)
+
 ## Development
 
 For development - clone this repo and run:
