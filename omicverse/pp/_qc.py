@@ -111,7 +111,7 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         sc.external.pp.scrublet(adata, random_state=1234)
         adata_remove = adata[adata.obs['predicted_doublet'], :]
         removed_cells.extend(list(adata_remove.obs_names))
-        adata = adata[~adata.obs['predicted_doublet'], :].copy()
+        adata = adata[~adata.obs['predicted_doublet'], :]
         n1 = adata.shape[0]
         print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
         print(f'End of post doublets removal and QC plots.')
@@ -147,7 +147,7 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         removed = QC_test.loc[lambda x : x == False]
         removed_cells.extend(list(removed.index.values))
         print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): {n1-np.sum(QC_test)}')
-        adata = adata[QC_test, :].copy()
+        adata = adata[QC_test, :]
         n2 = adata.shape[0]
             
 
@@ -232,7 +232,7 @@ def qc(adata:anndata.AnnData, mode='seurat',
     sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
     adata_remove = adata[adata.obs['predicted_doublet'], :]
     removed_cells.extend(list(adata_remove.obs_names))
-    adata = adata[~adata.obs['predicted_doublet'], :].copy()
+    adata = adata[~adata.obs['predicted_doublet'], :]
     n1 = adata.shape[0]
     print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
     print(f'End of post doublets removal and QC plots.')
@@ -268,7 +268,7 @@ def qc(adata:anndata.AnnData, mode='seurat',
     removed = QC_test.loc[lambda x : x == False]
     removed_cells.extend(list(removed.index.values))
     print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): {n1-np.sum(QC_test)}')
-    adata = adata[QC_test, :].copy()
+    adata = adata[QC_test, :]
     n2 = adata.shape[0]
         
 
