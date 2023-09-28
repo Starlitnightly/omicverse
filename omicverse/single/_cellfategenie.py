@@ -120,7 +120,7 @@ class cellfategenie(object):
         k=0
         for i in self.coef['abs(coef)'].values[1:]:
             coef_threshold_li.append(i)
-            train_idx=self.coef.loc[self.coef['abs(coef)']>i].index.values
+            train_idx=self.coef.loc[self.coef['abs(coef)']>=i].index.values
             if related == True:
                 train_idx=self.get_related_peak(train_idx)
 
@@ -174,7 +174,7 @@ class cellfategenie(object):
             res_pd_ievt: pd.DataFrame, the result of ridge model
         
         """
-        train_idx=self.coef.loc[self.coef['abs(coef)']>self.coef_threshold].index.values
+        train_idx=self.coef.loc[self.coef['abs(coef)']>=self.coef_threshold].index.values
         if related == True:
             train_idx=self.get_related_peak(train_idx)
         adata_t=self.adata[:,train_idx]
@@ -623,11 +623,11 @@ class gene_trends(object):
             pseudotime_max=np.max(adata.obs.loc[adata.obs[cluster_key]==cluster,pseudotime])
             ## set smaller than 10% and larger than 90% as border cells
             border_idx=cluster_obs.loc[(cluster_obs[pseudotime]<pseudotime_min+threshold*(pseudotime_max-pseudotime_min))|
-                                        (cluster_obs[pseudotime]>pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
+                                        (cluster_obs[pseudotime]>=pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
             adata.obs.loc[border_idx,'border']=True
 
             low_border_idx=cluster_obs.loc[(cluster_obs[pseudotime]<pseudotime_min+threshold*(pseudotime_max-pseudotime_min)),:].index
-            high_border_idx=cluster_obs.loc[(cluster_obs[pseudotime]>pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
+            high_border_idx=cluster_obs.loc[(cluster_obs[pseudotime]>=pseudotime_max-threshold*(pseudotime_max-pseudotime_min)),:].index
             adata.obs.loc[low_border_idx,'border_type']='low'
             adata.obs.loc[high_border_idx,'border_type']='high'
         print("adding ['border','border_type'] annotation to adata.obs")
@@ -662,7 +662,7 @@ class gene_trends(object):
         data=self.normalized_pd.loc[min_cell_idx+max_cell_idx,:]
         #border_gene=data.mean().sort_values(ascending=False).index[:num_gene]
         # border_gene must larger than threshold
-        border_gene=data.mean()[data.mean()>threshold].sort_values(ascending=False).index[:num_gene]
+        border_gene=data.mean()[data.mean()>=threshold].sort_values(ascending=False).index[:num_gene]
         return border_gene
         
     def get_multi_border_gene(self,adata:anndata.AnnData,
@@ -744,7 +744,7 @@ class gene_trends(object):
         data=self.normalized_pd.loc[cell_idx,:]
         #border_gene=data.mean().sort_values(ascending=False).index[:num_gene]
         # border_gene must larger than threshold
-        border_gene=data.mean()[data.mean()>threshold].sort_values(ascending=False).index[:num_gene]
+        border_gene=data.mean()[data.mean()>=threshold].sort_values(ascending=False).index[:num_gene]
         return border_gene
     
     def get_multi_kernel_gene(self,adata:anndata.AnnData,
@@ -819,7 +819,7 @@ class gene_trends(object):
         max_avg_li=[]
         for data_array in self.normalized_data:
             # 找到值大于 0.8 的元素的索引
-            indices = np.where(data_array > np.max(data_array)*max_threshold)
+            indices = np.where(data_array >= np.max(data_array)*max_threshold)
             
             # 计算索引的平均值
             average_index = np.mean(indices)
