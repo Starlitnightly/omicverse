@@ -17,7 +17,8 @@ class BulkTrajBlend(object):
 
     """
 
-    def __init__(self,bulk_seq:pd.DataFrame,single_seq:anndata.AnnData,celltype_key:str,
+    def __init__(self,bulk_seq:pd.DataFrame,single_seq:anndata.AnnData,
+                 celltype_key:str,bulk_group=None,
                  top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0) -> None:
         """
         Initialize the BulkTrajBlend class
@@ -38,6 +39,7 @@ class BulkTrajBlend(object):
         self.top_marker_num=top_marker_num
         self.ratio_num=ratio_num
         self.gpu=gpu
+        self.group=bulk_group
         if gpu=='mps' and torch.backends.mps.is_available():
             print('Note that mps may loss will be nan, used it when torch is supported')
             self.used_device = torch.device("mps")
@@ -50,7 +52,7 @@ class BulkTrajBlend(object):
         self.bulk_seq_group=data_dg
         pass
 
-    def bulk_preprocess_lazy(self,group=None)->None:
+    def bulk_preprocess_lazy(self,)->None:
         """
         Preprocess the bulk data
 
@@ -65,10 +67,10 @@ class BulkTrajBlend(object):
         print("......log10 the bulk data")
         self.bulk_seq=np.log10(self.bulk_seq+1)
         print("......calculate the mean of each group")
-        if group is None:
+        if self.group is None:
             return None
         else:
-            data_dg_v=self.bulk_seq[group].mean(axis=1)
+            data_dg_v=self.bulk_seq[self.group].mean(axis=1)
             data_dg=pd.DataFrame(index=data_dg_v.index)
             data_dg['group']=data_dg_v
             self.bulk_seq_group=data_dg
@@ -89,7 +91,7 @@ class BulkTrajBlend(object):
         sc.pp.log1p(self.single_seq)
         return None
     
-    def vae_configure(self,cell_target_num:int=100,):
+    def vae_configure(self,cell_target_num=None,**kwargs):
         """
         Configure the vae model
 
@@ -98,11 +100,20 @@ class BulkTrajBlend(object):
 
         
         """
-        self.vae_model=Bulk2Single(bulk_data=self.bulk_seq_group,single_data=self.single_seq,
-                                   celltype_key=self.celltype_key,
+        self.vae_model=Bulk2Single(bulk_data=self.bulk_seq,single_data=self.single_seq,
+                                   celltype_key=self.celltype_key,bulk_group=self.group,
                  top_marker_num=self.top_marker_num,ratio_num=self.ratio_num,gpu=self.gpu)
-        self.vae_model.cell_target_num=dict(zip(self.vae_model.cell_target_num.keys(),
-                                                [cell_target_num]*len(self.vae_model.cell_target_num.keys())))
+        if cell_target_num!=None:
+            self.vae_model.cell_target_num=dict(zip(list(set(self.single_seq.obs[self.celltype_key])),
+                                                [cell_target_num]*len(list(set(self.single_seq.obs[self.celltype_key])))))
+        else:
+            self.vae_model.predicted_fraction(*kwargs)
+        
+        self.vae_model.bulk_preprocess_lazy()
+        self.vae_model.single_preprocess_lazy()
+        self.vae_model.prepare_input()
+
+        
 
     def vae_train(self,
                   vae_save_dir:str='save_model',
@@ -268,6 +279,7 @@ class BulkTrajBlend(object):
             res_pd: The overlap cell community.
         
         """
+        '''
         pair_dict_r={}
         for i in range(self.nocd_obj.K):
             j=0
@@ -283,6 +295,19 @@ class BulkTrajBlend(object):
                 else:
                     j+=1
         pair_dict_r
+        '''
+        unique_adata=self.nocd_obj.adata[~self.nocd_obj.adata.obs['nocd_n'].str.contains('-')]
+        pair_dict_r={}
+        repeat_celltype=dict(zip(list(set(unique_adata.obs[self.celltype_key])),np.zeros(len(list(set(unique_adata.obs[self.celltype_key]))))))
+        for nocd_class in list(set(unique_adata.obs['nocd_n'])):
+            now_celltype=unique_adata[unique_adata.obs['nocd_n']==nocd_class].obs.value_counts(self.celltype_key).index[0]
+            if (now_celltype in pair_dict_r.values()):
+                #print(now_celltype)
+                pair_dict_r[str(nocd_class)]=now_celltype+'_'+str(int(repeat_celltype[now_celltype]))
+                repeat_celltype[now_celltype]+=1
+            else:
+                pair_dict_r[str(nocd_class)]=now_celltype
+                repeat_celltype[now_celltype]+=1
 
         def li_range(li,max_len):
             r=[0]*max_len   

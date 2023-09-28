@@ -5,11 +5,13 @@ import anndata
 import matplotlib.pyplot as plt
 from ._utils import load_data, data_process,bulk2single_data_prepare
 from ._vae import train_vae, generate_vae, load_vae
+from ..bulk import data_drop_duplicates_index,deseq2_normalize
 #from .map_utils import create_data, DFRunner, joint_analysis, knn
 import os
 import warnings
 import matplotlib
 from typing import Union,Tuple
+import scanpy as sc
 warnings.filterwarnings("ignore")
 
 
@@ -18,7 +20,8 @@ class Bulk2Single:
     Bulk2Single class.
     
     """
-    def __init__(self,bulk_data:pd.DataFrame,single_data:anndata.AnnData,celltype_key:str,
+    def __init__(self,bulk_data:pd.DataFrame,single_data:anndata.AnnData,
+                 celltype_key:str,bulk_group=None,max_single_cells:int=5000,
                  top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0):
         """
         Initializes the Bulk2Single class.
@@ -34,15 +37,105 @@ class Bulk2Single:
         """
         self.bulk_data=bulk_data
         self.single_data=single_data
+        if self.single_data.shape[0]>max_single_cells:
+            print(f"......random select {max_single_cells} single cells")
+            import random
+            cell_idx=random.sample(self.single_data.obs.index.tolist(),max_single_cells)
+            self.single_data=self.single_data[cell_idx,:]
         self.celltype_key=celltype_key
-        self.input_data=bulk2single_data_prepare(bulk_data,single_data,celltype_key)
-        self.cell_target_num = data_process(self.input_data, top_marker_num, ratio_num)
+        self.bulk_group=bulk_group
+        self.input_data=None
+        #self.input_data=bulk2single_data_prepare(bulk_data,single_data,celltype_key)
+        #self.cell_target_num = data_process(self.input_data, top_marker_num, ratio_num)
+
+        test2=single_data.to_df()
+        sc_ref=pd.DataFrame(columns=test2.columns)
+        sc_ref_index=[]
+        for celltype in list(set(single_data.obs[celltype_key])):
+            sc_ref.loc[celltype]=single_data[single_data.obs[celltype_key]==celltype].to_df().sum()
+            sc_ref_index.append(celltype)
+        sc_ref.index=sc_ref_index
+        self.sc_ref=sc_ref
+
+
         if gpu=='mps' and torch.backends.mps.is_available():
             print('Note that mps may loss will be nan, used it when torch is supported')
             self.used_device = torch.device("mps")
         else:
             self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
         self.history=[]
+
+    def predicted_fraction(self,sep='\t', scaler='mms',
+                        datatype='counts', genelenfile=None,
+                        mode='overall', adaptive=True, variance_threshold=0.98,
+                        save_model_name=None,
+                        batch_size=128, epochs=128, seed=1,scale_size=2):
+        from ..tape import Deconvolution
+        sc_ref=self.sc_ref.copy()
+        SignatureMatrix, CellFractionPrediction = \
+            Deconvolution(sc_ref, self.bulk_data.T, sep=sep, scaler=scaler,
+                        datatype=datatype, genelenfile=genelenfile,
+                        mode=mode, adaptive=adaptive, variance_threshold=variance_threshold,
+                        save_model_name=save_model_name,
+                        batch_size=batch_size, epochs=epochs, seed=seed)
+        if self.bulk_group!=None:
+            cell_total_num=self.single_data.shape[0]*self.bulk_data[self.bulk_group].mean(axis=1).sum()/self.single_data.to_df().sum().sum()
+            print('Predicted Total Cell Num:',cell_total_num)
+            self.cell_target_num=dict(pd.Series(CellFractionPrediction.loc[self.bulk_group].mean()*cell_total_num*scale_size).astype(int))
+        
+        else:
+            cell_total_num=self.single_data.shape[0]*self.bulk_data.mean(axis=1).sum()/self.single_data.to_df().sum().sum()
+            print('Predicted Total Cell Num:',cell_total_num)
+            self.cell_target_num=dict(pd.Series(CellFractionPrediction.mean()*cell_total_num*scale_size).astype(int))
+        
+        return SignatureMatrix, CellFractionPrediction
+
+    def bulk_preprocess_lazy(self,)->None:
+        """
+        Preprocess the bulk data
+
+        Arguments:
+            group: The group of the bulk data. Default is None. It need to set to calculate the mean of each group.
+        """
+
+        print("......drop duplicates index in bulk data")
+        self.bulk_data=data_drop_duplicates_index(self.bulk_data)
+        print("......deseq2 normalize the bulk data")
+        self.bulk_data=deseq2_normalize(self.bulk_data)
+        print("......log10 the bulk data")
+        self.bulk_data=np.log10(self.bulk_data+1)
+        print("......calculate the mean of each group")
+        if self.bulk_group is None:
+            self.bulk_seq_group=self.bulk_data
+            return None
+        else:
+            data_dg_v=self.bulk_data[self.bulk_group].mean(axis=1)
+            data_dg=pd.DataFrame(index=data_dg_v.index)
+            data_dg['group']=data_dg_v
+            self.bulk_seq_group=data_dg
+        return None
+    
+    def single_preprocess_lazy(self,target_sum:int=1e4)->None:
+        """
+        Preprocess the single data
+
+        Arguments:
+            target_sum: The target sum of the normalize. Default is 1e4.
+
+        """
+
+        print("......normalize the single data")
+        sc.pp.normalize_total(self.single_data, target_sum=target_sum)
+        print("......log1p the single data")
+        sc.pp.log1p(self.single_data)
+        return None
+    
+    def prepare_input(self,):
+        print("......prepare the input of bulk2single")
+        self.input_data=bulk2single_data_prepare(self.bulk_seq_group,
+                                                 self.single_data,
+                                                 self.celltype_key)
+
 
     def train(self,
             vae_save_dir:str='save_model',
@@ -72,6 +165,8 @@ class Bulk2Single:
         Returns:
             vae_net: The trained VAE model.
         """
+        if self.input_data==None:
+            self.prepare_input()
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print('...begin vae training')
@@ -91,6 +186,10 @@ class Bulk2Single:
                 os.makedirs(vae_save_dir)
             torch.save(vae_net.state_dict(), path_save)
             print(f"...save trained vae in {path_save}.")
+            import pickle
+            #save cell_target_num
+            with open(os.path.join(vae_save_dir, f"{vae_save_name}_cell_target_num.pkl"), 'wb') as f:
+                pickle.dump(self.cell_target_num, f)
         self.vae_net=vae_net
         self.history=history
         return vae_net
@@ -119,6 +218,10 @@ class Bulk2Single:
         if not os.path.exists(vae_save_dir):
             os.makedirs(vae_save_dir)
         torch.save(self.vae_net.state_dict(), path_save)
+        import pickle
+        #save cell_target_num
+        with open(os.path.join(vae_save_dir, f"{vae_save_name}_cell_target_num.pkl"), 'wb') as f:
+            pickle.dump(self.cell_target_num, f)
         print(f"...save trained vae in {path_save}.")
     
     def generate(self)->anndata.AnnData:
@@ -139,6 +242,22 @@ class Bulk2Single:
         sc_g.obs[self.celltype_key] = generate_sc_meta.loc[sc_g.obs.index,'Cell_type'].values
         return sc_g
     
+    def load_fraction(self,fraction_path:str):
+        r"""
+        Load the predicted cell fraction.
+
+        Arguments:
+            fraction_path: The path of the predicted cell fraction.
+
+        Returns:
+            fraction: The predicted cell fraction.
+        """
+        #load cell_target_num
+        import pickle
+        with open(os.path.join(fraction_path), 'rb') as f:
+            self.cell_target_num = pickle.load(f)
+        
+    
     def load(self,vae_load_dir:str,hidden_size:int=256):
         r"""
         load the trained VAE model of Bulk2Single.
@@ -147,6 +266,7 @@ class Bulk2Single:
             vae_load_dir: The directory to load the trained VAE model.
             hidden_size: The hidden size for the encoder and decoder networks. Default is 256.
         """
+
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
         print(f'loading model from {vae_load_dir}')
@@ -181,6 +301,23 @@ class Bulk2Single:
         
         print('...generating done!')
         return sc_g
+    
+    def filtered(self,generate_adata,highly_variable_genes:bool=True,max_value:float=10,
+                     n_comps:int=100,svd_solver:str='auto',leiden_size:int=50):
+        generate_adata.raw = generate_adata
+        if highly_variable_genes:
+            sc.pp.highly_variable_genes(generate_adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+            generate_adata = generate_adata[:, generate_adata.var.highly_variable]
+        sc.pp.scale(generate_adata, max_value=max_value)
+        sc.tl.pca(generate_adata, n_comps=n_comps, svd_solver=svd_solver)
+        sc.pp.neighbors(generate_adata, use_rep="X_pca")
+        sc.tl.leiden(generate_adata)
+        filter_leiden=list(generate_adata.obs['leiden'].value_counts()[generate_adata.obs['leiden'].value_counts()<leiden_size].index)
+        print("The filter leiden is ",filter_leiden)
+        generate_adata=generate_adata[~generate_adata.obs['leiden'].isin(filter_leiden)]
+        self.generate_adata=generate_adata.copy()
+
+        return generate_adata
     
     def plot_loss(self,figsize:tuple=(4,4))->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         r"""

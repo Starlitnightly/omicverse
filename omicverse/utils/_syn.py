@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 import scipy
 from anndata import AnnData
-from scanpy import read
+#from scanpy import read
+import scanpy as sc
 
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,6 @@ def pancreas(file_path= "data/Pancreas/endocrinogenesis_day15.h5ad"):
     Returns `adata` object
     """
     url = f"{url_datadir}data/Pancreas/endocrinogenesis_day15.h5ad"
-    adata = read(file_path, backup_url=url, sparse=True, cache=True)
+    adata = sc.read(file_path, backup_url=url, sparse=True, cache=True)
     adata.var_names_make_unique()
     return adata

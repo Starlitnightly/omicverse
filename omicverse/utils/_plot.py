@@ -22,7 +22,7 @@ blue_color=['#347862','#6BBBA0','#81C0DD','#3E8CB1','#88C8D2','#52B3AD','#265B58
 
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
-def pyomic_plot_set(verbosity=3,dpi=80,facecolor='white'):
+def plot_set(verbosity=3,dpi=80,facecolor='white'):
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -328,6 +328,7 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     
     """
     
+
     fig, ax = plt.subplots(figsize=figsize)
     if pos_type=='spring':
         pos = nx.spring_layout(G, scale=pos_scale, k=pos_k)
