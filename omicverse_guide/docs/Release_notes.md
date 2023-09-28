@@ -285,9 +285,16 @@ update `conda install omicverse -c conda-forge`
 
 - add `scLTNN` to infer the cell trajectory
 
+### bulk2single module
+
+- Update the cell fraction prediction with `TAPE` in bulk2single
+- Fix the group and normalization in bulk2single
+
 ### utils module
 
 - add `Ro/e` calculated (by:Haihao Zhang)
+- add `cal_paga` and `plot_paga` to visualize the state transfer matrix
+- fix the `read` function 
 
 
 
