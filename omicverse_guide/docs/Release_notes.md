@@ -296,5 +296,11 @@ update `conda install omicverse -c conda-forge`
 - add `cal_paga` and `plot_paga` to visualize the state transfer matrix
 - fix the `read` function 
 
+## v 1.5.2
 
+### bulk2single module
+
+- Fix the matrix error when the symbol of genes not unique.
+- Fix the `interpolation` of BulkTrajBlend when the target cells not exist.
+- Fix the `generate` of BulkTrajBlend.
 

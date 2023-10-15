@@ -86,6 +86,8 @@ class BulkTrajBlend(object):
         """
 
         print("......normalize the single data")
+        self.single_seq.obs_names_make_unique()
+        self.single_seq.var_names_make_unique()
         sc.pp.normalize_total(self.single_seq, target_sum=target_sum)
         print("......log1p the single data")
         sc.pp.log1p(self.single_seq)
@@ -195,10 +197,11 @@ class BulkTrajBlend(object):
         sc.pp.neighbors(generate_adata, use_rep="X_pca")
         sc.tl.leiden(generate_adata)
         filter_leiden=list(generate_adata.obs['leiden'].value_counts()[generate_adata.obs['leiden'].value_counts()<leiden_size].index)
+        generate_adata.uns['noisy_leiden']=filter_leiden
         print("The filter leiden is ",filter_leiden)
         generate_adata=generate_adata[~generate_adata.obs['leiden'].isin(filter_leiden)]
         self.generate_adata=generate_adata.copy()
-        return generate_adata
+        return generate_adata.raw.to_adata()
     
     def gnn_configure(self,gpu=0,hidden_size:int=128,
                      weight_decay:int=1e-2,
@@ -335,8 +338,13 @@ class BulkTrajBlend(object):
         """
         if adata is None:
             adata=self.single_seq
-        adata1=anndata.concat([self.nocd_obj.adata[self.nocd_obj.adata.obs['nocd_{}'.format(celltype)]==1].raw.to_adata(),
-                      adata],merge='same')
+        test_adata=self.nocd_obj.adata[self.nocd_obj.adata.obs['nocd_{}'.format(celltype)]==1].raw.to_adata()
+        if test_adata.shape[0]!=0:
+            adata1=anndata.concat([test_adata,
+                        adata],merge='same')
+        else:
+            adata1=adata 
+            print("The cell type {} is not in the nocd result".format(celltype))
         return adata1
     
 
