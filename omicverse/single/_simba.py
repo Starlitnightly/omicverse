@@ -170,9 +170,14 @@ class pySIMBA(object):
             self.adata.uns['simba_Gen'][batch].obsm['X_simba']=self.adata.uns['simba_Gen'][batch].to_df().values
         
         # we choose the largest dataset as a reference
-        adata_all = si.tl.embed(adata_ref=dict_adata['C'],
-                            list_adata_query=[dict_adata['C{}'.format(key)] for key in range(2,len(dict_adata.keys()))],
-                            use_precomputed=use_precomputed)
+        batch_size_si = dict(zip(list(dict_adata.keys()),
+                            [dict_adata[i].shape[0] for i in dict_adata.keys()]))
+        adata_ref_si = dict_adata[max(batch_size_si, key=batch_size_si.get)]
+        dict_adata.pop(max(batch_size_si, key=batch_size_si.get))
+        list_adata_query = list(dict_adata.values())
+        adata_all = si.tl.embed(adata_ref = adata_ref_si,
+                            list_adata_query = list_adata_query,
+                            use_precomputed = use_precomputed)
         
         #all_adata=anndata.concat([adata.uns['simba_Gen'][batch] for batch in adata.uns['simba_Gen'].keys()],merge='same')
         cell_idx=adata_all.obs.index
