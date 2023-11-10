@@ -303,4 +303,8 @@ update `conda install omicverse -c conda-forge`
 - Fix the matrix error when the symbol of genes not unique.
 - Fix the `interpolation` of BulkTrajBlend when the target cells not exist.
 - Fix the `generate` of BulkTrajBlend.
+- Fix thhe arguement of `vae_configure` in BulkTrajBlend when cell_target_num is None
+- Add `max_single_cells` for BulkTrajBlend input
 
+### single module
+- Fix the error of pyVIA when root is None

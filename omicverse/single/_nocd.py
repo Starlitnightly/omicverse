@@ -79,7 +79,8 @@ class scnocd(object):
         
         self.N, self.K = self.Z_gt.shape
 
- 
+
+
     def matrix_normalize(self,cuda=False):
         if torch.cuda.is_available():
             cuda=True
