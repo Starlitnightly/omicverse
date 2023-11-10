@@ -1,6 +1,7 @@
 <h1 align="center">
 <img src="https://raw.githubusercontent.com/Starlitnightly/omicverse/master/README.assets/logo.png" width="400">
 </h1><br>
+
 [![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse)[![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse)[![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py38|py39/badge.svg)](https://github.com/Starlitnightly/omicverse/) 
 
 OmicVerse is the fundamental package for multi omics included bulk and single cell analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v1)
