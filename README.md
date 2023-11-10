@@ -1,8 +1,7 @@
 <h1 align="center">
 <img src="https://raw.githubusercontent.com/Starlitnightly/omicverse/master/README.assets/logo.png" width="400">
 </h1><br>
-
-[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![CodeQL](https://github.com/Starlitnightly/omicverse/workflows/CodeQL/badge.svg)](https://github.com/Starlitnightly/omicverse/workflows/CodeQL/badge.svg) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py38|py39/badge.svg)](https://github.com/Starlitnightly/omicverse/)
+[![Lifecycle:maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) [![bulid:passing](https://img.shields.io/appveyor/build/gruntjs/grunt)](https://img.shields.io/appveyor/build/gruntjs/grunt) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse)[![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse)[![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py38|py39/badge.svg)](https://github.com/Starlitnightly/omicverse/) 
 
 OmicVerse is the fundamental package for multi omics included bulk and single cell analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v1)
 
@@ -65,6 +64,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [19] [Scanorama](https://github.com/brianhie/scanorama) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-019-0113-3)
 - [20] [Combat](https://github.com/epigenelabs/pyComBat/) was originally published in [*biorxiv*](https://doi.org/10.1101/2020.03.17.995431)
 - [21] [TAPE](https://github.com/poseidonchan/TAPE) was originally published in [*Nature Communications*](https://doi.org/10.1038/s41467-022-34550-9)
+- [22] [SEACells](https://github.com/dpeerlab/SEACells) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-023-01716-9)
 
 
 ## Included Package not published or preprint
