@@ -246,3 +246,4 @@
 
 ### utils Module:
 - Introduced `plot_pca_variance_ratio` for visualizing the ratio of PCA variance.
+- Added the `cluster` and `filtered` module for clustering the cells
