@@ -113,8 +113,11 @@ class BulkTrajBlend(object):
             self.vae_model.cell_target_num=dict(zip(list(set(self.single_seq.obs[self.celltype_key])),
                                                 [cell_target_num]*len(list(set(self.single_seq.obs[self.celltype_key])))))
         else:
-            self.vae_model.predicted_fraction(**kwargs)
+            self.cellfract=self.vae_model.predicted_fraction(**kwargs)
         
+        self.sc_ref=self.vae_model.sc_ref.copy()
+        self.bulk_ref=self.vae_model.bulk_data.T.copy()
+
         self.vae_model.bulk_preprocess_lazy()
         self.vae_model.single_preprocess_lazy()
         self.vae_model.prepare_input()

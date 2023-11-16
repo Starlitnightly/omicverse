@@ -964,3 +964,25 @@ class geneset_wordcloud(object):
             ax2.add_patch(rect)
 
         return fig
+
+
+from scanpy.plotting._anndata import ranking
+from scanpy.plotting._utils import savefig_or_show
+def plot_pca_variance_ratio(
+    adata,
+    use_rep='scaled|original|pca_var_ratios',
+    n_pcs: int = 30,
+    log: bool = False,
+    show=None,
+    save=None,
+):
+    ranking(
+        adata,
+        "uns",
+        use_rep,
+        n_points=n_pcs,
+        #dictionary="pca",
+        labels="PC",
+        log=log,
+    )
+    savefig_or_show("pca_variance_ratio", show=show, save=save)
