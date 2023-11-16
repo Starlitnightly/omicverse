@@ -1,6 +1,7 @@
 import scanpy as sc
 import pandas as pd
 import anndata
+import numpy as np
 from ._cosg import cosg
 from ..palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
 from ..palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
@@ -12,12 +13,14 @@ class TrajInfer(object):
     
     def __init__(self,adata:anndata.AnnData,
                  basis:str='X_umap',use_rep:str='X_pca',n_comps:int=50,
+                 n_neighbors:int=15,
                 groupby:str='clusters',):
         self.adata=adata
         self.use_rep=use_rep
         self.n_comps=n_comps
         self.basis=basis
         self.groupby=groupby
+        self.n_neighbors=n_neighbors
         
         self.origin=None
         self.terminal=None
@@ -67,6 +70,19 @@ class TrajInfer(object):
             
             self.adata.obs['palantir_pseudotime']=pr_res.pseudotime
             return pr_res
+        elif method=='diffusion_map':
+            sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
+               use_rep=self.use_rep)
+            sc.tl.diffmap(self.adata)
+            sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, use_rep='X_diffmap')
+            sc.tl.draw_graph(self.adata)
+            self.adata.uns['iroot'] = np.flatnonzero(self.adata.obs[self.groupby]  == self.origin)[0]
+            sc.tl.dpt(self.adata)
+            sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
+               use_rep=self.use_rep)
+        else:
+            print('Please input the correct method name, such as `palantir` or `diffusion_map`')
+            return
         
     def palantir_plot_pseudotime(self,**kwargs):
 

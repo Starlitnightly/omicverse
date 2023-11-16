@@ -1,9 +1,11 @@
 # Tutorial of single cell RNA-seq 
 
 - [Preprocessing the data of scRNA-seq](t_preprocess)
+- [Clustering space](t_cluster)
 - [Data integration and batch correction](t_single_batch)
 - [Celltype auto annotation with SCSA](t_cellanno)
 - [Celltype auto annotation with MetaTiME](t_metatime)
+- [Trajectory Inference with PAGA or Palantir](t_traj)
 - [Trajectory Inference with VIA](t_via)
 - [Trajectory Inference with VIA and scVelo](t_via_velo)
 - [Timing-associated genes analysis with cellfategenie](t_cellfate_gene)

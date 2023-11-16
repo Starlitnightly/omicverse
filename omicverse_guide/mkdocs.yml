@@ -18,12 +18,14 @@ nav:
     - Single:
         - Preprocessing:
             - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
+            - Clustering space: Tutorials-single/t_cluster.ipynb
             - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
         - Annotation: 
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
             - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
             - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
         - Trajectory:
+            - Trajectory Inference with PAGA or Palantir: Tutorials-single/t_traj.ipynb
             - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
             - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
             - Timing-associated genes analysis with cellfategenie: Tutorials-single/t_cellfate_gene.ipynb

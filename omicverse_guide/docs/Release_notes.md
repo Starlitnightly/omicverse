@@ -241,9 +241,10 @@
 ### single Module:
 - Fixed an error in `pyVIA` when the root is set to None.
 - Added the `TrajInfer` module for inferring cell trajectories.
-- Integrated `Palantir` into the `TrajInfer` module.
+- Integrated `Palantir` and `Diffusion_map` into the `TrajInfer` module.
 - Corrected the parameter error in `batch_correction`.
 
 ### utils Module:
 - Introduced `plot_pca_variance_ratio` for visualizing the ratio of PCA variance.
 - Added the `cluster` and `filtered` module for clustering the cells
+- Integrated `MiRA` to calculate the LDA topic
