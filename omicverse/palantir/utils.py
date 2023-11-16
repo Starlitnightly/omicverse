@@ -8,7 +8,7 @@ import gc
 
 from scipy.sparse import csr_matrix, find, issparse, hstack
 from scipy.sparse.linalg import eigs
-import mellon
+#import mellon
 import scanpy as sc
 
 from .core import run_palantir
@@ -222,7 +222,7 @@ def run_density(
     # Set the default arguments for mellon.DensityEstimator
     mellon_args = dict()
     mellon_args.update(kwargs)
-
+    import mellon
     dest = mellon.DensityEstimator(**mellon_args)
     log_density = np.asarray(dest.fit_predict(X))
 
@@ -285,6 +285,7 @@ def run_density_evaluation(
         )
 
     X = out_ad.obsm[repr_key]
+    import mellon
     predictor = mellon.Predictor.from_dict(in_ad.uns[predictor_key])
     log_density = predictor(X)
     out_ad.obs[density_key] = log_density
