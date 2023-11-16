@@ -1,0 +1,1806 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href="../../../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.4.2, mkdocs-material-9.1.2" name="generator"/>
+<title>Api scsa - omicverse Readthedocs</title>
+<link href="../../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../../../css/custom.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../../../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#omicverse.single.pySCSA">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Api scsa
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Installation_guild/">
+        Installation
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_preprocess/">
+        Preprocessing the data of scRNA-seq with omicverse
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_via/">
+        Trajectory Inference with VIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_via_velo/">
+        Trajectory Inference with VIA and scVelo
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with cellfategenie
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate_genesets/">
+        Timing-associated geneset analysis with cellfategenie
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdeg/">
+        Differential expression analysis in single cell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellphonedb/">
+        Cell interaction with CellPhoneDB
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../">
+        API documentation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single.pySCSA">
+    pySCSA
+  </a>
+<nav aria-label="pySCSA" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.__init__">
+    __init__()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.cell_anno">
+    cell_anno()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.cell_anno_print">
+    cell_anno_print()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.cell_auto_anno">
+    cell_auto_anno()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.get_model_tissue">
+    get_model_tissue()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single._anno.pySCSA.get_celltype_marker">
+    get_celltype_marker()
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single.scanpy_lazy">
+    scanpy_lazy()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single.scanpy_cellanno_from_dict">
+    scanpy_cellanno_from_dict()
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.single.get_celltype_marker">
+    get_celltype_marker()
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1>Api scsa</h1>
+<div class="doc doc-object doc-class">
+<h2 class="doc doc-heading" id="omicverse.single.pySCSA">
+<code>omicverse.single.pySCSA</code>
+<a class="headerlink" href="#omicverse.single.pySCSA" title="Permanent link">¶</a></h2>
+<div class="doc doc-contents first">
+<p class="doc doc-class-bases">
+        Bases: <code>object</code></p>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="347 "></span><span class="k">class</span> <span class="nc">pySCSA</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="linenos" data-linenos="348 "></span>
+<span class="linenos" data-linenos="349 "></span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="350 "></span>                <span class="n">foldchange</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span><span class="n">pvalue</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+<span class="linenos" data-linenos="351 "></span>                <span class="n">output</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'temp/rna_anno.txt'</span><span class="p">,</span>
+<span class="linenos" data-linenos="352 "></span>                <span class="n">model_path</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">''</span><span class="p">,</span>
+<span class="linenos" data-linenos="353 "></span>                <span class="n">outfmt</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'txt'</span><span class="p">,</span><span class="n">Gensymbol</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="linenos" data-linenos="354 "></span>                <span class="n">species</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'Human'</span><span class="p">,</span><span class="n">weight</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">tissue</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'All'</span><span class="p">,</span><span class="n">target</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'cellmarker'</span><span class="p">,</span>
+<span class="linenos" data-linenos="355 "></span>                <span class="n">celltype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'normal'</span><span class="p">,</span><span class="n">norefdb</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">cellrange</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="356 "></span>                <span class="n">noprint</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">list_tissue</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="357 "></span>
+<span class="linenos" data-linenos="358 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Initialize the pySCSA class</span>
+<span class="linenos" data-linenos="359 "></span>
+<span class="linenos" data-linenos="360 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="361 "></span><span class="sd">            adata: AnnData object of scRNA-seq after preprocessing</span>
+<span class="linenos" data-linenos="362 "></span><span class="sd">            foldchange: Fold change threshold for marker filtering. (2.0)</span>
+<span class="linenos" data-linenos="363 "></span><span class="sd">            pvalue: P-value threshold for marker filtering. (0.05)</span>
+<span class="linenos" data-linenos="364 "></span><span class="sd">            output: Output file for marker annotation.(temp/rna_anno.txt)</span>
+<span class="linenos" data-linenos="365 "></span><span class="sd">            model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet.</span>
+<span class="linenos" data-linenos="366 "></span><span class="sd">            outfmt: Output format for marker annotation. (txt)</span>
+<span class="linenos" data-linenos="367 "></span><span class="sd">            Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation.</span>
+<span class="linenos" data-linenos="368 "></span><span class="sd">            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</span>
+<span class="linenos" data-linenos="369 "></span><span class="sd">            weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)</span>
+<span class="linenos" data-linenos="370 "></span><span class="sd">            tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')</span>
+<span class="linenos" data-linenos="371 "></span><span class="sd">            target: Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])</span>
+<span class="linenos" data-linenos="372 "></span><span class="sd">            celltype: Cell type for annotation. (normal,[cancer])</span>
+<span class="linenos" data-linenos="373 "></span><span class="sd">            norefdb: Only using user-defined marker database for annotation.</span>
+<span class="linenos" data-linenos="374 "></span><span class="sd">            noprint: Do not print any detail results.</span>
+<span class="linenos" data-linenos="375 "></span><span class="sd">            list_tissue: List all available tissues in the database.</span>
+<span class="linenos" data-linenos="376 "></span><span class="sd">            cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.)</span>
+<span class="linenos" data-linenos="377 "></span>
+<span class="linenos" data-linenos="378 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="379 "></span>
+<span class="linenos" data-linenos="380 "></span>        <span class="c1">#create temp directory</span>
+<span class="linenos" data-linenos="381 "></span>        <span class="k">try</span><span class="p">:</span>
+<span class="linenos" data-linenos="382 "></span>            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">):</span>
+<span class="linenos" data-linenos="383 "></span>                <span class="nb">print</span><span class="p">(</span><span class="s2">"...Creating directory </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">))</span>
+<span class="linenos" data-linenos="384 "></span>                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="linenos" data-linenos="385 "></span>        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<span class="linenos" data-linenos="386 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s2">"...Unable to create directory </span><span class="si">{}</span><span class="s2">. Reason </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">,</span><span class="n">e</span><span class="p">))</span>
+<span class="linenos" data-linenos="387 "></span>
+<span class="linenos" data-linenos="388 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
+<span class="linenos" data-linenos="389 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="o">=</span><span class="n">foldchange</span>
+<span class="linenos" data-linenos="390 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="o">=</span><span class="n">pvalue</span>
+<span class="linenos" data-linenos="391 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="o">=</span><span class="n">output</span>
+<span class="linenos" data-linenos="392 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="o">=</span><span class="n">outfmt</span>
+<span class="linenos" data-linenos="393 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="o">=</span><span class="n">Gensymbol</span>
+<span class="linenos" data-linenos="394 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="o">=</span><span class="n">species</span>
+<span class="linenos" data-linenos="395 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="o">=</span><span class="n">weight</span>
+<span class="linenos" data-linenos="396 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="o">=</span><span class="n">tissue</span>
+<span class="linenos" data-linenos="397 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="o">=</span><span class="n">celltype</span>
+<span class="linenos" data-linenos="398 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="o">=</span><span class="n">norefdb</span>
+<span class="linenos" data-linenos="399 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="o">=</span><span class="n">noprint</span>
+<span class="linenos" data-linenos="400 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="o">=</span><span class="n">list_tissue</span>
+<span class="linenos" data-linenos="401 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">=</span><span class="n">target</span>
+<span class="linenos" data-linenos="402 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="o">=</span><span class="n">cellrange</span>
+<span class="linenos" data-linenos="403 "></span>        <span class="k">if</span> <span class="n">model_path</span> <span class="o">==</span><span class="s1">''</span><span class="p">:</span>
+<span class="linenos" data-linenos="404 "></span>            <span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="o">=</span><span class="n">data_downloader</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s1">'https://figshare.com/ndownloader/files/41369037'</span><span class="p">,</span>
+<span class="linenos" data-linenos="405 "></span>                                            <span class="n">path</span><span class="o">=</span><span class="s1">'temp/pySCSA_2023_v2_plus.db'</span><span class="p">,</span><span class="n">title</span><span class="o">=</span><span class="s1">'whole'</span><span class="p">)</span>
+<span class="linenos" data-linenos="406 "></span>        <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="407 "></span>            <span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="o">=</span><span class="n">model_path</span>
+<span class="linenos" data-linenos="408 "></span>
+<span class="linenos" data-linenos="409 "></span>    <span class="k">def</span> <span class="nf">get_model_tissue</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">species</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">"Human"</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="410 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""List all available tissues in the database.</span>
+<span class="linenos" data-linenos="411 "></span>
+<span class="linenos" data-linenos="412 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="413 "></span><span class="sd">            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</span>
+<span class="linenos" data-linenos="414 "></span>
+<span class="linenos" data-linenos="415 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="416 "></span>
+<span class="linenos" data-linenos="417 "></span>        <span class="n">anno</span> <span class="o">=</span> <span class="n">Annotator</span><span class="p">(</span><span class="n">foldchange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="418 "></span>                    <span class="n">weight</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span>
+<span class="linenos" data-linenos="419 "></span>                    <span class="n">pvalue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="p">,</span>
+<span class="linenos" data-linenos="420 "></span>                    <span class="n">tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="421 "></span>                    <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+<span class="linenos" data-linenos="422 "></span>                    <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+<span class="linenos" data-linenos="423 "></span>                    <span class="n">norefdb</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="p">,</span>
+<span class="linenos" data-linenos="424 "></span>                    <span class="n">MarkerDB</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="425 "></span>                    <span class="n">db</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+<span class="linenos" data-linenos="426 "></span>                    <span class="n">noprint</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="p">,</span>
+<span class="linenos" data-linenos="427 "></span>                    <span class="nb">input</span><span class="o">=</span><span class="s2">"temp/rna.csv"</span><span class="p">,</span>
+<span class="linenos" data-linenos="428 "></span>                    <span class="n">output</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+<span class="linenos" data-linenos="429 "></span>                    <span class="n">source</span><span class="o">=</span><span class="s2">"scanpy"</span><span class="p">,</span>
+<span class="linenos" data-linenos="430 "></span>                    <span class="n">cluster</span><span class="o">=</span><span class="s1">'all'</span><span class="p">,</span>
+<span class="linenos" data-linenos="431 "></span>                    <span class="n">fc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="432 "></span>                    <span class="n">outfmt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="p">,</span>
+<span class="linenos" data-linenos="433 "></span>                    <span class="n">celltype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="p">,</span>
+<span class="linenos" data-linenos="434 "></span>                    <span class="n">Gensymbol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="p">,</span>
+<span class="linenos" data-linenos="435 "></span>                    <span class="n">list_tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="436 "></span>                    <span class="n">cellrange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="p">)</span>
+<span class="linenos" data-linenos="437 "></span>        <span class="n">anno</span><span class="o">.</span><span class="n">load_pickle_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">)</span>
+<span class="linenos" data-linenos="438 "></span>        <span class="n">anno</span><span class="o">.</span><span class="n">get_list_tissue</span><span class="p">(</span><span class="n">species</span><span class="p">)</span>
+<span class="linenos" data-linenos="439 "></span>
+<span class="linenos" data-linenos="440 "></span>
+<span class="linenos" data-linenos="441 "></span>    <span class="k">def</span> <span class="nf">cell_anno</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="442 "></span>                  <span class="n">cluster</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'all'</span><span class="p">,</span><span class="n">rank_rep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="linenos" data-linenos="443 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Annotate cell type for each cluster.</span>
+<span class="linenos" data-linenos="444 "></span>
+<span class="linenos" data-linenos="445 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="446 "></span><span class="sd">            clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="447 "></span><span class="sd">            cluster: Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])</span>
+<span class="linenos" data-linenos="448 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="449 "></span>
+<span class="linenos" data-linenos="450 "></span>        <span class="n">dat</span><span class="o">=</span><span class="n">data_preprocess</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span><span class="n">clustertype</span><span class="o">=</span><span class="n">clustertype</span><span class="p">,</span><span class="n">path</span><span class="o">=</span><span class="s1">'temp/rna.csv'</span><span class="p">,</span><span class="n">rank_rep</span><span class="o">=</span><span class="n">rank_rep</span><span class="p">)</span>
+<span class="linenos" data-linenos="451 "></span>        <span class="n">dat</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">'temp/rna.csv'</span><span class="p">)</span>
+<span class="linenos" data-linenos="452 "></span>
+<span class="linenos" data-linenos="453 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'...Auto annotate cell'</span><span class="p">)</span>
+<span class="linenos" data-linenos="454 "></span>
+<span class="linenos" data-linenos="455 "></span>        <span class="n">p</span> <span class="o">=</span> <span class="n">Process</span><span class="p">()</span>
+<span class="linenos" data-linenos="456 "></span>        <span class="n">p</span><span class="o">.</span><span class="n">run_cmd_p</span><span class="p">(</span><span class="n">foldchange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="457 "></span>                    <span class="n">weight</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span>
+<span class="linenos" data-linenos="458 "></span>                    <span class="n">pvalue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="p">,</span>
+<span class="linenos" data-linenos="459 "></span>                    <span class="n">tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="460 "></span>                    <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+<span class="linenos" data-linenos="461 "></span>                    <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+<span class="linenos" data-linenos="462 "></span>                    <span class="n">norefdb</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="p">,</span>
+<span class="linenos" data-linenos="463 "></span>                    <span class="n">MarkerDB</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="464 "></span>                    <span class="n">db</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+<span class="linenos" data-linenos="465 "></span>                    <span class="n">noprint</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="p">,</span>
+<span class="linenos" data-linenos="466 "></span>                    <span class="nb">input</span><span class="o">=</span><span class="s2">"temp/rna.csv"</span><span class="p">,</span>
+<span class="linenos" data-linenos="467 "></span>                    <span class="n">output</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+<span class="linenos" data-linenos="468 "></span>                    <span class="n">source</span><span class="o">=</span><span class="s2">"scanpy"</span><span class="p">,</span>
+<span class="linenos" data-linenos="469 "></span>                    <span class="n">cluster</span><span class="o">=</span><span class="n">cluster</span><span class="p">,</span>
+<span class="linenos" data-linenos="470 "></span>                    <span class="n">fc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="471 "></span>                    <span class="n">outfmt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="p">,</span>
+<span class="linenos" data-linenos="472 "></span>                    <span class="n">celltype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="p">,</span>
+<span class="linenos" data-linenos="473 "></span>                    <span class="n">Gensymbol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="p">,</span>
+<span class="linenos" data-linenos="474 "></span>                    <span class="n">list_tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="475 "></span>                    <span class="n">cellrange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="p">)</span>
+<span class="linenos" data-linenos="476 "></span>
+<span class="linenos" data-linenos="477 "></span>
+<span class="linenos" data-linenos="478 "></span>        <span class="n">result</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">'temp/rna_anno.txt'</span><span class="p">,</span><span class="n">sep</span><span class="o">=</span><span class="s1">'</span><span class="se">\t</span><span class="s1">'</span><span class="p">)</span>
+<span class="linenos" data-linenos="479 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">=</span><span class="n">result</span>
+<span class="linenos" data-linenos="480 "></span>        <span class="k">return</span> <span class="n">result</span>
+<span class="linenos" data-linenos="481 "></span>
+<span class="linenos" data-linenos="482 "></span>    <span class="k">def</span> <span class="nf">cell_anno_print</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="483 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""print the annotation result</span>
+<span class="linenos" data-linenos="484 "></span>
+<span class="linenos" data-linenos="485 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="486 "></span>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]):</span>
+<span class="linenos" data-linenos="487 "></span>            <span class="n">test</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">==</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+<span class="linenos" data-linenos="488 "></span>            <span class="k">if</span> <span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">&gt;</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">*</span><span class="mi">2</span><span class="p">:</span>
+<span class="linenos" data-linenos="489 "></span>                <span class="nb">print</span><span class="p">(</span><span class="s1">'Nice:Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Cell Type'</span><span class="p">],</span>
+<span class="linenos" data-linenos="490 "></span>                                                            <span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">],</span><span class="mi">3</span><span class="p">)))</span>
+<span class="linenos" data-linenos="491 "></span>            <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="492 "></span>                <span class="nb">print</span><span class="p">(</span><span class="s1">'Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,(</span><span class="s1">'|'</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">'Cell Type'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()),</span>
+<span class="linenos" data-linenos="493 "></span>                                                            <span class="p">(</span><span class="s1">'|'</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())))</span>
+<span class="linenos" data-linenos="494 "></span>
+<span class="linenos" data-linenos="495 "></span>    <span class="k">def</span> <span class="nf">cell_auto_anno</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="496 "></span>                       <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">'scsa_celltype'</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="497 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Add cell type annotation to anndata.obs['scsa_celltype']</span>
+<span class="linenos" data-linenos="498 "></span>
+<span class="linenos" data-linenos="499 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="500 "></span><span class="sd">            adata: anndata object</span>
+<span class="linenos" data-linenos="501 "></span><span class="sd">            clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="502 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="503 "></span>        <span class="n">test_li</span><span class="o">=</span><span class="p">[]</span>
+<span class="linenos" data-linenos="504 "></span>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+<span class="linenos" data-linenos="505 "></span>            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+<span class="linenos" data-linenos="506 "></span>                <span class="n">test_li</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">==</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Cell Type'</span><span class="p">])</span>
+<span class="linenos" data-linenos="507 "></span>            <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="508 "></span>                <span class="n">test_li</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'Unknown'</span><span class="p">)</span>
+<span class="linenos" data-linenos="509 "></span>        <span class="n">scsa_anno</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">],</span>
+<span class="linenos" data-linenos="510 "></span>            <span class="n">test_li</span><span class="p">))</span>
+<span class="linenos" data-linenos="511 "></span>        <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">scsa_anno</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">'category'</span><span class="p">)</span>
+<span class="linenos" data-linenos="512 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'...cell type added to </span><span class="si">{}</span><span class="s1"> on obs of anndata'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
+<span class="linenos" data-linenos="513 "></span>
+<span class="linenos" data-linenos="514 "></span>    <span class="k">def</span> <span class="nf">get_celltype_marker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="515 "></span>                            <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="516 "></span>                            <span class="n">log2fc_min</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">scores_type</span><span class="o">=</span><span class="s1">'scores'</span><span class="p">,</span>
+<span class="linenos" data-linenos="517 "></span>                            <span class="n">pval_cutoff</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span><span class="n">rank</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">-&gt;</span><span class="nb">dict</span><span class="p">:</span>
+<span class="linenos" data-linenos="518 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Get marker genes for each clusters.</span>
+<span class="linenos" data-linenos="519 "></span>
+<span class="linenos" data-linenos="520 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="521 "></span><span class="sd">            adata: anndata object</span>
+<span class="linenos" data-linenos="522 "></span><span class="sd">            clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="523 "></span><span class="sd">            log2fc_min: Minimum log2 fold change of marker genes. (2)</span>
+<span class="linenos" data-linenos="524 "></span><span class="sd">            pval_cutoff: Maximum p value of marker genes. (0.05)</span>
+<span class="linenos" data-linenos="525 "></span><span class="sd">            rank: Whether to rank genes by wilcoxon test. (True)</span>
+<span class="linenos" data-linenos="526 "></span><span class="sd">            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`</span>
+<span class="linenos" data-linenos="527 "></span>
+<span class="linenos" data-linenos="528 "></span><span class="sd">        Returns:</span>
+<span class="linenos" data-linenos="529 "></span><span class="sd">            cellmarker: A dictionary of marker genes for each clusters.</span>
+<span class="linenos" data-linenos="530 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="531 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'...get cell type marker'</span><span class="p">)</span>
+<span class="linenos" data-linenos="532 "></span>        <span class="n">cell_marker_dict</span><span class="o">=</span><span class="n">get_celltype_marker</span><span class="p">(</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span>
+<span class="linenos" data-linenos="533 "></span>                            <span class="n">clustertype</span><span class="o">=</span><span class="n">clustertype</span><span class="p">,</span>
+<span class="linenos" data-linenos="534 "></span>                            <span class="n">log2fc_min</span><span class="o">=</span><span class="n">log2fc_min</span><span class="p">,</span><span class="n">scores_type</span><span class="o">=</span><span class="n">scores_type</span><span class="p">,</span>
+<span class="linenos" data-linenos="535 "></span>                            <span class="n">pval_cutoff</span><span class="o">=</span><span class="n">pval_cutoff</span><span class="p">,</span><span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">)</span>
+<span class="linenos" data-linenos="536 "></span>
+<span class="linenos" data-linenos="537 "></span>        <span class="k">return</span> <span class="n">cell_marker_dict</span>
+</code></pre></div>
+</details>
+<div class="doc doc-children">
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.__init__">
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">foldchange</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">pvalue</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'temp/rna_anno.txt'</span><span class="p">,</span> <span class="n">model_path</span><span class="o">=</span><span class="s1">''</span><span class="p">,</span> <span class="n">outfmt</span><span class="o">=</span><span class="s1">'txt'</span><span class="p">,</span> <span class="n">Gensymbol</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">species</span><span class="o">=</span><span class="s1">'Human'</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">tissue</span><span class="o">=</span><span class="s1">'All'</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s1">'cellmarker'</span><span class="p">,</span> <span class="n">celltype</span><span class="o">=</span><span class="s1">'normal'</span><span class="p">,</span> <span class="n">norefdb</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cellrange</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">noprint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">list_tissue</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.__init__" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>Initialize the pySCSA class</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>AnnData object of scRNA-seq after preprocessing</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>foldchange</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>Fold change threshold for marker filtering. (2.0)</p></td>
+<td>
+<code>1.5</code>
+</td>
+</tr>
+<tr>
+<td><code>pvalue</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>P-value threshold for marker filtering. (0.05)</p></td>
+<td>
+<code>0.05</code>
+</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Output file for marker annotation.(temp/rna_anno.txt)</p></td>
+<td>
+<code>'temp/rna_anno.txt'</code>
+</td>
+</tr>
+<tr>
+<td><code>model_path</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Path to the Database for annotation. If not provided, the model will be downloaded from the internet.</p></td>
+<td>
+<code>''</code>
+</td>
+</tr>
+<tr>
+<td><code>outfmt</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Output format for marker annotation. (txt)</p></td>
+<td>
+<code>'txt'</code>
+</td>
+</tr>
+<tr>
+<td><code>Gensymbol</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>Using gene symbol ID instead of ensembl ID in input file for calculation.</p></td>
+<td>
+<code>True</code>
+</td>
+</tr>
+<tr>
+<td><code>species</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</p></td>
+<td>
+<code>'Human'</code>
+</td>
+</tr>
+<tr>
+<td><code>weight</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>Weight threshold for marker filtering from cellranger v1.0 results. (100)</p></td>
+<td>
+<code>100</code>
+</td>
+</tr>
+<tr>
+<td><code>tissue</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Tissue for annotation. you can use <code>get_model_tissue</code> to see the available tissues. ('All')</p></td>
+<td>
+<code>'All'</code>
+</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])</p></td>
+<td>
+<code>'cellmarker'</code>
+</td>
+</tr>
+<tr>
+<td><code>celltype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Cell type for annotation. (normal,[cancer])</p></td>
+<td>
+<code>'normal'</code>
+</td>
+</tr>
+<tr>
+<td><code>norefdb</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>Only using user-defined marker database for annotation.</p></td>
+<td>
+<code>False</code>
+</td>
+</tr>
+<tr>
+<td><code>noprint</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>Do not print any detail results.</p></td>
+<td>
+<code>True</code>
+</td>
+</tr>
+<tr>
+<td><code>list_tissue</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>List all available tissues in the database.</p></td>
+<td>
+<code>False</code>
+</td>
+</tr>
+<tr>
+<td><code>cellrange</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.)</p></td>
+<td>
+<code>None</code>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="349 "></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="350 "></span>            <span class="n">foldchange</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span><span class="n">pvalue</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+<span class="linenos" data-linenos="351 "></span>            <span class="n">output</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'temp/rna_anno.txt'</span><span class="p">,</span>
+<span class="linenos" data-linenos="352 "></span>            <span class="n">model_path</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">''</span><span class="p">,</span>
+<span class="linenos" data-linenos="353 "></span>            <span class="n">outfmt</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'txt'</span><span class="p">,</span><span class="n">Gensymbol</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="linenos" data-linenos="354 "></span>            <span class="n">species</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'Human'</span><span class="p">,</span><span class="n">weight</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">tissue</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'All'</span><span class="p">,</span><span class="n">target</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'cellmarker'</span><span class="p">,</span>
+<span class="linenos" data-linenos="355 "></span>            <span class="n">celltype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'normal'</span><span class="p">,</span><span class="n">norefdb</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">cellrange</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="356 "></span>            <span class="n">noprint</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">list_tissue</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="357 "></span>
+<span class="linenos" data-linenos="358 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Initialize the pySCSA class</span>
+<span class="linenos" data-linenos="359 "></span>
+<span class="linenos" data-linenos="360 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="361 "></span><span class="sd">        adata: AnnData object of scRNA-seq after preprocessing</span>
+<span class="linenos" data-linenos="362 "></span><span class="sd">        foldchange: Fold change threshold for marker filtering. (2.0)</span>
+<span class="linenos" data-linenos="363 "></span><span class="sd">        pvalue: P-value threshold for marker filtering. (0.05)</span>
+<span class="linenos" data-linenos="364 "></span><span class="sd">        output: Output file for marker annotation.(temp/rna_anno.txt)</span>
+<span class="linenos" data-linenos="365 "></span><span class="sd">        model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet.</span>
+<span class="linenos" data-linenos="366 "></span><span class="sd">        outfmt: Output format for marker annotation. (txt)</span>
+<span class="linenos" data-linenos="367 "></span><span class="sd">        Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation.</span>
+<span class="linenos" data-linenos="368 "></span><span class="sd">        species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</span>
+<span class="linenos" data-linenos="369 "></span><span class="sd">        weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)</span>
+<span class="linenos" data-linenos="370 "></span><span class="sd">        tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')</span>
+<span class="linenos" data-linenos="371 "></span><span class="sd">        target: Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])</span>
+<span class="linenos" data-linenos="372 "></span><span class="sd">        celltype: Cell type for annotation. (normal,[cancer])</span>
+<span class="linenos" data-linenos="373 "></span><span class="sd">        norefdb: Only using user-defined marker database for annotation.</span>
+<span class="linenos" data-linenos="374 "></span><span class="sd">        noprint: Do not print any detail results.</span>
+<span class="linenos" data-linenos="375 "></span><span class="sd">        list_tissue: List all available tissues in the database.</span>
+<span class="linenos" data-linenos="376 "></span><span class="sd">        cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.)</span>
+<span class="linenos" data-linenos="377 "></span>
+<span class="linenos" data-linenos="378 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="379 "></span>
+<span class="linenos" data-linenos="380 "></span>    <span class="c1">#create temp directory</span>
+<span class="linenos" data-linenos="381 "></span>    <span class="k">try</span><span class="p">:</span>
+<span class="linenos" data-linenos="382 "></span>        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">):</span>
+<span class="linenos" data-linenos="383 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s2">"...Creating directory </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">))</span>
+<span class="linenos" data-linenos="384 "></span>            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="linenos" data-linenos="385 "></span>    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<span class="linenos" data-linenos="386 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s2">"...Unable to create directory </span><span class="si">{}</span><span class="s2">. Reason </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">'temp'</span><span class="p">,</span><span class="n">e</span><span class="p">))</span>
+<span class="linenos" data-linenos="387 "></span>
+<span class="linenos" data-linenos="388 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
+<span class="linenos" data-linenos="389 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="o">=</span><span class="n">foldchange</span>
+<span class="linenos" data-linenos="390 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="o">=</span><span class="n">pvalue</span>
+<span class="linenos" data-linenos="391 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="o">=</span><span class="n">output</span>
+<span class="linenos" data-linenos="392 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="o">=</span><span class="n">outfmt</span>
+<span class="linenos" data-linenos="393 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="o">=</span><span class="n">Gensymbol</span>
+<span class="linenos" data-linenos="394 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="o">=</span><span class="n">species</span>
+<span class="linenos" data-linenos="395 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="o">=</span><span class="n">weight</span>
+<span class="linenos" data-linenos="396 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="o">=</span><span class="n">tissue</span>
+<span class="linenos" data-linenos="397 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="o">=</span><span class="n">celltype</span>
+<span class="linenos" data-linenos="398 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="o">=</span><span class="n">norefdb</span>
+<span class="linenos" data-linenos="399 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="o">=</span><span class="n">noprint</span>
+<span class="linenos" data-linenos="400 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="o">=</span><span class="n">list_tissue</span>
+<span class="linenos" data-linenos="401 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">=</span><span class="n">target</span>
+<span class="linenos" data-linenos="402 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="o">=</span><span class="n">cellrange</span>
+<span class="linenos" data-linenos="403 "></span>    <span class="k">if</span> <span class="n">model_path</span> <span class="o">==</span><span class="s1">''</span><span class="p">:</span>
+<span class="linenos" data-linenos="404 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="o">=</span><span class="n">data_downloader</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s1">'https://figshare.com/ndownloader/files/41369037'</span><span class="p">,</span>
+<span class="linenos" data-linenos="405 "></span>                                        <span class="n">path</span><span class="o">=</span><span class="s1">'temp/pySCSA_2023_v2_plus.db'</span><span class="p">,</span><span class="n">title</span><span class="o">=</span><span class="s1">'whole'</span><span class="p">)</span>
+<span class="linenos" data-linenos="406 "></span>    <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="407 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="o">=</span><span class="n">model_path</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.cell_anno">
+<code class="highlight language-python"><span class="n">cell_anno</span><span class="p">(</span><span class="n">clustertype</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span> <span class="n">cluster</span><span class="o">=</span><span class="s1">'all'</span><span class="p">,</span> <span class="n">rank_rep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.cell_anno" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>Annotate cell type for each cluster.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clustertype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Clustering name used in scanpy. (leiden)</p></td>
+<td>
+<code>'leiden'</code>
+</td>
+</tr>
+<tr>
+<td><code>cluster</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])</p></td>
+<td>
+<code>'all'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="441 "></span><span class="k">def</span> <span class="nf">cell_anno</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="442 "></span>              <span class="n">cluster</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'all'</span><span class="p">,</span><span class="n">rank_rep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="linenos" data-linenos="443 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Annotate cell type for each cluster.</span>
+<span class="linenos" data-linenos="444 "></span>
+<span class="linenos" data-linenos="445 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="446 "></span><span class="sd">        clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="447 "></span><span class="sd">        cluster: Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])</span>
+<span class="linenos" data-linenos="448 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="449 "></span>
+<span class="linenos" data-linenos="450 "></span>    <span class="n">dat</span><span class="o">=</span><span class="n">data_preprocess</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span><span class="n">clustertype</span><span class="o">=</span><span class="n">clustertype</span><span class="p">,</span><span class="n">path</span><span class="o">=</span><span class="s1">'temp/rna.csv'</span><span class="p">,</span><span class="n">rank_rep</span><span class="o">=</span><span class="n">rank_rep</span><span class="p">)</span>
+<span class="linenos" data-linenos="451 "></span>    <span class="n">dat</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">'temp/rna.csv'</span><span class="p">)</span>
+<span class="linenos" data-linenos="452 "></span>
+<span class="linenos" data-linenos="453 "></span>    <span class="nb">print</span><span class="p">(</span><span class="s1">'...Auto annotate cell'</span><span class="p">)</span>
+<span class="linenos" data-linenos="454 "></span>
+<span class="linenos" data-linenos="455 "></span>    <span class="n">p</span> <span class="o">=</span> <span class="n">Process</span><span class="p">()</span>
+<span class="linenos" data-linenos="456 "></span>    <span class="n">p</span><span class="o">.</span><span class="n">run_cmd_p</span><span class="p">(</span><span class="n">foldchange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="457 "></span>                <span class="n">weight</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span>
+<span class="linenos" data-linenos="458 "></span>                <span class="n">pvalue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="p">,</span>
+<span class="linenos" data-linenos="459 "></span>                <span class="n">tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="460 "></span>                <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+<span class="linenos" data-linenos="461 "></span>                <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+<span class="linenos" data-linenos="462 "></span>                <span class="n">norefdb</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="p">,</span>
+<span class="linenos" data-linenos="463 "></span>                <span class="n">MarkerDB</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="464 "></span>                <span class="n">db</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+<span class="linenos" data-linenos="465 "></span>                <span class="n">noprint</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="p">,</span>
+<span class="linenos" data-linenos="466 "></span>                <span class="nb">input</span><span class="o">=</span><span class="s2">"temp/rna.csv"</span><span class="p">,</span>
+<span class="linenos" data-linenos="467 "></span>                <span class="n">output</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+<span class="linenos" data-linenos="468 "></span>                <span class="n">source</span><span class="o">=</span><span class="s2">"scanpy"</span><span class="p">,</span>
+<span class="linenos" data-linenos="469 "></span>                <span class="n">cluster</span><span class="o">=</span><span class="n">cluster</span><span class="p">,</span>
+<span class="linenos" data-linenos="470 "></span>                <span class="n">fc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="471 "></span>                <span class="n">outfmt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="p">,</span>
+<span class="linenos" data-linenos="472 "></span>                <span class="n">celltype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="p">,</span>
+<span class="linenos" data-linenos="473 "></span>                <span class="n">Gensymbol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="p">,</span>
+<span class="linenos" data-linenos="474 "></span>                <span class="n">list_tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="475 "></span>                <span class="n">cellrange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="p">)</span>
+<span class="linenos" data-linenos="476 "></span>
+<span class="linenos" data-linenos="477 "></span>
+<span class="linenos" data-linenos="478 "></span>    <span class="n">result</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">'temp/rna_anno.txt'</span><span class="p">,</span><span class="n">sep</span><span class="o">=</span><span class="s1">'</span><span class="se">\t</span><span class="s1">'</span><span class="p">)</span>
+<span class="linenos" data-linenos="479 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">=</span><span class="n">result</span>
+<span class="linenos" data-linenos="480 "></span>    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.cell_anno_print">
+<code class="highlight language-python"><span class="n">cell_anno_print</span><span class="p">()</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.cell_anno_print" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>print the annotation result</p>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="482 "></span><span class="k">def</span> <span class="nf">cell_anno_print</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="483 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""print the annotation result</span>
+<span class="linenos" data-linenos="484 "></span>
+<span class="linenos" data-linenos="485 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="486 "></span>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]):</span>
+<span class="linenos" data-linenos="487 "></span>        <span class="n">test</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">==</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+<span class="linenos" data-linenos="488 "></span>        <span class="k">if</span> <span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">&gt;</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">*</span><span class="mi">2</span><span class="p">:</span>
+<span class="linenos" data-linenos="489 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s1">'Nice:Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Cell Type'</span><span class="p">],</span>
+<span class="linenos" data-linenos="490 "></span>                                                        <span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Z-score'</span><span class="p">],</span><span class="mi">3</span><span class="p">)))</span>
+<span class="linenos" data-linenos="491 "></span>        <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="492 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s1">'Cluster:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Cell_type:</span><span class="si">{}</span><span class="se">\t</span><span class="s1">Z-score:</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,(</span><span class="s1">'|'</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">'Cell Type'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()),</span>
+<span class="linenos" data-linenos="493 "></span>                                                        <span class="p">(</span><span class="s1">'|'</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="s1">'Z-score'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())))</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.cell_auto_anno">
+<code class="highlight language-python"><span class="n">cell_auto_anno</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">clustertype</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'scsa_celltype'</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.cell_auto_anno" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>Add cell type annotation to anndata.obs['scsa_celltype']</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>anndata object</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>clustertype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Clustering name used in scanpy. (leiden)</p></td>
+<td>
+<code>'leiden'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="495 "></span><span class="k">def</span> <span class="nf">cell_auto_anno</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="496 "></span>                   <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">'scsa_celltype'</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="497 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Add cell type annotation to anndata.obs['scsa_celltype']</span>
+<span class="linenos" data-linenos="498 "></span>
+<span class="linenos" data-linenos="499 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="500 "></span><span class="sd">        adata: anndata object</span>
+<span class="linenos" data-linenos="501 "></span><span class="sd">        clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="502 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="503 "></span>    <span class="n">test_li</span><span class="o">=</span><span class="p">[]</span>
+<span class="linenos" data-linenos="504 "></span>    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+<span class="linenos" data-linenos="505 "></span>        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+<span class="linenos" data-linenos="506 "></span>            <span class="n">test_li</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">'Cluster'</span><span class="p">]</span><span class="o">==</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'Cell Type'</span><span class="p">])</span>
+<span class="linenos" data-linenos="507 "></span>        <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="508 "></span>            <span class="n">test_li</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'Unknown'</span><span class="p">)</span>
+<span class="linenos" data-linenos="509 "></span>    <span class="n">scsa_anno</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">],</span>
+<span class="linenos" data-linenos="510 "></span>        <span class="n">test_li</span><span class="p">))</span>
+<span class="linenos" data-linenos="511 "></span>    <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">scsa_anno</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">'category'</span><span class="p">)</span>
+<span class="linenos" data-linenos="512 "></span>    <span class="nb">print</span><span class="p">(</span><span class="s1">'...cell type added to </span><span class="si">{}</span><span class="s1"> on obs of anndata'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.get_model_tissue">
+<code class="highlight language-python"><span class="n">get_model_tissue</span><span class="p">(</span><span class="n">species</span><span class="o">=</span><span class="s1">'Human'</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.get_model_tissue" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>List all available tissues in the database.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>species</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</p></td>
+<td>
+<code>'Human'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="409 "></span><span class="k">def</span> <span class="nf">get_model_tissue</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">species</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">"Human"</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="410 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""List all available tissues in the database.</span>
+<span class="linenos" data-linenos="411 "></span>
+<span class="linenos" data-linenos="412 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="413 "></span><span class="sd">        species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])</span>
+<span class="linenos" data-linenos="414 "></span>
+<span class="linenos" data-linenos="415 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="416 "></span>
+<span class="linenos" data-linenos="417 "></span>    <span class="n">anno</span> <span class="o">=</span> <span class="n">Annotator</span><span class="p">(</span><span class="n">foldchange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="418 "></span>                <span class="n">weight</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span>
+<span class="linenos" data-linenos="419 "></span>                <span class="n">pvalue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pvalue</span><span class="p">,</span>
+<span class="linenos" data-linenos="420 "></span>                <span class="n">tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="421 "></span>                <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+<span class="linenos" data-linenos="422 "></span>                <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+<span class="linenos" data-linenos="423 "></span>                <span class="n">norefdb</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norefdb</span><span class="p">,</span>
+<span class="linenos" data-linenos="424 "></span>                <span class="n">MarkerDB</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="linenos" data-linenos="425 "></span>                <span class="n">db</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+<span class="linenos" data-linenos="426 "></span>                <span class="n">noprint</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noprint</span><span class="p">,</span>
+<span class="linenos" data-linenos="427 "></span>                <span class="nb">input</span><span class="o">=</span><span class="s2">"temp/rna.csv"</span><span class="p">,</span>
+<span class="linenos" data-linenos="428 "></span>                <span class="n">output</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+<span class="linenos" data-linenos="429 "></span>                <span class="n">source</span><span class="o">=</span><span class="s2">"scanpy"</span><span class="p">,</span>
+<span class="linenos" data-linenos="430 "></span>                <span class="n">cluster</span><span class="o">=</span><span class="s1">'all'</span><span class="p">,</span>
+<span class="linenos" data-linenos="431 "></span>                <span class="n">fc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foldchange</span><span class="p">,</span>
+<span class="linenos" data-linenos="432 "></span>                <span class="n">outfmt</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">outfmt</span><span class="p">,</span>
+<span class="linenos" data-linenos="433 "></span>                <span class="n">celltype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">celltype</span><span class="p">,</span>
+<span class="linenos" data-linenos="434 "></span>                <span class="n">Gensymbol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Gensymbol</span><span class="p">,</span>
+<span class="linenos" data-linenos="435 "></span>                <span class="n">list_tissue</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">list_tissue</span><span class="p">,</span>
+<span class="linenos" data-linenos="436 "></span>                <span class="n">cellrange</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cellrange</span><span class="p">)</span>
+<span class="linenos" data-linenos="437 "></span>    <span class="n">anno</span><span class="o">.</span><span class="n">load_pickle_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_path</span><span class="p">)</span>
+<span class="linenos" data-linenos="438 "></span>    <span class="n">anno</span><span class="o">.</span><span class="n">get_list_tissue</span><span class="p">(</span><span class="n">species</span><span class="p">)</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="omicverse.single._anno.pySCSA.get_celltype_marker">
+<code class="highlight language-python"><span class="n">get_celltype_marker</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">clustertype</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span> <span class="n">log2fc_min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">scores_type</span><span class="o">=</span><span class="s1">'scores'</span><span class="p">,</span> <span class="n">pval_cutoff</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">rank</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single._anno.pySCSA.get_celltype_marker" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents">
+<p>Get marker genes for each clusters.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>anndata object</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>clustertype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Clustering name used in scanpy. (leiden)</p></td>
+<td>
+<code>'leiden'</code>
+</td>
+</tr>
+<tr>
+<td><code>log2fc_min</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>Minimum log2 fold change of marker genes. (2)</p></td>
+<td>
+<code>2</code>
+</td>
+</tr>
+<tr>
+<td><code>pval_cutoff</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>Maximum p value of marker genes. (0.05)</p></td>
+<td>
+<code>0.05</code>
+</td>
+</tr>
+<tr>
+<td><code>rank</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>Whether to rank genes by wilcoxon test. (True)</p></td>
+<td>
+<code>True</code>
+</td>
+</tr>
+<tr>
+<td><code>scores_type</code></td>
+<td>
+</td>
+<td><p>The type of scores. can be selected from <code>scores</code> and <code>logfoldchanges</code></p></td>
+<td>
+<code>'scores'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th> <th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cellmarker</code></td> <td>
+<code>dict</code>
+</td>
+<td><p>A dictionary of marker genes for each clusters.</p></td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="514 "></span><span class="k">def</span> <span class="nf">get_celltype_marker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="515 "></span>                        <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="516 "></span>                        <span class="n">log2fc_min</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">scores_type</span><span class="o">=</span><span class="s1">'scores'</span><span class="p">,</span>
+<span class="linenos" data-linenos="517 "></span>                        <span class="n">pval_cutoff</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span><span class="n">rank</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">-&gt;</span><span class="nb">dict</span><span class="p">:</span>
+<span class="linenos" data-linenos="518 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Get marker genes for each clusters.</span>
+<span class="linenos" data-linenos="519 "></span>
+<span class="linenos" data-linenos="520 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="521 "></span><span class="sd">        adata: anndata object</span>
+<span class="linenos" data-linenos="522 "></span><span class="sd">        clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="523 "></span><span class="sd">        log2fc_min: Minimum log2 fold change of marker genes. (2)</span>
+<span class="linenos" data-linenos="524 "></span><span class="sd">        pval_cutoff: Maximum p value of marker genes. (0.05)</span>
+<span class="linenos" data-linenos="525 "></span><span class="sd">        rank: Whether to rank genes by wilcoxon test. (True)</span>
+<span class="linenos" data-linenos="526 "></span><span class="sd">        scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`</span>
+<span class="linenos" data-linenos="527 "></span>
+<span class="linenos" data-linenos="528 "></span><span class="sd">    Returns:</span>
+<span class="linenos" data-linenos="529 "></span><span class="sd">        cellmarker: A dictionary of marker genes for each clusters.</span>
+<span class="linenos" data-linenos="530 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="531 "></span>    <span class="nb">print</span><span class="p">(</span><span class="s1">'...get cell type marker'</span><span class="p">)</span>
+<span class="linenos" data-linenos="532 "></span>    <span class="n">cell_marker_dict</span><span class="o">=</span><span class="n">get_celltype_marker</span><span class="p">(</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span>
+<span class="linenos" data-linenos="533 "></span>                        <span class="n">clustertype</span><span class="o">=</span><span class="n">clustertype</span><span class="p">,</span>
+<span class="linenos" data-linenos="534 "></span>                        <span class="n">log2fc_min</span><span class="o">=</span><span class="n">log2fc_min</span><span class="p">,</span><span class="n">scores_type</span><span class="o">=</span><span class="n">scores_type</span><span class="p">,</span>
+<span class="linenos" data-linenos="535 "></span>                        <span class="n">pval_cutoff</span><span class="o">=</span><span class="n">pval_cutoff</span><span class="p">,</span><span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">)</span>
+<span class="linenos" data-linenos="536 "></span>
+<span class="linenos" data-linenos="537 "></span>    <span class="k">return</span> <span class="n">cell_marker_dict</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h2 class="doc doc-heading" id="omicverse.single.scanpy_lazy">
+<code class="highlight language-python"><span class="n">omicverse</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">scanpy_lazy</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_genes</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">min_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">drop_doublet</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">n_genes_by_counts</span><span class="o">=</span><span class="mi">4300</span><span class="p">,</span> <span class="n">pct_counts_mt</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">target_sum</span><span class="o">=</span><span class="mf">10000.0</span><span class="p">,</span> <span class="n">min_mean</span><span class="o">=</span><span class="mf">0.0125</span><span class="p">,</span> <span class="n">max_mean</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_disp</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">max_value</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">n_comps</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">svd_solver</span><span class="o">=</span><span class="s1">'auto'</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">112</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single.scanpy_lazy" title="Permanent link">¶</a></h2>
+<div class="doc doc-contents first">
+<p>scanpy lazy analysis</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>AnnData object</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>min_genes</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the min number of genes</p></td>
+<td>
+<code>200</code>
+</td>
+</tr>
+<tr>
+<td><code>min_cells</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the min number of cells</p></td>
+<td>
+<code>3</code>
+</td>
+</tr>
+<tr>
+<td><code>drop_doublet</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>whether to drop doublet</p></td>
+<td>
+<code>True</code>
+</td>
+</tr>
+<tr>
+<td><code>n_genes_by_counts</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the max number of genes</p></td>
+<td>
+<code>4300</code>
+</td>
+</tr>
+<tr>
+<td><code>pct_counts_mt</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the max proportion of mito-genes</p></td>
+<td>
+<code>25</code>
+</td>
+</tr>
+<tr>
+<td><code>target_sum</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>the max counts of total_counts</p></td>
+<td>
+<code>10000.0</code>
+</td>
+</tr>
+<tr>
+<td><code>min_mean</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>the min mean of genes</p></td>
+<td>
+<code>0.0125</code>
+</td>
+</tr>
+<tr>
+<td><code>max_mean</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the max mean of genes</p></td>
+<td>
+<code>3</code>
+</td>
+</tr>
+<tr>
+<td><code>min_disp</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>the min dispersion of genes</p></td>
+<td>
+<code>0.5</code>
+</td>
+</tr>
+<tr>
+<td><code>max_value</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the max value of genes</p></td>
+<td>
+<code>10</code>
+</td>
+</tr>
+<tr>
+<td><code>n_comps</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the number of components</p></td>
+<td>
+<code>100</code>
+</td>
+</tr>
+<tr>
+<td><code>svd_solver</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>the solver of svd</p></td>
+<td>
+<code>'auto'</code>
+</td>
+</tr>
+<tr>
+<td><code>n_neighbors</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the number of neighbors</p></td>
+<td>
+<code>15</code>
+</td>
+</tr>
+<tr>
+<td><code>random_state</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the random state</p></td>
+<td>
+<code>112</code>
+</td>
+</tr>
+<tr>
+<td><code>n_pcs</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>the number of pcs</p></td>
+<td>
+<code>50</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th> <th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td> <td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>AnnData object</p></td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="224 "></span><span class="k">def</span> <span class="nf">scanpy_lazy</span><span class="p">(</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span><span class="n">min_genes</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span><span class="n">min_cells</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">drop_doublet</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="linenos" data-linenos="225 "></span>                <span class="n">n_genes_by_counts</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">4300</span><span class="p">,</span><span class="n">pct_counts_mt</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+<span class="linenos" data-linenos="226 "></span>                <span class="n">target_sum</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">1e4</span><span class="p">,</span><span class="n">min_mean</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.0125</span><span class="p">,</span> <span class="n">max_mean</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_disp</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span><span class="n">max_value</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="linenos" data-linenos="227 "></span>                <span class="n">n_comps</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">svd_solver</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="linenos" data-linenos="228 "></span>                <span class="n">n_neighbors</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span><span class="nb">int</span> <span class="o">=</span> <span class="mi">112</span><span class="p">,</span> <span class="n">n_pcs</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+<span class="linenos" data-linenos="229 "></span>                <span class="p">)</span><span class="o">-&gt;</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">:</span>
+<span class="linenos" data-linenos="230 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""scanpy lazy analysis</span>
+<span class="linenos" data-linenos="231 "></span>
+<span class="linenos" data-linenos="232 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="233 "></span><span class="sd">        adata: AnnData object</span>
+<span class="linenos" data-linenos="234 "></span><span class="sd">        min_genes: the min number of genes</span>
+<span class="linenos" data-linenos="235 "></span><span class="sd">        min_cells: the min number of cells</span>
+<span class="linenos" data-linenos="236 "></span><span class="sd">        drop_doublet: whether to drop doublet</span>
+<span class="linenos" data-linenos="237 "></span><span class="sd">        n_genes_by_counts: the max number of genes</span>
+<span class="linenos" data-linenos="238 "></span><span class="sd">        pct_counts_mt: the max proportion of mito-genes</span>
+<span class="linenos" data-linenos="239 "></span><span class="sd">        target_sum: the max counts of total_counts</span>
+<span class="linenos" data-linenos="240 "></span><span class="sd">        min_mean: the min mean of genes</span>
+<span class="linenos" data-linenos="241 "></span><span class="sd">        max_mean: the max mean of genes</span>
+<span class="linenos" data-linenos="242 "></span><span class="sd">        min_disp: the min dispersion of genes</span>
+<span class="linenos" data-linenos="243 "></span><span class="sd">        max_value: the max value of genes</span>
+<span class="linenos" data-linenos="244 "></span><span class="sd">        n_comps: the number of components</span>
+<span class="linenos" data-linenos="245 "></span><span class="sd">        svd_solver: the solver of svd</span>
+<span class="linenos" data-linenos="246 "></span><span class="sd">        n_neighbors: the number of neighbors</span>
+<span class="linenos" data-linenos="247 "></span><span class="sd">        random_state: the random state</span>
+<span class="linenos" data-linenos="248 "></span><span class="sd">        n_pcs: the number of pcs</span>
+<span class="linenos" data-linenos="249 "></span>
+<span class="linenos" data-linenos="250 "></span><span class="sd">    Returns:</span>
+<span class="linenos" data-linenos="251 "></span><span class="sd">        adata: AnnData object</span>
+<span class="linenos" data-linenos="252 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="253 "></span>    <span class="c1">#filter cells and genes</span>
+<span class="linenos" data-linenos="254 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_cells</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_genes</span><span class="o">=</span><span class="n">min_genes</span><span class="p">)</span>
+<span class="linenos" data-linenos="255 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_cells</span><span class="o">=</span><span class="n">min_cells</span><span class="p">)</span>
+<span class="linenos" data-linenos="256 "></span>    <span class="c1">#filter the doublets cells</span>
+<span class="linenos" data-linenos="257 "></span>    <span class="k">if</span> <span class="n">drop_doublet</span><span class="p">:</span>
+<span class="linenos" data-linenos="258 "></span>        <span class="n">sc</span><span class="o">.</span><span class="n">external</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scrublet</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span> <span class="c1">#estimates doublets</span>
+<span class="linenos" data-linenos="259 "></span>        <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'predicted_doublet'</span><span class="p">]</span> <span class="o">==</span> <span class="kc">False</span><span class="p">]</span> <span class="c1">#do the actual filtering</span>
+<span class="linenos" data-linenos="260 "></span>    <span class="c1">#calculate the proportion of mito-genes</span>
+<span class="linenos" data-linenos="261 "></span>    <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">'mt'</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var_names</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">'MT-'</span><span class="p">)</span>  <span class="c1"># annotate the group of mitochondrial genes as 'mt'</span>
+<span class="linenos" data-linenos="262 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">calculate_qc_metrics</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">qc_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">'mt'</span><span class="p">],</span> <span class="n">percent_top</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log1p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="linenos" data-linenos="263 "></span>    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">n_genes_by_counts</span> <span class="o">&lt;</span> <span class="n">n_genes_by_counts</span><span class="p">,</span> <span class="p">:]</span>
+<span class="linenos" data-linenos="264 "></span>    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">pct_counts_mt</span> <span class="o">&lt;</span> <span class="n">pct_counts_mt</span><span class="p">,</span> <span class="p">:]</span>
+<span class="linenos" data-linenos="265 "></span>    <span class="c1">#save the raw counts</span>
+<span class="linenos" data-linenos="266 "></span>    <span class="n">adata</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s2">"counts"</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="linenos" data-linenos="267 "></span>    <span class="c1">#normalization, the max counts of total_counts is 20000 means the amount is 10e4</span>
+<span class="linenos" data-linenos="268 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">normalize_total</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">target_sum</span><span class="o">=</span><span class="n">target_sum</span><span class="p">)</span>
+<span class="linenos" data-linenos="269 "></span>    <span class="c1">#log</span>
+<span class="linenos" data-linenos="270 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="linenos" data-linenos="271 "></span>    <span class="c1">#select high-variable genes</span>
+<span class="linenos" data-linenos="272 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">highly_variable_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_mean</span><span class="o">=</span><span class="n">min_mean</span><span class="p">,</span> <span class="n">max_mean</span><span class="o">=</span><span class="n">max_mean</span><span class="p">,</span> <span class="n">min_disp</span><span class="o">=</span><span class="n">min_disp</span><span class="p">)</span>
+<span class="linenos" data-linenos="273 "></span>    <span class="c1">#save and filter</span>
+<span class="linenos" data-linenos="274 "></span>    <span class="n">adata</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">adata</span>
+<span class="linenos" data-linenos="275 "></span>    <span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">highly_variable</span><span class="p">]</span>
+<span class="linenos" data-linenos="276 "></span>    <span class="c1">#scale</span>
+<span class="linenos" data-linenos="277 "></span>    <span class="c1">#scale(adata, max_value=max_value)</span>
+<span class="linenos" data-linenos="278 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">max_value</span><span class="o">=</span><span class="n">max_value</span><span class="p">)</span>
+<span class="linenos" data-linenos="279 "></span>    <span class="c1">#pca analysis</span>
+<span class="linenos" data-linenos="280 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_comps</span><span class="o">=</span><span class="n">n_comps</span><span class="p">,</span> <span class="n">svd_solver</span><span class="o">=</span><span class="n">svd_solver</span><span class="p">)</span>
+<span class="linenos" data-linenos="281 "></span>    <span class="c1">#pca(adata,layer='scaled',n_pcs=50)</span>
+<span class="linenos" data-linenos="282 "></span>    <span class="c1">#cell neighbors graph construct</span>
+<span class="linenos" data-linenos="283 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">neighbors</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="n">n_neighbors</span><span class="p">,</span> <span class="n">random_state</span> <span class="o">=</span> <span class="n">random_state</span><span class="p">,</span> <span class="n">n_pcs</span><span class="o">=</span><span class="n">n_pcs</span><span class="p">)</span>
+<span class="linenos" data-linenos="284 "></span>    <span class="c1">#umap</span>
+<span class="linenos" data-linenos="285 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">leiden</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="linenos" data-linenos="286 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="linenos" data-linenos="287 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">paga</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># remove `plot=False` if you want to see the coarse-grained graph</span>
+<span class="linenos" data-linenos="288 "></span>    <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">init_pos</span><span class="o">=</span><span class="s1">'paga'</span><span class="p">)</span>
+<span class="linenos" data-linenos="289 "></span>    <span class="k">return</span> <span class="n">adata</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h2 class="doc doc-heading" id="omicverse.single.scanpy_cellanno_from_dict">
+<code class="highlight language-python"><span class="n">omicverse</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">scanpy_cellanno_from_dict</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">anno_dict</span><span class="p">,</span> <span class="n">anno_name</span><span class="o">=</span><span class="s1">'major'</span><span class="p">,</span> <span class="n">clustertype</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single.scanpy_cellanno_from_dict" title="Permanent link">¶</a></h2>
+<div class="doc doc-contents first">
+<p>add cell type annotation from dict to anndata object</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>AnnData object of scRNA-seq after preprocessing</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>anno_dict</code></td>
+<td>
+<code>dict</code>
+</td>
+<td><p>dict of cell type annotation. key is the cluster name, value is the cell type name.like <code>{'0':'B cell','1':'T cell'}</code></p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>anno_name</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>the name of annotation</p></td>
+<td>
+<code>'major'</code>
+</td>
+</tr>
+<tr>
+<td><code>clustertype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Clustering name used in scanpy. (leiden)</p></td>
+<td>
+<code>'leiden'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="291 "></span><span class="k">def</span> <span class="nf">scanpy_cellanno_from_dict</span><span class="p">(</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="292 "></span>                               <span class="n">anno_dict</span><span class="p">:</span><span class="nb">dict</span><span class="p">,</span>
+<span class="linenos" data-linenos="293 "></span>                               <span class="n">anno_name</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'major'</span><span class="p">,</span>
+<span class="linenos" data-linenos="294 "></span>                               <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="295 "></span>                               <span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="296 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""add cell type annotation from dict to anndata object</span>
+<span class="linenos" data-linenos="297 "></span>
+<span class="linenos" data-linenos="298 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="299 "></span><span class="sd">        adata: AnnData object of scRNA-seq after preprocessing</span>
+<span class="linenos" data-linenos="300 "></span><span class="sd">        anno_dict: dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`</span>
+<span class="linenos" data-linenos="301 "></span><span class="sd">        anno_name: the name of annotation</span>
+<span class="linenos" data-linenos="302 "></span><span class="sd">        clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="303 "></span>
+<span class="linenos" data-linenos="304 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="305 "></span>
+<span class="linenos" data-linenos="306 "></span>    <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">anno_name</span><span class="o">+</span><span class="s1">'_celltype'</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">anno_dict</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">'category'</span><span class="p">)</span>
+<span class="linenos" data-linenos="307 "></span>    <span class="nb">print</span><span class="p">(</span><span class="s1">'...cell type added to </span><span class="si">{}</span><span class="s1">_celltype on obs of anndata'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">anno_name</span><span class="p">))</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h2 class="doc doc-heading" id="omicverse.single.get_celltype_marker">
+<code class="highlight language-python"><span class="n">omicverse</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">get_celltype_marker</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">clustertype</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span> <span class="n">log2fc_min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">scores_type</span><span class="o">=</span><span class="s1">'scores'</span><span class="p">,</span> <span class="n">pval_cutoff</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">rank</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.single.get_celltype_marker" title="Permanent link">¶</a></h2>
+<div class="doc doc-contents first">
+<p>Get marker genes for each clusters.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata</code></td>
+<td>
+<code>anndata.<span title="anndata.AnnData">AnnData</span></code>
+</td>
+<td><p>anndata object</p></td>
+<td>
+<em>required</em>
+</td>
+</tr>
+<tr>
+<td><code>clustertype</code></td>
+<td>
+<code>str</code>
+</td>
+<td><p>Clustering name used in scanpy. (leiden)</p></td>
+<td>
+<code>'leiden'</code>
+</td>
+</tr>
+<tr>
+<td><code>log2fc_min</code></td>
+<td>
+<code>int</code>
+</td>
+<td><p>Minimum log2 fold change of marker genes. (2)</p></td>
+<td>
+<code>2</code>
+</td>
+</tr>
+<tr>
+<td><code>pval_cutoff</code></td>
+<td>
+<code>float</code>
+</td>
+<td><p>Maximum p value of marker genes. (0.05)</p></td>
+<td>
+<code>0.05</code>
+</td>
+</tr>
+<tr>
+<td><code>rank</code></td>
+<td>
+<code>bool</code>
+</td>
+<td><p>Whether to rank genes by wilcoxon test. (True)</p></td>
+<td>
+<code>False</code>
+</td>
+</tr>
+<tr>
+<td><code>scores_type</code></td>
+<td>
+</td>
+<td><p>The type of scores. can be selected from <code>scores</code> and <code>logfoldchanges</code></p></td>
+<td>
+<code>'scores'</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th> <th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cellmarker</code></td> <td>
+<code>dict</code>
+</td>
+<td><p>A dictionary of marker genes for each clusters.</p></td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_anno.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="309 "></span><span class="k">def</span> <span class="nf">get_celltype_marker</span><span class="p">(</span><span class="n">adata</span><span class="p">:</span><span class="n">anndata</span><span class="o">.</span><span class="n">AnnData</span><span class="p">,</span>
+<span class="linenos" data-linenos="310 "></span>                            <span class="n">clustertype</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">'leiden'</span><span class="p">,</span>
+<span class="linenos" data-linenos="311 "></span>                            <span class="n">log2fc_min</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">scores_type</span><span class="o">=</span><span class="s1">'scores'</span><span class="p">,</span>
+<span class="linenos" data-linenos="312 "></span>                            <span class="n">pval_cutoff</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span><span class="n">rank</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">-&gt;</span><span class="nb">dict</span><span class="p">:</span>
+<span class="linenos" data-linenos="313 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Get marker genes for each clusters.</span>
+<span class="linenos" data-linenos="314 "></span>
+<span class="linenos" data-linenos="315 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="316 "></span><span class="sd">            adata: anndata object</span>
+<span class="linenos" data-linenos="317 "></span><span class="sd">            clustertype: Clustering name used in scanpy. (leiden)</span>
+<span class="linenos" data-linenos="318 "></span><span class="sd">            log2fc_min: Minimum log2 fold change of marker genes. (2)</span>
+<span class="linenos" data-linenos="319 "></span><span class="sd">            pval_cutoff: Maximum p value of marker genes. (0.05)</span>
+<span class="linenos" data-linenos="320 "></span><span class="sd">            rank: Whether to rank genes by wilcoxon test. (True)</span>
+<span class="linenos" data-linenos="321 "></span><span class="sd">            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`</span>
+<span class="linenos" data-linenos="322 "></span>
+<span class="linenos" data-linenos="323 "></span><span class="sd">        Returns:</span>
+<span class="linenos" data-linenos="324 "></span><span class="sd">            cellmarker: A dictionary of marker genes for each clusters.</span>
+<span class="linenos" data-linenos="325 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="326 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'...get cell type marker'</span><span class="p">)</span>
+<span class="linenos" data-linenos="327 "></span>        <span class="n">celltypes</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clustertype</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+<span class="linenos" data-linenos="328 "></span>        <span class="n">cell_marker_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="linenos" data-linenos="329 "></span>        <span class="k">if</span> <span class="n">rank</span><span class="o">==</span><span class="kc">False</span><span class="p">:</span>
+<span class="linenos" data-linenos="330 "></span>            <span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">rank_genes_groups</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">clustertype</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'wilcoxon'</span><span class="p">)</span>
+<span class="linenos" data-linenos="331 "></span>        <span class="k">for</span> <span class="n">celltype</span> <span class="ow">in</span> <span class="n">celltypes</span><span class="p">:</span>
+<span class="linenos" data-linenos="332 "></span>            <span class="n">degs</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">rank_genes_groups_df</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">celltype</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'rank_genes_groups'</span><span class="p">,</span> <span class="n">log2fc_min</span><span class="o">=</span><span class="n">log2fc_min</span><span class="p">,</span> 
+<span class="linenos" data-linenos="333 "></span>                                            <span class="n">pval_cutoff</span><span class="o">=</span><span class="n">pval_cutoff</span><span class="p">)</span>
+<span class="linenos" data-linenos="334 "></span>            <span class="n">foldp</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">degs</span><span class="p">[</span><span class="n">scores_type</span><span class="p">])</span>
+<span class="linenos" data-linenos="335 "></span>            <span class="n">foldchange</span><span class="o">=</span><span class="p">(</span><span class="n">foldp</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">foldp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">5</span><span class="p">]]</span><span class="o">+</span><span class="n">foldp</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">foldp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">6</span><span class="p">]])</span><span class="o">/</span><span class="mi">2</span>
+<span class="linenos" data-linenos="336 "></span>
+<span class="linenos" data-linenos="337 "></span>            <span class="n">cellmarker</span><span class="o">=</span><span class="n">degs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">degs</span><span class="p">[</span><span class="n">scores_type</span><span class="p">]</span><span class="o">&gt;</span><span class="n">foldchange</span><span class="p">][</span><span class="s1">'names'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="linenos" data-linenos="338 "></span>            <span class="n">cell_marker_dict</span><span class="p">[</span><span class="n">celltype</span><span class="p">]</span><span class="o">=</span><span class="n">cellmarker</span>
+<span class="linenos" data-linenos="339 "></span>
+<span class="linenos" data-linenos="340 "></span>        <span class="k">return</span> <span class="n">cell_marker_dict</span>
+</code></pre></div>
+</details>
+</div>
+</div>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2023, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../../../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>

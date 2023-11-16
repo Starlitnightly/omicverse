@@ -298,6 +298,7 @@ update `conda install omicverse -c conda-forge`
 
 ## v 1.5.2
 
+
 ### bulk2single module
 
 - Fix the matrix error when the symbol of genes not unique.
@@ -305,6 +306,15 @@ update `conda install omicverse -c conda-forge`
 - Fix the `generate` of BulkTrajBlend.
 - Fix thhe arguement of `vae_configure` in BulkTrajBlend when cell_target_num is None
 - Add `max_single_cells` for BulkTrajBlend input
+- Using `scaden` as default when deconvoluted the Bulk RNA-seq
 
 ### single module
-- Fix the error of pyVIA when root is None
+
+- Fix the error of `pyVIA` when root is None
+- Add `TrajInfer` module to infer trajectory of cells
+- Add `Palantir` to `TrajInfer` module
+- Fix the error parameter of `batch_correction`
+
+## utils module
+
+- Add `plot_pca_variance_ratio` to visual to ratio of pca variance
