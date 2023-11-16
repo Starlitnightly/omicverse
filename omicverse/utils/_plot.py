@@ -986,3 +986,16 @@ def plot_pca_variance_ratio(
         log=log,
     )
     savefig_or_show("pca_variance_ratio", show=show, save=save)
+
+def plot_pca_variance_ratio1(adata,threshold=0.85):
+
+    import matplotlib.pyplot as plt
+    plt.scatter(range(len(adata.uns['scaled|original|pca_var_ratios'])),
+                adata.uns['scaled|original|pca_var_ratios'])
+    ratio_max=max(adata.uns['scaled|original|pca_var_ratios'])
+    ratio_max_85=(1-threshold)*ratio_max
+    pcs_85_num=len(adata.uns['scaled|original|pca_var_ratios'][adata.uns['scaled|original|pca_var_ratios']>ratio_max_85])
+    plt.axhline(ratio_max_85)
+    plt.title(f'PCs:{pcs_85_num}')
+    plt.xlabel('ranking')
+    
