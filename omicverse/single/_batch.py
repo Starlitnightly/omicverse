@@ -79,6 +79,21 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         # add to the AnnData object, create a new object first
         adata.obsm["X_scanorama"] = all_s
         return adata
+    elif methods=='scVI':
+        try:
+            import scvi 
+            #print('mofax have been install version:',mfx.__version__)
+        except ImportError:
+            raise ImportError(
+                'Please install the scVI: `pip install scvi-tools`. or `conda install scvi-tools -c conda-forge`'
+            )
+        import scvi
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_key)
+        model = scvi.model.SCVI(adata, **kwargs)
+        model.train()
+        SCVI_LATENT_KEY = "X_scVI"
+        adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
+        return adata
     else:
         print('Not supported')
 
