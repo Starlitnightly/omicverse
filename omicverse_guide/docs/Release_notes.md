@@ -248,3 +248,14 @@
 - Introduced `plot_pca_variance_ratio` for visualizing the ratio of PCA variance.
 - Added the `cluster` and `filtered` module for clustering the cells
 - Integrated `MiRA` to calculate the LDA topic
+
+## v 1.5.3
+### single Module:
+- Added `scVI` and `MIRA` to remove batch effect
+
+### space Module:
+- Added `STAGATE` to cluster and denoisy the spatial RNA-seq 
+
+### pp Module:
+- Added `doublets` argument of `ov.pp.qc` to control doublets('Default'=True)
+

@@ -339,7 +339,7 @@ from sklearn.cluster import KMeans
 
 
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
-    organism='human', no_cc=False,batch_key=None):
+    organism='human', no_cc=False,batch_key=None,):
     """
     Preprocesses the AnnData object adata using either a scanpy or a pearson residuals workflow for size normalization
     and highly variable genes (HVGs) selection, and calculates signature scores if necessary. 
@@ -360,13 +360,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     """
 
     # Log-normalization, HVGs identification
+    adata.layers['counts'] = adata.X.copy()
     print('Begin robust gene identification')
     identify_robust_genes(adata, percent_cells=0.05)
     adata = adata[:, adata.var['robust']]
     print(f'End of robust gene identification.')
     method_list = mode.split('|')
     print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
-    adata.layers['counts'] = adata.X.copy()
+    
 
     if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
         sc.pp.normalize_total(

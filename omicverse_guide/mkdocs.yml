@@ -44,6 +44,8 @@ nav:
         - Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq: Tutorials-bulk2single/t_bulktrajblend.ipynb
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
         - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
+    - Space:
+        - Spatial clustering and denoising expressions: Tutorials-space/t_stagate.ipynb
 - API documentation: api/index.md
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
