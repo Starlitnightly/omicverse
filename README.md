@@ -67,6 +67,9 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [21] [TAPE](https://github.com/poseidonchan/TAPE) was originally published in [*Nature Communications*](https://doi.org/10.1038/s41467-022-34550-9)
 - [22] [SEACells](https://github.com/dpeerlab/SEACells) was originally published in [*Nature Biotechnology*](https://www.nature.com/articles/s41587-023-01716-9)
 - [23] [Palantir](https://github.com/dpeerlab/Palantir) was originally published in [*Nature Biotechnology*](https://doi.org/10.1038/s41587-019-0068-49)
+- [24] [STAGATE](https://github.com/QIFEIDKN/STAGATE_pyG) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-022-29439-6)
+- [25] [scVI](https://github.com/scverse/scvi-tools) was originally published in [*Nature Biotechnology*](https://doi.org/10.1038/s41587-021-01206-w)
+- [26] [MIRA](https://github.com/cistrome/MIRA) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-022-01595-z)
 
 
 ## Included Package not published or preprint
