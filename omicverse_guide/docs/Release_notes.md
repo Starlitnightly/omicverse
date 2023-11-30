@@ -259,3 +259,6 @@
 ### pp Module:
 - Added `doublets` argument of `ov.pp.qc` to control doublets('Default'=True)
 
+## v 1.5.4
+### bulk Module:
+- Fixed an error in `pyDEG.deg_analysis` when `n_cpus` can not be set in `pyDeseq2(v0.4.3)`

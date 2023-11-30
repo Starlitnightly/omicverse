@@ -492,7 +492,7 @@ class pyDEG(object):
                     refit_cooks=True,
                     n_cpus=n_cpus,
                 )
-            else:
+            elif pydeseq2.__version__<='0.4.1':
                 dds = DeseqDataSet(
                     counts=counts_df,
                     metadata=clinical_df,
@@ -501,6 +501,16 @@ class pyDEG(object):
                     # column ("B" vs "A")
                     refit_cooks=True,
                     n_cpus=n_cpus,
+                )
+            else:
+                from pydeseq2.default_inference import DefaultInference
+                inference = DefaultInference(n_cpus=n_cpus)
+                dds = DeseqDataSet(
+                    counts=counts_df,
+                    metadata=clinical_df,
+                    design_factors="condition",  # compare samples based on the "condition"
+                    refit_cooks=True,
+                    inference=inference,
                 )
 
             
