@@ -262,3 +262,14 @@
 ## v 1.5.4
 ### bulk Module:
 - Fixed an error in `pyDEG.deg_analysis` when `n_cpus` can not be set in `pyDeseq2(v0.4.3)`
+
+### single Module:
+- Fixed an argument error in `single.batch_correction` of combat
+
+### utils Module:
+- Added `venn4` plot to visualize
+- Fixed the label visualization of `plot_network`
+- Added `ondisk` argument of `LDA_topic`
+
+### space Module:
+- Added `Tangram` to mapping the scRNA-seq to stRNA-seq
