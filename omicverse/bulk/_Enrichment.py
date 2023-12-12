@@ -418,7 +418,7 @@ class pyGSEA(object):
         self.cutoff=cutoff
     
     
-    def enrichment(self,format:str='png', seed:int=112)->pd.DataFrame:
+    def enrichment(self,format:str='png', pval=0.05,seed:int=112)->pd.DataFrame:
         """gene set enrichment analysis.
         
         Arguments:
@@ -434,7 +434,7 @@ class pyGSEA(object):
                                            self.processes,self.permutation_num,
                                            self.outdir,format,seed)
         self.pre_res=pre_res
-        enrich_res=pre_res.res2d[pre_res.res2d['fdr']<0.05]
+        enrich_res=pre_res.res2d[pre_res.res2d['fdr']<pval]
         enrich_res['logp']=-np.log(enrich_res['fdr']+0.0001)
         enrich_res['logc']=enrich_res['nes']
         enrich_res['num']=enrich_res['matched_size']

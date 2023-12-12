@@ -68,7 +68,7 @@ class LDA_topic(object):
 
     def __init__(self,adata,feature_type='expression',
                   highly_variable_key='highly_variable_features',
-                 layers='counts',batch_key=None,learning_rate=1e-3):
+                 layers='counts',batch_key=None,learning_rate=1e-3,ondisk=False):
         global mira_install
         try:
             import mira
@@ -89,14 +89,29 @@ class LDA_topic(object):
             counts_layer=layers,
             categorical_covariates=batch_key
         )
+        self.ondisk=ondisk
+        if self.ondisk!=True:
         
-        self.model.get_learning_rate_bounds(adata)
-        self.model.set_learning_rates(learning_rate, 0.25) # for larger datasets, the default of 1e-3, 0.1 usually works well.
+            self.model.get_learning_rate_bounds(adata)
+            self.model.set_learning_rates(learning_rate, 0.25) # for larger datasets, the default of 1e-3, 0.1 usually works well.
+        else:
+            train, test = self.model.train_test_split(adata)
+            import os 
+            os.mkdir('topic_train')
+            os.mkdir('topic_test')
+            self.model.write_ondisk_dataset(train, dirname='topic_train')
+            self.model.write_ondisk_dataset(test, dirname='topic_test')
+            self.model.get_learning_rate_bounds('topic_train')
+            self.model.set_learning_rates(learning_rate, 0.25) # for larger datasets, the default of 1e-3, 0.1 usually works well.
+
         self.model.plot_learning_rate_bounds(figsize=(6,3))
         
     def plot_topic_contributions(self,num_topics=6):
         NUM_TOPICS = num_topics
-        topic_contributions = mira.topics.gradient_tune(self.model, self.adata)
+        if self.ondisk!=True:
+            topic_contributions = mira.topics.gradient_tune(self.model, self.adata)
+        else:
+            topic_contributions = mira.topics.gradient_tune(self.model, 'topic_train')
         mira.pl.plot_topic_contributions(topic_contributions, NUM_TOPICS)
         
     def predicted(self,num_topics=6):

@@ -41,7 +41,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         return adata3
     elif methods=='combat':
         adata2=adata.copy()
-        sc.pp.combat(adata2, key=batch_key,*kwargs)
+        sc.pp.combat(adata2, key=batch_key,**kwargs)
         scale(adata2)
         pca(adata2,layer='scaled',n_pcs=n_pcs)
         adata2.obsm['X_combat']=adata2.obsm[use_rep].copy()

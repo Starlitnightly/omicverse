@@ -360,11 +360,18 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     for i in hub_gene:
         pos1[i]=pos[i]
     #label_options = {"ec": "white", "fc": "white", "alpha": 0.6}
-    nx.draw_networkx_labels(
-        G,pos1,verticalalignment=label_verticalalignment,
-        font_size=label_fontsize,font_family=label_fontfamily,
-        font_weight=label_fontweight,bbox=label_bbox,
-    )
+    #nx.draw_networkx_labels(
+    #    G,pos1,verticalalignment=label_verticalalignment,
+    #    font_size=label_fontsize,font_family=label_fontfamily,
+    #    font_weight=label_fontweight,bbox=label_bbox,
+    #)
+    from adjustText import adjust_text
+    texts=[ax.text(pos1[i][0], 
+               pos1[i][1],
+               i,
+               fontdict={'size':label_fontsize,'weight':label_fontweight,'color':'black'}
+               ) for i in hub_gene if 'ENSG' not in i]
+    adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
 
     ax.axis("off")
     

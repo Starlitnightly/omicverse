@@ -70,6 +70,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [24] [STAGATE](https://github.com/QIFEIDKN/STAGATE_pyG) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-022-29439-6)
 - [25] [scVI](https://github.com/scverse/scvi-tools) was originally published in [*Nature Biotechnology*](https://doi.org/10.1038/s41587-021-01206-w)
 - [26] [MIRA](https://github.com/cistrome/MIRA) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-022-01595-z)
+- [27] [Tangram](https://github.com/broadinstitute/Tangram/) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-021-01264-7)
 
 
 ## Included Package not published or preprint
