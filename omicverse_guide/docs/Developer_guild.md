@@ -15,6 +15,7 @@ A omicverse framework is primarily composed of 5 components.
 - `pp`: preprocess, including quantity control, normalize, etc.
 - `bulk`: to analysis the bulk omic-seq like RNA-seq or Proper-seq.
 - `single`: to analysis the single cell omic-seq like scRNA-seq or scATAC-seq
+- `space`: to analysis the spatial RNA-seq
 - `bulk2single`: to integrate the bulk RNA-seq and single cell RNA-seq
 
 The `__init__.py` file is responsible for importing function entries within each folder, and all function functions use a file starting with `_*.py` for function writing.
