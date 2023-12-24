@@ -7,7 +7,7 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch.nn import Parameter
 import torch.nn as nn
-from torch_sparse import SparseTensor, set_diag
+# from torch_sparse import SparseTensor, set_diag
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
@@ -132,7 +132,16 @@ class GATConv(MessagePassing):
                 attention weights for each edge. (default: :obj:`None`)
         """
         H, C = self.heads, self.out_channels
-
+        
+        try:
+            from torch_sparse import SparseTensor, set_diag
+        except ImportError:
+            raise ImportError(
+                """Please install the torch_sparse: `conda install torch_sparse` or 
+                `pip install torch_sparse`.'"""
+            )
+        
+    
         # We first transform the input node features. If a tuple is passed, we
         # transform source and target node features via separate weights:
         if isinstance(x, Tensor):
