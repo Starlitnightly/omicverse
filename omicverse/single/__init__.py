@@ -17,3 +17,4 @@ from ._batch import batch_correction
 from ._cellfategenie import cellfategenie,gene_trends
 from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
 from ._traj import TrajInfer
+from ._metacell import MetaCell

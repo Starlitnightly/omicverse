@@ -175,6 +175,7 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
 
 def qc(adata:anndata.AnnData, mode='seurat', 
        min_cells=3, min_genes=200, nmads=5, 
+       max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,
        path_viz=None, tresh=None):
     """
@@ -191,6 +192,8 @@ def qc(adata:anndata.AnnData, mode='seurat',
         mode : The filtering method to use. Valid options are 'seurat' and 'mads'. Default is 'seurat'.
         min_cells : The minimum number of cells for a sample to pass QC. Default is 3.
         min_genes : The minimum number of genes for a cell to pass QC. Default is 200.
+        max_cells_ratio : The maximum number of cells ratio for a sample to pass QC. Default is 1.
+        max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         path_viz : The path to save the QC plots. Default is None.
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', and 'detected_genes'.
@@ -280,6 +283,8 @@ def qc(adata:anndata.AnnData, mode='seurat',
     # Last gene and cell filter
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
+    sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
+    sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
 
     return adata
 
