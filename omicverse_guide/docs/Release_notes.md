@@ -283,3 +283,13 @@
 
 ### space Module:
 - Added `STAligner` to integrate multi stRNA-seq
+
+## v 1.5.6
+### pp Module
+- Added `mt_startswith` argument to control the `qc` in mouse or other species.
+
+### utils Module
+- Added `schist` method to cluster the single cell RNA-seq
+
+### single Module
+- Fixed the import error of `palantir` in SEACells

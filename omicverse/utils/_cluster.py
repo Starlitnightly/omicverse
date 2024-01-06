@@ -51,6 +51,14 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         
         print(f"""finished: found {n_components} clusters and added
     'gmm_cluster', the cluster labels (adata.obs, categorical)""")
+    elif method=='schist':
+        try:
+            import schist
+        except ImportError:
+            raise ImportError(
+                'Please install the schist using conda `conda install -c conda-forge schist` \nor `pip install git+https://github.com/dawe/schist.git`'
+            )
+        schist.inference.nested_model(adata, **kwargs)
 
         
 def filtered(adata:anndata.AnnData,
