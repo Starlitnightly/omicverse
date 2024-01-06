@@ -293,3 +293,6 @@
 
 ### single Module
 - Fixed the import error of `palantir` in SEACells
+
+### space Module:
+- Added `SpaceFlow` to identify the pseudo-spatial map
