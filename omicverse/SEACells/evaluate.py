@@ -1,5 +1,4 @@
 import numpy as np
-import palantir
 import pandas as pd
 
 
@@ -41,6 +40,7 @@ def separation(
     :return: `pd.DataFrame` with a separation of compactness per metacell
 
     """
+    import palantir
     components = pd.DataFrame(ad.obsm[low_dim_embedding]).set_index(ad.obs_names)
     dm_res = palantir.utils.run_diffusion_maps(components)
     dc = palantir.utils.determine_multiscale_space(dm_res, n_eigs=10)
@@ -90,6 +90,7 @@ def get_density(ad, key, nth_neighbor=150):
     :return: pd.DataFrame containing cell ID and density.
     """
     from sklearn.neighbors import NearestNeighbors
+    import palantir
 
     neigh = NearestNeighbors(n_neighbors=nth_neighbor)
 

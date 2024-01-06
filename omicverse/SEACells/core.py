@@ -4,10 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-try:
-    from . import evaluate
-except ImportError:
-    import evaluate
+
+from .evaluate import compute_celltype_purity
 
 
 def SEACells(
@@ -234,7 +232,7 @@ def summarize_by_SEACell(
     if celltype_label is not None:
         # TODO: Catch specific exception
         try:
-            purity_df = evaluate.compute_celltype_purity(ad, celltype_label)
+            purity_df = compute_celltype_purity(ad, celltype_label)
             meta_ad.obs = meta_ad.obs.join(purity_df)
         except Exception as e:  # noqa: BLE001
             print(f"Cell type purity failed with Exception {e}")
