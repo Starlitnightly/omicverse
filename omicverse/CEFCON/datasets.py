@@ -8,11 +8,30 @@ import numpy as np
 from itertools import permutations, product
 import scanpy as sc
 import requests
-import zipfile
 from tqdm.auto import tqdm
 
 
+zipfile_install = False
+
+def check_zipfile():
+    global zipfile_install
+    try:
+        import zipfile
+        zipfile_install=True
+    except ImportError:
+        raise ImportError(
+            'Please install the zipfile: `pip install zipfile`.'
+        )
+    
+
 def _download_from_url(file_url: str, save_path: Path):
+    check_zipfile()
+    global zipfile_install
+    if zipfile_install==True:
+        global zipfile
+        import zipfile
+
+
     try:
         response = requests.get(file_url, stream=True)
         response.raise_for_status()
