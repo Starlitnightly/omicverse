@@ -273,3 +273,26 @@
 
 ### space Module:
 - Added `Tangram` to mapping the scRNA-seq to stRNA-seq
+
+## v 1.5.5
+### pp Module:
+- Added `max_cells_ratio` and `max_genes_ratio` to control the max threshold in qc of scRNA-seq
+
+### single Module:
+- Added `SEACells` model to calculate the metacells from scRNA-seq
+
+### space Module:
+- Added `STAligner` to integrate multi stRNA-seq
+
+## v 1.5.6
+### pp Module
+- Added `mt_startswith` argument to control the `qc` in mouse or other species.
+
+### utils Module
+- Added `schist` method to cluster the single cell RNA-seq
+
+### single Module
+- Fixed the import error of `palantir` in SEACells
+
+### space Module:
+- Added `SpaceFlow` to identify the pseudo-spatial map

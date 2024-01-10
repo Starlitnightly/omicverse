@@ -5,6 +5,8 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
 from ..STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
+import scanpy as sc
+
 class pySTAGATE(object):
     
     def __init__(self,adata,num_batch_x,num_batch_y,
@@ -60,6 +62,10 @@ class pySTAGATE(object):
         self.data.to(self.device)
         
     def predicted(self):
+        """
+        Predict the STAGATE representation and ReX values for all cells.
+
+        """
         self.model.eval()
         z, out = self.model(self.data.x, self.data.edge_index)
 
@@ -68,4 +74,54 @@ class pySTAGATE(object):
         ReX = out.to('cpu').detach().numpy()
         ReX[ReX<0] = 0
         self.adata.layers['STAGATE_ReX'] = ReX
+
+        print('The STAGATE representation values are stored in adata.obsm["STAGATE"].')
+        print('The ReX values are stored in adata.layers["STAGATE_ReX"].')
+
+    def cal_pSM(self,n_neighbors:int=20,resolution:int=1,
+                       max_cell_for_subsampling:int=5000,
+                       psm_key='pSM_STAGATE'):
+        """
+        Calculate the pseudo-spatial map using diffusion pseudotime (DPT) algorithm.
+
+        Parameters
+        ----------
+        n_neighbors: int
+            Number of neighbors for constructing the kNN graph.
+        resolution: float
+            Resolution for clustering.
+        max_cell_for_subsampling: int
+            Maximum number of cells for subsampling. If the number of cells is larger than this value, the subsampling will be performed.
+
+        Returns
+        -------
+        pSM_values: numpy.ndarray
+            The pseudo-spatial map values.
+        
+        """
+
+        sc.pp.neighbors(self.adata, n_neighbors=n_neighbors, 
+               use_rep='STAGATE')
+        sc.tl.umap(self.adata)
+        sc.tl.leiden(self.adata, resolution=resolution)
+        sc.tl.paga(self.adata)
+        max_cell_for_subsampling = max_cell_for_subsampling
+        if self.adata.shape[0] < max_cell_for_subsampling:
+            sub_adata_x = self.adata.obsm['STAGATE']
+        else:
+            indices = np.arange(self.adata.shape[0])
+            selected_ind = np.random.choice(indices, max_cell_for_subsampling, False)
+            sub_adata_x = self.adata[selected_ind, :].obsm['STAGATE']
+
+        from scipy.spatial import distance_matrix
+        import numpy as np
+        sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
+        self.adata.uns['iroot'] = np.argmax(sum_dists)
+        sc.tl.diffmap(self.adata)
+        sc.tl.dpt(self.adata)
+        self.adata.obs.rename({"dpt_pseudotime": psm_key}, axis=1, inplace=True)
+        print(f'The pseudo-spatial map values are stored in adata.obs["{psm_key}"].')
+
+        pSM_values = self.adata.obs[psm_key].to_numpy()
+        return pSM_values
         
