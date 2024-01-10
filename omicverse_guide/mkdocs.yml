@@ -30,6 +30,7 @@ nav:
             - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
             - Timing-associated genes analysis with cellfategenie: Tutorials-single/t_cellfate_gene.ipynb
             - Timing-associated genesets analysis with cellfategenie: Tutorials-single/t_cellfate_genesets.ipynb
+            - Identify the driver regulators of cell fate decisions: Tutorials-single/t_cellfate.ipynb
         - Cell Structure:
             - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
             - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
