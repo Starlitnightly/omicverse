@@ -175,8 +175,9 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
 
 def qc(adata:anndata.AnnData, mode='seurat', 
        min_cells=3, min_genes=200, nmads=5, 
+       max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,
-       path_viz=None, tresh=None):
+       path_viz=None, tresh=None,mt_startswith='MT-'):
     """
     Perform quality control on a dictionary of AnnData objects.
     
@@ -191,10 +192,13 @@ def qc(adata:anndata.AnnData, mode='seurat',
         mode : The filtering method to use. Valid options are 'seurat' and 'mads'. Default is 'seurat'.
         min_cells : The minimum number of cells for a sample to pass QC. Default is 3.
         min_genes : The minimum number of genes for a cell to pass QC. Default is 200.
+        max_cells_ratio : The maximum number of cells ratio for a sample to pass QC. Default is 1.
+        max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         path_viz : The path to save the QC plots. Default is None.
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', and 'detected_genes'.
             Only used if mode is 'seurat'. Default is None.
+        mt_startswith : The prefix of mitochondrial genes. Default is 'MT-'.
 
     Returns:
         adata : An AnnData object containing cells that passed QC filters.
@@ -211,7 +215,7 @@ def qc(adata:anndata.AnnData, mode='seurat',
     # QC metrics
     print('Calculate QC metrics')
     adata.var_names_make_unique()
-    adata.var["mt"] = adata.var_names.str.startswith("MT-")
+    adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
     if issparse(adata.X):
         adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
         adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
@@ -280,6 +284,8 @@ def qc(adata:anndata.AnnData, mode='seurat',
     # Last gene and cell filter
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
+    sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
+    sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
 
     return adata
 

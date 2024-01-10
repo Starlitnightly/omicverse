@@ -114,8 +114,10 @@ def data_preprocess(adata,clustertype='leiden',
     sc.settings.verbosity = 2  # reduce the verbosity
     if rank_rep==False and 'rank_genes_groups' not in adata.uns.keys():
         sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
-    else:
+    elif rank_rep==True:
         sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+    else:
+        pass
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
