@@ -12,6 +12,7 @@ from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
+torch_sparse_install=False
 
 class GATConv(MessagePassing):
     r"""The graph attentional operator from the `"Graph Attention Networks"
@@ -59,11 +60,31 @@ class GATConv(MessagePassing):
     """
     _alpha: OptTensor
 
+    def check_torch_sparse(self):
+        """
+        
+        """
+        global torch_sparse_install
+        try:
+            from torch_sparse import SparseTensor, set_diag
+            torch_sparse_install=True
+        except ImportError:
+            raise ImportError(
+                'Please install the torch_sparse: `pip install -U torch_sparse`.'
+            )
+
     def __init__(self, in_channels: Union[int, Tuple[int, int]],
                  out_channels: int, heads: int = 1, concat: bool = True,
                  negative_slope: float = 0.2, dropout: float = 0.0,
                  add_self_loops: bool = True, bias: bool = True,
                  prune_weight: float = 0.0, **kwargs):
+        
+        self.check_torch_sparse()
+        global torch_sparse_install
+        if torch_sparse_install==True:
+            global_imports('torch_sparse', members=['SparseTensor', 'set_diag'], asfunction=True)
+        
+
         kwargs.setdefault('aggr', 'add')
         super(GATConv, self).__init__(node_dim=0, **kwargs)
 
@@ -132,15 +153,7 @@ class GATConv(MessagePassing):
                 attention weights for each edge. (default: :obj:`None`)
         """
         H, C = self.heads, self.out_channels
-        
-        try:
-            from torch_sparse import SparseTensor, set_diag
-        except ImportError:
-            raise ImportError(
-                """Please install the torch_sparse: `conda install torch_sparse` or 
-                `pip install torch_sparse`.'"""
-            )
-        
+    
     
         # We first transform the input node features. If a tuple is passed, we
         # transform source and target node features via separate weights:
@@ -229,3 +242,35 @@ class GATConv(MessagePassing):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
                                              self.in_channels,
                                              self.out_channels, self.heads)
+
+
+def global_imports(modulename, members=None, asfunction=False):
+    """
+    Dynamically imports a module or specific members and adds them to the global namespace.
+
+    Parameters:
+    - modulename (str): The name of the module to import.
+    - members (list, optional): A list of specific members to import from the module.
+    - asfunction (bool, optional): If True, import the module or members as functions in the global namespace.
+
+    Example usage:
+    - Importing the entire module:
+      global_imports('module_name')
+
+    - Importing specific members:
+      global_imports('module_name', members=['member1', 'member2'])
+
+    - Importing as functions:
+      global_imports('module_name', asfunction=True)
+      global_imports('module_name', members=['member1', 'member2'], asfunction=True)
+    """
+    if members is None:
+        members = [modulename]  # Default to importing the entire module
+
+    imported_module = __import__(modulename, fromlist=members)
+
+    if asfunction:
+        for member in members:
+            globals()[member] = getattr(imported_module, member)
+    else:
+        globals()[modulename] = imported_module

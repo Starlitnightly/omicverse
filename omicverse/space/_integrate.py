@@ -191,16 +191,18 @@ class pySTAligner(object):
             if epoch % 100 == 0 or epoch == 500:
                 if self.verbose:
                     print('Update spot triplets at epoch ' + str(epoch))
-
+                    
                 with torch.no_grad():
                     z_list = []
                     for batch in self.data_list:
                         z, _ = self.model.cpu()(batch.x, batch.edge_index)
                         z_list.append(z.cpu().detach().numpy())
+
                 self.adata.obsm['STAGATE'] = np.concatenate(z_list, axis=0)
                 self.model = self.model.to(self.device)
 
                 pair_data_list = []
+
                 for comb in self.iter_comb:
                     #print(comb)
                     i, j = comb[0], comb[1]
@@ -208,13 +210,13 @@ class pySTAligner(object):
                     mnn_dict = create_dictionary_mnn(batch_pair, use_rep='STAGATE', batch_name=self.batch_key,
                                                            k=self.knn_neigh,
                                                            iter_comb=None, verbose=0)
-
+                    
                     batchname_list = batch_pair.obs[self.batch_key]
                     cellname_by_batch_dict = dict()
                     for batch_id in range(len(self.section_ids)):
                         cellname_by_batch_dict[self.section_ids[batch_id]] = batch_pair.obs_names[
                             batch_pair.obs[self.batch_key] == self.section_ids[batch_id]].values
-
+                    
                     anchor_list = []
                     positive_list = []
                     negative_list = []
@@ -233,17 +235,21 @@ class pySTAligner(object):
                     negative_ind = list(map(lambda _: batch_as_dict[_], negative_list))
 
                     edge_list_1 = np.nonzero(self.Batch_list[i].uns['adj'])
+
                     max_ind = edge_list_1[0].max()
                     edge_list_2 = np.nonzero(self.Batch_list[j].uns['adj'])
+
                     edge_list_2 = (edge_list_2[0] + max_ind + 1, edge_list_2[1] + max_ind + 1)
                     edge_list = [edge_list_1, edge_list_2]
+
                     edge_pairs = [np.append(edge_list[0][0], edge_list[1][0]), np.append(edge_list[0][1], edge_list[1][1])]
+
                     pair_data_list.append(Data(edge_index=torch.LongTensor(np.array([edge_pairs[0], edge_pairs[1]])),
                                            anchor_ind=torch.LongTensor(np.array(anchor_ind)),
                                            positive_ind=torch.LongTensor(np.array(positive_ind)),
                                            negative_ind=torch.LongTensor(np.array(negative_ind)),
-                                           x=torch.FloatTensor(batch_pair.X.todense())))
-
+                                           x=batch_pair.X)) #torch.FloatTensor(batch_pair.X.todense())
+                
                 # for temp in pair_data_list:
                 #     temp.to(device)
                 pair_loader = DataLoader(pair_data_list, batch_size=1, shuffle=True)
@@ -251,6 +257,8 @@ class pySTAligner(object):
             for batch in pair_loader:
                 self.model.train()
                 self.optimizer.zero_grad()
+                
+                batch.x = torch.FloatTensor(batch.x[0].todense())
                 batch = batch.to(self.device)
                 z, out = self.model(batch.x, batch.edge_index)
                 mse_loss = F.mse_loss(batch.x, out)
@@ -279,3 +287,4 @@ class pySTAligner(object):
 
         self.adata.obsm[self.key_added] = np.concatenate(z_list, axis=0)
         return self.adata
+    
