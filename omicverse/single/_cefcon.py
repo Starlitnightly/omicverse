@@ -20,7 +20,19 @@ import zipfile
 from ..CEFCON.cell_lineage_GRN import NetModel
 from ..CEFCON.utils import data_preparation
 
+biomart_install = False
+ctxcore_install = False
 
+def check_ctxcore():
+    global ctxcore_install
+    try:
+        from ctxcore.genesig import GeneSignature
+        ctxcore_install = True
+    except ImportError:
+        raise ImportError(
+            'Please install the ctxcore: `pip install ctxcore`.'
+        )
+    
 def mouse_hsc_nestorowa16(fpath: Optional[str] = './data_cache/mouse_hsc_nestorowa16_v0.h5ad', version: Optional[str] = 'v0'):
     if version=='v0':
         fpath = './data_cache/mouse_hsc_nestorowa16_v0.h5ad'
@@ -158,7 +170,15 @@ def load_human_prior_interaction_network(dataset: str = 'nichenet',
 
 
 def convert_human_to_mouse_network(net: pd.DataFrame):
-    import biomart
+    global biomart_install
+    try:
+        import biomart
+        biomart_install=True
+    except ImportError:
+        raise ImportError(
+            'Please install the biomart: `pip install -U biomart`.'
+            )
+
 
     print('Convert genes of the prior interaction network to mouse gene symbols:')
     with tqdm(total=10, desc='Processing', miniters=1) as outer_bar:
@@ -312,7 +332,6 @@ class pyCEFCON(object):
                                 cuda=self.cuda,
                                 )
 
-
     def preprocess(self):
         print('Start data preparation\n')
         self.data = data_preparation(self.input_expData, self.input_priorNet, genes_DE=self.input_genesDE,
@@ -344,6 +363,7 @@ class pyCEFCON(object):
     
 
     def predicted_RGM(self):
+
         for lineage, result_lineage in self.cefcon_results_dict.items():
             print(f'Start calculate regulon-like gene modules - {lineage}:')
             result_lineage.RGM_activity()
@@ -351,3 +371,16 @@ class pyCEFCON(object):
             del result_lineage
         print('Finish predicted\n')
             
+
+
+def global_imports_members(modulename, members=None, asfunction=False):
+    if members is None:
+        members = [modulename]  # Default to importing the entire module
+
+    imported_module = __import__(modulename, fromlist=members)
+
+    if asfunction:
+        for member in members:
+            globals()[member] = getattr(imported_module, member)
+    else:
+        globals()[modulename] = imported_module
