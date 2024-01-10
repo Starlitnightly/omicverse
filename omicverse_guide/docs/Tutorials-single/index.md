@@ -10,6 +10,7 @@
 - [Trajectory Inference with VIA and scVelo](t_via_velo)
 - [Timing-associated genes analysis with cellfategenie](t_cellfate_gene)
 - [Timing-associated genesets analysis with cellfategenie](t_cellfate_genesets)
+- [Identify the driver regulators of cell fate decisions](t_cellfate.ipynb)
 - [Pathway analysis with AUCell](t_aucell)
 - [Different expression analysis in scRNA-seq](t_scdeg)
 - [Drug response predict with scDrug](t_scdrug)
