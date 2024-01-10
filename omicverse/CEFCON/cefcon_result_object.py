@@ -12,7 +12,7 @@ import matplotlib.ticker as ticker
 from matplotlib.pyplot import rc_context
 import seaborn as sns
 # import aucell and ctxcore
-from ..single import aucell
+from ..single._aucell import aucell
 
 from .driver_regulators import driver_regulators
 
@@ -141,7 +141,6 @@ class CefconResults:
         if ctxcore_install==True:
             global GeneSignature
             from ctxcore.genesig import GeneSignature
-        print(ctxcore_install)
 
         network = self.network
         DEgenes = self.DEgenes

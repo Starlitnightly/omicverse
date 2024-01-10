@@ -29,7 +29,7 @@ def check_ctxcore():
     try:
         import ctxcore
         ctxcore_install=True
-        print('ctxcore have been install version:',ctxcore.__version__)
+        #print('ctxcore have been install version:',ctxcore.__version__)
     except ImportError:
         raise ImportError(
             'Please install the ctxcore: `pip install ctxcore`.'
