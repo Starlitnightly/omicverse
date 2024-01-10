@@ -226,7 +226,7 @@ class CefconResults:
         data_for_plot = data_for_plot[0:topK]
 
         plt.figure(figsize=(1.5, topK * 0.15))
-        sns.set_theme(style='ticks', font_scale=0.5)
+        #sns.set_theme(style='ticks', font_scale=0.5)
 
         ax = sns.barplot(x='influence_score', y=data_for_plot.index, data=data_for_plot, orient='h',
                          palette=sns.color_palette(f"ch:start=.5,rot=-.5,reverse=1,dark=0.4", n_colors=topK))
@@ -272,7 +272,7 @@ class CefconResults:
                        )
         annotate.circos_labels(sub_net, sort_by='influence_score', layout='rotate')
 
-    def plot_driver_genes_Venn(self):
+    def plot_driver_genes_Venn(self,figsize=(4,4)):
         """
         Plot Venn diagram of MDS, MFVS and top-ranked regulators.
         """
@@ -288,8 +288,8 @@ class CefconResults:
         top_ranked_genes = set(drivers_df.loc[drivers_df['is_driver_regulator']].index).union(
             (set(drivers_df.index) - MFVS_driver_set.union(MDS_driver_set)))
 
-        f = plt.figure(figsize=(3, 3))
-        sns.set_theme(font_scale=f.get_dpi() / 100)
+        f = plt.figure(figsize=figsize)
+        #sns.set_theme(font_scale=f.get_dpi() / 100)
 
         matplotlib_venn()
         global venn_install
@@ -344,7 +344,7 @@ class CefconResults:
 
         # plot clustermap (n_cell * n_gene)
         f = plt.figure()
-        sns.set_theme(font_scale=f.get_dpi()/150)
+        #sns.set_theme(font_scale=f.get_dpi()/150)
         g = sns.clustermap(auc_mtx.T, method='ward', square=False, linecolor='black',
                            z_score=0, vmin=-2.5, vmax=2.5,
                            col_cluster=col_cluster, col_colors=network_colors, cmap="RdBu_r",

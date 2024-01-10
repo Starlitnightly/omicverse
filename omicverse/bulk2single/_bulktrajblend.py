@@ -210,7 +210,8 @@ class BulkTrajBlend(object):
         self.generate_adata=generate_adata.copy()
         return generate_adata.raw.to_adata()
     
-    def gnn_configure(self,gpu=0,hidden_size:int=128,
+    def gnn_configure(self,use_rep='X',neighbor_rep='X_pca',
+                      gpu=0,hidden_size:int=128,
                      weight_decay:int=1e-2,
                      dropout:float=0.5,
                      batch_norm:bool=True,
@@ -239,7 +240,8 @@ class BulkTrajBlend(object):
 
 
         """
-        nocd_obj=scnocd(self.generate_adata,gpu=gpu)
+        nocd_obj=scnocd(self.generate_adata,use_rep=use_rep,
+                        neighbor_rep=neighbor_rep,gpu=gpu)
         #nocd_obj.device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
         nocd_obj.matrix_transform(clustertype=self.celltype_key)
         nocd_obj.matrix_normalize()

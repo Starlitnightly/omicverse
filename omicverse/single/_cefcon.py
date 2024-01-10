@@ -169,7 +169,7 @@ def load_human_prior_interaction_network(dataset: str = 'nichenet',
     return prior_net
 
 
-def convert_human_to_mouse_network(net: pd.DataFrame):
+def convert_human_to_mouse_network(net: pd.DataFrame,server_name='asia'):
     global biomart_install
     try:
         import biomart
@@ -183,16 +183,20 @@ def convert_human_to_mouse_network(net: pd.DataFrame):
     print('Convert genes of the prior interaction network to mouse gene symbols:')
     with tqdm(total=10, desc='Processing', miniters=1) as outer_bar:
         outer_bar.update()
-
+        if server_name!='asia':
         # Set up connection to server
-        for name in ['ensembldb', 'asia', 'useast', 'martdb']:
-            try:
-                server = biomart.BiomartServer(
-                    f'http://{name}.ensembl.org/biomart/')
-                print(f'Server \'http://{name}.ensembl.org/biomart/\' is OK')
-                break
-            except Exception as e:
-                print(f'404 Client Error: Not Found for url: http://{name}.ensembl.org/biomart//martservice')
+            for name in ['ensembldb', 'asia', 'useast', 'martdb']:
+                try:
+                    server = biomart.BiomartServer(
+                        f'http://{name}.ensembl.org/biomart/')
+                    print(f'Server \'http://{name}.ensembl.org/biomart/\' is OK')
+                    break
+                except Exception as e:
+                    print(f'404 Client Error: Not Found for url: http://{name}.ensembl.org/biomart//martservice')
+        else:
+            server = biomart.BiomartServer(
+                        f'http://asia.ensembl.org/biomart/')
+            print(f'Server \'http://asia.ensembl.org/biomart/\' is OK')
 
         human_dataset = server.datasets['hsapiens_gene_ensembl']
         outer_bar.update()
