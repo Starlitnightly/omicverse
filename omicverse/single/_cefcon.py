@@ -11,12 +11,12 @@ from pathlib import Path
 import pandas as pd
 from tqdm.auto import tqdm
 import numpy as np
-from itertools import permutations
+from itertools import permutations, product
 from typing import Optional
+import requests
 import os
 import scanpy as sc
 import zipfile
-import requests
 from ..CEFCON.cell_lineage_GRN import NetModel
 from ..CEFCON.utils import data_preparation
 
