@@ -4,10 +4,9 @@ from pathlib import Path
 import pandas as pd
 
 import sys
-sys.path.insert(0, '/home/wangpeizhuo')
-from cefcon.cell_lineage_GRN import NetModel
-from cefcon.cefcon_result_object import CefconResults
-from cefcon.utils import data_preparation
+from .cell_lineage_GRN import NetModel
+from .cefcon_result_object import CefconResults
+from .utils import data_preparation
 
 
 def main():
