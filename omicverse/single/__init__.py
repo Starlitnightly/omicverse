@@ -17,3 +17,5 @@ from ._batch import batch_correction
 from ._cellfategenie import cellfategenie,gene_trends
 from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
 from ._traj import TrajInfer
+from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
+from ._aucell import aucell
