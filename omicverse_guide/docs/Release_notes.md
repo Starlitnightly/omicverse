@@ -293,6 +293,10 @@
 
 ### single Module
 - Fixed the import error of `palantir` in SEACells
+- Added `CEFCON` model to identify the driver regulators of cell fate decisions
+
+### bulk2single Module
+- Added `use_rep` and `neighbor_rep` argument to configure the nocd 
 
 ### space Module:
 - Added `SpaceFlow` to identify the pseudo-spatial map
