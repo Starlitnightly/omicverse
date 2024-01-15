@@ -273,17 +273,18 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
 
 
 def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
-                        cax_loc:int=2,cax_fontsize:int=12,
+                        cax_loc:list=[2, 0.55, 0.5, 0.02],cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
                         figsize:tuple=(2,4),cmap:str='YlGnBu',
-                        text_knock:int=2,text_maxsize:int=20)->matplotlib.axes._axes.Axes:
+                        text_knock:int=2,text_maxsize:int=20,
+                        bbox_to_anchor_used:tuple=(-0.45, -13),node_diameter:int=10)->matplotlib.axes._axes.Axes:
     """
     Plot the gene set enrichment result.
 
     Arguments:
         num: The number of enriched terms to plot. Default is 10.
         node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
-        cax_loc: The location of the colorbar on the plot. Default is 2.
+        cax_loc: The location, width and height of the colorbar on the plot. Default is [2, 0.55, 0.5, 0.02].
         cax_fontsize: The fontsize of the colorbar label. Default is 12.
         fig_title: The title of the plot. Default is an empty string.
         fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
@@ -291,6 +292,8 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
         cmap: The colormap to use for the plot. Default is 'YlGnBu'.
         text_knock: The number of characters to knock off the end of the term name. Default is 2.
         text_maxsize: The maximum fontsize of the term names. Default is 20.
+        bbox_to_anchor_used (tuple): The anchor point for placing the legend. Default is (-0.45, -13).
+        node_diameter (int): The base size for nodes in the plot. Default is 10.
 
     Returns:
         A matplotlib.axes.Axes object.
@@ -299,7 +302,7 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
     fig, ax = plt.subplots(figsize=figsize)
     plot_data2=enrich_res.sort_values('P-value')[:num].sort_values('logc')
     st=ax.scatter(plot_data2['fraction'],range(len(plot_data2['logc'])),
-            s=plot_data2['num']*10,linewidths=1,edgecolors='black',c=plot_data2['logp'],cmap=cmap)
+            s=plot_data2['num']*node_diameter,linewidths=1,edgecolors='black',c=plot_data2['logp'],cmap=cmap)
     ax.yaxis.tick_right()
     plt.yticks(range(len(plot_data2['fraction'])),[plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in plot_data2['Term']],
             fontsize=10,)
@@ -308,18 +311,18 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
     plt.xlabel(fig_xlabel,fontsize=12)
 
     #fig = plt.gcf()
-    cax = fig.add_axes([cax_loc, 0.55, 0.5, 0.02])
+    cax = fig.add_axes(cax_loc)
     cb=fig.colorbar(st,shrink=0.25,cax=cax,orientation='horizontal')
     cb.set_label(r'$−Log_{10}(P_{adjusted})$',fontdict={'size':cax_fontsize})
 
     gl_li=[]
     for i in node_size:
-        gl_li.append(ax.scatter([],[], s=i*10, marker='o', color='white',edgecolors='black'))
+        gl_li.append(ax.scatter([],[], s=i*node_diameter, marker='o', color='white',edgecolors='black'))
 
     plt.legend(gl_li,
         [str(i) for i in node_size],
         loc='lower left',
-        ncol=3,bbox_to_anchor=(-0.45, -13),
+        ncol=3,bbox_to_anchor=bbox_to_anchor_used,
         fontsize=cax_fontsize)
     return ax
 
