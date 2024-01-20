@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.5.6"
+version = "1.5.8"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -14,7 +14,7 @@ license = {file = "LICENSE"}
 authors = [
     {name = "Zehua Zeng", email = "starlitnightly@163.com"},
 ]
-keywords = ["bioinformatics", "deep-learning", "single-cell", "bulk RNA-seq"]
+keywords = ["bioinformatics", "deep-learning", "scRNA-seq", "RNA-seq"]
 classifiers = [
     "Intended Audience :: Science/Research",
     "Natural Language :: English",

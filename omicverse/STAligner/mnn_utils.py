@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 
 from sklearn.neighbors import NearestNeighbors
-from annoy import AnnoyIndex
+
 import itertools
 import networkx as nx
-import hnswlib
+
 
 # Modified from https://github.com/lkmklsmn/insct
 def create_dictionary_mnn(adata, use_rep, batch_name, k = 50, save_on_disk = True, approx = True, verbose = 1, iter_comb = None):
@@ -80,6 +80,7 @@ def consecutive_indexed(Y):
 
 
 def nn_approx(ds1, ds2, names1, names2, knn=50):
+    import hnswlib
     dim = ds2.shape[1]
     num_elements = ds2.shape[0]
     p = hnswlib.Index(space='l2', dim=dim)
@@ -111,6 +112,7 @@ def nn(ds1, ds2, names1, names2, knn=50, metric_p=2):
 def nn_annoy(ds1, ds2, names1, names2, knn = 20, metric='euclidean', n_trees = 50, save_on_disk = True):
     """ Assumes that Y is zero-indexed. """
     # Build index.
+    from annoy import AnnoyIndex
     a = AnnoyIndex(ds2.shape[1], metric=metric)
     if(save_on_disk):
         a.on_disk_build('annoy.index')
