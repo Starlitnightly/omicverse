@@ -233,10 +233,10 @@ class pyDEG(object):
                 )
         
         ax.plot([result['log2FC'].min(),result['log2FC'].max()],#辅助线的x值起点与终点
-        [-np.log10(self.pval_threshold),-np.log10(self.pval_threshold)],#辅助线的y值起点与终点
-        linewidth=2,#辅助线的宽度
-        linestyle="--",#辅助线类型：虚线
-        color='black'#辅助线的颜色
+                [-np.log10(self.pval_threshold),-np.log10(self.pval_threshold)],#辅助线的y值起点与终点
+                linewidth=2,#辅助线的宽度
+                linestyle="--",#辅助线类型：虚线
+                color='black'#辅助线的颜色
         )
         ax.plot([self.fc_max,self.fc_max],
                 [result['-log(qvalue)'].min(),result['-log(qvalue)'].max()],
@@ -273,6 +273,8 @@ class pyDEG(object):
         ax.spines['left'].set_visible(True)
 
         from adjustText import adjust_text
+        import adjustText
+        
         if plot_genes is not None:
             hub_gene=plot_genes
         else:
@@ -290,8 +292,13 @@ class pyDEG(object):
                result.loc[i,'-log(qvalue)'],
                i,
                fontdict={'size':plot_genes_fontsize,'weight':'bold','color':color_dict[result.loc[i,'sig']]}
-               ) for i in hub_gene if 'ENSG' not in i]
-        adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+               ) for i in hub_gene]
+        
+        if adjustText.__version__<='0.8':
+            adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+        else:
+            adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                        arrowprops=dict(arrowstyle='->', color='red'),autoalign='xy')
 
         ax.set_xticks([round(i,2) for i in ax.get_xticks()[1:-1]],#获取x坐标轴内容
               [round(i,2) for i in ax.get_xticks()[1:-1]],#更新x坐标轴内容
