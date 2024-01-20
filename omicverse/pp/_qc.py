@@ -177,7 +177,7 @@ def qc(adata:anndata.AnnData, mode='seurat',
        min_cells=3, min_genes=200, nmads=5, 
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-'):
+       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
     """
     Perform quality control on a dictionary of AnnData objects.
     
@@ -199,6 +199,7 @@ def qc(adata:anndata.AnnData, mode='seurat',
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', and 'detected_genes'.
             Only used if mode is 'seurat'. Default is None.
         mt_startswith : The prefix of mitochondrial genes. Default is 'MT-'.
+        mt_genes : The list of mitochondrial genes. Default is None. if mt_genes is not None, mt_startswith will be ignored.
 
     Returns:
         adata : An AnnData object containing cells that passed QC filters.
@@ -215,7 +216,12 @@ def qc(adata:anndata.AnnData, mode='seurat',
     # QC metrics
     print('Calculate QC metrics')
     adata.var_names_make_unique()
-    adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+    if mt_genes is not None:
+        adata.var['mt']=False
+        adata.var.loc[list(set(adata.var_names) & set(mt_genes)),'mt']=True
+    else:
+        adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+    
     if issparse(adata.X):
         adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
         adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
