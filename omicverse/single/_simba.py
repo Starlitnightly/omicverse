@@ -171,10 +171,13 @@ class pySIMBA(object):
         
         # we choose the largest dataset as a reference
         batch_size_si = dict(zip(list(dict_adata.keys()),
-                            [dict_adata[i].shape[0] for i in dict_adata.keys()]))
-        adata_ref_si = dict_adata[max(batch_size_si, key=batch_size_si.get)]
-        dict_adata.pop(max(batch_size_si, key=batch_size_si.get))
-        list_adata_query = list(dict_adata.values())
+                [dict_adata[i].shape[0] for i in dict_adata.keys()]))
+        max_dict_label = max(batch_size_si, key=batch_size_si.get)
+        dict_adata2 = dict_adata.copy()
+        adata_ref_si = dict_adata2[max_dict_label] # select largest dataset
+        dict_adata2.pop("G") # remove genes
+        dict_adata2.pop(max_dict_label) # remove largest dataset
+        list_adata_query = list(dict_adata2.values())
         adata_all = si.tl.embed(adata_ref = adata_ref_si,
                             list_adata_query = list_adata_query,
                             use_precomputed = use_precomputed)
