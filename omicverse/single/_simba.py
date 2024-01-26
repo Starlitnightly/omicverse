@@ -170,11 +170,11 @@ class pySIMBA(object):
             self.adata.uns['simba_Gen'][batch].obsm['X_simba']=self.adata.uns['simba_Gen'][batch].to_df().values
         
         # we choose the largest dataset as a reference
-        batch_size_si = dict(zip(list(dict_adata.keys()),
-                [dict_adata[i].shape[0] for i in dict_adata.keys()]))
-        dict_adata2.pop("G") # remove genes
-        max_dict_label = max(batch_size_si, key=batch_size_si.get)
         dict_adata2 = dict_adata.copy()
+        dict_adata2.pop("G") # remove genes
+        batch_size_si = dict(zip(list(dict_adata2.keys()),
+                [dict_adata2[i].shape[0] for i in dict_adata2.keys()]))
+        max_dict_label = max(batch_size_si, key=batch_size_si.get)
         adata_ref_si = dict_adata2[max_dict_label] # select largest dataset
         dict_adata2.pop(max_dict_label) # remove largest dataset
         list_adata_query = list(dict_adata2.values())
