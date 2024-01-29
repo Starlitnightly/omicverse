@@ -298,5 +298,18 @@
 ### bulk2single Module
 - Added `use_rep` and `neighbor_rep` argument to configure the nocd 
 
-### space Module:
+### space Module
 - Added `SpaceFlow` to identify the pseudo-spatial map
+
+## v 1.5.8
+
+### bulk Module
+- Fixed `dds.plot_volcano` text plot error when the version of `adjustText` larger than `0.9`
+
+### single Module
+- Optimised `MetaCell.load` model loading logic
+
+### pl Module
+Add `pl` as a unified drawing prefix for the next release, to replace the drawing functionality in the original utils, while retaining the drawing in the original utils.
+- Added `embedding` to plot the embedding of scRNA-seq using `ov.pl.embedding`
+- Added `optim_palette` to provide a spatially constrained approach that generates discriminate color assignments for visualizing single-cell spatial data in various scenarios
