@@ -313,3 +313,10 @@
 Add `pl` as a unified drawing prefix for the next release, to replace the drawing functionality in the original utils, while retaining the drawing in the original utils.
 - Added `embedding` to plot the embedding of scRNA-seq using `ov.pl.embedding`
 - Added `optim_palette` to provide a spatially constrained approach that generates discriminate color assignments for visualizing single-cell spatial data in various scenarios
+- Added `cellproportion` to plot the proportion of stack bar of scRNA-seq
+- Added `embedding_celltype` to plot the figures both celltype proportion and embedding
+- Added `ConvexHull` to plot the ConvexHull around the target cells
+- Added `embedding_adjust` to adjust the text of celltype legend in embedding
+- Added `embedding_density` to plot the category density in the cells
+- Added `bardotplot` to plot the bardotplot between different groups.
+- Added `add_palue` to plot the p-threshold between different groups.
