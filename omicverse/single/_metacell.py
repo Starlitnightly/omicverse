@@ -33,11 +33,12 @@ class MetaCell(object):
                     use_sparse=use_sparse)
         self.adata=adata
 
+        
+
+    def initialize_archetypes(self,**kwargs):
         self.model.construct_kernel_matrix()
         self.M = self.model.kernel_matrix
         self.metacells_ad=None
-
-    def initialize_archetypes(self,**kwargs):
         self.model.initialize_archetypes(**kwargs)
     
     def train(self,min_iter=10, max_iter=50,**kwargs):
@@ -71,6 +72,8 @@ class MetaCell(object):
         import pickle
         with open(model_path, "wb") as f:
             self.model=pickle.load(f)
+            self.M = self.model.kernel_matrix
+            self.metacells_ad=None
 
     def step(self,n_steps=5):
         # You can force the model to run additional iterations step-wise using the .step() function

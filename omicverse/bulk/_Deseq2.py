@@ -298,7 +298,7 @@ class pyDEG(object):
             adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
         else:
             adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
-                        arrowprops=dict(arrowstyle='->', color='red'),autoalign='xy')
+                        arrowprops=dict(arrowstyle='->', color='red'))
 
         ax.set_xticks([round(i,2) for i in ax.get_xticks()[1:-1]],#获取x坐标轴内容
               [round(i,2) for i in ax.get_xticks()[1:-1]],#更新x坐标轴内容
