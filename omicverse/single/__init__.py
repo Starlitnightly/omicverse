@@ -20,3 +20,4 @@ from ._traj import TrajInfer
 from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
 from ._aucell import aucell
 from ._metacell import MetaCell
+from ._mdic3 import pyMDIC3

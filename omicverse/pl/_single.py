@@ -127,8 +127,8 @@ def embedding(
 
 
 
-def cellproportion(adata:AnnData,celltype_clusters:str,visual_clusters:str,
-                       visual_li=None,visual_name:str='',figsize:tuple=(4,6),
+def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
+                       groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
                        legend:bool=False):
     """
@@ -137,9 +137,8 @@ def cellproportion(adata:AnnData,celltype_clusters:str,visual_clusters:str,
     Arguments:
         adata: AnnData object.
         celltype_clusters: Cell type clusters.
-        visual_clusters: Visual clusters.
-        visual_li: Visual cluster list.
-        visual_name: Visual cluster name.
+        groupby: Visual clusters.
+        groupby_li: Visual cluster list.
         figsize: Figure size.
         ticks_fontsize: Ticks fontsize.
         labels_fontsize: Labels fontsize.
@@ -149,7 +148,8 @@ def cellproportion(adata:AnnData,celltype_clusters:str,visual_clusters:str,
     """
 
     b=pd.DataFrame(columns=['cell_type','value','Week'])
-    
+    visual_clusters=groupby
+    visual_li=groupby_li
     if visual_li==None:
         adata.obs[visual_clusters]=adata.obs[visual_clusters].astype('category')
         visual_li=adata.obs[visual_clusters].cat.categories
@@ -210,7 +210,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,visual_clusters:str,
 
     plt.xticks(fontsize=ticks_fontsize,rotation=90)
     plt.yticks(fontsize=ticks_fontsize)
-    plt.xlabel(visual_name,fontsize=labels_fontsize)
+    plt.xlabel(groupby,fontsize=labels_fontsize)
     plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
     #fig.tight_layout()
     if ax==None:

@@ -50,6 +50,8 @@ nav:
         - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
         - Mapping single-cell profile onto spatial profile: Tutorials-space/t_tangram.ipynb
         - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
+    - Plotting:
+        - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
 
 - API documentation: api/index.md
 - Release notes: Release_notes.md
