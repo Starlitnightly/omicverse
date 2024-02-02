@@ -17,6 +17,8 @@ from typing import (
 )
 from warnings import warn
 
+import matplotlib.patches as mpatches
+from scipy.stats import kruskal
 import numpy as np
 import pandas as pd
 from anndata import AnnData
@@ -487,3 +489,184 @@ def bardotplot(adata,groupby,color,figsize=(8,3),return_values=False,
     if ax==None:
         return fig,ax
     
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from scipy.stats import kruskal
+
+def single_group_boxplot(adata,
+                         groupby: str = '',
+                         color: str = '',
+                         type_color_dict: dict = None,
+                         title: str = '',
+                         ylabel: str = '',
+                         kruskal_test: bool = False,
+                         figsize: tuple = (4, 4),
+                         x_ticks_plot: bool = False,
+                         legend_plot: bool = True,
+                         bbox_to_anchor: tuple = (1, 0.55),
+                         save: bool = False,
+                         point_number: int = 5,
+                         save_pathway: str = '',
+                         sort: bool = True,
+                         scatter_kwargs: dict = None,
+                         ax = None,
+                        ):
+    """
+    adata (AnnData object): The data object containing the information for plotting.
+    groupby (str): The variable used for grouping the data.
+    color (str): The variable used for coloring the data points.
+    type_color_dict (dict): A dictionary mapping group categories to specific colors.
+    title (str): The title for the plot.
+    ylabel (str): The label for the y-axis.
+    kruskal_test (bool): Whether to perform a Kruskal-Wallis test and display the p-value on the plot.
+    figsize (tuple): The size of the plot figure in inches (width, height).
+    x_ticks_plot (bool): Whether to display x-axis tick labels.
+    legend_plot (bool): Whether to display a legend for the groups.
+    bbox_to_anchor (tuple): The position of the legend bbox (x, y) in axes coordinates.
+    save (bool): Whether to save the plot to a file.
+    point_number (int): The number of data points to be plotted for each group.
+    save_pathway (str): The file path for saving the plot (if save is True).
+    sort (bool): Whether to sort the groups based on their mean values.
+    scatter_kwargs (dict): Additional keyword arguments for customizing the scatter plot.
+    ax (matplotlib.axes.Axes): A pre-existing axes object for plotting (optional).
+    
+    Example:
+    ov.pl.single_group_boxplot(adata,groupby='clusters',
+             color='Sox_aucell',
+             type_color_dict=dict(zip(pd.Categorical(adata.obs['clusters']).categories, adata.uns['clusters_colors'])),
+             x_ticks_plot=True,
+             figsize=(5,4),
+             kruskal_test=True,
+             ylabel='Sox_aucell',
+             legend_plot=False,
+             bbox_to_anchor=(1,1),
+             title='Expression',
+             scatter_kwargs={'alpha':0.8,'s':10,'marker':'o'},
+             point_number=15,
+             sort=False,
+             save=False,
+             )
+    """
+
+    if scatter_kwargs is None:
+        scatter_kwargs = {}
+
+    # Create an empty dictionary to store results
+    plot_data = {}
+
+    var_ticks = False
+    obs_ticks = False
+    plot_text_ = color
+    if (plot_text_ in adata.var_names):
+        adata1 = adata
+        var_ticks = True
+    elif plot_text_ in adata.obs.columns:
+        adata1 = adata
+        obs_ticks = True
+    elif (adata.raw is not None) and (plot_text_ in adata.raw.var_names):
+        adata1 = adata1.raw.to_adata()
+        var_ticks = True
+    else:
+        print(f'Please check the `{color}` key in adata.obs or adata.var')
+        return
+    adata1.obs[groupby] = adata1.obs[groupby].astype('category')
+
+    if var_ticks == True:
+        adata1.obs[color] = adata1[:, plot_text_].to_df().values
+
+    # Categorize by groups
+    for group in set(adata1.obs[groupby]):
+        plot_data[group] = np.array(adata1.obs.loc[adata1.obs[groupby] == group, color].tolist())
+
+    if sort == True:
+        sorted_keys = sorted(plot_data.keys(), key=lambda k: np.mean(plot_data[k]))
+        sorted_plot_data = {key: plot_data[key] for key in sorted_keys}
+        plot_data = sorted_plot_data
+
+        sorted_colors = [type_color_dict[key] for key in sorted_keys]
+        sc_color = sorted_colors
+    else:
+        sc_color = [type_color_dict[key] for key in plot_data.keys()]
+
+    shake_dict = {}
+
+    for group in set(adata1.obs[groupby]):
+        data_list = []
+        gene_data = adata1.obs.loc[adata1.obs[groupby] == group, color].tolist()
+        if len(gene_data) > point_number:
+            bootstrap_data = np.random.choice(gene_data, size=point_number, replace=False)
+        else:
+            bootstrap_data = gene_data
+        shake_dict[group] = np.array(bootstrap_data)
+
+    # Set figure size
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot boxplots
+    width = 0.8
+    ticks = np.arange(len(plot_data))
+    positions = np.arange(len(ticks))
+
+    for num, (hue_data, hue_color) in enumerate(zip(plot_data.keys(), sc_color)):
+        position = positions[num]
+        b1 = ax.boxplot(plot_data[hue_data],
+                        positions=[position],
+                        sym='',
+                        widths=width,
+                        patch_artist=True
+                        )
+        plt.scatter(np.random.normal(position, 0.12, point_number),
+                    shake_dict[hue_data],
+                    c=hue_color, zorder=1, **scatter_kwargs)
+        box = b1['boxes'][0]
+        light_hue_color = tuple((min(1, c + 0.5 * (1 - c))) for c in plt.cm.colors.to_rgb(hue_color))
+        box.set(facecolor=light_hue_color, edgecolor=hue_color, linewidth=2)
+        plt.setp(b1['whiskers'], color=hue_color, linewidth=2)
+        plt.setp(b1['caps'], color=hue_color, linewidth=2)
+        plt.setp(b1['medians'], color=hue_color, linewidth=3)
+
+    # Axis labels and title
+    fontsize = 12
+
+    if x_ticks_plot == True:
+        ax.set_xticks(positions)
+        ax.set_xticklabels(plot_data.keys(), rotation=90, fontsize=fontsize)
+    else:
+        ax.set_xticklabels([])
+
+    yticks = ax.get_yticks()
+    ax.set_title(title, fontsize=13, fontweight='bold')
+    plt.ylabel(ylabel, fontsize=13, fontweight='bold')
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+
+    if legend_plot == True:
+        labels = list(plot_data.keys())
+        patches = [mpatches.Patch(color=sc_color[i], label="{:s}".format(labels[i])) for i in range(len(plot_data))]
+        ax.legend(handles=patches, bbox_to_anchor=bbox_to_anchor, ncol=1, fontsize=fontsize)
+
+    if kruskal_test == True:
+        data_list = [plot_data[key] for key in plot_data]
+        statistic, p_value = kruskal(*data_list)
+
+        if p_value < 0.0001:
+            formatted_p_value = "{:.2e}".format(p_value)
+        else:
+            formatted_p_value = "{:.4f}".format(p_value)
+        if p_value < 2.2e-16:
+            formatted_p_value = 2.2e-16
+            text = f"Kruskal-Wallis: P < {formatted_p_value}"
+        else:
+            text = f"Kruskal-Wallis: P = {formatted_p_value}"
+        plt.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=fontsize, fontweight='bold', verticalalignment='top',
+                 bbox=dict(facecolor='white', edgecolor='white', boxstyle='round,pad=0.5'))
+
+    if save == True:
+        plt.savefig(save_pathway, dpi=300, bbox_inches='tight')
+
+    if ax is None:
+        return fig, ax
