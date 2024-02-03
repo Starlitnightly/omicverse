@@ -70,7 +70,7 @@ class MetaCell(object):
 
     def load(self,model_path='seacells/model.pkl'):
         import pickle
-        with open(model_path, "wb") as f:
+        with open(model_path, "rb") as f:
             self.model=pickle.load(f)
             self.M = self.model.kernel_matrix
             self.metacells_ad=None
@@ -86,21 +86,21 @@ class MetaCell(object):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
-            return compute_celltype_purity(self.metacells_ad,
+            return compute_celltype_purity(self.adata,
                                            celltype_label)
     
     def separation(self,use_rep='X_pca',nth_nbr=1,**kwargs):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
-            return separation(self.metacells_ad,
+            return separation(self.adata,
                                            use_rep,nth_nbr=nth_nbr,**kwargs)
         
     def compactness(self,use_rep='X_pca',**kwargs):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
-            return compactness(self.metacells_ad,
+            return compactness(self.adata,
                                            use_rep,**kwargs)
 
 

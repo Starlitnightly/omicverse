@@ -355,8 +355,8 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
         hub_gene=[i[0] for i in sorted(degree_dict.items(),key=lambda x: x[1],reverse=True)[:plot_node_num]]
     
     pos1=dict()
-    for i in pos.keys():
-        pos1[i]=np.array([-1000,-1000])
+    #for i in pos.keys():
+    #    pos1[i]=np.array([-1000,-1000])
     for i in hub_gene:
         pos1[i]=pos[i]
     #label_options = {"ec": "white", "fc": "white", "alpha": 0.6}
@@ -366,12 +366,18 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     #    font_weight=label_fontweight,bbox=label_bbox,
     #)
     from adjustText import adjust_text
+    import adjustText
     texts=[ax.text(pos1[i][0], 
                pos1[i][1],
                i,
                fontdict={'size':label_fontsize,'weight':label_fontweight,'color':'black'}
                ) for i in hub_gene if 'ENSG' not in i]
-    adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+    if adjustText.__version__<='0.8':
+        adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+    else:
+        adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                    arrowprops=dict(arrowstyle='->', color='red'))
+   #adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
 
     ax.axis("off")
     
