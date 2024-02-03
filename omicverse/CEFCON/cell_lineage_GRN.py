@@ -1,5 +1,4 @@
 from typing import Optional, Union
-from torch_geometric.typing import Adj
 
 import numpy as np
 import pandas as pd
@@ -16,7 +15,6 @@ from torch import multiprocessing as mp
 from functools import partial
 
 import torch_geometric as pyg
-from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.nn import Linear, BatchNorm, DeepGraphInfomax
 from torch_geometric.utils import (
@@ -30,7 +28,7 @@ from torch_geometric.data import Data
 from .cefcon_result_object import CefconResults
 
 
-class GraphAttention_layer(MessagePassing):
+class GraphAttention_layer(pyg.nn.conv.MessagePassing):
     def __init__(self,
                  input_dim: int,
                  output_dim: int,
@@ -87,7 +85,7 @@ class GraphAttention_layer(MessagePassing):
         zeros(self.bias)
         glorot(self.weight_concat)
 
-    def forward(self, x: Tensor, edge_index: Adj, x_auxiliary: Tensor,
+    def forward(self, x: Tensor, edge_index, x_auxiliary: Tensor,
                 return_attention_weights: Optional[bool] = None):
         N, H, C = x.size(0), self.heads, self.output_dim
 
