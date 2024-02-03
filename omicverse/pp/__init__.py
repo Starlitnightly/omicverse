@@ -10,6 +10,6 @@ from ._preprocess import (identify_robust_genes,
                           regress,
                           regress_and_scale,
                           neighbors,
-                          pca)
+                          pca,score_genes_cell_cycle)
 
 from ._qc import quantity_control,qc,filter_cells,filter_genes

@@ -25,11 +25,11 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
 
 ## Conda
 
-### 1.  Install conda. We typically use the `mambaforge` distribution. Use python>=3.8, conda consider using mamba instead of conda.
+### 1.  Install conda. We typically use the `mambaforge` distribution. Use python>=3.8, conda consider using `mamba` instead of `conda`.
 ### 2.  Create a new conda environment: 
 
    ```shell
-   conda create -n omicverse python=3.8
+   conda create -n omicverse python=3.9
    ```
 ### 3.  Activate your environment:
 
@@ -39,7 +39,8 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
 ### 4.  Install [PyTorch](https://pytorch.org/get-started/locally/) and [PyG](https://pytorch-geometric.readthedocs.io/) at first:
 
    ```shell
-   conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+   conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+   #conda install pytorch torchvision torchaudio cpuonly -c pytorch
    conda install pyg -c pyg
    ```
 ### 5.  Install `omicverse`:
@@ -55,20 +56,24 @@ The `omicverse` package can be installed via pip using one of the following comm
 ### 1. Install [PyTorch](https://pytorch.org/get-started/locally/) at first: More about the installation can be found at [PyTorch](https://pytorch.org/get-started/locally/). 
 
    ```shell
-   # ROCM 5.2 (Linux only)
-   pip3 install torch torchvision torchaudio --extra-index-url
-   pip install torch==1.13.1+rocm5.2 torchvision==0.14.1+rocm5.2 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/rocm5.2
-   # CUDA 11.6
-   pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
-   # CUDA 11.7
-   pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+   # ROCM 5.7 (Linux only)
+   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7
+   # CUDA 11.8
+   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   # CUDA 12.1
+   pip3 install torch torchvision torchaudio
    # CPU only
-   pip install torch==1.13.1+cpu torchvision==0.14.1+cpu torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
+   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
    ```
 ### 2. You also need to install [PyG](https://pytorch-geometric.readthedocs.io/)
 
    ```shell
    pip install torch_geometric
+   # Optional dependencies:
+   # CUDA 11.8
+   #pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cu118.html
+   # CPU only
+   #pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
    ```
 
 

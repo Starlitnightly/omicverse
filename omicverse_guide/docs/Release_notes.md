@@ -303,14 +303,20 @@
 
 ## v 1.5.8
 
+### pp Module
+- Added `score_genes_cell_cycle` function to calculate the cell cycle
+
 ### bulk Module
 - Fixed `dds.plot_volcano` text plot error when the version of `adjustText` larger than `0.9`
 
 ### single Module
 - Optimised `MetaCell.load` model loading logic
+- Fixed an error when loading the model usng `MetaCell.load`
 
 ### pl Module
+
 Add `pl` as a unified drawing prefix for the next release, to replace the drawing functionality in the original utils, while retaining the drawing in the original utils.
+
 - Added `embedding` to plot the embedding of scRNA-seq using `ov.pl.embedding`
 - Added `optim_palette` to provide a spatially constrained approach that generates discriminate color assignments for visualizing single-cell spatial data in various scenarios
 - Added `cellproportion` to plot the proportion of stack bar of scRNA-seq
