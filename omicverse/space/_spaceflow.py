@@ -18,15 +18,15 @@ class pySpaceFlow(object):
     def __init__(self,adata) -> None:
         global sf_install
         try:
-            import SpaceFlow
+            from ..spaceflow import SpaceFlow
             sf_install=True
             #print('mofax have been install version:',mfx.__version__)
         except ImportError:
             raise ImportError(
                 'Please install the SpaceFlow: `pip install SpaceFlow`.'
             )
-        from SpaceFlow import SpaceFlow
-        sf = SpaceFlow.SpaceFlow(adata=adata, 
+        from ..spaceflow import SpaceFlow
+        sf = SpaceFlow(adata=adata, 
                          spatial_locs=adata.obsm['spatial'])
         
         
@@ -43,7 +43,7 @@ class pySpaceFlow(object):
               min_stop=100, random_seed=42, gpu=0, 
               regularization_acceleration=True, edge_subset_sz=1000000):
         
-        from SpaceFlow.util import sparse_mx_to_torch_edge_list, corruption
+        from ..spaceflow import sparse_mx_to_torch_edge_list, corruption
 
         adata_preprocessed, spatial_graph = self.sf.adata_preprocessed, self.sf.spatial_graph
         if not adata_preprocessed:
@@ -153,6 +153,7 @@ class pySpaceFlow(object):
         sc.tl.leiden(self.adata, resolution=resolution)
         sc.tl.paga(self.adata)
         max_cell_for_subsampling = max_cell_for_subsampling
+        import numpy as np
         if self.adata.shape[0] < max_cell_for_subsampling:
             sub_adata_x = self.adata.obsm['spaceflow']
         else:
@@ -161,7 +162,6 @@ class pySpaceFlow(object):
             sub_adata_x = self.adata[selected_ind, :].obsm['spaceflow']
 
         from scipy.spatial import distance_matrix
-        import numpy as np
         sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
         self.adata.uns['iroot'] = np.argmax(sum_dists)
         sc.tl.diffmap(self.adata)

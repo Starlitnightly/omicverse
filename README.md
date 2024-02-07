@@ -73,6 +73,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [27] [Tangram](https://github.com/broadinstitute/Tangram/) was originally published in [*Nature Methods*](https://www.nature.com/articles/s41592-021-01264-7)
 - [28] [STAligner](https://github.com/zhoux85/STAligner) was originally published in [*Nature Computational Science*](https://doi.org/10.1038/s43588-023-00528-w)
 - [29] [CEFCON](https://github.com/WPZgithub/CEFCON) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-44103-3)
+- [30] [PyComplexHeatmap](https://github.com/DingWB/PyComplexHeatmap) was originally published in [*iMeta*](https://doi.org/10.1002/imt2.115)
 
 ## Included Package not published or preprint
 
