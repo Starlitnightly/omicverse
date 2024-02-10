@@ -223,13 +223,13 @@ def qc(adata:anndata.AnnData, mode='seurat',
         adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
     
     if issparse(adata.X):
-        adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
-        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
-        adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+        adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
+        adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / adata.obs['nUMIs'].values
+        adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
     else:
         adata.obs['nUMIs'] = adata.X.sum(axis=1)  
         adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / adata.obs['nUMIs'].values
-        adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)  
+        adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
     print(f'End calculation of QC metrics.')
 

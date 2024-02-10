@@ -36,11 +36,17 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
    ```shell
    conda activate omicverse
    ```
-### 4.  Install [PyTorch](https://pytorch.org/get-started/locally/) and [PyG](https://pytorch-geometric.readthedocs.io/) at first:
+### 4.  Install [PyTorch](https://pytorch.org/get-started/locally/) and [PyG](https://pytorch-geometric.readthedocs.io/) at first: 
+
+If you want to install the previous version of pytorch, please check out the tutorials of https://pytorch.org/get-started/previous-versions/
 
    ```shell
+   # Nigntly version
    conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
-   #conda install pytorch torchvision torchaudio cpuonly -c pytorch
+   # CPU only
+   # conda install pytorch torchvision torchaudio cpuonly -c pytorch
+   # Previous version
+   # conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 -c pytorch
    conda install pyg -c pyg
    ```
 ### 5.  Install `omicverse`:
