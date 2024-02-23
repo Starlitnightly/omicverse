@@ -312,6 +312,7 @@
 ### single Module
 - Optimised `MetaCell.load` model loading logic
 - Fixed an error when loading the model usng `MetaCell.load`
+- Added tutorials of `Metacells`
 
 ### pl Module
 
@@ -326,3 +327,8 @@ Add `pl` as a unified drawing prefix for the next release, to replace the drawin
 - Added `embedding_density` to plot the category density in the cells
 - Added `bardotplot` to plot the bardotplot between different groups.
 - Added `add_palue` to plot the p-threshold between different groups.
+- Added `embedding_multi` to support the `mudata` object
+- Added `purple_color` to visualize the purple palette.
+- Added `venn` to plot the venn from set 2 to set 4
+- Added `boxplot` to visualize the boxdotplot
+- Added `volcano` to visualzize the result of differential expressed genes

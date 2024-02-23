@@ -19,5 +19,5 @@ from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
 from ._traj import TrajInfer
 from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
 from ._aucell import aucell
-from ._metacell import MetaCell
+from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3

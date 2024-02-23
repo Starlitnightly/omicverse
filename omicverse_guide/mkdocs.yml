@@ -32,6 +32,7 @@ nav:
             - Timing-associated genesets analysis with cellfategenie: Tutorials-single/t_cellfate_genesets.ipynb
             - Identify the driver regulators of cell fate decisions: Tutorials-single/t_cellfate.ipynb
         - Cell Structure:
+            - Inference of MetaCell from Single-Cell RNA-seq: Tutorials-single/t_metacells.ipynb
             - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
             - Different expression analysis in scRNA-seq: Tutorials-single/t_scdeg.ipynb
             - Batch Correction with SIMBA: Tutorials-single/t_simba.ipynb
