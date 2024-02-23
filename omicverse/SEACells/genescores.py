@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import pyranges as pr
+
 import scanpy as sc
 from scipy.stats import rankdata
 from sklearn.metrics import pairwise_distances
@@ -102,6 +102,7 @@ def _pyranges_from_strings(pos_list):
     end = pd.Series(pos_list.str.split(":").str.get(1)).str.split("-").str.get(1)
 
     # Create ranges
+    import pyranges as pr
     gr = pr.PyRanges(chromosomes=chr, starts=start, ends=end)
     return gr
 
@@ -121,6 +122,7 @@ def _pyranges_to_strings(peaks):
 
 def load_transcripts(path_to_gtf):
     """Load transcripts from GTF File. `chr` is preprended to each entry."""
+    import pyranges as pr
     gtf = pr.read_gtf(path_to_gtf)
     gtf.Chromosome = "chr" + gtf.Chromosome.astype(str)
     transcripts = gtf[gtf.Feature == "transcript"]
@@ -149,6 +151,7 @@ def _peaks_correlations_per_gene(
     end = longest_transcript.End.values[0] + span
 
     # Gene span
+    import pyranges as pr
     gene_pr = pr.from_dict(
         {
             "Chromosome": [longest_transcript.Chromosome.values[0]],

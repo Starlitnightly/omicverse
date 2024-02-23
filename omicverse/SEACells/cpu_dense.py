@@ -1,7 +1,7 @@
 import copy
 
 import numpy as np
-import palantir
+
 import pandas as pd
 from scipy.sparse import csr_matrix, save_npz
 from tqdm import tqdm
@@ -233,7 +233,7 @@ class SEACellsCPUDense:
             print(
                 f"Computing diffusion components from {self.build_kernel_on} for waypoint initialization ... "
             )
-
+        import palantir
         dm_res = palantir.utils.run_diffusion_maps(
             pca_components, n_components=self.n_neighbors
         )

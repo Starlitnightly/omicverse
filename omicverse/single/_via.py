@@ -579,7 +579,8 @@ arrow_style="-|>",  max_length:int=4, linewidth:float=1,min_mass = 1, cutoff_per
         ax.scatter(embedding[:, 0], embedding[:, 1], s=gp_size, marker=".", c=gp_color, zorder=-1)
 
     if color_scheme == 'time':
-        ax.scatter(embedding[:,0],embedding[:,1], c=via_object.single_cell_pt_markov,alpha=scatter_alpha,  zorder = 0, s=scatter_size, linewidths=marker_edgewidth, cmap = 'viridis_r')
+        ax.scatter(embedding[:,0],embedding[:,1], c=via_object.single_cell_pt_markov,alpha=scatter_alpha,  
+                   zorder = 0, s=scatter_size, linewidths=marker_edgewidth, cmap = cmap_str)
     else:
         if color_scheme == 'annotation':color_labels = via_object.true_label
         if color_scheme == 'cluster': color_labels= via_object.labels
