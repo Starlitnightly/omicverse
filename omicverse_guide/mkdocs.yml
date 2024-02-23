@@ -53,6 +53,7 @@ nav:
         - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
+        - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
 
 - API documentation: api/index.md
 - Release notes: Release_notes.md
