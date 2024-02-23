@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from IPython.display import display
+
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 
@@ -59,6 +59,7 @@ def chromVAR_R(outdir):
         ["Rscript", get_Rscript("chromVAR.R"), outdir], stdout=subprocess.PIPE
     )
     print("Executing command:", " ".join(["Rscript", "run_chromVAR.R", outdir]))
+    from IPython.display import display
     display(result.stdout.decode("utf-8"))
 
     deviations = pd.read_csv(outdir + "deviations.csv", index_col=[0])

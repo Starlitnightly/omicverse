@@ -43,6 +43,8 @@ class MetaCell(object):
     
     def train(self,min_iter=10, max_iter=50,**kwargs):
         self.model.fit(min_iter=min_iter, max_iter=max_iter,**kwargs)
+        self.model.seacells_dict=dict(zip(self.adata.obs.index.tolist(),
+                                          self.adata.obs['SEACell'].tolist()))
 
     def predicted(self,method='soft',celltype_label='celltype',
                   summarize_layer='raw',minimum_weight=0.05):
@@ -59,6 +61,7 @@ class MetaCell(object):
                                     celltype_label=celltype_label
                                 )
         self.metacells_ad=ad
+        
         return ad
     
     def save(self,model_path='seacells/model.pkl'):
@@ -74,6 +77,7 @@ class MetaCell(object):
             self.model=pickle.load(f)
             self.M = self.model.kernel_matrix
             self.metacells_ad=None
+            self.adata.obs['SEACell']=[self.model.seacells_dict[i] for i in self.adata.obs.index.tolist()]
 
     def step(self,n_steps=5):
         # You can force the model to run additional iterations step-wise using the .step() function
@@ -115,3 +119,18 @@ def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
            edgecolors=edgecolors,linewidths=linewidths,
           alpha=alpha,**kwargs)
     return ax
+
+def get_obs_value(ad,adata,groupby,type='int'):
+    if type=='str':
+        
+        grouped_data = adata.obs.groupby('SEACell')[groupby]
+        result_index = grouped_data.idxmax()
+        result = adata.obs.loc[result_index].reset_index(drop=True)
+        result.index=result['SEACell'].tolist()
+        result.loc[[f'SEACell-{i}' for i in ad.obs.index.tolist()]]
+        ad.obs[groupby]=result[groupby].tolist()
+    else:
+        #type can be set in `max`, `mean`, `min` et al.
+        ad.obs[groupby]=adata.obs.groupby('SEACell').agg({groupby: type}).loc[[f'SEACell-{i}' for i in ad.obs.index.tolist()]][groupby].tolist()
+    
+    print(f'... {groupby} have been added to ad.obs[{groupby}]')

@@ -421,7 +421,7 @@ class cellfategenie(object):
             ax: matplotlib.pyplot.axis, the axis of fitting result
         
         """
-        fontsize=13
+        #fontsize=13
         fig, ax = plt.subplots(figsize=figsize)
         if type=='raw':
             y_test=self.y_test_r

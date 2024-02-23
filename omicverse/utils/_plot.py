@@ -19,10 +19,20 @@ red_color=['#F0C3C3','#E07370','#CB3E35','#A22E2A','#5A1713','#D3396D','#DBC3DC'
 green_color=['#91C79D','#8FC155','#56AB56','#2D5C33','#BBCD91','#6E944A','#A5C953','#3B4A25','#010000']
 orange_color=['#EFBD49','#D48F3E','#AC8A3E','#7D7237','#745228','#E1C085','#CEBC49','#EBE3A1','#6C6331','#8C9A48','#D7DE61']
 blue_color=['#347862','#6BBBA0','#81C0DD','#3E8CB1','#88C8D2','#52B3AD','#265B58','#B2B0D4','#5860A7','#312C6C']
+purple_color=['#823d86','#825b94','#bb98c6','#c69bc6','#a69ac9','#c5a6cc','#caadc4','#d1c3d4']
+
 
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
 def plot_set(verbosity=3,dpi=80,facecolor='white'):
+    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
+    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
+    import warnings
+    warnings.simplefilter("ignore", category=UserWarning)
+    warnings.simplefilter("ignore", category=FutureWarning)
+    warnings.simplefilter("ignore", category=DeprecationWarning)
+
+def plotset(verbosity=3,dpi=80,facecolor='white'):
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -281,7 +291,7 @@ def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
     ax.legend(handles=patches,bbox_to_anchor=legend_bbox, ncol=legend_ncol,fontsize=fontsize)
 
     #设置标题
-    ax.set_title(title,fontsize=fontsize+2)
+    ax.set_title(title,fontsize=fontsize+1)
     #设置spines可视化情况
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)

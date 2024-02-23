@@ -4,6 +4,7 @@ from pandas.api.types import CategoricalDtype, is_numeric_dtype
 import seaborn as sns
 import scanpy as sc
 import pandas as pd
+from ..utils import plotset
 
 pycomplexheatmap_install=False
 
@@ -99,9 +100,9 @@ def complexheatmap(adata,
     global pycomplexheatmap_install
     if pycomplexheatmap_install==True:
         global_imports("PyComplexHeatmap","pch")
-
-    sns.set_style('white')
-
+    
+    #sns.set_style('white')
+    plotset()
     if layer is not None:
         use_raw = False
     if use_raw == True:

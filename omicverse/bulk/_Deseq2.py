@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
+from ..pl import volcano
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
@@ -181,14 +182,16 @@ class pyDEG(object):
         self.result.loc[((self.result['log2FC']>fc_max)&(self.result['qvalue']<pval_threshold)),'sig']='up'
         self.result.loc[((self.result['log2FC']<fc_min)&(self.result['qvalue']<pval_threshold)),'sig']='down'
         self.result.loc[self.result['-log(qvalue)']>logp_max,'-log(qvalue)']=logp_max
+        self.logp_max=logp_max
     
 
-    def plot_volcano(self,figsize:tuple=(4,4),title:str='',titlefont:dict={'weight':'normal','size':14,},
+    def plot_volcano(self,figsize:tuple=(4,4),pval_name='qvalue',fc_name='log2FC',
+                     title:str='',titlefont:dict={'weight':'normal','size':14,},
                      up_color:str='#e25d5d',down_color:str='#7388c1',normal_color:str='#d7d7d7',
                      up_fontcolor:str='#e25d5d',down_fontcolor:str='#7388c1',normal_fontcolor:str='#d7d7d7',
                      legend_bbox:tuple=(0.8, -0.2),legend_ncol:int=2,legend_fontsize:int=12,
                      plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
-                     ticks_fontsize:int=12)->matplotlib.axes._axes.Axes:
+                     ticks_fontsize:int=12,ax=None):
         """
         Generate a volcano plot for the differential gene expression analysis results.
 
@@ -211,6 +214,17 @@ class pyDEG(object):
             ax: The generated volcano plot.
 
         """
+        
+        ax=volcano(result=self.result,pval_name=pval_name,fc_name=fc_name,pval_max=self.logp_max,
+                       figsize=figsize,title=title,titlefont=titlefont,
+                       up_color=up_color,down_color=down_color,normal_color=normal_color,
+                       up_fontcolor=up_fontcolor,down_fontcolor=down_fontcolor,normal_fontcolor=normal_fontcolor,
+                       legend_bbox=legend_bbox,legend_ncol=legend_ncol,legend_fontsize=legend_fontsize,plot_genes=plot_genes,
+                       plot_genes_num=plot_genes_num,plot_genes_fontsize=plot_genes_fontsize,
+                       ticks_fontsize=ticks_fontsize,ax=ax,
+                       pval_threshold=self.pval_threshold,fc_max=self.fc_max,fc_min=self.fc_min)
+        return ax
+        '''
         fig, ax = plt.subplots(figsize=figsize)
         result=self.result.copy()
         #首先绘制正常基因
@@ -306,6 +320,7 @@ class pyDEG(object):
               fontweight='normal'
               )
         return fig,ax
+        '''
     
     def plot_boxplot(self,genes:list,treatment_groups:list,control_groups:list,
                      log:bool=True,

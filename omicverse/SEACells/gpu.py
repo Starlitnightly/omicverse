@@ -1,7 +1,7 @@
-import cupy as cp
-import cupyx
+
+
 import numpy as np
-import palantir
+
 import pandas as pd
 from scipy.sparse import save_npz
 from tqdm import tqdm
@@ -302,7 +302,7 @@ class SEACellsGPU:
             print(
                 f"Computing diffusion components from {self.build_kernel_on} for waypoint initialization ... "
             )
-
+        import palantir
         dm_res = palantir.utils.run_diffusion_maps(
             pca_components, n_components=self.n_neighbors
         )
@@ -420,9 +420,10 @@ class SEACellsGPU:
         A = A_prev
 
         t = 0  # current iteration (determine multiplicative update)
-
+        import cupy as cp
         Ag = cp.array(A)
         Bg = cp.array(B)
+        import cupyx
         Kg = cupyx.scipy.sparse.csc_matrix(self.K)
 
         # precompute some gradient terms
@@ -468,9 +469,10 @@ class SEACellsGPU:
 
         # keep track of error
         t = 0
-
+        import cupy as cp
         Ag = cp.array(A)
         Bg = cp.array(B)
+        import cupyx
         Kg = cupyx.scipy.sparse.csc_matrix(self.K)
         # precompute some terms
         t1g = Ag.dot(Ag.T)

@@ -511,6 +511,7 @@ def single_group_boxplot(adata,
                          sort: bool = True,
                          scatter_kwargs: dict = None,
                          ax = None,
+                         fontsize = 12,
                         ):
     """
     adata (AnnData object): The data object containing the information for plotting.
@@ -627,7 +628,7 @@ def single_group_boxplot(adata,
         plt.setp(b1['medians'], color=hue_color, linewidth=3)
 
     # Axis labels and title
-    fontsize = 12
+    
 
     if x_ticks_plot == True:
         ax.set_xticks(positions)
@@ -636,13 +637,15 @@ def single_group_boxplot(adata,
         ax.set_xticklabels([])
 
     yticks = ax.get_yticks()
-    ax.set_title(title, fontsize=13, fontweight='bold')
-    plt.ylabel(ylabel, fontsize=13, fontweight='bold')
-
+    ax.set_title(title, fontsize=fontsize+1,)
+    plt.ylabel(ylabel, fontsize=fontsize+1, )
+    plt.grid(False)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
 
     if legend_plot == True:
         labels = list(plot_data.keys())
