@@ -37,3 +37,4 @@ metatime
 tensorboard
 mellon
 ctxcore
+pydeseq2==0.4.0

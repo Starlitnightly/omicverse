@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.5.8"
+version = "1.5.9"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -58,7 +58,7 @@ dependencies = [
     'datashader>=0.14',
     'phate>=1.0',
     'tqdm>=4.64',
-    'pydeseq2>=0.3',
+    'pydeseq2>=0.3, <=0.4.0',
     'mofax>=0.3',
     'adjustText>=0.8',
     'scikit-misc>=0.1',
