@@ -97,5 +97,7 @@ We would like to thank the following WeChat Official Accounts for promoting Omic
 
 ## Other
 
+If you would like to sponsor the development of our project, you can go to the afdian website (https://afdian.net/a/starlitnightly) and sponsor us.
+
 <div>Logo made by <a href="https://www.designevo.com/" title="Free Online Logo Maker">DesignEvo free logo creator</a></div>
 
