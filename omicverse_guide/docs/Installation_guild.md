@@ -23,6 +23,25 @@ In different platform, there are some differences in the most appropriate instal
 ### Apple silicon prerequisites
 Installing omicverse on a Mac with Apple Silicon is only possible using a native version of python. A native version of python can be installed with an Apple Silicon version of mambaforge (which can be installed from a native version of homebrew via `brew install --cask mambaforge`). 
 
+
+## One-click installation
+
+!!! note 
+    This part of the code installation may be wrong, if you encounter version error please refer to the following detailed code for step-by-step installation
+
+```shell
+conda create -n omicverse python=3.9
+conda activate omicverse
+conda install mamba -c conda-forge
+mamba install jax jaxlib -c conda-forge
+pip3 install torch torchvision torchaudio
+pip3 install torch_geometric
+pip3 install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.2.0+cu121.html
+pip3 install -U omicverse
+```
+Note that the version of torch we installed is `2.2.0` or `2.2.1`
+
+
 ## Conda
 
 ### 1.  Install conda. We typically use the `mambaforge` distribution. Use python>=3.8, conda consider using `mamba` instead of `conda`.
