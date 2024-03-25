@@ -332,3 +332,10 @@ Add `pl` as a unified drawing prefix for the next release, to replace the drawin
 - Added `venn` to plot the venn from set 2 to set 4
 - Added `boxplot` to visualize the boxdotplot
 - Added `volcano` to visualzize the result of differential expressed genes
+
+## v 1.5.9
+
+### single Module
+
+- Added `slingshot` in `single.TrajInfer`
+- Fixed some error of `scLTNN`

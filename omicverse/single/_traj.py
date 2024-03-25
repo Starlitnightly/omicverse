@@ -80,6 +80,20 @@ class TrajInfer(object):
             sc.tl.dpt(self.adata)
             sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
                use_rep=self.use_rep)
+        elif method=='slingshot':
+            #sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
+            #   use_rep=self.use_rep)
+            #sc.tl.umap(self.adata)
+            from ._pyslingshot import Slingshot
+            slingshot = Slingshot(self.adata, 
+                      celltype_key=self.groupby, 
+                      obsm_key=self.basis, 
+                      start_node=self.origin,
+                      end_nodes=self.terminal,
+                      debug_level='verbose')
+            slingshot.fit(**kwargs)
+            pseudotime = slingshot.unified_pseudotime
+            self.adata.obs['slingshot_pseudotime']=pseudotime
         else:
             print('Please input the correct method name, such as `palantir` or `diffusion_map`')
             return

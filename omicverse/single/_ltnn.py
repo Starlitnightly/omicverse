@@ -582,6 +582,7 @@ class RadioModel(nn.Module):
         self.fc1 = nn.Linear(input_dim, 512)
         self.fc2 = nn.Linear(512, 512)
         self.fc3 = nn.Linear(512, 512)
+        #self.fc3 = nn.Linear(512, 50)
         self.fc4 = nn.Linear(512, 1)
     
     def forward(self, x):
