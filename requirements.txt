@@ -1,3 +1,4 @@
+scikit-image == 0.22.0
 omicverse
 pandas == 1.5.3
 scanpy
