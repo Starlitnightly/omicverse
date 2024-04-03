@@ -6,6 +6,8 @@
 
 OmicVerse is the fundamental package for multi omics included bulk and single cell analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v2)
 
+If you like **OmicVerse** and want to support our mission, please consider making a [donation](https://afdian.net/a/starlitnightly) to support our efforts.
+
 The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to OmicVerse, it aimed to solve all task in RNA-seq.
 
 BulkTrajBlend algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of “interrupted” cells in the original scRNA-seq data.
