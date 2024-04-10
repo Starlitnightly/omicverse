@@ -339,3 +339,7 @@ Add `pl` as a unified drawing prefix for the next release, to replace the drawin
 
 - Added `slingshot` in `single.TrajInfer`
 - Fixed some error of `scLTNN`
+
+### space Module
+
+- Added `Spatrio` to mapping the scRNA-seq to stRNA-seq
