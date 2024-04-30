@@ -339,6 +339,8 @@ Add `pl` as a unified drawing prefix for the next release, to replace the drawin
 
 - Added `slingshot` in `single.TrajInfer`
 - Fixed some error of `scLTNN`
+- Added `GPU` mode to preprocess the data
+- Added `cNMF` to calculate the nmf
 
 ### space Module
 

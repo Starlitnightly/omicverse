@@ -594,3 +594,13 @@ class easter_egg(object):
 
     def O(self):
         print('尊嘟假嘟')
+
+def save(file,path):
+    import pickle
+    with open(path, 'wb') as f:
+        pickle.dump(file, f)
+
+def load(path):
+    import pickle
+    with open(path, 'rb') as f:
+        return pickle.load(f)
