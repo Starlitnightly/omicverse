@@ -10,9 +10,11 @@ import pandas as pd
 from typing import Union, Tuple, Optional, Sequence, List, Dict
 import skmisc.loess as sl
 import scanpy as sc
+import time 
 
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
+from .._settings import settings
 
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     """ 
@@ -337,6 +339,17 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
 
 from sklearn.cluster import KMeans  
 
+def anndata_to_GPU(adata,**kwargs):
+    import rapids_singlecell as rsc
+    rsc.get.anndata_to_GPU(adata,**kwargs)
+    print('Data has been moved to GPU')
+    print('Don`t forget to move it back to CPU after analysis is done')
+    print('Use `ov.pp.anndata_to_CPU(adata)`')
+
+def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
+    import rapids_singlecell as rsc
+    rsc.get.anndata_to_CPU(adata,layers=layer, convert_all=convert_all, copy=copy)
+
 
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     organism='human', no_cc=False,batch_key=None,):
@@ -368,39 +381,70 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     method_list = mode.split('|')
     print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
     
+    if settings.mode == 'cpu':
+        data_load_start = time.time()
+        if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
+            sc.pp.normalize_total(
+                adata, 
+                target_sum=target_sum,
+                exclude_highly_expressed=True,
+                max_fraction=0.2,
+            )
+            sc.pp.log1p(adata)
+        elif method_list[0] == 'pearson':
+            # Perason residuals workflow
+            sc.experimental.pp.normalize_pearson_residuals(adata)
 
-    if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
-        sc.pp.normalize_total(
-            adata, 
-            target_sum=target_sum,
-            exclude_highly_expressed=True,
-            max_fraction=0.2,
-        )
-        sc.pp.log1p(adata)
-    elif method_list[0] == 'pearson':
-        # Perason residuals workflow
-        sc.experimental.pp.normalize_pearson_residuals(adata)
+        if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
+            sc.experimental.pp.highly_variable_genes(
+                adata, 
+                flavor="pearson_residuals",
+                layer='counts',
+                n_top_genes=n_HVGs,
+                batch_key=batch_key,
+            )
+            if no_cc:
+                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
+        elif method_list[1] == 'seurat':
+            sc.pp.highly_variable_genes(
+                adata,
+                flavor="seurat_v3",
+                layer='counts',
+                n_top_genes=n_HVGs,
+                batch_key=batch_key,
+            )
+            if no_cc:
+                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
+        data_load_end = time.time()
+        print(f'Time to analyze data in cpu: {data_load_end - data_load_start} seconds.')
+    else:
+        import rapids_singlecell as rsc
+        data_load_start = time.time()
+        if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
+            rsc.pp.normalize_total(adata, target_sum=target_sum)
+            rsc.pp.log1p(adata)
+        elif method_list[0] == 'pearson':
+            # Perason residuals workflow
+            rsc.pp.normalize_pearson_residuals(adata)
+        if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
+            rsc.pp.highly_variable_genes(
+                adata, 
+                flavor="pearson_residuals",
+                layer='counts',
+                n_top_genes=n_HVGs,
+                batch_key=batch_key,
+            )
+        elif method_list[1] == 'seurat':
+            rsc.pp.highly_variable_genes(
+                adata,
+                flavor="seurat_v3",
+                layer='counts',
+                n_top_genes=n_HVGs,
+                batch_key=batch_key,
+            )
+        data_load_end = time.time()
+        print(f'Time to analyze data in gpu: {data_load_end - data_load_start} seconds.')
 
-    if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
-        sc.experimental.pp.highly_variable_genes(
-            adata, 
-            flavor="pearson_residuals",
-            layer='counts',
-            n_top_genes=n_HVGs,
-            batch_key=batch_key,
-        )
-        if no_cc:
-            remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
-    elif method_list[1] == 'seurat':
-        sc.pp.highly_variable_genes(
-            adata,
-            flavor="seurat_v3",
-            layer='counts',
-            n_top_genes=n_HVGs,
-            batch_key=batch_key,
-        )
-        if no_cc:
-            remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
 
     adata.var = adata.var.drop(columns=['highly_variable_features'])
     adata.var['highly_variable_features'] = adata.var['highly_variable']
@@ -430,9 +474,13 @@ def scale(adata,max_value=10,layers_add='scaled'):
             the expression matrix that has been scaled to unit variance and zero mean.
 
     """
-    adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value)
-    adata.layers[layers_add] = adata_mock.X.copy()
-    del adata_mock
+    if settings.mode == 'cpu':
+        adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value)
+        adata.layers[layers_add] = adata_mock.X.copy()
+        del adata_mock
+    else:
+        import rapids_singlecell as rsc
+        adata.layers['scaled']=rsc.pp.scale(adata, max_value=max_value,inplace=False)
 
 def regress(adata):
     """
@@ -447,9 +495,13 @@ def regress(adata):
             the expression matrix with covariates regressed out.
 
     """
-    adata_mock = sc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], n_jobs=8, copy=True)
-    adata.layers['regressed'] = adata_mock.X
-    return adata
+    if settings.mode == 'cpu':
+        adata_mock = sc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], n_jobs=8, copy=True)
+        adata.layers['regressed'] = adata_mock.X.copy()
+        del adata_mock
+    else:
+        import rapids_singlecell as rsc
+        adata.layers['regressed']=rsc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], inplace=False)
 
 def regress_and_scale(adata):
     """
@@ -518,6 +570,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
         adata : The original AnnData object with the calculated PCA embeddings and other information stored in its `obsm`, `varm`,
             and `uns` fields.
     """
+    
     if 'lognorm' not in adata.layers:
         adata.layers['lognorm'] = adata.X
     if layer in adata.layers: 
@@ -525,17 +578,25 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
         key = f'{layer}|original'
     else:
         raise KeyError(f'Selected layer {layer} is not present. Compute it first!')
-
-    model = my_PCA()
-    model.calculate_PCA(X, n_components=n_pcs)
-    adata.obsm[key + '|X_pca'] = model.embs
-    adata.varm[key + '|pca_loadings'] = model.loads
-    adata.uns[key + '|pca_var_ratios'] = model.var_ratios
-    adata.uns[key + '|cum_sum_eigenvalues'] = np.cumsum(model.var_ratios)
-    if inplace:
-        return None
+    
+    if settings.mode == 'cpu':
+        model = my_PCA()
+        model.calculate_PCA(X, n_components=n_pcs)
+        adata.obsm[key + '|X_pca'] = model.embs
+        adata.varm[key + '|pca_loadings'] = model.loads
+        adata.uns[key + '|pca_var_ratios'] = model.var_ratios
+        adata.uns[key + '|cum_sum_eigenvalues'] = np.cumsum(model.var_ratios)
+        if inplace:
+            return None
+        else:
+            return adata  
     else:
-        return adata  
+        import rapids_singlecell as rsc
+        rsc.pp.pca(adata, layer=layer,n_comps=n_pcs)
+        adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
+        adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
+        adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
+        adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
 
 def red(adata):
     """
@@ -684,11 +745,39 @@ def neighbors(
     and in later versions it will become a hard dependency.
     
     """
-    return sc.pp.neighbors(adata,n_neighbors,
-                           n_pcs,use_rep,knn,random_state,
-                           method,metric,metric_kwds,key_added) if copy else None
+    if settings.mode =='cpu':
+        sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
+                         random_state=random_state,method=method,metric=metric,metric_kwds=metric_kwds,
+                         key_added=key_added,copy=copy)
+    else:
+        import rapids_singlecell as rsc
+        rsc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
+                         random_state=random_state,algorithm=method,metric=metric,metric_kwds=metric_kwds,
+                         key_added=key_added,copy=copy)
 
 
+def umap(adata, **kwargs):
+    if settings.mode =='cpu':
+        sc.tl.umap(adata, **kwargs)
+    else:
+        import rapids_singlecell as rsc
+
+        rsc.tl.umap(adata, **kwargs)
+
+
+def louvain(adata, **kwargs):
+    if settings.mode =='cpu':
+        sc.tl.louvain(adata, **kwargs)
+    else:
+        import rapids_singlecell as rsc
+        rsc.tl.louvain(adata, **kwargs)
+
+def leiden(adata, **kwargs):
+    if settings.mode =='cpu':
+        sc.tl.leiden(adata, **kwargs)
+    else:
+        import rapids_singlecell as rsc
+        rsc.tl.leiden(adata, **kwargs)
 
 
 def score_genes_cell_cycle(adata,s_genes=None, g2m_genes=None):

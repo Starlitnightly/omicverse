@@ -25,4 +25,4 @@ omics="""
 print(omics)
 print(f'Version: {__version__}, Tutorials: https://omicverse.readthedocs.io/')
 
-
+from ._settings import settings

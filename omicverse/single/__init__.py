@@ -21,3 +21,4 @@ from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_in
 from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3
+from ._cnmf import *
