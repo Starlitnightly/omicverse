@@ -30,16 +30,16 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
     This part of the code installation may be wrong, if you encounter version error please refer to the following detailed code for step-by-step installation
 
 ```shell
-conda create -n omicverse python=3.9
+conda create -n omicverse python=3.10
 conda activate omicverse
 conda install mamba -c conda-forge
 mamba install jax jaxlib -c conda-forge
 pip3 install torch torchvision torchaudio
 pip3 install torch_geometric
-pip3 install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.2.0+cu121.html
+pip3 install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.3.0+cu121.html
 pip3 install -U omicverse
 ```
-Note that the version of torch we installed is `2.2.0` or `2.2.1`
+Note that the version of torch we installed is `2.3.0` 
 
 
 ## Conda
@@ -48,7 +48,7 @@ Note that the version of torch we installed is `2.2.0` or `2.2.1`
 ### 2.  Create a new conda environment: 
 
    ```shell
-   conda create -n omicverse python=3.9
+   conda create -n omicverse python=3.10
    ```
 ### 3.  Activate your environment:
 
@@ -150,6 +150,18 @@ conda install s_gd2 -c conda-forge
 pip install -U omicverse 
 conda install pytorch::pytorch torchvision torchaudio -c pytorch
 ```
+
+## [Extra] GPU-accelerated
+
+The easiest way to install *rapids-singlecell* and *omicverse* is to use one of the *yaml* file provided in the [conda](https://github.com/Starlitnightly/omicverse/tree/main/conda) folder. These *yaml* files install everything needed to run the example notebooks and get you started.
+
+```
+conda env create -f conda/omicverse_gpu.yml
+# or
+mamba env create -f conda/omicverse_gpu.yml
+```
+
+
 
 ## Jupyter-lab
 

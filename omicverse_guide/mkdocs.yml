@@ -1,3 +1,4 @@
+
 site_name: omicverse Readthedocs
 repo_url: https://github.com/Starlitnightly/omicverse
 site_author: "Zehua Zeng"
@@ -17,7 +18,8 @@ nav:
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
         - Preprocessing:
-            - Preprocessing the data of scRNA-seq: Tutorials-single/t_preprocess.ipynb
+            - Preprocessing the data of scRNA-seq[CPU]: Tutorials-single/t_preprocess_cpu.ipynb
+            - Preprocessing the data of scRNA-seq[GPU]: Tutorials-single/t_preprocess_gpu.ipynb
             - Clustering space: Tutorials-single/t_cluster.ipynb
             - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
         - Annotation: 
