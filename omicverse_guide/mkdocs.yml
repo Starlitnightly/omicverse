@@ -2,7 +2,7 @@
 site_name: omicverse Readthedocs
 repo_url: https://github.com/Starlitnightly/omicverse
 site_author: "Zehua Zeng"
-copyright: "Copyright &copy; 2019-2023, 112 Lab, USTB"
+copyright: "Copyright &copy; 2019-2024, 112 Lab, USTB"
 
 
 nav:
@@ -21,6 +21,7 @@ nav:
             - Preprocessing the data of scRNA-seq[CPU]: Tutorials-single/t_preprocess_cpu.ipynb
             - Preprocessing the data of scRNA-seq[GPU]: Tutorials-single/t_preprocess_gpu.ipynb
             - Clustering space: Tutorials-single/t_cluster.ipynb
+            - Consensus Non-negative Matrix factorization (cNMF): Tutorials-single/t_cnmf.ipynb
             - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
         - Annotation: 
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
