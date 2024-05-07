@@ -972,6 +972,11 @@ class cNMF():
             if close_clustergram_fig:
                 plt.close(fig)
 
+        self.topic_dist = topics_dist
+        self.spectra_order=spectra_order
+        self.local_density = local_density
+        self.kmeans_cluster_labels=kmeans_cluster_labels
+
 
     def k_selection_plot(self, close_fig=False):
         '''
@@ -1046,84 +1051,24 @@ class cNMF():
             top_genes.append(list(spectra_scores.sort_values(by=gep, ascending=False).index[:n_top_genes]))
         
         top_genes = pd.DataFrame(top_genes, index=spectra_scores.columns).T
-        return(usage, spectra_scores, spectra_tpm, top_genes)
-
-
-def main():
-    """
-    Example commands:
-
-        output_dir="./cnmf_test/"
-
-
-        python cnmf.py prepare --output-dir $output_dir \
-           --name test --counts ./cnmf_test/test_data.df.npz \
-           -k 6 7 8 9 --n-iter 5
-
-        python cnmf.py factorize  --name test --output-dir $output_dir
-
-        THis can be parallelized as such:
-
-        python cnmf.py factorize  --name test --output-dir $output_dir --total-workers 2 --worker-index WORKER_INDEX (where worker_index starts with 0)
-
-        python cnmf.py combine  --name test --output-dir $output_dir
-
-        python cnmf.py consensus  --name test --output-dir $output_dir
-
-    """
-
-    import sys, argparse
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('command', type=str, choices=['prepare', 'factorize', 'combine', 'consensus', 'k_selection_plot'])
-    parser.add_argument('--name', type=str, help='[all] Name for analysis. All output will be placed in [output-dir]/[name]/...', nargs='?', default='cNMF')
-    parser.add_argument('--output-dir', type=str, help='[all] Output directory. All output will be placed in [output-dir]/[name]/...', nargs='?', default='.')
-    parser.add_argument('-c', '--counts', type=str, help='[prepare] Input (cell x gene) counts matrix as df.npz or tab delimited text file')
-    parser.add_argument('-k', '--components', type=int, help='[prepare] Numper of components (k) for matrix factorization. Several can be specified with "-k 8 9 10"', nargs='+')
-    parser.add_argument('-n', '--n-iter', type=int, help='[prepare] Numper of factorization replicates', default=100)
-    parser.add_argument('--total-workers', type=int, help='[all] Total number of workers to distribute jobs to', default=1)
-    parser.add_argument('--seed', type=int, help='[prepare] Seed for pseudorandom number generation', default=None)
-    parser.add_argument('--genes-file', type=str, help='[prepare] File containing a list of genes to include, one gene per line. Must match column labels of counts matrix.', default=None)
-    parser.add_argument('--numgenes', type=int, help='[prepare] Number of high variance genes to use for matrix factorization.', default=2000)
-    parser.add_argument('--tpm', type=str, help='[prepare] Pre-computed (cell x gene) TPM values as df.npz or tab separated txt file. If not provided TPM will be calculated automatically', default=None)
-    parser.add_argument('--beta-loss', type=str, choices=['frobenius', 'kullback-leibler', 'itakura-saito'], help='[prepare] Loss function for NMF.', default='frobenius')
-    parser.add_argument('--init', type=str, choices=['random', 'nndsvd'], help='[prepare] Initialization algorithm for NMF.', default='random')
-    parser.add_argument('--densify', dest='densify', help='[prepare] Treat the input data as non-sparse', action='store_true', default=False) 
-    parser.add_argument('--worker-index', type=int, help='[factorize] Index of current worker (the first worker should have index 0)', default=0)
-    parser.add_argument('--local-density-threshold', type=float, help='[consensus] Threshold for the local density filtering. This string must convert to a float >0 and <=2', default=0.5)
-    parser.add_argument('--local-neighborhood-size', type=float, help='[consensus] Fraction of the number of replicates to use as nearest neighbors for local density filtering', default=0.30)
-    parser.add_argument('--show-clustering', dest='show_clustering', help='[consensus] Produce a clustergram figure summarizing the spectra clustering', action='store_true')
-
-    args = parser.parse_args()
-
-    cnmf_obj = cNMF(output_dir=args.output_dir, name=args.name)
+        usage.columns = ['cNMF_%d' % i for i in usage.columns]
+        result_dict = {}
+        result_dict['usage_norm'] = usage
+        result_dict['gep_scores'] = spectra_scores
+        result_dict['gep_tpm'] = spectra_tpm
+        result_dict['top_genes'] = top_genes
+        return result_dict
     
-    if args.command == 'prepare':
-        cnmf_obj.prepare(args.counts, components=args.components, n_iter=args.n_iter, densify=args.densify,
-                         tpm_fn=args.tpm, seed=args.seed, beta_loss=args.beta_loss,
-                         num_highvar_genes=args.numgenes, genes_file=args.genes_file, init=args.init)
-
-    elif args.command == 'factorize':
-        cnmf_obj.factorize(worker_i=args.worker_index, total_workers=args.total_workers)
-
-    elif args.command == 'combine':
-        cnmf_obj.combine(components=args.components)
-
-    elif args.command == 'consensus':
-        run_params = load_df_from_npz(cnmf_obj.paths['nmf_replicate_parameters'])
-
-        if type(args.components) is int:
-            ks = [args.components]
-        elif args.components is None:
-            ks = sorted(set(run_params.n_components))
-        else:
-            ks = args.components
-
-        for k in ks:
-            merged_spectra = load_df_from_npz(cnmf_obj.paths['merged_spectra']%k)
-            cnmf_obj.consensus(k, args.local_density_threshold, args.local_neighborhood_size, args.show_clustering,
-                               close_clustergram_fig=True)
-
-    elif args.command == 'k_selection_plot':
-        cnmf_obj.k_selection_plot(close_fig=True)
+    def get_results(self,adata,result_dict):
+        import pandas as pd
+        adata.obs = pd.merge(left=adata.obs, right=result_dict['usage_norm'], 
+                             how='left', left_index=True, right_index=True)
+        adata.var = pd.merge(left=adata.var,right=result_dict['gep_scores'].loc[adata.var.index],
+                             how='left', left_index=True, right_index=True)
+        df=adata.obs[result_dict['usage_norm'].columns].copy()
+        max_topic = df.idxmax(axis=1)
+        # 将结果添加到DataFrame中
+        adata.obs['cNMF_cluster'] = max_topic
+        print('cNMF_cluster is added to adata.obs')
+        print('gene scores are added to adata.var')
 
