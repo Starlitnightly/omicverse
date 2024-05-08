@@ -673,3 +673,30 @@ def single_group_boxplot(adata,
 
     if ax is None:
         return fig, ax
+
+def contour(ax,adata,groupby,clusters,basis='X_umap',
+            grid_density=100,contour_threshold=0.1,
+           **kwargs):
+    from scipy.stats import gaussian_kde
+    umap_embedding=adata[adata.obs[groupby].isin(clusters)].obsm[basis]
+    kde = gaussian_kde(umap_embedding.T)
+    # 生成网格
+    x_grid = np.linspace(min(umap_embedding[:, 0]), max(umap_embedding[:, 0]), grid_density)
+    y_grid = np.linspace(min(umap_embedding[:, 1]), max(umap_embedding[:, 1]), grid_density)
+    X_grid, Y_grid = np.meshgrid(x_grid, y_grid)
+    positions = np.vstack([X_grid.ravel(), Y_grid.ravel()])
+    Z = np.reshape(kde(positions).T, X_grid.shape)
+    
+    # 找到最外层轮廓的阈值
+    threshold = np.max(Z) * contour_threshold  # 通过调整阈值的倍数来控制轮廓的密度
+
+    # 绘制最外层轮廓
+    contour = ax.contour(X_grid, Y_grid, Z, 
+                         levels=[threshold],
+                        **kwargs)
+
+    # 获取最外层轮廓的路径
+    outer_contour_path = contour.collections[0].get_paths()[0]
+    outer_contour_x, outer_contour_y = outer_contour_path.vertices[:, 0], outer_contour_path.vertices[:, 1]
+
+    return ax
