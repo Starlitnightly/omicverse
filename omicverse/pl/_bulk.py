@@ -84,11 +84,28 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
     ax.spines['bottom'].set_visible(True)
     ax.spines['left'].set_visible(True)
 
+    ax.set_xticks([round(i,2) for i in ax.get_xticks()[1:-1]],#获取x坐标轴内容
+        [round(i,2) for i in ax.get_xticks()[1:-1]],#更新x坐标轴内容
+        fontsize=ticks_fontsize,
+        fontweight='normal'
+        )
+
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+
+
     from adjustText import adjust_text
     import adjustText
 
     if plot_genes is not None:
         hub_gene=plot_genes
+    elif (plot_genes is None) and (plot_genes_num is None):
+        return ax
     else:
         up_result=result.loc[result['sig']=='up']
         down_result=result.loc[result['sig']=='down']
@@ -112,20 +129,7 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
         adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
                     arrowprops=dict(arrowstyle='->', color='red'))
 
-    ax.set_xticks([round(i,2) for i in ax.get_xticks()[1:-1]],#获取x坐标轴内容
-        [round(i,2) for i in ax.get_xticks()[1:-1]],#更新x坐标轴内容
-        fontsize=ticks_fontsize,
-        fontweight='normal'
-        )
-
-    plt.grid(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
-    ax.spines['left'].set_visible(True)
-    ax.spines['left'].set_position(('outward', 10))
-    ax.spines['bottom'].set_position(('outward', 10))
-
+    
     return ax
 
 def venn(sets={}, out='./', palette='bgrc',
