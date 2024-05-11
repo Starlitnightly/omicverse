@@ -560,13 +560,13 @@ def single_group_boxplot(adata,
     obs_ticks = False
     plot_text_ = color
     if (plot_text_ in adata.var_names):
-        adata1 = adata
+        adata1 = adata.copy()
         var_ticks = True
     elif plot_text_ in adata.obs.columns:
-        adata1 = adata
+        adata1 = adata.copy()
         obs_ticks = True
     elif (adata.raw is not None) and (plot_text_ in adata.raw.var_names):
-        adata1 = adata1.raw.to_adata()
+        adata1 = adata.raw.to_adata().copy()
         var_ticks = True
     else:
         print(f'Please check the `{color}` key in adata.obs or adata.var')
@@ -602,7 +602,8 @@ def single_group_boxplot(adata,
         shake_dict[group] = np.array(bootstrap_data)
 
     # Set figure size
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     # Plot boxplots
     width = 0.8
@@ -665,7 +666,7 @@ def single_group_boxplot(adata,
             text = f"Kruskal-Wallis: P < {formatted_p_value}"
         else:
             text = f"Kruskal-Wallis: P = {formatted_p_value}"
-        plt.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=fontsize, fontweight='bold', verticalalignment='top',
+        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=fontsize, fontweight='bold', verticalalignment='top',
                  bbox=dict(facecolor='white', edgecolor='white', boxstyle='round,pad=0.5'))
 
     if save == True:
