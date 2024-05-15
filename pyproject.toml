@@ -28,7 +28,6 @@ classifiers = [
 dependencies = [
     'pybind11>=2.10',
     'hnswlib>=0.7',
-    'ERgene>=1.2',
     'numpy>=1.22, <1.24',
     'scanpy>=1.9',
     'pandas>=1.0.3, <=1.5.3',

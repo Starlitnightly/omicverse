@@ -574,10 +574,12 @@ def single_group_boxplot(adata,
     adata1.obs[groupby] = adata1.obs[groupby].astype('category')
 
     if var_ticks == True:
-        adata1.obs[color] = adata1[:, plot_text_].to_df().values
+        adata1.obs[color] = adata1[:, plot_text_].to_df().values.flatten()
+        #print(adata1.obs[color])
 
     # Categorize by groups
-    for group in set(adata1.obs[groupby]):
+    
+    for group in adata1.obs[groupby].cat.categories:
         plot_data[group] = np.array(adata1.obs.loc[adata1.obs[groupby] == group, color].tolist())
 
     if sort == True:
@@ -592,7 +594,7 @@ def single_group_boxplot(adata,
 
     shake_dict = {}
 
-    for group in set(adata1.obs[groupby]):
+    for group in adata1.obs[groupby].cat.categories:
         data_list = []
         gene_data = adata1.obs.loc[adata1.obs[groupby] == group, color].tolist()
         if len(gene_data) > point_number:
@@ -601,7 +603,6 @@ def single_group_boxplot(adata,
             bootstrap_data = gene_data
         shake_dict[group] = np.array(bootstrap_data)
 
-    # Set figure size
     if ax==None:
         fig, ax = plt.subplots(figsize=figsize)
 
