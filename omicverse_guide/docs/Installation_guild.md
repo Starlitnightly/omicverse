@@ -30,7 +30,7 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
     This part of the code installation may be wrong, if you encounter version error please refer to the following detailed code for step-by-step installation
 
 ```shell
-conda create -n omicverse python=3.10
+conda create -n omicverse python=3.9
 conda activate omicverse
 conda install mamba -c conda-forge
 mamba install jax jaxlib -c conda-forge
