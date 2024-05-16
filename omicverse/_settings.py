@@ -6,7 +6,7 @@ class omicverseConfig:
         self.mode = mode
 
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):
-        self.mode = 'gpu'
+        
         import scanpy as sc
         import cupy as cp
 
@@ -23,6 +23,7 @@ class omicverseConfig:
         )
         cp.cuda.set_allocator(rmm_cupy_allocator)
         print('GPU mode activated')
+        self.mode = 'gpu'
         
 
 settings = omicverseConfig()
