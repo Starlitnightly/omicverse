@@ -29,6 +29,7 @@ jinja2 == 3.1.2
 griffe == 0.26.0
 mkdocs == 1.4.2
 #mkdocs-jupyter==0.23.0
+mkdocs-jupyter
 mkdocs-material==9.1.2
 mkdocs-glightbox==0.3.2
 mkdocstrings == 0.20.0
