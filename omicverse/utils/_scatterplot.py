@@ -157,9 +157,17 @@ def embedding(
         else:
             cmap = color_map
     if matplotlib.__version__ < "3.7.0":
+        if cmap is not None:
+            pass
+        else: 
+            cmap = 'RdBu_r'
         cmap = copy(colormaps.get_cmap(cmap))
         cmap.set_bad(na_color)
     else:
+        if cmap is not None:
+            pass
+        else: 
+            cmap = 'RdBu_r'
         cmap = copy(matplotlib.colormaps[cmap])
         cmap.set_bad(na_color)
 

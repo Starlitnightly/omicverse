@@ -452,8 +452,8 @@ class pyVIA(object):
         """
         
         df_magic = self.model.do_impute(self.adata[:,gene_list].to_df(), magic_steps=3, gene_list=gene_list)
-        df_magic['parc'] = self.model.labels
-        df_magic_cluster = df_magic.groupby('parc', as_index=True).mean()
+      #  df_magic['parc'] = self.model.labels
+      #  df_magic_cluster = df_magic.groupby('parc', as_index=True).mean()
         fig,axs=plot_gene_trend_heatmaps_pyomic(via_object=self.model, df_gene_exp=df_magic, 
                                                 cmap=cmap,fontsize=fontsize,normalize=normalize,
                                                 ytick_labelrotation=ytick_labelrotation,figsize=figsize,
