@@ -79,6 +79,7 @@ Please checkout the documentations and tutorials at [omicverse page](https://sta
 - [29] [CEFCON](https://github.com/WPZgithub/CEFCON) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-44103-3)
 - [30] [PyComplexHeatmap](https://github.com/DingWB/PyComplexHeatmap) was originally published in [*iMeta*](https://doi.org/10.1002/imt2.115)
 - [31] [STT](https://github.com/cliffzhou92/STT/) was originally published in [*Nature Method*](https://www.nature.com/articles/s41592-024-02266-x#Sec2)
+- [32] [SLAT](https://github.com/gao-lab/SLAT) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-43105-5)
 
 ## Included Package not published or preprint
 
