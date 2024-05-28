@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import scanpy as sc
-from ..spatrio.spatrio import ot_alignment,assign_coord
+from ..externel.spatrio.spatrio import ot_alignment,assign_coord
 
 class CellMap(object):
 
