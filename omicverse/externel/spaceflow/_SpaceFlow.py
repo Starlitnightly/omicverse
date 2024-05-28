@@ -3,9 +3,9 @@ import math
 import os
 import torch
 import random
-import gudhi
+
 import anndata
-import cmcrameri
+#import cmcrameri
 import numpy as np
 import scanpy as sc
 import networkx as nx
@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
 from torch_geometric.nn import GCNConv, DeepGraphInfomax
 from sklearn.neighbors import kneighbors_graph
-from SpaceFlow.util import sparse_mx_to_torch_edge_list, corruption
+from ._util import sparse_mx_to_torch_edge_list, corruption
 
 class SpaceFlow(object):
     """An object for analysis of spatial transcriptomics data.
@@ -147,6 +147,7 @@ class SpaceFlow(object):
         :return: a spatial neighbor graph
         :rtype: class:`scipy.sparse.csr_matrix`
         """
+        import gudhi
         A_knn = kneighbors_graph(spatial_locs, n_neighbors=n_neighbors, mode='distance')
         estimated_graph_cut = A_knn.sum() / float(A_knn.count_nonzero())
         spatial_locs_list = spatial_locs.tolist()

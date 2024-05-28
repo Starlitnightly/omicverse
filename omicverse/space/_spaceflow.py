@@ -18,14 +18,14 @@ class pySpaceFlow(object):
     def __init__(self,adata) -> None:
         global sf_install
         try:
-            from ..spaceflow import SpaceFlow
+            from ..externel.spaceflow import SpaceFlow
             sf_install=True
             #print('mofax have been install version:',mfx.__version__)
         except ImportError:
             raise ImportError(
                 'Please install the SpaceFlow: `pip install SpaceFlow`.'
             )
-        from ..spaceflow import SpaceFlow
+        from ..externel.spaceflow import SpaceFlow
         sf = SpaceFlow(adata=adata, 
                          spatial_locs=adata.obsm['spatial'])
         
@@ -43,7 +43,7 @@ class pySpaceFlow(object):
               min_stop=100, random_seed=42, gpu=0, 
               regularization_acceleration=True, edge_subset_sz=1000000):
         
-        from ..spaceflow import sparse_mx_to_torch_edge_list, corruption
+        from ..externel.spaceflow import sparse_mx_to_torch_edge_list, corruption
 
         adata_preprocessed, spatial_graph = self.sf.adata_preprocessed, self.sf.spatial_graph
         if not adata_preprocessed:

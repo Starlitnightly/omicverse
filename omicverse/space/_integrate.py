@@ -21,8 +21,8 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
-from ..STAligner.mnn_utils import create_dictionary_mnn
-from ..STAligner.STALIGNER import STAligner
+from ..externel.STAligner.mnn_utils import create_dictionary_mnn
+from ..externel.STAligner.STALIGNER import STAligner
 
 
 

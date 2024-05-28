@@ -1,9 +1,9 @@
 
 
-from ..tosica import fit_model
-from ..tosica.TOSICA_model import scTrans_model as create_model
-from ..tosica.train import set_seed,splitDataSet,get_gmt,read_gmt,create_pathway_mask,train_one_epoch,evaluate,MyDataSet
-from ..tosica.pre import predict,predicted,todense
+from ..externel.tosica import fit_model
+from ..externel.tosica.TOSICA_model import scTrans_model as create_model
+from ..externel.tosica.train import set_seed,splitDataSet,get_gmt,read_gmt,create_pathway_mask,train_one_epoch,evaluate,MyDataSet
+from ..externel.tosica.pre import predict,predicted,todense
 import random
 import torch.nn.functional as F
 import numpy as np
