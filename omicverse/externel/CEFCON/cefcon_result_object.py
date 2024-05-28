@@ -12,7 +12,7 @@ import matplotlib.ticker as ticker
 from matplotlib.pyplot import rc_context
 import seaborn as sns
 # import aucell and ctxcore
-from ..single._aucell import aucell
+from ...single._aucell import aucell
 
 from .driver_regulators import driver_regulators
 

@@ -8,8 +8,8 @@ from scipy.optimize import nnls
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from scipy.stats import pearsonr
-from ..pp import pca
-from ..pp import scale
+from ...pp import pca
+from ...pp import scale
 #from .helper import intersect, kl_divergence_backend, to_dense_array, extract_exp, extract_data_matrix, process_anndata, construct_graph, distances_cal, dist_cal, scale_num
 from .helper import *
     

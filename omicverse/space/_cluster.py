@@ -4,7 +4,7 @@ import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
-from ..STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
+from ..externel.STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
 import scanpy as sc
 
 class pySTAGATE(object):

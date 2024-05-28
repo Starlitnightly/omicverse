@@ -1,4 +1,4 @@
-from ..STT import tl,pl
+from ..externel.STT import tl,pl
 import scanpy as sc
 import numpy as np
 import pandas as pd
