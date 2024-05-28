@@ -133,3 +133,45 @@ class LDA_topic(object):
         self.adata.obs['LDA_cluster'] = max_topic
         print(f"""finished: found {num_topics} clusters and added
     'LDA_cluster', the cluster labels (adata.obs, categorical)""")
+        
+    def get_results_rfc(self,adata,use_rep='X_pca',LDA_threshold=0.5,num_topics=6):
+        import pandas as pd
+        print(f"""running LDA topic predicted""")
+        #self.model = self.model.set_params(num_topics = num_topics).fit(self.adata)
+        #self.model.predict(self.adata)
+        # 找到每行中最大值所在的列（topic）
+        #df=self.adata.obs[self.model.topic_cols].copy()
+        
+        import numpy as np
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import train_test_split
+
+        new_array = []
+        class_array = []
+        for i in range(0, num_topics):
+            data = adata[adata.obs[f'topic_{i}'] > LDA_threshold].obsm[use_rep].toarray()
+            new_array.append(data)
+            class_array.append(np.full(data.shape[0], i))
+
+        new_array = np.concatenate(new_array, axis=0)
+        class_array = np.concatenate(class_array)
+
+        Xtrain, Xtest, Ytrain, Ytest = train_test_split(new_array,class_array,test_size=0.3)
+        clf = DecisionTreeClassifier(random_state=0)
+        rfc = RandomForestClassifier(random_state=0)
+        clf = clf.fit(Xtrain,Ytrain)
+        rfc = rfc.fit(Xtrain,Ytrain)
+        #查看模型效果
+        score_c = clf.score(Xtest,Ytest)
+        score_r = rfc.score(Xtest,Ytest)
+        #打印最后结果
+        print("Single Tree:",score_c)
+        print("Random Forest:",score_r)
+
+        adata.obs['LDA_cluster_rfc']=[str(i) for i in rfc.predict(adata.obsm[use_rep])]
+        adata.obs['LDA_cluster_clf']=[str(i) for i in clf.predict(adata.obsm[use_rep])]
+        print('LDA_cluster_rfc is added to adata.obs')
+        print('LDA_cluster_clf is added to adata.obs')
