@@ -31,13 +31,13 @@ BulkTrajBlend algorithm in OmicVerse that combines Beta-Variational AutoEncoder 
 
 ## Where to get it
 
-OmicVerse can be installed via conda or pypi and you need to install `pytorch` at first. Please refer to the [installation tutorial](https://omicverse.readthedocs.io/en/stable/Installation_guild/) for more detailed installation steps and adaptations for different platforms (`Windows`, `Linux` or `Mac OS`).
+OmicVerse can be installed via conda or pypi and you need to install `pytorch` at first. Please refer to the [installation tutorial](https://starlitnightly.github.io/omicverse/Installation_guild/) for more detailed installation steps and adaptations for different platforms (`Windows`, `Linux` or `Mac OS`).
 
 You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
 
 ## Usage
 
-Please checkout the documentations and tutorials at [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
+Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
 ## Data Framework
 
@@ -78,6 +78,7 @@ Please checkout the documentations and tutorials at [omicverse.readthedocs.io](h
 - [28] [STAligner](https://github.com/zhoux85/STAligner) was originally published in [*Nature Computational Science*](https://doi.org/10.1038/s43588-023-00528-w)
 - [29] [CEFCON](https://github.com/WPZgithub/CEFCON) was originally published in [*Nature Communications*](https://www.nature.com/articles/s41467-023-44103-3)
 - [30] [PyComplexHeatmap](https://github.com/DingWB/PyComplexHeatmap) was originally published in [*iMeta*](https://doi.org/10.1002/imt2.115)
+- [31] [STT](https://github.com/cliffzhou92/STT/) was originally published in [*Nature Method*](https://www.nature.com/articles/s41592-024-02266-x#Sec2)
 
 ## Included Package not published or preprint
 
