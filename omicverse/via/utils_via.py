@@ -778,7 +778,7 @@ def plot_sc_pb(ax, fig, embedding, prob, ti, cmap_name: str ='plasma', scatter_s
     c[loc_c, 3] = 0.8
     ax.scatter(embedding[loc_c, 0], embedding[loc_c, 1], c=prob[loc_c], s=size_point, edgecolors='none', alpha=0.8, cmap=cmap_name,vmin=0, vmax=vmax)
 
-from datashader.bundling import connect_edges, hammer_bundle
+
 def sigmoid_func(X):
     return 1 / (1 + np.exp(-X))
 
@@ -859,6 +859,7 @@ def make_edgebundle_viagraph(layout=None, graph=None,initial_bandwidth = 0.05, d
     edges = pd.DataFrame([e.tuple for e in graph.es], columns=['source', 'target'])
 
     edges['weight'] = graph.es['weight']
+    from datashader.bundling import connect_edges, hammer_bundle
     hb = hammer_bundle(nodes, edges, weight='weight',initial_bandwidth = initial_bandwidth, decay=decay) #default bw=0.05, dec=0.7
     print(f'{datetime.now()}\tHammer dims: Nodes shape: {nodes.shape} Edges shape: {edges.shape}')
     #fig, ax = plt.subplots(figsize=(8, 8))
@@ -912,7 +913,7 @@ def _make_edgebundle_sc(embedding, sc_graph, initial_bandwidth = 0.05, decay=0.7
     edges.drop('target_cluster', inplace=True, axis=1)
     edges.drop('source_cluster', inplace=True, axis=1)
 
-
+    from datashader.bundling import connect_edges, hammer_bundle
     hb = hammer_bundle(nodes, edges, weight = 'weight', initial_bandwidth = initial_bandwidth, decay=decay) #default bw=0.05, dec=0.7
 
     #fig, ax = plt.subplots(figsize=(8, 8))

@@ -54,7 +54,6 @@ dependencies = [
     'igraph>=0.10',
     'leidenalg>=0.9',
     'graphtools>=1.5',
-    'datashader>=0.14',
     'phate>=1.0',
     'tqdm>=4.64',
     'pydeseq2>=0.3, <=0.4.0',
