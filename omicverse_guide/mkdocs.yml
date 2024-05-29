@@ -24,6 +24,7 @@ nav:
             - Consensus Non-negative Matrix factorization (cNMF): Tutorials-single/t_cnmf.ipynb
             - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
         - Annotation: 
+            - Automatic cell type annotation with GPT/Other: Tutorials-single/t_gptanno.ipynb
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
             - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
             - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb

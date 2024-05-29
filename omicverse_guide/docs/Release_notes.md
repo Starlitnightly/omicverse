@@ -359,4 +359,5 @@ Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from r
 ### single Module
 
 - Added `get_results_rfc` in `omicverse.single.cNMF` to predict the precise cluster in complex scRNA-seq/stRNA-seq
-- - Added `get_results_rfc` in `omicverse.utils.LDA_topic` to predict the precise cluster in complex scRNA-seq/stRNA-seq
+- Added `get_results_rfc` in `omicverse.utils.LDA_topic` to predict the precise cluster in complex scRNA-seq/stRNA-seq
+- Added `gptcelltype` in `omicverse.single` to annotate celltype using large language model #82.
