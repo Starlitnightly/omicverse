@@ -22,3 +22,4 @@ from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3
 from ._cnmf import *
+from ._gptcelltype import gptcelltype
