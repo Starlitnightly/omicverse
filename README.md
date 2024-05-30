@@ -4,15 +4,13 @@
 
 [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse) [![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![scverse](https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow)](https://scverse.org/) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py38|py39/badge.svg)](https://github.com/Starlitnightly/omicverse/) 
 
-OmicVerse is the fundamental package for multi omics included bulk ,single cell and spatial RNA-seq analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v2)
+**`OmicVerse`** is the fundamental package for multi omics included **bulk ,single cell and spatial RNA-seq** analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v2)
 
-> \[!IMPORTANT]
+> [!IMPORTANT]
 >
 > **Star Us**, You will receive all release notifications from GitHub without any delay \~ ⭐️
-
-> \[!NOTE]  
 >
-> If you like **OmicVerse** and want to support our mission, please consider making a [donation](https://afdian.net/a/starlitnightly) to support our efforts.
+> If you like **OmicVerse** and want to support our mission, please consider making a [💗donation](https://afdian.net/a/starlitnightly) to support our efforts.
 
 <details>
   <summary><kbd>Star History</kbd></summary>
@@ -28,9 +26,10 @@ OmicVerse is the fundamental package for multi omics included bulk ,single cell 
 
 ## `1` [Introduction][docs-feat-provider]
 
-The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to OmicVerse, it aimed to solve all task in RNA-seq.
+The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to **`OmicVerse`**, it aimed to solve all task in RNA-seq.
 
-BulkTrajBlend algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of “interrupted” cells in the original scRNA-seq data.
+> [!NOTE]
+> **BulkTrajBlend** algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of **"omission"** cells in the original scRNA-seq data.
 
 ![omicverse-light](omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
 ![omicverse-dark](omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
@@ -144,16 +143,26 @@ The table contains the tools have been published
 - Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com) or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 - Lei Hu ([hulei@westlake.edu.cn](mailto:hulei@westlake.edu.cn))
 
-## `6` [Developer Guild and Acknowledgements](#)
+## `6` [Developer Guild and Contributing](#)
 
 If you would like to contribute to omicverse, please refer to our [developer documentation](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
 
+<table align="center">
+    <tr>
+      <th colspan="2">
+        <br><img src="https://contrib.rocks/image?repo=Starlitnightly/omicverse"><br><br>
+      </th>
+    </tr>
+</table>
+
+
 > [!IMPORTANT]  
 > We would like to thank the following WeChat Official Accounts for promoting Omicverse.
+> <p align="center"> <a href="http://www.biotrainee.com/" target="_blank" rel="noreferrer"> <img src="README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
 
 
 
-<p align="center"> <a href="http://www.biotrainee.com/" target="_blank" rel="noreferrer"> <img src="README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
+
 
 ## `7` [Other](#)
 
