@@ -82,7 +82,7 @@ class build_3D():
         self.loc_list = []
         self.anno_list = []
         for adata in adatas:
-            loc = adata.obsm[spatial_key]
+            loc = adata.obsm[spatial_key].copy()
             if scale_coordinate:
                 for i in range(2):
                     loc[:,i] = (loc[:,i]-np.min(loc[:,i]))/(np.max(loc[:,i])-np.min(loc[:,i]))
@@ -90,6 +90,8 @@ class build_3D():
             self.loc_list.append(loc)
             self.anno_list.append(anno)
             
+        self.adatas = adatas
+        self.anno_key=anno_key
         self.celltypes = set(pd.concat(self.anno_list))
         self.subsample_size = subsample_size
             
@@ -130,6 +132,9 @@ class build_3D():
         ax = fig.add_subplot(111, projection='3d')
         ax.set_box_aspect([1, 1, height_scale * len(self.mappings)])
         # color by different cell types
+        
+        
+
         color = get_color(len(self.celltypes))
         c_map = {}
         for i, celltype in enumerate(self.celltypes):
@@ -137,10 +142,21 @@ class build_3D():
         for j, mapping in enumerate(self.mappings):
             print(f"Mapping {j}th layer ")
             # plot cells
-            for i, (layer, anno) in enumerate(zip(self.loc_list[j:j+2], self.anno_list[j:j+2])):
+            for i, (layer, anno,ad) in enumerate(zip(self.loc_list[j:j+2], self.anno_list[j:j+2],self.adatas[j:j+2])):
                 if i==0 and 0<j<len(self.mappings)-1:
                     continue
-                for cell_type in self.celltypes:
+                
+                ad.obs[self.anno_key]=ad.obs[self.anno_key].astype('category')
+                if '{}_colors'.format(self.anno_key) in ad.uns.keys():
+                    c_map=dict(zip(ad.obs[self.anno_key].cat.categories.tolist(),
+                                    ad.uns['{}_colors'.format(self.anno_key)]))
+                else:
+                    if len(ad.obs[self.anno_key].cat.categories)>28:
+                        c_map=dict(zip(ad.obs[self.anno_key].cat.categories,sc.pl.palettes.default_102))
+                    else:
+                        c_map=dict(zip(ad.obs[self.anno_key].cat.categories,sc.pl.palettes.zeileis_28))
+
+                for cell_type in ad.obs[self.anno_key].cat.categories:
                     slice = layer[anno == cell_type,:]
                     xs = slice[:,0]
                     ys = slice[:,1]
@@ -159,7 +175,8 @@ class build_3D():
 
         if hide_axis:
             plt.axis('off')
-        plt.show()
+        return ax
+        #plt.show()
 
 
 class match_3D_multi():
@@ -311,15 +328,20 @@ class match_3D_multi():
             for i, dataset in enumerate(self.datasets):
                 if self.expr:
                     norm = plt.Normalize(dataset[self.expr].to_numpy().min(), dataset[self.expr].to_numpy().max())
-                for cell_type in self.celltypes:
+                
+                for cell_type in list(set(dataset[self.meta])):
                     slice = dataset[dataset[self.meta] == cell_type]
                     xs = slice['x']
                     ys = slice['y']
+                    if 'color' in slice.columns:
+                        cs=slice['color'].tolist()[0]
+                    else:
+                        cs = c_map[cell_type]
                     zs = i
                     if self.expr:
                         ax.scatter(xs, ys, zs, s=point_size[i], c=slice[self.expr], cmap=c_map, norm=norm)
                     else:
-                        ax.scatter(xs, ys, zs, s=point_size[i], c=c_map[cell_type])
+                        ax.scatter(xs, ys, zs, s=point_size[i], c=cs)
         # plot points without meta
         else:
             for i, dataset in enumerate(self.datasets):
@@ -745,3 +767,117 @@ def matching_2d(matching:np.ndarray,
     del src.obs['target_celltype']
     del src.obs['target_region']
     del src.obs['vis']
+
+import matplotlib.colors as mcolors
+def html_to_rgba_string(html_color):
+    rgba = mcolors.to_rgba(html_color)
+    # 将 RGBA 转换为字符串格式 'rgba(r, g, b, a)'
+    rgba_string = f'rgba({int(rgba[0]*255)}, {int(rgba[1]*255)}, {int(rgba[2]*255)}, {rgba[3]})'
+    return rgba_string
+
+def Sankey_multi(adata_li,prefix_li,matching_li,
+                clusters='annotation',filter_num=10,
+                layout=[1300,900],node_opacity = 0.8,
+                 link_opacity = 0.2,
+                 title='',
+           font_size=15,
+           font_color='Black',
+           save_name=None,
+           format='png',
+           width=1200,
+           height=1000,
+           return_fig=False):
+    #1. get adata_df
+    adata_df={}
+    for ad,prefix in zip(adata_li,prefix_li):
+        adata_df[prefix]=pd.DataFrame({'index':range(ad.shape[0]),
+                          'x': ad.obsm['spatial'][:,0],
+                          'y': ad.obsm['spatial'][:,1],
+                          'celltype':ad.obs[clusters]})
+    
+    #2. target_celltype
+    matching_table_li=[]
+    for idx,prefix in enumerate(prefix_li):
+        if idx==0:
+            prefix_pre=prefix
+            continue
+        adata_df[prefix]['target_celltype'] = adata_df[prefix_pre].iloc[matching_li[idx-1][1,:],:]['celltype'].to_list()
+        matching_table_li.append(adata_df[prefix].groupby(['celltype', 'target_celltype']).size().unstack(fill_value=0))
+        prefix_pre=prefix
+        
+    #3. Sankey prepare
+    source, target, value = [], [], []
+    label_all=[]
+    color_all=[]
+    for ad,prefix in zip(adata_li,
+                       prefix_li):
+        label_all=label_all+list(set([i+'_'+prefix for i in ad.obs[clusters].tolist()]))
+
+
+    anno_key=clusters
+    color_dict={}
+    for ad,prefix in zip(adata_li,
+                       prefix_li):
+        if '{}_colors'.format(anno_key) in ad.uns.keys():
+            c_map=dict(zip(ad.obs[anno_key].cat.categories.tolist(),
+                                        ad.uns['{}_colors'.format(anno_key)]))
+            for cname in c_map.keys():
+                color_dict[cname+'_'+prefix]=c_map[cname]
+
+
+    color_all=[html_to_rgba_string(color_dict[i]) for i in label_all]
+    color_all_dict=dict(zip(label_all, color_all))
+    label2index = dict(zip(label_all, list(range(len(label_all)))))
+    
+    color_all=[
+        f'rgba(255,0,255,{node_opacity})' 
+        if c == "magenta" else c.replace('1.0', str(node_opacity)) 
+        for c in color_all]
+    
+    #filter_num=10
+    #matching_table_li=[matching_table1,matching_table2]
+    paired_list = [[prefix_li[i], prefix_li[i+1]] for i in range(len(prefix_li)-1)]
+
+    for matching_t,pre in zip(matching_table_li,paired_list):
+        for i, query in enumerate(matching_t.index.tolist()):
+            for j, ref in enumerate(matching_t.columns.tolist()):
+                if int(matching_t.loc[query,ref]) > filter_num:
+                    #print(1,query+'_'+pre[1],ref+'_'+pre[0])
+                    if (query+'_'+pre[1] in label2index.keys()) and (ref+'_'+pre[0] in label2index.keys() ):
+                        #print(query+'_'+pre[1],ref+'_'+pre[0])
+                        target.append(label2index[query+'_'+pre[1]])
+                        source.append(label2index[ref+'_'+pre[0]])
+                        value.append(int(matching_t.iloc[i,j]))
+
+    
+    link_color = [color_all[src].replace(str(node_opacity), str(link_opacity))
+                                    for src in source]
+    
+    fig = go.Figure(data=[go.Sankey(
+                valueformat = ".0f",
+                valuesuffix = "TWh",
+                # Define nodes
+                node = dict(
+                  pad = 15,
+                  thickness = 15,
+                  line = dict(color = "black", width = 0.5),
+                  label =  label_all,
+                  color =  color_all
+                ),
+                # Add links
+                link = dict(
+                  source =  source,
+                  target =  target,
+                  value =  value,
+                  label =  label_all,
+                  color =  link_color
+            ))],
+                   layout=go.Layout(autosize=False, width=layout[0], height=layout[1])
+                   )
+
+    fig.update_layout(title_text=title, font_size=font_size, font_color=font_color)
+    fig.show()
+    if save_name != None:
+        fig.write_image(save_name + f'.{format}', width=width, height=height)
+    if return_fig:
+        return fig
