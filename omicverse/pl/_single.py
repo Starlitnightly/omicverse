@@ -32,6 +32,7 @@ from matplotlib import patheffects
 from matplotlib.colors import Colormap, Normalize
 from functools import partial
 import matplotlib.pyplot as plt
+import seaborn as sns
 import scanpy as sc
 
 from scanpy.plotting import _utils 
@@ -702,3 +703,249 @@ def contour(ax,adata,groupby,clusters,basis='X_umap',
     outer_contour_x, outer_contour_y = outer_contour_path.vertices[:, 0], outer_contour_path.vertices[:, 1]
 
     return ax
+
+
+def plot_boxplots(  # pragma: no cover
+        data,
+        feature_name: str,
+        modality_key: str = "coda",
+        y_scale = "relative",
+        plot_facets: bool = False,
+        add_dots: bool = False,
+        cell_types=None,
+        args_boxplot=None,
+        args_swarmplot= None,
+        palette= "Blues",
+        show_legend= True,
+        level_order=None,
+        figsize  = None,
+        dpi= 100,
+        return_fig= None,
+        ax = None,
+        show = None,
+        save = None,
+    ):
+        """Grouped boxplot visualization.
+
+         The cell counts for each cell type are shown as a group of boxplots
+         with intra--group separation by a covariate from data.obs.
+
+        Args:
+            data: AnnData object or MuData object
+            feature_name: The name of the feature in data.obs to plot
+            modality_key: If data is a MuData object, specify which modality to use.
+            y_scale: Transformation to of cell counts. Options: "relative" - Relative abundance, "log" - log(count),
+                     "log10" - log10(count), "count" - absolute abundance (cell counts).
+            plot_facets: If False, plot cell types on the x-axis. If True, plot as facets.
+            add_dots: If True, overlay a scatterplot with one dot for each data point.
+            cell_types: Subset of cell types that should be plotted.
+            args_boxplot: Arguments passed to sns.boxplot.
+            args_swarmplot: Arguments passed to sns.swarmplot.
+            figsize: Figure size.
+            dpi: Dpi setting.
+            palette: The seaborn color map for the barplot.
+            show_legend: If True, adds a legend.
+            level_order: Custom ordering of bars on the x-axis.
+
+        Returns:
+            Depending on `plot_facets`, returns a :class:`~matplotlib.axes.Axes` (`plot_facets = False`)
+            or :class:`~sns.axisgrid.FacetGrid` (`plot_facets = True`) object
+
+        Examples:
+            >>> import pertpy as pt
+            >>> haber_cells = pt.dt.haber_2017_regions()
+            >>> sccoda = pt.tl.Sccoda()
+            >>> mdata = sccoda.load(haber_cells, type="cell_level", generate_sample_level=True, cell_type_identifier="cell_label", \
+                sample_identifier="batch", covariate_obs=["condition"])
+            >>> sccoda.plot_boxplots(mdata, feature_name="condition", add_dots=True)
+
+        Preview:
+            .. image:: /_static/docstring_previews/sccoda_boxplots.png
+        """
+        if args_boxplot is None:
+            args_boxplot = {}
+        if args_swarmplot is None:
+            args_swarmplot = {}
+        #if isinstance(data, MuData):
+        #    data = data[modality_key]
+        #if isinstance(data, AnnData):
+        #    data = data
+        # y scale transformations
+        if y_scale == "relative":
+            sample_sums = np.sum(data.X, axis=1, keepdims=True)
+            X = data.X / sample_sums
+            value_name = "Proportion"
+        # add pseudocount 0.5 if using log scale
+        elif y_scale == "log":
+            X = data.X.copy()
+            X[X == 0] = 0.5
+            X = np.log(X)
+            value_name = "log(count)"
+        elif y_scale == "log10":
+            X = data.X.copy()
+            X[X == 0] = 0.5
+            X = np.log(X)
+            value_name = "log10(count)"
+        elif y_scale == "count":
+            X = data.X
+            value_name = "count"
+        else:
+            raise ValueError("Invalid y_scale transformation")
+
+        count_df = pd.DataFrame(X, columns=data.var.index, index=data.obs.index).merge(
+            data.obs[feature_name], left_index=True, right_index=True
+        )
+        plot_df = pd.melt(count_df, id_vars=feature_name, var_name="Cell type", value_name=value_name)
+        if cell_types is not None:
+            plot_df = plot_df[plot_df["Cell type"].isin(cell_types)]
+
+        # Currently disabled because the latest statsannotations does not support the latest seaborn.
+        # We had to drop the dependency.
+        # Get credible effects results from model
+        # if draw_effects:
+        #     if model is not None:
+        #         credible_effects_df = model.credible_effects(data, modality_key).to_frame().reset_index()
+        #     else:
+        #         print("[bold yellow]Specify a tasCODA model to draw effects")
+        #     credible_effects_df[feature_name] = credible_effects_df["Covariate"].str.removeprefix(f"{feature_name}[T.")
+        #     credible_effects_df[feature_name] = credible_effects_df[feature_name].str.removesuffix("]")
+        #     credible_effects_df = credible_effects_df[credible_effects_df["Final Parameter"]]
+
+        # If plot as facets, create a FacetGrid and map boxplot to it.
+        if plot_facets:
+            if level_order is None:
+                level_order = pd.unique(plot_df[feature_name])
+
+            K = X.shape[1]
+
+            if figsize is not None:
+                height = figsize[0]
+                aspect = np.round(figsize[1] / figsize[0], 2)
+            else:
+                height = 3
+                aspect = 2
+
+            g = sns.FacetGrid(
+                plot_df,
+                col="Cell type",
+                sharey=False,
+                col_wrap=int(np.floor(np.sqrt(K))),
+                height=height,
+                aspect=aspect,
+            )
+            g.map(
+                sns.boxplot,
+                feature_name,
+                value_name,
+                palette=palette,
+                order=level_order,
+                **args_boxplot,
+            )
+
+            if add_dots:
+                if "hue" in args_swarmplot:
+                    hue = args_swarmplot.pop("hue")
+                else:
+                    hue = None
+
+                if hue is None:
+                    g.map(
+                        sns.swarmplot,
+                        feature_name,
+                        value_name,
+                        color="black",
+                        order=level_order,
+                        **args_swarmplot,
+                    ).set_titles("{col_name}")
+                else:
+                    g.map(
+                        sns.swarmplot,
+                        feature_name,
+                        value_name,
+                        hue,
+                        order=level_order,
+                        **args_swarmplot,
+                    ).set_titles("{col_name}")
+
+            if save:
+                plt.savefig(save, bbox_inches="tight")
+            if show:
+                plt.show()
+            if return_fig:
+                return plt.gcf()
+            if not (show or save):
+                return g
+            return None
+
+        # If not plot as facets, call boxplot to plot cell types on the x-axis.
+        else:
+            if level_order:
+                args_boxplot["hue_order"] = level_order
+                args_swarmplot["hue_order"] = level_order
+
+            _, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+            ax = sns.boxplot(
+                x="Cell type",
+                y=value_name,
+                hue=feature_name,
+                data=plot_df,
+                fliersize=1,
+                palette=palette,
+                ax=ax,
+                **args_boxplot,
+            )
+
+            # Currently disabled because the latest statsannotations does not support the latest seaborn.
+            # We had to drop the dependency.
+            # if draw_effects:
+            #     pairs = [
+            #         [(row["Cell Type"], row[feature_name]), (row["Cell Type"], "Control")]
+            #         for _, row in credible_effects_df.iterrows()
+            #     ]
+            #     annot = Annotator(ax, pairs, data=plot_df, x="Cell type", y=value_name, hue=feature_name)
+            #     annot.configure(test=None, loc="outside", color="red", line_height=0, verbose=False)
+            #     annot.set_custom_annotations([row[feature_name] for _, row in credible_effects_df.iterrows()])
+            #     annot.annotate()
+
+            if add_dots:
+                sns.swarmplot(
+                    x="Cell type",
+                    y=value_name,
+                    data=plot_df,
+                    hue=feature_name,
+                    ax=ax,
+                    dodge=True,
+                    palette="dark:black",
+                    **args_swarmplot,
+                )
+
+            cell_types = pd.unique(plot_df["Cell type"])
+            ax.set_xticklabels(cell_types, rotation=90)
+
+            if show_legend:
+                handles, labels = ax.get_legend_handles_labels()
+                handout = []
+                labelout = []
+                for h, l in zip(handles, labels, strict=False):
+                    if l not in labelout:
+                        labelout.append(l)
+                        handout.append(h)
+                ax.legend(
+                    handout,
+                    labelout,
+                    loc="upper left",
+                    bbox_to_anchor=(1, 1),
+                    ncol=1,
+                    title=feature_name,
+                )
+
+            if save:
+                plt.savefig(save, bbox_inches="tight")
+            if show:
+                plt.show()
+            if return_fig:
+                return plt.gcf()
+            if not (show or save):
+                return ax
+            return None
