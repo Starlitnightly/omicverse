@@ -1,306 +1,363 @@
-# Release notes
+# Release Notes
 
 ## v 1.0.0
-
-First public release
+- First public release.
 
 ## v 1.1.7
-
 ### bulk module:
-
-- Add the Deseq2 included `pyDEseq` `deseq2_normalize`, `estimateSizeFactors`, `estimateDispersions`, `Matrix_ID_mapping`
-- Add the tcga included `TCGA`
-- Add the Enrichment included `geneset_enrichment`, `geneset_plot`
+- Added Deseq2, including `pyDEseq` functions: `deseq2_normalize`, `estimateSizeFactors`, `estimateDispersions`, `Matrix_ID_mapping`.
+- Included TCGA with `TCGA`.
+- Introduced Enrichment with functions `geneset_enrichment`, `geneset_plot`.
 
 ### single module:
-
-- Add the scdrug included `autoResolution`, `writeGEP`, `Drug_Response`
-- Add the cpdb included `cpdb_network_cal`, `cpdb_plot_network`, `cpdb_plot_interaction`, `cpdb_interaction_filtered`
-- Add the scgsea included `geneset_aucell`, `pathway_aucell`, `pathway_aucell_enrichment`, `pathway_enrichment`, `pathway_enrichment_plot`
+- Integrated scdrug with functions `autoResolution`, `writeGEP`, `Drug_Response`.
+- Added cpdb with functions `cpdb_network_cal`, `cpdb_plot_network`, `cpdb_plot_interaction`, `cpdb_interaction_filtered`.
+- Included scgsea with functions `geneset_aucell`, `pathway_aucell`, `pathway_aucell_enrichment`, `pathway_enrichment`, `pathway_enrichment_plot`.
 
 ## v 1.1.8
-
 ### single module:
-
-- Fix the cpdb's error included `import error` and `color error of cpdb_plot_network`
-- Add the cpdb's method included `cpdb_submeans_exacted` that researchers can exact the sub network easily.
+- Addressed errors in cpdb, including import errors and color issues in `cpdb_plot_network`.
+- Introduced `cpdb_submeans_exacted` in cpdb for easy sub-network extraction.
 
 ## v 1.1.9
-
 ### bulk2single module:
-
-- Add the `bulk2single` module
-- Fix the model load error from bulk2space
-- Fix the early stop from bulk2space
-- Add more friendly input method and visualisation
-- Add the loss history visualisation
+- Added the `bulk2single` module.
+- Fixed model load error from bulk2space.
+- Resolved early stop issues from bulk2space.
+- Included more user-friendly input methods and visualizations.
+- Added loss history visualization.
 
 ### utils module:
-
-- Add the `pyomic_palette` in plot module
+- Introduced `pyomic_palette` in the plot module.
 
 ## v 1.1.10
+- Updated all code references.
 
-Update all code reference
-
-- Fix the parameter non-vaild on `single.mofa.mofa_run` function 
-- Add the layer raw count addition on `single.scanpy_lazy` function
-- Add `utils.plot_boxplot` to plot the box plot with jittered points.
-- Add `bulk.pyDEseq.plot_boxplot` to plot the box plot with jittered points of specific Genes.
-
+### single module:
+- Fixed non-valid parameters in `single.mofa.mofa_run` function.
+- Added layer raw count addition in `single.scanpy_lazy` function.
+- Introduced `utils.plot_boxplot` for plotting box plots with jittered points.
+- Added `bulk.pyDEseq.plot_boxplot` for plotting box plots with jittered points for specific genes.
 
 ## v 1.2.0
-
 ### bulk module:
-
-- Fix the `cutoff` parameter non-vaild on `bulk.geneset_enrichment`
-- Add `pyPPI`,`pyGSEA`,`pyWGCNA`,`pyTCGA`,`pyDEG` module.
+- Fixed non-valid `cutoff` parameter in `bulk.geneset_enrichment`.
+- Added modules: `pyPPI`, `pyGSEA`, `pyWGCNA`, `pyTCGA`, `pyDEG`.
 
 ### bulk2single module:
-
-- Add the `bulk2single.save` to save model by manual
+- Introduced `bulk2single.save` for manual model saving.
 
 ## v 1.2.1-4
-
 ### single module:
-
-- Add `pySCSA` module included `cell_anno`, `cell_anno_print`, `cell_auto_anno`, `get_model_tissue`
-- Add filter the doublets cells of `single.scanpy_lazy`
-- Add `single.scanpy_cellanno_from_dict` to annotate easier
-- Updated the database of SCSA from [CellMarker2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/)
-- Fix the error database key `Ensembl_HGNC` and `Ensembl_Mouse` of SCSA 
+- Added `pySCSA` module with functions: `cell_anno`, `cell_anno_print`, `cell_auto_anno`, `get_model_tissue`.
+- Implemented doublet cell filtering in `single.scanpy_lazy`.
+- Added `single.scanpy_cellanno_from_dict` for easier annotation.
+- Updated SCSA database from [CellMarker2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/).
+- Fixed errors in SCSA database keys: `Ensembl_HGNC` and `Ensembl_Mouse`.
 
 ## v 1.2.5
-
 ### single module:
-
-- Add `pyVIA` module include `run`, `plot_piechart_graph`, `plot_stream`, `plot_trajectory_gams`, `plot_lineage_probability`, `plot_gene_trend`, `plot_gene_trend_heatmap`, `plot_clustergraph`
-- Fix the error of warning of `utils.pyomic_plot_set` 
-- Update the requirements included `pybind11`, `hnswlib`, `termcolor`, `pygam`, `pillow`, `gdown`
+- Added `pyVIA` module with functions: `run`, `plot_piechart_graph`, `plot_stream`, `plot_trajectory_gams`, `plot_lineage_probability`, `plot_gene_trend`, `plot_gene_trend_heatmap`, `plot_clustergraph`.
+- Fixed warning error in `utils.pyomic_plot_set`.
+- Updated requirements, including `pybind11`, `hnswlib`, `termcolor`, `pygam`, `pillow`, `gdown`.
 
 ## v 1.2.6
-
-### single module
-
-- Add `pyVIA.get_piechart_dict` and `pyVIA.get_pseudotime`
+### single module:
+- Added `pyVIA.get_piechart_dict` and `pyVIA.get_pseudotime`.
 
 ## v 1.2.7
-
-### bulk2single module
-
-- Add `Single2Spatial` module included `load`, `save`, `train`, `spot_assess`
-- Fix the error in install the packages in pip
+### bulk2single module:
+- Added `Single2Spatial` module with functions: `load`, `save`, `train`, `spot_assess`.
+- Fixed installation errors for packages in pip.
 
 ## v 1.2.8
+- Fixed pip installation errors.
 
-- fix the error of pip in install
-
-### bulk2single module
-
-- Change the `deep-forest` of `Single2Spatial` to `Neuron Network` to perform classification task
-- The entire Single2Spatial inference process is accelerated using the GPU, and can be estimated at the batch level by modifying the set `predicted_size`, the original author's function is estimated spot by spot, which is very inefficient
-- Update the logical of `Single2Spatial.load` to accelerate model loading
+### bulk2single module:
+- Replaced `deep-forest` in `Single2Spatial` with `Neuron Network` for classification tasks.
+- Accelerated the entire Single2Spatial inference process using GPU and batch-level estimation by modifying the `predicted_size` setting.
 
 ## v 1.2.9
+### bulk module:
+- Fixed duplicates_index mapping in `Matrix_ID_mapping`.
+- Resolved hub genes plot issues in `pyWGCNA.plot_sub_network`.
+- Fixed backupgene in `pyGSEA.geneset_enrichment` to support rare species.
+- Added matrix plot module in `pyWGCNA.plot_matrix`.
 
-### bulk module
+### single module:
+- Added `rank_genes_groups` check in `pySCSA`.
 
-- fix the duplicates_index mapping of `Matrix_ID_mapping`
-- fix the hub genes plot of `pyWGCNA.plot_sub_network`
-- fix the backupgene of `pyGSEA.geneset_enrichment` to support the rare species
-- add the module matrix plot in `pyWGCNA.plot_matrix`
-
-### single module
-
-- add the `rank_genes_groups` check in `pySCSA`
-
-### bulk2single module
-
-- fix the import error of `deepforest`
+### bulk2single module:
+- Fixed import error of `deepforest`.
 
 ## v 1.2.10
+- Renamed the package to `omicverse`.
 
-renamed the package to `omicverse`
+### single module:
+- Fixed argument error in `pySCSA`.
 
-### single module
-
-- fix the argument error of `pySCSA`
-
-### bulk2single module
-
-- update the plot argument of `bulk2single`
+### bulk2single module:
+- Updated plot arguments in `bulk2single`.
 
 ## v 1.2.11
-
-### bulk module
-
-- fix `wilcoxon` method in `pyDEG.deg_analysis`
-- add the parameter setting of treatment and control group's name in `pyDEG.plot_boxplot`
-- fix the figure display not entire of `pyWGCNA.plot_matrix`
-- fix the category correlation failed by ont-hot in `pyWGCNA.analysis_meta_correlation`
-- fix the network display failed in `pyWGCNA.plot_sub_network` and updated the `utils.plot_network` to avoid this error.
+### bulk module:
+- Fixed `wilcoxon` method in `pyDEG.deg_analysis`.
+- Added parameter setting for treatment and control group names in `pyDEG.plot_boxplot`.
+- Fixed figure display issues in `pyWGCNA.plot_matrix`.
+- Fixed category correlation failed by one-hot in `pyWGCNA.analysis_meta_correlation`.
+- Fixed network display issues in `pyWGCNA.plot_sub_network` and updated `utils.plot_network` to avoid errors.
 
 ## v 1.3.0
-
-### bulk module
-
-- add `DEseq2` method to `pyDEG.deg_analysis`
-- add `pyGSEA` module in `bulk`
-- change the name of raw `pyGSEA` to `pyGSE` in `bulk`
-- add `get_gene_annotation` of `utils` to perform gene_name transformation
+### bulk module:
+- Added `DEseq2` method to `pyDEG.deg_analysis`.
+- Introduced `pyGSEA` module in `bulk`.
+- Renamed raw `pyGSEA` to `pyGSE` in `bulk`.
+- Added `get_gene_annotation` in `utils` for gene name transformation.
 
 ## v 1.3.1
+### single module:
+- Added `get_celltype_marker` method.
 
-### single module
-
-- add `get_celltype_marker` method in `single`
-- add `GLUE_pair`, `pyMOFA`, `pyMOFAART` module in `single`
-- add tutorial of `Multi omics analysis by MOFA and GLUE`
-- update tutorial of `Multi omics analysis by MOFA`
+### single module:
+- Added `GLUE_pair`, `pyMOFA`, `pyMOFAART` module.
+- Added tutorials for `Multi omics analysis by MOFA and GLUE`.
+- Updated tutorial for `Multi omics analysis by MOFA`.
 
 ## v 1.4.0
+### bulk2single module:
+- Added `BulkTrajBlend` method.
 
-### bulk2single module
+### single module:
+- Fixed errors in `scnocd` model.
+- Added `save`, `load`, and `get_pair_dict` in `scnocd` model.
 
-- add `BulkTrajBlend` method in `bulk2single`
-
-### single module
-
-- fix the error of `scnocd` model
-- add `save`, `load`, and `get_pair_dict` of `scnocd` model
-
-### utils
-
-- add `mde` method in utils
-- add `gz` format support for `utils.read`
+### utils module:
+- Added `mde` method.
+- Added `gz` format support for `utils.read`.
 
 ## v 1.4.1
-
-### preprocess module
-
-- add `pp`(preprocess) module included `qc`(quantity control), `hvg`(high variable feature), `pca` 
-- add `data_files` for cell cycle calculate from [Cellula](https://github.com/andrecossa5/Cellula/) and [pegasus](https://github.com/lilab-bcb/pegasus/)
+### preprocess module:
+- Added `pp` (preprocess) module with `qc` (quantity control), `hvg` (high variable feature), `pca`.
+- Added `data_files` for cell cycle calculation from [Cellula](https://github.com/andrecossa5/Cellula/) and [pegasus](https://github.com/lilab-bcb/pegasus/).
 
 ## v 1.4.3
+###
 
-### preprocess module
-
-- fix sparse preprocess error of `pp`
-- fix the trajectory import error of `via`
-- add the gene correlation analysis of trajectory 
+ preprocess module:
+- Fixed sparse preprocess error in `pp`.
+- Fixed trajectory import error in `via`.
+- Added gene correlation analysis of trajectory.
 
 ## v 1.4.4
+### single module:
+- Added `panglaodb` database to `pySCSA` module.
+- Fixed errors in `pySCSA.cell_auto_anno` when some cell types are not found in clusters.
+- Fixed errors in `pySCSA.cell_anno` when `rank_genes_groups` are not consistent with clusters.
+- Added `pySIMBA` module in single for batch correction.
 
-### single module
-
-- add `panglaodb` database to `pySCSA` module
-- fix the error of `pySCSA.cell_auto_anno` when some celltype not found in clusters
-- fix the error of `pySCSA.cell_anno` when `rank_genes_groups` not consisted with clusters
-- add `pySIMBA` module in single to perform batch correction
-
-### preprocess module
-
-- add `store_layers` and `retrieve_layers` in `ov.utils`
-- add `plot_embedding_celltype` and `plot_cellproportion` in `ov.utils`
+### preprocess module:
+- Added `store_layers` and `retrieve_layers` in `ov.utils`.
+- Added `plot_embedding_celltype` and `plot_cellproportion` in `ov.utils`.
 
 ## v 1.4.5
-
-### single module
-
-- add `MetaTiME` module in single to perform celltype annotation automatically in TME
+### single module:
+- Added `MetaTiME` module to perform cell type annotation automatically in TME.
 
 ## v 1.4.12
+- Updated `conda install omicverse -c conda-forge`.
 
-update `conda install omicverse -c conda-forge`
+### single module:
+- Added `pyTOSICA` module to perform cell type migration from reference scRNA-seq in Transformer model.
+- Added `atac_concat_get_index`, `atac_concat_inner`, `atac_concat_outer` functions to merge/concatenate scATAC data.
+- Fixed `MetaTime.predicted` when Unknown cell type appears.
 
-### single module
-
-- add `pyTOSICA` module in single to perform celltype migration from reference scRNA-seq in Tranformer model
-- add `atac_concat_get_index`,`atac_concat_inner`,`atac_concat_outer` function to merge/concat the scATAC data.
-- fix `MetaTime.predicted` when Unknown cell type appear
-
-### preprocess module
-
-- add `plot_embedding` in `ov.utils` to plot umap in special color dict
+### preprocess module:
+- Added `plot_embedding` in `ov.utils` to plot UMAP in a special color dictionary.
 
 ## v 1.4.13
+### bulk module:
+- Added `mad_filtered` to filter robust genes when calculating the network in `ov.bulk.pyWGCNA` module.
+- Fixed `string_interaction` in `ov.bulk.pyPPI` for string-db updates.
 
-### bulk module 
-
-- add `mad_filtered` to filtered the robust genes when calculated the network in `ov.bulk.pyWGCNA` module
-- fix `string_interaction` in `ov.bulk.pyPPI` for string-db updated.
-
-### preprocess module
-
-- change `mode` arguement of `pp.preprocess`, normalize|HVGs：We use | to control the preprocessing step, | before for the normalisation step, either `shiftlog` or `pearson`, and | after for the highly variable gene calculation step, either `pearson` or `seurat`. Our default is `shiftlog|pearson`.
-- add `ov.utils.embedding`,`ov.utils.neighbors`, and `ov.utils.stacking_vol`
+### preprocess module:
+- Changed `mode` argument of `pp.preprocess` to control preprocessing steps.
+- Added `ov.utils.embedding`, `ov.utils.neighbors`, and `ov.utils.stacking_vol`.
 
 ## v 1.4.14
+### preprocess module:
+- Added `batch_key` in `pp.preprocess` and `pp.qc`.
 
-### preprocess module
+### utils module:
+- Added `plot_ConvexHull` to visualize the boundary of clusters.
+- Added `weighted_knn_trainer` and `weighted_knn_transfer` for multi-adata integration.
 
-- add `batch_key` in `pp.preprocess` and `pp.qc`
-
-### utils module
-
-- add `plot_ConvexHull` to visualize the boundary of clusters
-- add `weighted_knn_trainer` and `weighted_knn_transfer` for multi adata integrate
-  
-### single module
-
-- fix the error of import of `mofa` 
+### single module:
+- Fixed import errors in `mofa`.
 
 ## v 1.4.17
+### bulk module:
+- Fixed compatibility issues with `pydeseq2` version `0.4.0`.
+- Added `bulk.batch_correction` for multi-bulk RNA-seq/microarray samples.
 
-### bulk module
+### single module:
+- Added `single.batch_correction` for multi-single cell datasets.
 
-- fix the compatibility of `pydeseq2` while version is `0.4.0`
-- add `bulk.batch_correction` for multi bulk RNA-seq/microarray sample
-
-### single module
-
-- add `single.batch_correction` for multi single cell datasets
-
-### preprocess module
-
-- add parameter `layers_add` in `pp.scale`
+### preprocess module:
+- Added parameter `layers_add` in `pp.scale`.
 
 ## v 1.5.0
+### single module:
+- Added `cellfategenie` to calculate timing-associated genes/genesets.
+- Fixed the name error in `atac_concat_outer`.
+- Added more kwargs for `batch_correction`.
 
-### single module
-
-- add `cellfategenie` to calculate the timing-associated genes/genesets
-- fix the name error of `atac_concat_outer`
-- add more kwargs of `batch_correction`
-
-### utils module
-
-- add `plot_heatmap` to visualize the heatmap of pseudotime
-- fix the `embedding` when the version of mpl larger than 3.7.0
-- add `geneset_wordcloud` to visualize the genesets heatmap of pseudotime
+### utils module:
+- Added `plot_heatmap` to visualize the heatmap of pseudotime.
+- Fixed `embedding` when the version of `mpl` is larger than `3.7.0`.
+- Added `geneset_wordcloud` to visualize geneset heatmaps of pseudotime.
 
 ## v 1.5.1
+### single module:
+- Added `scLTNN` to infer cell trajectory.
 
-### single module
+### bulk2single module:
+- Updated cell fraction prediction with `TAPE` in bulk2single.
+- Fixed group and normalization issues in bulk2single.
 
-- add `scLTNN` to infer the cell trajectory
-
-### bulk2single module
-
-- Update the cell fraction prediction with `TAPE` in bulk2single
-- Fix the group and normalization in bulk2single
-
-### utils module
-
-- add `Ro/e` calculated (by:Haihao Zhang)
-- add `cal_paga` and `plot_paga` to visualize the state transfer matrix
-- fix the `read` function 
+### utils module:
+- Added `Ro/e` calculation (by: Haihao Zhang).
+- Added `cal_paga` and `plot_paga` to visualize the state transfer matrix.
+- Fixed the `read` function.
 
 ## v 1.5.2
+### bulk2single Module:
+- Resolved a matrix error occurring when gene symbols are not unique.
+- Addressed the `interpolation` issue in `BulkTrajBlend` when target cells do not exist.
+- Corrected the `generate` function in `BulkTrajBlend`.
+- Rectified the argument for `vae_configure` in `BulkTrajBlend` when `cell_target_num` is set to None.
+- Introduced the parameter `max_single_cells` for input in `BulkTrajBlend`.
+- Defaulted to using `scaden` for deconvolution in Bulk RNA-seq.
 
-### bulk2single module
+### single Module:
+- Fixed an error in `pyVIA` when the root is set to None.
+- Added the `TrajInfer` module for inferring cell trajectories.
+- Integrated `Palantir` and `Diffusion_map` into the `TrajInfer` module.
+- Corrected the parameter error in `batch_correction`.
 
-- Fix the matrix error when the symbol of genes not unique.
-- Fix the `interpolation` of BulkTrajBlend when the target cells not exist.
-- Fix the `generate` of BulkTrajBlend.
+### utils Module:
+- Introduced `plot_pca_variance_ratio` for visualizing the ratio of PCA variance.
+- Added the `cluster` and `filtered` module for clustering the cells
+- Integrated `MiRA` to calculate the LDA topic
 
+## v 1.5.3
+### single Module:
+- Added `scVI` and `MIRA` to remove batch effect
+
+### space Module:
+- Added `STAGATE` to cluster and denoisy the spatial RNA-seq 
+
+### pp Module:
+- Added `doublets` argument of `ov.pp.qc` to control doublets('Default'=True)
+
+## v 1.5.4
+### bulk Module:
+- Fixed an error in `pyDEG.deg_analysis` when `n_cpus` can not be set in `pyDeseq2(v0.4.3)`
+
+### single Module:
+- Fixed an argument error in `single.batch_correction` of combat
+
+### utils Module:
+- Added `venn4` plot to visualize
+- Fixed the label visualization of `plot_network`
+- Added `ondisk` argument of `LDA_topic`
+
+### space Module:
+- Added `Tangram` to mapping the scRNA-seq to stRNA-seq
+
+## v 1.5.5
+### pp Module:
+- Added `max_cells_ratio` and `max_genes_ratio` to control the max threshold in qc of scRNA-seq
+
+### single Module:
+- Added `SEACells` model to calculate the metacells from scRNA-seq
+
+### space Module:
+- Added `STAligner` to integrate multi stRNA-seq
+
+## v 1.5.6
+### pp Module
+- Added `mt_startswith` argument to control the `qc` in mouse or other species.
+
+### utils Module
+- Added `schist` method to cluster the single cell RNA-seq
+
+### single Module
+- Fixed the import error of `palantir` in SEACells
+- Added `CEFCON` model to identify the driver regulators of cell fate decisions
+
+### bulk2single Module
+- Added `use_rep` and `neighbor_rep` argument to configure the nocd 
+
+### space Module
+- Added `SpaceFlow` to identify the pseudo-spatial map
+
+## v 1.5.8
+
+### pp Module
+- Added `score_genes_cell_cycle` function to calculate the cell cycle
+
+### bulk Module
+- Fixed `dds.plot_volcano` text plot error when the version of `adjustText` larger than `0.9`
+
+### single Module
+- Optimised `MetaCell.load` model loading logic
+- Fixed an error when loading the model usng `MetaCell.load`
+- Added tutorials of `Metacells`
+
+### pl Module
+
+Add `pl` as a unified drawing prefix for the next release, to replace the drawing functionality in the original utils, while retaining the drawing in the original utils.
+
+- Added `embedding` to plot the embedding of scRNA-seq using `ov.pl.embedding`
+- Added `optim_palette` to provide a spatially constrained approach that generates discriminate color assignments for visualizing single-cell spatial data in various scenarios
+- Added `cellproportion` to plot the proportion of stack bar of scRNA-seq
+- Added `embedding_celltype` to plot the figures both celltype proportion and embedding
+- Added `ConvexHull` to plot the ConvexHull around the target cells
+- Added `embedding_adjust` to adjust the text of celltype legend in embedding
+- Added `embedding_density` to plot the category density in the cells
+- Added `bardotplot` to plot the bardotplot between different groups.
+- Added `add_palue` to plot the p-threshold between different groups.
+- Added `embedding_multi` to support the `mudata` object
+- Added `purple_color` to visualize the purple palette.
+- Added `venn` to plot the venn from set 2 to set 4
+- Added `boxplot` to visualize the boxdotplot
+- Added `volcano` to visualzize the result of differential expressed genes
+
+## v 1.5.9
+
+### single Module
+
+- Added `slingshot` in `single.TrajInfer`
+- Fixed some error of `scLTNN`
+- Added `GPU` mode to preprocess the data
+- Added `cNMF` to calculate the nmf
+
+### space Module
+
+- Added `Spatrio` to mapping the scRNA-seq to stRNA-seq
+
+## v 1.5.10
+
+Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from root to externel module.
+
+### space Module
+
+- Added `STT` in `omicverse.space` to calculate the spatial transition tensor.
+- Added `GNTD` in `omicverse.space` to reconstruct whole spatial transcriptomes from spatial gene expression profiling data such as the dataets generated by Visium ST and Stereo-seq.
+- Added `scSLAT` in `omicverse.externel` to align of different spatial slices.
+
+### single Module
+
+- Added `get_results_rfc` in `omicverse.single.cNMF` to predict the precise cluster in complex scRNA-seq/stRNA-seq
+- Added `get_results_rfc` in `omicverse.utils.LDA_topic` to predict the precise cluster in complex scRNA-seq/stRNA-seq
+- Added `gptcelltype` in `omicverse.single` to annotate celltype using large language model #82.

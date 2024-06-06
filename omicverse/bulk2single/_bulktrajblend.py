@@ -15,10 +15,11 @@ class BulkTrajBlend(object):
     """
     BulkTrajBlend: A class for bulk and single cell data integration and trajectory inference using beta-VAE and GNN.
 
+
     """
 
     def __init__(self,bulk_seq:pd.DataFrame,single_seq:anndata.AnnData,
-                 celltype_key:str,bulk_group=None,
+                 celltype_key:str,bulk_group=None,max_single_cells:int=5000,
                  top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0) -> None:
         """
         Initialize the BulkTrajBlend class
@@ -30,6 +31,7 @@ class BulkTrajBlend(object):
             top_marker_num: The number of top marker genes for each cell type.
             ratio_num: The number of cells to be selected for each cell type.
             gpu: The gpu id or 'cpu' or 'mps'.
+            max_single_cells: The maximum number of single cells to be used. Default is 5000.
 
         """
 
@@ -40,6 +42,7 @@ class BulkTrajBlend(object):
         self.ratio_num=ratio_num
         self.gpu=gpu
         self.group=bulk_group
+        self.max_single_cells=max_single_cells
         if gpu=='mps' and torch.backends.mps.is_available():
             print('Note that mps may loss will be nan, used it when torch is supported')
             self.used_device = torch.device("mps")
@@ -104,13 +107,17 @@ class BulkTrajBlend(object):
         """
         self.vae_model=Bulk2Single(bulk_data=self.bulk_seq,single_data=self.single_seq,
                                    celltype_key=self.celltype_key,bulk_group=self.group,
+                                      max_single_cells=self.max_single_cells,
                  top_marker_num=self.top_marker_num,ratio_num=self.ratio_num,gpu=self.gpu)
         if cell_target_num!=None:
             self.vae_model.cell_target_num=dict(zip(list(set(self.single_seq.obs[self.celltype_key])),
                                                 [cell_target_num]*len(list(set(self.single_seq.obs[self.celltype_key])))))
         else:
-            self.vae_model.predicted_fraction(*kwargs)
+            self.cellfract=self.vae_model.predicted_fraction(**kwargs)
         
+        self.sc_ref=self.vae_model.sc_ref.copy()
+        self.bulk_ref=self.vae_model.bulk_data.T.copy()
+
         self.vae_model.bulk_preprocess_lazy()
         self.vae_model.single_preprocess_lazy()
         self.vae_model.prepare_input()
@@ -203,7 +210,8 @@ class BulkTrajBlend(object):
         self.generate_adata=generate_adata.copy()
         return generate_adata.raw.to_adata()
     
-    def gnn_configure(self,gpu=0,hidden_size:int=128,
+    def gnn_configure(self,use_rep='X',neighbor_rep='X_pca',
+                      gpu=0,hidden_size:int=128,
                      weight_decay:int=1e-2,
                      dropout:float=0.5,
                      batch_norm:bool=True,
@@ -232,7 +240,8 @@ class BulkTrajBlend(object):
 
 
         """
-        nocd_obj=scnocd(self.generate_adata,gpu=gpu)
+        nocd_obj=scnocd(self.generate_adata,use_rep=use_rep,
+                        neighbor_rep=neighbor_rep,gpu=gpu)
         #nocd_obj.device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
         nocd_obj.matrix_transform(clustertype=self.celltype_key)
         nocd_obj.matrix_normalize()

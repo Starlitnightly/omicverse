@@ -37,7 +37,7 @@ class scnocd(object):
                 'Please install the pytorch: `conda install -c conda-forge pytorch` or `pip install pytorch`.'
             )
 
-    def __init__(self,adata,gpu=0):
+    def __init__(self,adata,use_rep='X',neighbor_rep='X',gpu=0):
         self.check_torch()
         global torch_install
         if torch_install==True:
@@ -48,10 +48,14 @@ class scnocd(object):
         self.adata_raw=adata
         self.adata=adata.copy()
         self.device  = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
+        self.use_rep=use_rep
+        self.neighbor_rep=neighbor_rep
+        self.ground_truth=False
 
       
-    def matrix_transform(self,clustertype='leiden'):
+    def matrix_transform(self,clustertype=None):
         
+        '''
         try:
             self.adata.obsp['connectivities']
         except NameError:
@@ -69,17 +73,31 @@ class scnocd(object):
             return None
         else:
             var_exists = True
-            
-        self.X=sp.csr_matrix(self.adata.X)
+        '''
+        
+        if self.use_rep=='X':
+            self.X=sp.csr_matrix(self.adata.X)
+        elif self.use_rep=='raw':
+            self.X=sp.csr_matrix(self.adata.raw.X)
+        else:
+            self.X=sp.csr_matrix(self.adata.obsm[self.use_rep])
+        sc.pp.neighbors(self.adata,use_rep=self.neighbor_rep)
+
         self.A=self.adata.obsp['connectivities']
         self.clustertype=clustertype
-        self.Z_gt=pd.get_dummies(self.adata.obs[clustertype]).values
-        self.Z_gt=self.Z_gt.astype(np.float32)
+        self.N=self.A.shape[0]
+        if clustertype!=None:
+            self.ground_truth=True
+            self.Z_gt=pd.get_dummies(self.adata.obs[clustertype]).values
+            self.Z_gt=self.Z_gt.astype(np.float32)
+            self.K = self.Z_gt.shape[1]
+        else:
+            self.ground_truth=False
+            sc.tl.leiden(self.adata,key_added='tmp_leiden')
+            self.K = self.adata.obs['tmp_leiden'].nunique()
 
-        
-        self.N, self.K = self.Z_gt.shape
 
- 
+
     def matrix_normalize(self,cuda=False):
         if torch.cuda.is_available():
             cuda=True
@@ -164,6 +182,7 @@ class scnocd(object):
         validation_fn = lambda: val_loss
         early_stopping = nocd.train.NoImprovementStopping(validation_fn, patience=10)
         self.model_saver = nocd.train.ModelSaver(self.gnn)
+        
         with tqdm(total=self.max_epochs) as t:
             for epoch, batch in enumerate(self.sampler):
                 if epoch > self.max_epochs:
@@ -175,8 +194,7 @@ class scnocd(object):
                         Z = F.relu(self.gnn(self.x_norm, self.adj_norm))
                         val_loss = self.decoder.loss_full(Z, self.A)
                         #print(f'Epoch {epoch:4d}, loss.full = {val_loss:.4f}, nmi = {self.get_nmi():.2f}')
-                        t.set_description(f'Epoch {epoch:4d}, loss.full = {val_loss:.4f}, nmi = {self.get_nmi():.2f}')
-
+                        
                         # Check if it's time for early stopping / to save the model
                         early_stopping.next_step()
                         if early_stopping.should_save():
@@ -185,18 +203,33 @@ class scnocd(object):
                             print(f'Breaking due to early stopping at epoch {epoch}')
                             break
 
+
                 # Training step
                 self.gnn.train()
                 self.opt.zero_grad()
                 Z = F.relu(self.gnn(self.x_norm, self.adj_norm))
+                val_loss = self.decoder.loss_full(Z, self.A)
+                if self.ground_truth:
+                    Z_pred = Z.cpu().detach().numpy() > 0.5
+                    metrics_u = nocd.metrics.evaluate_unsupervised(Z_pred, self.A)
+                    t.set_description(f"Epoch {epoch:4d}, loss.full = {val_loss:.4f}, nmi = {self.get_nmi():.2f}, coverage = {metrics_u['coverage']:.4f}, conductance = {metrics_u['conductance']:.4f}, density  = {metrics_u['density']:.3e}, clust_coef  = {metrics_u['clustering_coef']:.3e}")
+                
+                else:
+                    Z_pred = Z.cpu().detach().numpy() > 0.5
+                    metrics_u = nocd.metrics.evaluate_unsupervised(Z_pred, self.A)
+                    t.set_description(f"Epoch {epoch:4d}, loss.full = {val_loss:.4f}, coverage = {metrics_u['coverage']:.4f}, conductance = {metrics_u['conductance']:.4f}, density  = {metrics_u['density']:.3e}, clust_coef  = {metrics_u['clustering_coef']:.3e}")
+                t.update(1)
+
                 ones_idx, zeros_idx = batch
                 if self.stochastic_loss:
                     loss = self.decoder.loss_batch(Z, ones_idx, zeros_idx)
                 else:
-                    loss = self.decoder.loss_full(Z, A)
+                    loss = self.decoder.loss_full(Z, self.A)
                 loss += nocd.utils.l2_reg_loss(self.gnn, scale=self.weight_decay)
                 loss.backward()
                 self.opt.step()
+
+                
 
            
     def GNN_result(self,thresh=0.5):
@@ -205,7 +238,7 @@ class scnocd(object):
         Z = F.relu(self.gnn(self.x_norm, self.adj_norm))
         self.Z_pred = Z.cpu().detach().numpy() > thresh
         self.model_saver.restore()
-        print(f'Final nmi = {self.get_nmi(thresh):.3f}')
+        #print(f'Final nmi = {self.get_nmi(thresh):.3f}')
 
       
     def GNN_plot(self,figsize=[10,10],markersize=0.05):
