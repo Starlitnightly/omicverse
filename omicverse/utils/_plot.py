@@ -19,10 +19,20 @@ red_color=['#F0C3C3','#E07370','#CB3E35','#A22E2A','#5A1713','#D3396D','#DBC3DC'
 green_color=['#91C79D','#8FC155','#56AB56','#2D5C33','#BBCD91','#6E944A','#A5C953','#3B4A25','#010000']
 orange_color=['#EFBD49','#D48F3E','#AC8A3E','#7D7237','#745228','#E1C085','#CEBC49','#EBE3A1','#6C6331','#8C9A48','#D7DE61']
 blue_color=['#347862','#6BBBA0','#81C0DD','#3E8CB1','#88C8D2','#52B3AD','#265B58','#B2B0D4','#5860A7','#312C6C']
+purple_color=['#823d86','#825b94','#bb98c6','#c69bc6','#a69ac9','#c5a6cc','#caadc4','#d1c3d4']
+
 
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
 def plot_set(verbosity=3,dpi=80,facecolor='white'):
+    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
+    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
+    import warnings
+    warnings.simplefilter("ignore", category=UserWarning)
+    warnings.simplefilter("ignore", category=FutureWarning)
+    warnings.simplefilter("ignore", category=DeprecationWarning)
+
+def plotset(verbosity=3,dpi=80,facecolor='white'):
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -281,7 +291,7 @@ def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
     ax.legend(handles=patches,bbox_to_anchor=legend_bbox, ncol=legend_ncol,fontsize=fontsize)
 
     #设置标题
-    ax.set_title(title,fontsize=fontsize+2)
+    ax.set_title(title,fontsize=fontsize+1)
     #设置spines可视化情况
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -355,16 +365,29 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
         hub_gene=[i[0] for i in sorted(degree_dict.items(),key=lambda x: x[1],reverse=True)[:plot_node_num]]
     
     pos1=dict()
-    for i in pos.keys():
-        pos1[i]=np.array([-1000,-1000])
+    #for i in pos.keys():
+    #    pos1[i]=np.array([-1000,-1000])
     for i in hub_gene:
         pos1[i]=pos[i]
     #label_options = {"ec": "white", "fc": "white", "alpha": 0.6}
-    nx.draw_networkx_labels(
-        G,pos1,verticalalignment=label_verticalalignment,
-        font_size=label_fontsize,font_family=label_fontfamily,
-        font_weight=label_fontweight,bbox=label_bbox,
-    )
+    #nx.draw_networkx_labels(
+    #    G,pos1,verticalalignment=label_verticalalignment,
+    #    font_size=label_fontsize,font_family=label_fontfamily,
+    #    font_weight=label_fontweight,bbox=label_bbox,
+    #)
+    from adjustText import adjust_text
+    import adjustText
+    texts=[ax.text(pos1[i][0], 
+               pos1[i][1],
+               i,
+               fontdict={'size':label_fontsize,'weight':label_fontweight,'color':'black'}
+               ) for i in hub_gene if 'ENSG' not in i]
+    if adjustText.__version__<='0.8':
+        adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+    else:
+        adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                    arrowprops=dict(arrowstyle='->', color='red'))
+   #adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
 
     ax.axis("off")
     
@@ -964,3 +987,38 @@ class geneset_wordcloud(object):
             ax2.add_patch(rect)
 
         return fig
+
+
+from scanpy.plotting._anndata import ranking
+from scanpy.plotting._utils import savefig_or_show
+def plot_pca_variance_ratio(
+    adata,
+    use_rep='scaled|original|pca_var_ratios',
+    n_pcs: int = 30,
+    log: bool = False,
+    show=None,
+    save=None,
+):
+    ranking(
+        adata,
+        "uns",
+        use_rep,
+        n_points=n_pcs,
+        #dictionary="pca",
+        labels="PC",
+        log=log,
+    )
+    savefig_or_show("pca_variance_ratio", show=show, save=save)
+
+def plot_pca_variance_ratio1(adata,threshold=0.85):
+
+    import matplotlib.pyplot as plt
+    plt.scatter(range(len(adata.uns['scaled|original|pca_var_ratios'])),
+                adata.uns['scaled|original|pca_var_ratios'])
+    ratio_max=max(adata.uns['scaled|original|pca_var_ratios'])
+    ratio_max_85=(1-threshold)*ratio_max
+    pcs_85_num=len(adata.uns['scaled|original|pca_var_ratios'][adata.uns['scaled|original|pca_var_ratios']>ratio_max_85])
+    plt.axhline(ratio_max_85)
+    plt.title(f'PCs:{pcs_85_num}')
+    plt.xlabel('ranking')
+    

@@ -6,7 +6,7 @@ import time
 import matplotlib
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import euclidean_distances
-import umap
+#import umap
 
 import os.path
 
@@ -1180,6 +1180,7 @@ def main_Bcell(ncomps=50, knn=20, random_seed=0, cluster_graph_pruning_std=.15,p
 
     # color_dict = {"0": [0], "2": [1], "6": [2], "12": [3], "18": [4], "24": [5]}
     # sc.pl.heatmap(mplot_adata, var_names  = small_large_gene_list,groupby = 'TimeStamp', dendrogram = True)
+    import umap
     embedding = umap.UMAP(random_state=42, n_neighbors=15, init='random').fit_transform(
         adata_counts.obsm['X_pca'][:, 0:5])
     df_umap = pd.DataFrame(embedding)
@@ -3007,7 +3008,7 @@ def main_faced(cell_line='mcf7', cluster_graph_pruning_std=1.):
     # Start embedding
 
     f, ax = plt.subplots()
-
+    import umap
     embedding = umap.UMAP().fit_transform(ad.obsm['X_pca'][:, 0:20])
     phate_op = phate.PHATE()
     # embedding = phate_op.fit_transform(X_in)
@@ -3197,7 +3198,7 @@ def main():
         data = data.drop(['cell', 'time_hour'], axis=1)
         adata = sc.AnnData(data_genes)
         adata.obsm['X_pca'] = data.values
-
+        import umap
         # use UMAP or PHate to obtain embedding that is used for single-cell level visualization
         embedding = umap.UMAP(random_state=42, n_neighbors=15, init='random').fit_transform(data.values[:, 0:5])
 
@@ -3207,5 +3208,3 @@ def main():
         via_wrapper(adata, true_label, embedding, knn=15, ncomps=20, jac_std_global=0.15, root=[42], dataset='', random_seed=1,v0_toobig=0.3, v1_toobig=0.1, marker_genes=marker_genes, draw_all_curves=True, piegraph_edgeweight_scalingfactor=1.0, piegraph_arrow_head_width=0.05, edgebundle_pruning_twice = True)
 
 
-if __name__ == '__main__':
-    main()

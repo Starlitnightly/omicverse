@@ -114,8 +114,10 @@ def data_preprocess(adata,clustertype='leiden',
     sc.settings.verbosity = 2  # reduce the verbosity
     if rank_rep==False and 'rank_genes_groups' not in adata.uns.keys():
         sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
-    else:
+    elif rank_rep==True:
         sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+    else:
+        pass
     result = adata.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     dat = pd.DataFrame({group + '_' + key[:1]: result[key][group] for group in groups for key in ['names', 'logfoldchanges','scores','pvals']})
@@ -309,7 +311,9 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
 def get_celltype_marker(adata:anndata.AnnData,
                             clustertype:str='leiden',
                             log2fc_min:int=2,scores_type='scores',
-                            pval_cutoff:float=0.05,rank:bool=False)->dict:
+                            pval_cutoff:float=0.05,rank:bool=False,
+                            key='rank_genes_groups',method='wilcoxon',
+                            foldchange=None,topgenenumber=10)->dict:
         r"""Get marker genes for each clusters.
         
         Arguments:
@@ -327,15 +331,19 @@ def get_celltype_marker(adata:anndata.AnnData,
         celltypes = sorted(adata.obs[clustertype].unique())
         cell_marker_dict={}
         if rank==False:
-            sc.tl.rank_genes_groups(adata, clustertype, method='wilcoxon')
+            sc.tl.rank_genes_groups(adata, clustertype, method=method)
         for celltype in celltypes:
-            degs = sc.get.rank_genes_groups_df(adata, group=celltype, key='rank_genes_groups', log2fc_min=log2fc_min, 
+            degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
                                             pval_cutoff=pval_cutoff)
             foldp=np.histogram(degs[scores_type])
-            foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
-            
-            cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values
+            if foldchange is None:
+                foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+            cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
             cell_marker_dict[celltype]=cellmarker
+        
+        for key in cell_marker_dict.keys():
+            cell_marker_dict[key]=list(cell_marker_dict[key])
+
 
         return cell_marker_dict
 

@@ -1,0 +1,33 @@
+name: omicverse_gpu
+channels:
+ - rapidsai
+ - nvidia
+ - conda-forge
+ - bioconda
+ - pytorch
+dependencies:
+ - rapids=24.02
+ - python=3.10
+ - cuda-version=11.8
+ - omicverse
+ - pytorch
+ - torchvision
+ - torchaudio
+ - pytorch-cuda=11.8
+ - cudnn
+ - cutensor
+ - cusparselt
+ - leidenalg
+ - louvain
+ - fa2
+ - jupyterlab
+ - pip
+ - pip:
+    - decoupler
+    - omnipath
+    - gdown
+    - wget
+    - scikit-misc
+    - harmonypy
+    - rapids-singlecell
+    - torch_geometric

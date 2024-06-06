@@ -65,19 +65,26 @@ class Bulk2Single:
             self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
         self.history=[]
 
-    def predicted_fraction(self,sep='\t', scaler='mms',
+    def predicted_fraction(self,method='scaden',sep='\t', scaler='mms',
                         datatype='counts', genelenfile=None,
                         mode='overall', adaptive=True, variance_threshold=0.98,
                         save_model_name=None,
                         batch_size=128, epochs=128, seed=1,scale_size=2):
-        from ..tape import Deconvolution
+        from ..tape import Deconvolution,ScadenDeconvolution
         sc_ref=self.sc_ref.copy()
-        SignatureMatrix, CellFractionPrediction = \
-            Deconvolution(sc_ref, self.bulk_data.T, sep=sep, scaler=scaler,
-                        datatype=datatype, genelenfile=genelenfile,
-                        mode=mode, adaptive=adaptive, variance_threshold=variance_threshold,
-                        save_model_name=save_model_name,
-                        batch_size=batch_size, epochs=epochs, seed=seed)
+        if method=='scaden':
+            CellFractionPrediction=ScadenDeconvolution(sc_ref, 
+                           self.bulk_data.T, sep=sep,
+                           batch_size=batch_size, epochs=epochs)
+        elif method=='tape':
+            SignatureMatrix, CellFractionPrediction = \
+                Deconvolution(sc_ref, self.bulk_data.T, sep=sep, scaler=scaler,
+                            datatype=datatype, genelenfile=genelenfile,
+                            mode=mode, adaptive=adaptive, variance_threshold=variance_threshold,
+                            save_model_name=save_model_name,
+                            batch_size=batch_size, epochs=epochs, seed=seed)
+        else:
+            raise ValueError('method must be scaden or tape')
         if self.bulk_group!=None:
             cell_total_num=self.single_data.shape[0]*self.bulk_data[self.bulk_group].mean(axis=1).sum()/self.single_data.to_df().sum().sum()
             print('Predicted Total Cell Num:',cell_total_num)
@@ -88,7 +95,7 @@ class Bulk2Single:
             print('Predicted Total Cell Num:',cell_total_num)
             self.cell_target_num=dict(pd.Series(CellFractionPrediction.mean()*cell_total_num*scale_size).astype(int))
         
-        return SignatureMatrix, CellFractionPrediction
+        return CellFractionPrediction
 
     def bulk_preprocess_lazy(self,)->None:
         """
