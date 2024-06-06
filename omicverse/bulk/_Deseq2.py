@@ -58,6 +58,52 @@ def deseq2_normalize(data:pd.DataFrame)->pd.DataFrame:
     scale=data_log.sub(avg1.values,axis=0).median(axis=0).apply(np.exp)
     return data/scale
 
+def normalize_bulk(counts, lengths, type='CPM'):
+    """
+    Normalize the count data.
+
+    Parameters:
+    counts (numpy.ndarray): A matrix of raw counts.
+    lengths (numpy.ndarray): A vector of gene lengths.
+    type (str): The type of normalization ('CPM', 'TPM', 'FPKM', 'RPKM').
+
+    Returns:
+    numpy.ndarray: Normalized counts.
+    """
+    if type not in ['CPM', 'TPM', 'FPKM', 'RPKM']:
+        raise ValueError("Normalization type must be one of 'CPM', 'TPM', 'FPKM', 'RPKM'")
+
+    # Define helper functions for each normalization method
+    def cpm(counts):
+        counts_per_million = counts / np.sum(counts, axis=0) * 1e6
+        return counts_per_million
+
+    def tpm(counts, lengths):
+        rate = counts / lengths[:, None]
+        tpm_values = rate / np.sum(rate, axis=0) * 1e6
+        return tpm_values
+
+    def fpkm(counts, lengths):
+        counts_per_kilobase = counts / (lengths[:, None] / 1e3)
+        fpkm_values = counts_per_kilobase / np.sum(counts, axis=0) * 1e6
+        return fpkm_values
+
+    def rpkm(counts, lengths):
+        counts_per_kilobase = counts / (lengths[:, None] / 1e3)
+        rpkm_values = counts_per_kilobase / (np.sum(counts, axis=1) / 1e6)[:, None]
+        return rpkm_values
+
+    # Select the appropriate normalization method
+    if type == 'CPM':
+        return cpm(counts)
+    elif type == 'TPM':
+        return tpm(counts, lengths)
+    elif type == 'FPKM':
+        return fpkm(counts, lengths)
+    elif type == 'RPKM':
+        return rpkm(counts, lengths)
+
+
 def estimateSizeFactors(data:pd.DataFrame)->pd.Series:
     """
     Estimate size factors for data normalization.
