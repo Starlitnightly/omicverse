@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
+from ..pl import volcano
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
@@ -181,13 +182,16 @@ class pyDEG(object):
         self.result.loc[((self.result['log2FC']>fc_max)&(self.result['qvalue']<pval_threshold)),'sig']='up'
         self.result.loc[((self.result['log2FC']<fc_min)&(self.result['qvalue']<pval_threshold)),'sig']='down'
         self.result.loc[self.result['-log(qvalue)']>logp_max,'-log(qvalue)']=logp_max
+        self.logp_max=logp_max
     
 
-    def plot_volcano(self,figsize:tuple=(4,4),title:str='',titlefont:dict={'weight':'normal','size':14,},
+    def plot_volcano(self,figsize:tuple=(4,4),pval_name='qvalue',fc_name='log2FC',
+                     title:str='',titlefont:dict={'weight':'normal','size':14,},
                      up_color:str='#e25d5d',down_color:str='#7388c1',normal_color:str='#d7d7d7',
+                     up_fontcolor:str='#e25d5d',down_fontcolor:str='#7388c1',normal_fontcolor:str='#d7d7d7',
                      legend_bbox:tuple=(0.8, -0.2),legend_ncol:int=2,legend_fontsize:int=12,
                      plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
-                     ticks_fontsize:int=12)->matplotlib.axes._axes.Axes:
+                     ticks_fontsize:int=12,ax=None):
         """
         Generate a volcano plot for the differential gene expression analysis results.
 
@@ -210,6 +214,17 @@ class pyDEG(object):
             ax: The generated volcano plot.
 
         """
+        
+        ax=volcano(result=self.result,pval_name=pval_name,fc_name=fc_name,pval_max=self.logp_max,
+                       figsize=figsize,title=title,titlefont=titlefont,
+                       up_color=up_color,down_color=down_color,normal_color=normal_color,
+                       up_fontcolor=up_fontcolor,down_fontcolor=down_fontcolor,normal_fontcolor=normal_fontcolor,
+                       legend_bbox=legend_bbox,legend_ncol=legend_ncol,legend_fontsize=legend_fontsize,plot_genes=plot_genes,
+                       plot_genes_num=plot_genes_num,plot_genes_fontsize=plot_genes_fontsize,
+                       ticks_fontsize=ticks_fontsize,ax=ax,
+                       pval_threshold=self.pval_threshold,fc_max=self.fc_max,fc_min=self.fc_min)
+        return ax
+        '''
         fig, ax = plt.subplots(figsize=figsize)
         result=self.result.copy()
         #首先绘制正常基因
@@ -232,10 +247,10 @@ class pyDEG(object):
                 )
         
         ax.plot([result['log2FC'].min(),result['log2FC'].max()],#辅助线的x值起点与终点
-        [-np.log10(self.pval_threshold),-np.log10(self.pval_threshold)],#辅助线的y值起点与终点
-        linewidth=2,#辅助线的宽度
-        linestyle="--",#辅助线类型：虚线
-        color='black'#辅助线的颜色
+                [-np.log10(self.pval_threshold),-np.log10(self.pval_threshold)],#辅助线的y值起点与终点
+                linewidth=2,#辅助线的宽度
+                linestyle="--",#辅助线类型：虚线
+                color='black'#辅助线的颜色
         )
         ax.plot([self.fc_max,self.fc_max],
                 [result['-log(qvalue)'].min(),result['-log(qvalue)'].max()],
@@ -258,7 +273,7 @@ class pyDEG(object):
         labels = ['up:{0}'.format(len(result[result['sig']=='up'])),
                 'down:{0}'.format(len(result[result['sig']=='down']))]  
         #用label和color列表生成mpatches.Patch对象，它将作为句柄来生成legend
-        color = ['#e25d5d','#174785']
+        color = [up_color,down_color]
         patches = [mpatches.Patch(color=color[i], label="{:s}".format(labels[i]) ) for i in range(len(color))] 
 
         ax.legend(handles=patches,
@@ -272,6 +287,8 @@ class pyDEG(object):
         ax.spines['left'].set_visible(True)
 
         from adjustText import adjust_text
+        import adjustText
+        
         if plot_genes is not None:
             hub_gene=plot_genes
         else:
@@ -280,26 +297,33 @@ class pyDEG(object):
             hub_gene=up_result.sort_values('qvalue').index[:plot_genes_num//2].tolist()+down_result.sort_values('qvalue').index[:plot_genes_num//2].tolist()
 
         color_dict={
-        'up':'#a51616',
-            'down':'#174785',
-            'normal':'grey'
+        'up':up_fontcolor,
+            'down':down_fontcolor,
+            'normal':normal_fontcolor
         }
 
         texts=[ax.text(result.loc[i,'log2FC'], 
                result.loc[i,'-log(qvalue)'],
                i,
                fontdict={'size':plot_genes_fontsize,'weight':'bold','color':color_dict[result.loc[i,'sig']]}
-               ) for i in hub_gene if 'ENSG' not in i]
-        adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+               ) for i in hub_gene]
+        
+        if adjustText.__version__<='0.8':
+            adjust_text(texts,only_move={'text': 'xy'},arrowprops=dict(arrowstyle='->', color='red'),)
+        else:
+            adjust_text(texts,only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                        arrowprops=dict(arrowstyle='->', color='red'))
 
         ax.set_xticks([round(i,2) for i in ax.get_xticks()[1:-1]],#获取x坐标轴内容
               [round(i,2) for i in ax.get_xticks()[1:-1]],#更新x坐标轴内容
               fontsize=ticks_fontsize,
               fontweight='normal'
               )
-        return ax
+        return fig,ax
+        '''
     
     def plot_boxplot(self,genes:list,treatment_groups:list,control_groups:list,
+                     log:bool=True,
                      treatment_name:str='Treatment',control_name:str='Control',
                      figsize:tuple=(4,3),palette:list=["#a64d79","#674ea7"],
                      title:str='Gene Expression',fontsize:int=12,legend_bbox:tuple=(1, 0.55),legend_ncol:int=1,
@@ -324,19 +348,34 @@ class pyDEG(object):
             ax: The axis of the plot.
         """
         p_data=pd.DataFrame(columns=['Value','Gene','Type'])
-        for gene in genes:
-            plot_data1=pd.DataFrame()
-            plot_data1['Value']=self.data[treatment_groups].loc[gene].values
-            plot_data1['Gene']=gene
-            plot_data1['Type']=treatment_name
+        if log:
+            for gene in genes:
+                plot_data1=pd.DataFrame()
+                plot_data1['Value']=np.log1p(self.data[treatment_groups].loc[gene].values)
+                plot_data1['Gene']=gene
+                plot_data1['Type']=treatment_name
 
-            plot_data2=pd.DataFrame()
-            plot_data2['Value']=self.data[control_groups].loc[gene].values
-            plot_data2['Gene']=gene
-            plot_data2['Type']=control_name
+                plot_data2=pd.DataFrame()
+                plot_data2['Value']=np.log1p(self.data[control_groups].loc[gene].values)
+                plot_data2['Gene']=gene
+                plot_data2['Type']=control_name
 
-            plot_data=pd.concat([plot_data1,plot_data2],axis=0)
-            p_data=pd.concat([p_data,plot_data],axis=0)
+                plot_data=pd.concat([plot_data1,plot_data2],axis=0)
+                p_data=pd.concat([p_data,plot_data],axis=0)
+        else:
+            for gene in genes:
+                plot_data1=pd.DataFrame()
+                plot_data1['Value']=self.data[treatment_groups].loc[gene].values
+                plot_data1['Gene']=gene
+                plot_data1['Type']=treatment_name
+
+                plot_data2=pd.DataFrame()
+                plot_data2['Value']=self.data[control_groups].loc[gene].values
+                plot_data2['Gene']=gene
+                plot_data2['Type']=control_name
+
+                plot_data=pd.concat([plot_data1,plot_data2],axis=0)
+                p_data=pd.concat([p_data,plot_data],axis=0)
 
         fig,ax=plot_boxplot(p_data,hue='Type',x_value='Gene',y_value='Value',palette=palette,
                           figsize=figsize,fontsize=fontsize,title=title,
@@ -492,7 +531,7 @@ class pyDEG(object):
                     refit_cooks=True,
                     n_cpus=n_cpus,
                 )
-            else:
+            elif pydeseq2.__version__<='0.4.1':
                 dds = DeseqDataSet(
                     counts=counts_df,
                     metadata=clinical_df,
@@ -501,6 +540,16 @@ class pyDEG(object):
                     # column ("B" vs "A")
                     refit_cooks=True,
                     n_cpus=n_cpus,
+                )
+            else:
+                from pydeseq2.default_inference import DefaultInference
+                inference = DefaultInference(n_cpus=n_cpus)
+                dds = DeseqDataSet(
+                    counts=counts_df,
+                    metadata=clinical_df,
+                    design_factors="condition",  # compare samples based on the "condition"
+                    refit_cooks=True,
+                    inference=inference,
                 )
 
             
