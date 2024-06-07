@@ -69,8 +69,10 @@ nav:
 
 
 plugins:
-  - mkdocs-jupyter
+  - mkdocs-jupyter:
+      include_requirejs: true
   - glightbox
+  - plotly
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
@@ -122,10 +124,12 @@ markdown_extensions:
       linenums_style: pymdownx-inline
   - pymdownx.superfences:
       custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+        - name: plotly
+          class: mkdocs-plotly
+          format: !!python/name:mkdocs_plotly_plugin.fences.fence_plotly
   - pymdownx.inlinehilite
+
+        
 
 extra_javascript:
   - javascripts/config.js
