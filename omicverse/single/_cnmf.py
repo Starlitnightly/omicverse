@@ -205,15 +205,9 @@ class cNMF():
                         beta_loss='frobenius',num_highvar_genes=2000, genes_file=None,
                         alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir="./tmp", name=None):
         """
-        Parameters
-        ----------
-
-        output_dir : path, optional (default=".")
-            Output directory for analysis files.
-
-        name : string, optional (default=None)
-            A name for this analysis. Will be prefixed to all output files.
-            If set to None, will be automatically generated from date (and random string).
+        Arguments:
+            output_dir: path, optional (default="."). Output directory for analysis files.
+            name: string, optional (default=None). A name for this analysis. Will be prefixed to all output files. If set to None, will be automatically generated from date (and random string).
         """
 
         self.output_dir = output_dir
@@ -276,41 +270,18 @@ class cNMF():
         Load input counts, reduce to high-variance genes, and variance normalize genes.
         Prepare file for distributing jobs over workers.
 
-
-        Parameters
-        ----------
-        counts_fn : str
-            Path to input counts matrix
-
-        components : list or numpy array
-            Values of K to run NMF for
-            
-        n_iter : integer, optional (defailt=100)
-            Number of iterations for factorization. If several ``k`` are specified, this many
-            iterations will be run for each value of ``k``.
-
-        densify : boolean, optional (default=False)
-            Convert sparse data to dense
-
-        tpm_fn : str or None, optional (default=None)
-            If provided, load tpm data from file. Otherwise will compute it from the counts file
-            
-        seed : int or None, optional (default=None)
-            Seed for sklearn random state.
-            
-        beta_loss : str or None, optional (default='frobenius')
-
-        num_highvar_genes : int or None, optional (default=2000)
-            If provided and genes_file is None, will compute this many highvar genes to use for factorization
-        
-        genes_file : str or None, optional (default=None)
-            If provided will load high-variance genes from a list of these genes
-            
-        alpha_usage : float, optional (default=0.0)
-            Regularization parameter for NMF corresponding to alpha_W in scikit-learn
-
-        alpha_spectra : float, optional (default=0.0)
-            Regularization parameter for NMF corresponding to alpha_H in scikit-learn
+    Arguments:
+        counts_fn: Path to input counts matrix
+        components: Values of K to run NMF for
+        n_iter: Number of iterations for factorization. If several "k" are specified, this many iterations will be run for each value of "k".
+        densify: Convert sparse data to dense
+        tpm_fn: If provided, load tpm data from file. Otherwise will compute it from the counts file
+        seed: Seed for sklearn random state.
+        beta_loss: 
+        num_highvar_genes: If provided and genes_file is None, will compute this many highvar genes to use for factorization
+        genes_file: If provided will load high-variance genes from a list of these genes
+        alpha_usage: Regularization parameter for NMF corresponding to alpha_W in scikit-learn
+        alpha_spectra: Regularization parameter for NMF corresponding to alpha_H in scikit-learn
         """
         
         '''

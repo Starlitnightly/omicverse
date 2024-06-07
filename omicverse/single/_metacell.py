@@ -33,23 +33,26 @@ class MetaCell(object):
                     use_sparse=use_sparse)
         self.adata=adata
 
-    """Core SEACells class.
+        """
+        Core SEACells class.
 
-    :param ad: (AnnData) annotated data matrix
-    :param build_kernel_on: (str) key corresponding to matrix in ad.obsm which is used to compute kernel for metacells
-                            Typically 'X_pca' for scRNA or 'X_svd' for scATAC
-    :param n_SEACells: (int) number of SEACells to compute
-    :param use_gpu: (bool) whether to use GPU for computation
-    :param verbose: (bool) whether to suppress verbose program logging
-    :param n_waypoint_eigs: (int) number of eigenvectors to use for waypoint initialization
-    :param n_neighbors: (int) number of nearest neighbors to use for graph construction
-    :param convergence_epsilon: (float) convergence threshold for Franke-Wolfe algorithm
-    :param l2_penalty: (float) L2 penalty for Franke-Wolfe algorithm
-    :param max_franke_wolfe_iters: (int) maximum number of iterations for Franke-Wolfe algorithm
-    :param use_sparse: (bool) whether to use sparse matrix operations. Currently only supported for CPU implementation.
+        Arguments:
+            ad: Annotated data matrix.
+            build_kernel_on: Key corresponding to matrix in ad.obsm which is used to compute kernel for metacells.
+                Typically 'X_pca' for scRNA or 'X_svd' for scATAC.
+            n_seacells: Number of SEACells to compute.
+            use_gpu: Whether to use GPU for computation.
+            verbose: Whether to suppress verbose program logging.
+            n_waypoint_eigs: Number of eigenvectors to use for waypoint initialization.
+            n_neighbors: Number of nearest neighbors to use for graph construction.
+            convergence_epsilon: Convergence threshold for Franke-Wolfe algorithm.
+            l2_penalty: L2 penalty for Franke-Wolfe algorithm.
+            max_franke_wolfe_iters: Maximum number of iterations for Franke-Wolfe algorithm.
+            use_sparse: Whether to use sparse matrix operations. Currently only supported for CPU implementation.
 
-    See cpu.py or gpu.py for descriptions of model attributes and methods.
-    """    
+        See cpu.py or gpu.py for descriptions of model attributes and methods.
+        """
+
 
     def initialize_archetypes(self,**kwargs):
         self.model.construct_kernel_matrix()
