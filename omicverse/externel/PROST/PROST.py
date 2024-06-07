@@ -9,7 +9,7 @@ from .calculate_PI import minmax_scaler, gau_filter, get_binary, get_sub, cal_pr
 
 
 
-def cal_PI(adata, kernel_size=5, del_rate=0.01, platform = "visium", multiprocess=False):
+def cal_PI(adata, layer='counts',kernel_size=5, del_rate=0.01, platform = "visium", multiprocess=False):
     '''
     Use PI to identify spatially variable genes for ST data.
     
@@ -41,7 +41,7 @@ def cal_PI(adata, kernel_size=5, del_rate=0.01, platform = "visium", multiproces
         adata.obs.SIG : Significance score for each genes.
     '''
     
-    adata = minmax_scaler(adata)
+    adata = minmax_scaler(adata,layer=layer)
     adata = gau_filter(adata, platform, multiprocess=multiprocess)
     adata = get_binary(adata, platform, method = "iterative", multiprocess=multiprocess)
     adata = get_sub(adata, kernel_size, platform, del_rate)
