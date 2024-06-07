@@ -33,7 +33,23 @@ class MetaCell(object):
                     use_sparse=use_sparse)
         self.adata=adata
 
-        
+    """Core SEACells class.
+
+    :param ad: (AnnData) annotated data matrix
+    :param build_kernel_on: (str) key corresponding to matrix in ad.obsm which is used to compute kernel for metacells
+                            Typically 'X_pca' for scRNA or 'X_svd' for scATAC
+    :param n_SEACells: (int) number of SEACells to compute
+    :param use_gpu: (bool) whether to use GPU for computation
+    :param verbose: (bool) whether to suppress verbose program logging
+    :param n_waypoint_eigs: (int) number of eigenvectors to use for waypoint initialization
+    :param n_neighbors: (int) number of nearest neighbors to use for graph construction
+    :param convergence_epsilon: (float) convergence threshold for Franke-Wolfe algorithm
+    :param l2_penalty: (float) L2 penalty for Franke-Wolfe algorithm
+    :param max_franke_wolfe_iters: (int) maximum number of iterations for Franke-Wolfe algorithm
+    :param use_sparse: (bool) whether to use sparse matrix operations. Currently only supported for CPU implementation.
+
+    See cpu.py or gpu.py for descriptions of model attributes and methods.
+    """    
 
     def initialize_archetypes(self,**kwargs):
         self.model.construct_kernel_matrix()
