@@ -47,18 +47,12 @@ def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
     """
     Create a whole genome rankings dataframe from a single cell expression profile dataframe.
 
-    Parameters
-    ----------
-    - ex_mtx : `pandas.DataFrame`
-        The expression profile matrix. The rows should correspond to different cells, the columns to different genes
-        (n_cells x n_genes).
-    - seed : `int`, optional (default: None)
-        The seed for the random number generator. If None, the seed is not set.
-
-    Returns
-    -------
-    - data: `pandas.DataFrame`
-        A genome rankings dataframe (n_cells x n_genes).
+    Arguments:
+        ex_mtx: pandas DataFrame: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).
+        seed: int, optional (default: None): The seed for the random number generator. If None, the seed is not set.
+    
+    Returns:
+        data: pandas DataFrame: A genome rankings dataframe (n_cells x n_genes).
 
     """
     # Do a shuffle would be nice for exactly similar behaviour as R implementation.
@@ -88,12 +82,13 @@ def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
 
     It is important to check that most cells have a substantial fraction of expressed/detected genes in the calculation of
     the AUC.
+    
+    Arguments:
+        ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).
+    
+    Returns:
+        A dataframe with AUC threshold for different quantiles over the number cells: a fraction of 0.01 designates that when using this value as the AUC threshold for 99% of the cells all ranked genes used for AUC calculation will have had a detected expression in the single-cell experiment.
 
-    :param ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different
-        genes (n_cells x n_genes).
-    :return: A dataframe with AUC threshold for different quantiles over the number cells: a fraction of 0.01 designates
-        that when using this value as the AUC threshold for 99% of the cells all ranked genes used for AUC calculation will
-        have had a detected expression in the single-cell experiment.
     """
     return (
         pd.Series(np.count_nonzero(ex_mtx, axis=1)).quantile(
@@ -141,14 +136,17 @@ def aucell4r(
     """
     Calculate enrichment of gene signatures for single cells.
 
-    :param df_rnk: The rank matrix (n_cells x n_genes).
-    :param signatures: The gene signatures or regulons.
-    :param auc_threshold: The fraction of the ranked genome to take into account for the calculation of the
-        Area Under the recovery Curve.
-    :param noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
-    :param normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
-    :param num_workers: The number of cores to use.
-    :return: A dataframe with the AUCs (n_cells x n_modules).
+    Arguments:
+        df_rnk: The rank matrix (n_cells x n_genes).
+        signatures: The gene signatures or regulons.
+        auc_threshold: The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve.
+        noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
+        normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
+        num_workers: The number of cores to use.
+    
+    Returns:
+        A dataframe with the AUCs (n_cells x n_modules).
+
     """
     check_ctxcore()
     global ctxcore_install
@@ -236,14 +234,17 @@ def aucell(
     """
     Calculate enrichment of gene signatures for single cells.
 
-    :param exp_mtx: The expression matrix (n_cells x n_genes).
-    :param signatures: The gene signatures or regulons.
-    :param auc_threshold: The fraction of the ranked genome to take into account for the calculation of the
-        Area Under the recovery Curve.
-    :param noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
-    :param normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
-    :param num_workers: The number of cores to use.
-    :return: A dataframe with the AUCs (n_cells x n_modules).
+    Arguments:
+        exp_mtx: The expression matrix (n_cells x n_genes).
+        signatures: The gene signatures or regulons.
+        auc_threshold: The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve.
+        noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
+        normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
+        num_workers: The number of cores to use.
+    
+    Returns:
+        A dataframe with the AUCs (n_cells x n_modules).
+
     """
     return aucell4r(
         create_rankings(exp_mtx, seed),
