@@ -22,23 +22,17 @@ from matplotlib import pyplot as plt
 
 import time
 def autoResolution(adata,cpus=4):
-    r"""Automatically determine clustering resolution
+    r"""
+    Automatically determine clustering resolution
 
-    Parameters
-    ----------
-    - adata : `scanpy.AnnData`
-        The single cell data.
-    - cpus : `int`, optional (default: 4)
-        The number of cpus used for parallel computing.
+    Arguments:
+        adata : `scanpy.AnnData` The single cell data.
+        cpus : `int`, optional (default: 4) The number of cpus used for parallel computing.
     
-    Returns
-    -------
-    - adata : `scanpy.AnnData`
-        The single cell data with the clustering resolution.
-    - res : `float`
-        The clustering resolution.
-    - df_sil: `pandas.DataFrame`
-        The silhouette score of each clustering resolution.
+    Returns:
+        adata : `scanpy.AnnData` The single cell data with the clustering resolution.
+        res : `float` The clustering resolution.
+        df_sil: `pandas.DataFrame` The silhouette score of each clustering resolution.
     """
     print("Automatically determine clustering resolution...")
     start = time.time()
@@ -109,17 +103,14 @@ def autoResolution(adata,cpus=4):
     return adata, res, df_sil
 
 def writeGEP(adata_GEP,path):
-    r"""Write the gene expression profile to a file
+    r"""
+    Write the gene expression profile to a file
 
-    Parameters
-    ----------
-    - adata_GEP : `scanpy.AnnData`
-        The single cell data with gene expression profile.
-    - path : `str`
-        The path to save the gene expression profile.
+    Arguments:
+        adata_GEP : `scanpy.AnnData` The single cell data with gene expression profile. 
+        path : `str` The path to save the gene expression profile.
     
-    Returns
-    -------
+    Returns:
 
     """
     print('Exporting GEP...')
@@ -140,38 +131,26 @@ class Drug_Response:
     """
     def __init__(self,adata,scriptpath,modelpath,output='./',model='GDSC',clusters='All',
                  cell='A549',cpus=4,n_drugs=10):
-        r"""
+        
+        """
         Initializes the Drug_Response class.
 
-        Parameters
-        ----------
-        - adata : `AnnData object`
-            Annotated data matrix with cells as rows and genes as columns.
-        - scriptpath : `str`
-            Path to the directory containing the CaDRReS scripts for the analysis.
-            You need to download the scirpt according `git clone https://github.com/CSB5/CaDRReS-Sc.git`
-            and set the path to the directory.
-        - modelpath : `str`
-            Path to the directory containing the pre-trained models.
-            You need to download the model according `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()`
-            and set the path to the directory.
-        - output : `str`, optional (default: './')
-            Path to the directory where the output files will be saved.
-        - model : `str`, optional (default: 'GDSC')
-            The name of the pre-trained model to be used for the analysis.
-        - clusters : `str`, optional (default: 'All')
-            The cluster labels to be used for the analysis. Default is all cells.
-        - cell : `str`, optional (default: 'A549')
-            The cell line to be analyzed.
-        - cpus : `int`, optional (default: 4)
-            The number of CPUs to be used for the analysis.
-        - n_drugs : `int`, optional (default: 10)
-            The number of top drugs to be selected based on the predicted sensitivity.
+        Arguments:
+            adata: Annotated data matrix with cells as rows and genes as columns.
+            scriptpath: Path to the directory containing the CaDRReS scripts for the analysis. You need to download the scripts according to `git clone https://github.com/CSB5/CaDRReS-Sc.git` and set the path to the directory.
+            modelpath: Path to the directory containing the pre-trained models.
+                You need to download the models according to `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()` and set the path to the directory.
+            output: Path to the directory where the output files will be saved (default: './').
+            model: The name of the pre-trained model to be used for the analysis (default: 'GDSC').
+            clusters: The cluster labels to be used for the analysis. Default is all cells (default: 'All').
+            cell: The cell line to be analyzed (default: 'A549').
+            cpus: The number of CPUs to be used for the analysis (default: 4).
+            n_drugs: The number of top drugs to be selected based on the predicted sensitivity (default: 10).
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
+
         self.model = model
         self.adata=adata
         self.clusters=clusters
@@ -342,16 +321,11 @@ class Drug_Response:
         r"""
         plot heatmap of drug response prediction
 
-        Parameters
-        ----------
-        - df : `pandas.DataFrame`
-            drug response prediction dataframe
-        - n_drug : `int`
-            number of drugs to be plotted
-        - name : `str`
-            name of the plot
-        - figsize : `tuple`
-            size of the plot
+        Arguments:
+            df : `pandas.DataFrame` drug response prediction dataframe
+            n_drug : `int` number of drugs to be plotted
+            name : `str` name of the plot
+            figsize : `tuple` size of the plot
         """
         def select_drug(df, n_drug):
             selected_drugs = []

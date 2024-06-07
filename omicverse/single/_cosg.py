@@ -327,55 +327,39 @@ def cosg(
 
     copy:bool=False
 ):
-    """\
+    """
     Marker gene identification for single-cell sequencing data using COSG.
     
-    Parameters
-    ----------
-    adata
-        Annotated data matrix. Note: input paramters are simliar to the parameters used for scanpy's rank_genes_groups() function.
-    groupby
-        The key of the cell groups in .obs, the default value is set to 'CellTypes'.
-    groups
-        Subset of cell groups, e.g. [`'g1'`, `'g2'`, `'g3'`], to which comparison shall be restricted. The default value is 'all', and all groups will be compared.
-    mu
-        The penalty restricting marker genes expressing in non-target cell groups. Larger value represents more strict restrictions. mu should be >= 0, and by default, mu = 1.
-    remove_lowly_expressed
-        If True, genes that express a percentage of target cells smaller than a specific value (`expressed_pct`) are not considered as marker genes for the target cells. The default value is False.
-    expressed_pct
-        When `remove_lowly_expressed` is set to True, genes that express a percentage of target cells smaller than a specific value (`expressed_pct`) are not considered as marker genes for the target cells. The default value for `expressed_pct`
-        is 0.1 (10%).
-    n_genes_user
-        The number of genes that appear in the returned tables. The default value is 50.
-    key_added
-        The key in `adata.uns` information is saved to.
-    calculate_logfoldchanges
-        Calculate logfoldchanges.
-    use_raw
-        Use `raw` attribute of `adata` if present.
-    layer
-        Key from `adata.layers` whose value will be used to perform tests on.
-    reference
-        If `'rest'`, compare each group to the union of the rest of the group.
-        If a group identifier, compare with respect to this group.
- 
-    Returns
-    -------
-    names : structured `np.ndarray` (`.uns['rank_genes_groups']`)
-        Structured array to be indexed by group id storing the gene names. Ordered according to scores.
-    scores : structured `np.ndarray` (`.uns['rank_genes_groups']`)
-        Structured array to be indexed by group id storing COSG scores for each gene for each
-        group. Ordered according to scores.
-    Notes
-    -----
-    Contact: Min Dai, daimin@zju.edu.cn
-    Examples
-    --------
-    >>> import cosg as cosg
-    >>> import scanpy as sc
-    >>> adata = sc.datasets.pbmc68k_reduced()
-    >>> cosg.cosg(adata, key_added='cosg', groupby='bulk_labels')
-    >>> sc.pl.rank_genes_groups(adata, key='cosg')
+    Arguments:
+        adata: Annotated data matrix. Note: input parameters are similar to the parameters used for scanpy's rank_genes_groups() function.
+        groupby: The key of the cell groups in .obs, the default value is set to 'CellTypes'.
+        groups: Subset of cell groups, e.g. ['g1', 'g2', 'g3'], to which comparison shall be restricted. The default value is 'all', and all groups will be compared.
+        mu: The penalty restricting marker genes expressing in non-target cell groups. Larger value represents more strict restrictions. mu should be >= 0, and by default, mu = 1.
+        remove_lowly_expressed: If True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. The default value is False.
+        expressed_pct: When remove_lowly_expressed is set to True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. The default value for expressed_pct is 0.1 (10%).
+        n_genes_user: The number of genes that appear in the returned tables. The default value is 50.
+        key_added: The key in adata.uns information is saved to.
+        calculate_logfoldchanges: Calculate logfoldchanges.
+        use_raw: Use raw attribute of adata if present.
+        layer: Key from adata.layers whose value will be used to perform tests on.
+        reference: If 'rest', compare each group to the union of the rest of the group. If a group identifier, compare with respect to this group.
+
+    Returns:
+        names : structured np.ndarray (.uns['rank_genes_groups'])
+                Structured array to be indexed by group id storing the gene names. Ordered according to scores.
+        scores : structured np.ndarray (.uns['rank_genes_groups'])
+                Structured array to be indexed by group id storing COSG scores for each gene for each group. Ordered according to scores.
+
+    Notes:
+        Contact: Min Dai, daimin@zju.edu.cn
+
+    Examples:
+        >>> import cosg as cosg
+        >>> import scanpy as sc
+        >>> adata = sc.datasets.pbmc68k_reduced()
+        >>> cosg.cosg(adata, key_added='cosg', groupby='bulk_labels')
+        >>> sc.pl.rank_genes_groups(adata, key='cosg')
+
     """
     
     adata = adata.copy() if copy else adata
