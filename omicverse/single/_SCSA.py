@@ -26,41 +26,30 @@ class Annotator(object):
                  outfmt,celltype,Gensymbol,list_tissue,cellrange):
         
         """
-    Arguments:
-    
-    --input INPUT
-            Input file for marker annotation(Only CSV format supported).
-    --output OUTPUT
-            Output file for marker annotation.
-    --db DB     Database for annotation. (whole.db)
-    --source SOURCE
-            Source of marker genes. (cellranger,[seurat],[scanpy],[scran])
-    --cluster CLUSTER
-            Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])
-    --MarkerDB MARKERDB
-            User-defined marker database in table format with two columns.First column as Cellname, Second refers to Genename.
-    --foldchange FOLDCHANGE
-            Fold change threshold for marker filtering. (2.0)
-    --pvalue PVALUE
-            P-value threshold for marker filtering. (0.05)
-    --weight WEIGHT
-            Weight threshold for marker filtering from cellranger v1.0 results. (100)
-    --species SPECIES
-            Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
-    --tissue TISSUE
-            Tissue for annotation. Only used for cellmarker database. Multiple tissues should be seperated by commas.Run '-l' option to see all tissues.
-            In linux platform:('All',['Bone marrow'],['Bone marrow,Brain,Blood'][...])
-            In windows platform:("All",["Bone marrow"],["Bone marrow,Brain,Blood"][...])
-    --outfmt OUTFMT
-            Output file format for marker annotation. (ms-excel,[txt])
-    --celltype CELLTYPE
-            Cell type for annotation. (normal,[cancer])
-    --target TARGET
-            Target to annotation class in Database. (cellmarker,[cancersea])
-    --Gensymbol       Using gene symbol ID instead of ensembl ID in input file for calculation.
-    --norefdb         Only using user-defined marker database for annotation.
-    --noprint         Do not print any detail results.
-    --list_tissue     List tissue names in database.
+        Annotates marker genes using various databases and filtering criteria.
+
+        Arguments:
+            input: Input file for marker annotation (Only CSV format supported).
+            output: Output file for marker annotation.
+            db: Database for annotation (whole.db).
+            source: Source of marker genes (cellranger, [seurat], [scanpy], [scran]).
+            cluster: Only deal with one cluster of marker genes (all, [1], [1, 2, 3], [...]).
+            markerdb: User-defined marker database in table format with two columns. First column as Cellname, second column as Genename.
+            foldchange: Fold change threshold for marker filtering (2.0).
+            pvalue: P-value threshold for marker filtering (0.05).
+            weight: Weight threshold for marker filtering from cellranger v1.0 results (100).
+            species: Species for annotation. Only used for cellmarker database ('Human', ['Mouse']).
+            tissue: Tissue for annotation. Only used for cellmarker database. Multiple tissues should be separated by commas.
+                In linux platform: ('All', ['Bone marrow'], ['Bone marrow, Brain, Blood'], [...]).
+                In windows platform: ("All", ["Bone marrow"], ["Bone marrow, Brain, Blood"], [...]).
+            outfmt: Output file format for marker annotation (ms-excel, [txt]).
+            celltype: Cell type for annotation (normal, [cancer]).
+            target: Target to annotation class in database (cellmarker, [cancersea]).
+            gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation.
+            norefdb: Only using user-defined marker database for annotation.
+            noprint: Do not print any detail results.
+            list_tissue: List tissue names in database.
+            
             """
         
         #self = args

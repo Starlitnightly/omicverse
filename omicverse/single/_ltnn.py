@@ -121,10 +121,10 @@ class scLTNN(object):
         sc.tl.paga(self.adata, groups='leiden')
 
     def cal_model_time(self):
-        r"""predict the latent time by primriary ANN model
+        r"""
+        predict the latent time by primriary ANN model
 
-        Arguments
-        ---------
+        Arguments:
         
         """
         print('......predict model_time')
@@ -138,10 +138,10 @@ class scLTNN(object):
 
 
     def cal_exp_gene_value(self,mode='exp',rev=False):
-        r"""Calculated the gene with the same trend in the expression gene amount of cell
+        r"""
+        Calculated the gene with the same trend in the expression gene amount of cell
         
-        Arguments
-        ---------
+        Arguments: 
         
         """
         res_pd=find_related_gene(self.adata)
@@ -183,18 +183,14 @@ class scLTNN(object):
 
             
     def cal_dpt_pseudotime(self,leiden_range_start=0.01,leiden_range_end=0.01,leiden_range_mid=0.05,rev=False):
-        r"""calculate the diffusion pseudotime of anndata by start node selected automatically
+        r"""
+        calculate the diffusion pseudotime of anndata by start node selected automatically
 
-        Arguments
-        ---------
-        leiden_range_start
-            the range of start node
-        leiden_range_end
-            the range of end node
-        leiden_range_mid
-            the range of middle node
-        rev
-            test function to use the end node
+        Arguments:
+            leiden_range_start: the range of start node
+            leiden_range_end: the range of end node
+            leiden_range_mid: the range of middle node
+            rev: test function to use the end node
 
         """
 
@@ -253,20 +249,14 @@ class scLTNN(object):
         
         
     def ANN(self,batch_size=30,n_epochs=200,verbose=0,mode='p_time'):
-        r"""regression of latent time by start and end node using ANN model
+        r"""
+        regression of latent time by start and end node using ANN model
         
-        Arguments
-        ---------
-        batch_size
-            the batch_size of ANN model
-        epochs
-            the epochs of ANN model
-        verbose
-            the visualization of ANN model summary
-        mode
-            the calculation mode of ANN model
-            if we want to use the diffusion time to regression the ANN model
-            we can set the model 'dpt_time'
+        Arguments:
+            batch_size: the batch_size of ANN model
+            epochs: the epochs of ANN model
+            verbose: the visualization of ANN model summary
+            mode: the calculation mode of ANN model, if we want to use the diffusion time to regression the ANN model, we can set the model 'dpt_time'
         
         """
         print('......ANN')
@@ -377,10 +367,11 @@ class scLTNN(object):
         self.adata.obs['p_ANN_time']=y_pred
 
     def cal_distrubute(self) -> None:
-        r"""calculate the distribution of ANN time and diffusion pseudotime
+        r"""
         
-        Arguments
-        ---------
+        calculate the distribution of ANN time and diffusion pseudotime
+        
+        Arguments:
         
         """
 
@@ -403,24 +394,20 @@ class scLTNN(object):
         self.dist2=dist2
 
     def distribute_fun(self,mode,x1,x2):
-        r"""calculate the distribution of model
+        r"""
+        calculate the distribution of model
 
-        Arguments
-        ---------
-        mode
-            - Norm: the normal module of scLTNN distribution
-            - Best_all: the best distribution to use in scLTNN time calcultion
-            - Best_dweibull: the best distribution of ANN model 
-            time to use in  scLTNN time calcultion
-        x1
-            the dpt_pseudotime of adata
-        x2
-            the p_ANN_time of adata
+        Arguments:
+            mode:
+                Norm: the normal module of scLTNN distribution
+                Best_all: the best distribution to use in scLTNN time calcultion
+                Best_dweibull: the best distribution of ANN model time to use in  scLTNN time calcultion
+            x1: the dpt_pseudotime of adata
+            x2: the p_ANN_time of adata
         
-        Returns
-        -------
-        x
-            the composition of x1 and x2 by special distribution
+        Returns:
+        x: the composition of x1 and x2 by special distribution
+        
         """
         if mode=='Norm':
             a1=(norm.pdf(x1,loc=self.norm_arg['loc'],scale=self.norm_arg['scale']))
@@ -435,15 +422,14 @@ class scLTNN(object):
         return x1*(a1/(a1+a2))+x2*(a2/(a1+a2))
 
     def cal_scLTNN_time(self,mode='Norm'):
-        r"""calcualte the scLTNN time of anndata
+        r"""
+        calcualte the scLTNN time of anndata
         
-        Arguments
-        ---------
-        mode:
-            'Norm': the normal module of scLTNN distribution
-            'Best_all' the best distribution to use in scLTNN time calcultion
-            'Best_dweibull': the best distribution of ANN model 
-            time to use in  scLTNN time calcultion
+        Arguments:
+            mode:
+                'Norm': the normal module of scLTNN distribution
+                'Best_all' the best distribution to use in scLTNN time calcultion
+                'Best_dweibull': the best distribution of ANN model time to use in  scLTNN time calcultion
         
         """
         print('......calculate scLTNN time')
@@ -457,16 +443,14 @@ class scLTNN(object):
         self.adata.obs['LTNN_time_r']=1-np.array(new_x)
 
 def find_related_gene(adata):
-    r"""Find out the gene with postivate relation of the amounts of cells
-    Arguments
-    ---------
-    adata
-        the anndata performed LTNN analysis
+    r"""
+    Find out the gene with postivate relation of the amounts of cells
+   
+    Arguments:
+        adata: the anndata performed LTNN analysis
 
-    Returns
-    -------
-    res_pd
-        the pandas of correlation with genes and the amounts of cells
+    Returns:
+        res_pd: the pandas of correlation with genes and the amounts of cells
 
     """
     adata_copy=adata.copy()
@@ -598,16 +582,14 @@ class RadioModel(nn.Module):
     
 
 def find_related_gene(adata):
-    r"""Find out the gene with postivate relation of the amounts of cells
-    Arguments
-    ---------
-    adata
-        the anndata performed LTNN analysis
+    r"""
+    Find out the gene with postivate relation of the amounts of cells
+    
+    Arguments:
+        adata: the anndata performed LTNN analysis
 
-    Returns
-    -------
-    res_pd
-        the pandas of correlation with genes and the amounts of cells
+    Returns:
+        res_pd: the pandas of correlation with genes and the amounts of cells
 
     """
     adata_copy=adata.copy()
@@ -637,19 +619,14 @@ def plot_origin_tesmination(adata,basis,origin,tesmination,figsize=(4,4),**kwarg
     r"""
     plot the origin and tesmination cell of scRNA-seq
     
-    Arguments
-    ---------
-    adata
-        the anndata performed LTNN analysis
-    origin
-        the origin cell list/numpy.nparray
-    tesmination
-        the tesmination cell list/numpy.nparray
+    Arguments:
+        adata: the anndata performed LTNN analysis
+        origin: the origin cell list/numpy.nparray
+        tesmination: the tesmination cell list/numpy.nparray
 
-    Returns
-    -------
-    ax
-        the axex subplot of heatmap
+    Returns:
+        ax: the axex subplot of heatmap
+    
     """
     import matplotlib.pyplot as plt
     start_mao=[]
@@ -714,15 +691,12 @@ def tfidf(X: Array) -> Array:
     r"""
     TF-IDF normalization (following the Seurat v3 approach)
 
-    Parameters
-    ----------
-    X
-        Input matrix
+    Arguments:
+        X: Input matrix
 
-    Returns
-    -------
-    X_tfidf
-        TF-IDF normalized matrix
+    Returns:
+    X_tfidf: TF-IDF normalized matrix
+    
     """
     idf = X.shape[0] / X.sum(axis=0)
     if scipy.sparse.issparse(X):

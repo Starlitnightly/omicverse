@@ -304,10 +304,10 @@ class Slingshot:
 
     def construct_mst(self, start_node):
         """
-        Parameters
-           start_node: the starting node of the minimum spanning tree
+        Arguments:
+            start_node: the starting node of the minimum spanning tree
         Returns:
-             children: a dictionary mapping clusters to the children of each cluster
+            children: a dictionary mapping clusters to the children of each cluster
         """
         # Calculate empirical covariance of clusters
         emp_covs = np.stack([np.cov(self.data[self.cluster_label_indices == i].T) for i in range(self.num_clusters)])
@@ -651,10 +651,12 @@ class Slingshot:
     def shrink_branch_curves(self, branch_curves, avg_curve, shrinkage_percent):
         """
         Shrinks curves through a branch to the average curve.
-
-        :param branch_curves: list of `PrincipalCurve`s associated with the branch.
-        :param avg_curve: `PrincipalCurve` for average curve.
-        :param shrinkage_percent: percentage shrinkage, in same order as curve.pseudotimes
+        
+        Arguments:
+            branch_curves: list of `PrincipalCurve`s associated with the branch.
+            avg_curve: `PrincipalCurve` for average curve.
+            shrinkage_percent: percentage shrinkage, in same order as curve.pseudotimes
+       
         """
         num_dims_reduced = branch_curves[0].points_interp.shape[1]
 
