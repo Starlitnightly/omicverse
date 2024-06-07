@@ -42,11 +42,17 @@ def prepare_for_PI(adata, grid_size=20, percentage=0.1, platform="visium"):
     return adata
 
 
-def minmax_scaler(adata):
-    if sp.issparse(adata.X):
-        data = adata.X.A.T
+def minmax_scaler(adata,layer='counts'):
+    if layer=='X' or layer=='raw':
+        if sp.issparse(adata.X):
+            data = adata.X.A.T
+        else:
+            data = adata.X.T      
     else:
-        data = adata.X.T        
+        if sp.issparse(adata.layers[layer]):
+            data = adata.layers[layer].A.T
+        else:
+            data = adata.layers[layer].T   
 
     print('\nNormalize each geneing...')
     nor_counts = data.copy().T

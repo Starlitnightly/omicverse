@@ -567,7 +567,8 @@ def cal_eachGene(arglist):
     return [gene_i, _moranI, _gearyC, _p_norm, _p_rand]
 
 
-def spatial_autocorrelation(adata, k = 10, permutations = None, multiprocess = True):
+def spatial_autocorrelation(adata, layer='counts',
+                            k = 10, permutations = None, multiprocess = True):
     """
     Statistical test of spatial autocorrelation for each gene.
     
@@ -597,10 +598,17 @@ def spatial_autocorrelation(adata, k = 10, permutations = None, multiprocess = T
         adata.var["p_sim"] : p-value based on permutation test
         adata.var["fdr_sim"] : FDR based on permutation test
     """
-    if sp.issparse(adata.X):
-        genes_exp = adata.X.A
+
+    if layer=='X' or layer=='raw':
+        if sp.issparse(adata.X):
+            genes_exp = adata.X.A
+        else:
+            genes_exp = adata.X     
     else:
-        genes_exp = adata.X
+        if sp.issparse(adata.layers[layer]):
+            genes_exp = adata.layers[layer].A
+        else:
+            genes_exp = adata.layers[layer]
     spatial = adata.obsm['spatial'] 
     w = kneighbors_graph(spatial, n_neighbors = k, include_self = False).toarray()
 
@@ -727,13 +735,13 @@ def feature_selection(adata, selected_gene_name = None, by = 'prost', n_top_gene
     selected_gene_name = [i.upper() for i in selected_gene_name]
     raw_gene_name = [i.upper() for i in list(adata.var_names)]
     
-    adata.var['selected'] = False
+    adata.var['space_variable_features'] = False
     for i in range(len(raw_gene_name)):
         name = raw_gene_name[i]
         if name in selected_gene_name:
-            adata.var['selected'][i] = True
+            adata.var['space_variable_features'][i] = True
 
-    adata = adata[:, adata.var.selected]
+    #adata = adata[:, adata.var.selected]
     return adata
     
 
