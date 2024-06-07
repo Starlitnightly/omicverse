@@ -305,29 +305,25 @@ class pyCEFCON(object):
         #     out_dir='./output'
             ):
         """
-        Args:
-        input_expData (str or sc.AnnData or pd.DataFrame): input gene expression data. It can be the path to a csv file, an AnnData object, or a pandas dataframe.
-                                                       If the input is an AnnData object, the lineage name must be contained in AnnData.uns['lineages'], and
-                                                       the lineage information (can be the pseudotime, where non-NA data denotes cells in the lineage) must be
-                                                       contained in AnnData.obs. If no lineage information is detected, all cell expressions will be regarded as
-                                                       one lineage, which will be named 'all' by default.
-        input_priorNet (str or pd.DataFrame): input prior gene interaction network. It can be the path to a csv file or a pandas dataframe
-        input_genesDE (str or pd.DataFrame): input gene differential expression score. It can be the path to a csv file or a pandas dataframe
-        additional_edges_pct (float, optional): proportion of high co-expression interactions to be added (default: 0.01)
-        cuda (int, optional): an integer greater than -1 indicates the GPU device number and -1 indicates the CPU device
-        seed (int, optional): random seed (set to -1 means no random seed is assigned)
-        hidden_dim (int, optional): hidden dimension of the GNN encoder (default: 128)
-        output_dim (int, optional): output dimension of the GNN encoder (default: 64)
-        heads (int, optional): number of heads for the multi-head attention (d8tefault: 4)
-        attention (str, optional): type of attention scoring function ('COS', 'SD', 'AD') (default: 'COS')
-        miu (float, optional): parameter (0~1) for considering the importance of attention coefficients of the first GNN layer (default: 0.5)
-        epochs (int, optional): number of epochs for one repeat (default: 350)
-        repeats (int, optional): number of repeats (default: 5)
-        edge_threshold_param (int, optional): threshold for selecting top-weighted edges (larger values mean more edges). This parameter corresponds to the average degree of the constructed GRN (default: 8)
-        remove_self_loops (bool, optional): whether to remove all self-loops (default: True)
-        topK_drivers (int, optional): number of top-ranked candidate driver genes according to their influence scores (default: 100)
-        solver (str, optional): Solver ('GUROBI', 'SCIP') for solving the integer linear programming problems (for identifying drive regulators) (default: 'GUROBI')
-
+        Arguments:
+            input_expData (str or sc.AnnData or pd.DataFrame): input gene expression data. It can be the path to a csv file, an AnnData object, or a pandas dataframe. If the input is an AnnData object, the lineage name must be contained in AnnData.uns['lineages'], and the lineage information (can be the pseudotime, where non-NA data denotes cells in the lineage) must be contained in AnnData.obs. If no lineage information is detected, all cell expressions will be regarded as one lineage, which will be named 'all' by default.
+            input_priorNet (str or pd.DataFrame): input prior gene interaction network. It can be the path to a csv file or a pandas dataframe
+            input_genesDE (str or pd.DataFrame): input gene differential expression score. It can be the path to a csv file or a pandas dataframe
+            additional_edges_pct (float, optional): proportion of high co-expression interactions to be added (default: 0.01)
+            cuda (int, optional): an integer greater than -1 indicates the GPU device number and -1 indicates the CPU device
+            seed (int, optional): random seed (set to -1 means no random seed is assigned)
+            hidden_dim (int, optional): hidden dimension of the GNN encoder (default: 128)
+            output_dim (int, optional): output dimension of the GNN encoder (default: 64)
+            heads (int, optional): number of heads for the multi-head attention (default: 4)
+            attention (str, optional): type of attention scoring function ('COS', 'SD', 'AD') (default: 'COS')
+            miu (float, optional): parameter (0~1) for considering the importance of attention coefficients of the first GNN layer (default: 0.5)
+            epochs (int, optional): number of epochs for one repeat (default: 350)
+            repeats (int, optional): number of repeats (default: 5)
+            edge_threshold_param (int, optional): threshold for selecting top-weighted edges (larger values mean more edges). This parameter corresponds to the average degree of the constructed GRN (default: 8)
+            remove_self_loops (bool, optional): whether to remove all self-loops (default: True)
+            topK_drivers (int, optional): number of top-ranked candidate driver genes according to their influence scores (default: 100)
+            solver (str, optional): Solver ('GUROBI', 'SCIP') for solving the integer linear programming problems (for identifying drive regulators) (default: 'GUROBI')
+    
         """   
         self.input_expData = input_expData
         self.input_priorNet = input_priorNet

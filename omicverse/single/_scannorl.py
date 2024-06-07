@@ -41,7 +41,6 @@ class scANNORL(object):
             batch_size: The batch size for training the GNN model. Default is 2000.
             num_workers: The number of workers for training the GNN model. Default is 5.
 
-
         """
         nocd_obj=ov.single.scnocd(self.adata,gpu=gpu)
         #nocd_obj.device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
