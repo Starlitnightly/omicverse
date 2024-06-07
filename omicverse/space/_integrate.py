@@ -45,6 +45,14 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     Returns
     -------
     The spatial networks are saved in adata.uns['Spatial_Net']
+
+    Example
+    -------
+    >>> ov.space.Cal_Spatial_Net(adata, rad_cutoff=50, model='Radius')
+    or
+    >>> ov.space.Cal_Spatial_Net(adata, k_cutoff=10, model='KNN')
+    When using STAligner, it is necessary to adjust the **rad_cutoff** parameter according to different data to ensure that each spot has an **average of 5-10 adjacent spots** connected to it. 
+    Such as: "11.3356 neighbors per cell on average."
     """
 
     assert (model in ['Radius', 'KNN'])
@@ -112,8 +120,47 @@ class pySTAligner(object):
                              random_seed=666, iter_comb=None, knn_neigh=100, Batch_list=None,
                 device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         
-        self.device = device    
+        r'''
+        Parameter
+        ----------
+        adata: AnnData
+            The AnnData object of your input data.
+        hidden_dims: list
+            The hidden dimensions of the neural network.
+        n_epochs: int   
+            The number of epochs for training.  
+        lr: float   
+            The learning rate for training.
+        batch_key: str  
+            The key of batch information in adata.obs.
+        key_added: str  
+            The key of the new embedding in adata.obsm.
+        gradient_clipping: float    
+            The gradient clipping value.
+        weight_decay: float
+            The weight decay value.
+        margin: float
+            The margin value for triplet loss.
+        verbose: bool
+            Whether to print the training process.
+        random_seed: int
+            The random seed for training.
+        iter_comb: list
+            The list of pairwise comparison of batches.
+        knn_neigh: int
+            The number of nearest neighbors for MNN.
+        Batch_list: list
+            The list of AnnData objects of each batch.
+        device: torch.device
+            The device for training.
+
+        Example
+        ----------
+        >>> STAligner_obj = ov.space.pySTAligner(adata_concat, verbose=True, knn_neigh = 100, n_epochs = 600, iter_comb = iter_comb,
+                                     batch_key = 'batch_name',  key_added='STAligner', Batch_list = Batch_list)
+        '''
         
+        self.device = device   
         
         section_ids = np.array(adata.obs[batch_key].unique())
 
@@ -155,7 +202,7 @@ class pySTAligner(object):
             print(self.model)
 
     def train(self):
-
+        
         seed = self.random_seed
         import random
         random.seed(seed)
