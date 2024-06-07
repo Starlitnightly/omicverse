@@ -161,15 +161,21 @@ def embedding(
             pass
         else: 
             cmap = 'RdBu_r'
-        cmap = copy(colormaps.get_cmap(cmap))
-        cmap.set_bad(na_color)
+        if type(cmap)==matplotlib.colors.LinearSegmentedColormap:
+            pass
+        else:
+            cmap = copy(colormaps.get_cmap(cmap))
+            cmap.set_bad(na_color)
     else:
         if cmap is not None:
             pass
         else: 
             cmap = 'RdBu_r'
-        cmap = copy(matplotlib.colormaps[cmap])
-        cmap.set_bad(na_color)
+        if type(cmap)==matplotlib.colors.LinearSegmentedColormap:
+            pass
+        else:
+            cmap = copy(matplotlib.colormaps[cmap])
+            cmap.set_bad(na_color)
 
     
     kwargs["cmap"] = cmap
