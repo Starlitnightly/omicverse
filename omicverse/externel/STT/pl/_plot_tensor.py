@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-from adjustText import adjust_text
+
 
 
 def plot_tensor_single(adata, adata_aggr = None, state = 'joint', attractor = None, basis = 'umap', color ='attractor', color_map = None, size = 20, alpha = 0.5, ax = None, show = None, filter_cells = False, member_thresh = 0.05, density =2):
@@ -221,6 +221,7 @@ def plot_pathway(adata,figsize = (10,10),fontsize = 12,cmp='Set2',size = 20):
         texts.append(ax.annotate(txt, (x[i], y[i]), fontsize=fontsize))
         
     # Adjust the annotation positions to avoid overlaps
+    from adjustText import adjust_text
     adjust_text(texts,arrowprops=arrow_properties)
 
     # Hide axis ticks
