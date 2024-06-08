@@ -2,7 +2,7 @@ import numpy as np
 
 
 from sklearn.decomposition import PCA
-import gseapy as gp
+
 from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
