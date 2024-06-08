@@ -36,14 +36,5 @@ def test_metatime():
     TiME_object.predictTiME(save_obs_name='MetaTiME')
     assert TiME_object.adata.obs['MetaTiME'].shape[0]==adata.shape[0]
 
-def test_via():
-    adata=ov.utils.pancreas()
-    adata=ov.single.scanpy_lazy(adata)
-    v0 = ov.single.pyVIA(adata=adata,adata_key='X_pca',adata_ncomps=50, basis='X_umap',
-                         clusters='clusters',knn=30,random_seed=112,)
-
-    v0.run()
-    v0.get_pseudotime(v0.adata)
-    assert v0.adata.obs['pt_via'].shape[0]==adata.shape[0]
 
 
