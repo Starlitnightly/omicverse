@@ -150,7 +150,7 @@ If you would like to contribute to omicverse, please refer to our [developer doc
 <table align="center">
     <tr>
       <th colspan="2">
-        <br><img src="https://contrib.rocks/image?repo=Starlitnightly/omicverse"><br><br>
+        <br><img src="https://contrib.rocks/image?repo=Starlitnightly/omicverse/"><br><br>
       </th>
     </tr>
 </table>
@@ -171,7 +171,7 @@ If you would like to sponsor the development of our project, you can go to the a
 > [!TIP] 
 > <div>Logo made by <a href="https://www.designevo.com/" title="Free Online Logo Maker">DesignEvo free logo creator</a></div>
 
-Copyright © 2024 [112 Lab](). <br />
+Copyright © 2024 [112 Lab](https://112lab.asia/). <br />
 This project is [GPL3.0](./LICENSE) licensed.
 
 <!-- LINK GROUP -->
