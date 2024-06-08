@@ -224,6 +224,7 @@ def make_edgebundle_milestone(embedding:ndarray=None, sc_graph=None, via_object=
     if weighted ==True: edges['weight'] = edges['weight0']#1  # [1/i for i in edges['weight0']]np.where((edges['source_cluster'] != edges['target_cluster']) , 1,0.1)#[1/i for i in edges['weight0']]#
     else: edges['weight'] = 1
     print(f'{datetime.now()}\tMaking smooth edges')
+    from datashader.bundling import connect_edges, hammer_bundle
     hb = hammer_bundle(nodes_mean, edges, weight='weight', initial_bandwidth=initial_bandwidth,
                        decay=decay)  # default bw=0.05, dec=0.7
     # hb.x and hb.y contain all the x and y coords of the points that make up the edge lines.
