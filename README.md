@@ -150,7 +150,7 @@ If you would like to contribute to omicverse, please refer to our [developer doc
 <table align="center">
     <tr>
       <th colspan="2">
-        <br><img src="https://contrib.rocks/image?repo=Starlitnightly/omicverse/"><br><br>
+        <br><img src="https://contrib.rocks/image?repo=Starlitnightly/omicverse"><br><br>
       </th>
     </tr>
 </table>
