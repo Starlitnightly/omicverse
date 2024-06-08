@@ -65,6 +65,8 @@ dependencies = [
     'tensorboard>=2.6',
     'scrublet >=0.2',
     'scvi-tools>=0.20.1',
+    'pynvml',
+    'plotly',
     #'cvxpy>=1.3',
 
 ]
