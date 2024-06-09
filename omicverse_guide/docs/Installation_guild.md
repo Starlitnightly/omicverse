@@ -12,7 +12,8 @@ OmicVerse can be installed via conda or pypi and you need to install `pytorch` a
 
 In different platform, there are some differences in the most appropriate installation method.
 
-- `Windows`: You need to install the [`wsl` subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and `conda` in the wsl subsystem to configure the omicverse environment.
+- `Windows-Wsl`: You need to install the [`wsl` subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and `conda` in the wsl subsystem to configure the omicverse environment.
+- `Windows-Raw`: After version `1.6.2`, omicverse now supports windows natively, but you need to install `torch`, `torch_geometric` and `python-annoy` first.
 - `Linux`: We can choose to install [anaconda](https://www.anaconda.com/) or [miniconda](https://docs.conda.io/en/latest/miniconda.html), and then use conda to configure the omicverse environment
 - `Mac Os`: We recommend using [`miniforge`](https://github.com/conda-forge/miniforge)  or [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/)to configure.
 
@@ -30,10 +31,24 @@ Installing omicverse on a Mac with Apple Silicon is only possible using a native
     This part of the code installation may be wrong, if you encounter version error please refer to the following detailed code for step-by-step installation
 
 ```shell
+#Linux
 conda create -n omicverse python=3.9
 conda activate omicverse
 conda install mamba -c conda-forge
 mamba install jax jaxlib -c conda-forge
+pip3 install torch torchvision torchaudio
+pip3 install torch_geometric
+pip3 install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.3.0+cu121.html
+pip3 install -U omicverse
+```
+Note that the version of torch we installed is `2.3.0` 
+
+```shell
+#Windows-Raw[GPU]
+conda create -n omicverse python=3.9
+conda activate omicverse
+conda install mamba -c conda-forge
+conda install python-annoy -c conda-forge
 pip3 install torch torchvision torchaudio
 pip3 install torch_geometric
 pip3 install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.3.0+cu121.html

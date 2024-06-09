@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.6.1"
+version = "1.6.2"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -26,8 +26,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics"
 ]
 dependencies = [
-    'pybind11>=2.10',
-    'hnswlib>=0.7',
     'numpy>=1.22, <1.24',
     'scanpy>=1.9',
     'pandas>=1.0.3, <=1.5.3',
@@ -44,7 +42,7 @@ dependencies = [
     'lifelines>=0.27',
     'ktplotspy>=0.1',
     'python-dotplot>=0.0.1',
-    'pybedtools>=0.8.1',
+    #'pybedtools>=0.8.1',
     'boltons>=23.0',
     'ctxcore>=0.2',
     'termcolor>=2.1',
@@ -64,7 +62,7 @@ dependencies = [
     'einops>=0.6',
     'tensorboard>=2.6',
     'scrublet >=0.2',
-    'scvi-tools>=0.20.1',
+    #'scvi-tools>=0.20.1',
     'pynvml',
     'plotly',
     #'cvxpy>=1.3',

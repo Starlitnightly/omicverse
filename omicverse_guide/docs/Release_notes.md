@@ -365,3 +365,9 @@ Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from r
 ### pl Module
 
 - Added `plot_spatial` in `omicverse.pl` to visual the spot proportion of cells when deconvolution
+
+## v 1.6.2
+
+Support Raw Windows platform
+
+- Added `mde` in `omicverse.pp` to accerate the umap calculation.

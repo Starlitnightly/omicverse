@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import issparse, spmatrix
-import hnswlib
+
 import time
 import matplotlib
 import igraph as ig
@@ -491,7 +491,7 @@ def classic(D, n_components=2, random_state=None):
 
 
 def construct_knn_utils(data: np.ndarray, too_big: bool = False, distance='l2', num_threads: int = -1,
-                         knn: int = 20) -> hnswlib.Index:
+                         knn: int = 20):
     """
     Construct K-NN graph for given data. This is also featured within VIA class, but since we use it outside the class, we declare it in utils too
     too_big: if constructing knn during an iteration of PARC that tries to break up very large clusters. typically False unless called within too_big SubPARC
@@ -519,7 +519,7 @@ def construct_knn_utils(data: np.ndarray, too_big: bool = False, distance='l2', 
             k = ef_const = min(nsamples - 10, 500)
         if nsamples <= 50000 and dim > 30:
             M = 48  # good for scRNA-seq where dimensionality is high
-
+    import hnswlib
     p = hnswlib.Index(space=distance, dim=dim)
     p.set_num_threads(num_threads)
     p.init_index(max_elements=nsamples, ef_construction=ef_const, M=M)
@@ -589,7 +589,7 @@ def sequential_knn(data: np.ndarray, time_series_labels: list, neighbors: np.nda
     return augmented_nn, augmented_nn_data
 
 
-def _construct_knn(data: np.ndarray, knn: int, distance: str, num_threads: int, too_big: bool = False) -> hnswlib.Index:
+def _construct_knn(data: np.ndarray, knn: int, distance: str, num_threads: int, too_big: bool = False):
     """
     Construct K-NN graph index for given data. This is not the knngraph in itself. that is made by querying this index
 
@@ -606,7 +606,7 @@ def _construct_knn(data: np.ndarray, knn: int, distance: str, num_threads: int, 
     -------
     Initialized instance of hnswlib.Index to be used over given data
     """
-
+    import hnswlib
     k = knn + 1  # since first knn is itself
 
     nsamples, dim = data.shape
@@ -672,6 +672,7 @@ def sc_loc_ofsuperCluster_PCAspace(p0, p1, idx):
     :param idx: if using a subsampled PCA space for visualization. otherwise just range(0,n_samples)
     :return:
     '''
+    import hnswlib
     #ci_list first finds location in unsampled PCA space of the location of the super-cluster or sub-terminal-cluster and root
     # Returns location (index) of cell nearest to the ci_list in the downsampled space
     #print("dict of terminal state pairs, Super: sub: ", p1.dict_terminal_super_sub_pairs)
