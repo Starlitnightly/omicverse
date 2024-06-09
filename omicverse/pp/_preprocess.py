@@ -786,3 +786,117 @@ def score_genes_cell_cycle(adata,s_genes=None, g2m_genes=None):
     if g2m_genes==None:
         g2m_genes=['HMGB2', 'CDK1', 'NUSAP1', 'UBE2C', 'BIRC5', 'TPX2', 'TOP2A', 'NDC80', 'CKS2', 'NUF2', 'CKS1B', 'MKI67', 'TMPO', 'CENPF', 'TACC3', 'FAM64A', 'SMC4', 'CCNB2', 'CKAP2L', 'CKAP2', 'AURKB', 'BUB1', 'KIF11', 'ANP32E', 'TUBB4B', 'GTSE1', 'KIF20B', 'HJURP', 'CDCA3', 'HN1', 'CDC20', 'TTK', 'CDC25C', 'KIF2C', 'RANGAP1', 'NCAPD2', 'DLGAP5', 'CDCA2', 'CDCA8', 'ECT2', 'KIF23', 'HMMR', 'AURKA', 'PSRC1', 'ANLN', 'LBR', 'CKAP5', 'CENPE', 'CTCF', 'NEK2', 'G2E3', 'GAS2L3', 'CBX5', 'CENPA']
     sc.tl.score_genes_cell_cycle(adata,s_genes=s_genes, g2m_genes=g2m_genes)
+
+
+def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
+        transformer=None, metric='euclidean',verbose=False,
+        key_added=None,random_state=0,repulsive_fraction=0.7,constraint=None):
+    
+    import pymde
+    import logging
+    import time
+
+    # 配置日志
+    #logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    #logger = logging.getLogger()
+    # 记录开始时间
+    start_time = time.time()
+
+    print("computing neighbors")
+    if use_rep==None:
+        use_rep='X_pca'
+    data=adata.obsm[use_rep]
+    if n_pcs==None:
+        n_pcs=50
+    data=data[:,:n_pcs]
+
+    if constraint is None:
+        constraint = pymde.Standardized()
+    
+    _kwargs = {
+        "embedding_dim": embedding_dim,
+        "constraint": constraint,
+        "repulsive_fraction": repulsive_fraction,
+        "verbose": verbose,
+        "device": 'cuda',
+        "n_neighbors": n_neighbors,
+    }
+    #_kwargs.update(kwargs)
+    
+    gr=pymde.preprocess.k_nearest_neighbors(data,k=n_neighbors)
+
+    mde = pymde.preserve_neighbors(data, **_kwargs)
+    import torch
+    emb=mde.embed(verbose=_kwargs["verbose"])
+
+    if isinstance(emb, torch.Tensor):
+        emb = emb.cpu().numpy()
+    
+    from scipy.spatial import KDTree
+    # 使用KNN算法找到最近邻居
+    n_neighbors = n_neighbors  # 设置KNN的邻居数
+    kdtree = KDTree(emb)
+    distances, indices = kdtree.query(emb, k=n_neighbors)
+
+    # 构建稀疏的距离矩阵
+    n_items = emb.shape[0]
+    row_indices = np.repeat(np.arange(n_items), n_neighbors)
+    col_indices = indices.flatten()
+    distances = distances.flatten()
+    sparse_distance_matrix = csr_matrix((distances, (row_indices, col_indices)), shape=(n_items, n_items))
+
+    # 构建连接矩阵
+    # 这里我们简单地将连接矩阵设置为距离矩阵的二值化形式
+    connectivities = (sparse_distance_matrix > 0).astype(float)
+
+    if key_added is None:
+        key_added = "neighbors"
+        conns_key = "connectivities"
+        dists_key = "distances"
+    else:
+        conns_key = key_added + "_connectivities"
+        dists_key = key_added + "_distances"
+
+    adata.uns[key_added] = {}
+
+    neighbors_dict = adata.uns[key_added]
+
+    neighbors_dict["connectivities_key"] = conns_key
+    neighbors_dict["distances_key"] = dists_key
+
+    neighbors_dict["params"] = dict(
+        n_neighbors=n_neighbors,
+        method='mde',
+        random_state=random_state,
+        metric=metric,
+    )
+    if use_rep is not None:
+        neighbors_dict["params"]["use_rep"] = use_rep
+    if n_pcs is not None:
+        neighbors_dict["params"]["n_pcs"] = n_pcs
+
+
+    # 创建或更新AnnData对象
+    #adata = anndata.AnnData(X=data)
+    adata.obsp[dists_key] = sparse_distance_matrix
+    adata.obsp[conns_key] = gr.adjacency_matrix
+    adata.obsm[basis]=emb
+
+
+    
+    # 记录结束时间
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    # 打印结果和日志信息
+    print("    finished: added to `.uns['neighbors']`")
+    print(f"    `.obsm['{basis}']`, MDE coordinates")
+    if key_added==None:
+        print("    `.obsp['distances']`, distances for each pair of neighbors")
+        print("    `.obsp['connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(int(elapsed_time // 60), int(elapsed_time % 60)))
+
+    else:
+        print(f"    `.obsp['{key_added}_distances']`, distances for each pair of neighbors")
+        print("    `.obsp['{}_connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(key_added,int(elapsed_time // 60), int(elapsed_time % 60)))
+
+    #return emb

@@ -11,6 +11,6 @@ from ._preprocess import (identify_robust_genes,
                           regress_and_scale,
                           neighbors,
                           pca,score_genes_cell_cycle,
-                          leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,)
+                          leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,mde)
 
 from ._qc import quantity_control,qc,filter_cells,filter_genes

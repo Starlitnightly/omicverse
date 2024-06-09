@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import issparse, spmatrix
-import hnswlib
+
 import time
 import matplotlib
 import igraph as ig
@@ -378,6 +378,7 @@ def plot_scatter(embedding:ndarray, labels:list, cmap='rainbow', s=5, alpha=0.3,
     return fig, ax
 
 def _make_knn_embeddedspace(embedding):
+    import hnswlib
     # knn struct built in the embedded space to be used for drawing the lineage trajectories onto the 2D plot
     knn = hnswlib.Index(space='l2', dim=embedding.shape[1])
     knn.init_index(max_elements=embedding.shape[0], ef_construction=200, M=16)
@@ -727,7 +728,7 @@ def draw_sc_lineage_probability(via_object, via_fine=None, figsize=(8,4),
     :param marker_lineages: Default is to use all lineage pathways. other provide a list of lineage number (terminal cluster number).
     :return: fig, axs
     '''
-
+    import hnswlib
     if via_fine is None:
         via_fine = via_object
     if len(marker_lineages) == 0:

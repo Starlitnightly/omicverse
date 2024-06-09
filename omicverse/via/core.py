@@ -8,14 +8,14 @@ import igraph as ig
 import leidenalg
 import time
 from datetime import datetime
-import hnswlib
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 from matplotlib.path import get_path_collection_extents
 import multiprocessing
-import pygam as pg
+
 from collections import Counter
 from typing import Optional, Union
 from .plotting_via import *
@@ -1580,6 +1580,7 @@ class VIA:
         return ig.Graph(list(zip(*csr_full_graph.nonzero()))).simplify(combine_edges='sum')
 
     def get_gene_expression_solo(self, gene_exp, title_gene="", spline_order=4, cmap='jet', verbose=False):
+        import pygam as pg
         df_gene = pd.DataFrame()
         fig_0, ax = plt.subplots(dpi=300)
         sc_pt = self.single_cell_pt_markov
