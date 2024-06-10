@@ -116,12 +116,17 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
         pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
         ```
         ---
+
         where `${TORCH}` and `${CUDA}` should be replaced by the specific PyTorch and CUDA versions, respectively:
-         1.  PyTorch 2.3: `${TORCH}=2.3.0` and `${CUDA}=cpu|cu118|cu121`
-         2.  PyTorch 2.2: `${TORCH}=2.2.0` and `${CUDA}=cpu|cu118|cu121`
-         3.  PyTorch 2.1: `${TORCH}=2.1.0` and `${CUDA}=cpu|cu118|cu121`
-         4.  PyTorch 2.0: `${TORCH}=2.0.0` and `${CUDA}=cpu|cu117|cu118`
-         5.  PyTorch 1.13: `${TORCH}=1.13.0` and ${CUDA}=cpu|cu116|cu117`
+        
+         <ul>
+        <li>PyTorch 2.3: ${TORCH}=2.3.0 and ${CUDA}=cpu|cu118|cu121</li>
+        <li>PyTorch 2.2: ${TORCH}=2.2.0 and ${CUDA}=cpu|cu118|cu121</li>
+        <li>PyTorch 2.1: ${TORCH}=2.1.0 and ${CUDA}=cpu|cu118|cu121</li>
+        <li>PyTorch 2.0: ${TORCH}=2.0.0 and ${CUDA}=cpu|cu117|cu118</li>
+        <li>PyTorch 1.13: ${TORCH}=1.13.0 and ${CUDA}=cpu|cu116|cu117</li>
+         </ul>
+
         ---
         For example, for PyTorch 2.3.* and CUDA 12.1, type:
         
@@ -135,7 +140,7 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
         ```
 
         More information could be found in documention of [PyG](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
-        
+
         ---
 
 

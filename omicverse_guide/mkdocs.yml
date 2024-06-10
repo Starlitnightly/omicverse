@@ -71,11 +71,9 @@ nav:
 plugins:
   - mkdocs-jupyter:
       include_requirejs: true
+  - mermaid2
   - glightbox
   - plotly
-  - gen-files:
-      scripts:
-      - docs/gen_ref_pages.py
   - mkdocstrings:
       enabled: !ENV [ENABLE_MKDOCSTRINGS, true]
       custom_templates: templates
