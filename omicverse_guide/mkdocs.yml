@@ -118,7 +118,7 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.highlight:
-      linenums: true
+      linenums: false
       linenums_style: pymdownx-inline
   - pymdownx.superfences:
       custom_fences:
