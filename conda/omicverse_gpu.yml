@@ -21,6 +21,7 @@ dependencies:
  - louvain
  - fa2
  - jupyterlab
+ - pandas=1.5.3
  - pip
  - pip:
     - decoupler
