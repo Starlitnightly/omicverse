@@ -105,10 +105,16 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
         python -c "import torch; print(torch.version.cuda)"
         ```
 
-    - Install the appropriate PyG version based on your CUDA and PyTorch versions:
-
+    - Install the appropriate PyG 
         ```shell
         pip install torch_geometric
+        ```
+
+    - (Optional)Install the PyG dependencies version based on your CUDA and PyTorch versions:
+
+        ```shell
+        #For windows
+        pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-${TORCH}+cpu.html
         ```
 
         Install the relevant packages:
