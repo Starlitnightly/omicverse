@@ -169,8 +169,6 @@ If you would like to contribute to omicverse, please refer to our [developer doc
 
 If you would like to sponsor the development of our project, you can go to the afdian website (https://afdian.net/a/starlitnightly) and sponsor us.
 
-> [!TIP] 
-> <div>Logo made by <a href="https://www.designevo.com/" title="Free Online Logo Maker">DesignEvo free logo creator</a></div>
 
 Copyright © 2024 [112 Lab](https://112lab.asia/). <br />
 This project is [GPL3.0](./LICENSE) licensed.
