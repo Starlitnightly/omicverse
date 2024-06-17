@@ -348,7 +348,7 @@ def anndata_to_GPU(adata,**kwargs):
 
 def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     import rapids_singlecell as rsc
-    rsc.get.anndata_to_CPU(adata,layers=layer, convert_all=convert_all, copy=copy)
+    rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
 
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
