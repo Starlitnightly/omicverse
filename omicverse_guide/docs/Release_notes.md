@@ -371,3 +371,16 @@ Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from r
 Support Raw Windows platform
 
 - Added `mde` in `omicverse.pp` to accerate the umap calculation.
+
+## v 1.6.3
+
+- Added  `ov.setting.cpu_init` to change the environment to CPU.
+
+### Single Module
+- Added `CytoTrace2` to predict cellular potency categories and absolute developmental potential from single-cell RNA-sequencing data.
+
+### Bulk Module
+- Added `MaxBaseMean` columns in dds.result to help people ignore the empty samples.
+  
+### Space Module
+- Added `**kwargs` in `STT.compute_pathway`

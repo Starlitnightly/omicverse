@@ -24,6 +24,10 @@ class omicverseConfig:
         cp.cuda.set_allocator(rmm_cupy_allocator)
         print('GPU mode activated')
         self.mode = 'gpu'
+    
+    def cpu_init(self):
+        print('CPU mode activated')
+        self.mode = 'cpu'
         
 
 settings = omicverseConfig()
