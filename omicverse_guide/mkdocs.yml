@@ -29,6 +29,7 @@ nav:
             - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
             - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
         - Trajectory:
+            - Prediction of absolute developmental potential using CytoTrace2: Tutorials-single/t_cytotrace.ipynb
             - Trajectory Inference with PAGA or Palantir: Tutorials-single/t_traj.ipynb
             - Trajectory Inference with VIA: Tutorials-single/t_via.ipynb
             - Trajectory Inference with VIA and scVelo: Tutorials-single/t_via_velo.ipynb
