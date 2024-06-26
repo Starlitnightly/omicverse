@@ -88,8 +88,7 @@ def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_pa
     return pred_cores_to_use, smooth_cores_to_use
 
 
-def cytotrace2(#input_path, 
-               #annotation_path = "",
+def cytotrace2(
                adata,
                use_model_dir,
                species = "mouse",
@@ -101,6 +100,23 @@ def cytotrace2(#input_path,
                max_pcs = 200,
                seed = 14,
                output_dir = 'cytotrace2_results'):
+    """
+    CytoTRACE 2: A deep learning-based tool for cell potency prediction
+
+    Arguments:
+        adata: AnnData object containing the scRNA-seq data.
+        use_model_dir: Path to the directory containing the pre-trained model files.
+        species: The species of the input data. Default is "mouse".
+        batch_size: The number of cells to process in each batch. Default is 10000.
+        smooth_batch_size: The number of cells to process in each batch for smoothing. Default is 1000.
+        disable_parallelization: If True, disable parallel processing. Default is False.
+        max_cores: Maximum number of CPU cores to use for parallel processing. If None, all available cores will be used. Default is None.
+        max_pcs: Maximum number of principal components to use. Default is 200.
+        seed: Random seed for reproducibility. Default is 14.
+        output_dir: Directory to save the results. Default is 'cytotrace2_results'.
+
+    
+    """
 
     # Make output directory 
     out = os.system('mkdir -p '+output_dir)
