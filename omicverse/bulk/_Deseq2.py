@@ -508,6 +508,8 @@ class pyDEG(object):
             result=result.loc[~result['pvalue'].isnull()]
             result['-log(pvalue)'] = -np.log10(result['pvalue'])
             result['-log(qvalue)'] = -np.log10(result['qvalue'])
+            #max mean of between each value in group1 and group2
+            result['MaxBaseMean']=np.max([g1_mean,g2_mean],axis=0)
             result['BaseMean']=(g1_mean+g2_mean)/2
             result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
             result['log2FC'] = np.log2(result['FoldChange'])
