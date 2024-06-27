@@ -157,7 +157,7 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       celltype_key:str,nodecolor_dict=None,ax=None,
                       source_cells=None,target_cells=None,
                       figsize=(3,3),fontsize=11,rotate=False,
-                      legend_kws={'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',},**kwargs):
+                      legend_kws={'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',},return_table=False,**kwargs):
     
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -369,7 +369,10 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
 
 
     plt.tight_layout()
-    return ax
+    if return_table==True:
+        return corr_mat
+    else:
+        return ax
 
 
 def cpdb_interacting_heatmap(adata,
@@ -383,7 +386,8 @@ def cpdb_interacting_heatmap(adata,
                             ax=None,
                             figsize=(2,6),
                             fontsize=12,
-                            plot_secret=True):
+                            plot_secret=True,
+                            return_table=False,):
 
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -480,7 +484,10 @@ def cpdb_interacting_heatmap(adata,
         tesr[6].set_xticklabels(tesr[6].get_xticklabels(),fontsize=fontsize)
         tesr[6].set_yticklabels(tesr[6].get_yticklabels(),fontsize=fontsize)
    
-    return ax
+    if return_table==True:
+        return cor
+    else:
+        return ax
 
 
 def cpdb_group_heatmap(adata,
@@ -496,7 +503,8 @@ def cpdb_group_heatmap(adata,
                             figsize=(2,6),
                             fontsize=12,
                             plot_secret=True,
-                      cmap={'Target':'Blues','Source':'Reds'}):
+                      cmap={'Target':'Blues','Source':'Reds'},
+                      return_table=False,):
 
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -613,6 +621,146 @@ def cpdb_group_heatmap(adata,
         tesr[6].set_xticklabels(tesr[6].get_xticklabels(),fontsize=fontsize)
         tesr[7].set_xticklabels(tesr[7].get_xticklabels(),fontsize=fontsize)
         tesr[7].set_yticklabels(tesr[7].get_yticklabels(),fontsize=fontsize)
-   
-    return ax
+    if return_table==True:
+        return cor
+    else:
+        return ax
     
+
+
+
+
+def cpdb_interacting_network(adata,
+                             celltype_key,
+                             means,
+                             source_cells,
+                             target_cells,
+                             means_min=1,
+                             means_sum_min=1,        
+                             nodecolor_dict=None,
+                             ax=None,
+                             figsize=(6,6),
+                             fontsize=10,
+                             return_graph=False):
+    """
+    Creates and visualizes a network of cell-cell interactions.
+
+    Parameters:
+    adata : AnnData
+        AnnData object containing cell type and associated data.
+    celltype_key : str
+        Column name for cell types.
+    means : DataFrame
+        DataFrame containing interaction strengths.
+    source_cells : list
+        List of source cell types.
+    target_cells : list
+        List of target cell types.
+    means_min : float, optional
+        Minimum threshold for interaction strength (default is 1).
+    means_sum_min : float, optional
+        Minimum threshold for the sum of individual interactions (default is 1).
+    nodecolor_dict : dict, optional
+        Dictionary mapping cell types to colors (default is None).
+    ax : matplotlib.axes.Axes, optional
+        Axes object for the plot (default is None).
+    figsize : tuple, optional
+        Size of the figure (default is (6, 6)).
+    fontsize : int, optional
+        Font size for node labels (default is 10).
+
+    Returns:
+    ax : matplotlib.axes.Axes
+        Axes object with the drawn network.
+    """
+    # Determine node colors based on provided dictionary or defaults from adata
+    from adjustText import adjust_text
+    import re
+    import networkx as nx
+    
+    if nodecolor_dict:
+        type_color_all = nodecolor_dict
+    else:
+        color_key = f"{celltype_key}_colors"
+        categories = adata.obs[celltype_key].cat.categories
+        if color_key in adata.uns:
+            type_color_all = dict(zip(categories, adata.uns[color_key]))
+        else:
+            palette = sc.pl.palettes.default_102 if len(categories) > 28 else sc.pl.palettes.zeileis_28
+            type_color_all = dict(zip(categories, palette))
+
+    # Create a directed graph
+    G = nx.DiGraph()
+
+    # Filter the means DataFrame based on target and source cells
+    sub_means = cpdb_exact_target(means, target_cells)
+    sub_means = cpdb_exact_source(sub_means, source_cells)
+    
+    # Remove rows with null values in 'gene_a' or 'gene_b'
+    sub_means = sub_means.dropna(subset=['gene_a', 'gene_b'])
+
+    # Initialize a dictionary to store interactions
+    nx_dict = {}
+
+    for source_cell in source_cells:
+        for target_cell in target_cells:
+            key = f"{source_cell}|{target_cell}"
+            nx_dict[key] = []
+
+            # Find receptors related to the source and target cells
+            escaped_str = re.escape(key)
+            receptor_names = sub_means.columns[sub_means.columns.str.contains(escaped_str)].tolist()
+            receptor_sub = sub_means[sub_means.columns[:10].tolist() + receptor_names]
+
+            # Filter interactions based on the threshold values
+            for j in receptor_sub.index:
+                if receptor_sub.loc[j, receptor_names].sum() > means_min:
+                    for rece in receptor_names:
+                        if receptor_sub.loc[j, rece] > means_sum_min:
+                            nx_dict[key].append(receptor_sub.loc[j, 'gene_b'])
+                            G.add_edge(source_cell, f'L:{receptor_sub.loc[j, "gene_a"]}')
+                            G.add_edge(f'L:{receptor_sub.loc[j, "gene_a"]}', f'R:{receptor_sub.loc[j, "gene_b"]}')
+                            G.add_edge(f'R:{receptor_sub.loc[j, "gene_b"]}', rece.split('|')[1])
+
+            # Remove duplicate interactions
+            nx_dict[key] = list(set(nx_dict[key]))
+
+    # Set colors for ligand and receptor nodes
+    color_dict = type_color_all
+    color_dict['ligand'] = '#a51616'
+    color_dict['receptor'] = '#c2c2c2'
+
+    # Assign colors to nodes based on their type
+    node_colors = [
+        color_dict.get(node, 
+                       color_dict['ligand'] if 'L:' in node 
+                       else color_dict['receptor'])
+        for node in G.nodes()
+    ]
+
+    # Create figure and axis if not provided
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    # Use graphviz layout for positioning nodes
+    pos = nx.nx_agraph.graphviz_layout(G, prog="twopi")
+
+    # Draw nodes and edges
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors)
+    nx.draw_networkx_edges(G, pos, edge_color='#c2c2c2')
+
+    # Add labels to the nodes
+    texts = [
+        ax.text(pos[node][0], pos[node][1], node,
+                fontdict={'size': fontsize, 'weight': 'bold', 'color': 'black'})
+        for node in G.nodes() if 'ENSG' not in node
+    ]
+    adjust_text(texts, only_move={"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                arrowprops=dict(arrowstyle='-', color='black'))
+
+    # Remove axes
+    ax.axis("off")
+    if return_graph:
+        return G
+    else:
+        return ax
