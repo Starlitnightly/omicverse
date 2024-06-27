@@ -312,3 +312,27 @@ def cpdb_interaction_filtered(adata:anndata.AnnData,cell_type1:str,cell_type2:st
     )
 
     return list(set(res['interaction_group']))
+
+def cpdb_exact_target(means,target_cells):
+    import re
+    
+    t_dict=[]
+    for t in target_cells:
+        escaped_str = re.escape('|'+t)
+        target_names=means.columns[means.columns.str.contains(escaped_str)].tolist()
+        t_dict+=target_names
+    #print(t_dict)
+    target_sub=means[means.columns[:10].tolist()+t_dict]
+    return target_sub
+
+def cpdb_exact_source(means,source_cells):
+    import re
+    
+    t_dict=[]
+    for t in source_cells:
+        escaped_str = re.escape(t+'|')
+        source_names=means.columns[means.columns.str.contains(escaped_str)].tolist()
+        t_dict+=source_names
+    #print(t_dict)
+    source_sub=means[means.columns[:10].tolist()+t_dict]
+    return source_sub

@@ -505,16 +505,16 @@ class pyDEG(object):
             #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
             genearray = np.asarray(pvalue)
             result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
-            result=result.loc[~result['pvalue'].isnull()]
-            result['-log(pvalue)'] = -np.log10(result['pvalue'])
-            result['-log(qvalue)'] = -np.log10(result['qvalue'])
-            #max mean of between each value in group1 and group2
             result['MaxBaseMean']=np.max([g1_mean,g2_mean],axis=0)
             result['BaseMean']=(g1_mean+g2_mean)/2
             result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
             result['log2FC'] = np.log2(result['FoldChange'])
             result['abs(log2FC)'] = abs(np.log2(result['FoldChange']))
             result['size']  =np.abs(result['FoldChange'])/10
+            result=result.loc[~result['pvalue'].isnull()]
+            result['-log(pvalue)'] = -np.log10(result['pvalue'])
+            result['-log(qvalue)'] = -np.log10(result['qvalue'])
+            #max mean of between each value in group1 and group2
             #result=result[result['padj']<alpha]
             result['sig']='normal'
             result.loc[result['qvalue']<alpha,'sig']='sig'
