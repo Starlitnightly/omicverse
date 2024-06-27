@@ -387,4 +387,4 @@ Support Raw Windows platform
 - Added `**kwargs` in `STT.compute_pathway`
 
 ### pl Module
-- Added `cpdb_network`, `cpdb_chord`, `cpdb_heatmap`, `cpdb_interacting_heatmap` and `cpdb_group_heatmap` to visualize the result of CellPhoneDB
+- Added `cpdb_network`, `cpdb_chord`, `cpdb_heatmap`, `cpdb_interacting_network`,`cpdb_interacting_heatmap` and `cpdb_group_heatmap` to visualize the result of CellPhoneDB
