@@ -44,8 +44,8 @@ class STT(object):
         self.adata_aggr=adata_aggr
 
         
-    def compute_pathway(self,pathway_dict):
-        return tl.compute_pathway(self.adata,self.adata_aggr,pathway_dict)
+    def compute_pathway(self,pathway_dict,**kwargs):
+        return tl.compute_pathway(self.adata,self.adata_aggr,pathway_dict,**kwargs)
         
     def plot_pathway(self,label_fontsize=20,**kwargs):
         fig = pl.plot_pathway(self.adata,**kwargs)
