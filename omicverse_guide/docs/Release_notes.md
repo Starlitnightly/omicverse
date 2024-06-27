@@ -378,9 +378,13 @@ Support Raw Windows platform
 
 ### Single Module
 - Added `CytoTrace2` to predict cellular potency categories and absolute developmental potential from single-cell RNA-sequencing data.
+- Added `cpdb_exact_target` and `cpdb_exact_source` to exact the means of special ligand/receptor
 
 ### Bulk Module
 - Added `MaxBaseMean` columns in dds.result to help people ignore the empty samples.
   
 ### Space Module
 - Added `**kwargs` in `STT.compute_pathway`
+
+### pl Module
+- Added `cpdb_network`, `cpdb_chord`, `cpdb_heatmap`, `cpdb_interacting_heatmap` and `cpdb_group_heatmap` to visualize the result of CellPhoneDB
