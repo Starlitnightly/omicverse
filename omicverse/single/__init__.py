@@ -27,3 +27,4 @@ from ._mdic3 import pyMDIC3
 from ._cnmf import *
 from ._gptcelltype import gptcelltype
 from ._cytotrace2 import cytotrace2
+from ._gptcelltype_local import gptcelltype_local
