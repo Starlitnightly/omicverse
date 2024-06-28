@@ -70,7 +70,7 @@ class Bulk2Single:
                         mode='overall', adaptive=True, variance_threshold=0.98,
                         save_model_name=None,
                         batch_size=128, epochs=128, seed=1,scale_size=2):
-        from ..tape import Deconvolution,ScadenDeconvolution
+        from ..externel.tape import Deconvolution,ScadenDeconvolution
         sc_ref=self.sc_ref.copy()
         if method=='scaden':
             CellFractionPrediction=ScadenDeconvolution(sc_ref, 

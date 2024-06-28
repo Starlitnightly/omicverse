@@ -3,10 +3,10 @@ import pandas as pd
 import anndata
 import numpy as np
 from ._cosg import cosg
-from ..palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
-from ..palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
-from ..palantir.core import run_palantir
-from ..palantir.presults import select_branch_cells,compute_gene_trends
+from ..externel.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
+from ..externel.palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
+from ..externel.palantir.core import run_palantir
+from ..externel.palantir.presults import select_branch_cells,compute_gene_trends
 
 
 class TrajInfer(object):
