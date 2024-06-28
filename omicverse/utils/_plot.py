@@ -25,6 +25,7 @@ purple_color=['#823d86','#825b94','#bb98c6','#c69bc6','#a69ac9','#c5a6cc','#caad
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
 def plot_set(verbosity=3,dpi=80,facecolor='white'):
+    check_dependencies(dependencies)
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -33,6 +34,7 @@ def plot_set(verbosity=3,dpi=80,facecolor='white'):
     warnings.simplefilter("ignore", category=DeprecationWarning)
 
 def plotset(verbosity=3,dpi=80,facecolor='white'):
+    check_dependencies(dependencies)
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -41,6 +43,7 @@ def plotset(verbosity=3,dpi=80,facecolor='white'):
     warnings.simplefilter("ignore", category=DeprecationWarning)
 
 def ov_plot_set(verbosity=3,dpi=80,facecolor='white'):
+    check_dependencies(dependencies)
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings
@@ -1021,4 +1024,64 @@ def plot_pca_variance_ratio1(adata,threshold=0.85):
     plt.axhline(ratio_max_85)
     plt.title(f'PCs:{pcs_85_num}')
     plt.xlabel('ranking')
-    
+
+
+import pkg_resources
+from pkg_resources import DistributionNotFound, VersionConflict
+
+def check_dependencies(dependencies):
+    """
+    Check if the installed versions of the dependencies match the specified version requirements.
+
+    Parameters:
+    dependencies (list): A list of dependency strings in the format 'package_name>=version, <version'
+
+    Returns:
+    None
+    """
+    try:
+        pkg_resources.require(dependencies)
+        print("All dependencies are satisfied.")
+    except (DistributionNotFound, VersionConflict) as e:
+        print(f"Dependency error: {e}")
+
+# List of dependencies
+dependencies = [
+    'numpy>=1.22, <1.24',
+    'scanpy>=1.9',
+    'pandas>=1.0.3, <=1.5.3',
+    'matplotlib<3.7',
+    'scikit-learn>=1.2',
+    'scipy>=1.8, <1.12',
+    'networkx>=2.8',
+    'multiprocess>=0.70',
+    'seaborn>=0.11',
+    'datetime>=4.5',
+    'statsmodels>=0.13',
+    'gseapy==0.10.8',
+    'ipywidgets>=8.0',
+    'lifelines>=0.27',
+    'ktplotspy>=0.1',
+    'python-dotplot>=0.0.1',
+    'boltons>=23.0',
+    'ctxcore>=0.2',
+    'termcolor>=2.1',
+    'pygam==0.8.0',
+    'pillow>=9.0',
+    'gdown>=4.6',
+    'igraph>=0.10',
+    'leidenalg>=0.9',
+    'graphtools>=1.5',
+    'phate>=1.0',
+    'tqdm>=4.64',
+    'pydeseq2>=0.3, <=0.4.0',
+    'mofax>=0.3',
+    'adjustText>=0.8',
+    'scikit-misc>=0.1',
+    'metatime>=1.3.0',
+    'einops>=0.6',
+    'tensorboard>=2.6',
+    'scrublet>=0.2',
+    'pynvml',
+    'plotly',
+]
