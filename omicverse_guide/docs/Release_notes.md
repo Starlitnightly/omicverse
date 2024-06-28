@@ -375,6 +375,7 @@ Support Raw Windows platform
 ## v 1.6.3
 
 - Added  `ov.setting.cpu_init` to change the environment to CPU.
+- Move module `tape`,`SEACells` and `palantir` to `externel`
 
 ### Single Module
 - Added `CytoTrace2` to predict cellular potency categories and absolute developmental potential from single-cell RNA-sequencing data.
