@@ -22,6 +22,50 @@ def get_initial_means(X, n_components,init_params, r):
     return gmm.means_
 
 
+def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
+              modelNames='EEE',  random_seed=2020):
+    """Clustering using Gaussian Mixture Model (GMM), similar to mclust in R."""
+
+    if n_components is None:
+        print('You need to input the `n_components` when methods is `GMM`')
+        return
+    print(f"""running GaussianMixture clustering""")
+    # Extract the data to be clustered
+    data = adata.obsm[use_rep]
+    
+    import numpy as np
+    np.random.seed(random_seed)
+    
+    # Extract the data to be clustered
+    data = adata.obsm[use_rep]
+    
+    # Map modelNames to scikit-learn covariance_type
+    covariance_type_map = {
+        'EEE': 'spherical',  # Equal volume, shape, and orientation (spherical)
+        'VVV': 'full',       # Variable volume, shape, and orientation
+        'EEV': 'tied',       # Equal volume and shape, variable orientation (tied)
+        'VVI': 'diag',       # Variable volume and shape, equal orientation (diag)
+        # Add more mappings as needed
+    }
+    
+    covariance_type = covariance_type_map.get(modelNames, 'full')
+    
+    # Initialize and fit the Gaussian Mixture Model
+    gmm = GaussianMixture(n_components=n_components, covariance_type=covariance_type, random_state=random_seed)
+    gmm.fit(data)
+    
+    # Get the cluster labels
+    mclust_res = gmm.predict(data)
+    
+    # Add the cluster labels to adata.obs
+    adata.obs['mclust'] = mclust_res
+    adata.obs['mclust'] = adata.obs['mclust'].astype('int')
+    adata.obs['mclust'] = adata.obs['mclust'].astype('category')
+    adata.obs['gmm_cluster'] = adata.obs['mclust']
+    
+    return adata
+
+
 def cluster(adata:anndata.AnnData,method:str='leiden',
             use_rep:str='X_pca',random_state:int=1024,
             n_components=None, **kwargs):
@@ -31,26 +75,14 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     elif method=='louvain':
         sc.tl.louvain(adata,**kwargs)
     elif method=='GMM':
-        if n_components is None:
-            print('You need to input the `n_components` when methods is `GMM`')
-            return
-        print(f"""running GaussianMixture clustering""")
-        data=adata.obsm[use_rep].copy()
-        ini = get_initial_means(data,n_components, 'k-means++', 0)
-        gmm = GaussianMixture(n_components = n_components,random_state=random_state,
-                     means_init=ini, **kwargs)
-        gmm.fit(data)
-        adata.obs['gmm_cluster']=gmm.predict(data)
-        adata.obs['gmm_cluster']=adata.obs['gmm_cluster'].astype(str)
-        
-        #new_num=adata.obs['gmm_cluster'].value_counts()[adata.obs['gmm_cluster'].value_counts()>10].shape[0]
-        #adata.obs.loc[adata.obs['gmm_cluster'].isin(adata.obs['gmm_cluster'].value_counts()[adata.obs['gmm_cluster'].value_counts()<10].index.tolist()),'gmm_cluster']='-1'
-        
-        #adata.obs['gmm_cluster']=adata.obs['gmm_cluster'].astype('category')
-        #adata.obs['gmm_cluster'].cat.categories=pd.Index(list(range(len(adata.obs['gmm_cluster'].cat.categories))))
-        
+        mclust_py(adata, n_components=n_components,use_rep=use_rep,random_seed=random_state,**kwargs)
         print(f"""finished: found {n_components} clusters and added
-    'gmm_cluster', the cluster labels (adata.obs, categorical)""")
+    'mclust', the cluster labels (adata.obs, categorical)""")
+    elif method=='mclust':
+        mclust_py(adata, n_components=n_components,use_rep=use_rep,
+                  random_seed=random_state,**kwargs)
+        print(f"""finished: found {n_components} clusters and added
+    'mclust', the cluster labels (adata.obs, categorical)""")
     elif method=='schist':
         try:
             import schist
@@ -60,6 +92,32 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
             )
         schist.inference.nested_model(adata, **kwargs)
 
+      
+def refine_label(adata, radius=50, key='label'):
+    import ot
+    n_neigh = radius
+    new_type = []
+    old_type = adata.obs[key].values
+    
+    #calculate distance
+    position = adata.obsm['spatial']
+    distance = ot.dist(position, position, metric='euclidean')
+           
+    n_cell = distance.shape[0]
+    
+    for i in range(n_cell):
+        vec  = distance[i, :]
+        index = vec.argsort()
+        neigh_type = []
+        for j in range(1, n_neigh+1):
+            neigh_type.append(old_type[index[j]])
+        max_type = max(neigh_type, key=neigh_type.count)
+        new_type.append(max_type)
+        
+    new_type = [str(i) for i in list(new_type)]    
+    #adata.obs['label_refined'] = np.array(new_type)
+    
+    return new_type
         
 def filtered(adata:anndata.AnnData,
              cluster_key:str,

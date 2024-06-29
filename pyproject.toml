@@ -65,6 +65,7 @@ dependencies = [
     #'scvi-tools>=0.20.1',
     'pynvml',
     'plotly',
+    'numba<0.59'
     #'cvxpy>=1.3',
 
 ]
