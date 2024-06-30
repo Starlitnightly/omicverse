@@ -1,0 +1,928 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href=".." rel="prev"/>
+<link href="../Tutorials-bulk/t_bulk_combat/" rel="next"/>
+<link href="../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.4.2, mkdocs-material-9.1.2" name="generator"/>
+<title>Installation - omicverse Readthedocs</title>
+<link href="../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../css/custom.css" rel="stylesheet"/>
+<script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#omicverse-installation-guide">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href=".." title="omicverse Readthedocs">
+<img alt="logo" src="../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Installation
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href=".." title="omicverse Readthedocs">
+<img alt="logo" src="../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+          Installation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+        Installation
+      </a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#prerequisites">
+    Prerequisites
+  </a>
+<nav aria-label="Prerequisites" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#platform-specific-instructions">
+    Platform-Specific Instructions
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pip-prerequisites">
+    pip Prerequisites
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#apple-silicon-prerequisites">
+    Apple Silicon Prerequisites
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#detailed-installation-steps">
+    Detailed Installation Steps
+  </a>
+<nav aria-label="Detailed Installation Steps" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#using-conda">
+    Using Conda
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#using-pip">
+    Using pip
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#nightly-version">
+    Nightly Version
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#additional-notes">
+    Additional Notes
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#gpu-accelerated-installation">
+    GPU-Accelerated Installation
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#jupyter-lab">
+    Jupyter-lab
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#development">
+    Development
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_preprocess_cpu/">
+        Preprocessing the data of scRNA-seq with omicverse
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_preprocess_gpu/">
+        Preprocessing the data of scRNA-seq with omicverse[GPU]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cluster/">
+        Clustering space
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cnmf/">
+        Consensus Non-negative Matrix factorization (cNMF)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_gptanno/">
+        Automatic cell type annotation with GPT/Other
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cytotrace/">
+        Prediction of absolute developmental potential using CytoTrace2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_traj/">
+        Trajectory Inference with PAGA or Palantir
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_via/">
+        Trajectory Inference with VIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_via_velo/">
+        Trajectory Inference with VIA and scVelo
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with cellfategenie
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellfate_genesets/">
+        Timing-associated geneset analysis with cellfategenie
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellfate/">
+        Identify the driver regulators of cell fate decisions
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_metacells/">
+        Inference of MetaCell from Single-Cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_scdeg/">
+        Differential expression analysis in single cell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellphonedb/">
+        Cell interaction with CellPhoneDB
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          Space
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
+<span class="md-nav__icon md-icon"></span>
+          Space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_stagate/">
+        Spatial clustering and denoising expressions
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_spaceflow/">
+        Identifying Pseudo-Spatial Map
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_mapping/">
+        Mapping single-cell profile onto spatial profile
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_stt/">
+        Spatial transition tensor of single cells
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_staligner/">
+        Spatial integration and clustering
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_slat/">
+        Single cell spatial alignment tools
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+          Plotting
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_5">
+<span class="md-nav__icon md-icon"></span>
+          Plotting
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-plotting/t_visualize_single/">
+        Visualization of single cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-plotting/t_visualize_bulk/">
+        Visualization of Bulk RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../api/">
+        API documentation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#prerequisites">
+    Prerequisites
+  </a>
+<nav aria-label="Prerequisites" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#platform-specific-instructions">
+    Platform-Specific Instructions
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pip-prerequisites">
+    pip Prerequisites
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#apple-silicon-prerequisites">
+    Apple Silicon Prerequisites
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#detailed-installation-steps">
+    Detailed Installation Steps
+  </a>
+<nav aria-label="Detailed Installation Steps" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#using-conda">
+    Using Conda
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#using-pip">
+    Using pip
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#nightly-version">
+    Nightly Version
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#additional-notes">
+    Additional Notes
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#gpu-accelerated-installation">
+    GPU-Accelerated Installation
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#jupyter-lab">
+    Jupyter-lab
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#development">
+    Development
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="omicverse-installation-guide">OmicVerse Installation Guide<a class="headerlink" href="#omicverse-installation-guide" title="Permanent link">¶</a></h1>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">¶</a></h2>
+<p>OmicVerse can be installed via conda or pip, but you need to install <code>PyTorch</code> first.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To avoid potential dependency conflicts, it is recommended to install within a <code>conda</code> environment. Use <code>pip install -U omicverse</code> to update.</p>
+</div>
+<h3 id="platform-specific-instructions">Platform-Specific Instructions<a class="headerlink" href="#platform-specific-instructions" title="Permanent link">¶</a></h3>
+<p>Installation methods vary depending on the platform:</p>
+<ul>
+<li><strong>Windows-WSL</strong>: Install the <a href="https://learn.microsoft.com/en-us/windows/wsl/install">WSL subsystem</a> and <code>conda</code> within WSL to configure the OmicVerse environment.</li>
+<li><strong>Windows-Native</strong>: From version <code>1.6.2</code>, OmicVerse supports native Windows, but you need to install <code>torch</code>, <code>torch_geometric</code>, and <code>python-annoy</code> first.</li>
+<li><strong>Linux</strong>: Install <a href="https://www.anaconda.com/">Anaconda</a> or <a href="https://docs.conda.io/en/latest/miniconda.html">Miniconda</a> and use conda to configure the OmicVerse environment.</li>
+<li><strong>Mac OS</strong>: Use <a href="https://github.com/conda-forge/miniforge"><code>miniforge</code></a> or <a href="https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/"><code>mambaforge</code></a> to configure the environment.</li>
+</ul>
+<h3 id="pip-prerequisites">pip Prerequisites<a class="headerlink" href="#pip-prerequisites" title="Permanent link">¶</a></h3>
+<ul>
+<li>If using conda/mamba, run <code>conda install -c anaconda pip</code> and skip this section.</li>
+<li>Install Python, preferably using the pyenv version management system along with pyenv-virtualenv.</li>
+</ul>
+<h3 id="apple-silicon-prerequisites">Apple Silicon Prerequisites<a class="headerlink" href="#apple-silicon-prerequisites" title="Permanent link">¶</a></h3>
+<p>Installing OmicVerse on a Mac with Apple Silicon is only possible using a native version of Python. You can install a native version of Python with an Apple Silicon version of mambaforge (installable via a native version of Homebrew using <code>brew install --cask mambaforge</code>).</p>
+<h2 id="detailed-installation-steps">Detailed Installation Steps<a class="headerlink" href="#detailed-installation-steps" title="Permanent link">¶</a></h2>
+<h3 id="using-conda">Using Conda<a class="headerlink" href="#using-conda" title="Permanent link">¶</a></h3>
+<ol>
+<li>
+<p><strong>Install conda</strong>: Typically, use the <code>mambaforge</code> distribution.</p>
+</li>
+<li>
+<p><strong>Create a new conda environment</strong>:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>omicverse<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10
+</code></pre></div>
+</li>
+<li>
+<p><strong>Activate your environment</strong>:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>activate<span class="w"> </span>omicverse
+</code></pre></div>
+</li>
+<li>
+<p><strong>Install PyTorch and PyG</strong>:</p>
+<ul>
+<li>
+<p>First, determine your CUDA version (if applicable):</p>
+<div class="highlight"><pre><span></span><code>nvcc<span class="w"> </span>--version
+</code></pre></div>
+</li>
+<li>
+<p>Install the appropriate version of PyTorch:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">11</span>.8<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia
+</code></pre></div>
+<p>If using CPU only:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>cpuonly<span class="w"> </span>-c<span class="w"> </span>pytorch
+</code></pre></div>
+</li>
+<li>
+<p>Install PyG:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pyg<span class="w"> </span>-c<span class="w"> </span>pyg
+</code></pre></div>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Install OmicVerse</strong>:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>python-annoy<span class="w"> </span>-c<span class="w"> </span>conda-forge
+conda<span class="w"> </span>install<span class="w"> </span>omicverse<span class="w"> </span>-c<span class="w"> </span>conda-forge
+</code></pre></div>
+</li>
+<li>
+<p><strong>Verify the installation</strong>:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import omicverse"</span>
+</code></pre></div>
+<p>If no errors appear, the installation was successful.</p>
+</li>
+</ol>
+<h3 id="using-pip">Using pip<a class="headerlink" href="#using-pip" title="Permanent link">¶</a></h3>
+<ol>
+<li>
+<p><strong>Install PyTorch</strong>:</p>
+<div class="highlight"><pre><span></span><code>pip3<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu118
+</code></pre></div>
+<p>If using CPU only:</p>
+<div class="highlight"><pre><span></span><code>pip3<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cpu
+</code></pre></div>
+</li>
+<li>
+<p><strong>Install PyG</strong>:</p>
+<ul>
+<li>
+<p>First, check your local CUDA version and PyTorch version:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import torch; print(torch.__version__)"</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import torch; print(torch.version.cuda)"</span>
+</code></pre></div>
+</li>
+<li>
+<p>Install the appropriate PyG 
+    <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>torch_geometric
+</code></pre></div></p>
+</li>
+<li>
+<p>(Optional)Install the PyG dependencies version based on your CUDA and PyTorch versions:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">#For windows</span>
+pip<span class="w"> </span>install<span class="w"> </span>pyg_lib<span class="w"> </span>torch_scatter<span class="w"> </span>torch_sparse<span class="w"> </span>torch_cluster<span class="w"> </span>torch_spline_conv<span class="w"> </span>-f<span class="w"> </span>https://data.pyg.org/whl/torch-<span class="si">${</span><span class="nv">TORCH</span><span class="si">}</span>+cpu.html
+</code></pre></div>
+<p>Install the relevant packages:
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyg_lib<span class="w"> </span>torch_scatter<span class="w"> </span>torch_sparse<span class="w"> </span>torch_cluster<span class="w"> </span>torch_spline_conv<span class="w"> </span>-f<span class="w"> </span>https://data.pyg.org/whl/torch-<span class="si">${</span><span class="nv">TORCH</span><span class="si">}</span>+<span class="si">${</span><span class="nv">CUDA</span><span class="si">}</span>.html
+</code></pre></div></p>
+<hr/>
+<p>where <code>${TORCH}</code> and <code>${CUDA}</code> should be replaced by the specific PyTorch and CUDA versions, respectively:</p>
+<p><ul>
+<li>PyTorch 2.3: ${TORCH}=2.3.0 and ${CUDA}=cpu|cu118|cu121</li>
+<li>PyTorch 2.2: ${TORCH}=2.2.0 and ${CUDA}=cpu|cu118|cu121</li>
+<li>PyTorch 2.1: ${TORCH}=2.1.0 and ${CUDA}=cpu|cu118|cu121</li>
+<li>PyTorch 2.0: ${TORCH}=2.0.0 and ${CUDA}=cpu|cu117|cu118</li>
+<li>PyTorch 1.13: ${TORCH}=1.13.0 and ${CUDA}=cpu|cu116|cu117</li>
+</ul></p>
+<hr/>
+<p>For example, for PyTorch 2.3.* and CUDA 12.1, type:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyg_lib<span class="w"> </span>torch_scatter<span class="w"> </span>torch_sparse<span class="w"> </span>torch_cluster<span class="w"> </span>torch_spline_conv<span class="w"> </span>-f<span class="w"> </span>https://data.pyg.org/whl/torch-2.3.0+cu121.html
+</code></pre></div>
+<p>For example, for PyTorch 2.2.* and CUDA 11.8, type:
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyg_lib<span class="w"> </span>torch_scatter<span class="w"> </span>torch_sparse<span class="w"> </span>torch_cluster<span class="w"> </span>torch_spline_conv<span class="w"> </span>-f<span class="w"> </span>https://data.pyg.org/whl/torch-2.2.0+cu118.html
+</code></pre></div></p>
+<p>More information could be found in documention of <a href="https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html">PyG</a></p>
+<hr/>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Configure Annoy (Windows Native only)</strong>:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>python-annoy<span class="w"> </span>-c<span class="w"> </span>conda-forge
+</code></pre></div>
+</li>
+<li>
+<p><strong>Configure GCC (Linux only)</strong>:</p>
+<ul>
+<li>
+<p>For Ubuntu:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>update
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>build-essential
+</code></pre></div>
+</li>
+<li>
+<p>For CentOS:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>yum<span class="w"> </span>group<span class="w"> </span>install<span class="w"> </span><span class="s2">"Development Tools"</span>
+</code></pre></div>
+</li>
+<li>
+<p>Verify GCC installation:</p>
+<div class="highlight"><pre><span></span><code>gcc<span class="w"> </span>--version
+</code></pre></div>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Install OmicVerse and Numba</strong>:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>omicverse
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>numba
+</code></pre></div>
+</li>
+<li>
+<p><strong>Verify the installation</strong>:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import omicverse"</span>
+</code></pre></div>
+<p>If no errors appear, the installation was successful.</p>
+</li>
+</ol>
+<h3 id="nightly-version">Nightly Version<a class="headerlink" href="#nightly-version" title="Permanent link">¶</a></h3>
+<p>If you want to use the nightly version of OmicVerse:</p>
+<ol>
+<li>
+<p><strong>Clone the repository</strong>:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Starlitnightly/omicverse.git
+</code></pre></div>
+</li>
+<li>
+<p><strong>Install OmicVerse</strong>:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>.
+</code></pre></div>
+<p>Alternatively, you can install directly from GitHub:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>git+https://github.com/Starlitnightly/omicverse.git
+</code></pre></div>
+</li>
+</ol>
+<h3 id="additional-notes">Additional Notes<a class="headerlink" href="#additional-notes" title="Permanent link">¶</a></h3>
+<p>If you encounter errors with pip, for packages that pip can't install (e.g., scikit-misc), use conda:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>scikit-misc<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-c<span class="w"> </span>bioconda
+</code></pre></div>
+<p>For M1/M2 silicon users, the following commands may help:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Python 3.9</span>
+conda<span class="w"> </span>install<span class="w"> </span>s_gd2<span class="w"> </span>-c<span class="w"> </span>conda-forge
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>omicverse
+conda<span class="w"> </span>install<span class="w"> </span>pytorch::pytorch<span class="w"> </span>torchvision<span class="w"> </span>torchaudio<span class="w"> </span>-c<span class="w"> </span>pytorch
+</code></pre></div>
+<h2 id="gpu-accelerated-installation">GPU-Accelerated Installation<a class="headerlink" href="#gpu-accelerated-installation" title="Permanent link">¶</a></h2>
+<p>To install <code>rapids-singlecell</code> and <code>omicverse</code> with GPU acceleration, use the provided <code>yaml</code> file:</p>
+<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>conda/omicverse_gpu.yml
+<span class="c1"># or</span>
+mamba<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>conda/omicverse_gpu.yml
+</code></pre></div>
+<h2 id="jupyter-lab">Jupyter-lab<a class="headerlink" href="#jupyter-lab" title="Permanent link">¶</a></h2>
+<p>For the best interactive analysis experience, we highly recommend installing jupyter-lab so that you can interactively edit the code and get the analysis results and visualizations right away.</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>jupyter-lab
+</code></pre></div>
+<p>After you have finished the installation, in your terminal (note that you must be in the omicverse environment, not the base environment), type <code>jupyter-lab</code>, a URL will appear, we can open this URL in the browser to start our analysis journey!</p>
+<p><a class="glightbox" data-desc-position="bottom" data-height="auto" data-type="image" data-width="100%" href="../img/jupyter.jpg"><img alt="jupyter" src="../img/jupyter.jpg"/></a></p>
+<p><a class="glightbox" data-desc-position="bottom" data-height="auto" data-type="image" data-width="100%" href="../img/light_jupyter.jpg#gh-light-mode-only"><img alt="jupyter-light" src="../img/light_jupyter.jpg#gh-light-mode-only"/></a>
+<a class="glightbox" data-desc-position="bottom" data-height="auto" data-type="image" data-width="100%" href="../img/dark_jupyter.jpg#gh-dark-mode-only"><img alt="jupyter-dark" src="../img/dark_jupyter.jpg#gh-dark-mode-only"/></a></p>
+<h2 id="development">Development<a class="headerlink" href="#development" title="Permanent link">¶</a></h2>
+<p>For development - clone this repo and run:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[dev,docs]"</span>
+</code></pre></div>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2024, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>
