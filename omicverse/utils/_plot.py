@@ -105,51 +105,36 @@ def blue_palette()->list:
     """ 
     return blue_color
 
-def plot_text_set(text,text_knock=2,text_maxsize=20):
+def plot_text_set(text, text_knock=2, text_maxsize=20):
     """
     Formats the text to fit in a plot by adding line breaks.
 
     Parameters
     ----------
-    - text : `str`
+    - text : str
         Text to format.
-    - text_knock : `int`, optional
+    - text_knock : int, optional
         Number of words to skip between two line breaks, by default 2.
-    - text_maxsize : `int`, optional
+    - text_maxsize : int, optional
         Maximum length of the text before formatting, by default 20.
 
     Returns
     -------
-    - text: `str`
+    - text: str
         Formatted text.
     """
-    #print(text)
-    text_len=len(text)
-    if text_len>text_maxsize:
-        ty=text.split(' ')
-        ty_len=len(ty)
-        if ty_len%2==1:
-            ty_mid=(ty_len//text_knock)+1
-        else:
-            ty_mid=(ty_len//text_knock)
-        #print(ty_mid)
-
-        if ty_mid==0:
-            ty_mid=1
-
-        res=''
-        ty_len_max=np.max([i%ty_mid for i in range(ty_len)])
-        if ty_len_max==0:
-            ty_len_max=1
-        for i in range(ty_len):
-            #print(ty_mid,i%ty_mid,i,ty_len_max)
-            if (i%ty_mid)!=ty_len_max:
-                res+=ty[i]+' '
-            else:
-                res+='\n'+ty[i]+' '
-        return res
-    else:
+    if len(text) <= text_maxsize:
         return text
+    
+    words = text.split(' ')
+    formatted_text = []
+    for i, word in enumerate(words):
+        if i > 0 and i % text_knock == 0:
+            formatted_text.append('\n')
+        formatted_text.append(word)
+    
+    return ' '.join(formatted_text).strip()
+
     
 def ticks_range(x,width):
     """

@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 
-class cellfategenie(object):
+class Fate(object):
 
     def __init__(self,adata:anndata.AnnData,pseudotime:str):
         """
@@ -118,7 +118,8 @@ class cellfategenie(object):
         coef_threshold_li=[]
         r2_li=[]
         k=0
-        for i in self.coef['abs(coef)'].values[1:]:
+        from tqdm import tqdm
+        for i in tqdm(self.coef['abs(coef)'].values[1:]):
             coef_threshold_li.append(i)
             train_idx=self.coef.loc[self.coef['abs(coef)']>=i].index.values
             if related == True:
@@ -229,6 +230,61 @@ class cellfategenie(object):
         self.kendalltau_filter=test_pd
         return test_pd
     
+    def low_density(self,
+                    n_components: int = 10,
+                    knn: int = 30,
+                    alpha: float = 0,
+                    seed = 0,
+                    pca_key: str = "X_pca",
+                    kernel_key: str = "DM_Kernel",
+                    sim_key: str = "DM_Similarity",
+                    eigval_key: str = "DM_EigenValues",
+                    eigvec_key: str = "DM_EigenVectors",):
+        try:
+            import mellon
+        except:
+            print("Please install mellon package first using ``pip install mellon``")
+        from ..externel.palantir.utils import run_diffusion_maps
+        run_diffusion_maps(self.adata,n_components=n_components,knn=knn,alpha=alpha,seed=seed,
+                           pca_key=pca_key,kernel_key=kernel_key,sim_key=sim_key,
+                           eigval_key=eigval_key,eigvec_key=eigvec_key)
+        
+        model = mellon.DensityEstimator(d_method="fractal")
+        log_density = model.fit_predict(self.adata.obsm["DM_EigenVectors"])
+        self.adata.obs["mellon_log_density_lowd"] = log_density
+
+
+    
+    def lineage_score(self,cluster_key:str,lineage=None,
+                    cell_mask= "specification",
+                    density_key: str = "mellon_log_density_lowd",
+                    localvar_key: str = "local_variability",
+                    #score_key: str = "low_density_gene_variability",
+                    expression_key: str = "MAGIC_imputed_data",
+                    distances_key: str = "distances",
+                    ):
+        from ..externel.palantir.utils import run_low_density_variability,run_local_variability
+        
+        if localvar_key not in self.adata.layers.keys():
+            print("Run low_density first")
+            run_local_variability(self.adata,expression_key=expression_key,
+                                  distances_key=distances_key,localvar_key=localvar_key)
+        import pandas as pd
+        specification_cells = (
+            self.adata.obs[cluster_key].isin(lineage)
+        )
+        self.adata.obsm["specification"] = pd.DataFrame({"lineage": specification_cells})
+        print("Calculating lineage score")
+        run_low_density_variability(
+                                    self.adata,
+                                    cell_mask=cell_mask,
+                                    density_key=density_key,
+                                    score_key="change_scores",
+                                )
+        print(f"The lineage score stored in adata.var['change_scores_lineage']")
+
+
+    
     def get_coef(self,type:str='raw')->pd.DataFrame:
         """
         Get the coef of model
@@ -240,6 +296,7 @@ class cellfategenie(object):
             coef: pd.DataFrame, the coef of model
 
         """
+
         if type=='raw':
             return self.coef
         elif type=='filter':
