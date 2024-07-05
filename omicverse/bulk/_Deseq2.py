@@ -156,8 +156,11 @@ def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     Returns:
         data: The data after dropping the duplicated index.
     """
-    index=data.index
-    data=data.loc[~index.duplicated(keep='first')]
+    # Sort the data by the sum of counts in descending order
+    data = data.loc[data.sum(axis=1).sort_values(ascending=False).index]
+    
+    # Drop duplicates, keeping the first occurrence (which is the highest due to sorting)
+    data = data.loc[~data.index.duplicated(keep='first')]
     return data
 
 class pyDEG(object):
