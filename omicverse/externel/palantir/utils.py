@@ -502,7 +502,8 @@ def _local_var_helper(expressions, distances):
             return x
 
         issparse = False
-    for cell in range(expressions.shape[0]):
+    from tqdm import trange
+    for cell in trange(expressions.shape[0]):
         neighbors = distances.getrow(cell).indices if issparse else slice(None)
         try:
             neighbor_expression = cast(expressions[neighbors, :])
@@ -511,8 +512,51 @@ def _local_var_helper(expressions, distances):
         except ValueError:
             raise ValueError(f"This cell caused the error: {cell}")
         expr_distance = np.sqrt(np.sum(expr_deltas**2, axis=1, keepdims=True))
-        change_rate = expr_deltas / expr_distance
+        change_rate = expr_deltas / (expr_distance+0.000001)
         yield np.max(change_rate**2, axis=0)
+
+
+
+def _local_var_helper_(expressions, distances):
+    import numpy as np
+    from tqdm import tqdm
+    from numba import njit
+    # 检查是否为稀疏矩
+    is_sparse = hasattr(expressions, "todense")
+    cast = (lambda x: x.todense()) if is_sparse else (lambda x: x)
+
+    # 获取总行数
+    num_cells = expressions.shape[0]
+
+    @njit
+    def compute_change_rate(neighbor_expression, cell_expression):
+        expr_deltas = neighbor_expression - cell_expression
+        expr_distance = np.sqrt(np.sum(expr_deltas ** 2, axis=1, keepdims=True))
+        change_rate = expr_deltas / expr_distance
+        return np.max(change_rate ** 2, axis=0)
+    
+    # 初始化结果数组
+    results = np.zeros((num_cells, expressions.shape[1]))
+
+    for cell in tqdm(range(num_cells), desc="Processing cells"):
+        if is_sparse:
+            neighbors = distances.getrow(cell).indices
+        else:
+            neighbors = np.arange(num_cells)
+        
+        try:
+            neighbor_expression = cast(expressions[neighbors, :])
+            cell_expression = cast(expressions[cell, :])
+        except ValueError:
+            raise ValueError(f"This cell caused the error: {cell}")
+        
+        results[cell] = compute_change_rate(neighbor_expression, cell_expression)
+    
+    return results
+
+# 使用方法：例如
+# expressions 和 distances 需要在调用时定义
+# results = _local_var_helper(expressions, distances)
 
 
 def run_local_variability(
@@ -553,6 +597,13 @@ def run_local_variability(
         X = ad.layers[expression_key]
     else:
         X = ad.X
+
+    from scipy.sparse import issparse, csr_matrix
+    if issparse(X):
+        pass
+    else:
+        print("Converting to sparse matrix")
+        X=csr_matrix(X)
 
     if distances_key not in ad.obsp:
         raise KeyError(f"'{distances_key}' not found in .obsp.")

@@ -395,3 +395,11 @@ Support Raw Windows platform
 ### utils Module
 - Added `mclust_py` to identify the Gaussian Mixture cluster
 - Added `mclust` methdo in `cluster` function
+
+## v 1.6.4
+
+### Bulk Module
+
+- Optimised pyGSEA's `geneset_plot` visualisation of coordinate effects
+- Fixed an error of `pyTCGA.survival_analysis` when the matrix is sparse. #62, #68, #95
+- Added tqdm to visualize the process of `pyTCGA.survial_analysis_all`

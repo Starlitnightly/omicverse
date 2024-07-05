@@ -276,7 +276,7 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         cax_loc:list=[2, 0.55, 0.5, 0.02],cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
                         figsize:tuple=(2,4),cmap:str='YlGnBu',
-                        text_knock:int=2,text_maxsize:int=20,
+                        text_knock:int=5,text_maxsize:int=20,
                         bbox_to_anchor_used:tuple=(-0.45, -13),node_diameter:int=10,
                         custom_ticks:list=[5,10])->matplotlib.axes._axes.Axes:
     """

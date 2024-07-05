@@ -232,18 +232,31 @@ class pyTCGA(object):
             pvalue: The survival pvalue
 
         """
+        from scipy.sparse import issparse
         goal_gene=gene
         
         s_pd=self.s_pd
         s_pd=s_pd.loc[self.adata.obs['Case ID']]
         if layer!='raw':
             if layer not in self.adata.layers.keys():
-                s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1).toarray()
+                #issparse
+                
+                if issparse(self.adata.X):
+                    s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1).toarray()
+                else:
+                    s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1)
             else:
-                s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].layers[layer].mean(axis=1).toarray()
+
+                if issparse(self.adata.layers[layer]):
+                    s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].layers[layer].mean(axis=1).toarray()
+                else:
+                    s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].layers[layer].mean(axis=1)
             
         else:
-            s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1).toarray()
+            if issparse(self.adata.X):
+                s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1).toarray()
+            else:
+                s_pd[goal_gene]=self.adata[self.adata.obs.index,self.adata.var['gene_name']==goal_gene].X.mean(axis=1)
         if gene_threshold=='median':
             s_pd['{}_status'.format(goal_gene)]=['High' if i>s_pd[goal_gene].median() else 'Low' for i in s_pd[goal_gene] ]
         elif gene_threshold=='mean':
@@ -285,9 +298,10 @@ class pyTCGA(object):
         r"""
         analysis the survival of all the genes
         """
+        from tqdm import tqdm
         res_l_lnc=[]
         res_l_tt=[]
-        for i in self.adata.var.index:
+        for i in tqdm(self.adata.var.index):
             res_l_tt.append(self.survival_analysis(i)[0])
             res_l_lnc.append(self.survival_analysis(i)[1])
         self.adata.var['survial_test_statistic']=res_l_tt
