@@ -404,3 +404,6 @@ Support Raw Windows platform
 - Fixed an error of `pyTCGA.survival_analysis` when the matrix is sparse. #62, #68, #95
 - Added tqdm to visualize the process of `pyTCGA.survial_analysis_all`
 - Fixed an error of `data_drop_duplicates_index` with remove duplicate indexes to retain only the highest expressed genes #45
+
+### PP Module
+- Fixed an error of `ov.pp.pca` when pcs smaller than 13. #102
