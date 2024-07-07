@@ -580,16 +580,12 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
         raise KeyError(f'Selected layer {layer} is not present. Compute it first!')
     
     if settings.mode == 'cpu':
-        model = my_PCA()
-        model.calculate_PCA(X, n_components=n_pcs)
-        adata.obsm[key + '|X_pca'] = model.embs
-        adata.varm[key + '|pca_loadings'] = model.loads
-        adata.uns[key + '|pca_var_ratios'] = model.var_ratios
-        adata.uns[key + '|cum_sum_eigenvalues'] = np.cumsum(model.var_ratios)
-        if inplace:
-            return None
-        else:
-            return adata  
+        sc.pp.pca(adata, layer=layer,n_comps=n_pcs)
+        adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
+        adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
+        adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
+        adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
+
     else:
         import rapids_singlecell as rsc
         rsc.pp.pca(adata, layer=layer,n_comps=n_pcs)
@@ -597,6 +593,10 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
         adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
         adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
         adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
+    if inplace:
+        return None
+    else:
+        return adata 
 
 def red(adata):
     """
