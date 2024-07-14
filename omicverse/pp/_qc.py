@@ -186,7 +186,7 @@ def qc(adata,**kwargs):
 def qc_cpu(adata:anndata.AnnData, mode='seurat', 
        min_cells=3, min_genes=200, nmads=5, 
        max_cells_ratio=1,max_genes_ratio=1,
-       batch_key=None,doublets=True,
+       batch_key=None,doublets=True,doublets_method='scrublet',
        path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
     """
     Perform quality control on a dictionary of AnnData objects.
@@ -248,15 +248,41 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     print(f'Original cell number: {n0}')
 
     if doublets==True:
-        # Post doublets removal QC plot
-        print('Begin of post doublets removal and QC plot')
-        sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
-        adata_remove = adata[adata.obs['predicted_doublet'], :]
-        removed_cells.extend(list(adata_remove.obs_names))
-        adata = adata[~adata.obs['predicted_doublet'], :]
-        n1 = adata.shape[0]
-        print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-        print(f'End of post doublets removal and QC plots.')
+        if doublets_method=='scrublet':
+            # Post doublets removal QC plot
+            print('!!!It should be noted that the `scrublet` detection is too old and may not work properly.!!!')
+            print('!!!if you want to use novel doublet detection, please set `doublets_method=sccomposite`!!!')
+            print('Begin of post doublets removal and QC plot using`scrublet`')
+            sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+            adata_remove = adata[adata.obs['predicted_doublet'], :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[~adata.obs['predicted_doublet'], :]
+            n1 = adata.shape[0]
+            print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
+            print(f'End of post doublets removal and QC plots.')
+        elif doublets_method=='sccomposite':
+            print('!!!It should be noted that the `sccomposite` will remove more cells than `scrublet`!!!')
+            print('Begin of post doublets removal and QC plot using `sccomposite`')
+            adata.obs['sccomposite_doublet']=0
+            adata.obs['sccomposite_consistency']=0
+            if batch_key is None:
+                from _sccomposite import composite_rna
+                multiplet_classification, consistency = composite_rna(adata)
+                adata.obs['sccomposite_doublet']=multiplet_classification
+                adata.obs['sccomposite_consistency']=consistency
+            else:
+                for batch in adata.obs[batch_key].unique():
+                    from _sccomposite import composite_rna
+                    adata_batch=adata[adata.obs[batch_key]==batch]
+                    multiplet_classification, consistency = composite_rna(adata_batch)
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[adata.obs['sccomposite_doublet']==0, :]
+            n1 = adata.shape[0]
+            print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
+            print(f'End of post sccomposite removal and QC plots.')
 
     # Post seurat or mads filtering QC plot
 
@@ -309,7 +335,7 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
 def qc_gpu(adata, mode='seurat', 
        min_cells=3, min_genes=200, nmads=5, 
        max_cells_ratio=1,max_genes_ratio=1,
-       batch_key=None,doublets=True,
+       batch_key=None,doublets=True,doublets_method='scrublet',
        path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
     import rapids_singlecell as rsc
      # Logging 
@@ -340,15 +366,38 @@ def qc_gpu(adata, mode='seurat',
     print(f'Original cell number: {n0}')
 
     if doublets==True:
-        # Post doublets removal QC plot
-        print('Begin of post doublets removal and QC plot')
-        rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
-        adata_remove = adata[adata.obs['predicted_doublet'], :]
-        removed_cells.extend(list(adata_remove.obs_names))
-        adata = adata[~adata.obs['predicted_doublet'], :]
-        n1 = adata.shape[0]
-        print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-        print(f'End of post doublets removal and QC plots.')
+        if doublets_method=='scrublet':
+            # Post doublets removal QC plot
+            print('Begin of post doublets removal and QC plot')
+            rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+            adata_remove = adata[adata.obs['predicted_doublet'], :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[~adata.obs['predicted_doublet'], :]
+            n1 = adata.shape[0]
+            print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
+            print(f'End of post doublets removal and QC plots.')
+
+        elif doublets_method=='sccomposite':
+            adata.obs['sccomposite_doublet']=0
+            adata.obs['sccomposite_consistency']=0
+            if batch_key is None:
+                from _sccomposite import composite_rna
+                multiplet_classification, consistency = composite_rna(adata)
+                adata.obs['sccomposite_doublet']=multiplet_classification
+                adata.obs['sccomposite_consistency']=consistency
+            else:
+                for batch in adata.obs[batch_key].unique():
+                    from _sccomposite import composite_rna
+                    adata_batch=adata[adata.obs[batch_key]==batch]
+                    multiplet_classification, consistency = composite_rna(adata_batch)
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[adata.obs['sccomposite_doublet']==0, :]
+            n1 = adata.shape[0]
+            print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
+            print(f'End of post sccomposite removal and QC plots.')
 
     # Filters
     print('Filters application (seurat or mads)')

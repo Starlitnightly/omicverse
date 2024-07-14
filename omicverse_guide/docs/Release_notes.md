@@ -405,5 +405,10 @@ Support Raw Windows platform
 - Added tqdm to visualize the process of `pyTCGA.survial_analysis_all`
 - Fixed an error of `data_drop_duplicates_index` with remove duplicate indexes to retain only the highest expressed genes #45
 
+### Single Module
+
+- Added `mellon_density` to calculate the cell density. #103
+
 ### PP Module
 - Fixed an error of `ov.pp.pca` when pcs smaller than 13. #102
+- Added `COMPOSITE` in `ov.pp.qc`'s method to predicted doublet cells. #103
