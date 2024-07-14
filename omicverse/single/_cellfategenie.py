@@ -899,3 +899,26 @@ class gene_trends(object):
         ax.set_xlabel(xlabel,fontsize=fontsize+1)
         return fig,ax
 
+
+def mellon_density(adata,
+                    n_components: int = 10,
+                    knn: int = 30,
+                    alpha: float = 0,
+                    seed = 0,
+                    pca_key: str = "X_pca",
+                    kernel_key: str = "DM_Kernel",
+                    sim_key: str = "DM_Similarity",
+                    eigval_key: str = "DM_EigenValues",
+                    eigvec_key: str = "DM_EigenVectors",):
+        try:
+            import mellon
+        except:
+            print("Please install mellon package first using ``pip install mellon``")
+        from ..externel.palantir.utils import run_diffusion_maps
+        run_diffusion_maps(adata,n_components=n_components,knn=knn,alpha=alpha,seed=seed,
+                           pca_key=pca_key,kernel_key=kernel_key,sim_key=sim_key,
+                           eigval_key=eigval_key,eigvec_key=eigvec_key)
+        
+        model = mellon.DensityEstimator(d_method="fractal")
+        log_density = model.fit_predict(adata.obsm["DM_EigenVectors"])
+        adata.obs["mellon_log_density_lowd"] = log_density
