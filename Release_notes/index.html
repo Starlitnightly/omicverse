@@ -1227,6 +1227,30 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-164">
+    v 1.6.4
+  </a>
+<nav aria-label="v 1.6.4" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_10">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_27">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_4">
+    PP Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </li>
@@ -1958,6 +1982,30 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-164">
+    v 1.6.4
+  </a>
+<nav aria-label="v 1.6.4" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_10">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_27">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_4">
+    PP Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -2428,6 +2476,25 @@
 <ul>
 <li>Added <code>mclust_py</code> to identify the Gaussian Mixture cluster</li>
 <li>Added <code>mclust</code> methdo in <code>cluster</code> function</li>
+</ul>
+<h2 id="v-164">v 1.6.4<a class="headerlink" href="#v-164" title="Permanent link">¶</a></h2>
+<h3 id="bulk-module_10">Bulk Module<a class="headerlink" href="#bulk-module_10" title="Permanent link">¶</a></h3>
+<ul>
+<li>Optimised pyGSEA's <code>geneset_plot</code> visualisation of coordinate effects</li>
+<li>Fixed an error of <code>pyTCGA.survival_analysis</code> when the matrix is sparse. #62, #68, #95</li>
+<li>Added tqdm to visualize the process of <code>pyTCGA.survial_analysis_all</code></li>
+<li>Fixed an error of <code>data_drop_duplicates_index</code> with remove duplicate indexes to retain only the highest expressed genes #45</li>
+<li>Added <code>geneset_plot_multi</code> in <code>ov.bulk</code> to visualize the multi results of enrichment. #103</li>
+</ul>
+<h3 id="single-module_27">Single Module<a class="headerlink" href="#single-module_27" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>mellon_density</code> to calculate the cell density. #103</li>
+</ul>
+<h3 id="pp-module_4">PP Module<a class="headerlink" href="#pp-module_4" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed an error of <code>ov.pp.pca</code> when pcs smaller than 13. #102</li>
+<li>Added <code>COMPOSITE</code> in <code>ov.pp.qc</code>'s method to predicted doublet cells. #103</li>
+<li>Added <code>species</code> argument in <code>score_genes_cell_cycle</code> to calculate the cell phase without gene manual input</li>
 </ul>
 </article>
 </div>
