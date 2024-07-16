@@ -4,7 +4,7 @@
 
 [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse) [![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![scverse](https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow)](https://scverse.org/) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py38|py39/badge.svg)](https://github.com/Starlitnightly/omicverse/) 
 
-**`OmicVerse`** is the fundamental package for multi omics included **bulk ,single cell and spatial RNA-seq** analysis with Python. For more information, please read our paper: [OmicVerse: A single pipeline for exploring the entire transcriptome universe](https://www.nature.com/articles/s41467-024-50194-3)
+**`OmicVerse`** is the fundamental package for multi omics included **bulk ,single cell and spatial RNA-seq** analysis with Python. For more information, please read our paper: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
 
 > [!IMPORTANT]
 >
@@ -169,7 +169,7 @@ If you would like to contribute to omicverse, please refer to our [developer doc
 > <p align="center"> <a href="https://mp.weixin.qq.com/s/egAnRfr3etccU_RsN-zIlg" target="_blank" rel="noreferrer"> <img src="README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
 
 
-## `7` [Citation]
+## `7` [Citation](https://doi.org/10.1038/s41467-024-50194-3)
 
 If you use `omicverse` in your work, please cite the `omicverse` publication as follows:
 
