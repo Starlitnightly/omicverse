@@ -12,7 +12,7 @@ Omicverse is the fundamental package for multi omics included bulk and single ce
 
 To get started with `omicverse`, check out the [Installation](Installation_guild) and [Tutorials](Tutorial).
 
-For more details about the omicverse framework, please check out our [publication](https://www.biorxiv.org/content/10.1101/2023.06.06.543913v2).
+For more details about the omicverse framework, please check out our [publication](https://www.nature.com/articles/s41467-024-50194-3).
 
 </div>
 
@@ -22,6 +22,6 @@ For more details about the omicverse framework, please check out our [publicatio
 
 ## Contact
 
-- Zehua Zeng ([starlitnightly@163.com](mailto:starlitnightly@163.com), or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
+- Zehua Zeng ([starlitnightly@gmail.com](mailto:starlitnightly@gmail.com), or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 
 </div>
