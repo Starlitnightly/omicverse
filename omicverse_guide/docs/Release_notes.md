@@ -404,6 +404,7 @@ Support Raw Windows platform
 - Fixed an error of `pyTCGA.survival_analysis` when the matrix is sparse. #62, #68, #95
 - Added tqdm to visualize the process of `pyTCGA.survial_analysis_all`
 - Fixed an error of `data_drop_duplicates_index` with remove duplicate indexes to retain only the highest expressed genes #45
+- Added `geneset_plot_multi` in `ov.bulk` to visualize the multi results of enrichment. #103
 
 ### Single Module
 
@@ -412,3 +413,4 @@ Support Raw Windows platform
 ### PP Module
 - Fixed an error of `ov.pp.pca` when pcs smaller than 13. #102
 - Added `COMPOSITE` in `ov.pp.qc`'s method to predicted doublet cells. #103
+- Added `species` argument in `score_genes_cell_cycle` to calculate the cell phase without gene manual input

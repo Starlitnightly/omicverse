@@ -271,6 +271,89 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
     enrich_res['P-value']=enrich_res['fdr']
     return enrich_res
 
+def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
+                        fig_title:str='',fig_xlabel:str='Fractions of genes',
+                        figsize:tuple=(2,4),cmap:str='YlGnBu',
+                        text_knock:int=5,text_maxsize:int=20,ax=None,
+                        ):
+    """
+    Enrichment multi genesets analysis using GSEA
+
+    Arguments:
+        enr_dict: A dictionary of enrichment results.
+        colors_dict: A dictionary of colors for each gene set.
+        num: The number of enriched terms to plot. Default is 5.
+        fontsize: The fontsize of the plot. Default is 10.
+        fig_title: The title of the plot. Default is an empty string.
+        fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
+        figsize: The size of the plot. Default is (2,4).
+        cmap: The colormap to use for the plot. Default is 'YlGnBu'.
+        text_knock: The number of characters to knock off the end of the term name. Default is 5.
+        text_maxsize: The maximum fontsize of the term names. Default is 20.
+        ax: A matplotlib.axes.Axes object.
+
+    """
+    from PyComplexHeatmap import HeatmapAnnotation,DotClustermapPlotter,anno_label,anno_simple,AnnotationBase
+    for key in enr_dict.keys():
+        enr_dict[key]['Type']=key
+    enr_all=pd.concat([enr_dict[i].iloc[:num] for i in enr_dict.keys()],axis=0)
+    enr_all['Term']=[ov.utils.plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in enr_all.Term.tolist()]
+    enr_all.index=enr_all.Term
+    enr_all['Term1']=[i for i in enr_all.index.tolist()]
+    del enr_all['Term']
+
+    colors=colors_dict
+
+    left_ha = HeatmapAnnotation(
+                          label=anno_label(enr_all.Type, merge=True,rotation=0,colors=colors,relpos=(1,0.8)),
+                          Category=anno_simple(enr_all.Type,cmap='Set1',
+                                           add_text=False,legend=False,colors=colors),
+                           axis=0,verbose=0,label_kws={'rotation':45,'horizontalalignment':'left','visible':False})
+    right_ha = HeatmapAnnotation(
+                              label=anno_label(enr_all.Term1, merge=True,rotation=0,relpos=(0,0.5),arrowprops=dict(visible=True),
+                                               colors=enr_all.assign(color=enr_all.Type.map(colors)).set_index('Term1').color.to_dict(),
+                                              fontsize=fontsize,luminance=0.8,height=2),
+                               axis=0,verbose=0,#label_kws={'rotation':45,'horizontalalignment':'left'},
+                                orientation='right')
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize) 
+    else:
+        ax=ax
+    #plt.figure(figsize=figsize)
+    cm = DotClustermapPlotter(data=enr_all, x='fraction',y='Term1',value='logp',c='logp',s='num',
+                              cmap=cmap,
+                              row_cluster=True,#col_cluster=True,#hue='Group',
+                              #cmap={'Group1':'Greens','Group2':'OrRd'},
+                              vmin=-1*np.log10(0.1),vmax=-1*np.log10(1e-10),
+                              #colors={'Group1':'yellowgreen','Group2':'orange'},
+                              #marker={'Group1':'*','Group2':'$\\ast$'},
+                              show_rownames=True,show_colnames=False,row_dendrogram=False,
+                              col_names_side='top',row_names_side='right',
+                              xticklabels_kws={'labelrotation': 30, 'labelcolor': 'blue','labelsize':fontsize},
+                              #yticklabels_kws={'labelsize':10},
+                              #top_annotation=col_ha,left_annotation=left_ha,right_annotation=right_ha,
+                              left_annotation=left_ha,right_annotation=right_ha,
+                              spines=False,
+                              row_split=enr_all.Type,# row_split_gap=1,
+                              #col_split=df_col.Group,col_split_gap=0.5,
+                              verbose=1,legend_gap=10,
+                              #dot_legend_marker='*',
+                              xlabel='Fractions of genes',xlabel_side="bottom",
+                              xlabel_kws=dict(labelpad=8,fontweight='normal',fontsize=fontsize+2),
+                              # xlabel_bbox_kws=dict(facecolor=facecolor)
+                             )
+    tesr=plt.gcf().axes
+    for ax in plt.gcf().axes:
+        if hasattr(ax, 'get_xlabel'):
+            if ax.get_xlabel() == 'Fractions of genes':  # 假设 colorbar 有一个特定的标签
+                cbar = ax
+                cbar.grid(False)
+            if ax.get_ylabel() == 'logp':  # 假设 colorbar 有一个特定的标签
+                cbar = ax
+                cbar.tick_params(labelsize=fontsize+2)
+                cbar.set_ylabel(r'$−Log_{10}(P_{adjusted})$',fontsize=fontsize+2)
+                cbar.grid(False)
+    return ax
 
 def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         cax_loc:list=[2, 0.55, 0.5, 0.02],cax_fontsize:int=12,

@@ -266,13 +266,13 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
             if batch_key is None:
-                from _sccomposite import composite_rna
+                from ._sccomposite import composite_rna
                 multiplet_classification, consistency = composite_rna(adata)
                 adata.obs['sccomposite_doublet']=multiplet_classification
                 adata.obs['sccomposite_consistency']=consistency
             else:
                 for batch in adata.obs[batch_key].unique():
-                    from _sccomposite import composite_rna
+                    from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
                     multiplet_classification, consistency = composite_rna(adata_batch)
                     adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
@@ -381,13 +381,13 @@ def qc_gpu(adata, mode='seurat',
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
             if batch_key is None:
-                from _sccomposite import composite_rna
+                from ._sccomposite import composite_rna
                 multiplet_classification, consistency = composite_rna(adata)
                 adata.obs['sccomposite_doublet']=multiplet_classification
                 adata.obs['sccomposite_consistency']=consistency
             else:
                 for batch in adata.obs[batch_key].unique():
-                    from _sccomposite import composite_rna
+                    from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
                     multiplet_classification, consistency = composite_rna(adata_batch)
                     adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
