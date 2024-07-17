@@ -297,7 +297,7 @@ def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
     for key in enr_dict.keys():
         enr_dict[key]['Type']=key
     enr_all=pd.concat([enr_dict[i].iloc[:num] for i in enr_dict.keys()],axis=0)
-    enr_all['Term']=[ov.utils.plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in enr_all.Term.tolist()]
+    enr_all['Term']=[plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in enr_all.Term.tolist()]
     enr_all.index=enr_all.Term
     enr_all['Term1']=[i for i in enr_all.index.tolist()]
     del enr_all['Term']
