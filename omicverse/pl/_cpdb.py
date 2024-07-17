@@ -540,12 +540,12 @@ def cpdb_group_heatmap(adata,
 
     source_gene_pd=pd.DataFrame(index=cor.index)
     for source_cell in source_cells:
-        source_gene_pd[source_cell]=adata[adata.obs['cell_labels']==source_cell,
+        source_gene_pd[source_cell]=adata[adata.obs[celltype_key]==source_cell,
         [i.split('_')[0] for i in cor.index]].to_df().mean().values
     
     target_gene_pd=pd.DataFrame(index=cor.index)
     for target_cell in target_cells:
-        target_gene_pd[target_cell]=adata[adata.obs['cell_labels']==target_cell,
+        target_gene_pd[target_cell]=adata[adata.obs[celltype_key]==target_cell,
         [i.split('_')[1] for i in cor.index]].to_df().mean().values
 
     cor=pd.concat([source_gene_pd,target_gene_pd],axis=1)
