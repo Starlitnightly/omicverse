@@ -414,3 +414,13 @@ Support Raw Windows platform
 - Fixed an error of `ov.pp.pca` when pcs smaller than 13. #102
 - Added `COMPOSITE` in `ov.pp.qc`'s method to predicted doublet cells. #103
 - Added `species` argument in `score_genes_cell_cycle` to calculate the cell phase without gene manual input
+
+## v 1.6.6
+
+### Pl Module
+
+- Fixed the 'celltyep_key' error of `ov.pl.cpdb_group_heatmap` #109
+
+### Bulk Module
+
+- Fiexed an key error in `ov.bulk.Matrix_ID_mapping`
