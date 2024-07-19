@@ -234,6 +234,36 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
     enrich_res['fraction']=[int(i.split('/')[0])/int(i.split('/')[1]) for i in enrich_res['Overlap']]
     return enrich_res
 
+def enrichment_multi_concat(enr_dict):
+    def process_df(df, term_col_name):
+        new_data = []
+        for _, row in df.iterrows():
+            genes = row['Genes'].split(';')
+            for gene in genes:
+                new_data.append({
+                    'Gene': gene,
+                    term_col_name: row['Term'],
+                    
+                })
+        return pd.DataFrame(new_data)
+    new_dict={}
+    new_li=[]
+    for key in enr_dict.keys():
+        new_dict[key]=process_df(enr_dict[key], key)
+        new_li.append(new_dict[key])
+    # 合并两个DataFrame
+    merged_df = pd.concat(new_li, ignore_index=True).fillna('')
+    #return merged_df
+
+    #print(dict(zip(enr_dict.keys(),
+    #        [lambda x: '|'.join(x.dropna().unique()) for i in range(len(enr_dict.keys()))])))
+    
+    # 按基因分组，并将相同基因的Term合并
+    result_df = merged_df.groupby('Gene').agg(dict(zip(enr_dict.keys(),
+            [lambda x: '|'.join(x.dropna().unique()) for i in range(len(enr_dict.keys()))]))
+                                             ).reset_index()
+    return result_df
+
 
 
 def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
