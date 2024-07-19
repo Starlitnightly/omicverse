@@ -424,3 +424,4 @@ Support Raw Windows platform
 ### Bulk Module
 
 - Fiexed an key error in `ov.bulk.Matrix_ID_mapping`
+- Added `enrichment_multi_concat` in `ov.bulk` to concat the result of enrichment.
