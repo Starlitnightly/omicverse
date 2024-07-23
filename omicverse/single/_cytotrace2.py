@@ -1,21 +1,26 @@
+"""
+The function cytotrace2 is a Python implementation of CytoTRACE 2, a deep learning-based tool for cell potency prediction. CytoTRACE 2 predicts
+"""
 import concurrent.futures
 import math
-import numpy as np
 import os
-import pandas as pd
-import scanpy as sc
-import subprocess
-import torch
 import warnings
 
-from sklearn.model_selection import train_test_split
+import numpy as np
+import pandas as pd
+import scanpy as sc
+
 
 from ..externel.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *
 
-
+#pylint: disable=too-many-arguments
+#pylint: disable=too-many-locals
 def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_use, 
                    species, use_model_dir, output_dir, max_pcs, seed):
+    """
+    Process a subset of the data in parallel
+    """
 
     # map and rank
     cell_names, gene_names, ranked_data = preprocess(chunked_expression, species)
@@ -23,26 +28,28 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
     # top variable genes
     top_col_inds = top_var_genes(ranked_data)
     top_col_names = gene_names[top_col_inds]
-    
+
     # predict by unrandomized chunked batches
     predicted_df = predict(ranked_data, cell_names, use_model_dir , chunked_expression.shape[0])
-	
-    smooth_score = smoothing_by_diffusion(predicted_df, ranked_data, top_col_inds, smooth_batch_size,  seed)
-    
+
+    smooth_score = smoothing_by_diffusion(predicted_df, ranked_data, 
+                                          top_col_inds, smooth_batch_size,  seed)
+
     binned_score_pred_df = binning(predicted_df, smooth_score)
 
     # Transpose the matrix and create a DataFrame
     ranked_df = pd.DataFrame(ranked_data.T,  columns = cell_names)
-	
+
     # Set the column names
     ranked_df.index = gene_names
     suffix = '_'+str(idx)
     binned_score_pred_df.to_csv(output_dir+'/binned_df'+suffix+'.txt',sep='\t', index=True)
     ranked_df.to_csv(output_dir+'/ranked_df'+suffix+'.txt', sep='\t', index=True)
 	
-    with open(output_dir+'/top_var_genes'+suffix+'.txt', 'w') as f:
+    with open(output_dir+'/top_var_genes'+suffix+'.txt', 'w',
+              encoding='utf-8') as f:
         for item in top_col_names:
-            f.write("%s\n" % item)
+            f.write(f"{item}\n")
 
     if chunked_expression.shape[0] < 100:
         print('cytotrace2: Fewer than 100 cells in dataset. Skipping KNN smoothing step.')
@@ -51,7 +58,7 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
         #run_script = pkg_resources.resource_filename("cytotrace2_py","resources/smoothDatakNN.R")
         #knn_path = output_dir+'/smoothbykNNresult'+suffix+'.txt'
         #out = subprocess.run(['Rscript', run_script, '--output-dir', output_dir,
-                               #'--suffix', suffix, '--max-pcs', str(max_pcs), '--seed', str(seed)], check=True)
+               #'--suffix', suffix, '--max-pcs', str(max_pcs), '--seed', str(seed)], check=True)
         #smooth_by_knn_df = pd.read_csv(knn_path, index_col = 0, sep='\t')
         from ..externel.cytotrace2.smoothDatakNN import smooth_data_kNN
         smooth_data_kNN(output_dir=output_dir, suffix=suffix, max_pcs=max_pcs, seed=seed)
@@ -62,11 +69,15 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
     return smooth_by_knn_df
 
 def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_parallelization):
+    """
+    Calculate the number of cores to use for parallel processing
+    """
 
     pred_cores_to_use = 1
     smooth_cores_to_use = 1
     if smooth_chunk_number == 1 and chunk_number == 1:
-        print("cytotrace2: The number of cells in your dataset is less than the specified batch size.\n")
+        print("cytotrace2: The number of cells in your dataset is \
+              less than the specified batch size.\n")
         print("    Model prediction will not be parallelized.")
 
     elif not disable_parallelization:
@@ -75,14 +86,15 @@ def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_pa
         print("cytotrace2: "+str(num_proc)+" cores detected")
         if num_proc == 1:
             print("cytotrace2: Only one core detected. CytoTRACE 2 will not be run in parallel.")
-        elif max_cores == None:
+        elif max_cores is None:
             pred_cores_to_use = min(chunk_number,num_proc-1)
             smooth_cores_to_use = min(smooth_chunk_number,max(math.floor((num_proc-1)/pred_cores_to_use),1))
             print('cytotrace2: Running '+str(pred_cores_to_use)+' prediction batch(es) in parallel using '+str(smooth_cores_to_use)+' cores for smoothing per batch.')
         else:
             max_cores = min(max_cores,num_proc-1)
             pred_cores_to_use = min(chunk_number,max_cores)
-            smooth_cores_to_use = min(smooth_chunk_number,max(math.floor(max_cores/pred_cores_to_use),1))
+            smooth_cores_to_use = min(smooth_chunk_number,
+                                      max(math.floor(max_cores/pred_cores_to_use),1))
             print('cytotrace2: Running '+str(pred_cores_to_use)+' prediction batch(es) in parallel using '+str(smooth_cores_to_use)+' cores for smoothing per batch.')
 
     return pred_cores_to_use, smooth_cores_to_use
