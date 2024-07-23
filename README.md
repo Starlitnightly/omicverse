@@ -10,7 +10,7 @@
 >
 > **Star Us**, You will receive all release notifications from GitHub without any delay \~ ⭐️
 >
-> If you like **OmicVerse** and want to support our mission, please consider making a [💗donation](https://afdian.net/a/starlitnightly) to support our efforts.
+> If you like **OmicVerse** and want to support our mission, please consider making a [💗donation](https://ifdian.net/a/starlitnightly) to support our efforts.
 
 <details>
   <summary><kbd>Star History</kbd></summary>
