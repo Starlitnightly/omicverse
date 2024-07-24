@@ -141,7 +141,7 @@ def cytotrace2(
     if issparse(adata.X):
         expression=pd.DataFrame(adata.X.toarray(),index=adata.obs.index,columns=adata.var.index)
     else:
-        expression=adata.X
+        expression = pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
     print('cytotrace2: Dataset characteristics')
     print('    Number of input genes: ',str(expression.shape[1]))
     print('    Number of input cells: ',str(expression.shape[0]))
