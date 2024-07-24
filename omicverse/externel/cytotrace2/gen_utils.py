@@ -116,8 +116,7 @@ def preprocess(expression, species):
         expression.columns = mapped_genes.values
         num_genes_mapped = len([i for i in mapped_genes if i in features.values])
         print("    Mapped "+str(num_genes_mapped)+" input gene names to mouse orthologs")    
-        duplicate_genes = expression.columns[expression.columns.duplicated()].values
-        duplicate_genes = [i for i in duplicate_genes if i is not np.nan]
+        duplicate_genes = expression.columns[expression.columns.duplicated()].dropna().values
         idx = [unmapped_genes[i.upper()] for i in duplicate_genes if i.upper() in unmapped_genes.keys()]
         expression = expression.iloc[:, [j for j, c in enumerate(expression.columns) if j not in idx]]
         
