@@ -177,7 +177,7 @@ If you use `omicverse` in your work, please cite the `omicverse` publication as 
 >
 > Zeng, Z., Ma, Y., Hu, L. et al.
 >
-> _Nature Communication_ 2024 Jul 17. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
+> _Nature Communication_ 2024 Jul 16. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
 
 
 ## `8` [Other](#)

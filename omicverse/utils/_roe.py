@@ -55,6 +55,9 @@ def roe(
                 f"Some expected frequencies are less than {expected_value_threshold}, it is suggested to use other statistical methods, such as Fisher's exact test")
             expected_data = pd.DataFrame(expected, index=num_cell.index, columns=num_cell.columns)
             adata.uns['expected_values'] = expected_data
+            roe = num_cell / expected_data
+            adata.uns['roe_results'] = roe
+            adata.uns['unsig_roe_results'] = roe
     else:
         print("P-value is greater than 0.05, there is no statistical significance")
         roe_ratio = num_cell / expected

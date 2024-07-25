@@ -420,13 +420,17 @@ Support Raw Windows platform
 ### Pl Module
 
 - Fixed the 'celltyep_key' error of `ov.pl.cpdb_group_heatmap` #109
+- Fixed an error in `ov.utils.roe` when some expected frequencies are less than expected value.
+
+### Single Module
+- Fixed the bug of `ov.single.cytotrace2` when adata.X is not sparse data. #115, #116
 
 ### Bulk Module
 
 - Fixed an key error in `ov.bulk.Matrix_ID_mapping`
 - Added `enrichment_multi_concat` in `ov.bulk` to concat the result of enrichment.
 
-### Bulk Module
+### Bulk2Single Module
 
 - Added `adata.var_names_make_unique()` to avoid mat shape error if gene not unique. #100
 
