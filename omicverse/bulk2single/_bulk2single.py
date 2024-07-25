@@ -35,8 +35,11 @@ class Bulk2Single:
             gpu: The ID of the GPU to use. Set to -1 to use CPU. Default is 0. If set to 'mps', the MPS backend will be used.
 
         """
+        single_data.var_names_make_unique()
+        bulk_data=data_drop_duplicates_index(bulk_data)
         self.bulk_data=bulk_data
         self.single_data=single_data
+        
         if self.single_data.shape[0]>max_single_cells:
             print(f"......random select {max_single_cells} single cells")
             import random

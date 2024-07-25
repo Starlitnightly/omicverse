@@ -32,10 +32,24 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
     mu_hat = sc_object.uns['da_out']['mu_hat']
     rho = sc_object.obsm['rho']
     projection = sc_object.obsm[coord_key][:,0:2]
+    p_hat=adata.uns['da_out']['P_hat']
     
     
     labels = np.argmax(rho,axis = 1)
     K = max(labels)+1
+
+    while K<rho.shape[1]:
+        rho=rho[:,:-1]
+        mu_hat=mu_hat[:-1]
+        mu_hat = mu_hat / np.sum(mu_hat)
+        p_hat=p_hat[:-1,:-1]
+        p_hat=(p_hat.T/np.sum(p_hat, axis=1)).T
+
+    sc_object.obsm['rho']=rho
+    sc_object.uns['da_out']['mu_hat']=mu_hat
+    sc_object.uns['da_out']['P_hat']=p_hat
+    
+
     
     centers = []
     for i in range(K):
@@ -43,6 +57,7 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
         p = np.mean(projection[index], axis=0)
         centers.append(p)
     centers = np.array(centers)
+    centers = np.nan_to_num(centers, nan=0.0)
         
     trans_coord = np.matmul(rho,centers)
     

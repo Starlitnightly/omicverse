@@ -423,5 +423,13 @@ Support Raw Windows platform
 
 ### Bulk Module
 
-- Fiexed an key error in `ov.bulk.Matrix_ID_mapping`
+- Fixed an key error in `ov.bulk.Matrix_ID_mapping`
 - Added `enrichment_multi_concat` in `ov.bulk` to concat the result of enrichment.
+
+### Bulk Module
+
+- Added `adata.var_names_make_unique()` to avoid mat shape error if gene not unique. #100
+
+### Space Module
+
+- Fixed an error in `construct_landscape` of `ov.space.STT`
