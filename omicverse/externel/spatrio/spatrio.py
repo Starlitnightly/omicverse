@@ -26,7 +26,7 @@ def ot_alignment(
     norm: str = 'l2', 
     backend = None,  
     return_obj: bool = False,
-    verbose: bool = False, 
+    verbose: bool = True, 
     k: int = 10,
     graph_mode: str = "connectivity",
     aware_spatial: bool = True,
@@ -541,8 +541,11 @@ def my_ot(M, C1, C2, p, q, G_init = None, loss_fun='square_loss', alpha=0.1, arm
     def df(G):
         return ot.gromov.gwggrad(constC, hC1, hC2, G)
     if log:
-        res, log = ot.gromov.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, log=True, numItermaxEmd=numItermaxEmd, **kwargs)
-
+        if ot.__version__ < '0.9.0':
+            res, log = ot.gromov.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, log=True, numItermaxEmd=numItermaxEmd, **kwargs)
+        else:
+            res, log = ot.optim.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, log=True, numItermaxEmd=numItermaxEmd, **kwargs)
+        
         fgw_dist = log['loss'][-1]
 
         log['fgw_dist'] = fgw_dist
@@ -550,5 +553,8 @@ def my_ot(M, C1, C2, p, q, G_init = None, loss_fun='square_loss', alpha=0.1, arm
         log['v'] = log['v']
         return res, log
     else:
-        return ot.gromov.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, **kwargs)
-    
+        if ot.__version__ < '0.9.0':
+            return ot.gromov.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, **kwargs)
+        else:
+            return ot.optim.cg(p, q, (1 - alpha) * M, alpha, f, df, G0, armijo=armijo, C1=C1, C2=C2, constC=constC, **kwargs)
+        
