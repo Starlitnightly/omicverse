@@ -437,3 +437,7 @@ Support Raw Windows platform
 ### Space Module
 
 - Fixed an error in `construct_landscape` of `ov.space.STT`
+
+### Pl Module
+
+- Added `cellstackarea` to visual the Percent stacked area chart of celltype in samples.

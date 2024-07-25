@@ -166,7 +166,8 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
         b=pd.concat([b,b1])
     
     plt_data2=adata.obs[celltype_clusters].value_counts()
-    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
+    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,
+                                   adata.uns['{}_colors'.format(celltype_clusters)]))
     plt_data3=adata.obs[visual_clusters].value_counts()
     plot_data3_color_dict=dict(zip([i.replace('Retinoblastoma_','') for i in adata.obs[visual_clusters].cat.categories],adata.uns['{}_colors'.format(visual_clusters)]))
     b['cell_type_color'] = b['cell_type'].map(plot_data2_color_dict)
@@ -949,3 +950,86 @@ def plot_boxplots(  # pragma: no cover
             if not (show or save):
                 return ax
             return None
+        
+
+def cellstackarea(adata,celltype_clusters:str,groupby:str,
+                       groupby_li=None,figsize:tuple=(4,6),
+                       ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
+                       legend:bool=False):
+    """
+    Plot the cell type percentage in each groupby category
+    
+    """
+    df = adata.obs[[groupby, celltype_clusters]]
+
+    # 计算每个样本类型中每个细胞类型的数量
+    count_df = df.groupby([groupby, celltype_clusters]).size().reset_index(name='count')
+    
+    # 计算每个样本类型中的总数
+    total_count_df = count_df.groupby(groupby)['count'].sum().reset_index(name='total_count')
+    
+    # 将总数合并回原数据框
+    count_df = count_df.merge(total_count_df, on=groupby)
+    
+    # 计算百分比
+    count_df['percentage'] = count_df['count'] / count_df['total_count'] * 100
+    
+    # 将数据从长格式转换为宽格式，以便绘制面积图
+    pivot_df = count_df.pivot(index=groupby, columns=celltype_clusters, values='percentage').fillna(0)
+    if groupby_li!=None:
+        pivot_df=pivot_df.loc[groupby_li]
+
+    
+    # 使用 matplotlib 绘制面积图
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize)
+    
+    # 为每种细胞类型绘制面积图
+    cell_types = pivot_df.columns
+    bottom = pd.Series([0] * len(pivot_df), index=pivot_df.index)
+
+    adata.obs[celltype_clusters]=adata.obs[celltype_clusters].astype('category')
+    if '{}_colors'.format(celltype_clusters) in adata.uns.keys():
+        print('{}_colors'.format(celltype_clusters))
+        type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
+    else:
+        if len(adata.obs[cluster_key].cat.categories)>28:
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.default_102))
+        else:
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.zeileis_28))
+    
+    
+    
+    for cell_type in cell_types:
+        ax.fill_between(pivot_df.index, bottom, bottom + pivot_df[cell_type], label=cell_type,
+                       color=type_color_all[cell_type])
+        bottom += pivot_df[cell_type]
+    
+    if legend!=False:
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
+    
+    plt.grid(False)
+    
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+
+    # 设置左边和下边的坐标刻度为透明色
+    #ax.yaxis.tick_left()
+    #ax.xaxis.tick_bottom()
+    #ax.xaxis.set_tick_params(color='none')
+    #ax.yaxis.set_tick_params(color='none')
+
+    # 设置左边和下边的坐标轴线为独立的线段
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+
+    plt.xticks(fontsize=ticks_fontsize,rotation=90)
+    plt.yticks(fontsize=ticks_fontsize)
+    plt.xlabel(groupby,fontsize=labels_fontsize)
+    plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
+    #fig.tight_layout()
+    if ax==None:
+        return fig,ax
