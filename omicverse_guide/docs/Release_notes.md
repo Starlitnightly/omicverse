@@ -424,6 +424,7 @@ Support Raw Windows platform
 
 ### Single Module
 - Fixed the bug of `ov.single.cytotrace2` when adata.X is not sparse data. #115, #116
+- Fixed the groupby error in `ov.single.get_obs_value` of SEACells.
 
 ### Bulk Module
 
