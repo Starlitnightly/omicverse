@@ -438,6 +438,9 @@ def plot_paga(adata,
     scatter_flag=None,
     **kwargs,):
 
+    if layout is not None:
+        basis = None
+    
     import scvelo as scv
     return scv.pl.paga(adata,
     basis=basis,
