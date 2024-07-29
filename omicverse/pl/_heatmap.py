@@ -301,7 +301,6 @@ def complexheatmap(adata,
         plt.show()
     return cm
 
-
 def marker_heatmap(
     adata: AnnData,
     marker_genes_dict: dict = None,
@@ -349,7 +348,7 @@ def marker_heatmap(
     show_colnames: bool
         Whether to show the column names in the heatmap.
     save_pathway: str 
-        The file path for saving the plot (if save is True).
+        The file path for saving the plot.
     ax: matplotlib.axes.Axes
         A pre-existing axes object for plotting (optional).
 
@@ -371,7 +370,7 @@ def marker_heatmap(
         show_colnames=True,
     )
     """
-
+    
     # input check
     if marker_genes_dict is None:
         print("Please provide a dictionary containing the marker genes for each cell type.")
