@@ -6,31 +6,31 @@ Copy from pegasus and cellual
 
 import os
 import logging
-import pandas as pd 
 from functools import reduce
+from random import seed, sample
+from typing import Union, Optional, Sequence, Tuple, List, Dict
+import pandas as pd 
 import anndata
 import numpy as np 
-from random import seed, sample
 import scanpy as sc
 import matplotlib.pyplot as plt 
 from matplotlib.backends.backend_pdf import PdfPages 
 from matplotlib import rcParams
 import seaborn as sns
-from typing import Union, Optional, Sequence, Tuple, List, Dict
 from scipy.sparse import issparse
 
 from .._settings import settings
 
 
-def mads(meta, cov, nmads=5, lt=None): 
+def mads(meta, cov, nmads=5, lt=None):
     """
     Given a certain array, it calculate its Median Absolute Deviation (MAD).
     """
     x = meta[cov]
     mad = np.median(np.absolute(x - np.median(x)))
-    t1 = np.median(x) - (nmads * mad) 
+    t1 = np.median(x) - (nmads * mad)
     t1 = t1 if t1 > 0 else lt[cov]
-    t2 = np.median(x) + (nmads * mad) 
+    t2 = np.median(x) + (nmads * mad)
     return t1, t2
 
 def mads_test(meta, cov, nmads=5, lt=None):
@@ -41,7 +41,8 @@ def mads_test(meta, cov, nmads=5, lt=None):
     tresholds = mads(meta, cov, nmads=nmads, lt=lt)
     return (meta[cov] > tresholds[0]) & (meta[cov] < tresholds[1])
 
-def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5, path_viz=None, tresh=None):
+def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
+    nmads=5, path_viz=None, tresh=None):
     """
     Perform quality control on a dictionary of AnnData objects.
     
@@ -66,7 +67,8 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
     path_viz : str, optional
         The path to save the QC plots. Default is None.
     tresh : dict, optional
-        A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', and 'detected_genes'.
+        A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', 
+        and 'detected_genes'.
         Only used if mode is 'seurat'. Default is None.
 
     Returns
@@ -76,13 +78,12 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
     removed_cells : list
         List of cells that did not pass QC on all samples.
     """
-    # Logging 
-    logger = logging.getLogger("my_logger")  
+    # Logging
+    logger = logging.getLogger("my_logger") 
     if tresh is None:
         tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}
-    
     # For each adata, produce a figure
-    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf: 
+    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     removed_cells = []
     for s, adata in adatas.items():
 
@@ -94,15 +95,17 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         adata.var_names_make_unique()
         adata.var["mt"] = adata.var_names.str.startswith("MT-")
         if issparse(adata.X):
-            adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)  
-            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / adata.obs['nUMIs'].values
-            adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)  
+            adata.obs['nUMIs'] = adata.X.toarray().sum(axis=1)
+            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.toarray().sum(axis=1) / \
+            adata.obs['nUMIs'].values
+            adata.obs['detected_genes'] = (adata.X.toarray() > 0).sum(axis=1)
         else:
-            adata.obs['nUMIs'] = adata.X.sum(axis=1)  
-            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / adata.obs['nUMIs'].values
-            adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)  
+            adata.obs['nUMIs'] = adata.X.sum(axis=1)
+            adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / \
+            adata.obs['nUMIs'].values
+            adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)
         adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-        print(f'End calculation of QC metrics.')
+        print('End calculation of QC metrics.')
 
         # Original QC plot
         n0 = adata.shape[0]
@@ -116,7 +119,7 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         adata = adata[~adata.obs['predicted_doublet'], :]
         n1 = adata.shape[0]
         print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-        print(f'End of post doublets removal and QC plots.')
+        print('End of post doublets removal and QC plots.')
 
         # Post seurat or mads filtering QC plot
 
@@ -129,31 +132,37 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
         elif mode == 'mads':
             adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
             adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-            adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)  
+            adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', \
+            nmads=nmads, lt=tresh)
 
-        # Report 
+        # Report
         if mode == 'seurat':
-            print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-            print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+            print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
+            {n1-np.sum(adata.obs["passing_nUMIs"])}')
+            print(f'Lower treshold, n genes: {tresh["detected_genes"]}; \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
+            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
         elif mode == 'mads':
             nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
             n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-            print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-            print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
-        print(f'Filters applicated.')
+            print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
+            print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); \
+                filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
+            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+        print('Filters applicated.')
 
         # QC plot
-        QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-        removed = QC_test.loc[lambda x : x == False]
+        QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & \
+        (adata.obs['passing_ngenes'])
+        removed = QC_test.loc[lambda x : x is False]
         removed_cells.extend(list(removed.index.values))
-        print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): {n1-np.sum(QC_test)}')
+        print(f'Total cell filtered out with this last --mode {mode} QC (and its \
+        chosen options): {n1-np.sum(QC_test)}')
         adata = adata[QC_test, :]
         n2 = adata.shape[0]
-            
-
-
         # Store cleaned adata
         print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
         adatas[s] = adata
@@ -176,6 +185,11 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200, nmads=5,
 
 
 def qc(adata,**kwargs):
+    '''
+    qc
+    '''
+
+
     if settings.mode == 'gpu':
         print('GPU mode activated')
         return qc_gpu(adata,**kwargs)
@@ -183,8 +197,9 @@ def qc(adata,**kwargs):
         print('CPU mode activated')
         return qc_cpu(adata,**kwargs)
 
-def qc_cpu(adata:anndata.AnnData, mode='seurat', 
-       min_cells=3, min_genes=200, nmads=5, 
+
+def qc_cpu(adata:anndata.AnnData, mode='seurat',
+       min_cells=3, min_genes=200, nmads=5,
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
@@ -199,28 +214,30 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
 
     Arguments:
         adatas : AnnData objects
-        mode : The filtering method to use. Valid options are 'seurat' and 'mads'. Default is 'seurat'.
+        mode : The filtering method to use. Valid options are 'seurat' 
+        and 'mads'. Default is 'seurat'.
         min_cells : The minimum number of cells for a sample to pass QC. Default is 3.
         min_genes : The minimum number of genes for a cell to pass QC. Default is 200.
         max_cells_ratio : The maximum number of cells ratio for a sample to pass QC. Default is 1.
         max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         path_viz : The path to save the QC plots. Default is None.
-        tresh : A dictionary of QC thresholds. The keys should be 'mito_perc', 'nUMIs', and 'detected_genes'.
+        tresh : A dictionary of QC thresholds. The keys should be 'mito_perc', 
+        'nUMIs', and 'detected_genes'.
             Only used if mode is 'seurat'. Default is None.
         mt_startswith : The prefix of mitochondrial genes. Default is 'MT-'.
-        mt_genes : The list of mitochondrial genes. Default is None. if mt_genes is not None, mt_startswith will be ignored.
+        mt_genes : The list of mitochondrial genes. Default is None. 
+        if mt_genes is not None, mt_startswith will be ignored.
 
     Returns:
         adata : An AnnData object containing cells that passed QC filters.
 
     """
-    # Logging 
+    # Logging
     if tresh is None:
         tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}
-    
     # For each adata, produce a figure
-    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf: 
+    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     removed_cells = []
 
     # QC metrics
@@ -231,27 +248,30 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         adata.var.loc[list(set(adata.var_names) & set(mt_genes)),'mt']=True
     else:
         adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
-    
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
-        adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / adata.obs['nUMIs'].values
+        adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
+        adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
     else:
-        adata.obs['nUMIs'] = adata.X.sum(axis=1)  
-        adata.obs['mito_perc'] = adata[:, adata.var["mt"]==True].X.sum(axis=1) / adata.obs['nUMIs'].values
+        adata.obs['nUMIs'] = adata.X.sum(axis=1)
+        adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
+        adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    print(f'End calculation of QC metrics.')
+    print('End calculation of QC metrics.')
 
     # Original QC plot
     n0 = adata.shape[0]
     print(f'Original cell number: {n0}')
 
-    if doublets==True:
+    if doublets is True:
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
-            print('!!!It should be noted that the `scrublet` detection is too old and may not work properly.!!!')
-            print('!!!if you want to use novel doublet detection, please set `doublets_method=sccomposite`!!!')
+            print('!!!It should be noted that the `scrublet` detection is too old and \
+            may not work properly.!!!')
+            print('!!!if you want to use novel doublet detection, \
+            please set `doublets_method=sccomposite`!!!')
             print('Begin of post doublets removal and QC plot using`scrublet`')
             sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
             adata_remove = adata[adata.obs['predicted_doublet'], :]
@@ -259,9 +279,10 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
             print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-            print(f'End of post doublets removal and QC plots.')
+            print('End of post doublets removal and QC plots.')
         elif doublets_method=='sccomposite':
-            print('!!!It should be noted that the `sccomposite` will remove more cells than `scrublet`!!!')
+            print('!!!It should be noted that the `sccomposite` will remove more cells than \
+            `scrublet`!!!')
             print('Begin of post doublets removal and QC plot using `sccomposite`')
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
@@ -275,14 +296,15 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
                     from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
                     multiplet_classification, consistency = composite_rna(adata_batch)
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
+                    multiplet_classification
                     adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
             adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[adata.obs['sccomposite_doublet']==0, :]
             n1 = adata.shape[0]
             print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
-            print(f'End of post sccomposite removal and QC plots.')
+            print('End of post sccomposite removal and QC plots.')
 
     # Post seurat or mads filtering QC plot
 
@@ -295,31 +317,35 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     elif mode == 'mads':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)  
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
 
-    # Report 
+    # Report
     if mode == 'seurat':
-        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_nUMIs"])}')
+        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_ngenes"])}')
+        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_mt"])}')
     elif mode == 'mads':
         nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
-    print(f'Filters applicated.')
+        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_nUMIs"])}')
+        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_ngenes"])}')
+        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_mt"])}')
+    print('Filters applicated.')
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
     removed = QC_test.loc[lambda x : x == False]
     removed_cells.extend(list(removed.index.values))
-    print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): {n1-np.sum(QC_test)}')
+    print(f'Total cell filtered out with this last --mode {mode} QC (and its \
+    chosen options): {n1-np.sum(QC_test)}')
     adata = adata[QC_test, :]
     n2 = adata.shape[0]
-        
-
-
     # Store cleaned adata
     print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
 
@@ -332,18 +358,21 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     return adata
 
 
-def qc_gpu(adata, mode='seurat', 
-       min_cells=3, min_genes=200, nmads=5, 
+def qc_gpu(adata, mode='seurat',
+       min_cells=3, min_genes=200, nmads=5,
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
+    '''
+    qc
+    
+    '''
     import rapids_singlecell as rsc
-     # Logging 
+     # Logging
     if tresh is None:
         tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}
-    
     # For each adata, produce a figure
-    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf: 
+    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     removed_cells = []
     rsc.get.anndata_to_GPU(adata)
     # QC metrics
@@ -359,13 +388,13 @@ def qc_gpu(adata, mode='seurat',
     adata.obs['mito_perc'] = adata.obs['pct_counts_mt']/100
     adata.obs['detected_genes'] = adata.obs['n_genes_by_counts']
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    print(f'End calculation of QC metrics.')
+    print('End calculation of QC metrics.')
 
     # Original QC plot
     n0 = adata.shape[0]
     print(f'Original cell number: {n0}')
 
-    if doublets==True:
+    if doublets is True:
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
             print('Begin of post doublets removal and QC plot')
@@ -375,7 +404,7 @@ def qc_gpu(adata, mode='seurat',
             adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
             print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-            print(f'End of post doublets removal and QC plots.')
+            print('End of post doublets removal and QC plots.')
 
         elif doublets_method=='sccomposite':
             adata.obs['sccomposite_doublet']=0
@@ -390,14 +419,15 @@ def qc_gpu(adata, mode='seurat',
                     from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
                     multiplet_classification, consistency = composite_rna(adata_batch)
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
+                    multiplet_classification
                     adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
             adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[adata.obs['sccomposite_doublet']==0, :]
             n1 = adata.shape[0]
             print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
-            print(f'End of post sccomposite removal and QC plots.')
+            print('End of post sccomposite removal and QC plots.')
 
     # Filters
     print('Filters application (seurat or mads)')
@@ -408,41 +438,41 @@ def qc_gpu(adata, mode='seurat',
     elif mode == 'mads':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh) 
-
-    
-
-    # Report 
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+     # Report
     if mode == 'seurat':
-        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
+            {n1-np.sum(adata.obs["passing_nUMIs"])}')
+        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
+        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
+            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
     elif mode == 'mads':
         nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_nUMIs"])}')
+        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_ngenes"])}')
+        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
+        {n1-np.sum(adata.obs["passing_mt"])}')
     print(f'Filters applicated.')
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-    removed = QC_test.loc[lambda x : x == False]
+    removed = QC_test.loc[lambda x : x is False]
     removed_cells.extend(list(removed.index.values))
-    print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): {n1-np.sum(QC_test)}')
+    print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): \
+    {n1-np.sum(QC_test)}')
     adata = adata[QC_test, :]
     n2 = adata.shape[0]
-        
-
-
     # Store cleaned adata
     print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
 
     # Last gene and cell filter
-    rsc.pp.filter_cells(adata,qc_var='detected_genes', min_count=min_genes, max_count=max_genes_ratio*adata.shape[1])
+    rsc.pp.filter_cells(adata,qc_var='detected_genes', min_count=min_genes, \
+        max_count=max_genes_ratio*adata.shape[1])
     rsc.pp.filter_genes(adata, min_count=min_cells, max_count=max_cells_ratio*adata.shape[0])
-
-
     return adata
 
 
@@ -496,7 +526,6 @@ def filter_cells(adata: anndata.AnnData,
 
     sc.pp.filter_cells(adata, min_genes=min_genes,min_counts=min_counts, max_counts=max_counts,
                        max_genes=max_genes, inplace=inplace)
-    
 def filter_genes(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_cells: Optional[int] = None,
