@@ -100,7 +100,7 @@ class Tangram(object):
 def construct_obs_plot(df_plot: pd.DataFrame,
                         adata: AnnData,
                         perc: int = 0,
-                        suffix: Any | None = None
+                        suffix = None
                     ) -> None:
     """
     Construct adata.obs from df_plot.
