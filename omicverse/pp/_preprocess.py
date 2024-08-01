@@ -3,11 +3,10 @@ Copy from pegasus and cellual
 
 """
 
-
+from typing import Union, Tuple, Optional, Sequence, List, Dict
 import anndata
 import numpy as np
 import pandas as pd
-from typing import Union, Tuple, Optional, Sequence, List, Dict
 import skmisc.loess as sl
 import scanpy as sc
 import time 
@@ -18,11 +17,13 @@ from .._settings import settings
 
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     """ 
-    Identify robust genes as candidates for HVG selection and remove genes that are not expressed in any cells.
+    Identify robust genes as candidates for HVG selection and remove genes 
+    that are not expressed in any cells.
 
     Arguments:
         data: Use current selected modality in data, which should contain one RNA expression matrix.
-        percent_cells: Only assign genes to be ``robust`` that are expressed in at least ``percent_cells`` % of cells.
+        percent_cells: Only assign genes to be ``robust`` that are expressed in at least 
+        ``percent_cells`` % of cells.
 
 
     Update ``data.var``:
@@ -30,7 +31,9 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
         * ``n_cells``: Total number of cells in which each gene is measured.
         * ``percent_cells``: Percent of cells in which each gene is measured.
         * ``robust``: Boolean type indicating if a gene is robust based on the QC metrics.
-        * ``highly_variable_features``: Boolean type indicating if a gene is a highly variable feature. By default, set all robust genes as highly variable features.
+        * ``highly_variable_features``: Boolean type indicating if a gene 
+        is a highly variable feature. 
+        By default, set all robust genes as highly variable features.
 
     """
 
@@ -44,8 +47,10 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
     else:
         data.var["robust"] = True
 
-    data.var["highly_variable_features"] = data.var["robust"]  # default all robust genes are "highly" variable
-    print(f"After filtration, {data.shape[1]}/{prior_n} genes are kept. Among {data.shape[1]} genes, {data.var['robust'].sum()} genes are robust.")
+    data.var["highly_variable_features"] = data.var["robust"]  
+    # default all robust genes are "highly" variable
+    print(f"After filtration, {data.shape[1]}/{prior_n} genes are kept. \
+    Among {data.shape[1]} genes, {data.var['robust'].sum()} genes are robust.")
 
 def calc_mean_and_var(X: Union[csr_matrix, np.ndarray], axis: int) -> Tuple[np.ndarray, np.ndarray]:
     if issparse(X):
@@ -54,8 +59,8 @@ def calc_mean_and_var(X: Union[csr_matrix, np.ndarray], axis: int) -> Tuple[np.n
     else:
         from ..cylib.fast_utils import calc_mean_and_var_dense
         return calc_mean_and_var_dense(X.shape[0], X.shape[1], X, axis)
-    
-def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: Union[pd.Categorical, np.ndarray, list]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: \
+    Union[pd.Categorical, np.ndarray, list]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     from pandas.api.types import is_categorical_dtype
     if is_categorical_dtype(batch):
         nbatch = batch.categories.size
@@ -135,6 +140,11 @@ def select_hvf_pegasus(
     data.var.loc[robust_idx, "highly_variable_features"] = hvf_index
 
 def calc_expm1(X: Union[csr_matrix, np.ndarray]) -> np.ndarray:
+    
+    '''
+    exponential minus one
+    
+    '''
     if not issparse(X):
         return np.expm1(X)
     res = X.copy()
@@ -217,7 +227,6 @@ def select_hvf_seurat(
             min_mean=min_mean,
             max_mean=max_mean,
         )
-        
     )
 
     hvf_index = hvf_rank >= 0
@@ -243,19 +252,27 @@ def highly_variable_features(
 
     Arguments:
         data: Annotated data matrix with rows for cells and columns for genes.
-        batch: A key in data.obs specifying batch information. If `batch` is not set, do not consider batch effects in selecting highly variable features. Otherwise, if `data.obs[batch]` is not categorical, `data.obs[batch]` will be automatically converted into categorical before highly variable feature selection.
-        flavor: The HVF selection method to use. Available choices are ``"pegasus"`` or ``"Seurat"``.
+        batch: A key in data.obs specifying batch information. 
+        If `batch` is not set, do not consider batch effects in selecting highly variable features. 
+        Otherwise, if `data.obs[batch]` is not categorical, 
+        `data.obs[batch]` will be automatically converted into categorical 
+        before highly variable feature selection.
+        flavor: The HVF selection method to use. 
+        Available choices are ``"pegasus"`` or ``"Seurat"``.
         n_top: Number of genes to be selected as HVF. if ``None``, no gene will be selected.
-        span: Only applicable when ``flavor`` is ``"pegasus"``. The smoothing factor used by *scikit-learn loess* model in pegasus HVF selection method.
+        span: Only applicable when ``flavor`` is ``"pegasus"``. 
+        The smoothing factor used by *scikit-learn loess* model in pegasus HVF selection method.
         min_disp: Minimum normalized dispersion.
         max_disp: Maximum normalized dispersion. Set it to ``np.inf`` for infinity bound.
         min_mean: Minimum mean.
         max_mean: Maximum mean.
-        n_jobs: Number of threads to be used during calculation. If ``-1``, all physical CPU cores will be used.
+        n_jobs: Number of threads to be used during calculation. 
+        If ``-1``, all physical CPU cores will be used.
 
 
     Update ``adata.var``:
-        * ``highly_variable_features``: replace with Boolean type array indicating the selected highly variable features.
+        * ``highly_variable_features``: replace with Boolean type array 
+        indicating the selected highly variable features.
 
     Examples
     --------
@@ -280,29 +297,32 @@ def highly_variable_features(
 
     data.uns.pop("_tmp_fmat_highly_variable_features", None) # Pop up cached feature matrix
 
-    print(f"{data.var['highly_variable_features'].sum()} highly variable features have been selected.")
+    print(f"{data.var['highly_variable_features'].sum()} \
+        highly variable features have been selected.")
 
 def fit_loess(x: List[float], y: List[float], span: float, degree: int) -> object:
+    '''
+    A LOESS (Locally Weighted Regression) model is used to fit a given data set
+    '''
     try:
         lobj = sl.loess(x, y, span=span, degree=degree)
         lobj.fit()
         return lobj
     except ValueError:
         return None
-    
-def corr2_coeff(A, B):
+def corr2_coeff(a, b):
     """
-    Calculate Pearson correlation between matrix A and B
-    A and B are allowed to have different shapes. Taken from Cospar, Wang et al., 2023.
+    Calculate Pearson correlation between matrix a and b
+    a and b are allowed to have different shapes. Taken from Cospar, Wang et al., 2023.
     """
     resol = 10 ** (-15)
 
-    A_mA = A - A.mean(1)[:, None]
-    B_mB = B - B.mean(1)[:, None]
-    ssA = (A_mA ** 2).sum(1)
-    ssB = (B_mB ** 2).sum(1)
+    a_ma = a - a.mean(1)[:, None]
+    b_mb = b - b.mean(1)[:, None]
+    ssa = (a_ma ** 2).sum(1)
+    ssb = (b_mb ** 2).sum(1)
 
-    corr = np.dot(A_mA, B_mB.T) / (np.sqrt(np.dot(ssA[:, None], ssB[None])) + resol)
+    corr = np.dot(a_ma, b_mb.T) / (np.sqrt(np.dot(ssa[:, None], ssb[None])) + resol)
 
     return corr
 
@@ -314,32 +334,35 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
     Arguments:
         adata: Annotated data matrix with rows for cells and columns for genes.
         organism: Organism of the dataset. Available choices are ``"human"`` or ``"mouse"``.
-        corr_threshold: Threshold for correlation with cc genes. Genes having a correlation with cc genes > corr_threshold will be discarded.
+        corr_threshold: Threshold for correlation with cc genes. 
+        Genes having a correlation with cc genes > corr_threshold will be discarded.
     """
     # Get cc genes
     cycling_genes = load_signatures_from_file(predefined_signatures[f'cell_cycle_{organism}'])
     cc_genes = list(set(cycling_genes['G1/S']) | set(cycling_genes['G2/M']))
     cc_genes = [ x for x in cc_genes if x in adata.var_names ]
-   
     # Compute corr
     cc_expression = adata[:, cc_genes].X.A.T
-    HVGs = adata.var_names[adata.var['highly_variable_features']]
-    hvgs_expression = adata[:, HVGs].X.A.T
+    hvgs = adata.var_names[adata.var['highly_variable_features']]
+    hvgs_expression = adata[:, hvgs].X.A.T
     cc_corr = corr2_coeff(hvgs_expression, cc_expression)
 
     # Discard genes having the maximum correlation with one of the cc > corr_threshold
     max_corr = np.max(abs(cc_corr), 1)
-    HVGs_no_cc = HVGs[max_corr < corr_threshold]
+    hvgs_no_cc = hvgs[max_corr < corr_threshold]
     print(
-        f'Number of selected non-cycling highly variable genes: {HVGs_no_cc.size}\n'
+        f'Number of selected non-cycling highly variable genes: {hvgs_no_cc.size}\n'
         f'{np.sum(max_corr > corr_threshold)} cell cycle correlated genes will be removed...'
     )
-    # Update 
-    adata.var['highly_variable_features'] = adata.var_names.isin(HVGs_no_cc)
+    # Update
+    adata.var['highly_variable_features'] = adata.var_names.isin(hvgs_no_cc)
 
 from sklearn.cluster import KMeans  
 
 def anndata_to_GPU(adata,**kwargs):
+    '''
+    Migrate the data of AnnData objects to the GPU for processing
+    '''
     import rapids_singlecell as rsc
     rsc.get.anndata_to_GPU(adata,**kwargs)
     print('Data has been moved to GPU')
@@ -347,6 +370,9 @@ def anndata_to_GPU(adata,**kwargs):
     print('Use `ov.pp.anndata_to_CPU(adata)`')
 
 def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
+    '''
+    Migrate the data of AnnData objects to the CPU for processing
+    '''
     import rapids_singlecell as rsc
     rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
@@ -354,15 +380,19 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     organism='human', no_cc=False,batch_key=None,):
     """
-    Preprocesses the AnnData object adata using either a scanpy or a pearson residuals workflow for size normalization
+    Preprocesses the AnnData object adata using either a scanpy or 
+    a pearson residuals workflow for size normalization
     and highly variable genes (HVGs) selection, and calculates signature scores if necessary. 
 
     Arguments:
         adata: The data matrix.
-        mode: The mode for size normalization and HVGs selection. It can be either 'scanpy' or 'pearson'. If 'scanpy', performs size normalization using scanpy's normalize_total() function and selects HVGs 
-            using pegasus' highly_variable_features() function with batch correction. If 'pearson', selects HVGs 
-            using scanpy's experimental.pp.highly_variable_genes() function with pearson residuals method and performs 
-            size normalization using scanpy's experimental.pp.normalize_pearson_residuals() function. 
+        mode: The mode for size normalization and HVGs selection. 
+        It can be either 'scanpy' or 'pearson'. If 'scanpy', 
+        performs size normalization using scanpy's normalize_total() function and selects HVGs 
+        using pegasus' highly_variable_features() function with batch correction. 
+        If 'pearson', selects HVGs sing scanpy's experimental.pp.highly_variable_genes() function
+        with pearson residuals method and performs 
+        size normalization using scanpy's experimental.pp.normalize_pearson_residuals() function. 
         target_sum: The target total count after normalization.
         n_HVGs: the number of HVGs to select.
         organism: The organism of the data. It can be either 'human' or 'mouse'. 
@@ -377,15 +407,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     print('Begin robust gene identification')
     identify_robust_genes(adata, percent_cells=0.05)
     adata = adata[:, adata.var['robust']]
-    print(f'End of robust gene identification.')
+    print('End of robust gene identification.')
     method_list = mode.split('|')
     print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
-    
     if settings.mode == 'cpu':
         data_load_start = time.time()
         if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
             sc.pp.normalize_total(
-                adata, 
+                adata,
                 target_sum=target_sum,
                 exclude_highly_expressed=True,
                 max_fraction=0.2,
@@ -397,7 +426,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
 
         if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
             sc.experimental.pp.highly_variable_genes(
-                adata, 
+                adata,
                 flavor="pearson_residuals",
                 layer='counts',
                 n_top_genes=n_HVGs,
@@ -451,13 +480,18 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     adata.var = adata.var.drop(columns=['highly_variable'])
     adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
     print(f'End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
-   
-    return adata 
-
+    return adata
 def normalize_pearson_residuals(adata,**kwargs):
+    '''
+    normalize
+    '''
+
     sc.experimental.pp.normalize_pearson_residuals(adata,kwargs)
 
 def highly_variable_genes(adata,**kwargs):
+    '''
+    highly_variable_genes calculation
+    '''
     sc.experimental.pp.highly_variable_genes(
         adata, kwargs,
     )
@@ -470,7 +504,8 @@ def scale(adata,max_value=10,layers_add='scaled'):
         adata : Annotated data matrix with n_obs x n_vars shape.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. Adds a new layer called 'scaled' that stores
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Adds a new layer called 'scaled' that stores
             the expression matrix that has been scaled to unit variance and zero mean.
 
     """
@@ -487,11 +522,13 @@ def regress(adata):
     Regress out covariates from the input AnnData object.
 
     Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape. Should contain columns 'mito_perc' and 'nUMIs'
-            that represent the percentage of mitochondrial genes and the total number of UMI counts, respectively.
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Should contain columns 'mito_perc' and 'nUMIs'that represent the percentage of 
+        mitochondrial genes and the total number of UMI counts, respectively.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. Adds a new layer called 'regressed' that stores
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Adds a new layer called 'regressed' that stores
             the expression matrix with covariates regressed out.
 
     """
@@ -508,11 +545,13 @@ def regress_and_scale(adata):
     Regress out covariates from the input AnnData object and scale the resulting expression matrix.
 
     Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape. Should contain a layer called 'regressed'
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Should contain a layer called 'regressed'
             that stores the expression matrix with covariates regressed out.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. Adds a new layer called 'regressed_and_scaled'
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Adds a new layer called 'regressed_and_scaled'
             that stores the expression matrix with covariates regressed out and then scaled.
 
     """
@@ -543,7 +582,7 @@ class my_PCA:
         '''
         self.n_pcs = n_components
         # Convert to dense np.array if necessary)
-        if isinstance(M, np.ndarray) == False:
+        if isinstance(M, np.ndarray) is False:
             M = M.toarray()
 
         # Perform PCA
@@ -561,24 +600,26 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
     Performs Principal Component Analysis (PCA) on the data stored in a scanpy AnnData object.
 
     Arguments:
-        adata : Annotated data matrix with rows representing cells and columns representing features.
+        adata : Annotated data matrix with rows representing cells 
+        and columns representing features.
         n_pcs : Number of principal components to calculate.
-        layer : The name of the layer in `adata` where the data to be analyzed is stored. Defaults to the 'scaled' layer,
-            and falls back to 'lognorm' if that layer does not exist. Raises a KeyError if the specified layer is not present.
+        layer : The name of the layer in `adata` where the data to be analyzed is stored. 
+        Defaults to the 'scaled' layer,
+            and falls back to 'lognorm' if that layer does not exist. 
+        Raises a KeyError if the specified layer is not present.
 
     Returns:
-        adata : The original AnnData object with the calculated PCA embeddings and other information stored in its `obsm`, `varm`,
+        adata : The original AnnData object with the calculated PCA embeddings 
+        and other information stored in its `obsm`, `varm`,
             and `uns` fields.
     """
-    
     if 'lognorm' not in adata.layers:
         adata.layers['lognorm'] = adata.X
-    if layer in adata.layers: 
+    if layer in adata.layers:
         X = adata.layers[layer]
         key = f'{layer}|original'
     else:
         raise KeyError(f'Selected layer {layer} is not present. Compute it first!')
-    
     if settings.mode == 'cpu':
         sc.pp.pca(adata, layer=layer,n_comps=n_pcs)
         adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
@@ -596,19 +637,23 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
     if inplace:
         return None
     else:
-        return adata 
+        return adata
 
 def red(adata):
     """
-    Reduce the input AnnData object to highly variable features and store the resulting expression matrices.
+    Reduce the input AnnData object to highly variable features 
+    and store the resulting expression matrices.
 
     Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape. Should contain a variable 'highly_variable_features'
-            that indicates which features are considered to be highly variable.
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Should contain a variable 'highly_variable_features'that 
+        indicates which features are considered to be highly variable.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. Adds new layers called 'lognorm' and 'raw' that store
-            the logarithmized normalized expression matrix and the unnormalized expression matrix, respectively.
+        adata : Annotated data matrix with n_obs x n_vars shape. 
+        Adds new layers called 'lognorm' and 'raw' that store
+            the logarithmized normalized expression matrix and 
+            the unnormalized expression matrix, respectively.
             The matrix is reduced to the highly variable features only.
 
     """
@@ -618,15 +663,24 @@ def red(adata):
     return adata
 
 def counts_store(adata,layers):
+    '''
+    counts store
+    '''
     adata.uns[layers] = adata.X.to_df().copy()
 
 def counts_retrieve(adata,layers):
+    '''
+    counts retrieve
+    '''
     cell_idx=adata.obs.index
     adata.uns['raw_store'] = adata.X.to_df().copy()
     adata.X=adata.uns[layers].loc[cell_idx,:].values
 
 from scipy.stats import median_abs_deviation
 def is_outlier(adata, metric: str, nmads: int):
+    '''
+    Identify outliers based on specific metrics in a given AnnData object
+    '''
     M = adata.obs[metric]
     outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (
         np.median(M) + nmads * median_abs_deviation(M) < M
@@ -645,15 +699,14 @@ from typing import (
     Generator,
     Tuple,
     Literal,
-)
+    )
 N_DCS = 15  # default number of diffusion components
 
 _Method = Literal['umap', 'gauss', 'rapids']
 _MetricFn = Callable[[np.ndarray, np.ndarray], float]
 # from sklearn.metrics.pairwise_distances.__doc__:
 _MetricSparseCapable = Literal[
-    'cityblock', 'cosine', 'euclidean', 'l1', 'l2', 'manhattan'
-]
+'cityblock', 'cosine', 'euclidean', 'l1', 'l2', 'manhattan']
 _MetricScipySpatial = Literal[
     'braycurtis',
     'canberra',
@@ -672,10 +725,9 @@ _MetricScipySpatial = Literal[
     'sokalsneath',
     'sqeuclidean',
     'yule',
-]
+    ]
 _Metric = Union[_MetricSparseCapable, _MetricScipySpatial]
-
-
+from types import MappingProxyType
 def neighbors(
     adata: anndata.AnnData,
     n_neighbors: int = 15,
@@ -747,16 +799,21 @@ def neighbors(
     """
     if settings.mode =='cpu':
         sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method=method,metric=metric,metric_kwds=metric_kwds,
+                         random_state=random_state,method=method,metric=metric,
+                         metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
     else:
         import rapids_singlecell as rsc
         rsc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,algorithm=method,metric=metric,metric_kwds=metric_kwds,
+                         random_state=random_state,algorithm=method,metric=metric,
+                         metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
 
 
 def umap(adata, **kwargs):
+    '''
+    umap
+    '''
     if settings.mode =='cpu':
         sc.tl.umap(adata, **kwargs)
     else:
@@ -766,6 +823,10 @@ def umap(adata, **kwargs):
 
 
 def louvain(adata, **kwargs):
+    '''
+    Louvain clustering
+    '''
+
     if settings.mode =='cpu':
         sc.tl.louvain(adata, **kwargs)
     else:
@@ -773,6 +834,10 @@ def louvain(adata, **kwargs):
         rsc.tl.louvain(adata, **kwargs)
 
 def leiden(adata, **kwargs):
+    '''
+    leiden clustering
+    '''
+
     if settings.mode =='cpu':
         sc.tl.leiden(adata, **kwargs)
     else:
@@ -791,26 +856,50 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
         g2m_genes: The list of genes that are specific to the G2/M phase of the cell cycle.
     
     """
-    if s_genes==None:
+    if s_genes is None:
         if species=='human':
-            s_genes=['MCM5', 'PCNA', 'TYMS', 'FEN1', 'MCM2', 'MCM4', 'RRM1', 'UNG', 'GINS2', 'MCM6', 'CDCA7', 'DTL', 'PRIM1', 'UHRF1', 'MLF1IP', 'HELLS', 'RFC2', 'RPA2', 'NASP', 'RAD51AP1', 'GMNN', 'WDR76', 'SLBP', 'CCNE2', 'UBR7', 'POLD3', 'MSH2', 'ATAD2', 'RAD51', 'RRM2', 'CDC45', 'CDC6', 'EXO1', 'TIPIN', 'DSCC1', 'BLM', 'CASP8AP2', 'USP1', 'CLSPN', 'POLA1', 'CHAF1B', 'BRIP1', 'E2F8']
+            s_genes=['MCM5', 'PCNA', 'TYMS', 'FEN1', 'MCM2', 'MCM4', 
+            'RRM1', 'UNG', 'GINS2', 'MCM6', 'CDCA7', 'DTL', 'PRIM1', 
+            'UHRF1', 'MLF1IP', 'HELLS', 'RFC2', 'RPA2', 'NASP', 'RAD51AP1', 
+            'GMNN', 'WDR76', 'SLBP', 'CCNE2', 'UBR7', 'POLD3', 'MSH2', 'ATAD2', 
+            'RAD51', 'RRM2', 'CDC45', 'CDC6', 'EXO1', 'TIPIN', 'DSCC1', 'BLM',
+             'CASP8AP2', 'USP1', 'CLSPN', 'POLA1', 'CHAF1B', 'BRIP1', 'E2F8']
         elif species=='mouse':
-            s_genes=['Cdca7', 'Mcm4', 'Mcm7', 'Rfc2', 'Ung', 'Mcm6', 'Rrm1', 'Slbp', 'Pcna', 'Atad2', 'Tipin', 'Mcm5', 'Uhrf1', 'Polr1b', 'Dtl', 'Prim1', 'Fen1', 'Hells', 'Gmnn', 'Pold3', 'Nasp', 'Chaf1b', 'Gins2', 'Pola1', 'Msh2', 'Casp8ap2', 'Cdc6', 'Ubr7', 'Ccne2', 'Wdr76', 'Tyms', 'Cdc45', 'Clspn', 'Rrm2', 'Dscc1', 'Rad51', 'Usp1', 'Exo1', 'Blm', 'Rad51ap1', 'Cenpu', 'E2f8', 'Mrpl36']
-        else:
-            s_genes=s_genes
-    if g2m_genes==None:
+            s_genes=['Cdca7', 'Mcm4', 'Mcm7', 'Rfc2', 'Ung', 'Mcm6', 
+            'Rrm1', 'Slbp', 'Pcna', 'Atad2', 'Tipin', 'Mcm5', 'Uhrf1', 
+            'Polr1b', 'Dtl', 'Prim1', 'Fen1', 'Hells', 'Gmnn', 'Pold3', 
+            'Nasp', 'Chaf1b', 'Gins2', 'Pola1', 'Msh2', 'Casp8ap2', 'Cdc6',
+             'Ubr7', 'Ccne2', 'Wdr76', 'Tyms', 'Cdc45', 'Clspn', 'Rrm2', 
+             'Dscc1', 'Rad51', 'Usp1', 'Exo1', 'Blm', 'Rad51ap1', 'Cenpu', 'E2f8', 'Mrpl36']       
+    if g2m_genes is None:
         if species=='human':
-            g2m_genes=['HMGB2', 'CDK1', 'NUSAP1', 'UBE2C', 'BIRC5', 'TPX2', 'TOP2A', 'NDC80', 'CKS2', 'NUF2', 'CKS1B', 'MKI67', 'TMPO', 'CENPF', 'TACC3', 'FAM64A', 'SMC4', 'CCNB2', 'CKAP2L', 'CKAP2', 'AURKB', 'BUB1', 'KIF11', 'ANP32E', 'TUBB4B', 'GTSE1', 'KIF20B', 'HJURP', 'CDCA3', 'HN1', 'CDC20', 'TTK', 'CDC25C', 'KIF2C', 'RANGAP1', 'NCAPD2', 'DLGAP5', 'CDCA2', 'CDCA8', 'ECT2', 'KIF23', 'HMMR', 'AURKA', 'PSRC1', 'ANLN', 'LBR', 'CKAP5', 'CENPE', 'CTCF', 'NEK2', 'G2E3', 'GAS2L3', 'CBX5', 'CENPA']
+            g2m_genes=['HMGB2', 'CDK1', 'NUSAP1', 'UBE2C', 'BIRC5', 
+            'TPX2', 'TOP2A', 'NDC80', 'CKS2', 'NUF2', 'CKS1B', 'MKI67', 
+            'TMPO', 'CENPF', 'TACC3', 'FAM64A', 'SMC4', 'CCNB2', 'CKAP2L', 
+            'CKAP2', 'AURKB', 'BUB1', 'KIF11', 'ANP32E', 'TUBB4B', 'GTSE1',
+             'KIF20B', 'HJURP', 'CDCA3', 'HN1', 'CDC20', 'TTK', 'CDC25C', 'KIF2C',
+              'RANGAP1', 'NCAPD2', 'DLGAP5', 'CDCA2', 'CDCA8', 'ECT2', 'KIF23', 'HMMR',
+               'AURKA', 'PSRC1', 'ANLN', 'LBR', 'CKAP5', 'CENPE', 'CTCF', 'NEK2', 
+               'G2E3', 'GAS2L3', 'CBX5', 'CENPA']
         elif species=='mouse':
-            g2m_genes=['Cbx5', 'Aurkb', 'Cks1b', 'Cks2', 'Jpt1', 'Hmgb2', 'Anp32e', 'Lbr', 'Tmpo', 'Top2a', 'Tacc3', 'Tubb4b', 'Ncapd2', 'Rangap1', 'Cdk1', 'Smc4', 'Kif20b', 'Cdca8', 'Ckap2', 'Ndc80', 'Dlgap5', 'Hjurp', 'Ckap5', 'Bub1', 'Ckap2l', 'Ect2', 'Kif11', 'Birc5', 'Cdca2', 'Nuf2', 'Cdca3', 'Nusap1', 'Ttk', 'Aurka', 'Mki67', 'Pimreg', 'Ccnb2', 'Tpx2', 'Hjurp', 'Anln', 'Kif2c', 'Cenpe', 'Gtse1', 'Kif23', 'Cdc20', 'Ube2c', 'Cenpf', 'Cenpa', 'Hmmr', 'Ctcf', 'Psrc1', 'Cdc25c', 'Nek2', 'Gas2l3', 'G2e3']
-        else:
-            g2m_genes=g2m_genes
+            g2m_genes=['Cbx5', 'Aurkb', 'Cks1b', 'Cks2', 'Jpt1', 'Hmgb2', 
+            'Anp32e', 'Lbr', 'Tmpo', 'Top2a', 'Tacc3', 'Tubb4b', 'Ncapd2', 
+            'Rangap1', 'Cdk1', 'Smc4', 'Kif20b', 'Cdca8', 'Ckap2', 'Ndc80',
+             'Dlgap5', 'Hjurp', 'Ckap5', 'Bub1', 'Ckap2l', 'Ect2', 'Kif11',
+              'Birc5', 'Cdca2', 'Nuf2', 'Cdca3', 'Nusap1', 'Ttk', 'Aurka', 
+              'Mki67', 'Pimreg', 'Ccnb2', 'Tpx2', 'Hjurp', 'Anln', 'Kif2c',
+               'Cenpe', 'Gtse1', 'Kif23', 'Cdc20', 'Ube2c', 'Cenpf', 'Cenpa',
+                'Hmmr', 'Ctcf', 'Psrc1', 'Cdc25c', 'Nek2', 'Gas2l3', 'G2e3']
     sc.tl.score_genes_cell_cycle(adata,s_genes=s_genes, g2m_genes=g2m_genes)
 
 
 def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
         transformer=None, metric='euclidean',verbose=False,
         key_added=None,random_state=0,repulsive_fraction=0.7,constraint=None):
+    '''
+    MDE
+    '''
+    
     
     import pymde
     import logging
@@ -823,17 +912,16 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     start_time = time.time()
 
     print("computing neighbors")
-    if use_rep==None:
+    if use_rep is None:
         use_rep='X_pca'
     data=adata.obsm[use_rep]
-    if n_pcs==None:
+    if n_pcs is None:
         n_pcs=50
     data=data[:,:n_pcs]
 
     if constraint is None:
         constraint = pymde.Standardized()
-    
-    _kwargs = {
+        _kwargs = {
         "embedding_dim": embedding_dim,
         "constraint": constraint,
         "repulsive_fraction": repulsive_fraction,
@@ -851,7 +939,6 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
 
     if isinstance(emb, torch.Tensor):
         emb = emb.cpu().numpy()
-    
     from scipy.spatial import KDTree
     # 使用KNN算法找到最近邻居
     n_neighbors = n_neighbors  # 设置KNN的邻居数
@@ -863,7 +950,8 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     row_indices = np.repeat(np.arange(n_items), n_neighbors)
     col_indices = indices.flatten()
     distances = distances.flatten()
-    sparse_distance_matrix = csr_matrix((distances, (row_indices, col_indices)), shape=(n_items, n_items))
+    sparse_distance_matrix = csr_matrix((distances, (row_indices, col_indices)), \
+    shape=(n_items, n_items))
 
     # 构建连接矩阵
     # 这里我们简单地将连接矩阵设置为距离矩阵的二值化形式
@@ -901,9 +989,6 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     adata.obsp[dists_key] = sparse_distance_matrix
     adata.obsp[conns_key] = gr.adjacency_matrix
     adata.obsm[basis]=emb
-
-
-    
     # 记录结束时间
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -911,7 +996,7 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     # 打印结果和日志信息
     print("    finished: added to `.uns['neighbors']`")
     print(f"    `.obsm['{basis}']`, MDE coordinates")
-    if key_added==None:
+    if key_added is None:
         print("    `.obsp['distances']`, distances for each pair of neighbors")
         print("    `.obsp['connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(int(elapsed_time // 60), int(elapsed_time % 60)))
 
