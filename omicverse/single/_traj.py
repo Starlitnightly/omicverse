@@ -46,16 +46,18 @@ class TrajInfer(object):
             cosg(self.adata, key_added=f'{self.groupby}_cosg', groupby=self.groupby)
             
             ## terminal cells calculation
-            terminal_index=[]
-            for t in self.terminal:
-                gene=sc.get.rank_genes_groups_df(self.adata, group=t, key=f'{self.groupby}_cosg')['names'][0]
-                terminal_index.append(self.adata[self.adata.obs[self.groupby]==t].to_df()[gene].sort_values().index[-1])
-            
-            terminal_states = pd.Series(
-                self.terminal,
-                index=terminal_index,
-            )
-            #return terminal_states
+            if self.terminal is None:
+                terminal_states = None  # let Palantir compute terminal cells
+            else:
+                terminal_index=[]
+                for t in self.terminal:
+                    gene=sc.get.rank_genes_groups_df(self.adata, group=t, key=f'{self.groupby}_cosg')['names'][0]
+                    terminal_index.append(self.adata[self.adata.obs[self.groupby]==t].to_df()[gene].sort_values().index[-1])
+                
+                terminal_states = pd.Series(
+                    self.terminal,
+                    index=terminal_index,
+                )
             
             ## origin cells calculation
             origin_cell=self.origin
