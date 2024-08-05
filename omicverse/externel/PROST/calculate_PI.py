@@ -207,7 +207,7 @@ def get_sub(adata, kernel_size = 5, platform="visium",del_rate = 0.01):
         image_idx_1d = adata.obs['image_idx_1d']
         output = np.zeros(gene_data.shape)
         del_index = np.ones(gene_data.shape[0])
-        for i in trange(len(gene_data)):
+        for i in tqdm(range(len(gene_data))):
             temp_data = gene_data[i, :]
             temp_i, _ = make_image(temp_data, locates)      
             kernel = np.ones((kernel_size,kernel_size), np.uint8)
@@ -241,7 +241,7 @@ def get_sub(adata, kernel_size = 5, platform="visium",del_rate = 0.01):
     else:
         output = np.zeros((gene_data.shape[0], adata.uns['shape'][0]*adata.uns['shape'][1]))
         del_index = np.ones(gene_data.shape[0])
-        for i in trange(len(gene_data)):
+        for i in tqdm(range(len(gene_data))):
             temp_data = gene_data[i, :]
             temp_i = temp_data.reshape(adata.uns['shape'])     
             kernel = np.ones((kernel_size,kernel_size), np.uint8)
@@ -289,7 +289,7 @@ def cal_prost_index(adata, platform="visium"):
         SIG = np.zeros(len(data))
         region_number = np.zeros(len(data))
         
-        for i in trange(len(data)): 
+        for i in tqdm(range(len(data))): 
             temp_raw = data[i, :]
             temp_label = subregions[i, :]
             back_value = temp_raw[temp_label == 0]
@@ -344,7 +344,7 @@ def cal_prost_index(adata, platform="visium"):
         locates = adata.uns['locates']
         SEP = np.zeros(len(data))
         SIG = np.zeros(len(data))
-        for i in trange(len(data)): 
+        for i in tqdm(range(len(data))): 
             temp_raw = data[i, :]
             temp_img,_ = make_image(temp_raw, locates, platform)
             temp_raw = temp_img.flatten()
