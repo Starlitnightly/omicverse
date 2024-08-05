@@ -141,13 +141,12 @@ def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
 
 def get_obs_value(ad,adata,groupby,type='int'):
     if type=='str':
-        
         grouped_data = adata.obs.groupby('SEACell')[groupby]
-        result_index = grouped_data.idxmax()
-        result = adata.obs.loc[result_index].reset_index(drop=True)
-        result.index=result['SEACell'].tolist()
-        result.loc[[f'SEACell-{i}' for i in ad.obs.index.tolist()]]
-        ad.obs[groupby]=result[groupby].tolist()
+        result_index1=[]
+        for i in grouped_data.idxmax().index:
+            result_index1.append(grouped_data.get_group(i).value_counts().index[0])
+        result_index=pd.Series(result_index1,grouped_data.idxmax().index)
+        ad.obs[groupby]=result_index.loc[[f'SEACell-{i}' for i in ad.obs.index]].values.tolist()
     else:
         #type can be set in `max`, `mean`, `min` et al.
         ad.obs[groupby]=adata.obs.groupby('SEACell').agg({groupby: type}).loc[[f'SEACell-{i}' for i in ad.obs.index.tolist()]][groupby].tolist()
