@@ -231,7 +231,9 @@ def compute_tensor_similarity(adata, adata_aggr, pathway1, pathway2, state = 'sp
     tpm2 = adata.uns[vkey+'_graph'].toarray()
     return np.corrcoef(tpm1.reshape(-1),tpm2.reshape(-1))[0,1]
 
-def plot_landscape(sc_object,show_colorbar = False, dim = 2, size_point = 3, alpha_land = 0.5, alpha_point = 0.5,  color_palette_name = 'Set1', contour_levels = 15, elev=10, azim = 4):
+def plot_landscape(sc_object,show_colorbar = False, dim = 2, size_point = 3, 
+                   alpha_land = 0.5, alpha_point = 0.5,  color_palette_name = 'Set1',
+                     contour_levels = 15, elev=10, azim = 4):
     """
     Plot the landscape of the attractor landscape
     

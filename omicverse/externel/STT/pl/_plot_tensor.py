@@ -4,7 +4,10 @@ import matplotlib.patches as mpatches
 
 
 
-def plot_tensor_single(adata, adata_aggr = None, state = 'joint', attractor = None, basis = 'umap', color ='attractor', color_map = None, size = 20, alpha = 0.5, ax = None, show = None, filter_cells = False, member_thresh = 0.05, density =2):
+def plot_tensor_single(adata, adata_aggr = None, state = 'joint', 
+                       attractor = None, basis = 'umap', color ='attractor', 
+                       color_map = None, size = 20, alpha = 0.5, ax = None, 
+                       show = None, filter_cells = False, member_thresh = 0.05, density =2):
     """
     Function to plot a single tensor graph with assgined components
     
@@ -75,6 +78,7 @@ def plot_tensor_single(adata, adata_aggr = None, state = 'joint', attractor = No
         scv.tl.velocity_graph(adata_aggr, vkey = 'vj', xkey = 'Ms',n_jobs = -1)
         scv.pl.velocity_embedding_stream(adata_aggr, vkey = 'vj',basis=basis, color=color, title = title+','+'Joint',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show, density =density)
         
+
         
 def plot_tensor(adata, adata_aggr, list_state =['joint','spliced','unspliced'], list_attractor ='all', basis = 'umap',figsize = (8,8),hspace = 0.2,wspace = 0.2, color_map = None,size = 20,alpha = 0.5, filter_cells = False, member_thresh = 0.05, density =2):
     """
