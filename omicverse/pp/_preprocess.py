@@ -920,7 +920,15 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     data=data[:,:n_pcs]
 
     if constraint is None:
-        constraint = pymde.Standardized()
+        _kwargs = {
+        "embedding_dim": embedding_dim,
+        "constraint": pymde.Standardized(),
+        "repulsive_fraction": repulsive_fraction,
+        "verbose": verbose,
+        "device": 'cuda',
+        "n_neighbors": n_neighbors,
+    }
+    else:
         _kwargs = {
         "embedding_dim": embedding_dim,
         "constraint": constraint,
