@@ -26,9 +26,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics"
 ]
 dependencies = [
-    'numpy>=1.22, <1.24',
+    'numpy>=1.23',
     'scanpy>=1.9',
-    'pandas>=1.0.3, <=1.5.3',
+    'pandas>=1.5',
     'matplotlib<3.7',
     'scikit-learn>=1.2',
     'scipy>=1.8, <1.12',
@@ -65,7 +65,8 @@ dependencies = [
     #'scvi-tools>=0.20.1',
     'pynvml',
     'plotly',
-    'numba<0.59'
+    'numba>=0.56',
+    'tqdm'
     #'cvxpy>=1.3',
 
 ]

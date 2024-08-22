@@ -1032,9 +1032,9 @@ def check_dependencies(dependencies):
 
 # List of dependencies
 dependencies = [
-    'numpy>=1.22, <1.24',
+    'numpy>=1.23',
     'scanpy>=1.9',
-    'pandas>=1.0.3, <=1.5.3',
+    'pandas>=1.5',
     'matplotlib<3.7',
     'scikit-learn>=1.2',
     'scipy>=1.8, <1.12',
@@ -1048,6 +1048,7 @@ dependencies = [
     'lifelines>=0.27',
     'ktplotspy>=0.1',
     'python-dotplot>=0.0.1',
+    #'pybedtools>=0.8.1',
     'boltons>=23.0',
     'ctxcore>=0.2',
     'termcolor>=2.1',
@@ -1066,7 +1067,12 @@ dependencies = [
     'metatime>=1.3.0',
     'einops>=0.6',
     'tensorboard>=2.6',
-    'scrublet>=0.2',
+    'scrublet >=0.2',
+    #'scvi-tools>=0.20.1',
     'pynvml',
     'plotly',
+    'numba>=0.56',
+    'tqdm'
+    #'cvxpy>=1.3',
+
 ]
