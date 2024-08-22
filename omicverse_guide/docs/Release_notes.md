@@ -421,10 +421,13 @@ Support Raw Windows platform
 
 - Fixed the 'celltyep_key' error of `ov.pl.cpdb_group_heatmap` #109
 - Fixed an error in `ov.utils.roe` when some expected frequencies are less than expected value.
+- Added `cellstackarea` to visual the Percent stacked area chart of celltype in samples.
 
 ### Single Module
 - Fixed the bug of `ov.single.cytotrace2` when adata.X is not sparse data. #115, #116
 - Fixed the groupby error in `ov.single.get_obs_value` of SEACells.
+- Fixed the error of cNMF #107, #85
+
 
 ### Bulk Module
 
@@ -441,6 +444,8 @@ Support Raw Windows platform
 - Fixed an error of `get_image_idx_1D` in `ov.space.svg` #117
 - Added `COMMOT` to calculate the cell-cell interaction of spatial RNA-seq.
 
-### Pl Module
+### PP Module
 
-- Added `cellstackarea` to visual the Percent stacked area chart of celltype in samples.
+- Updated constraint error of ov.pp.mde #129
+
+
