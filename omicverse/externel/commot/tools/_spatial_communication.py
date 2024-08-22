@@ -82,7 +82,7 @@ class CellCommunication(object):
             self.ligs = avail_ligs
             self.recs = avail_recs
             A = np.inf * np.ones([len(self.ligs), len(self.recs)], float)
-            for i in range(len(df_ligrec)):
+            for i in tqdm(range(len(df_ligrec))):
                 tmp_lig = df_ligrec.iloc[i,0]
                 tmp_rec = df_ligrec.iloc[i,1]
                 if tmp_lig in self.ligs and tmp_rec in self.recs:
@@ -94,14 +94,14 @@ class CellCommunication(object):
             ncell = adata.shape[0]
             S = np.zeros([ncell, A.shape[0]], float)
             D = np.zeros([ncell, A.shape[1]], float)
-            for i in range(len(self.ligs)):
+            for i in tqdm(range(len(self.ligs))):
                 tmp_lig = self.ligs[i]
                 lig_genes = tmp_lig.split(heteromeric_delimiter)
                 if heteromeric_rule == 'min':
                     S[:,i] = adata[:, lig_genes].X.toarray().min(axis=1)[:]
                 elif heteromeric_rule == 'ave':
                     S[:,i] = adata[:, lig_genes].X.toarray().mean(axis=1)[:]
-            for i in range(len(self.recs)):
+            for i in tqdm(range(len(self.recs))):
                 tmp_rec = self.recs[i]
                 rec_genes = tmp_rec.split(heteromeric_delimiter)
                 if heteromeric_rule == 'min':
@@ -150,11 +150,11 @@ class CellCommunication(object):
             # Smooth the expression
             S_smth = np.zeros_like(self.S)
             D_smth = np.zeros_like(self.D)
-            for i in trange(self.nlig):
+            for i in tqdm(range(self.nlig)):
                 nzind = np.where(self.S[:,i] > 0)[0]
                 phi = kernel_function(self.M[nzind,:][:,nzind], smth_eta, smth_nu, smth_kernel, normalization='unit_col_sum')
                 S_smth[nzind,i] = np.matmul( phi, self.S[nzind,i].reshape(-1,1) )[:,0]
-            for i in trange(self.nrec):
+            for i in tqdm(range(self.nrec)):
                 nzind = np.where(self.D[:,i] > 0)[0]
                 phi = kernel_function(self.M[nzind,:][:,nzind], smth_eta, smth_nu, smth_kernel, normalization='unit_col_sum')
                 D_smth[nzind,i] = np.matmul( phi, self.D[nzind,i].reshape(-1,1) )[:,0]
@@ -163,7 +163,7 @@ class CellCommunication(object):
                 eps_p=cot_eps_p, eps_mu=cot_eps_mu, eps_nu=cot_eps_nu, rho=cot_rho, weights=cot_weights, nitermax=cot_nitermax)
             # Deconvolute back to original cells
             self.comm_network = {}
-            for i in trange(self.nlig):
+            for i in tqdm(range(self.nlig)):
                 S = self.S[:,i]
                 nzind_S = np.where(S > 0)[0]
                 phi_S = kernel_function(self.M[nzind_S,:][:,nzind_S], smth_eta, smth_nu, smth_kernel, normalization='unit_col_sum')

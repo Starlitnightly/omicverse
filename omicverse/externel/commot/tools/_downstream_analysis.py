@@ -14,7 +14,7 @@ from scipy.stats import spearmanr, pearsonr
 from sklearn.preprocessing import normalize
 from sklearn.neighbors import kneighbors_graph
 from sklearn.decomposition import PCA
-import karateclub
+
 
 from .._utils import partial_corr
 from .._utils import semipartial_corr
@@ -641,7 +641,7 @@ def group_cell_communication(
     
     nkey = len(keys)
     ncell = adata.shape[0]
-
+    import karateclub
     # Get a dissimilarity matrix D
     if dissimilarity_method == 'graphwave':
         if knn > 0:

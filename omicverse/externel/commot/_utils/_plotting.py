@@ -304,8 +304,9 @@ def plot_cell_signaling(X,
             if background == 'summary':
                 ax.scatter(X[idx,0], X[idx,1], s=ndsize, c=ndcolor[idx], cmap=cmap, linewidth=0)
             elif background == 'cluster':
+                adata.obs[clustering]=adata.obs[clustering].astype('category')
                 labels = np.array( adata.obs[clustering], str )
-                unique_labels = np.sort(list(set(list(labels))))
+                unique_labels = adata.obs[clustering].cat.categories
                 for i_label in range(len(unique_labels)):
                     idx = np.where(labels == unique_labels[i_label])[0]
                     if cluster_cmap is None:
