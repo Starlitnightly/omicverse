@@ -3,6 +3,9 @@ from ..externel.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,featu
 
 def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         mt_startwith='MT-'):
+    """
+    Find the spatial variable genes.
+    """
     if mode=='prost':
         if 'counts' not in adata.layers.keys():
             adata.layers['counts'] = adata.X.copy()
@@ -14,10 +17,10 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         # Spatial autocorrelation test
         spatial_autocorrelation(adata)
         print('Spatial autocorrelation test is done!')
-        
+
         # Remove MT-gene
         drop_gene_name = mt_startwith
-        selected_gene_name = list(adata.var_names[adata.var_names.str.contains(mt_startwith) == False])
+        selected_gene_name=list(adata.var_names[adata.var_names.str.contains(mt_startwith)==False])
         sc.pp.normalize_total(adata, target_sum=target_sum)
         sc.pp.log1p(adata)
         print('normalization and log1p are done!')
@@ -28,3 +31,4 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
     else:
         raise ValueError(f"mode {mode} is not supported")
     return adata
+    # End-of-file (EOF)

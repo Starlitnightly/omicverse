@@ -1,8 +1,9 @@
+"""Module providing a encapsulation of spaceflow."""
+import random
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import torch
-import random
 from tqdm import tqdm
 import torch.nn as nn
 
@@ -14,22 +15,22 @@ from sklearn.neighbors import kneighbors_graph
 sf_install = False
 
 class pySpaceFlow(object):
-
+    """Class representing the object of pySpaceFlow."""
     def __init__(self,adata) -> None:
         global sf_install
         try:
             from ..externel.spaceflow import SpaceFlow
             sf_install=True
             #print('mofax have been install version:',mfx.__version__)
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 'Please install the SpaceFlow: `pip install SpaceFlow`.'
-            )
+            ) from e
         from ..externel.spaceflow import SpaceFlow
         sf = SpaceFlow(adata=adata, 
                          spatial_locs=adata.obsm['spatial'])
-        
-        
+
+
         spatial_locs = adata.obsm['spatial']
         spatial_graph = sf.graph_alpha(spatial_locs, n_neighbors=10)
 
@@ -42,13 +43,13 @@ class pySpaceFlow(object):
               z_dim=50, lr=1e-3, epochs=1000, max_patience=50, 
               min_stop=100, random_seed=42, gpu=0, 
               regularization_acceleration=True, edge_subset_sz=1000000):
-        
         from ..externel.spaceflow import sparse_mx_to_torch_edge_list, corruption
 
         adata_preprocessed, spatial_graph = self.sf.adata_preprocessed, self.sf.spatial_graph
         if not adata_preprocessed:
-            print("The data has not been preprocessed, please run preprocessing_data() method first!")
+            print("Data has not been preprocessed, please run preprocessing_data() method first!")
             return
+
         torch.manual_seed(random_seed)
         random.seed(random_seed)
         np.random.seed(random_seed)
@@ -124,7 +125,6 @@ class pySpaceFlow(object):
         self.adata.obsm['spaceflow']=self.sf.embedding.copy()
 
         return embedding
-    
     def cal_pSM(self,n_neighbors:int=20,resolution:int=1,
                        max_cell_for_subsampling:int=5000,
                        psm_key='pSM_spaceflow'):
@@ -138,7 +138,8 @@ class pySpaceFlow(object):
         resolution: float
             Resolution for clustering.
         max_cell_for_subsampling: int
-            Maximum number of cells for subsampling. If the number of cells is larger than this value, the subsampling will be performed.
+            Maximum number of cells for subsampling. 
+            If the number of cells is larger than this value, the subsampling will be performed.
 
         Returns
         -------
@@ -147,13 +148,12 @@ class pySpaceFlow(object):
         
         """
 
-        sc.pp.neighbors(self.adata, n_neighbors=n_neighbors, 
+        sc.pp.neighbors(self.adata, n_neighbors=n_neighbors,
                use_rep='spaceflow')
         sc.tl.umap(self.adata)
         sc.tl.leiden(self.adata, resolution=resolution)
         sc.tl.paga(self.adata)
-        max_cell_for_subsampling = max_cell_for_subsampling
-        import numpy as np
+       # max_cell_for_subsampling = max_cell_for_subsampling
         if self.adata.shape[0] < max_cell_for_subsampling:
             sub_adata_x = self.adata.obsm['spaceflow']
         else:
@@ -161,7 +161,6 @@ class pySpaceFlow(object):
             selected_ind = np.random.choice(indices, max_cell_for_subsampling, False)
             sub_adata_x = self.adata[selected_ind, :].obsm['spaceflow']
 
-        from scipy.spatial import distance_matrix
         sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
         self.adata.uns['iroot'] = np.argmax(sum_dists)
         sc.tl.diffmap(self.adata)
@@ -169,11 +168,15 @@ class pySpaceFlow(object):
         self.adata.obs.rename({"dpt_pseudotime": psm_key}, axis=1, inplace=True)
         print(f'The pseudo-spatial map values are stored in adata.obs["{psm_key}"].')
 
-        pSM_values = self.adata.obs[psm_key].to_numpy()
-        return pSM_values
+        psm_values = self.adata.obs[psm_key].to_numpy()
+        return psm_values
 
 
 class GraphEncoder(nn.Module):
+    """
+    This class implements a graph encoder, with input channels of in_channels 
+    and hidden layer channels of hidden_channels.
+    """
     def __init__(self, in_channels, hidden_channels):
         super(GraphEncoder, self).__init__()
         self.conv = GCNConv(in_channels, hidden_channels, cached=False)
@@ -182,8 +185,10 @@ class GraphEncoder(nn.Module):
         self.prelu2 = nn.PReLU(hidden_channels)
 
     def forward(self, x, edge_index):
+        """Define the forward propagation method"""
         x = self.conv(x, edge_index)
         x = self.prelu(x)
         x = self.conv2(x, edge_index)
         x = self.prelu2(x)
         return x
+    # End-of-file (EOF)
