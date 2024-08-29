@@ -1033,3 +1033,30 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
     #fig.tight_layout()
     if ax==None:
         return fig,ax
+
+
+def violin(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=12,
+           ticks_fontsize=None,rotation=90,**kwargs):
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize)
+    sc.pl.violin(adata,keys=keys,groupby=groupby,ax=ax,show=False,**kwargs)
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+    if ticks_fontsize==None:
+        ticks_fontsize=fontsize-1
+
+    plt.xticks(fontsize=ticks_fontsize,rotation=rotation)
+    plt.yticks(fontsize=ticks_fontsize)
+    plt.xlabel(groupby,fontsize=fontsize)
+    plt.ylabel(keys,fontsize=fontsize)
+
+    if ax==None:
+        return fig,ax
+
+    #plt.xticks(fontsize=ticks_fontsize,rotation=90)
+    #plt.yticks(fontsize=ticks_fontsize)

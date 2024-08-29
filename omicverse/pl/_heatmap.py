@@ -315,7 +315,7 @@ def marker_heatmap(
     fontsize: int = 12,
     show_rownames: bool = True,
     show_colnames: bool = True,
-    save_pathway: str = None,
+    save_path: str = None,
     ax=None,
 ):
     """
@@ -524,7 +524,7 @@ def marker_heatmap(
     cm = DotClustermapPlotter(color_df,y=groupby,x='gene',value='Mean\nexpression\nin group',
                       c='Mean\nexpression\nin group',s='Fraction\nof cells\nin group',cmap=color_map,
                       vmin=0,
-                      hue=groupby,
+                      #hue=groupby,
                       top_annotation=col_ha,left_annotation=row_ha,
                       row_dendrogram=False,col_dendrogram=False,
                       col_split_order=list(df_col.Celltype_name.unique()),
@@ -543,6 +543,9 @@ def marker_heatmap(
     plt.grid(False)
     plt.tight_layout()  # 调整布局以适应所有组件
 
+    for ax1 in plt.gcf().axes:
+        ax1.grid(False)
+
     # legend plot
     handles = [plt.Line2D([0], [0], color=type_color_all[cell], lw=4) for cell in type_color_all.keys()]
     labels = type_color_all.keys()
@@ -551,13 +554,13 @@ def marker_heatmap(
     plt.legend(handles, labels, 
         borderaxespad=1, handletextpad=0.5, labelspacing=0.2,**legend_kws)
 
-    if save_pathway is None:
+    if save_path is None:
         pass
     else:
-        plt.savefig(save_pathway, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         
     plt.tight_layout()
-    plt.show()
+    #plt.show()
 
     return fig,ax
 

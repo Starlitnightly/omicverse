@@ -127,9 +127,9 @@ class pySTAligner(object):
                  margin: float = 1,
                  verbose: bool = False,
                  random_seed: int = 666,
-                 iter_comb: list | None = None,
+                 iter_comb = None,
                  knn_neigh: int = 100,
-                 Batch_list: list | None = None,
+                 Batch_list = None,
                  device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
              ) -> None:
         r'''
