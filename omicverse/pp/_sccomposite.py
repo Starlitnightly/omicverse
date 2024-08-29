@@ -191,19 +191,23 @@ def log_joint_one_k_rna(data, theta, alpha, beta, decay, k0):
     return log_joint
 
 def prob_k0_rna(data, theta, alpha, beta, decay, k0, k=3):
-    '''
-    Probability calculation at k0
-    '''
+    # Check if float128 is supported, otherwise fall back to float64
+    try:
+        np.dtype('float128')
+        float_type = np.float128
+    except TypeError:
+        float_type = np.float64
+
     log_joint_k0 = log_joint_one_k_rna(data, theta, alpha, beta, decay, k0)
 
-    one_ks = np.ones((data.shape[0],k))
+    one_ks = np.ones((data.shape[0], k), dtype=float_type)
     for i in np.arange(k):
-        one_ks[:,i] = log_joint_one_k_rna(data, theta, alpha, beta, decay, i)
+        one_ks[:, i] = log_joint_one_k_rna(data, theta, alpha, beta, decay, i)
 
-    logsumexp_ks = special.logsumexp(one_ks, axis = 1)
+    logsumexp_ks = special.logsumexp(one_ks, axis=1)
     log_prob = log_joint_k0 - logsumexp_ks
-    log_prob = log_prob.astype('float128')
-    prob = np.exp(log_prob, dtype=np.float128)
+    log_prob = log_prob.astype(float_type)
+    prob = np.exp(log_prob, dtype=float_type)
 
 
     return prob
