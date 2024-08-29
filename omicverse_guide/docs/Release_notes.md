@@ -427,6 +427,7 @@ Support Raw Windows platform
 - Fixed the bug of `ov.single.cytotrace2` when adata.X is not sparse data. #115, #116
 - Fixed the groupby error in `ov.single.get_obs_value` of SEACells.
 - Fixed the error of cNMF #107, #85
+- Fixed the plot error when `Pycomplexheatmap` version > 1.7 #136
 
 
 ### Bulk Module
