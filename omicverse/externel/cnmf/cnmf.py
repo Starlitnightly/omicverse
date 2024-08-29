@@ -17,7 +17,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.utils import sparsefuncs
 
-from fastcluster import linkage
+
 from scipy.cluster.hierarchy import leaves_list
 
 import matplotlib.pyplot as plt
@@ -855,6 +855,7 @@ class cNMF():
                 if cl_filter.sum() > 1:
                     cl_dist = squareform(topics_dist[cl_filter, :][:, cl_filter], checks=False)
                     cl_dist[cl_dist < 0] = 0 #Rarely get floating point arithmetic issues
+                    from fastcluster import linkage
                     cl_link = linkage(cl_dist, 'average')
                     cl_leaves_order = leaves_list(cl_link)
 
