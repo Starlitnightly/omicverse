@@ -172,6 +172,9 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
 
     from PyComplexHeatmap import DotClustermapPlotter,HeatmapAnnotation,anno_simple,anno_label,AnnotationBase
     
+    
+
+    
     corr_mat=interaction_edges.copy()
     if source_cells!=None and target_cells==None:
         corr_mat=corr_mat.loc[corr_mat['SOURCE'].isin(source_cells)]
@@ -267,13 +270,18 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             axis=1
         )
     # 绘制热图
+    import PyComplexHeatmap as pch
+    if pch.__version>'1.7':
+        hue_arg=None:
+    else:
+        hue_arg='SOURCE'
     if rotate==True:
         cm = DotClustermapPlotter(
         corr_mat,
         y='SOURCE',
         x='TARGET',
         value='COUNT',
-        hue='SOURCE',
+        hue=hue_arg,
         legend_gap=7,
         top_annotation=col_ha,
         left_annotation=row_ha,
@@ -295,7 +303,7 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             x='SOURCE',
             y='TARGET',
             value='COUNT',
-            hue='SOURCE',
+            hue=hue_arg,
             legend_gap=7,
             top_annotation=row_ha,
             left_annotation=col_ha,
