@@ -447,5 +447,6 @@ Support Raw Windows platform
 ### PP Module
 
 - Updated constraint error of ov.pp.mde #129
+- Fixed type error of `float128` #134
 
 

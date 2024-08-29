@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import os, errno, sys
 import datetime
-import uuid
+
 import itertools
 import yaml
 import subprocess
