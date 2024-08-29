@@ -271,8 +271,8 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
         )
     # 绘制热图
     import PyComplexHeatmap as pch
-    if pch.__version>'1.7':
-        hue_arg=None:
+    if pch.__version__>'1.7':
+        hue_arg=None
     else:
         hue_arg='SOURCE'
     if rotate==True:
