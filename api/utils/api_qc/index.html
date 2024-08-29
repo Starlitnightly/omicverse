@@ -558,15 +558,21 @@
 <code class="highlight language-python"><span class="n">omicverse</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">qc</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.pp.qc" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents first">
+<p>qc</p>
 <details class="quote">
 <summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/pp/_qc.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="178 "></span><span class="k">def</span> <span class="nf">qc</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="linenos" data-linenos="179 "></span>    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">'gpu'</span><span class="p">:</span>
-<span class="linenos" data-linenos="180 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'GPU mode activated'</span><span class="p">)</span>
-<span class="linenos" data-linenos="181 "></span>        <span class="k">return</span> <span class="n">qc_gpu</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-<span class="linenos" data-linenos="182 "></span>    <span class="k">else</span><span class="p">:</span>
-<span class="linenos" data-linenos="183 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'CPU mode activated'</span><span class="p">)</span>
-<span class="linenos" data-linenos="184 "></span>        <span class="k">return</span> <span class="n">qc_cpu</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="187 "></span><span class="k">def</span> <span class="nf">qc</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="linenos" data-linenos="188 "></span><span class="w">    </span><span class="sd">'''</span>
+<span class="linenos" data-linenos="189 "></span><span class="sd">    qc</span>
+<span class="linenos" data-linenos="190 "></span><span class="sd">    '''</span>
+<span class="linenos" data-linenos="191 "></span>
+<span class="linenos" data-linenos="192 "></span>
+<span class="linenos" data-linenos="193 "></span>    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s1">'gpu'</span><span class="p">:</span>
+<span class="linenos" data-linenos="194 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'GPU mode activated'</span><span class="p">)</span>
+<span class="linenos" data-linenos="195 "></span>        <span class="k">return</span> <span class="n">qc_gpu</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<span class="linenos" data-linenos="196 "></span>    <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="197 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'CPU mode activated'</span><span class="p">)</span>
+<span class="linenos" data-linenos="198 "></span>        <span class="k">return</span> <span class="n">qc_cpu</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div>
 </details>
 </div>
