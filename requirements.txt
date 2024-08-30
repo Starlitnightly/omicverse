@@ -42,3 +42,4 @@ mellon
 ctxcore
 pydeseq2 > 0.3
 mkdocs-plotly-plugin
+bioservices
