@@ -434,6 +434,7 @@ Support Raw Windows platform
 
 - Fixed an key error in `ov.bulk.Matrix_ID_mapping`
 - Added `enrichment_multi_concat` in `ov.bulk` to concat the result of enrichment.
+- Fixed the pandas version error in gseapy #137
 
 ### Bulk2Single Module
 
