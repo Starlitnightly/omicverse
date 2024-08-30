@@ -445,6 +445,7 @@ Support Raw Windows platform
 - Fixed an error in `construct_landscape` of `ov.space.STT`
 - Fixed an error of `get_image_idx_1D` in `ov.space.svg` #117
 - Added `COMMOT` to calculate the cell-cell interaction of spatial RNA-seq.
+- Added `starfysh` to deconvolute spatial transcriptomic without scRNA-seq (#108)
 
 ### PP Module
 
