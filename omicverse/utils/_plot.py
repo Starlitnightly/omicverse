@@ -1043,7 +1043,7 @@ dependencies = [
     'seaborn>=0.11',
     'datetime>=4.5',
     'statsmodels>=0.13',
-    'gseapy==0.10.8',
+    #'gseapy==0.10.8',
     'ipywidgets>=8.0',
     'lifelines>=0.27',
     'ktplotspy>=0.1',
@@ -1072,6 +1072,7 @@ dependencies = [
     'pynvml',
     'plotly',
     'numba>=0.56',
+    'bioservices',
     'tqdm'
     #'cvxpy>=1.3',
 

@@ -214,7 +214,8 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
         https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html#Gene-set-enrichment-analysis.
     """
 
-    import gseapy as gp
+    #import gseapy as gp
+    from ..externel.gseapy import enrichr
     df_list = []
     cluster_list = []
     celltypes = sorted(adata.obs[group_by].unique())
@@ -235,7 +236,7 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
             background='hsapiens_gene_ensembl'
         else:
             background=adata.var.index.tolist()
-        enr = gp.enrichr(gene_list=degs,
+        enr = enrichr(gene_list=degs,
                 description='',
                 gene_sets=pathways_dict,
                 organism=organism,
