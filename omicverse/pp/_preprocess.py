@@ -595,7 +595,7 @@ class my_PCA:
 
         return self
 
-def pca(adata, n_pcs=50, layer='scaled',inplace=True):
+def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
     """
     Performs Principal Component Analysis (PCA) on the data stored in a scanpy AnnData object.
 
@@ -621,7 +621,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True):
     else:
         raise KeyError(f'Selected layer {layer} is not present. Compute it first!')
     if settings.mode == 'cpu':
-        sc.pp.pca(adata, layer=layer,n_comps=n_pcs)
+        sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
         adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
         adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
         adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
