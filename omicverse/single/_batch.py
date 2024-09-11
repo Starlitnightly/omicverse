@@ -34,8 +34,9 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             )
         
         adata3=adata.copy()
-        scale(adata3)
-        pca(adata3,layer='scaled',n_pcs=n_pcs)
+        if 'scaled|original|X_pca' not in adata3.obsm.keys():
+            scale(adata3)
+            pca(adata3,layer='scaled',n_pcs=n_pcs)
         sc.external.pp.harmony_integrate(adata3, batch_key,basis=use_rep,**kwargs)
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
         return adata3

@@ -478,7 +478,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     adata.var = adata.var.drop(columns=['highly_variable_features'])
     adata.var['highly_variable_features'] = adata.var['highly_variable']
     adata.var = adata.var.drop(columns=['highly_variable'])
-    adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
+    #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
     print(f'End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
     return adata
 def normalize_pearson_residuals(adata,**kwargs):
