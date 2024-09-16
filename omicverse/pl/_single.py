@@ -133,7 +133,7 @@ def embedding(
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False):
+                       legend:bool=False,legend_awargs=None):
     """
     Plot cell proportion of each cell type in each visual cluster.
 
@@ -192,7 +192,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
             bottoms+=test1['value'].values
         n+=1
     if legend!=False:
-        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10,**legend_awargs)
     
     plt.grid(False)
     
@@ -955,7 +955,7 @@ def plot_boxplots(  # pragma: no cover
 def cellstackarea(adata,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False):
+                       legend:bool=False,legend_awargs=None):
     """
     Plot the cell type percentage in each groupby category
     
@@ -1006,7 +1006,8 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
         bottom += pivot_df[cell_type]
     
     if legend!=False:
-        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,
+                   fontsize=labels_fontsize,**legend_awargs)
     
     plt.grid(False)
     
