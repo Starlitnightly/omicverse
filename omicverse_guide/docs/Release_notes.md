@@ -453,3 +453,18 @@ Support Raw Windows platform
 - Fixed type error of `float128` #134
 
 
+## v 1.6.7
+
+### Space Module
+
+- Added `n_jobs` argument to adjust thread in `extenel.STT.pl.plot_tensor_single`
+- Fixed an error in `extenel.STT.tl.construct_landscape`
+  
+
+### Pl Module
+
+- Added `legend_awargs` to adjust the legend set in `pl.cellstackarea` and `pl.cellproportion`
+
+### Single Module
+
+- Fixed the error of `get_results` and `get_results_rfc` in `cNMF` module. (#143) (#139)

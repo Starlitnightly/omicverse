@@ -32,7 +32,7 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
     mu_hat = sc_object.uns['da_out']['mu_hat']
     rho = sc_object.obsm['rho']
     projection = sc_object.obsm[coord_key][:,0:2]
-    p_hat=adata.uns['da_out']['P_hat']
+    p_hat=sc_object.uns['da_out']['P_hat']
     
     
     labels = np.argmax(rho,axis = 1)

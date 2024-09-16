@@ -7,7 +7,8 @@ import matplotlib.patches as mpatches
 def plot_tensor_single(adata, adata_aggr = None, state = 'joint', 
                        attractor = None, basis = 'umap', color ='attractor', 
                        color_map = None, size = 20, alpha = 0.5, ax = None, 
-                       show = None, filter_cells = False, member_thresh = 0.05, density =2):
+                       show = None, filter_cells = False, member_thresh = 0.05, density =2,
+                       n_jobs = -1):
     """
     Function to plot a single tensor graph with assgined components
     
@@ -66,18 +67,22 @@ def plot_tensor_single(adata, adata_aggr = None, state = 'joint',
         
     if state == 'spliced':
         adata.layers['vs'] = velo[:,gene_select,1]
-        scv.tl.velocity_graph(adata, vkey = 'vs', xkey = 'Ms',n_jobs = -1)
+        scv.tl.velocity_graph(adata, vkey = 'vs', xkey = 'Ms',n_jobs = n_jobs)
         scv.pl.velocity_embedding_stream(adata, vkey = 'vs', basis=basis, color=color, title = title+','+'Spliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show)
     if state == 'unspliced':
         adata.layers['vu'] = velo[:,gene_select,0]
-        scv.tl.velocity_graph(adata, vkey = 'vu', xkey = 'Mu',n_jobs = -1)
+        scv.tl.velocity_graph(adata, vkey = 'vu', xkey = 'Mu',n_jobs = n_jobs)
         scv.pl.velocity_embedding_stream(adata, vkey = 'vu',basis=basis, color=color, title = title+','+'Unspliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show)
     if state == 'joint':
         print("check that the input includes aggregated object")
         #adata_aggr.layers['vj'] = np.concatenate((velo[:,gene_select,0],velo[:,gene_select,1]),axis = 1)
-        scv.tl.velocity_graph(adata_aggr, vkey = 'vj', xkey = 'Ms',n_jobs = -1)
+        scv.tl.velocity_graph(adata_aggr, vkey = 'vj', xkey = 'Ms',n_jobs = n_jobs)
         scv.pl.velocity_embedding_stream(adata_aggr, vkey = 'vj',basis=basis, color=color, title = title+','+'Joint',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show, density =density)
         
+    del adata_copy
+    del adata_aggr_copy
+    import gc
+    gc.collect()
 
         
 def plot_tensor(adata, adata_aggr, list_state =['joint','spliced','unspliced'], list_attractor ='all', basis = 'umap',figsize = (8,8),hspace = 0.2,wspace = 0.2, color_map = None,size = 20,alpha = 0.5, filter_cells = False, member_thresh = 0.05, density =2):

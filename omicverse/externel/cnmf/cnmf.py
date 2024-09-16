@@ -1083,3 +1083,65 @@ class cNMF():
         adata.obs['cNMF_cluster_clf']=[str(i) for i in clf.predict(adata.obsm[use_rep])]
         print('cNMF_cluster_rfc is added to adata.obs')
         print('cNMF_cluster_clf is added to adata.obs')
+
+    def get_results(self,adata,result_dict):
+        import pandas as pd
+        if result_dict['usage_norm'].columns[0] in adata.obs.columns:
+            #remove the columns if they already exist
+            #remove columns name starts with 'cNMF'
+            adata.obs = adata.obs.loc[:,~adata.obs.columns.str.startswith('cNMF')]
+        adata.obs = pd.merge(left=adata.obs, right=result_dict['usage_norm'], 
+                             how='left', left_index=True, right_index=True)
+        adata.var = pd.merge(left=adata.var,right=result_dict['gep_scores'].loc[adata.var.index],
+                             how='left', left_index=True, right_index=True)
+        df=adata.obs[result_dict['usage_norm'].columns].copy()
+        max_topic = df.idxmax(axis=1)
+        # 将结果添加到DataFrame中
+        adata.obs['cNMF_cluster'] = max_topic
+        print('cNMF_cluster is added to adata.obs')
+        print('gene scores are added to adata.var')
+
+    def get_results_rfc(self,adata,result_dict,use_rep='STAGATE',cNMF_threshold=0.5):
+        import pandas as pd
+        if result_dict['usage_norm'].columns[0] in adata.obs.columns:
+            #remove the columns if they already exist
+            #remove columns name starts with 'cNMF'
+            adata.obs = adata.obs.loc[:,~adata.obs.columns.str.startswith('cNMF')]
+        adata.obs = pd.merge(left=adata.obs, right=result_dict['usage_norm'], 
+                             how='left', left_index=True, right_index=True)
+        adata.var = pd.merge(left=adata.var,right=result_dict['gep_scores'].loc[adata.var.index],
+                             how='left', left_index=True, right_index=True)
+
+        import numpy as np
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import train_test_split
+
+        new_array = []
+        class_array = []
+        for i in range(1, result_dict['usage_norm'].shape[1] + 1):
+            data = adata[adata.obs[f'cNMF_{i}'] > cNMF_threshold].obsm[use_rep].toarray()
+            new_array.append(data)
+            class_array.append(np.full(data.shape[0], i))
+
+        new_array = np.concatenate(new_array, axis=0)
+        class_array = np.concatenate(class_array)
+
+        Xtrain, Xtest, Ytrain, Ytest = train_test_split(new_array,class_array,test_size=0.3)
+        clf = DecisionTreeClassifier(random_state=0)
+        rfc = RandomForestClassifier(random_state=0)
+        clf = clf.fit(Xtrain,Ytrain)
+        rfc = rfc.fit(Xtrain,Ytrain)
+        #查看模型效果
+        score_c = clf.score(Xtest,Ytest)
+        score_r = rfc.score(Xtest,Ytest)
+        #打印最后结果
+        print("Single Tree:",score_c)
+        print("Random Forest:",score_r)
+
+        adata.obs['cNMF_cluster_rfc']=[str(i) for i in rfc.predict(adata.obsm[use_rep])]
+        adata.obs['cNMF_cluster_clf']=[str(i) for i in clf.predict(adata.obsm[use_rep])]
+        print('cNMF_cluster_rfc is added to adata.obs')
+        print('cNMF_cluster_clf is added to adata.obs')
