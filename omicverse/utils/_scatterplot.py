@@ -32,7 +32,6 @@ from functools import partial
 from scanpy.plotting import _utils 
 
 from scanpy.plotting._utils import (
-    _IGraphLayout,
     _FontWeight,
     _FontSize,
     ColorLike,
@@ -813,7 +812,7 @@ def diffmap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     show_save_ax=doc_show_save_ax,
 )
 def draw_graph(
-    adata: AnnData, *, layout: Optional[_IGraphLayout] = None, **kwargs
+    adata: AnnData, *, layout = None, **kwargs
 ) -> Union[Axes, List[Axes], None]:
     """\
     Scatter plot in graph-drawing basis.

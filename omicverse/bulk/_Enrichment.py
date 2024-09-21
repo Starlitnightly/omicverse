@@ -280,7 +280,7 @@ class pyGSE(object):
 
     def __init__(self,gene_list:list,pathways_dict:dict,pvalue_threshold:float=0.05,pvalue_type:str='auto',
                  background=None,organism:str='Human',description:str='None',outdir:str='./enrichr',cutoff:float=0.5) -> None:
-        """Initialize the pyGSEA class.
+        """Initialize the pyGSE class.
 
         Arguments:
             gene_list: A list of genes.
