@@ -53,8 +53,11 @@ class Enrichr(object):
         self.ENRICHR_URL = "http://maayanlab.cloud" 
         # init logger
         logfile = self.prepare_outdir()
-        self._logger = log_init(outlog=logfile,
-                                log_level=logging.INFO if self.verbose else logging.WARNING)
+        self._logger = log_init(
+            name=str(self.module) + str(id(self)),
+            log_level=logging.INFO if self.verbose else logging.WARNING,
+            filename=logfile,
+        )
 
 
     def prepare_outdir(self):
@@ -256,15 +259,27 @@ class Enrichr(object):
             return set(bg)
         
         # package included data
-        DB_FILE = resource_filename("gseapy", "data/{}.background.genes.txt".format(self.background))
+        DEFAULT_CACHE_PATH = os.path.join(os.path.expanduser("~"), ".cache/gseapy")
+        DB_FILE = os.path.join(
+            DEFAULT_CACHE_PATH, "{}.background.genes.txt".format(self.background)
+        )
         if os.path.exists(DB_FILE):
-            df = pd.read_csv(DB_FILE,sep="\t")
+            df = pd.read_csv(DB_FILE, sep="\t")
         else:
             # background is a biomart database name
-            self._logger.warning("Downloading %s for the first time. It might take a couple of miniutes."%self.background)
+            self._logger.warning(
+                "Downloading %s for the first time. It might take a couple of miniutes."
+                % self.background
+            )
             bm = Biomart()
-            df = bm.query(dataset=self.background)
-            df.dropna(subset=['go_id'], inplace=True)
+            df = bm.query(
+                dataset=self.background,
+                attributes=["ensembl_gene_id", "external_gene_name", "entrezgene_id"],
+                filename=os.path.join(
+                    DEFAULT_CACHE_PATH,
+                    "{}.background.genes.txt".format(self.background),
+                ),
+            )
         self._logger.info("Using all annotated genes with GO_ID as background: %s"%self.background)
         df.dropna(subset=['entrezgene_id'], inplace=True)     
         # input id type: entrez or gene_name
