@@ -38,14 +38,10 @@ import scanpy as sc
 from scanpy.plotting import _utils 
 
 from scanpy.plotting._utils import (
-    _IGraphLayout,
     _FontWeight,
     _FontSize,
     ColorLike,
     VBound,
-    circles,
-    check_projection,
-    check_colornorm,
 )
 
 def embedding(

@@ -472,3 +472,4 @@ Support Raw Windows platform
 ### Bulk Module
 
 - Fixed the import error of `gseapy` in `bulk.geneset_enrichment`
+- Optimized code logic for offline enrichment analysis, added background parameter
