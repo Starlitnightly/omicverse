@@ -613,6 +613,7 @@ def SCCAF_optimize_all(ad,
                        min_i = 3,
 		                start = None,
                        start_iter = 0,
+                       iters=10,
                        *args, **kwargs):
     """
     ad: `AnnData`
@@ -650,34 +651,47 @@ def SCCAF_optimize_all(ad,
     clstr_old = len(ad.obs['%s_Round%d'%(prefix, start_iter)].unique())
     #'while acc < min_acc:
     from tqdm import tqdm
-    for i in tqdm(range(10)):
-        if start_iter >0:
-            print("start_iter: %d" % start_iter)
-        print("R1norm_cutoff: %f" % R1norm_cutoff)
-        print("R2norm_cutoff: %f" % R2norm_cutoff)
-        print("Accuracy: %f" % acc)
-        print("======================")
-        ad, m1, m2, acc, start_iter = SCCAF_optimize(ad=ad,
-                                                     R1norm_cutoff=R1norm_cutoff,
-                                                     R2norm_cutoff=R2norm_cutoff,
-                                                     start_iter=start_iter,
-                                                     min_acc=min_acc, 
-                                                     prefix=prefix,
-                                                     *args, **kwargs)
-        print("m1: %f" % m1)
-        print("m2: %f" % m2)
-        print("Accuracy: %f" % acc)
-        R1norm_cutoff = m1 - R1norm_step
-        R2norm_cutoff = m2 - R2norm_step
-        
-        clstr_new = len(ad.obs['%s_result'%prefix].unique())
-        
-        if clstr_new >= clstr_old and i >= min_i:
-            print("converged SCCAF_all!")
-            break
-        
-        if acc >=min_acc:
-            break
+    with tqdm(total=iters, desc="Processing items") as pbar:
+        for i in range(iters):
+            #if start_iter >0:
+            #    print("start_iter: %d" % start_iter)
+            #print("R1norm_cutoff: %f" % R1norm_cutoff)
+            #print("R2norm_cutoff: %f" % R2norm_cutoff)
+            #print("Accuracy: %f" % acc)
+            #print("======================")
+            ad, m1, m2, acc, start_iter = SCCAF_optimize(ad=ad,
+                                                        R1norm_cutoff=R1norm_cutoff,
+                                                        R2norm_cutoff=R2norm_cutoff,
+                                                        start_iter=start_iter,
+                                                        min_acc=min_acc, 
+                                                        prefix=prefix,
+                                                        *args, **kwargs)
+            #print("m1: %f" % m1)
+            #print("m2: %f" % m2)
+            #print("Accuracy: %f" % acc)
+            R1norm_cutoff = m1 - R1norm_step
+            R2norm_cutoff = m2 - R2norm_step
+            
+            clstr_new = len(ad.obs['%s_result'%prefix].unique())
+            
+            if clstr_new >= clstr_old and i >= min_i:
+                print("converged SCCAF_all!")
+                for i in ad.obs.columns:
+                    if '_Round' in i:
+                        del ad.obs[i]
+                break
+            
+            if acc >=min_acc:
+                print("Reached the minimum accuracy!")
+                for i in ad.obs.columns:
+                    if '_Round' in i:
+                        del ad.obs[i]
+                break
+
+            pbar.update(1)
+            pbar.set_description(f"Processing item {i}")
+            pbar.set_postfix({"start_iter": start_iter, "R1norm_cutoff": R1norm_cutoff,"R2norm_cutoff":R2norm_cutoff,
+                              "Accuracy":acc,"m1":m1,"m2":m2})
             
             
 def SCCAF_optimize(ad,
@@ -817,16 +831,12 @@ def SCCAF_optimize(ad,
         ad.obs['%s_self-projection' % old_id] = clf.predict(X)
         
         if plot:
-            aucs = plot_roc(y_prob, y_test, clf, cvsm=cvsm, acc=acc, title="Self-project ROC {}".format(old_id))
-            if mplotlib_backend:
-                mplotlib_backend.savefig()
-                plt.clf()
-            else:
-                plt.show()
-            plt.close()
+            fig,axes=plt.subplots(1,3,figsize=(12,4))
+            aucs = plot_roc(y_prob, y_test, clf, cvsm=cvsm, acc=acc, title="Self-project ROC {}".format(old_id),
+                            axes=axes)
 
-            sc.pl.scatter(ad, basis=basis, color=['%s_self-projection' % old_id], show=(mplotlib_backend is None),
-                          color_map="RdYlBu_r", legend_loc='on data', frameon=False)
+            sc.pl.embedding(ad, basis=basis, color=['%s_self-projection' % old_id], show=(mplotlib_backend is None),
+                          color_map="RdYlBu_r", legend_loc='on data', frameon=False,ax=axes[2])
             if mplotlib_backend:
                 mplotlib_backend.savefig()
                 plt.clf()
@@ -866,8 +876,8 @@ def SCCAF_optimize(ad,
         if plot:
             if plot_cmat:
                 plot_heatmap_gray(cmat, 'Confusion Matrix', mplotlib_backend=mplotlib_backend)
-            plot_heatmap_gray(R1mat, 'Normalized Confusion Matrix (R1norm) - %s' % old_id, mplotlib_backend=mplotlib_backend)
-            plot_heatmap_gray(R2mat, 'Normalized Confusion Matrix (R2norm) - %s' % old_id, mplotlib_backend=mplotlib_backend)
+            #plot_heatmap_gray(R1mat, 'Normalized Confusion Matrix (R1norm) - %s' % old_id, mplotlib_backend=mplotlib_backend)
+            #plot_heatmap_gray(R2mat, 'Normalized Confusion Matrix (R2norm) - %s' % old_id, mplotlib_backend=mplotlib_backend)
 
         if R1norm_only:
             groups = cluster_adjmat(R1mat, cutoff=R1norm_cutoff, method=method)
@@ -890,7 +900,7 @@ def SCCAF_optimize(ad,
         merge_cluster(ad, old_id1, new_id, groups)
         
         if plot:
-            sc.pl.scatter(ad, basis=basis, color=[new_id], color_map="RdYlBu_r", legend_loc='on data',
+            sc.pl.embedding(ad, basis=basis, color=[new_id], color_map="RdYlBu_r", legend_loc='on data',
                           show=(mplotlib_backend is None))
             if mplotlib_backend:
                 mplotlib_backend.savefig()
@@ -1008,7 +1018,7 @@ def sc_pl_scatter(ad, basis='tsne', color='cell'):
                fit_reg=False,  # Don't fix a regression line
                hue=color,  # Set color
                scatter_kws={"marker": "o",  # Set marker style
-                            "s": 10}, palette=default_20)
+                            "s": 10}, palette=color_long)
     return df
 
 
@@ -1033,7 +1043,8 @@ def plot_heatmap_gray(X, title='', save=None, mplotlib_backend=None):
         plt.show()
 
 
-def plot_roc(y_prob, y_test, clf, plot='both', save=None, title='', colors=None, cvsm=None, acc=None, fontsize=16):
+def plot_roc(y_prob, y_test, clf, plot='both', save=None, title='', 
+             colors=None, cvsm=None, acc=None, fontsize=13,axes=None):
     """
     y_prob, y_test, clf, plot=True, save=False, title ='', colors=None, cvsm=None, acc=None, fontsize=16):
     """
@@ -1072,8 +1083,10 @@ def plot_roc(y_prob, y_test, clf, plot='both', save=None, title='', colors=None,
             else:
                 colors = default_102
         if plot == 'both':
-            
-            fig, ax = plt.subplots(1, 2, sharey=True)
+            if axes is None:
+                fig, ax = plt.subplots(1, 2, sharey=True,figsize=(8, 4))
+            else:
+                ax = axes
             ax[0].plot([0, 1], [0, 1], color='k', ls=':')
             ax[0].set_xticks([0, 1])
             ax[0].set_yticks([0, 1])
@@ -1105,7 +1118,10 @@ def plot_roc(y_prob, y_test, clf, plot='both', save=None, title='', colors=None,
                 ax[1].annotate("Test: %.3f" % acc, (0.5, 0.1), fontsize=fontsize)
             
         else:
-            fig, ax = plt.subplots()
+            if axes is None:
+                fig, ax = plt.subplots()
+            else:
+                ax = axes
             ax.set_xticks([0, 1])
             ax.set_yticks([0, 1])
             if plot == 'roc':
