@@ -32,8 +32,8 @@ def bulk2single_data_prepare(bulk_data:pd.DataFrame,
     ism['Cell_type']=single_data.obs[celltype_key].values
     input_data["input_sc_meta"] = ism
     
-    input_data["sc_gene"] = single_data.var._stat_axis.values.tolist()
-    input_data["bulk_gene"] = bulk_data._stat_axis.values.tolist()
+    input_data["sc_gene"] = single_data.var.index.values.tolist()
+    input_data["bulk_gene"] = bulk_data.index.values.tolist()
     
     bulk_genes=input_data["bulk_gene"]
     intersection_genes=[]
@@ -165,10 +165,10 @@ def load_data(input_bulk_path,
     input_data["input_sc_meta"] = pd.read_csv(input_sc_meta_path, index_col=0)
     # load sc_data.csv file, containing gene expression of each cell
     input_sc_data = pd.read_csv(input_sc_data_path, index_col=0)
-    input_data["sc_gene"] = input_sc_data._stat_axis.values.tolist()
+    input_data["sc_gene"] = input_sc_data.index.values.tolist()
     # load bulk.csv file, containing one column of gene expression in bulk
     input_bulk = pd.read_csv(input_bulk_path, index_col=0)
-    input_data["bulk_gene"] = input_bulk._stat_axis.values.tolist()
+    input_data["bulk_gene"] = input_bulk.index.values.tolist()
     # filter overlapping genes.
     bulk_genes=input_data["bulk_gene"]
     intersection_genes=[]

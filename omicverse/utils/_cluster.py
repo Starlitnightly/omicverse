@@ -93,30 +93,39 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         schist.inference.nested_model(adata, **kwargs)
 
       
-def refine_label(adata, radius=50, key='label'):
-    import ot
+def refine_label(adata, use_rep='spatial',radius=50, key='label'):
+    """
+    Optimize the label by majority voting in the neighborhood.
+
+    Args:
+        adata: an Anndata object, after normalization.
+        radius: the radius of the neighborhood.
+        key: the key in `.obs` that corresponds to the cluster labels.
+    """
+    from scipy.spatial import distance
+    from tqdm import tqdm
     n_neigh = radius
     new_type = []
     old_type = adata.obs[key].values
-    
-    #calculate distance
-    position = adata.obsm['spatial']
-    distance = ot.dist(position, position, metric='euclidean')
-           
-    n_cell = distance.shape[0]
-    
-    for i in range(n_cell):
-        vec  = distance[i, :]
+
+    # calculate distance
+    position = adata.obsm[use_rep]
+    dist_matrix = distance.cdist(position, position, metric="euclidean")
+
+    n_cell = dist_matrix.shape[0]
+
+    for i in tqdm(range(n_cell)):
+        vec = dist_matrix[i, :]
         index = vec.argsort()
         neigh_type = []
-        for j in range(1, n_neigh+1):
+        for j in range(1, n_neigh + 1):
             neigh_type.append(old_type[index[j]])
         max_type = max(neigh_type, key=neigh_type.count)
         new_type.append(max_type)
-        
-    new_type = [str(i) for i in list(new_type)]    
-    #adata.obs['label_refined'] = np.array(new_type)
-    
+
+    new_type = [str(i) for i in list(new_type)]
+    # adata.obs['label_refined'] = np.array(new_type)
+
     return new_type
         
 def filtered(adata:anndata.AnnData,
