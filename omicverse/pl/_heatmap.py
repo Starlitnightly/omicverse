@@ -347,7 +347,7 @@ def marker_heatmap(
         Whether to show the row names in the heatmap.
     show_colnames: bool
         Whether to show the column names in the heatmap.
-    save_pathway: str 
+    save_path: str 
         The file path for saving the plot.
     ax: matplotlib.axes.Axes
         A pre-existing axes object for plotting (optional).
@@ -529,6 +529,11 @@ def marker_heatmap(
                       row_dendrogram=False,col_dendrogram=False,
                       col_split_order=list(df_col.Celltype_name.unique()),
                       col_split=df_col.Celltype_name,col_split_gap=1,
+                      xticklabels_kws={'labelsize':fontsize},
+                      yticklabels_kws={'labelsize':fontsize},
+                      dot_legend_kws={'fontsize':fontsize,
+                                      'title_fontsize':fontsize},
+                      color_legend_kws={'fontsize':fontsize},
                   #    row_split=df_row.Celltype_name,row_split_gap=1,
                       x_order=df_col.Gene_name.unique(),y_order=df_col.Celltype_name.unique(),
                       row_cluster=False,col_cluster=False,
