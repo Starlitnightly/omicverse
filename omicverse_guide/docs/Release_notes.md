@@ -468,3 +468,7 @@ Support Raw Windows platform
 ### Single Module
 
 - Fixed the error of `get_results` and `get_results_rfc` in `cNMF` module. (#143) (#139)
+
+### Bulk Module
+
+- Fixed the import error of `gseapy` in `bulk.geneset_enrichment`

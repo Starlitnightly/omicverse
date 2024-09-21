@@ -61,12 +61,13 @@ dependencies = [
     'metatime>=1.3.0',
     'einops>=0.6',
     'tensorboard>=2.6',
-    'scrublet >=0.2',
+    'scrublet>=0.2',
     #'scvi-tools>=0.20.1',
     'pynvml',
     'plotly',
     'numba>=0.56',
-    'tqdm'
+    'tqdm',
+    'transformers',
     #'cvxpy>=1.3',
 
 ]
