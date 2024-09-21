@@ -468,8 +468,13 @@ Support Raw Windows platform
 ### Single Module
 
 - Fixed the error of `get_results` and `get_results_rfc` in `cNMF` module. (#143) (#139)
+- Added `sccaf` to obtain the best clusters.
 
 ### Bulk Module
 
 - Fixed the import error of `gseapy` in `bulk.geneset_enrichment`
 - Optimized code logic for offline enrichment analysis, added background parameter
+
+### Bulk2Single Module
+
+- Remove `_stat_axis` in `bulk2single_data_prepare` and use `index` instead of it (#160).
