@@ -319,6 +319,7 @@ class DFRunner:
         self.st_test = self.st_data  # pd.DataFrame, test spot-gene expression data.
         sc_gene = self.sc_test.index.values.tolist()
         st_gene = self.st_test.index.values.tolist()
+        
         intersect_gene = list(set(sc_gene).intersection(set(st_gene)))
         self.sc_test = self.sc_test.loc[intersect_gene]
         self.st_test = self.st_test.loc[intersect_gene]
