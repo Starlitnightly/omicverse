@@ -478,3 +478,7 @@ Support Raw Windows platform
 ### Bulk2Single Module
 
 - Remove `_stat_axis` in `bulk2single_data_prepare` and use `index` instead of it (#160).
+
+### PP Module
+
+- Fixed a return bugs in `pp.regress_and_scale` (#156)

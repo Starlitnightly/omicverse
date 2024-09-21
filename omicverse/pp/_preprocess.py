@@ -559,7 +559,7 @@ def regress_and_scale(adata):
         raise KeyError('Regress out covariates first!')
     adata_mock= adata.copy()
     adata_mock.X = adata_mock.layers['regressed']
-    adata_mock = scale(adata_mock)
+    scale(adata_mock)
     adata.layers['regressed_and_scaled'] = adata_mock.layers['scaled']
 
     return adata
