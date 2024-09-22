@@ -2810,6 +2810,13 @@ dds.foldchange_set(fc_threshold=-1,
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>Note that the <code>pvalue_type</code> we set to <code>auto</code>, this is because when the genesets we enrichment if too small, use the <code>adjusted pvalue</code> we can't get the correct result. So you can set <code>adjust</code> or <code>raw</code> to get the significant geneset.</p>
+<p>If you didn't have internet, please set <code>background</code> to all genes expressed in rna-seq,like:</p>
+<div class="highlight"><pre><span></span><span class="n">enr</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">bulk</span><span class="o">.</span><span class="n">geneset_enrichment</span><span class="p">(</span><span class="n">gene_list</span><span class="o">=</span><span class="n">deg_genes</span><span class="p">,</span>
+                                <span class="n">pathways_dict</span><span class="o">=</span><span class="n">pathway_dict</span><span class="p">,</span>
+                                <span class="n">pvalue_type</span><span class="o">=</span><span class="s1">'auto'</span><span class="p">,</span>
+                                <span class="n">background</span><span class="o">=</span><span class="n">dds</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+                                <span class="n">organism</span><span class="o">=</span><span class="s1">'mouse'</span><span class="p">)</span>
+</pre></div>
 </div>
 </div>
 </div>

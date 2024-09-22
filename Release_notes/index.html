@@ -1295,6 +1295,45 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-167">
+    v 1.6.7
+  </a>
+<nav aria-label="v 1.6.7" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_8">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_4">
+    Pl Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_29">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_12">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk2single-module_11">
+    Bulk2Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_6">
+    PP Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </li>
@@ -2089,6 +2128,45 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-167">
+    v 1.6.7
+  </a>
+<nav aria-label="v 1.6.7" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_8">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_4">
+    Pl Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_29">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_12">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk2single-module_11">
+    Bulk2Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_6">
+    PP Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -2608,11 +2686,41 @@
 <li>Fixed an error in <code>construct_landscape</code> of <code>ov.space.STT</code></li>
 <li>Fixed an error of <code>get_image_idx_1D</code> in <code>ov.space.svg</code> #117</li>
 <li>Added <code>COMMOT</code> to calculate the cell-cell interaction of spatial RNA-seq.</li>
+<li>Added <code>starfysh</code> to deconvolute spatial transcriptomic without scRNA-seq (#108)</li>
 </ul>
 <h3 id="pp-module_5">PP Module<a class="headerlink" href="#pp-module_5" title="Permanent link">¶</a></h3>
 <ul>
 <li>Updated constraint error of ov.pp.mde #129</li>
 <li>Fixed type error of <code>float128</code> #134</li>
+</ul>
+<h2 id="v-167">v 1.6.7<a class="headerlink" href="#v-167" title="Permanent link">¶</a></h2>
+<h3 id="space-module_8">Space Module<a class="headerlink" href="#space-module_8" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>n_jobs</code> argument to adjust thread in <code>extenel.STT.pl.plot_tensor_single</code></li>
+<li>Fixed an error in <code>extenel.STT.tl.construct_landscape</code></li>
+</ul>
+<h3 id="pl-module_4">Pl Module<a class="headerlink" href="#pl-module_4" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>legend_awargs</code> to adjust the legend set in <code>pl.cellstackarea</code> and <code>pl.cellproportion</code></li>
+</ul>
+<h3 id="single-module_29">Single Module<a class="headerlink" href="#single-module_29" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed the error of <code>get_results</code> and <code>get_results_rfc</code> in <code>cNMF</code> module. (#143) (#139)</li>
+<li>Added <code>sccaf</code> to obtain the best clusters.</li>
+</ul>
+<h3 id="bulk-module_12">Bulk Module<a class="headerlink" href="#bulk-module_12" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed the import error of <code>gseapy</code> in <code>bulk.geneset_enrichment</code></li>
+<li>Optimized code logic for offline enrichment analysis, added background parameter</li>
+<li>Added <code>pyWGCNA</code> package replace the raw calculation of pyWGCNA (#162)</li>
+</ul>
+<h3 id="bulk2single-module_11">Bulk2Single Module<a class="headerlink" href="#bulk2single-module_11" title="Permanent link">¶</a></h3>
+<ul>
+<li>Remove <code>_stat_axis</code> in <code>bulk2single_data_prepare</code> and use <code>index</code> instead of it (#160).</li>
+</ul>
+<h3 id="pp-module_6">PP Module<a class="headerlink" href="#pp-module_6" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed a return bugs in <code>pp.regress_and_scale</code> (#156)</li>
 </ul>
 </article>
 </div>
