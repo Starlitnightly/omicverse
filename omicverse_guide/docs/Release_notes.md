@@ -474,6 +474,7 @@ Support Raw Windows platform
 
 - Fixed the import error of `gseapy` in `bulk.geneset_enrichment`
 - Optimized code logic for offline enrichment analysis, added background parameter
+- Added `pyWGCNA` package replace the raw calculation of pyWGCNA (#162)
 
 ### Bulk2Single Module
 
