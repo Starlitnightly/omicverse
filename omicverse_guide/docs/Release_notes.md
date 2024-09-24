@@ -483,3 +483,4 @@ Support Raw Windows platform
 ### PP Module
 
 - Fixed a return bugs in `pp.regress_and_scale` (#156)
+- Fixed a scanpy version error when using `ov.pp.pca` (#154)

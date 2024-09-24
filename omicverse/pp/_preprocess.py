@@ -621,11 +621,19 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
     else:
         raise KeyError(f'Selected layer {layer} is not present. Compute it first!')
     if settings.mode == 'cpu':
-        sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
-        adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
-        adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
-        adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
-        adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
+        if sc.__version__ <'1.10':
+            adata_mock=sc.AnnData(adata.layers[layer],obs=adata.obs,var=adata.var)
+            sc.pp.pca(adata_mock, n_comps=n_pcs)
+            adata.obsm[key + '|X_pca'] = adata_mock.obsm['X_pca']
+            adata.varm[key + '|pca_loadings'] = adata_mock.varm['PCs']
+            adata.uns[key + '|pca_var_ratios'] = adata_mock.uns['pca']['variance_ratio']
+            adata.uns[key + '|cum_sum_eigenvalues'] = adata_mock.uns['pca']['variance']
+        else:
+            sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
+            adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
+            adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
+            adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
+            adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
 
     else:
         import rapids_singlecell as rsc

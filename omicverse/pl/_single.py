@@ -129,7 +129,7 @@ def embedding(
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False,legend_awargs=None):
+                       legend:bool=False,legend_awargs={'ncol':1}):
     """
     Plot cell proportion of each cell type in each visual cluster.
 
