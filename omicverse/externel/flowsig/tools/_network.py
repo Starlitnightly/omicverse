@@ -42,7 +42,10 @@ def run_gsp(adata: ad.AnnData,
     if use_spatial:
 
         # Define the blocks for spatial block bootstrapping
-        block_clusters = sorted(adata.obs[block_key].unique().tolist())
+        #block_clusters = sorted(adata.obs[block_key].unique().tolist())
+        adata.obs[block_key]=adata.obs[block_key].astype('category')
+        block_clusters = adata.obs[block_key].cat.categories.tolist()
+        
 
         for block in block_clusters:
             block_indices = np.where(adata.obs[block_key] == block)[0] # Sample only those cells within the block
@@ -118,7 +121,8 @@ def run_utigsp(adata: ad.AnnData,
         control_resampled = control_samples.copy()
         
         # Define the blocks for bootstrapping
-        block_clusters_control = sorted(adata_control.obs[block_key].unique().tolist())
+        adata_control.obs[block_key]=adata_control.obs[block_key].astype('category')
+        block_clusters_control = adata_control.obs[block_key].cat.categories.tolist()
 
         for block in block_clusters_control:
 
@@ -133,7 +137,10 @@ def run_utigsp(adata: ad.AnnData,
 
             adata_pert = adata_perturbed[adata_perturbed.obs[condition_key] == pert]
 
-            block_clusters_pert = sorted(adata_pert.obs[block_key].unique().tolist())
+            adata_pert.obs[block_key]=adata_pert.obs[block_key].astype('category')
+            block_clusters_pert = adata_pert.obs[block_key].cat.categories.tolist()
+
+            #block_clusters_pert = sorted(adata_pert.obs[block_key].unique().tolist())
 
             for block in block_clusters_pert:
 

@@ -989,7 +989,7 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
         print('{}_colors'.format(celltype_clusters))
         type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
     else:
-        if len(adata.obs[cluster_key].cat.categories)>28:
+        if len(adata.obs[celltype_clusters].cat.categories)>28:
             type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.default_102))
         else:
             type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.zeileis_28))
