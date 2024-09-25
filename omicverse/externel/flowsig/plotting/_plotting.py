@@ -29,7 +29,7 @@ def subset_for_flow_type(adata: sc.AnnData,
 
     if var_type != 'all':
 
-        adata_subset = adata_subset[:, adata_subset.var['Type'].isin(list(var_type))]
+        adata_subset = adata_subset[:, adata_subset.var['Type'].isin([var_type])]
 
     return adata_subset
 
