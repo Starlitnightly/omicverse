@@ -469,6 +469,7 @@ Support Raw Windows platform
 
 - Fixed the error of `get_results` and `get_results_rfc` in `cNMF` module. (#143) (#139)
 - Added `sccaf` to obtain the best clusters.
+- Fixed the `.str` error in cytotrace2 (#146)
 
 ### Bulk Module
 
