@@ -142,7 +142,7 @@ def normalize_confmat1(cmat, mod='1'):
     xmat = np.zeros([dim, dim])
     for i in range(dim):
         for j in range(i + 1, dim):
-            if mod is '1':
+            if mod == '1':
                 xmat[i, j] = xmat[j, i] = max(dmat[i, j] / smat[j], dmat[j, i] / smat[i])
             else:
                 xmat[i, j] = xmat[j, i] = max(dmat[i, j] / smat[i], dmat[j, i] / smat[j])
