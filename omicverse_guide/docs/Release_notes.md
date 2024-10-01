@@ -459,6 +459,7 @@ Support Raw Windows platform
 
 - Added `n_jobs` argument to adjust thread in `extenel.STT.pl.plot_tensor_single`
 - Fixed an error in `extenel.STT.tl.construct_landscape`
+- Updated the tutorial of `COMMOT` and `Flowsig`
   
 
 ### Pl Module

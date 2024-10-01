@@ -55,7 +55,11 @@ class scMulan:
         cell_expression_dict = self.get_gene_expression_dict(i, matrix)
         expressed_genes = list(cell_expression_dict.keys())[::-1]
         expression_values = list(cell_expression_dict.values())[::-1]
-        max_expression = np.max(expression_values)
+        if len(expression_values) == 0:  # Check if the array is empty
+            max_expression = 0  # Set a default value or handle accordingly
+        else:
+            max_expression = np.max(expression_values)
+        #max_expression = np.max(expression_values)
         bins = np.linspace(0, max_expression, self.n_express_level+1)
         binned_expr = np.digitize(expression_values, bins, right=True)
 
