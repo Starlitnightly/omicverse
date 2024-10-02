@@ -42,6 +42,7 @@ def cell_type_smoothing(adata, N_neighbors=15, weighted_smoothing=True, threshol
     adata.obs.cell_type_from_mulan_smoothing[adata.obs.smoothing_score<threshold] = "Unclassified"
 
     if not (col_name + '_colors' in adata.uns):
+        
         sc.pl.umap(adata,color=[col_name],show=False)
         plt.close()
     
