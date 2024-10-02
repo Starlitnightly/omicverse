@@ -17,10 +17,70 @@ A omicverse framework is primarily composed of 5 components.
 - `single`: to analysis the single cell omic-seq like scRNA-seq or scATAC-seq
 - `space`: to analysis the spatial RNA-seq
 - `bulk2single`: to integrate the bulk RNA-seq and single cell RNA-seq
+- `externel`: more related module included RNA-seq avoided installation and confliction
 
 The `__init__.py` file is responsible for importing function entries within each folder, and all function functions use a file starting with `_*.py` for function writing.
 
+
 ## For Developer
+
+### Externel module
+
+In most cases, we realize that writing a module function is difficult. Therefore, we introduced the `external` module. We can directly clone the entire package from GitHub and then move the entire folder to the `external` folder. During this process, we need to pay attention to whether the License allows it and whether there is a conflict with OmicVerse's GPL license. Subsequently, we need to modify the `import` content. We need to change the packages that are not dependencies of OmicVerse from top-level imports to function-level imports.
+
+````shell
+.
+├── omicverse               
+├───── externel
+├──────── STT
+├─────────── __init__.py 
+├─────────── pl
+├─────────── tl
+````
+
+All imports need to ensure that there are no conflicts.
+
+This is an error because this package is not included in the default requirements.txt of OmicVerse.
+
+```python
+
+import dgl 
+
+def calculate():
+    dgl.run()
+    pass
+
+```
+
+The correct import is
+
+```python
+
+def calculate():
+    import dgl 
+    dgl.run()
+    pass
+
+```
+
+We recommend using `try` to detect import errors, which can then guide the user to the correct installation page.
+
+
+```python
+
+def calculate():
+    try:
+        import dgl 
+    except ImportError:
+        raise ImportError(
+            'Please install the dgl from https://www.dgl.ai/pages/start.html'
+        )
+    dgl.run()
+    pass
+
+```
+
+### Main module
 
 If you want to provide pull request for omicverse, you need to be clear about which module the functionality you are developing is subordinate to, e.g. `TOSICA` belongs to the algorithms of the single-cell domain, i.e., you need to add the `_tosica.py` file inside the `single` folder of `omicverse` and `_init__.py` inside the `from . _tosica import pyTOSICA` to make the omicverse add the new functionality
 
