@@ -278,7 +278,7 @@ class Annotator(object):
                     if all_outs.size == 0:
                         all_outs = outs
                     else:
-                        all_outs = all_outs.append(outs)
+                        all_outs = pd.concat([all_outs,outs])
                     if self.noprint == False:
                         print()
                 if self.output:
