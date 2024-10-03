@@ -5,7 +5,7 @@ import scipy.sparse as sp
 from scipy.ndimage import gaussian_filter
 import scanpy as sc
 from tqdm import trange, tqdm
-from skimage.measure import label
+
 import multiprocessing as mp
 from .utils import pre_process, make_image, gene_img_flatten, minmax_normalize, gau_filter_for_single_gene
 
@@ -198,6 +198,7 @@ def get_binary(adata, platform="visium", method = "iterative", multiprocess=Fals
 
 def get_sub(adata, kernel_size = 5, platform="visium",del_rate = 0.01): 
     import cv2
+    from skimage.measure import label
     gene_data = adata.uns['binary_image']
     locates = adata.uns['locates']
         

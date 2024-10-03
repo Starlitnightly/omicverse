@@ -50,13 +50,14 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         return adata2
     elif methods=='scanorama':
         try:
-            import scanorama
+            import intervaltree
+            import fbpca
             #print('mofax have been install version:',mfx.__version__)
         except ImportError:
             raise ImportError(
-                'Please install the scanorama: `pip install scanorama`.'
+                'Please install the intervaltree: `pip install intervaltree fbpca`.'
             )
-        import scanorama
+        from ..externel.scanorama import integrate_scanpy
         batches = adata.obs[batch_key].cat.categories.tolist()
         alldata = {}
         for batch in batches:
@@ -70,7 +71,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         adatas = list(alldata2.values())
         
         # run scanorama.integrate
-        scanorama.integrate_scanpy(adatas, dimred = n_pcs,**kwargs)
+        integrate_scanpy(adatas, dimred = n_pcs,**kwargs)
         scanorama_int = [ad.obsm['X_scanorama'] for ad in adatas]
 
         # make into one matrix.
