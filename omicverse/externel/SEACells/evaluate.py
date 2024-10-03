@@ -14,11 +14,12 @@ def compactness(ad, low_dim_embedding="X_pca", SEACells_label="SEACell"):
     :return: `pd.DataFrame` with a dataframe of compactness per metacell
 
     """
-    import palantir
+    #import palantir
+    from ..palantir.utils import run_diffusion_maps, determine_multiscale_space
 
     components = pd.DataFrame(ad.obsm[low_dim_embedding]).set_index(ad.obs_names)
-    dm_res = palantir.utils.run_diffusion_maps(components)
-    dc = palantir.utils.determine_multiscale_space(dm_res, n_eigs=10)
+    dm_res = run_diffusion_maps(components)
+    dc = determine_multiscale_space(dm_res, n_eigs=10)
 
     return pd.DataFrame(
         dc.join(ad.obs[SEACells_label]).groupby(SEACells_label).var().mean(1)
@@ -40,10 +41,11 @@ def separation(
     :return: `pd.DataFrame` with a separation of compactness per metacell
 
     """
-    import palantir
+    #import palantir
+    from ..palantir.utils import run_diffusion_maps, determine_multiscale_space
     components = pd.DataFrame(ad.obsm[low_dim_embedding]).set_index(ad.obs_names)
-    dm_res = palantir.utils.run_diffusion_maps(components)
-    dc = palantir.utils.determine_multiscale_space(dm_res, n_eigs=10)
+    dm_res = run_diffusion_maps(components)
+    dc = determine_multiscale_space(dm_res, n_eigs=10)
 
     # Compute DC per metacell
     metacells_dcs = (
@@ -90,7 +92,8 @@ def get_density(ad, key, nth_neighbor=150):
     :return: pd.DataFrame containing cell ID and density.
     """
     from sklearn.neighbors import NearestNeighbors
-    import palantir
+    i#mport palantir
+    from ..palantir.utils import run_diffusion_maps, determine_multiscale_space
 
     neigh = NearestNeighbors(n_neighbors=nth_neighbor)
 
@@ -100,8 +103,8 @@ def get_density(ad, key, nth_neighbor=150):
     else:
         raise ValueError(f"Key {key} not present in ad.obsm.")
 
-    diffusion_map_results = palantir.utils.run_diffusion_maps(components)
-    diffusion_components = palantir.utils.determine_multiscale_space(
+    diffusion_map_results = run_diffusion_maps(components)
+    diffusion_components = determine_multiscale_space(
         diffusion_map_results, n_eigs=8
     )
 

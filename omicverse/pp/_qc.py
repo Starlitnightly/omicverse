@@ -113,7 +113,7 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
 
         # Post doublets removal QC plot
         print('Begin of post doublets removal and QC plot')
-        sc.external.pp.scrublet(adata, random_state=1234)
+        sc.pp.scrublet(adata, random_state=1234)
         adata_remove = adata[adata.obs['predicted_doublet'], :]
         removed_cells.extend(list(adata_remove.obs_names))
         adata = adata[~adata.obs['predicted_doublet'], :]
@@ -273,7 +273,8 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             print('!!!if you want to use novel doublet detection, \
             please set `doublets_method=sccomposite`!!!')
             print('Begin of post doublets removal and QC plot using`scrublet`')
-            sc.external.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+            sc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+
             adata_remove = adata[adata.obs['predicted_doublet'], :]
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[~adata.obs['predicted_doublet'], :]
