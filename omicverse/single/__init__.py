@@ -17,7 +17,7 @@ from ._simba import pySIMBA
 from ._tosica import pyTOSICA
 from ._atac import atac_concat_get_index,atac_concat_inner,atac_concat_outer
 from ._batch import batch_correction
-from ._cellfategenie import Fate,gene_trends,mellon_density
+from ._cellfategenie import Fate as cellfategenie,gene_trends,mellon_density
 from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
 from ._traj import TrajInfer
 from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
