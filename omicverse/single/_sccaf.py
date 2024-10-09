@@ -809,9 +809,9 @@ def SCCAF_optimize(ad,
         if 'X_pca' not in ad.obsm.keys():
             raise ValueError("`adata.obsm['X_pca']` doesn't exist. Run `sc.pp.pca` first.")
         X = ad.obsm['X_pca']
-    elif 'X_%s'%use in ad.obsm.dtype.fields:
+    elif 'X_%s'%use in ad.obsm.keys():
         X = ad.obsm['X_%s'%use]
-    elif use in ad.obsm.dtype.fields:
+    elif use in ad.obsm.keys():
         X = ad.obsm[use]
     else:
         X = ad[:,ad.var['highly_variable']].X

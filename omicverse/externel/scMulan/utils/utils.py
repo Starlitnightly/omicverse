@@ -4,9 +4,12 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 
-def cell_type_smoothing(adata, N_neighbors=15, weighted_smoothing=True, threshold=0.5,col_name = 'cell_type_from_scMulan'):
+def cell_type_smoothing(adata,use_rep='X_pca', N_neighbors=15,n_pcs=10,
+                         weighted_smoothing=True, threshold=0.5,
+                         col_name = 'cell_type_from_scMulan'):
     # 重新算一个nn，避免取的N_neighbors比画umap的时候选的参数大
-    sc.pp.neighbors(adata, n_pcs=10, n_neighbors=N_neighbors, key_added="Smoothing")
+    sc.pp.neighbors(adata,use_rep=use_rep, n_pcs=n_pcs, 
+                    n_neighbors=N_neighbors, key_added="Smoothing")
     
     # smoothing_score是近邻平滑之后给的分数
     # cell_type_from_mulan_smoothing是平滑后的结果
@@ -40,11 +43,14 @@ def cell_type_smoothing(adata, N_neighbors=15, weighted_smoothing=True, threshol
     adata.obs['cell_type_from_mulan_smoothing'] = smoothing_celltype_list
     adata.obs['smoothing_score'] = smoothing_score_list
     adata.obs.cell_type_from_mulan_smoothing[adata.obs.smoothing_score<threshold] = "Unclassified"
-
+    adata.obs[col_name]=adata.obs[col_name].astype('category')
     if not (col_name + '_colors' in adata.uns):
-        
-        sc.pl.umap(adata,color=[col_name],show=False)
-        plt.close()
+        if len(adata.obs[col_name].cat.categories)<102:
+            adata.uns[col_name + '_colors'] = sc.pl.palettes.default_102[:len(adata.obs[col_name].cat.categories)]
+        else:
+            adata.uns[col_name + '_colors'] = ['grey' for _ in range(len(adata.obs[col_name].cat.categories))]
+        #sc.pl.umap(adata,color=[col_name],show=False)
+        #plt.close()
     
     adata.uns['cell_type_from_mulan_smoothing_colors'] = ["#666666" for _ in adata.obs['cell_type_from_mulan_smoothing'].unique()]
     adata.obs[col_name] = pd.Categorical(adata.obs[col_name])
