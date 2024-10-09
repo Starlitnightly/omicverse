@@ -142,7 +142,7 @@ The table contains the tools have been published
   </tr>
 
   <tr>
-    <td align="center">COMPOSITE<br><a href="https://github.com/wanglab-broad/CAST">📦</a> <a href="https://www.nature.com/articles/s41592-024-02410-7">📖</a></td>
+    <td align="center">CAST<br><a href="https://github.com/wanglab-broad/CAST">📦</a> <a href="https://www.nature.com/articles/s41592-024-02410-7">📖</a></td>
   </tr>
 </table>
 </div>

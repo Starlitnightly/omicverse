@@ -54,7 +54,7 @@ dependencies = [
     'graphtools>=1.5',
     'phate>=1.0',
     'tqdm>=4.64',
-    'pydeseq2>=0.3',
+    'pydeseq2==0.4.1',
     'mofax>=0.3',
     'adjustText>=0.8',
     'scikit-misc>=0.1',
@@ -68,7 +68,7 @@ dependencies = [
     'plotly',
     'numba>=0.56',
     'tqdm',
-    'transformers',
+    'transformers>=0.30',
     #'cvxpy>=1.3',
 
 ]

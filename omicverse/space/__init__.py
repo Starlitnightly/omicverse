@@ -5,3 +5,4 @@ from ._spaceflow import pySpaceFlow
 from ._spatrio import CellMap
 from ._stt import STT
 from ._svg import svg
+from ._cast import CAST
