@@ -349,7 +349,8 @@ class GSEA(GSEAbase):
         self._noplot=no_plot
         # init logger
         logfile = self.prepare_outdir()
-        self._logger = log_init(outlog=logfile,
+        self._logger = log_init(name='gseapy',
+                                filename=logfile,
                                 log_level=logging.INFO if self.verbose else logging.WARNING)
 
     def load_data(self, cls_vec):
@@ -481,7 +482,8 @@ class Prerank(GSEAbase):
         self._noplot=no_plot
         # init logger
         logfile = self.prepare_outdir()
-        self._logger = log_init(outlog=logfile,
+        self._logger = log_init(name='gseapy',
+                                filename=logfile,
                                 log_level=logging.INFO if self.verbose else logging.WARNING)
 
 
@@ -558,7 +560,8 @@ class SingleSampleGSEA(GSEAbase):
         # init logger
 
         logfile = self.prepare_outdir()
-        self._logger = log_init(outlog=logfile,
+        self._logger = log_init(name='gseapy',
+                                filename=logfile,
                                 log_level=logging.INFO if self.verbose else logging.WARNING)
 
     def corplot(self):
@@ -814,7 +817,8 @@ class Replot(GSEAbase):
         # init logger
         mkdirs(self.outdir)
         outlog = os.path.join(self.outdir,"gseapy.%s.%s.log"%(self.module,"run"))
-        self._logger = log_init(outlog=outlog,
+        self._logger = log_init(name='gseapy',
+                                filename=logfile,
                                 log_level=logging.INFO if self.verbose else logging.WARNING)
     def run(self):
         """main replot function"""
