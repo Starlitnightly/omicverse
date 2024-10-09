@@ -15,7 +15,7 @@ def CAST(adata,sample_key=None,basis='spatial',layer='norm_1e4',
     # Get the coordinates and expression data for each sample
     samples = np.unique(adata.obs[sample_key]) # used samples in adata
     coords_raw = {sample_t: np.array(adata.obs[['x','y']])[adata.obs[sample_key] == sample_t] for sample_t in samples}
-    exp_dict = {sample_t: adata[adata.obs[sample_key] == sample_t].layers['norm_1e4'] for sample_t in samples}
+    exp_dict = {sample_t: adata[adata.obs[sample_key] == sample_t].layers[layer] for sample_t in samples}
 
     
     os.makedirs(output_path, exist_ok=True)

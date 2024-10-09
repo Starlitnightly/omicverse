@@ -492,3 +492,7 @@ Support Raw Windows platform
 ### Bulk Module
 
 - Fixed the error of log_init in gsea_obj.enrichment (#184)
+
+### Space Module
+
+- Added CAST to integrate multi slice
