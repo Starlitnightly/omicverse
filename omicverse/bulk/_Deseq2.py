@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import statsmodels.api as sm
+import anndata as ad
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib
@@ -573,6 +574,10 @@ class pyDEG(object):
                     n_cpus=n_cpus,
                 )
             elif pydeseq2.__version__<='0.4.1':
+                if ad.__version__>'0.10.8':
+                    raise ImportError(
+                            'Please install the 0.10.8 version of anndata: `pip install anndata==0.10.8`.'
+                        )
                 dds = DeseqDataSet(
                     counts=counts_df,
                     metadata=clinical_df,
