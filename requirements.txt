@@ -2,7 +2,7 @@ scipy < 1.12
 scikit-image == 0.21.0
 omicverse
 pandas
-scanpy
+scanpy == 1.9.8
 matplotlib
 seaborn
 scikit-learn
@@ -43,3 +43,10 @@ ctxcore
 pydeseq2 > 0.3
 mkdocs-plotly-plugin
 bioservices
+datetime >= 4.5
+ERgene >= 1.2
+gseapy == 0.10.8
+mofax >= 0.3
+pybedtools >= 0.8.1
+pybind11 >= 2.10
+scrublet >= 0.2

@@ -53,6 +53,23 @@ OmicVerse can be installed via conda or pypi and you need to install `pytorch` a
 
 You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
 
+Please note that the `scanpy` version is pinned to `1.9.8` to avoid compatibility issues. Additionally, ensure that the following dependencies are installed:
+
+- `ctxcore>=0.2`
+- `datetime>=4.5`
+- `ERgene>=1.2`
+- `graphtools>=1.5`
+- `gseapy==0.10.8`
+- `ktplotspy>=0.1`
+- `metatime>=1.3.0`
+- `mofax>=0.3`
+- `phate>=1.0`
+- `pybedtools>=0.8.1`
+- `pybind11>=2.10`
+- `pydeseq2<=0.4.0,>=0.3`
+- `python-dotplot>=0.0.1`
+- `scrublet>=0.2`
+
 Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
 ## `4` [Data Framework and Reference](#)
