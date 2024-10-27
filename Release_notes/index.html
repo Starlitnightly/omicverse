@@ -502,6 +502,11 @@
         Visualization of Bulk RNA-seq
       </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1334,6 +1339,30 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="#pp-module_6">
     PP Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-168">
+    v 1.6.8
+  </a>
+<nav aria-label="v 1.6.8" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_13">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_9">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_5">
+    Pl Module
   </a>
 </li>
 </ul>
@@ -2172,6 +2201,30 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-168">
+    v 1.6.8
+  </a>
+<nav aria-label="v 1.6.8" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_13">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_9">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_5">
+    Pl Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -2703,6 +2756,7 @@
 <ul>
 <li>Added <code>n_jobs</code> argument to adjust thread in <code>extenel.STT.pl.plot_tensor_single</code></li>
 <li>Fixed an error in <code>extenel.STT.tl.construct_landscape</code></li>
+<li>Updated the tutorial of <code>COMMOT</code> and <code>Flowsig</code></li>
 </ul>
 <h3 id="pl-module_4">Pl Module<a class="headerlink" href="#pl-module_4" title="Permanent link">¶</a></h3>
 <ul>
@@ -2728,6 +2782,23 @@
 <ul>
 <li>Fixed a return bugs in <code>pp.regress_and_scale</code> (#156)</li>
 <li>Fixed a scanpy version error when using <code>ov.pp.pca</code> (#154)</li>
+</ul>
+<h2 id="v-168">v 1.6.8<a class="headerlink" href="#v-168" title="Permanent link">¶</a></h2>
+<h3 id="bulk-module_13">Bulk Module<a class="headerlink" href="#bulk-module_13" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed the error of log_init in gsea_obj.enrichment (#184)</li>
+<li>Added <code>ax</code> argument to visualize the <code>geneset_plot</code></li>
+</ul>
+<h3 id="space-module_9">Space Module<a class="headerlink" href="#space-module_9" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added CAST to integrate multi slice</li>
+<li>Added <code>crop_space_visium</code> in <code>omicverse.tl</code> to crop the sub area of space data</li>
+</ul>
+<h3 id="pl-module_5">Pl Module<a class="headerlink" href="#pl-module_5" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>legend</code> argument to visualize the <code>cpdb_heatmap</code></li>
+<li>Added <code>text_show</code> argument to visualize the <code>cellstackarea</code></li>
+<li>Added <code>ForbiddenCity</code> color system</li>
 </ul>
 </article>
 </div>

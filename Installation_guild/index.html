@@ -192,6 +192,11 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#docker">
+    Docker
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#jupyter-lab">
     Jupyter-lab
   </a>
@@ -583,6 +588,11 @@
         Visualization of Bulk RNA-seq
       </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
 </ul>
 </nav>
 </li>
@@ -677,6 +687,11 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#docker">
+    Docker
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#jupyter-lab">
     Jupyter-lab
   </a>
@@ -704,7 +719,7 @@
 <p>Installation methods vary depending on the platform:</p>
 <ul>
 <li><strong>Windows-WSL</strong>: Install the <a href="https://learn.microsoft.com/en-us/windows/wsl/install">WSL subsystem</a> and <code>conda</code> within WSL to configure the OmicVerse environment.</li>
-<li><strong>Windows-Native</strong>: From version <code>1.6.2</code>, OmicVerse supports native Windows, but you need to install <code>torch</code>, <code>torch_geometric</code>, and <code>python-annoy</code> first.</li>
+<li><strong>Windows-Native</strong>: From version <code>1.6.2</code>, OmicVerse supports native Windows, but you need to install <code>torch</code>, <code>torch_geometric</code> first.</li>
 <li><strong>Linux</strong>: Install <a href="https://www.anaconda.com/">Anaconda</a> or <a href="https://docs.conda.io/en/latest/miniconda.html">Miniconda</a> and use conda to configure the OmicVerse environment.</li>
 <li><strong>Mac OS</strong>: Use <a href="https://github.com/conda-forge/miniforge"><code>miniforge</code></a> or <a href="https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/"><code>mambaforge</code></a> to configure the environment.</li>
 </ul>
@@ -756,7 +771,7 @@
 </li>
 <li>
 <p><strong>Install OmicVerse</strong>:</p>
-<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>python-annoy<span class="w"> </span>-c<span class="w"> </span>conda-forge
+<div class="highlight"><pre><span></span><code><span class="c1">#conda install python-annoy -c conda-forge</span>
 conda<span class="w"> </span>install<span class="w"> </span>omicverse<span class="w"> </span>-c<span class="w"> </span>conda-forge
 </code></pre></div>
 </li>
@@ -821,7 +836,7 @@ pip<span class="w"> </span>install<span class="w"> </span>pyg_lib<span class="w"
 </ul>
 </li>
 <li>
-<p><strong>Configure Annoy (Windows Native only)</strong>:</p>
+<p><strong>Configure Annoy (Windows Native only) (Removed)</strong>:</p>
 <div class="highlight"><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>python-annoy<span class="w"> </span>-c<span class="w"> </span>conda-forge
 </code></pre></div>
 </li>
@@ -892,6 +907,8 @@ conda<span class="w"> </span>install<span class="w"> </span>pytorch::pytorch<spa
 <span class="c1"># or</span>
 mamba<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>conda/omicverse_gpu.yml
 </code></pre></div>
+<h2 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">¶</a></h2>
+<p>If you plan on running omicverse in a containerized environment, we provide various <a href="https://hub.docker.com/r/starlitnightly/omicverse">Docker images</a> hosted on Docker Hub.</p>
 <h2 id="jupyter-lab">Jupyter-lab<a class="headerlink" href="#jupyter-lab" title="Permanent link">¶</a></h2>
 <p>For the best interactive analysis experience, we highly recommend installing jupyter-lab so that you can interactively edit the code and get the analysis results and visualizations right away.</p>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>jupyter-lab
