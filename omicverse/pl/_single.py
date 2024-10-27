@@ -951,7 +951,7 @@ def plot_boxplots(  # pragma: no cover
 def cellstackarea(adata,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False,legend_awargs=None):
+                       legend:bool=False,legend_awargs=None,text_show=False,):
     """
     Plot the cell type percentage in each groupby category
     
@@ -999,6 +999,10 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
     for cell_type in cell_types:
         ax.fill_between(pivot_df.index, bottom, bottom + pivot_df[cell_type], label=cell_type,
                        color=type_color_all[cell_type])
+        max_index = pivot_df[cell_type].idxmax()
+        if text_show==True:
+            ax.text(max_index,bottom[max_index]+pivot_df.loc[max_index,cell_type]/2,cell_type,fontsize=ticks_fontsize-1)
+        
         bottom += pivot_df[cell_type]
     
     if legend!=False:
@@ -1030,6 +1034,7 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
     #fig.tight_layout()
     if ax==None:
         return fig,ax
+
 
 
 def violin(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=12,

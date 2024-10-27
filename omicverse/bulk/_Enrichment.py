@@ -225,7 +225,7 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         figsize:tuple=(2,4),cmap:str='YlGnBu',
                         text_knock:int=5,text_maxsize:int=20,
                         bbox_to_anchor_used:tuple=(-0.45, -13),node_diameter:int=10,
-                        custom_ticks:list=[5,10])->matplotlib.axes._axes.Axes:
+                        custom_ticks:list=[5,10],ax=None)->matplotlib.axes._axes.Axes:
     """
     Plot the gene set enrichment result.
 
@@ -247,7 +247,8 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
         A matplotlib.axes.Axes object.
     
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     plot_data2=enrich_res.sort_values('P-value')[:num].sort_values('logc')
     st=ax.scatter(plot_data2['fraction'],range(len(plot_data2['logc'])),
             s=plot_data2['num']*node_diameter,linewidths=1,edgecolors='black',c=plot_data2['logp'],cmap=cmap)
@@ -258,7 +259,7 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
     plt.title(fig_title,fontsize=12)
     plt.xlabel(fig_xlabel,fontsize=12)
 
-    #fig = plt.gcf()
+    fig = plt.gcf()
     cax = fig.add_axes(cax_loc)
     cb=fig.colorbar(st,shrink=0.25,cax=cax,orientation='horizontal')
     cb.set_label(r'$−Log_{10}(P_{adjusted})$',fontdict={'size':cax_fontsize})
