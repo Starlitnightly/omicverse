@@ -160,8 +160,9 @@ def cpdb_chord(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
 def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       celltype_key:str,nodecolor_dict=None,ax=None,
                       source_cells=None,target_cells=None,
-                      figsize=(3,3),fontsize=11,rotate=False,
-                      legend_kws={'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',},return_table=False,**kwargs):
+                      figsize=(3,3),fontsize=11,rotate=False,legend=True,
+                      legend_kws={'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',},
+                      return_table=False,**kwargs):
     
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -297,7 +298,7 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
         show_colnames=False,
         row_dendrogram=False,
         col_names_side='left',
-        legend=True,
+        legend=legend,
         **kwargs
         #cmap_legend_kws={'font':12},
     )
@@ -319,7 +320,7 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             show_colnames=False,
             row_dendrogram=False,
             col_names_side='top',
-            legend=True,
+            legend=legend,
             **kwargs
             #cmap_legend_kws={'font':12},
         )

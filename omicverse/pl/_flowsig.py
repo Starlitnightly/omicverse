@@ -60,7 +60,7 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
                        label_verticalalignment: str = 'center_baseline', label_fontsize: int = 12,
                        label_fontfamily: str = 'Arial', label_fontweight: str = 'bold', label_bbox=None,
                        legend_bbox: tuple = (0.7, 0.05), legend_ncol: int = 3, legend_fontsize: int = 12,
-                       legend_fontweight: str = 'bold', curve_awarg=None,ylim=(-0.5,0.5),xlim=(-3,3)):
+                       legend_fontweight: str = 'bold', curve_awarg=None,ylim=(-0.5,0.5),xlim=(-3,3),ax=None):
     """
     Plot network graph.
 
@@ -91,7 +91,10 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
         curve_awarg: dict, arguments for curved graph
     """
     from adjustText import adjust_text
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
 
     # Determine node positions
     if pos_type == 'spring':
@@ -202,6 +205,12 @@ def plot_flowsig_network(flow_network,
     gem_li=[i for i in flow_network.nodes if 'GEM' in i]
     receptor_li=[i for i,j in flow_network.edges if ('GEM' in j)and('GEM' not in i)]
     sender_li=[j for i,j in flow_network.edges if ('GEM' in i)and('GEM' not in j)]
+    for g in gem_li:
+        flow_network.nodes[g]['type']='module'
+    for g in receptor_li:
+        flow_network.nodes[g]['type']='inflow'
+    for g in sender_li:
+        flow_network.nodes[g]['type']='outflow'
     #gene_li=[i for i in flow_network.nodes if 'GEM' not in i]
     G_type_dict=dict(zip(gem_li+receptor_li+sender_li,
             ['GEM' for i in range(len(gem_li))]+\
@@ -213,7 +222,10 @@ def plot_flowsig_network(flow_network,
     sender_li=[j for i,j in flow_network.edges if ('GEM' in i)and('GEM' not in j)]
     #gene_li=[i for i in flow_network.nodes if 'GEM' not in i]
     if len(gem_li)<28:
-        from ._palette import sc_color
+        sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
+            '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
+            '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
+
         G_color_dict=dict(zip(gem_li+receptor_li+sender_li,
                 [sc_color[i] for i in range(len(gem_li))]+\
                             ['#c2c2c2'  for i in range(len(receptor_li))]+\
@@ -227,7 +239,16 @@ def plot_flowsig_network(flow_network,
     
     #G = nx.Graph([(0, 1), (1, 2), (1, 3), (3, 4)])
     import networkx as nx
-    layers = {"layer1": list(set(sender_li)),  "layer3": list(set(receptor_li)),"layer2": list(set(gem_li)),}
+    if len(sender_li)==0 and len(receptor_li)>0:
+        layers = { "layer3": list(set(receptor_li)),
+                  "layer2": list(set(gem_li)),}
+    elif len(sender_li)>0 and len(receptor_li)==0:
+        layers = {"layer1": list(set(sender_li)), 
+                   "layer3": list(set(gem_li))}
+    else:
+        layers = {"layer1": list(set(sender_li)), 
+                   "layer3": list(set(receptor_li)),
+                   "layer2": list(set(gem_li)),}
     pos = nx.multipartite_layout(flow_network, subset_key=layers,align='horizontal',scale=2.0)
 
     #fig, ax = plt.subplots(figsize=(8,8)) 

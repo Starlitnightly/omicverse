@@ -492,7 +492,16 @@ Support Raw Windows platform
 ### Bulk Module
 
 - Fixed the error of log_init in gsea_obj.enrichment (#184)
+- Added `ax` argument to visualize the `geneset_plot`
 
 ### Space Module
 
 - Added CAST to integrate multi slice
+- Added `crop_space_visium` in `omicverse.tl` to crop the sub area of space data
+
+### Pl Module
+
+- Added `legend` argument to visualize the `cpdb_heatmap`
+- Added `text_show` argument to visualize the `cellstackarea`
+- Added `ForbiddenCity` color system
+

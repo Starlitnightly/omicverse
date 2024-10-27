@@ -63,6 +63,7 @@ nav:
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
+        - Color system: Tutorials-plotting/t_visualize_colorsystem.ipynb
 
 - API documentation: api/index.md
 - Release notes: Release_notes.md
