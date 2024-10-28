@@ -262,6 +262,11 @@
         Celltype annotation migration(mapping) with TOSICA
       </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scmulan/">
+        Celltype auto annotation with scMulan
+      </a>
+</li>
 </ul>
 </nav>
 </li>
@@ -546,77 +551,47 @@
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.__init__">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.__init__">
     __init__()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_direct">
-    calculate_correlation_direct()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_indirect">
-    calculate_correlation_indirect()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_soft_threshold">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_soft_threshold">
     calculate_soft_threshold()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_corr_matrix">
-    calculate_corr_matrix()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_distance">
-    calculate_distance()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_geneTree">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_geneTree">
     calculate_geneTree()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_dynamicMods">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_dynamicMods">
     calculate_dynamicMods()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_gene_module">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_gene_module">
     calculate_gene_module()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.get_sub_module">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_module">
     get_sub_module()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.get_sub_network">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_network">
     get_sub_network()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_sub_network">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_sub_network">
     plot_sub_network()
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.analysis_meta_correlation">
-    analysis_meta_correlation()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_meta_correlation">
-    plot_meta_correlation()
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_matrix">
+<a class="md-nav__link" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_matrix">
     plot_matrix()
   </a>
 </li>
@@ -632,373 +607,118 @@
 <a id="omicverse.bulk.pyWGCNA"></a>
 <div class="doc doc-contents first">
 <p class="doc doc-class-bases">
-        Bases: <code>object</code></p>
-<p>pyWGCNA: Weighted correlation network analysis in Python</p>
+        Bases: <code><span title="omicverse.externel.PyWGCNA.geneExp.GeneExp">GeneExp</span></code></p>
+<p>A class used to do weighted gene co-expression network analysis.</p>
+<p>:param name: name of the WGCNA we used to visualize data (default: 'WGCNA')
+:type name: str
+:param save: indicate if you want to save result of important steps in a figure directory (default: False)
+:type save: bool
+:param species: species of the data you use i.e mouse, human
+:type species: str
+:param level: which type of data you use including gene, transcript (default: gene)
+:type level: str
+:param outputPath: path you want to save all you figures and object (default: '', where you rau your script)
+:type outputPath: str
+:param anndata: if the expression data is in anndata format you should pass it through this parameter. X should be expression matrix. var is a gene information and obs is a sample information.
+:type anndata: anndata
+:param geneExp: expression matrix which genes are in the rows and samples are columns
+:type geneExp: pandas dataframe
+:param geneExpPath: path of expression matrix
+:type geneExpPath: str
+:param sep: separation symbol to use for reading data in geneExpPath properly
+:type sep: str
+:param geneInfo: dataframe that contains genes information it should have a same index as gene expression column names (gene/transcript ID)
+:type geneInfo: pandas dataframe
+:param sampleInfo: dataframe that contains samples information it should have a same index as gene expression index (sample ID)
+:type sampleInfo: pandas dataframe
+:param TPMcutoff: cut off for removing genes that expressed under this number along samples
+:type TPMcutoff: int
+:param cut: number to remove outlier sample (default: 'inf') By default we don't remove any sample by hierarchical clustering
+:type cut: float
+:param powers: different powers to test to have scale free network (default: [1:10, 11:21:2])
+:type powers: list of int
+:param RsquaredCut: R squaered cut to choose power for having scale free network; between 0 to 1 (default: 0.9)
+:type RsquaredCut: float
+:param MeanCut: mean connectivity to choose power for having scale free network (default: 100)
+:type MeanCut: int
+:param networkType: Type of network we can create including "unsigned", "signed" and "signed hybrid" (default: "signed hybrid")
+:type networkType: str
+:param TOMType: Type of topological overlap matrix(TOM) including "unsigned", "signed" (default: "signed")
+:type TOMType: str
+:param minModuleSize: We like large modules, so we set the minimum module size relatively high (default: 50)
+:type minModuleSize: int
+:param naColor: color we used to identify genes we don't find any cluster for them (default: "grey")
+:type naColor: str
+:param MEDissThres:  diss similarity threshold (default: 0.2)
+:type MEDissThres: float
+:param figureType: extension of figure (default: "pdf")
+:type figureType: str
+:param MEs: eigengenes
+:type MEs: ndarray
+:param geneExpr: gene expression object that contains raw gene expression along with gene and sample information.
+:type geneExpr: geneExp class
+:param datExpr: data expression data that contains preprocessed data
+:type datExpr: anndata
+:param dynamicMods: name of modules by clustering similar genes together
+:type dynamicMods: list
+:param TOM: topological overlap measure using average linkage hierarchical clustering which inputs a measure of interconnectedness
+:param TOM: ndarray
+:param adjacency: adjacency matrix calculating base of the type of network
+:type adjacency: ndarray
+:param geneTree: average hierarchical clustering of dissTOM matrix
+:type geneTree: ndarray
+:param power: power to have scale free network (default: 6)
+:type power: int
+:param sft: soft threshold table which has information for each powers
+:type sft: pandas dataframe
+:param datME:
+:type datME: pandas dataframe
+:param signedKME:(signed) eigengene-based connectivity (module membership)
+:type signedKME: pandas dataframe
+:param moduleTraitCor: correlation between each module and metadata
+:type moduleTraitCor: pandas dataframe
+:param moduleTraitPvalue: p-value of correlation between each module and metadata
+:type moduleTraitPvalue: pandas dataframe</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.__init__">
-<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="s1">''</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.__init__" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.__init__">
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'WGCNA'</span><span class="p">,</span> <span class="n">TPMcutoff</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">powers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">RsquaredCut</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">MeanCut</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">networkType</span><span class="o">=</span><span class="s1">'signed hybrid'</span><span class="p">,</span> <span class="n">TOMType</span><span class="o">=</span><span class="s1">'signed'</span><span class="p">,</span> <span class="n">minModuleSize</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">naColor</span><span class="o">=</span><span class="s1">'grey'</span><span class="p">,</span> <span class="n">cut</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="s1">'inf'</span><span class="p">),</span> <span class="n">MEDissThres</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">species</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">'gene'</span><span class="p">,</span> <span class="n">anndata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">geneExp</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">geneExpPath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">','</span><span class="p">,</span> <span class="n">geneInfo</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sampleInfo</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">outputPath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figureType</span><span class="o">=</span><span class="s1">'pdf'</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.__init__" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
-<p>Initialize the pyWGCNA module</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>data</code></td>
-<td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>The dataframe of gene expression data</p></td>
-<td>
-<em>required</em>
-</td>
-</tr>
-<tr>
-<td><code>save_path</code></td>
-<td>
-<code>str</code>
-</td>
-<td><p>The path to save the results</p></td>
-<td>
-<code>''</code>
-</td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_direct">
-<code class="highlight language-python"><span class="n">calculate_correlation_direct</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s1">'pearson'</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_direct" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_soft_threshold">
+<code class="highlight language-python"><span class="n">calculate_soft_threshold</span><span class="p">(</span><span class="n">colorlist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_soft_threshold" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
-<p>calculate the correlation coefficient matrix</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>method</code></td>
-<td>
-<code>str</code>
-</td>
-<td><p>The method to calculate the correlation coefficient matrix</p></td>
-<td>
-<code>'pearson'</code>
-</td>
-</tr>
-<tr>
-<td><code>save</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to save the result</p></td>
-<td>
-<code>False</code>
-</td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_indirect">
-<code class="highlight language-python"><span class="n">calculate_correlation_indirect</span><span class="p">(</span><span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_correlation_indirect" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_geneTree">
+<code class="highlight language-python"><span class="n">calculate_geneTree</span><span class="p">()</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_geneTree" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
-<p>calculate the indirect correlation coefficient matrix</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>save</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to save the result</p></td>
-<td>
-<code>False</code>
-</td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_soft_threshold">
-<code class="highlight language-python"><span class="n">calculate_soft_threshold</span><span class="p">(</span><span class="n">threshold_range</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_soft_threshold" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_dynamicMods">
+<code class="highlight language-python"><span class="n">calculate_dynamicMods</span><span class="p">(</span><span class="n">kwargs_function</span><span class="o">=</span><span class="p">{</span><span class="s1">'cutreeHybrid'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'deepSplit'</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">'pamRespectsDendro'</span><span class="p">:</span> <span class="kc">False</span><span class="p">}})</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_dynamicMods" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
-<p>calculate the soft threshold</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>threshold_range</code></td>
-<td>
-<code>int</code>
-</td>
-<td><p>The range of threshold</p></td>
-<td>
-<code>12</code>
-</td>
-</tr>
-<tr>
-<td><code>plot</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to plot the result</p></td>
-<td>
-<code>True</code>
-</td>
-</tr>
-<tr>
-<td><code>save</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to save the result</p></td>
-<td>
-<code>False</code>
-</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>The dataframe of soft threshold</p></td>
-</tr>
-</tbody>
-</table>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_corr_matrix">
-<code class="highlight language-python"><span class="n">calculate_corr_matrix</span><span class="p">()</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_corr_matrix" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_gene_module">
+<code class="highlight language-python"><span class="n">calculate_gene_module</span><span class="p">(</span><span class="n">kwargs_function</span><span class="o">=</span><span class="p">{</span><span class="s1">'cutreeHybrid'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'deepSplit'</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">'pamRespectsDendro'</span><span class="p">:</span> <span class="kc">False</span><span class="p">}})</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.calculate_gene_module" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
-<p>calculate the correlation matrix</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_distance">
-<code class="highlight language-python"><span class="n">calculate_distance</span><span class="p">(</span><span class="n">trans</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_distance" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>calculate the distance matrix</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>trans</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to transpose the correlation matrix</p></td>
-<td>
-<code>True</code>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_geneTree">
-<code class="highlight language-python"><span class="n">calculate_geneTree</span><span class="p">(</span><span class="n">linkage_method</span><span class="o">=</span><span class="s1">'ward'</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_geneTree" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>calculate the geneTree</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>linkage_method</code></td>
-<td>
-<code>str</code>
-</td>
-<td><p>The method to calculate the geneTree, it can be found in <code>scipy.cluster.hierarchy.linkage</code></p></td>
-<td>
-<code>'ward'</code>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_dynamicMods">
-<code class="highlight language-python"><span class="n">calculate_dynamicMods</span><span class="p">(</span><span class="n">minClusterSize</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">deepSplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_dynamicMods" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>calculate the dynamicMods</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>minClusterSize</code></td>
-<td>
-<code>int</code>
-</td>
-<td><p>The minimum size of cluster</p></td>
-<td>
-<code>30</code>
-</td>
-</tr>
-<tr>
-<td><code>deepSplit</code></td>
-<td>
-<code>int</code>
-</td>
-<td><p>The deep of split</p></td>
-<td>
-<code>2</code>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.calculate_gene_module">
-<code class="highlight language-python"><span class="n">calculate_gene_module</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">25</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">colorlist</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.calculate_gene_module" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>calculate the gene module</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>figsize</code></td>
-<td>
-<code>tuple</code>
-</td>
-<td><p>The size of figure</p></td>
-<td>
-<code>(25, 10)</code>
-</td>
-</tr>
-<tr>
-<td><code>save</code></td>
-<td>
-<code>bool</code>
-</td>
-<td><p>Whether to save the figure</p></td>
-<td>
-<code>True</code>
-</td>
-</tr>
-<tr>
-<td><code>colorlist</code></td>
-<td>
-<code>list</code>
-</td>
-<td><p>The color list of module</p></td>
-<td>
-<code>None</code>
-</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>The dataframe of gene module</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.get_sub_module">
-<code class="highlight language-python"><span class="n">get_sub_module</span><span class="p">(</span><span class="n">mod_list</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.get_sub_module" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_module">
+<code class="highlight language-python"><span class="n">get_sub_module</span><span class="p">(</span><span class="n">mod_list</span><span class="p">,</span> <span class="n">mod_type</span><span class="o">=</span><span class="s1">'module_color'</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_module" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
 <p>Get sub-module of a module</p>
 <p><strong>Parameters:</strong></p>
@@ -1044,9 +764,9 @@
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.get_sub_network">
-<code class="highlight language-python"><span class="n">get_sub_network</span><span class="p">(</span><span class="n">mod_list</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.get_sub_network" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_network">
+<code class="highlight language-python"><span class="n">get_sub_network</span><span class="p">(</span><span class="n">mod_list</span><span class="p">,</span> <span class="n">mod_type</span><span class="o">=</span><span class="s1">'module_color'</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.get_sub_network" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
 <p>Get sub-network of a module</p>
 <p><strong>Parameters:</strong></p>
@@ -1092,9 +812,9 @@
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.plot_sub_network">
-<code class="highlight language-python"><span class="n">plot_sub_network</span><span class="p">(</span><span class="n">mod_list</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span> <span class="n">plot_genes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plot_gene_num</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_sub_network" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_sub_network">
+<code class="highlight language-python"><span class="n">plot_sub_network</span><span class="p">(</span><span class="n">mod_list</span><span class="p">,</span> <span class="n">mod_type</span><span class="o">=</span><span class="s1">'module_color'</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span> <span class="n">plot_genes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plot_gene_num</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_sub_network" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
 <p>plot sub-network of a module</p>
 <p><strong>Parameters:</strong></p>
@@ -1160,13 +880,11 @@
 <tbody>
 <tr>
 <td><code>fig</code></td> <td>
-<code>matplotlib.<span title="matplotlib.figure">figure</span>.<span title="matplotlib.figure.Figure">Figure</span></code>
 </td>
 <td><p>figure</p></td>
 </tr>
 <tr>
 <td><code>ax</code></td> <td>
-<code>matplotlib.<span title="matplotlib.axes">axes</span>.<span title="matplotlib.axes._axes">_axes</span>.<span title="matplotlib.axes._axes.Axes">Axes</span></code>
 </td>
 <td><p>axis</p></td>
 </tr>
@@ -1175,131 +893,9 @@
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.analysis_meta_correlation">
-<code class="highlight language-python"><span class="n">analysis_meta_correlation</span><span class="p">(</span><span class="n">meta_data</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.analysis_meta_correlation" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>Analysis meta correlation</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>meta_data</code></td>
-<td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>meta data of samples</p></td>
-<td>
-<em>required</em>
-</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th> <th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>meta_cor</code></td> <td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>meta correlation</p></td>
-</tr>
-<tr>
-<td><code>meta_p</code></td> <td>
-<code><span title="pandas">pd</span>.<span title="pandas.DataFrame">DataFrame</span></code>
-</td>
-<td><p>meta p-value</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.plot_meta_correlation">
-<code class="highlight language-python"><span class="n">plot_meta_correlation</span><span class="p">(</span><span class="n">cor_matrix</span><span class="p">,</span> <span class="n">label_fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">label_colors</span><span class="o">=</span><span class="s1">'red'</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_meta_correlation" title="Permanent link">¶</a></h2>
-<div class="doc doc-contents">
-<p>Plot meta correlation</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>cor_matrix</code></td>
-<td>
-<code>tuple</code>
-</td>
-<td><p>meta correlation and meta p-value</p></td>
-<td>
-<em>required</em>
-</td>
-</tr>
-<tr>
-<td><code>label_fontsize</code></td>
-<td>
-<code>int</code>
-</td>
-<td><p>label fontsize</p></td>
-<td>
-<code>10</code>
-</td>
-</tr>
-<tr>
-<td><code>label_colors</code></td>
-<td>
-<code>str</code>
-</td>
-<td><p>label colors</p></td>
-<td>
-<code>'red'</code>
-</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th> <th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ax</code></td> <td>
-<code>matplotlib.<span title="matplotlib.axes">axes</span>.<span title="matplotlib.axes._axes">_axes</span>.<span title="matplotlib.axes._axes.Axes">Axes</span></code>
-</td>
-<td><p>axis</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="doc doc-object doc-function">
-<h2 class="doc doc-heading" id="omicverse.bulk._Gene_module.pyWGCNA.plot_matrix">
-<code class="highlight language-python"><span class="n">plot_matrix</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="s1">'RdBu_r'</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span> <span class="n">legene_ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">legene_bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mf">2.95</span><span class="p">),</span> <span class="n">legene_fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span></code>
-<a class="headerlink" href="#omicverse.bulk._Gene_module.pyWGCNA.plot_matrix" title="Permanent link">¶</a></h2>
+<h2 class="doc doc-heading" id="omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_matrix">
+<code class="highlight language-python"><span class="n">plot_matrix</span><span class="p">(</span><span class="n">cmap</span><span class="o">=</span><span class="s1">'RdBu_r'</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span> <span class="n">legene_ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">legene_bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mf">2.95</span><span class="p">),</span> <span class="n">legene_fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">color_type</span><span class="o">=</span><span class="s1">'dynamicColors'</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<a class="headerlink" href="#omicverse.externel.PyWGCNA.wgcna.pyWGCNA.plot_matrix" title="Permanent link">¶</a></h2>
 <div class="doc doc-contents">
 <p>plot the matrix of correlation</p>
 <p><strong>Parameters:</strong></p>
