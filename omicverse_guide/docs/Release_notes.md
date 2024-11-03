@@ -505,3 +505,12 @@ Support Raw Windows platform
 - Added `text_show` argument to visualize the `cellstackarea`
 - Added `ForbiddenCity` color system
 
+## v 1.6.9
+
+### PP Module
+
+- Added `recover_counts` to recover `counts` after `ov.pp.preprocess`
+
+### Single Module
+
+- Added `MultiMap` module to integrate multi species
