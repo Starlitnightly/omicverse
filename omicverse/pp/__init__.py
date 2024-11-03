@@ -14,3 +14,4 @@ from ._preprocess import (identify_robust_genes,
                           leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,mde)
 
 from ._qc import quantity_control,qc,filter_cells,filter_genes
+from ._recover import recover_counts,binary_search
