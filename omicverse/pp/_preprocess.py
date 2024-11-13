@@ -613,8 +613,8 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         and other information stored in its `obsm`, `varm`,
             and `uns` fields.
     """
-    if 'lognorm' not in adata.layers:
-        adata.layers['lognorm'] = adata.X
+    #if 'lognorm' not in adata.layers:
+    #    adata.layers['lognorm'] = adata.X
     if layer in adata.layers:
         X = adata.layers[layer]
         key = f'{layer}|original'
