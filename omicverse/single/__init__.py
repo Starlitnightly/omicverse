@@ -30,3 +30,4 @@ from ._cytotrace2 import cytotrace2
 from ._gptcelltype_local import gptcelltype_local
 from ._sccaf import SCCAF_assessment,plot_roc,SCCAF_optimize_all,color_long
 from ._multimap import TFIDF_LSI,Wrapper,Integration,Batch
+from ._scdiffusion import scDiffusion
