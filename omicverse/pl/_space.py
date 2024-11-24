@@ -157,6 +157,7 @@ def plot_spatial_general(
     white_spacing=20,
     palette=None,
     legend_title_fontsize=12,
+    return_ax=False,
 ):
     r"""Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
 
@@ -401,8 +402,10 @@ def plot_spatial_general(
                 from adjustText import adjust_text
 
                 adjust_text(texts, arrowprops=dict(arrowstyle="->", color="w", lw=0.5))
-
-    return fig
+    if return_ax==True:
+        return fig,ax
+    else:
+        return fig
 
 
 def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
@@ -431,6 +434,8 @@ def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
         kwargs["coords"] = adata.obsm["spatial"]
 
     fig = plot_spatial_general(adata,value_df=adata.obs[color], **kwargs)  # cell abundance values
+    fig.axes[0].set_xlim(kwargs["coords"][:,0].min(),kwargs["coords"][:,0].max())
+    fig.axes[0].set_ylim(kwargs["coords"][:,1].max(),kwargs["coords"][:,1].min())
 
     return fig
 
@@ -459,7 +464,7 @@ def spatial_value(adata,color,library_id,
             legend_title_fontsize=12,
             legend_title_color=None,
             colorbar_label_kw={},res='hires',
-            img_show=True,ax=None):
+            img_show=True,ax=None,alpha_img=1):
 
     #ax_input=False
     if ax is None:
@@ -467,7 +472,7 @@ def spatial_value(adata,color,library_id,
 
     img=adata.uns["spatial"][library_id]["images"][res]
     if img_show:
-        ax.imshow(img, aspect="equal", alpha=1, origin="lower", cmap=cmap)
+        ax.imshow(img, aspect="equal", alpha=alpha_img, origin="lower", cmap=cmap)
         ax.invert_yaxis()
     ax.axis(False)
     coords=adata.obsm['spatial']*adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
@@ -479,6 +484,9 @@ def spatial_value(adata,color,library_id,
         weighted_colors=adata.raw[:,color].to_adata().to_df().values.reshape(-1)
     ax.scatter(x=coords[:, 0], y=coords[:, 1], c=weighted_colors, s=dot_size**2,
               cmap=cmap)
+    
+    ax.set_xlim(coords[:,0].min(),coords[:,0].max())
+    ax.set_ylim(coords[:,1].max(),coords[:,1].min())
     
     
     colorbar_grid=None

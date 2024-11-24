@@ -25,7 +25,7 @@ from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3
 from ._cnmf import *
-from ._gptcelltype import gptcelltype
+from ._gptcelltype import gptcelltype,gpt4celltype,get_cluster_celltype
 from ._cytotrace2 import cytotrace2
 from ._gptcelltype_local import gptcelltype_local
 from ._sccaf import SCCAF_assessment,plot_roc,SCCAF_optimize_all,color_long
