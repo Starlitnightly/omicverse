@@ -354,6 +354,7 @@ class scDiffusion(object):
                 vae_path=vae_path,
                 hidden_dim=128,
                 train_vae=False,
+                cell_type=cell_type
             )
         else:
             val_data = None
@@ -550,6 +551,8 @@ class scDiffusion(object):
             batch_size=3000,
             use_ddim=False,
             class_cond=False, 
+            loss_ae="mse",
+            decoder_activation='ReLU',
 
             model_path="output/diffusion_checkpoint/muris_diffusion/model000000.pt", 
 
@@ -850,8 +853,17 @@ class scDiffusion(object):
 
         arr = np.concatenate(all_cell, axis=0)
         dist.barrier()
+        autoencoder = self.load_VAE(
+            vae_path=vae_path,
+            loss_ae=loss_ae,
+            decoder_activation=decoder_activation,
+        )
+        cell_gen = autoencoder(torch.tensor(arr).cuda(),return_decoded=True).cpu().detach().numpy()
+
+        adata=sc.AnnData(cell_gen)
+        adata.var.index=self.adata.var_names
         logger.log("sampling complete")
-        return arr
+        return adata
             
 
 

@@ -3,13 +3,12 @@ import numpy as np
 from anndata import AnnData
 import scanpy as sc
 import pandas as pd
+from tqdm import tqdm
 #
 from scipy.optimize import nnls
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from scipy.stats import pearsonr
-from ...pp import pca
-from ...pp import scale
 #from .helper import intersect, kl_divergence_backend, to_dense_array, extract_exp, extract_data_matrix, process_anndata, construct_graph, distances_cal, dist_cal, scale_num
 from .helper import *
     
@@ -203,7 +202,8 @@ def ot_alignment(
    
     print('Running OT...')
     print('alpha = '+str(alpha))
-    pi, logw = my_ot(M, Cx, Cy, p, q, G_init = G_init, loss_fun='square_loss', alpha= alpha, log=True, numItermax=numItermax,verbose=verbose)
+    pi, logw = my_ot(M, Cx, Cy, p, q, G_init = G_init, loss_fun='square_loss', 
+                     alpha= alpha, log=True, numItermax=numItermax,verbose=verbose)
     pi = nx.to_numpy(pi)
     print("OT done!")
     #obj = nx.to_numpy(logw['fgw_dist'])
@@ -219,6 +219,7 @@ def ot_alignment(
     if return_obj:
         return pi, out_data
     return out_data
+
 
 
 def assign_coord(
@@ -434,7 +435,7 @@ def assign_coord(
         exp_mapped = exp_mapped.groupby('spot')[np.setdiff1d(exp_mapped.columns, 'spot')].mean()
 
         df_meta = pd.DataFrame(columns = list(out_data.columns)+['x','y','Cell_xcoord','Cell_ycoord'] )
-        for each_spot in np.unique(out_data.spot):
+        for each_spot in tqdm(np.unique(out_data.spot)):
             each_spot_x = coord.loc[each_spot].x
             each_spot_y = coord.loc[each_spot].y
 
@@ -469,6 +470,7 @@ def assign_coord(
             spot_cell_ot.loc[:,'y'] = each_spot_y
 
             ### Align cells according to pearson correlation coefficient calculated with neighbor spots
+            
             for cell_self in spot_cell_ot.cell:
                 exp_cell = exp_adata2.loc[cell_self].values
                 neighbor_pearson = []
@@ -481,6 +483,8 @@ def assign_coord(
                     neighbor_pearson_scaled = scale_num(neighbor_pearson)###scale to 0-1
                 elif len(neighbor_pearson)>1:
                     neighbor_pearson_scaled = neighbor_pearson
+                else:
+                    neighbor_pearson_scaled = 0
                     
                 dist_of_each_spot=dist_of_each_spot.copy()
                 
@@ -517,7 +521,8 @@ def assign_coord(
             
     return df_meta
 
-def my_ot(M, C1, C2, p, q, G_init = None, loss_fun='square_loss', alpha=0.1, armijo=False, log=False,numItermax=200,numItermaxEmd=10e6, use_gpu = False, **kwargs):
+def my_ot(M, C1, C2, p, q, G_init = None, loss_fun='square_loss', alpha=0.1, 
+          armijo=False, log=False,numItermax=200,numItermaxEmd=10e6, use_gpu = False, **kwargs):
     """
     Adapted fused_gromov_wasserstein with G_init (inital mapping).
     Also added capability of utilizing different POT backends to speed up computation.
