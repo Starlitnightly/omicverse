@@ -28,7 +28,33 @@ class CellVote(object):
              base_url=None,
              species='human',
              organization='stomach',
-             provider='openai'):
+             provider='openai',
+             result_key='CellVote_celltype'):
+        """
+        Vote the Best celltype from scRNA-seq
+
+        Arguments:
+            clusters_key: str, the clusters key for annotation, such as leiden, louvain
+            cluster_markers: dict, the markers of cluster, we can use `ov.single.get_celltype_marker` to obtain.
+            celltype_keys: list, the celltype annotation columns stored in adata.obs, such as ['scsa_annotation','scMulan_anno']
+            model: str, the LLM we used to identify the best matched cells in clusters.
+            base_url: str, the LLM api url.
+            species: str, the species of scRNA-seq,
+            organization: str, the organization of scRNA-seq
+            provider: str, if `base_url` is None, we can use default provider.
+
+        Example:
+        ```
+        vote_obj=CellVote(adata)
+        vote_obj.vote('leiden',marker_dict,
+                        celltype_keys=['scsa_annotation','scMulan_anno'],
+                        )
+        ```
+        You can found the result in adata.obs['CellVote_celltype']
+
+        """
+
+
         
         
         cluster_celltypes={}
@@ -38,6 +64,7 @@ class CellVote(object):
         for ct in adata.obs['best_clusters'].cat.categories:
             ct_li=[]
             for celltype_key in celltype_keys:
+                #selected the major cells as the present cells of cluster
                 ct1=adata.obs.loc[adata.obs['best_clusters']==ct,celltype_key].value_counts().index[0]
                 ct_li.append(ct1)
 
@@ -46,6 +73,8 @@ class CellVote(object):
         result = get_cluster_celltype(cluster_celltypes, cluster_markers, 
                               species=species, organization=organization,
                              model=model,base_url=base_url,provider=provider)
+        adata.obs[result_key] = adata.obs['best_clusters'].map(result).astype('category')
+        adata.obs[result_key]=[i.capitalize() for i in adata.obs['best_celltype'].tolist()]
         return result
 
 
