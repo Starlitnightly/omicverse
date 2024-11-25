@@ -1063,7 +1063,6 @@ def violin(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=12,
     #plt.xticks(fontsize=ticks_fontsize,rotation=90)
     #plt.yticks(fontsize=ticks_fontsize)
 
-
 def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_strip_points=1000):
     import colorcet
     from scipy.sparse import issparse  
@@ -1105,7 +1104,8 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
     
     # 绘制小提琴图
     sns.violinplot(x=groupby, y=keys, data=plot_data, hue=groupby, dodge=False,
-                   palette=adata.uns[f'{groupby}_colors'], scale="width", inner=None, ax=ax)
+                   palette=adata.uns[f'{groupby}_colors'], scale="width", inner=None, ax=ax,
+                   legend=False)
     
     # 调整小提琴图
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
@@ -1114,9 +1114,7 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
         x0, y0, width, height = bbox.bounds
         violin.set_clip_path(plt.Rectangle((x0, y0), width / 2, height, transform=ax.transData))
     
-    # 绘制箱线图
-    sns.boxplot(x=groupby, y=keys, data=plot_data, saturation=1, showfliers=False,
-                width=0.3, boxprops={'zorder': 3, 'facecolor': 'none'}, ax=ax)
+    
     
     # 限制 stripplot 的数据点数量
     if len(plot_data) > max_strip_points:
@@ -1125,16 +1123,31 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
     # 绘制 stripplot
     old_len_collections = len(ax.collections)
     sns.stripplot(x=groupby, y=keys, data=plot_data, hue=groupby,
-                  palette=adata.uns[f'{groupby}_colors'], dodge=False, ax=ax)
+                  palette=adata.uns[f'{groupby}_colors'], dodge=False, ax=ax,
+                  )
     
     # 调整 stripplot 点的位置
     for dots in ax.collections[old_len_collections:]:
         dots.set_offsets(dots.get_offsets() + np.array([0.12, 0]))
+
+    # 绘制箱线图
+    sns.boxplot(x=groupby, y=keys, data=plot_data, saturation=1, showfliers=False,
+                width=0.3, boxprops={'zorder': 3, 'facecolor': 'none'}, ax=ax,
+                )
     
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    plt.xticks(rotation=90)
-    
+    #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
+    ax.get_legend().remove()
+    #ax.legend().set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+    #
+
     if show:
         plt.show()
     
