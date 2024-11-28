@@ -510,7 +510,14 @@ Support Raw Windows platform
 ### PP Module
 
 - Added `recover_counts` to recover `counts` after `ov.pp.preprocess`
+- removed the lognorm layers added in `ov.pp.pca`
 
 ### Single Module
 
 - Added `MultiMap` module to integrate multi species
+- Added `CellVote` to vote the best cells
+
+### Space Module
+
+- Added `ov.space.cluster` to identify the spatial domain
+- Added `Binary` for spatial cluster

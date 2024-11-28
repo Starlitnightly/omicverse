@@ -3,6 +3,7 @@ import scanpy as sc
 import networkx as nx
 import numpy as np
 import pandas as pd
+import anndata as ad
 
 import networkx as nx 
 
@@ -165,6 +166,8 @@ def apply_biological_flow(adata: sc.AnnData,
     import graphical_models as gpm
     adjacency = adata.uns[flowsig_network_key]['network'][adjacency_key]
     flow_vars = adata.uns[flowsig_network_key]['flow_var_info'].index.tolist()
+    #make sure the index is unique
+    adata.uns[flowsig_network_key]['flow_var_info'].index=ad.utils.make_index_unique(adata.uns[flowsig_network_key]['flow_var_info'].index)
     flow_var_info = adata.uns[flowsig_network_key]['flow_var_info']
 
     cpdag = gpm.PDAG.from_amat(adjacency)
