@@ -2,6 +2,7 @@
 from sklearn.mixture import GaussianMixture
 import scanpy as sc
 import pandas as pd
+import numpy as np
 import anndata
 
 mira_install=False
@@ -91,6 +92,25 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
                 'Please install the schist using conda `conda install -c conda-forge schist` \nor `pip install git+https://github.com/dawe/schist.git`'
             )
         schist.inference.nested_model(adata, **kwargs)
+    elif method=='mclust_R':
+        np.random.seed(random_state)
+        import rpy2.robjects as robjects
+        robjects.r.library("mclust")
+
+        import rpy2.robjects.numpy2ri
+        rpy2.robjects.numpy2ri.activate()
+        r_random_seed = robjects.r['set.seed']
+        r_random_seed(random_state)
+        rmclust = robjects.r['Mclust']
+
+        res = rmclust(rpy2.robjects.numpy2ri.numpy2rpy(adata.obsm[use_rep]), n_components, 'EEE')
+        mclust_res = np.array(res[-2])
+
+        adata.obs[method] = mclust_res
+        adata.obs[method] = adata.obs[method].astype('int')
+        adata.obs[method] = adata.obs[method].astype('category')
+        print(f"""finished: found {n_components} clusters and added
+    'mclust', the cluster labels (adata.obs, categorical)""")
 
       
 def refine_label(adata, use_rep='spatial',radius=50, key='label'):
