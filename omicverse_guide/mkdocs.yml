@@ -53,7 +53,7 @@ nav:
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
         - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
     - Space:
-        - Spatial clustering and denoising expressions: Tutorials-space/t_stagate.ipynb
+        - Spatial clustering and denoising expressions: Tutorials-space/t_cluster_space.ipynb
         - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
         - Mapping single-cell profile onto spatial profile: Tutorials-space/t_mapping.ipynb
         - Deconvolution spatial transcriptomic without scRNA-seq: Tutorials-space/t_starfysh.ipynb
