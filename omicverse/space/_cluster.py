@@ -317,8 +317,8 @@ def clusters(adata,
     return adata
 
 def merge_cluster(adata,groupby='mclust',use_rep='STAGATE',
-                  threshold=0.05,plot=True):
-    sc.tl.dendrogram(adata,groupby=groupby,use_rep=use_rep,)
+                  threshold=0.05,plot=True,start_idx=0,**kwargs):
+    sc.tl.dendrogram(adata,groupby=groupby,use_rep=use_rep)
     import numpy as np
     from scipy.cluster.hierarchy import fcluster
 
@@ -330,14 +330,14 @@ def merge_cluster(adata,groupby='mclust',use_rep='STAGATE',
 
     # 使用fcluster来合并类别
     clusters = fcluster(linkage_matrix, threshold, criterion='distance')
-
+    
     # 创建字典
     cluster_dict = {}
     for idx, cluster_id in enumerate(clusters):
         key = f'c{cluster_id}'
         if key not in cluster_dict:
             cluster_dict[key] = []
-        cluster_dict[key].append(idx+1)
+        cluster_dict[key].append(idx+start_idx)
     
     reversed_dict = {}
     for key, values in cluster_dict.items():
@@ -349,6 +349,6 @@ def merge_cluster(adata,groupby='mclust',use_rep='STAGATE',
     adata.obs[f'{groupby}_tree']=adata.obs[groupby].map(reversed_dict)
     print(f'The merged cluster information is stored in adata.obs["{groupby}_tree"].')
     if plot:
-        ax=sc.pl.dendrogram(adata,groupby=groupby,show=False)
+        ax=sc.pl.dendrogram(adata,groupby=groupby,show=False,**kwargs)
         ax.plot((ax.get_xticks().min(),ax.get_xticks().max()),(threshold,threshold))
     return reversed_dict
