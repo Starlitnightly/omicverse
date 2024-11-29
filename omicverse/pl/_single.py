@@ -1138,7 +1138,9 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
-    ax.get_legend().remove()
+    #remove legend
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
     #ax.legend().set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
