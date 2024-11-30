@@ -1,4 +1,17 @@
+import importlib.util
+import hashlib
 
+def validate_module(module_name, expected_hash):
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        raise ImportError(f"Module {module_name} not found")
+    
+    module_path = spec.origin
+    with open(module_path, 'rb') as f:
+        file_hash = hashlib.sha256(f.read()).hexdigest()
+    
+    if file_hash != expected_hash:
+        raise ImportError(f"Module {module_name} failed validation")
 
 class omicverseConfig:
 
@@ -31,4 +44,3 @@ class omicverseConfig:
         
 
 settings = omicverseConfig()
-        

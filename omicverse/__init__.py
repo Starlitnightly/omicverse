@@ -8,6 +8,24 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
+import importlib.util
+import hashlib
+
+def validate_module(module_name, expected_hash):
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        raise ImportError(f"Module {module_name} not found")
+    
+    module_path = spec.origin
+    with open(module_path, 'rb') as f:
+        file_hash = hashlib.sha256(f.read()).hexdigest()
+    
+    if file_hash != expected_hash:
+        raise ImportError(f"Module {module_name} failed validation")
+
+# Example usage:
+# validate_module('numpy', 'expected_sha256_hash_here')
+
 from . import bulk,single,utils,bulk2single,pp,space,pl,externel
 #usually
 from .utils._data import read
