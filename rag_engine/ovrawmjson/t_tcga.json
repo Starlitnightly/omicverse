@@ -1,0 +1,38 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse and scanpy. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nov.plot_set()"
+  },
+  {
+    "action": "Initialize a TCGA object using the provided sample sheet, download files, and clinical cart paths. Then, initialize the AnnData object to store the raw count, FPKM, and TPM matrices.",
+    "code": "get_ipython().run_cell_magic('time', '', \"gdc_sample_sheep='data/TCGA_OV/gdc_sample_sheet.2024-07-05.tsv'\\ngdc_download_files='data/TCGA_OV/gdc_download_20240705_180129.081531'\\nclinical_cart='data/TCGA_OV/clinical.cart.2024-07-05'\\naml_tcga=ov.bulk.pyTCGA(gdc_sample_sheep,gdc_download_files,clinical_cart)\\naml_tcga.adata_init()\\n\")"
+  },
+  {
+    "action": "Save the AnnData object to an H5AD file for later use.",
+    "code": "aml_tcga.adata.write_h5ad('data/TCGA_OV/ov_tcga_raw.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Initialize a TCGA object and read the previously saved AnnData file. This step is necessary to ensure that subsequent TCGA functions, such as survival analysis, can be used properly.",
+    "code": "gdc_sample_sheep='data/TCGA_OV/gdc_sample_sheet.2024-07-05.tsv'\ngdc_download_files='data/TCGA_OV/gdc_download_20240705_180129.081531'\nclinical_cart='data/TCGA_OV/clinical.cart.2024-07-05'\naml_tcga=ov.bulk.pyTCGA(gdc_sample_sheep,gdc_download_files,clinical_cart)\naml_tcga.adata_read('data/TCGA_OV/ov_tcga_raw.h5ad')"
+  },
+  {
+    "action": "Initialize the metadata for the AnnData object. This involves converting gene IDs to gene names and adding basic patient information.",
+    "code": "aml_tcga.adata_meta_init()"
+  },
+  {
+    "action": "Initialize the survival data for the TCGA object. This step imports the clinical information from the previously set clinical cart path.",
+    "code": "aml_tcga.survial_init()\naml_tcga.adata"
+  },
+  {
+    "action": "Perform survival analysis for the gene 'MYC' using the 'deseq_normalize' layer and generate a survival plot.",
+    "code": "aml_tcga.survival_analysis('MYC',layer='deseq_normalize',plot=True)"
+  },
+  {
+    "action": "Perform survival analysis for all genes in the dataset. This process may take a significant amount of time.",
+    "code": "aml_tcga.survial_analysis_all()\naml_tcga.adata"
+  },
+  {
+    "action": "Save the updated AnnData object, which now includes the results of the survival analysis, to an H5AD file.",
+    "code": "aml_tcga.adata.write_h5ad('data/TCGA_OV/ov_tcga_survial_all.h5ad',compression='gzip')"
+  }
+]

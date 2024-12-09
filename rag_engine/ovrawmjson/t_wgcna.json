@@ -1,0 +1,98 @@
+[
+  {
+    "action": "Import necessary libraries: scanpy, omicverse, and matplotlib. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import scanpy as sc\nimport omicverse as ov\nimport matplotlib.pyplot as plt\nov.plot_set()"
+  },
+  {
+    "action": "Load the expression data from a CSV file into a pandas DataFrame. The data is from the 5xFAD paper and is part of the PyWGCNA tutorial data.",
+    "code": "import pandas as pd\ndata=ov.utils.read('data/5xFAD_paper/expressionList.csv',\n                           index_col=0)\ndata.head()"
+  },
+  {
+    "action": "Calculate the Median Absolute Deviation (MAD) for each gene in the expression data. Then, select the top 2000 genes with the highest MAD values and transpose the DataFrame.",
+    "code": "from statsmodels import robust #import package\ngene_mad=data.apply(robust.mad) #use function to calculate MAD\ndata=data.T\ndata=data.loc[gene_mad.sort_values(ascending=False).index[:2000]]\ndata.head()"
+  },
+  {
+    "action": "Initialize a PyWGCNA object named '5xFAD_2k' for bulk RNA-seq analysis. The object is configured for mouse data and uses the transposed expression data. The results will be saved to the specified output path.",
+    "code": "#import PyWGCNA\npyWGCNA_5xFAD = ov.bulk.pyWGCNA(name='5xFAD_2k', \n                              species='mus musculus', \n                              geneExp=data.T, \n                              outputPath='',\n                              save=True)\npyWGCNA_5xFAD.geneExpr.to_df().head(5)"
+  },
+  {
+    "action": "Preprocess the expression data using the `preprocess()` method of the PyWGCNA object. This step includes removing genes with too many missing values or low expression and removing samples with too many missing values.",
+    "code": "pyWGCNA_5xFAD.preprocess()"
+  },
+  {
+    "action": "Calculate the soft-thresholding power for network construction using the `calculate_soft_threshold()` method.",
+    "code": "pyWGCNA_5xFAD.calculate_soft_threshold()"
+  },
+  {
+    "action": "Calculate the adjacency matrix based on the selected soft-thresholding power using the `calculating_adjacency_matrix()` method.",
+    "code": "pyWGCNA_5xFAD.calculating_adjacency_matrix()"
+  },
+  {
+    "action": "Calculate the Topological Overlap Matrix (TOM) similarity matrix using the `calculating_TOM_similarity_matrix()` method.",
+    "code": "pyWGCNA_5xFAD.calculating_TOM_similarity_matrix()"
+  },
+  {
+    "action": "Calculate the gene tree, dynamic modules, and gene-module relationships. The `calculate_geneTree()` method computes the gene dendrogram. The `calculate_dynamicMods()` method identifies modules using dynamic tree cutting with specified parameters. The `calculate_gene_module()` method calculates module eigengenes with the chosen soft power.",
+    "code": "pyWGCNA_5xFAD.calculate_geneTree()\npyWGCNA_5xFAD.calculate_dynamicMods(kwargs_function={'cutreeHybrid': {'deepSplit': 2, 'pamRespectsDendro': False}})\npyWGCNA_5xFAD.calculate_gene_module(kwargs_function={'moduleEigengenes': {'softPower': 8}})"
+  },
+  {
+    "action": "Plot the TOM matrix using the `plot_matrix()` method. The plot visualizes the relationships between genes based on topological overlap.",
+    "code": "pyWGCNA_5xFAD.plot_matrix(save=False)"
+  },
+  {
+    "action": "Save the current state of the PyWGCNA object using the `saveWGCNA()` method. This allows for later retrieval of the object and its associated data.",
+    "code": "pyWGCNA_5xFAD.saveWGCNA()"
+  },
+  {
+    "action": "Load a previously saved PyWGCNA object from a file named '5xFAD_2k.p' using the `ov.bulk.readWGCNA()` function.",
+    "code": "pyWGCNA_5xFAD=ov.bulk.readWGCNA('5xFAD_2k.p')"
+  },
+  {
+    "action": "Display the first few rows of the `mol` attribute of the PyWGCNA object, which likely contains module information.",
+    "code": "pyWGCNA_5xFAD.mol.head()"
+  },
+  {
+    "action": "Display the first few rows of the `datExpr.var` attribute of the PyWGCNA object. This likely contains variable information related to the expression data.",
+    "code": "pyWGCNA_5xFAD.datExpr.var.head()"
+  },
+  {
+    "action": "Extract a subset of modules ('gold' and 'lightgreen') from the PyWGCNA object using the `get_sub_module()` method. The `mod_type` parameter specifies that the selection is based on module colors.",
+    "code": "sub_mol=pyWGCNA_5xFAD.get_sub_module(['gold','lightgreen'],\n                            mod_type='module_color')\nsub_mol.head(),sub_mol.shape"
+  },
+  {
+    "action": "Extract a subnetwork from the PyWGCNA object corresponding to the 'lightgreen' module. The `get_sub_network()` method is used with a specified correlation threshold of 0.2.",
+    "code": "G_sub=pyWGCNA_5xFAD.get_sub_network(mod_list=['lightgreen'],\n                            mod_type='module_color',correlation_threshold=0.2)\nG_sub"
+  },
+  {
+    "action": "Count the number of edges in the extracted subnetwork `G_sub`.",
+    "code": "len(G_sub.edges())"
+  },
+  {
+    "action": "Visualize the subnetwork for the 'gold' and 'lightgreen' modules using the `plot_sub_network()` method. The plot uses the 'kamada_kawai' layout algorithm and includes specific styling options.",
+    "code": "pyWGCNA_5xFAD.plot_sub_network(['gold','lightgreen'],pos_type='kamada_kawai',pos_scale=10,pos_dim=2,\n                         figsize=(8,8),node_size=10,label_fontsize=8,correlation_threshold=0.2,\n                        label_bbox={\"ec\": \"white\", \"fc\": \"white\", \"alpha\": 0.6})"
+  },
+  {
+    "action": "Update the sample information of the PyWGCNA object with data from a CSV file. Additionally, assign colors to different categories within the metadata for downstream analysis.",
+    "code": "pyWGCNA_5xFAD.updateSampleInfo(path='data/5xFAD_paper/sampleInfo.csv', sep=',')\n\n# add color for metadata\npyWGCNA_5xFAD.setMetadataColor('Sex', {'Female': 'green',\n                                       'Male': 'yellow'})\npyWGCNA_5xFAD.setMetadataColor('Genotype', {'5xFADWT': 'darkviolet',\n                                            '5xFADHEMI': 'deeppink'})\npyWGCNA_5xFAD.setMetadataColor('Age', {'4mon': 'thistle',\n                                       '8mon': 'plum',\n                                       '12mon': 'violet',\n                                       '18mon': 'purple'})\npyWGCNA_5xFAD.setMetadataColor('Tissue', {'Hippocampus': 'red',\n                                          'Cortex': 'blue'})"
+  },
+  {
+    "action": "Perform a comprehensive analysis of the PyWGCNA object using the `analyseWGCNA()` method. This includes quantifying module-trait relationships and identifying important genes.",
+    "code": "pyWGCNA_5xFAD.analyseWGCNA()"
+  },
+  {
+    "action": "Retrieve the column names from the observation data (`datExpr.obs`) of the PyWGCNA object, which represent the metadata fields.",
+    "code": "metadata = pyWGCNA_5xFAD.datExpr.obs.columns.tolist()"
+  },
+  {
+    "action": "Plot the module eigengene for the 'lightgreen' module against the specified metadata using the `plotModuleEigenGene()` method.",
+    "code": "pyWGCNA_5xFAD.plotModuleEigenGene('lightgreen', metadata, show=True)"
+  },
+  {
+    "action": "Create a bar plot of the module eigengene for the 'lightgreen' module against the specified metadata using the `barplotModuleEigenGene()` method.",
+    "code": "pyWGCNA_5xFAD.barplotModuleEigenGene('lightgreen', metadata, show=True)"
+  },
+  {
+    "action": "Identify the top 10 hub genes for the 'lightgreen' module based on their connectivity using the `top_n_hub_genes()` method.",
+    "code": "pyWGCNA_5xFAD.top_n_hub_genes(moduleName=\"lightgreen\", n=10)"
+  }
+]

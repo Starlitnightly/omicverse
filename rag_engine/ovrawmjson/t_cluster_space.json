@@ -1,0 +1,122 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nov.plot_set()"
+  },
+  {
+    "action": "Read 10x Visium spatial transcriptomics data from the specified path and count file. Make variable names unique.",
+    "code": "adata = sc.read_visium(path='data', count_file='151676_filtered_feature_bc_matrix.h5')\nadata.var_names_make_unique()"
+  },
+  {
+    "action": "Calculate quality control metrics. Filter out genes with total counts less than 100. Identify spatially variable genes (SVGs) using the `prost` method and other specified parameters.",
+    "code": "sc.pp.calculate_qc_metrics(adata, inplace=True)\nadata = adata[:,adata.var['total_counts']>100]\nadata=ov.space.svg(adata,mode='prost',n_svgs=3000,target_sum=1e4,platform=\"visium\",)"
+  },
+  {
+    "action": "Write the processed AnnData object to an H5AD file with gzip compression.",
+    "code": "adata.write('data/cluster_svg.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Read the processed AnnData object from the H5AD file with gzip decompression.",
+    "code": "adata=ov.read('data/cluster_svg.h5ad',compression='gzip')"
+  },
+  {
+    "action": "(Optional) Read ground truth annotations from a TSV file and add them to the AnnData object's observation metadata. Visualize the spatial distribution of the ground truth annotations.",
+    "code": "import pandas as pd\nimport os\nAnn_df = pd.read_csv(os.path.join('data', '151676_truth.txt'), sep='\t', header=None, index_col=0)\nAnn_df.columns = ['Ground Truth']\nadata.obs['Ground Truth'] = Ann_df.loc[adata.obs_names, 'Ground Truth']\nsc.pl.spatial(adata, img_key=\"hires\", color=[\"Ground Truth\"])"
+  },
+  {
+    "action": "Define parameters for the GraphST clustering method, including device, number of principal components. Apply GraphST clustering to the AnnData object using specified parameters and log-normalization.",
+    "code": "methods_kwargs={}\nmethods_kwargs['GraphST']={ \n    'device':'cuda:0',\n    'n_pcs':30\n}\n\nadata=ov.space.clusters(adata,\n                  methods=['GraphST'],\n                  methods_kwargs=methods_kwargs,\n                  lognorm=1e4)"
+  },
+  {
+    "action": "Perform mclust clustering on the GraphST representation, refine the labels, and convert the refined labels to categorical type.",
+    "code": "ov.utils.cluster(adata,use_rep='graphst|original|X_pca',method='mclust',n_components=10,\n                 modelNames='EEV', random_state=112,\n                )\nadata.obs['mclust_GraphST'] = ov.utils.refine_label(adata, radius=50, key='mclust') \nadata.obs['mclust_GraphST']=adata.obs['mclust_GraphST'].astype('category')"
+  },
+  {
+    "action": "Merge clusters based on the 'mclust_GraphST' labels using a specified threshold and visualize the merging process.",
+    "code": "res=ov.space.merge_cluster(adata,groupby='mclust_GraphST',use_rep='graphst|original|X_pca',\n                  threshold=0.2,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclust_GraphST', 'mclust_GraphST_tree', 'mclust', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclust_GraphST','mclust_GraphST_tree','mclust','Ground Truth'])"
+  },
+  {
+    "action": "Perform mclust_R clustering on the GraphST representation, refine the labels, convert them to categorical type, and merge clusters based on the refined labels.",
+    "code": "ov.utils.cluster(adata,use_rep='graphst|original|X_pca',method='mclust_R',n_components=10,\n                 random_state=42,\n                )\nadata.obs['mclust_R_GraphST'] = ov.utils.refine_label(adata, radius=30, key='mclust_R') \nadata.obs['mclust_R_GraphST']=adata.obs['mclust_R_GraphST'].astype('category')\nres=ov.space.merge_cluster(adata,groupby='mclust_R_GraphST',use_rep='graphst|original|X_pca',\n                  threshold=0.2,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclust_R_GraphST', 'mclust_R_GraphST_tree', 'mclust', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclust_R_GraphST','mclust_R_GraphST_tree','mclust','Ground Truth'])"
+  },
+  {
+    "action": "Define parameters for the BINARY clustering method. Apply BINARY clustering to the AnnData object using specified parameters.",
+    "code": "methods_kwargs={}\nmethods_kwargs['BINARY']={ \n    'use_method':'KNN',\n    'cutoff':6,\n    'obs_key':'BINARY_sample',\n    'use_list':None,\n    'pos_weight':10,\n    'device':'cuda:0',\n    'hidden_dims':[512, 30],\n    'n_epochs': 1000,\n    'lr':  0.001,\n    'key_added': 'BINARY',\n    'gradient_clipping': 5,\n    'weight_decay': 0.0001,\n    'verbose': True,\n    'random_seed':0,\n    'lognorm':1e4,\n    'n_top_genes':2000,\n}\nadata=ov.space.clusters(adata,\n                  methods=['BINARY'],\n                 methods_kwargs=methods_kwargs)"
+  },
+  {
+    "action": "Perform mclust_R clustering on the BINARY representation, refine the labels, and convert them to categorical type.",
+    "code": "ov.utils.cluster(adata,use_rep='BINARY',method='mclust_R',n_components=10,\n                 random_state=42,\n                )\nadata.obs['mclust_BINARY'] = ov.utils.refine_label(adata, radius=30, key='mclust_R') \nadata.obs['mclust_BINARY']=adata.obs['mclust_BINARY'].astype('category')"
+  },
+  {
+    "action": "Merge clusters based on the 'mclust_BINARY' labels using a specified threshold and visualize the merging process.",
+    "code": "res=ov.space.merge_cluster(adata,groupby='mclust_BINARY',use_rep='BINARY',\n                  threshold=0.01,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclust_BINARY', 'mclust_BINARY_tree', 'mclust', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclust_BINARY','mclust_BINARY_tree','mclust','Ground Truth'])"
+  },
+  {
+    "action": "Perform mclust clustering on the BINARY representation using Python's implementation, refine the labels, and convert them to categorical type.",
+    "code": "ov.utils.cluster(adata,use_rep='BINARY',method='mclust',n_components=10,\n                 modelNames='EEV', random_state=42,\n                )\nadata.obs['mclustpy_BINARY'] = ov.utils.refine_label(adata, radius=30, key='mclust') \nadata.obs['mclustpy_BINARY']=adata.obs['mclustpy_BINARY'].astype('category')"
+  },
+  {
+    "action": "Merge clusters based on the 'mclustpy_BINARY' labels using a specified threshold and visualize the merging process.",
+    "code": "adata.obs['mclustpy_BINARY']=adata.obs['mclustpy_BINARY'].astype('category')\nres=ov.space.merge_cluster(adata,groupby='mclustpy_BINARY',use_rep='BINARY',\n                  threshold=0.013,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclustpy_BINARY', 'mclustpy_BINARY_tree', 'mclust', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclustpy_BINARY','mclustpy_BINARY_tree','mclust','Ground Truth'])"
+  },
+  {
+    "action": "Define parameters for the STAGATE clustering method. Apply STAGATE clustering to the AnnData object using specified parameters.",
+    "code": "methods_kwargs={}\nmethods_kwargs['STAGATE']={ \n    'num_batch_x':3,'num_batch_y':2,\n    'spatial_key':['X','Y'],'rad_cutoff':200,\n    'num_epoch':1000,'lr':0.001,\n    'weight_decay':1e-4,'hidden_dims':[512, 30],\n    'device':'cuda:0',\n    #'n_top_genes':2000,\n}\n\nadata=ov.space.clusters(adata,\n                  methods=['STAGATE'],\n                 methods_kwargs=methods_kwargs)"
+  },
+  {
+    "action": "Perform mclust_R clustering on the STAGATE representation, refine the labels, convert them to categorical type, and merge clusters based on the refined labels.",
+    "code": "ov.utils.cluster(adata,use_rep='STAGATE',method='mclust_R',n_components=10,\n                 random_state=112,\n                )\nadata.obs['mclust_R_STAGATE'] = ov.utils.refine_label(adata, radius=30, key='mclust_R') \nadata.obs['mclust_R_STAGATE']=adata.obs['mclust_R_STAGATE'].astype('category')\nres=ov.space.merge_cluster(adata,groupby='mclust_R_STAGATE',use_rep='STAGATE',\n                  threshold=0.005,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclust_R_STAGATE', 'mclust_R_STAGATE_tree', 'mclust_R', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclust_R_STAGATE','mclust_R_STAGATE_tree','mclust_R','Ground Truth'])"
+  },
+  {
+    "action": "Sort genes by their 'PI' values in descending order and display the top 5 genes.",
+    "code": "adata.var.sort_values('PI',ascending=False).head(5)"
+  },
+  {
+    "action": "Visualize the spatial expression of a specific gene ('MBP') in both raw and STAGATE-denoised data.",
+    "code": "plot_gene = 'MBP'\nimport matplotlib.pyplot as plt\nfig, axs = plt.subplots(1, 2, figsize=(8, 4))\nsc.pl.spatial(adata, img_key=\"hires\", color=plot_gene, show=False, ax=axs[0], title='RAW_'+plot_gene, vmax='p99')\nsc.pl.spatial(adata, img_key=\"hires\", color=plot_gene, show=False, ax=axs[1], title='STAGATE_'+plot_gene, layer='STAGATE_ReX', vmax='p99')"
+  },
+  {
+    "action": "Define parameters for the CAST clustering method. Apply CAST clustering to the AnnData object using specified parameters.",
+    "code": "methods_kwargs={}\nmethods_kwargs['CAST']={ \n    'output_path_t':'result/CAST_gas/output',\n    'device':'cuda:0',\n    'gpu_t':0\n}\nadata=ov.space.clusters(adata,\n                  methods=['CAST'],\n                 methods_kwargs=methods_kwargs)"
+  },
+  {
+    "action": "Perform mclust clustering on the CAST representation, refine the labels, and convert them to categorical type.",
+    "code": "ov.utils.cluster(adata,use_rep='X_cast',method='mclust',n_components=10,\n                 modelNames='EEV', random_state=42,\n                )\nadata.obs['mclust_CAST'] = ov.utils.refine_label(adata, radius=50, key='mclust') \nadata.obs['mclust_CAST']=adata.obs['mclust_CAST'].astype('category')"
+  },
+  {
+    "action": "Merge clusters based on the 'mclust_CAST' labels using a specified threshold and visualize the merging process.",
+    "code": "res=ov.space.merge_cluster(adata,groupby='mclust_CAST',use_rep='X_cast',\n                  threshold=0.1,plot=True)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the 'mclust_CAST', 'mclust_CAST_tree', 'mclust', and 'Ground Truth' labels.",
+    "code": "sc.pl.spatial(adata, color=['mclust_CAST','mclust_CAST_tree','mclust','Ground Truth'])"
+  },
+  {
+    "action": "Display the AnnData object.",
+    "code": "adata"
+  },
+  {
+    "action": "Calculate and print the Adjusted Rand Index (ARI) for each clustering method compared to the ground truth.",
+    "code": "from sklearn.metrics.cluster import adjusted_rand_score\n\nobs_df = adata.obs.dropna()\n#GraphST\nARI = adjusted_rand_score(obs_df['mclust_GraphST'], obs_df['Ground Truth'])\nprint('mclust_GraphST: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclust_R_GraphST'], obs_df['Ground Truth'])\nprint('mclust_R_GraphST: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclust_R_STAGATE'], obs_df['Ground Truth'])\nprint('mclust_STAGATE: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclust_BINARY'], obs_df['Ground Truth'])\nprint('mclust_BINARY: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclustpy_BINARY'], obs_df['Ground Truth'])\nprint('mclustpy_BINARY: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclust_CAST'], obs_df['Ground Truth'])\nprint('mclust_CAST: Adjusted rand index = %.2f' %ARI)"
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "file_selection_model": "qwen2.5-coder:3b",
+  "query_processing_model": "qwen2.5-coder:7b",
+  "rate_limit": 5
+}

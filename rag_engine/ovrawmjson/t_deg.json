@@ -1,0 +1,82 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and matplotlib.pyplot. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport matplotlib.pyplot as plt\n\nov.plot_set()"
+  },
+  {
+    "action": "Download gene ID annotation pair using `ov.utils.download_geneid_annotation_pair()`. This is necessary for converting gene IDs.",
+    "code": "ov.utils.download_geneid_annotation_pair()"
+  },
+  {
+    "action": "Read the data from a file named 'counts.txt' (or from a URL, commented out). The data is assumed to be a tab-separated file with the first column as index and the second row as header. The `.bam` suffix is removed from column names.",
+    "code": "#data=pd.read_csv('https://raw.githubusercontent.com/Starlitnightly/omicverse/master/sample/counts.txt',index_col=0,sep='\\t',header=1)\ndata=ov.read('data/counts.txt',index_col=0,header=1)\n#replace the columns `.bam` to `` \ndata.columns=[i.split('/')[-1].replace('.bam','') for i in data.columns]\ndata.head()"
+  },
+  {
+    "action": "Perform gene ID mapping on the data using the downloaded annotation pair file for 'GRCm39'.",
+    "code": "data=ov.bulk.Matrix_ID_mapping(data,'genesets/pair_GRCm39.tsv')\ndata.head()"
+  },
+  {
+    "action": "Initialize a pyDEG object for differential expression analysis using the `omicverse` library.",
+    "code": "dds=ov.bulk.pyDEG(data)"
+  },
+  {
+    "action": "Drop duplicate indices in the pyDEG object, keeping only the highest expressed genes.",
+    "code": "dds.drop_duplicates_index()\nprint('... drop_duplicates_index success')"
+  },
+  {
+    "action": "Normalize the data using the `estimateSizeFactors` method from DEseq2, likely to remove batch effects.",
+    "code": "dds.normalize()\nprint('... estimateSizeFactors and normalize success')"
+  },
+  {
+    "action": "Perform differential expression gene analysis using the t-test method. The treatment groups are '4-3' and '4-4', and the control groups are '1--1' and '1--2'.",
+    "code": "treatment_groups=['4-3','4-4']\ncontrol_groups=['1--1','1--2']\nresult=dds.deg_analysis(treatment_groups,control_groups,method='ttest')\nresult.head()"
+  },
+  {
+    "action": "Filter out genes with low expression (log2(BaseMean) <= 1).",
+    "code": "print(result.shape)\nresult=result.loc[result['log2(BaseMean)']>1]\nprint(result.shape)"
+  },
+  {
+    "action": "Set the threshold for fold change. The threshold is calculated automatically (-1) based on the log2FC distribution. The p-value threshold is set to 0.05, and the maximum log p-value is set to 6.",
+    "code": "# -1 means automatically calculates\ndds.foldchange_set(fc_threshold=-1,\n                   pval_threshold=0.05,\n                   logp_max=6)"
+  },
+  {
+    "action": "Plot a volcano plot to visualize the results of the differential expression analysis. The plot includes the top 8 differentially expressed genes and sets the font size for gene labels to 12.",
+    "code": "dds.plot_volcano(title='DEG Analysis',figsize=(4,4),\n                 plot_genes_num=8,plot_genes_fontsize=12,)"
+  },
+  {
+    "action": "Plot a boxplot for the genes 'Ckap2' and 'Lef1' to visualize their expression levels in the treatment and control groups.",
+    "code": "dds.plot_boxplot(genes=['Ckap2','Lef1'],treatment_groups=treatment_groups,\n                control_groups=control_groups,figsize=(2,3),fontsize=12,\n                 legend_bbox=(2,0.55))"
+  },
+  {
+    "action": "Plot a boxplot for the gene 'Ckap2' to visualize its expression levels in the treatment and control groups.",
+    "code": "dds.plot_boxplot(genes=['Ckap2'],treatment_groups=treatment_groups,\n                control_groups=control_groups,figsize=(2,3),fontsize=12,\n                 legend_bbox=(2,0.55))"
+  },
+  {
+    "action": "Download pathway database using `ov.utils.download_pathway_database()`.",
+    "code": "ov.utils.download_pathway_database()"
+  },
+  {
+    "action": "Prepare a pathway dictionary from the 'WikiPathways_2019_Mouse.txt' file for mouse.",
+    "code": "pathway_dict=ov.utils.geneset_prepare('genesets/WikiPathways_2019_Mouse.txt',organism='Mouse')"
+  },
+  {
+    "action": "Perform gene set enrichment analysis using the prepared pathway dictionary. The `pvalue_type` is set to 'auto' to automatically determine whether to use adjusted or raw p-values. The organism is set to 'mouse'.",
+    "code": "deg_genes=dds.result.loc[dds.result['sig']!='normal'].index.tolist()\nenr=ov.bulk.geneset_enrichment(gene_list=deg_genes,\n                                pathways_dict=pathway_dict,\n                                pvalue_type='auto',\n                                organism='mouse')"
+  },
+  {
+    "action": "Plot the gene set enrichment results using a custom plot function `geneset_plot`.",
+    "code": "ov.bulk.geneset_plot(enr,figsize=(2,5),fig_title='Wiki Pathway enrichment',\n                    cax_loc=[2, 0.45, 0.5, 0.02],\n                    bbox_to_anchor_used=(-0.25, -13),node_diameter=10,\n                     custom_ticks=[5,7],text_knock=3,\n                    cmap='Reds')"
+  },
+  {
+    "action": "Prepare pathway dictionaries for GO Biological Process, GO Molecular Function, and GO Cellular Component for mouse and perform gene set enrichment analysis for each.",
+    "code": "pathway_dict=ov.utils.geneset_prepare('genesets/GO_Biological_Process_2023.txt',organism='Mouse')\nenr_go_bp=ov.bulk.geneset_enrichment(gene_list=deg_genes,\n                                pathways_dict=pathway_dict,\n                                pvalue_type='auto',\n                                organism='mouse')\npathway_dict=ov.utils.geneset_prepare('genesets/GO_Molecular_Function_2023.txt',organism='Mouse')\nenr_go_mf=ov.bulk.geneset_enrichment(gene_list=deg_genes,\n                                pathways_dict=pathway_dict,\n                                pvalue_type='auto',\n                                organism='mouse')\npathway_dict=ov.utils.geneset_prepare('genesets/GO_Cellular_Component_2023.txt',organism='Mouse')\nenr_go_cc=ov.bulk.geneset_enrichment(gene_list=deg_genes,\n                                pathways_dict=pathway_dict,\n                                pvalue_type='auto',\n                                organism='mouse')"
+  },
+  {
+    "action": "Plot multiple gene set enrichment results together using `geneset_plot_multi`.",
+    "code": "enr_dict={'BP':enr_go_bp,\n         'MF':enr_go_mf,\n         'CC':enr_go_cc}\ncolors_dict={\n    'BP':ov.pl.red_color[1],\n    'MF':ov.pl.green_color[1],\n    'CC':ov.pl.blue_color[1],\n}\n                \nov.bulk.geneset_plot_multi(enr_dict,colors_dict,num=3,\n                   figsize=(2,5),\n                   text_knock=3,fontsize=8,\n                    cmap='Reds'\n                  )"
+  },
+  {
+    "action": "Define a function `geneset_plot_multi` to plot multiple gene set enrichment results.",
+    "code": "def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,\n                        fig_title:str='',fig_xlabel:str='Fractions of genes',\n                        figsize:tuple=(2,4),cmap:str='YlGnBu',\n                        text_knock:int=5,text_maxsize:int=20,ax=None,\n                        ):\n    from PyComplexHeatmap import HeatmapAnnotation,DotClustermapPlotter,anno_label,anno_simple,AnnotationBase\n    for key in enr_dict.keys():\n        enr_dict[key]['Type']=key\n    enr_all=pd.concat([enr_dict[i].iloc[:num] for i in enr_dict.keys()],axis=0)\n    enr_all['Term']=[ov.utils.plot_text_set(i.split('(')[0],text_knock=text_knock,text_maxsize=text_maxsize) for i in enr_all.Term.tolist()]\n    enr_all.index=enr_all.Term\n    enr_all['Term1']=[i for i in enr_all.index.tolist()]\n    del enr_all['Term']\n\n    colors=colors_dict\n\n    left_ha = HeatmapAnnotation(\n                          label=anno_label(enr_all.Type, merge=True,rotation=0,colors=colors,relpos=(1,0.8)),\n                          Category=anno_simple(enr_all.Type,cmap='Set1',\n                                           add_text=False,legend=False,colors=colors),\n                           axis=0,verbose=0,label_kws={'rotation':45,'horizontalalignment':'left','visible':False})\n    right_ha = HeatmapAnnotation(\n                              label=anno_label(enr_all.Term1, merge=True,rotation=0,relpos=(0,0.5),arrowprops=dict(visible=True),\n                                               colors=enr_all.assign(color=enr_all.Type.map(colors)).set_index('Term1').color.to_dict(),\n                                              fontsize=fontsize,luminance=0.8,height=2),\n                               axis=0,verbose=0,#label_kws={'rotation':45,'horizontalalignment':'left'},\n                                orientation='right')\n    if ax==None:\n        fig, ax = plt.subplots(figsize=figsize) \n    else:\n        ax=ax\n    #plt.figure(figsize=figsize)\n    cm = DotClustermapPlotter(data=enr_all, x='fraction',y='Term1',value='logp',c='logp',s='num',\n                              cmap=cmap,\n                              row_cluster=True,#col_cluster=True,#hue='Group',\n                              #cmap={'Group1':'Greens','Group2':'OrRd'},\n                              vmin=-1*np.log10(0.1),vmax=-1*np.log10(1e-10),\n                              #colors={'Group1':'yellowgreen','Group2':'orange'},\n                              #marker={'Group1':'*','Group2':'$\\ast$'},\n                              show_rownames=True,show_colnames=False,row_dendrogram=False,\n                              col_names_side='top',row_names_side='right',\n                              xticklabels_kws={'labelrotation': 30, 'labelcolor': 'blue','labelsize':fontsize},\n                              #yticklabels_kws={'labelsize':10},\n                              #top_annotation=col_ha,left_annotation=left_ha,right_annotation=right_ha,\n                              left_annotation=left_ha,right_annotation=right_ha,\n                              spines=False,\n                              row_split=enr_all.Type,# row_split_gap=1,\n                              #col_split=df_col.Group,col_split_gap=0.5,\n                              verbose=1,legend_gap=10,\n                              #dot_legend_marker='*',\n                              \n                              xlabel='Fractions of genes',xlabel_side=\"bottom\",\n                              xlabel_kws=dict(labelpad=8,fontweight='normal',fontsize=fontsize+2),\n                              # xlabel_bbox_kws=dict(facecolor=facecolor)\n                             )\n    tesr=plt.gcf().axes\n    for ax in plt.gcf().axes:\n        if hasattr(ax, 'get_xlabel'):\n            if ax.get_xlabel() == 'Fractions of genes':  # 假设 colorbar 有一个特定的标签\n                cbar = ax\n                cbar.grid(False)\n            if ax.get_ylabel() == 'logp':  # 假设 colorbar 有一个特定的标签\n                cbar = ax\n                cbar.tick_params(labelsize=fontsize+2)\n                cbar.set_ylabel(r'$−Log_{10}(P_{adjusted})$',fontsize=fontsize+2)\n                cbar.grid(False)\n    return ax"
+  }
+]

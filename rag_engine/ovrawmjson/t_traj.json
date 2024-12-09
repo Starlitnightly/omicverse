@@ -1,0 +1,98 @@
+[
+  {
+    "action": "Import necessary libraries: scanpy, scvelo, matplotlib, and omicverse. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import scanpy as sc\nimport scvelo as scv\nimport matplotlib.pyplot as plt\nimport omicverse as ov\nov.plot_set()"
+  },
+  {
+    "action": "Import the scvelo library and load the dentategyrus dataset using `scv.datasets.dentategyrus()`. The dataset is stored in the `adata` variable.",
+    "code": "import scvelo as scv\nadata=scv.datasets.dentategyrus()\nadata"
+  },
+  {
+    "action": "Preprocess the `adata` object using `ov.pp.preprocess()`. The preprocessing steps include shift log transformation, Pearson residuals, and selecting the top 3000 highly variable genes. The preprocessed data is stored back in `adata`. The raw data is saved in `adata.raw`. Only highly variable genes are kept. The data is then scaled using `ov.pp.scale()` and PCA is performed using `ov.pp.pca()` with 50 principal components.",
+    "code": "adata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=3000,)\nadata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]\nov.pp.scale(adata)\nov.pp.pca(adata,layer='scaled',n_pcs=50)"
+  },
+  {
+    "action": "Plot the variance ratio explained by each principal component using `ov.utils.plot_pca_variance_ratio()`. This helps determine the number of principal components to use for downstream analysis.",
+    "code": "ov.utils.plot_pca_variance_ratio(adata)"
+  },
+  {
+    "action": "Create a Trajectory Inference object using `ov.single.TrajInfer()`. The object is initialized with the `adata` object, UMAP coordinates as the basis, 'clusters' as the grouping variable, and 'scaled|original|X_pca' as the representation. The number of components is set to 50. The origin cells are set to 'nIPC'.",
+    "code": "Traj=ov.single.TrajInfer(adata,basis='X_umap',groupby='clusters',\n                         use_rep='scaled|original|X_pca',n_comps=50,)\nTraj.set_origin_cells('nIPC')"
+  },
+  {
+    "action": "Perform trajectory inference using the diffusion map method with `Traj.inference(method='diffusion_map')`.",
+    "code": "Traj.inference(method='diffusion_map')"
+  },
+  {
+    "action": "Visualize the UMAP embedding colored by 'clusters' and 'dpt_pseudotime' using `ov.utils.embedding()`. The plot is customized with a small frame and the 'Reds' colormap.",
+    "code": "ov.utils.embedding(adata,basis='X_umap',\n                   color=['clusters','dpt_pseudotime'],\n                   frameon='small',cmap='Reds')"
+  },
+  {
+    "action": "Calculate the PAGA graph using `ov.utils.cal_paga()`. The 'dpt_pseudotime' is used as a prior for the time, 'paga' is used as the velocity key, and 'clusters' is used as the grouping variable.",
+    "code": "ov.utils.cal_paga(adata,use_time_prior='dpt_pseudotime',vkey='paga',\n                 groups='clusters')"
+  },
+  {
+    "action": "Plot the PAGA graph on the UMAP embedding using `ov.utils.plot_paga()`. The plot is customized with size 50, alpha 0.1, title 'PAGA LTNN-graph', minimum edge width 2, node size scale 1.5, and the legend is hidden.",
+    "code": "ov.utils.plot_paga(adata,basis='umap', size=50, alpha=.1,title='PAGA LTNN-graph',\n            min_edge_width=2, node_size_scale=1.5,show=False,legend_loc=False)"
+  },
+  {
+    "action": "Create a Trajectory Inference object using `ov.single.TrajInfer()`. The object is initialized with the `adata` object, UMAP coordinates as the basis, 'clusters' as the grouping variable, and 'scaled|original|X_pca' as the representation. The number of components is set to 50. The origin cells are set to 'nIPC'.",
+    "code": "Traj=ov.single.TrajInfer(adata,basis='X_umap',groupby='clusters',\n                         use_rep='scaled|original|X_pca',n_comps=50)\nTraj.set_origin_cells('nIPC')\n#Traj.set_terminal_cells([\"Granule mature\",\"OL\",\"Astrocytes\"])"
+  },
+  {
+    "action": "Perform trajectory inference using the slingshot method with `Traj.inference(method='slingshot',num_epochs=1)`.",
+    "code": "Traj.inference(method='slingshot',num_epochs=1)"
+  },
+  {
+    "action": "Create a 2x2 subplot using `plt.subplots()` and perform trajectory inference using the slingshot method with `Traj.inference(method='slingshot',num_epochs=1,debug_axes=axes)`. The `debug_axes` parameter is used to visualize the lineage.",
+    "code": "fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))\nTraj.inference(method='slingshot',num_epochs=1,debug_axes=axes)"
+  },
+  {
+    "action": "Visualize the UMAP embedding colored by 'clusters' and 'slingshot_pseudotime' using `ov.utils.embedding()`. The plot is customized with a small frame and the 'Reds' colormap.",
+    "code": "ov.utils.embedding(adata,basis='X_umap',\n                   color=['clusters','slingshot_pseudotime'],\n                   frameon='small',cmap='Reds')"
+  },
+  {
+    "action": "Calculate the nearest neighbors using `sc.pp.neighbors()` with 'scaled|original|X_pca' as the representation. Then, calculate the PAGA graph using `ov.utils.cal_paga()` with 'slingshot_pseudotime' as a prior for the time, 'paga' as the velocity key, and 'clusters' as the grouping variable.",
+    "code": "sc.pp.neighbors(adata,use_rep='scaled|original|X_pca')\nov.utils.cal_paga(adata,use_time_prior='slingshot_pseudotime',vkey='paga',\n                 groups='clusters')"
+  },
+  {
+    "action": "Plot the PAGA graph on the UMAP embedding using `ov.utils.plot_paga()`. The plot is customized with size 50, alpha 0.1, title 'PAGA Slingshot-graph', minimum edge width 2, node size scale 1.5, and the legend is hidden.",
+    "code": "ov.utils.plot_paga(adata,basis='umap', size=50, alpha=.1,title='PAGA Slingshot-graph',\n            min_edge_width=2, node_size_scale=1.5,show=False,legend_loc=False)"
+  },
+  {
+    "action": "Create a Trajectory Inference object using `ov.single.TrajInfer()`. The object is initialized with the `adata` object, UMAP coordinates as the basis, 'clusters' as the grouping variable, and 'scaled|original|X_pca' as the representation. The number of components is set to 50. The origin cells are set to 'nIPC' and the terminal cells are set to 'Granule mature', 'OL', and 'Astrocytes'.",
+    "code": "Traj=ov.single.TrajInfer(adata,basis='X_umap',groupby='clusters',\n                         use_rep='scaled|original|X_pca',n_comps=50)\nTraj.set_origin_cells('nIPC')\nTraj.set_terminal_cells([\"Granule mature\",\"OL\",\"Astrocytes\"])"
+  },
+  {
+    "action": "Perform trajectory inference using the palantir method with `Traj.inference(method='palantir',num_waypoints=500)`. The number of waypoints is set to 500.",
+    "code": "Traj.inference(method='palantir',num_waypoints=500)"
+  },
+  {
+    "action": "Visualize the Palantir pseudotime on the UMAP embedding using `Traj.palantir_plot_pseudotime()`. The plot is customized with the 'RdBu_r' colormap and a marker size of 3.",
+    "code": "Traj.palantir_plot_pseudotime(embedding_basis='X_umap',cmap='RdBu_r',s=3)"
+  },
+  {
+    "action": "Calculate the branch probabilities using `Traj.palantir_cal_branch()` with an epsilon value of 0.",
+    "code": "Traj.palantir_cal_branch(eps=0)"
+  },
+  {
+    "action": "Plot the trajectory for the 'Granule mature' branch using `ov.externel.palantir.plot.plot_trajectory()`. The cells are colored by 'palantir_entropy', 10 arrows are used, the color is set to red, and the colormap is set to 'RdBu_r'.",
+    "code": "ov.externel.palantir.plot.plot_trajectory(adata, \"Granule mature\",\n                                cell_color=\"palantir_entropy\",\n                                n_arrows=10,\n                                color=\"red\",\n                                scanpy_kwargs=dict(cmap=\"RdBu_r\"),\n                                )"
+  },
+  {
+    "action": "Calculate the gene expression trends using `Traj.palantir_cal_gene_trends()` with 'MAGIC_imputed_data' as the layer.",
+    "code": "gene_trends = Traj.palantir_cal_gene_trends(\n    layers=\"MAGIC_imputed_data\",\n)"
+  },
+  {
+    "action": "Plot the gene expression trends for the genes 'Cdca3', 'Rasl10a', 'Mog', and 'Aqp4' using `Traj.palantir_plot_gene_trends()`. The plot is then displayed using `plt.show()`.",
+    "code": "genes = ['Cdca3','Rasl10a','Mog','Aqp4']\nTraj.palantir_plot_gene_trends(genes)\nplt.show()"
+  },
+  {
+    "action": "Calculate the PAGA graph using `ov.utils.cal_paga()`. The 'palantir_pseudotime' is used as a prior for the time, 'paga' is used as the velocity key, and 'clusters' is used as the grouping variable.",
+    "code": "ov.utils.cal_paga(adata,use_time_prior='palantir_pseudotime',vkey='paga',\n                 groups='clusters')"
+  },
+  {
+    "action": "Plot the PAGA graph on the UMAP embedding using `ov.utils.plot_paga()`. The plot is customized with size 50, alpha 0.1, title 'PAGA LTNN-graph', minimum edge width 2, node size scale 1.5, and the legend is hidden.",
+    "code": "ov.utils.plot_paga(adata,basis='umap', size=50, alpha=.1,title='PAGA LTNN-graph',\n            min_edge_width=2, node_size_scale=1.5,show=False,legend_loc=False)"
+  }
+]

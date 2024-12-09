@@ -1,0 +1,7 @@
+langchain-community
+chromadb
+gpt4all
+ollama
+streamlit
+python-dotenv
+requests

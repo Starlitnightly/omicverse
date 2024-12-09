@@ -1,0 +1,94 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and scvelo. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport scvelo as scv\n\nov.plot_set()"
+  },
+  {
+    "action": "Load the pancreas dataset using `scv.datasets.pancreas()`.",
+    "code": "adata = scv.datasets.pancreas()\nadata"
+  },
+  {
+    "action": "Perform quality control on the AnnData object `adata` using `ov.pp.qc()`, filtering cells based on mitochondrial percentage, number of UMIs, and number of detected genes.",
+    "code": "#quantity control\nadata=ov.pp.qc(adata,\n              tresh={'mito_perc': 0.20, 'nUMIs': 500, 'detected_genes': 250},\n              mt_startswith='mt-')"
+  },
+  {
+    "action": "Preprocess the AnnData object `adata` using `ov.pp.preprocess()`, normalizing and calculating highly variable genes (HVGs).",
+    "code": "#normalize and high variable genes (HVGs) calculated\nadata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)"
+  },
+  {
+    "action": "Save the whole genes in `adata.raw` and filter out non-HVGs from `adata`.",
+    "code": "#save the whole genes and filter the non-HVGs\nadata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]"
+  },
+  {
+    "action": "Scale the `adata.X` using `ov.pp.scale()`.",
+    "code": "#scale the adata.X\nov.pp.scale(adata)"
+  },
+  {
+    "action": "Perform dimensionality reduction using PCA on the scaled data with `ov.pp.pca()`, keeping the top 50 principal components.",
+    "code": "#Dimensionality Reduction\nov.pp.pca(adata,layer='scaled',n_pcs=50)"
+  },
+  {
+    "action": "Construct a metacellular object using `ov.single.MetaCell` with specified parameters.",
+    "code": "meta_obj=ov.single.MetaCell(adata,use_rep='scaled|original|X_pca',\n                            n_metacells=None,\n                           use_gpu='cuda:0')"
+  },
+  {
+    "action": "Initialize archetypes for the metacellular object.",
+    "code": "get_ipython().run_cell_magic('time', '', 'meta_obj.initialize_archetypes()\\n')"
+  },
+  {
+    "action": "Train the SEACells model with specified minimum and maximum iterations.",
+    "code": "get_ipython().run_cell_magic('time', '', 'meta_obj.train(min_iter=10, max_iter=50)\\n')"
+  },
+  {
+    "action": "Save the trained model to a file.",
+    "code": "meta_obj.save('seacells/model.pkl')"
+  },
+  {
+    "action": "Load the trained model from a file.",
+    "code": "meta_obj.load('seacells/model.pkl')"
+  },
+  {
+    "action": "Predict metacells using the `predicted` method with 'soft' aggregation and summarize the 'lognorm' layer.",
+    "code": "ad=meta_obj.predicted(method='soft',celltype_label='clusters',\n                     summarize_layer='lognorm')"
+  },
+  {
+    "action": "Compute cell type purity, separation, and compactness for benchmarking.",
+    "code": "SEACell_purity = meta_obj.compute_celltype_purity('clusters')\nseparation = meta_obj.separation(use_rep='scaled|original|X_pca',nth_nbr=1)\ncompactness = meta_obj.compactness(use_rep='scaled|original|X_pca')"
+  },
+  {
+    "action": "Create box plots to visualize cell type purity, compactness, and separation using `seaborn` and `matplotlib`.",
+    "code": "import seaborn as sns\nimport matplotlib.pyplot as plt\nov.plot_set()\nfig, axes = plt.subplots(1,3,figsize=(4,4))\nsns.boxplot(data=SEACell_purity, y='clusters_purity',ax=axes[0],\n           color=ov.utils.blue_color[3])\nsns.boxplot(data=compactness, y='compactness',ax=axes[1],\n           color=ov.utils.blue_color[4])\nsns.boxplot(data=separation, y='separation',ax=axes[2],\n           color=ov.utils.blue_color[4])\nplt.tight_layout()\nplt.suptitle('Evaluate of MetaCells',fontsize=13,y=1.05)\nfor ax in axes:\n    ax.grid(False)\n    ax.spines['top'].set_visible(False)\n    ax.spines['right'].set_visible(False)\n    ax.spines['bottom'].set_visible(True)\n    ax.spines['left'].set_visible(True)"
+  },
+  {
+    "action": "Plot UMAP embedding of metacells colored by cluster labels and overlay metacell centers.",
+    "code": "import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(4,4))\nov.pl.embedding(\n    meta_obj.adata,\n    basis=\"X_umap\",\n    color=['clusters'],\n    frameon='small',\n    title=\"Meta cells\",\n    #legend_loc='on data',\n    legend_fontsize=14,\n    legend_fontoutline=2,\n    size=10,\n    ax=ax,\n    alpha=0.2,\n    #legend_loc='', \n    add_outline=False, \n    #add_outline=True,\n    outline_color='black',\n    outline_width=1,\n    show=False,\n    #palette=ov.utils.blue_color[:],\n    #legend_fontweight='normal'\n)\nov.single.plot_metacells(ax,meta_obj.adata,color='#CB3E35',\n                                  )"
+  },
+  {
+    "action": "Get the mean value of 'S_score' from the original `adata` and store it in the metacell AnnData object `ad`.",
+    "code": "ov.single.get_obs_value(ad,adata,groupby='S_score',\n                       type='mean')\nad.obs.head()"
+  },
+  {
+    "action": "Identify highly variable genes in the metacell AnnData object `ad`.",
+    "code": "import scanpy as sc\nad.raw=ad.copy()\nsc.pp.highly_variable_genes(ad, n_top_genes=2000, inplace=True)\nad=ad[:,ad.var.highly_variable]"
+  },
+  {
+    "action": "Scale the metacell data and perform PCA.",
+    "code": "ov.pp.scale(ad)\nov.pp.pca(ad,layer='scaled',n_pcs=30)"
+  },
+  {
+    "action": "Compute nearest neighbors for the metacell data.",
+    "code": "ov.pp.neighbors(ad, n_neighbors=15, n_pcs=20,\n               use_rep='scaled|original|X_pca')"
+  },
+  {
+    "action": "Compute UMAP for the metacell data.",
+    "code": "ov.pp.umap(ad)"
+  },
+  {
+    "action": "Set the 'celltype' observation to be categorical and reorder categories to match the original data. Also, set the color palette for 'celltype' to match the original data.",
+    "code": "ad.obs['celltype']=ad.obs['celltype'].astype('category')\nad.obs['celltype']=ad.obs['celltype'].cat.reorder_categories(adata.obs['clusters'].cat.categories)\nad.uns['celltype_colors']=adata.uns['clusters_colors']"
+  },
+  {
+    "action": "Plot UMAP embedding of metacells colored by 'celltype' and 'S_score'.",
+    "code": "ov.pl.embedding(ad, basis='X_umap',\n                color=[\"celltype\",\"S_score\"],\n                frameon='small',cmap='RdBu_r',\n               wspace=0.5)"
+  }
+]
