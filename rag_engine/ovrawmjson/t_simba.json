@@ -1,0 +1,50 @@
+[
+  {
+    "action": "Import necessary libraries and set up the working directory. `ov.utils.ov_plot_set()` sets default plotting parameters.",
+    "code": "import omicverse as ov\nfrom omicverse.utils import mde\nworkdir = 'result_human_pancreas'\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Installation instructions for SIMBA, a tool for single-cell data integration and batch correction.",
+    "code": "# We need to install simba at first\n# \n# ```\n# conda install -c bioconda simba\n# ```\n# \n# or\n# \n# ```\n# pip install git+https://github.com/huidongchen/simba\n# pip install git+https://github.com/pinellolab/simba_pbg\n# ```"
+  },
+  {
+    "action": "Read the combined AnnData object from a file. This object contains three scRNA-seq human pancreas datasets.",
+    "code": "adata=ov.utils.read('simba_adata_raw.h5ad')"
+  },
+  {
+    "action": "Initialize a pySIMBA object with the AnnData object and the working directory.",
+    "code": "simba_object=ov.single.pySIMBA(adata,workdir)"
+  },
+  {
+    "action": "Preprocess the data using default parameters. This includes filtering cells, normalizing library sizes, selecting highly variable genes, and binning genes.",
+    "code": "simba_object.preprocess(batch_key='batch',min_n_cells=3,\n                    method='lib_size',n_top_genes=3000,n_bins=5)"
+  },
+  {
+    "action": "Generate a graph for training. The graph represents cells and genes as nodes, with edges connecting them based on relationships in the data.",
+    "code": "simba_object.gen_graph()"
+  },
+  {
+    "action": "Train the PyTorch BigGraph (PBG) model using the generated graph. The `num_workers` parameter specifies the number of CPU cores to use for training.",
+    "code": "simba_object.train(num_workers=6)"
+  },
+  {
+    "action": "Load a pre-trained model from a specified directory.",
+    "code": "simba_object.load('result_human_pancreas/pbg/graph0')"
+  },
+  {
+    "action": "Perform batch correction using the `batch_correction()` method. This aligns the datasets to reduce batch effects.",
+    "code": "adata=simba_object.batch_correction()\nadata"
+  },
+  {
+    "action": "Visualize the batch-corrected data using Minimum Distortion Embedding (MDE) instead of UMAP.",
+    "code": "adata.obsm[\"X_mde\"] = mde(adata.obsm[\"X_simba\"])"
+  },
+  {
+    "action": "Plot the MDE visualization, coloring cells by cell type and batch.",
+    "code": "sc.pl.embedding(adata,basis='X_mde',color=['cell_type1','batch'])"
+  },
+  {
+    "action": "Visualize the batch-corrected data using UMAP.",
+    "code": "import scanpy as sc\nsc.pp.neighbors(adata, use_rep=\"X_simba\")\nsc.tl.umap(adata)\nsc.pl.umap(adata,color=['cell_type1','batch'])"
+  }
+]

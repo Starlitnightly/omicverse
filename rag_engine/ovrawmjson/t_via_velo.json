@@ -1,0 +1,38 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, scvelo, and cellrank. Set plotting parameters using `ov.utils.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport scvelo as scv\nimport cellrank as cr\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Load the pancreas dataset from cellrank.",
+    "code": "adata = cr.datasets.pancreas()\nadata"
+  },
+  {
+    "action": "Filter and normalize the data, calculate PCA, compute moments, and calculate velocity.",
+    "code": "n_pcs = 30\nscv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=5000)\nsc.tl.pca(adata, n_comps = n_pcs)\nscv.pp.moments(adata, n_pcs=None, n_neighbors=None)\nscv.tl.velocity(adata, mode='stochastic')"
+  },
+  {
+    "action": "Initialize the pyVIA object with specified parameters.",
+    "code": "v0 = ov.single.pyVIA(adata=adata,adata_key='X_pca',adata_ncomps=n_pcs, basis='X_umap',\n                         clusters='clusters',knn=20, root_user=None,\n                         dataset='', random_seed=42,is_coarse=True, preserve_disconnected=True, pseudotime_threshold_TS=50,\n                         piegraph_arrow_head_width=0.15,piegraph_edgeweight_scalingfactor=2.5,\n                         velocity_matrix=adata.layers['velocity'],gene_matrix=adata.X.todense(),velo_weight=0.5,\n                         edgebundle_pruning_twice=False, edgebundle_pruning=0.15, pca_loadings = adata.varm['PCs']\n                        )"
+  },
+  {
+    "action": "Run the VIA algorithm.",
+    "code": "v0.run()"
+  },
+  {
+    "action": "Plot the piechart graph with specified parameters.",
+    "code": "fig, ax, ax1 = v0.plot_piechart_graph(clusters='clusters',cmap='Reds',dpi=80,\n                                   show_legend=False,ax_text=False,fontsize=4)\nfig.set_size_inches(8,4)"
+  },
+  {
+    "action": "Plot the trajectory GAMs.",
+    "code": "v0.plot_trajectory_gams(basis='X_umap',clusters='clusters',draw_all_curves=False)"
+  },
+  {
+    "action": "Plot the stream with specified parameters.",
+    "code": "v0.plot_stream(basis='X_umap',clusters='clusters',\n               density_grid=0.8, scatter_size=30, scatter_alpha=0.3, linewidth=0.5)"
+  },
+  {
+    "action": "Plot the lineage probabilities.",
+    "code": "v0.plot_lineage_probability()"
+  }
+]

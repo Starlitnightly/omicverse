@@ -1,0 +1,110 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\n#print(f\"omicverse version: {ov.__version__}\")\nimport scanpy as sc\n#print(f\"scanpy version: {sc.__version__}\")\nov.plot_set()"
+  },
+  {
+    "action": "Read 10x Visium spatial transcriptomics data from the specified path and count file, and make variable names unique.",
+    "code": "adata = sc.read_visium(path='data', count_file='151676_filtered_feature_bc_matrix.h5')\nadata.var_names_make_unique()"
+  },
+  {
+    "action": "Calculate quality control metrics and filter genes with total counts less than 100. Then, identify spatially variable genes using the `ov.space.svg` function with the 'prost' method.",
+    "code": "sc.pp.calculate_qc_metrics(adata, inplace=True)\nadata = adata[:,adata.var['total_counts']>100]\nadata=ov.space.svg(adata,mode='prost',n_svgs=3000,target_sum=1e4,platform=\"visium\",)"
+  },
+  {
+    "action": "Write the processed AnnData object to a compressed H5AD file.",
+    "code": "adata.write('data/cluster_svg.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Load ligand-receptor database from CellChat for secreted signaling in humans using `ov.externel.commot.pp.ligand_receptor_database`.",
+    "code": "df_cellchat = ov.externel.commot.pp.ligand_receptor_database(species='human', \n                                                             signaling_type='Secreted Signaling', \n                                                             database='CellChat')\nprint(df_cellchat.shape)"
+  },
+  {
+    "action": "Filter the ligand-receptor database to include only pairs where both ligand and receptor are expressed in at least 5% of the spots using `ov.externel.commot.pp.filter_lr_database`.",
+    "code": "df_cellchat_filtered = ov.externel.commot.pp.filter_lr_database(df_cellchat, \n                                                                adata, \n                                                                min_cell_pct=0.05)\nprint(df_cellchat_filtered.shape)"
+  },
+  {
+    "action": "Perform spatial communication inference using `ov.externel.commot.tl.spatial_communication` with specified parameters, including distance threshold and handling of heteromeric complexes.",
+    "code": "ov.externel.commot.tl.spatial_communication(adata,\n                            database_name='cellchat', \n                            df_ligrec=df_cellchat_filtered, \n                            dis_thr=500, heteromeric=True, \n                            pathway_sum=True)"
+  },
+  {
+    "action": "Read ground truth annotations from a file and add them to the AnnData object. Visualize the spatial distribution of ground truth annotations using `sc.pl.spatial`.",
+    "code": "# read the annotation\nimport pandas as pd\nimport os\nAnn_df = pd.read_csv(os.path.join('data', '151676_truth.txt'), sep='\\t', header=None, index_col=0)\nAnn_df.columns = ['Ground_Truth']\nadata.obs['Ground_Truth'] = Ann_df.loc[adata.obs_names, 'Ground_Truth']\nLayer_color=['#283b5c', '#d8e17b', '#838e44', '#4e8991', '#d08c35', '#511a3a',\n       '#c2c2c2', '#dfc648']\nsc.pl.spatial(adata, img_key=\"hires\", color=[\"Ground_Truth\"],palette=Layer_color)"
+  },
+  {
+    "action": "Create a dictionary mapping ground truth categories to their corresponding colors.",
+    "code": "ct_color_dict=dict(zip(adata.obs['Ground_Truth'].cat.categories,\n                      adata.uns['Ground_Truth_colors']))"
+  },
+  {
+    "action": "Display the head of the ligand-receptor dataframe from the CellChat database information.",
+    "code": "adata.uns['commot-cellchat-info']['df_ligrec'].head()"
+  },
+  {
+    "action": "Determine the spatial direction of the FGF signaling pathway using `ov.externel.commot.tl.communication_direction`. Visualize the cell communication for the FGF pathway using `ov.externel.commot.pl.plot_cell_communication` with specified parameters.",
+    "code": "import matplotlib.pyplot as plt\nscale=0.000008\nk=5\ngoal_pathway='FGF'\nov.externel.commot.tl.communication_direction(adata, database_name='cellchat', pathway_name=goal_pathway, k=k)\nov.externel.commot.pl.plot_cell_communication(adata, database_name='cellchat', \n                                              pathway_name='FGF', plot_method='grid', \n                                              background_legend=True,\n                                              scale=scale, ndsize=8, grid_density=0.4, \n                                              summary='sender', background='cluster', \n                                              clustering='Ground_Truth', \n                                              cluster_cmap=ct_color_dict,\n                                              cmap='Alphabet',\n                                              normalize_v = True, normalize_v_quantile=0.995)\nplt.title(f'Pathway:{goal_pathway}',fontsize=13)\n#plt.savefig('figures/TLE/TLE_cellchat_all_FGF.png',dpi=300,bbox_inches='tight')\n#fig.savefig('pdf/TLE/control_cellchat_all_FGF.pdf',dpi=300,bbox_inches='tight')"
+  },
+  {
+    "action": "Write the AnnData object with COMMOT results to a compressed H5AD file.",
+    "code": "adata.write('data/151676_commot.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Read the AnnData object with COMMOT results from the H5AD file.",
+    "code": "adata=ov.read('data/151676_commot.h5ad')"
+  },
+  {
+    "action": "Copy the normalized data to a new layer in the AnnData object.",
+    "code": "adata.layers['normalized'] = adata.X.copy()"
+  },
+  {
+    "action": "Construct gene expression modules (GEMs) using non-negative matrix factorization (NMF) with `ov.externel.flowsig.pp.construct_gems_using_nmf`.",
+    "code": "# We construct 10 gene expression modules using the raw cell count.\nov.externel.flowsig.pp.construct_gems_using_nmf(adata,\n                                n_gems = 10,\n                                layer_key = 'counts',\n                                                   )"
+  },
+  {
+    "action": "Retrieve the top genes for a specific GEM using `ov.externel.flowsig.ul.get_top_gem_genes`.",
+    "code": "goal_gem='GEM-5'\ngem_gene=ov.externel.flowsig.ul.get_top_gem_genes(adata=adata,\n                                            gems=[goal_gem],\n                                         n_genes=100,\n                                         gene_type='all',\n                                        method = 'nmf',\n                                        )\ngem_gene.head()"
+  },
+  {
+    "action": "Construct flow expression matrices using `ov.externel.flowsig.pp.construct_flows_from_commot` with specified parameters.",
+    "code": "commot_output_key = 'commot-cellchat'\n# We first construct the potential cellular flows from the commot output\nov.externel.flowsig.pp.construct_flows_from_commot(adata,\n                                commot_output_key,\n                                gem_expr_key = 'X_gem',\n                                scale_gem_expr = True,\n                                flowsig_network_key = 'flowsig_network',\n                                flowsig_expr_key = 'X_flow')"
+  },
+  {
+    "action": "Determine informative variables for spatial data using `ov.externel.flowsig.pp.determine_informative_variables` with a Moran's I threshold.",
+    "code": "# Then we subset for \"spatially flowing\" inflows and outflows\nov.externel.flowsig.pp.determine_informative_variables(adata,  \n                                    flowsig_expr_key = 'X_flow',\n                                    flowsig_network_key = 'flowsig_network',\n                                    spatial = True,\n                                    moran_threshold = 0.15,\n                                    coord_type = 'grid',\n                                    n_neighbours = 8,\n                                    library_key = None)"
+  },
+  {
+    "action": "Perform k-means clustering on spatial coordinates and add the cluster labels to the AnnData object.",
+    "code": "from sklearn.cluster import KMeans\nimport pandas as pd\n\nkmeans = KMeans(n_clusters=10, random_state=0).fit(adata.obsm['spatial'])\nadata.obs['spatial_kmeans'] = pd.Series(kmeans.labels_, dtype='category').values"
+  },
+  {
+    "action": "Learn intercellular flows using spatial block bootstrapping with `ov.externel.flowsig.tl.learn_intercellular_flows`.",
+    "code": "# # Now we are ready to learn the network\nov.externel.flowsig.tl.learn_intercellular_flows(adata,\n                        flowsig_key = 'flowsig_network',\n                        flow_expr_key = 'X_flow',\n                        use_spatial = True,\n                        block_key = 'spatial_kmeans',\n                        n_jobs = 4,\n                        n_bootstraps = 500)"
+  },
+  {
+    "action": "Apply biological flow constraints to the network using `ov.externel.flowsig.tl.apply_biological_flow`.",
+    "code": "# This part is key for reducing false positives\nov.externel.flowsig.tl.apply_biological_flow(adata,\n                        flowsig_network_key = 'flowsig_network',\n                        adjacency_key = 'adjacency',\n                        validated_key = 'validated')"
+  },
+  {
+    "action": "Filter low-confidence edges based on bootstrapped frequencies using `ov.externel.flowsig.tl.filter_low_confidence_edges`.",
+    "code": "edge_threshold = 0.7\n\nov.externel.flowsig.tl.filter_low_confidence_edges(adata,\n                                edge_threshold = edge_threshold,\n                                flowsig_network_key = 'flowsig_network',\n                                adjacency_key = 'adjacency_validated',\n                                filtered_key = 'filtered')"
+  },
+  {
+    "action": "Write the AnnData object with COMMOT and flowsig results to a compressed H5AD file.",
+    "code": "adata.write('data/cortex_commot_flowsig.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Construct the directed NetworkX DiGraph object from the filtered adjacency matrix using `ov.externel.flowsig.tl.construct_intercellular_flow_network`.",
+    "code": "flow_network = ov.externel.flowsig.tl.construct_intercellular_flow_network(adata,\n                                                        flowsig_network_key = 'flowsig_network',\n                                                        adjacency_key = 'adjacency_validated_filtered')"
+  },
+  {
+    "action": "Create a subset of the AnnData object containing only GEM expression data and corresponding metadata.",
+    "code": "flowsig_expr_key='X_gem'\nX_flow = adata.obsm[flowsig_expr_key]\nadata_subset = sc.AnnData(X=X_flow)\nadata_subset.obs = adata.obs\nadata_subset.var.index =[f'GEM-{i}' for i in range(1,len(adata_subset.var)+1)]"
+  },
+  {
+    "action": "Visualize the expression of GEMs in different cell types using a dotplot with `sc.pl.dotplot`.",
+    "code": "import matplotlib.pyplot as plt\nax=sc.pl.dotplot(adata_subset, adata_subset.var.index, groupby='Ground_Truth', \n              dendrogram=True,standard_scale='var',cmap='Reds',show=False)\ncolor_dict=dict(zip(adata.obs['Ground_Truth'].cat.categories,adata.uns['Ground_Truth_colors']))"
+  },
+  {
+    "action": "Visualize the flowsig network using `ov.pl.plot_flowsig_network` with specified parameters for node shapes, curve arguments, and axis limits.",
+    "code": "ov.pl.plot_flowsig_network(flow_network=flow_network,\n                         gem_plot=['GEM-2','GEM-7','GEM-1','GEM-3','GEM-4','GEM-5'],\n                        figsize=(8,4),\n                     curve_awarg={'eps':2},\n                      node_shape={'GEM':'^','Sender':'o','Receptor':'o'},\n                          ylim=(-0.5,0.5),xlim=(-3,3))"
+  }
+]

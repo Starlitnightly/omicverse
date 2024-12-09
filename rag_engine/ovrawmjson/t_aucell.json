@@ -1,0 +1,70 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and scvelo. Set plotting parameters using `ov.utils.ov_plot_set()`. Download pathway database and gene ID annotation pair using `ov.utils.download_pathway_database()` and `ov.utils.download_geneid_annotation_pair()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport scvelo as scv\n\nov.utils.ov_plot_set()\n\nov.utils.download_pathway_database()\nov.utils.download_geneid_annotation_pair()"
+  },
+  {
+    "action": "Load the pancreas dataset using `scv.datasets.pancreas()`. Print the AnnData object to inspect its contents.",
+    "code": "adata = scv.datasets.pancreas()\nadata"
+  },
+  {
+    "action": "Check the maximum value in the `adata.X` matrix.",
+    "code": "adata.X.max()"
+  },
+  {
+    "action": "Normalize the data to a total count of 1e4 per cell and log-transform it.",
+    "code": "sc.pp.normalize_total(adata, target_sum=1e4)\nsc.pp.log1p(adata)"
+  },
+  {
+    "action": "Check the maximum value in the `adata.X` matrix after normalization and log-transformation.",
+    "code": "adata.X.max()"
+  },
+  {
+    "action": "Prepare the gene set dictionary from the GO Biological Process 2021 file for the Mouse organism using `ov.utils.geneset_prepare()`.",
+    "code": "pathway_dict=ov.utils.geneset_prepare('genesets/GO_Biological_Process_2021.txt',organism='Mouse')"
+  },
+  {
+    "action": "Assess the enrichment of a single gene set ('response to vitamin (GO:0033273)') using AUCell and visualize it on a UMAP embedding.",
+    "code": "##Assest one geneset\ngeneset_name='response to vitamin (GO:0033273)'\nov.single.geneset_aucell(adata,\n                            geneset_name=geneset_name,\n                            geneset=pathway_dict[geneset_name])\nsc.pl.embedding(adata,\n                basis='umap',\n          color=[\"{}_aucell\".format(geneset_name)])"
+  },
+  {
+    "action": "Assess the enrichment of multiple gene sets ('response to vitamin (GO:0033273)' and 'response to vitamin D (GO:0033280)') using AUCell and visualize them on a UMAP embedding.",
+    "code": "##Assest more than one geneset\ngeneset_names=['response to vitamin (GO:0033273)','response to vitamin D (GO:0033280)']\nov.single.pathway_aucell(adata,\n                            pathway_names=geneset_names,\n                            pathways_dict=pathway_dict)\nsc.pl.embedding(adata,\n                basis='umap',\n                color=[i+'_aucell' for i in geneset_names])"
+  },
+  {
+    "action": "Assess the enrichment of a custom gene set ('Sox') using AUCell and visualize it on a UMAP embedding.",
+    "code": "##Assest test geneset\nov.single.geneset_aucell(adata,\n                            geneset_name='Sox',\n                            geneset=['Sox17', 'Sox4', 'Sox7', 'Sox18', 'Sox5'])\nsc.pl.embedding(adata,\n                basis='umap',\n          color=[\"Sox_aucell\"])"
+  },
+  {
+    "action": "Calculate AUCell enrichment scores for all pathways in the `pathway_dict` using multiple workers. Then, transfer metadata from the original `adata` object to the new `adata_aucs` object.",
+    "code": "##Assest all pathways\nadata_aucs=ov.single.pathway_aucell_enrichment(adata,\n                                                  pathways_dict=pathway_dict,\n                                                  num_workers=8)\n\nadata_aucs.obs=adata[adata_aucs.obs.index].obs\nadata_aucs.obsm=adata[adata_aucs.obs.index].obsm\nadata_aucs.obsp=adata[adata_aucs.obs.index].obsp\nadata_aucs"
+  },
+  {
+    "action": "Save the `adata_aucs` object to an H5AD file and then read it back.",
+    "code": "adata_aucs.write_h5ad('data/pancreas_auce.h5ad',compression='gzip')\n\nadata_aucs=sc.read('data/pancreas_auce.h5ad')"
+  },
+  {
+    "action": "Visualize the AUCell enrichment scores for the previously selected gene sets on a UMAP embedding of the `adata_aucs` object.",
+    "code": "sc.pl.embedding(adata_aucs,\n                basis='umap',\n          color=geneset_names)"
+  },
+  {
+    "action": "Perform differential gene expression analysis on the `adata_aucs` object using the t-test method and visualize the top 3 differentially expressed genes per cluster using a dot plot.",
+    "code": "#adata_aucs.uns['log1p']['base']=None\nsc.tl.rank_genes_groups(adata_aucs, 'clusters', method='t-test',n_genes=100)\nsc.pl.rank_genes_groups_dotplot(adata_aucs,groupby='clusters',\n                                cmap='Spectral_r',\n                                standard_scale='var',n_genes=3)"
+  },
+  {
+    "action": "Extract the names of differentially expressed genes in the 'Beta' cluster based on log2 fold change and p-value thresholds.",
+    "code": "degs = sc.get.rank_genes_groups_df(adata_aucs, group='Beta', key='rank_genes_groups', log2fc_min=2, \n                                    pval_cutoff=0.05)['names'].squeeze()\ndegs"
+  },
+  {
+    "action": "Visualize the expression of the differentially expressed genes and the cluster assignments on a UMAP embedding using `sc.pl.embedding`.",
+    "code": "import matplotlib.pyplot as plt\n#fig, axes = plt.subplots(4,3,figsize=(12,9))\naxes=sc.pl.embedding(adata_aucs,ncols=3,\n                basis='umap',show=False,return_fig=True,wspace=0.55,hspace=0.65,\n                color=['clusters']+degs.values.tolist(),\n                title=[ov.utils.plot_text_set(i,3,20)for i in ['clusters']+degs.values.tolist()])\n\naxes.tight_layout()"
+  },
+  {
+    "action": "Perform differential gene expression analysis on the original `adata` object using the t-test method.",
+    "code": "adata.uns['log1p']['base']=None\nsc.tl.rank_genes_groups(adata, 'clusters', method='t-test',n_genes=100)"
+  },
+  {
+    "action": "Perform pathway enrichment analysis using `ov.single.pathway_enrichment` and visualize the results using `ov.single.pathway_enrichment_plot`.",
+    "code": "res=ov.single.pathway_enrichment(adata,pathways_dict=pathway_dict,organism='Mouse',\n                                     group_by='clusters',plot=True)\n\nax=ov.single.pathway_enrichment_plot(res,plot_title='Enrichment',cmap='Reds',\n                                         xticklabels=True,cbar=False,square=True,vmax=10,\n                                         yticklabels=True,cbar_kws={'label': '-log10(qvalue)','shrink': 0.5,})"
+  }
+]

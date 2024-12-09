@@ -1,0 +1,98 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import omicverse as ov\nprint(f'omicverse version:{ov.__version__}')\nimport scanpy as sc\nprint(f'scanpy version:{sc.__version__}')\nov.ov_plot_set()"
+  },
+  {
+    "action": "Create a directory named 'data', download the PBMC3K dataset from 10x Genomics, and unpack it. Then, create a directory named 'write' for storing processed data.",
+    "code": "# !mkdir data\n# !wget http://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz -O data/pbmc3k_filtered_gene_bc_matrices.tar.gz\n# !cd data; tar -xzf pbmc3k_filtered_gene_bc_matrices.tar.gz\n# !mkdir write"
+  },
+  {
+    "action": "Read the count matrix from the 10x Genomics data into an AnnData object, using gene symbols for variable names and caching the data for faster reading.",
+    "code": "adata = sc.read_10x_mtx(\n    'data/filtered_gene_bc_matrices/hg19/',  # the directory with the `.mtx` file\n    var_names='gene_symbols',                # use gene symbols for the variable names (variables-axis index)\n    cache=True)                              # write a cache file for faster subsequent reading"
+  },
+  {
+    "action": "Perform quality control on the AnnData object, filtering cells based on mitochondrial gene percentage, number of UMIs, and number of detected genes.",
+    "code": "adata=ov.pp.qc(adata,\n              tresh={'mito_perc': 0.05, 'nUMIs': 500, 'detected_genes': 250})"
+  },
+  {
+    "action": "Preprocess the data by normalizing and identifying highly variable genes (HVGs) using the 'shiftlog|pearson' mode, selecting the top 2000 HVGs.",
+    "code": "adata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)"
+  },
+  {
+    "action": "Store the raw data in `adata.raw` and filter the AnnData object to keep only the highly variable genes.",
+    "code": "adata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]"
+  },
+  {
+    "action": "Scale the data in `adata.X`.",
+    "code": "ov.pp.scale(adata)"
+  },
+  {
+    "action": "Perform Principal Component Analysis (PCA) on the scaled data, reducing the dimensionality to 50 principal components.",
+    "code": "ov.pp.pca(adata,layer='scaled',n_pcs=50)"
+  },
+  {
+    "action": "Construct a neighborhood graph using the top 50 principal components, considering 15 nearest neighbors.",
+    "code": "sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50,\n               use_rep='scaled|original|X_pca')"
+  },
+  {
+    "action": "Perform Leiden clustering on the neighborhood graph.",
+    "code": "sc.tl.leiden(adata)"
+  },
+  {
+    "action": "Calculate a dendrogram for the Leiden clusters and identify marker genes for each cluster using the Wilcoxon rank-sum test.",
+    "code": "sc.tl.dendrogram(adata,'leiden',use_rep='scaled|original|X_pca')\nsc.tl.rank_genes_groups(adata, 'leiden', use_rep='scaled|original|X_pca',\n                        method='wilcoxon',use_raw=False,)"
+  },
+  {
+    "action": "Perform dimensionality reduction for visualization using Minimum Distortion Embedding (MDE) based on the PCA results.",
+    "code": "adata.obsm[\"X_mde\"] = ov.utils.mde(adata.obsm[\"scaled|original|X_pca\"])"
+  },
+  {
+    "action": "Plot the MDE embedding, coloring cells by their Leiden cluster assignments, with the legend placed on the data points and a custom color palette.",
+    "code": "ov.pl.embedding(adata,\n                   basis='X_mde',\n                   color=['leiden'], \n                   legend_loc='on data', \n                   frameon='small',\n                   legend_fontoutline=2,\n                   palette=ov.utils.palette()[14:],\n                  )"
+  },
+  {
+    "action": "Manually define a dictionary of marker genes for two clusters and use `ov.single.gptcelltype` to annotate cell types using the Qwen model through its API, specifying 'PBMC' as the tissue and 'human' as the species.",
+    "code": "import os\nall_markers={'cluster1':['CD3D','CD3E'],\n            'cluster2':['MS4A1']}\n\nos.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='qwen-plus', provider='qwen',\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Automatically identify marker genes for each cluster in the AnnData object using `ov.single.get_celltype_marker`, considering genes with a fold change greater than 2 and selecting the top 5 genes.",
+    "code": "all_markers=ov.single.get_celltype_marker(adata,clustertype='leiden',rank=True,\n                                          key='rank_genes_groups',\n                                          foldchange=2,topgenenumber=5)\nall_markers"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype` to annotate cell types using the Qwen model through its API, specifying 'PBMC' as the tissue and 'human' as the species, based on automatically identified marker genes.",
+    "code": "import os\nos.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='qwen-plus', provider='qwen',\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Extract the cell type annotations from the `gptcelltype` output, removing extra information and keeping only the cell type names.",
+    "code": "new_result={}\nfor key in result.keys():\n    new_result[key]=result[key].split(': ')[-1].split(' (')[0].split('. ')[1]\nnew_result"
+  },
+  {
+    "action": "Map the extracted cell type annotations to the 'leiden' clusters in the AnnData object and store them in a new observation called 'gpt_celltype'.",
+    "code": "adata.obs['gpt_celltype'] = adata.obs['leiden'].map(new_result).astype('category')"
+  },
+  {
+    "action": "Plot the MDE embedding, coloring cells by both their 'leiden' cluster assignments and the new 'gpt_celltype' annotations, with the legend placed on the data points and a custom color palette.",
+    "code": "ov.pl.embedding(adata,\n                   basis='X_mde',\n                   color=['leiden','gpt_celltype'], \n                   legend_loc='on data', \n                   frameon='small',\n                   legend_fontoutline=2,\n                   palette=ov.utils.palette()[14:],\n                  )"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype` with the OpenAI API to annotate cell types for a given set of marker genes, specifying 'gpt-4o' as the model and 'openai' as the provider.",
+    "code": "os.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='gpt-4o', provider='openai',\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype` with the Qwen API to annotate cell types for a given set of marker genes, specifying 'qwen-plus' as the model and 'qwen' as the provider.",
+    "code": "os.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='qwen-plus', provider='qwen',\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype` with the Kimi API to annotate cell types for a given set of marker genes, specifying 'moonshot-v1-8k' as the model and 'kimi' as the provider.",
+    "code": "os.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='moonshot-v1-8k', provider='kimi',\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype` with a custom `base_url` to annotate cell types, demonstrating the flexibility to use other models that support the OpenAI API format.",
+    "code": "os.environ['AGI_API_KEY'] = 'sk-**'  # Replace with your actual API key\nresult = ov.single.gptcelltype(all_markers, tissuename='PBMC', speciename='human',\n                      model='moonshot-v1-8k', base_url=\"https://api.moonshot.cn/v1\",\n                      topgenenumber=5)\nresult"
+  },
+  {
+    "action": "Use `ov.single.gptcelltype_local` to annotate cell types using a local large language model (LLM), specifying the path to the local model.",
+    "code": "anno_model = 'path/to/your/local/LLM'  # '~/models/Qwen2-7B-Instruct'\n\nresult = ov.single.gptcelltype_local(all_markers, tissuename='PBMC', speciename='human', \n                     model_name=anno_model, topgenenumber=5)\nresult"
+  }
+]
