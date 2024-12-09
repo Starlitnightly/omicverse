@@ -1,0 +1,74 @@
+[
+  {
+    "action": "Import necessary libraries: anndata, pandas, and omicverse. Set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import anndata\nimport pandas as pd\nimport omicverse as ov\nov.ov_plot_set()"
+  },
+  {
+    "action": "Load the first dataset (GSE18520) from a pickle file, create an AnnData object, transpose it, and assign batch label '1'.",
+    "code": "dataset_1 = pd.read_pickle(\"data/combat/GSE18520.pickle\")\nadata1=anndata.AnnData(dataset_1.T)\nadata1.obs['batch']='1'\nadata1"
+  },
+  {
+    "action": "Load the second dataset (GSE66957) from a pickle file, create an AnnData object, transpose it, and assign batch label '2'.",
+    "code": "dataset_2 = pd.read_pickle(\"data/combat/GSE66957.pickle\")\nadata2=anndata.AnnData(dataset_2.T)\nadata2.obs['batch']='2'\nadata2"
+  },
+  {
+    "action": "Load the third dataset (GSE69428) from a pickle file, create an AnnData object, transpose it, and assign batch label '3'.",
+    "code": "dataset_3 = pd.read_pickle(\"data/combat/GSE69428.pickle\")\nadata3=anndata.AnnData(dataset_3.T)\nadata3.obs['batch']='3'\nadata3"
+  },
+  {
+    "action": "Concatenate the three AnnData objects into a single AnnData object, keeping only the common genes.",
+    "code": "adata=anndata.concat([adata1,adata2,adata3],merge='same')\nadata"
+  },
+  {
+    "action": "Perform batch effect correction on the combined AnnData object using the `ov.bulk.batch_correction` function, specifying 'batch' as the batch key.",
+    "code": "ov.bulk.batch_correction(adata,batch_key='batch')"
+  },
+  {
+    "action": "Convert the raw data to a pandas DataFrame and transpose it.",
+    "code": "raw_data=adata.to_df().T\nraw_data.head()"
+  },
+  {
+    "action": "Convert the batch-corrected data to a pandas DataFrame and transpose it.",
+    "code": "removing_data=adata.to_df(layer='batch_correction').T\nremoving_data.head()"
+  },
+  {
+    "action": "Save the raw data and batch-corrected data to CSV files.",
+    "code": "raw_data.to_csv('raw_data.csv')\nremoving_data.to_csv('removing_data.csv')"
+  },
+  {
+    "action": "Save the AnnData object to an H5AD file with gzip compression.",
+    "code": "adata.write_h5ad('adata_batch.h5ad',compression='gzip')\n#adata=ov.read('adata_batch.h5ad')"
+  },
+  {
+    "action": "Define a dictionary to map batch labels to colors for visualization.",
+    "code": "color_dict={\n    '1':ov.utils.red_color[1],\n    '2':ov.utils.blue_color[1],\n    '3':ov.utils.green_color[1],\n}"
+  },
+  {
+    "action": "Create a boxplot of the raw data, coloring each box by its corresponding batch.",
+    "code": "fig,ax=plt.subplots( figsize = (20,4))\nbp=plt.boxplot(adata.to_df().T,patch_artist=True)\nfor i,batch in zip(range(adata.shape[0]),adata.obs['batch']):\n    bp['boxes'][i].set_facecolor(color_dict[batch])\nax.axis(False)\nplt.show()"
+  },
+  {
+    "action": "Create a boxplot of the batch-corrected data, coloring each box by its corresponding batch.",
+    "code": "fig,ax=plt.subplots( figsize = (20,4))\nbp=plt.boxplot(adata.to_df(layer='batch_correction').T,patch_artist=True)\nfor i,batch in zip(range(adata.shape[0]),adata.obs['batch']):\n    bp['boxes'][i].set_facecolor(color_dict[batch])\nax.axis(False)\nplt.show()"
+  },
+  {
+    "action": "Store a copy of the raw data in the 'raw' layer of the AnnData object.",
+    "code": "adata.layers['raw']=adata.X.copy()"
+  },
+  {
+    "action": "Calculate principal components (PCs) for the raw data using `ov.pp.pca`.",
+    "code": "ov.pp.pca(adata,layer='raw',n_pcs=50)\nadata"
+  },
+  {
+    "action": "Calculate principal components (PCs) for the batch-corrected data using `ov.pp.pca`.",
+    "code": "ov.pp.pca(adata,layer='batch_correction',n_pcs=50)\nadata"
+  },
+  {
+    "action": "Create a UMAP embedding of the raw data, colored by batch.",
+    "code": "ov.utils.embedding(adata,\n                  basis='raw|original|X_pca',\n                  color='batch',\n                  frameon='small')"
+  },
+  {
+    "action": "Create a UMAP embedding of the batch-corrected data, colored by batch.",
+    "code": "ov.utils.embedding(adata,\n                  basis='batch_correction|original|X_pca',\n                  color='batch',\n                  frameon='small')"
+  }
+]

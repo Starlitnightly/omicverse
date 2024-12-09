@@ -1,0 +1,74 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scvelo, and matplotlib. Set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scvelo as scv\nimport matplotlib.pyplot as plt\nov.ov_plot_set()"
+  },
+  {
+    "action": "Read the data from 'data/tutorial_meta_den.h5ad' using `ov.read()`. Convert the raw data to AnnData object.",
+    "code": "adata=ov.read('data/tutorial_meta_den.h5ad')\nadata=adata.raw.to_adata()\nadata"
+  },
+  {
+    "action": "Prepare gene sets from a file using `ov.utils.geneset_prepare()`. The file path is '../placenta/genesets/GO_Biological_Process_2021.txt', and the organism is set to 'Mouse'.",
+    "code": "import omicverse as ov\npathway_dict=ov.utils.geneset_prepare('../placenta/genesets/GO_Biological_Process_2021.txt',organism='Mouse')\nlen(pathway_dict.keys())"
+  },
+  {
+    "action": "Calculate pathway enrichment scores using AUCell with `ov.single.pathway_aucell_enrichment()`. The input is the AnnData object `adata`, and the pathway dictionary `pathway_dict`. The number of workers is set to 8.",
+    "code": "##Assest all pathways\nadata_aucs=ov.single.pathway_aucell_enrichment(adata,\n                                                pathways_dict=pathway_dict,\n                                                num_workers=8)"
+  },
+  {
+    "action": "Copy observation, observation matrices, observation pairwise distances, and unstructured data from `adata` to `adata_aucs` based on the index.",
+    "code": "adata_aucs.obs=adata[adata_aucs.obs.index].obs\nadata_aucs.obsm=adata[adata_aucs.obs.index].obsm\nadata_aucs.obsp=adata[adata_aucs.obs.index].obsp\nadata_aucs.uns=adata[adata_aucs.obs.index].uns\n\nadata_aucs"
+  },
+  {
+    "action": "Initialize a CellFateGenie object with `ov.single.cellfategenie()`. The input is `adata_aucs`, and the pseudotime key is 'pt_via'. Initialize the model using `cfg_obj.model_init()`.",
+    "code": "cfg_obj=ov.single.cellfategenie(adata_aucs,pseudotime='pt_via')\ncfg_obj.model_init()"
+  },
+  {
+    "action": "Perform Adaptive Threshold Regression using `cfg_obj.ATR()` with a stopping criterion of 500.",
+    "code": "cfg_obj.ATR(stop=500)"
+  },
+  {
+    "action": "Plot the filtering results using `cfg_obj.plot_filtering()` with a specified color.",
+    "code": "fig,ax=cfg_obj.plot_filtering(color='#5ca8dc')\nax.set_title('Dentategyrus Metacells\\nCellFateGenie')"
+  },
+  {
+    "action": "Fit the model and get the results using `cfg_obj.model_fit()`.",
+    "code": "res=cfg_obj.model_fit()"
+  },
+  {
+    "action": "Plot the color fitting for raw data using `cfg_obj.plot_color_fitting()`. The type is set to 'raw', and the cluster key is 'celltype'.",
+    "code": "cfg_obj.plot_color_fitting(type='raw',cluster_key='celltype')"
+  },
+  {
+    "action": "Plot the color fitting for filtered data using `cfg_obj.plot_color_fitting()`. The type is set to 'filter', and the cluster key is 'celltype'.",
+    "code": "cfg_obj.plot_color_fitting(type='filter',cluster_key='celltype')"
+  },
+  {
+    "action": "Perform Kendall's tau test and filter the results using `cfg_obj.kendalltau_filter()`.",
+    "code": "kt_filter=cfg_obj.kendalltau_filter()\nkt_filter.head()"
+  },
+  {
+    "action": "Get gene trends using `ov.single.gene_trends()`. The inputs are `adata_aucs`, 'pt_via', and a list of variable names. Calculate the trends with a convolution window of 10.",
+    "code": "var_name=kt_filter.loc[kt_filter['pvalue']<kt_filter['pvalue'].mean()].index.tolist()\ngt_obj=ov.single.gene_trends(adata_aucs,'pt_via',var_name)\ngt_obj.calculate(n_convolve=10)"
+  },
+  {
+    "action": "Print the dimension (number of genes) in `var_name`.",
+    "code": "print(f\"Dimension: {len(var_name)}\")"
+  },
+  {
+    "action": "Plot the gene trends using `gt_obj.plot_trend()` with a specified color.",
+    "code": "fig,ax=gt_obj.plot_trend(color=ov.utils.blue_color[3])\nax.set_title(f'Dentategyrus meta\\nCellfategenie',fontsize=13)"
+  },
+  {
+    "action": "Plot a heatmap using `ov.utils.plot_heatmap()`. The inputs are `adata_aucs`, `var_name`, 'pt_via' for sorting, 'celltype' for column colors, and a convolution window of 10.",
+    "code": "g=ov.utils.plot_heatmap(adata_aucs,var_names=var_name,\n                  sortby='pt_via',col_color='celltype',\n                 n_convolve=10,figsize=(1,6),show=False)\n\ng.fig.set_size_inches(2, 6)\ng.fig.suptitle('CellFateGenie',x=0.25,y=0.83,\n               horizontalalignment='left',fontsize=12,fontweight='bold')\ng.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),fontsize=12)\nplt.show()"
+  },
+  {
+    "action": "Generate a gene set word cloud object using `ov.utils.geneset_wordcloud()`. The inputs are `adata_aucs`, a subset of columns based on `var_name`, 'celltype' as the cluster key, 'pt_via' for pseudotime, and a figure size of (3,6).",
+    "code": "gw_obj1=ov.utils.geneset_wordcloud(adata=adata_aucs[:,var_name],\n                                  cluster_key='celltype',pseudotime='pt_via',figsize=(3,6))\ngw_obj1.get()"
+  },
+  {
+    "action": "Plot a heatmap from the word cloud object using `gw_obj1.plot_heatmap()` with a specified figure width and colormap.",
+    "code": "g=gw_obj1.plot_heatmap(figwidth=6,cmap='RdBu_r')\nplt.suptitle('CellFateGenie',x=0.18,y=0.95,\n               horizontalalignment='left',fontsize=12,fontweight='bold')"
+  }
+]

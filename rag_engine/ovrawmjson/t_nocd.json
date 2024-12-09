@@ -1,0 +1,38 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, anndata, scanpy, matplotlib.pyplot, numpy, and pandas. Also, enable inline plotting for matplotlib.",
+    "code": "import omicverse as ov\nimport anndata\nimport scanpy as sc\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\nget_ipython().run_line_magic('matplotlib', 'inline')"
+  },
+  {
+    "action": "Set scanpy settings for verbosity and figure parameters.",
+    "code": "sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)\nsc.settings.set_figure_params(dpi=80, facecolor='white')"
+  },
+  {
+    "action": "Define a custom colormap for visualizations.",
+    "code": "from matplotlib.colors import LinearSegmentedColormap\nsc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',\n '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',\n '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']\nsc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))"
+  },
+  {
+    "action": "Read the single-cell RNA sequencing data from an h5ad file.",
+    "code": "adata = anndata.read('sample/rna.h5ad')\nadata"
+  },
+  {
+    "action": "Apply lazy preprocessing using omicverse's scanpy_lazy function.",
+    "code": "adata=ov.single.scanpy_lazy(adata)"
+  },
+  {
+    "action": "Initialize, configure, and run the scNOCD model for overlapping community detection.",
+    "code": "scbrca=ov.single.scnocd(adata)\nscbrca.matrix_transform()\nscbrca.matrix_normalize()\nscbrca.GNN_configure()\nscbrca.GNN_preprocess()\nscbrca.GNN_model()\nscbrca.GNN_result()\nscbrca.GNN_plot()\n#scbrca.calculate_nocd()\nscbrca.cal_nocd()"
+  },
+  {
+    "action": "Calculate the non-overlapping community detection (NOCD) results.",
+    "code": "scbrca.calculate_nocd()"
+  },
+  {
+    "action": "Visualize the UMAP embeddings colored by Leiden clustering and NOCD results.",
+    "code": "sc.pl.umap(scbrca.adata, color=['leiden','nocd'],wspace=0.4,palette=sc_color)"
+  },
+  {
+    "action": "Visualize the UMAP embeddings colored by Leiden clustering and the number of communities each cell belongs to (nocd_n).",
+    "code": "sc.pl.umap(scbrca.adata, color=['leiden','nocd_n'],wspace=0.4,palette=sc_color)"
+  }
+]

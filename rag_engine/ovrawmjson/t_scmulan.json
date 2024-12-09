@@ -1,0 +1,82 @@
+[
+  {
+    "action": "Import necessary libraries and set plotting parameters.",
+    "code": "import os\nimport scanpy as sc\nimport omicverse as ov\nov.plot_set()"
+  },
+  {
+    "action": "Load the liver dataset from an h5ad file.",
+    "code": "adata = sc.read('./data/liver_test.h5ad')"
+  },
+  {
+    "action": "Display the AnnData object to inspect its structure.",
+    "code": "adata"
+  },
+  {
+    "action": "Convert the sparse matrix format of `adata.X` to Compressed Sparse Column format for compatibility.",
+    "code": "from scipy.sparse import csc_matrix\nadata.X = csc_matrix(adata.X)"
+  },
+  {
+    "action": "Transform the gene symbols in the input AnnData object to a uniform set of 42117 gene symbols, matching the pre-trained scMulan model.",
+    "code": "adata_GS_uniformed = ov.externel.scMulan.GeneSymbolUniform(input_adata=adata,\n                                 output_dir=\"./data\",\n                                 output_prefix='liver')"
+  },
+  {
+    "action": "Load the uniformed AnnData object from the saved file.",
+    "code": "adata_GS_uniformed=sc.read_h5ad('./data/liver_uniformed.h5ad')"
+  },
+  {
+    "action": "Display the uniformed AnnData object.",
+    "code": "adata_GS_uniformed"
+  },
+  {
+    "action": "Normalize and log-transform the count matrix if the maximum value is greater than 10.",
+    "code": "if adata_GS_uniformed.X.max() > 10:\n    sc.pp.normalize_total(adata_GS_uniformed, target_sum=1e4) \n    sc.pp.log1p(adata_GS_uniformed)"
+  },
+  {
+    "action": "Specify the path to the pre-trained scMulan model checkpoint.",
+    "code": "ckp_path = './ckpt/ckpt_scMulan.pt'"
+  },
+  {
+    "action": "Initialize the scMulan model for inference and prepare it for CUDA processing.",
+    "code": "scml = ov.externel.scMulan.model_inference(ckp_path, adata_GS_uniformed)\nbase_process = scml.cuda_count()"
+  },
+  {
+    "action": "Predict cell types and obtain cell embeddings using the scMulan model, with optional parallel processing.",
+    "code": "scml.get_cell_types_and_embds_for_adata(parallel=True, n_process = 1)"
+  },
+  {
+    "action": "Copy the AnnData object with scMulan results for further analysis.",
+    "code": "adata_mulan = scml.adata.copy()"
+  },
+  {
+    "action": "Scale the data, perform PCA, and then compute a 2-D embedding using pyMDE for visualization.",
+    "code": "ov.pp.scale(adata_mulan)\nov.pp.pca(adata_mulan)\nov.pp.mde(adata_mulan,embedding_dim=2,n_neighbors=15, basis='X_mde',\n          n_pcs=10, use_rep='scaled|original|X_pca',)"
+  },
+  {
+    "action": "Visualize the cell type annotations from scMulan using the computed 2-D embedding.",
+    "code": "ov.pl.embedding(adata_mulan,basis='X_mde',\n                color=[\"cell_type_from_scMulan\",],\n                ncols=1,frameon='small')"
+  },
+  {
+    "action": "Copy the 'X_mde' embeddings to 'X_umap' for compatibility with other functions.",
+    "code": "adata_mulan.obsm['X_umap']=adata_mulan.obsm['X_mde']"
+  },
+  {
+    "action": "Apply a smoothing function to filter false positives in the cell type predictions.",
+    "code": "ov.externel.scMulan.cell_type_smoothing(adata_mulan, threshold=0.1)"
+  },
+  {
+    "action": "Visualize both the smoothed cell type predictions and the original annotations on the 2-D embedding.",
+    "code": "ov.pl.embedding(adata_mulan,basis='X_mde',\n                color=[\"cell_type_from_mulan_smoothing\",\"cell_type\"],\n                ncols=1,frameon='small')"
+  },
+  {
+    "action": "Display the AnnData object with smoothed cell type annotations.",
+    "code": "adata_mulan"
+  },
+  {
+    "action": "Get the top 20 most frequent cell types from scMulan's predictions.",
+    "code": "top_celltypes = adata_mulan.obs.cell_type_from_scMulan.value_counts().index[:20]"
+  },
+  {
+    "action": "Visualize selected cell types on the UMAP embedding, optionally with smoothing.",
+    "code": "selected_cell_types = top_celltypes\nov.externel.scMulan.visualize_selected_cell_types(adata_mulan,selected_cell_types,smoothing=True)"
+  }
+]

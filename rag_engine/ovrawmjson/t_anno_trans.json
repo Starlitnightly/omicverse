@@ -1,0 +1,58 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, matplotlib, and scanpy. Set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport matplotlib.pyplot as plt\nimport scanpy as sc\nov.ov_plot_set()"
+  },
+  {
+    "action": "Load RNA and ATAC data from preprocessed files. These files are assumed to be outputs from GLUE cross-modal integration and contain the `obsm['X_glue']` layer. The RNA data is already annotated.",
+    "code": "rna=sc.read(\"data/analysis_lymph/rna-emb.h5ad\")\natac=sc.read(\"data/analysis_lymph/atac-emb.h5ad\")"
+  },
+  {
+    "action": "Combine RNA and ATAC data into a single AnnData object for visualization.",
+    "code": "import scanpy as sc\ncombined=sc.concat([rna,atac],merge='same')\ncombined"
+  },
+  {
+    "action": "Perform Minimum Distortion Embedding (MDE) on the combined data using the `X_glue` layer.",
+    "code": "combined.obsm['X_mde']=ov.utils.mde(combined.obsm['X_glue'])"
+  },
+  {
+    "action": "Visualize the combined data using MDE, coloring by the 'domain' (RNA or ATAC) to check alignment.",
+    "code": "ov.utils.embedding(combined,\n               basis='X_mde',\n               color='domain',\n                title='Layers',\n                show=False,\n                palette=ov.utils.red_color,\n                frameon='small'\n               )"
+  },
+  {
+    "action": "Visualize the RNA data using MDE, coloring by the 'major_celltype' to show existing annotations.",
+    "code": "ov.utils.embedding(rna,\n               basis='X_mde',\n               color='major_celltype',\n                title='Cell type',\n                show=False,\n                #palette=ov.utils.red_color,\n                frameon='small'\n               )"
+  },
+  {
+    "action": "Train a weighted K-nearest neighbors (KNN) classifier using the `X_glue` features from the annotated RNA data.",
+    "code": "knn_transformer=ov.utils.weighted_knn_trainer(\n    train_adata=rna,\n    train_adata_emb='X_glue',\n    n_neighbors=15,\n)"
+  },
+  {
+    "action": "Transfer cell type labels from RNA to ATAC data using the trained KNN classifier. Calculate uncertainty for each prediction.",
+    "code": "labels,uncert=ov.utils.weighted_knn_transfer(\n    query_adata=atac,\n    query_adata_emb='X_glue',\n    label_keys='major_celltype',\n    knn_model=knn_transformer,\n    ref_adata_obs=rna.obs,\n)"
+  },
+  {
+    "action": "Assign the transferred cell type labels and uncertainty scores to the ATAC data.",
+    "code": "atac.obs[\"transf_celltype\"]=labels.loc[atac.obs.index,\"major_celltype\"]\natac.obs[\"transf_celltype_unc\"]=uncert.loc[atac.obs.index,\"major_celltype\"]"
+  },
+  {
+    "action": "Copy the transferred cell type labels to the 'major_celltype' column in the ATAC data.",
+    "code": "atac.obs[\"major_celltype\"]=atac.obs[\"transf_celltype\"].copy()"
+  },
+  {
+    "action": "Visualize the ATAC data using UMAP, coloring by the transferred cell type labels and their uncertainty.",
+    "code": "ov.utils.embedding(atac,\n               basis='X_umap',\n               color=['transf_celltype_unc','transf_celltype'],\n                #title='Cell type Un',\n                show=False,\n                palette=ov.palette()[11:],\n                frameon='small'\n               )"
+  },
+  {
+    "action": "Merge the RNA and ATAC data again after transferring annotations.",
+    "code": "import scanpy as sc\ncombined1=sc.concat([rna,atac],merge='same')\ncombined1"
+  },
+  {
+    "action": "Perform MDE on the merged data after annotation transfer.",
+    "code": "combined1.obsm['X_mde']=ov.utils.mde(combined1.obsm['X_glue'])"
+  },
+  {
+    "action": "Visualize the merged data using MDE, coloring by 'domain' and 'major_celltype' to assess the consistency of cell type annotations across modalities.",
+    "code": "ov.utils.embedding(combined1,\n               basis='X_mde',\n               color=['domain','major_celltype'],\n                title=['Layers','Cell type'],\n                show=False,\n                palette=ov.palette()[11:],\n                frameon='small'\n               )"
+  }
+]

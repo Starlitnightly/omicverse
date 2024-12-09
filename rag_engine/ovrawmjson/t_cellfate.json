@@ -1,0 +1,98 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, pandas, and tqdm. Set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport pandas as pd\nfrom tqdm.auto import tqdm\nov.plot_set()"
+  },
+  {
+    "action": "Load the mouse hematopoiesis data from Nestorowa et al. (2016) using `ov.single.mouse_hsc_nestorowa16()`.",
+    "code": "adata = ov.single.mouse_hsc_nestorowa16()\nadata"
+  },
+  {
+    "action": "Load the human prior interaction network from the 'nichenet' dataset using `ov.single.load_human_prior_interaction_network()`.",
+    "code": "prior_network = ov.single.load_human_prior_interaction_network(dataset='nichenet')"
+  },
+  {
+    "action": "Convert the gene symbols in the prior network from human to mouse using `ov.single.convert_human_to_mouse_network()`.",
+    "code": "prior_network = ov.single.convert_human_to_mouse_network(prior_network,server_name='asia')\nprior_network"
+  },
+  {
+    "action": "Save the converted prior network to a compressed tab-separated file.",
+    "code": "prior_network.to_csv('result/combined_network_Mouse.txt.gz',sep='\t')"
+  },
+  {
+    "action": "Alternatively, read the prior network from the saved file using `ov.read()`.",
+    "code": "prior_network=ov.read('result/combined_network_Mouse.txt.gz',index_col=0)"
+  },
+  {
+    "action": "Initialize the CEFCON object with the AnnData object, prior network, number of repeats, and solver.",
+    "code": "CEFCON_obj = ov.single.pyCEFCON(adata, prior_network, repeats=5, solver='GUROBI')\nCEFCON_obj"
+  },
+  {
+    "action": "Preprocess the data for CEFCON analysis using `CEFCON_obj.preprocess()`.",
+    "code": "CEFCON_obj.preprocess()"
+  },
+  {
+    "action": "Train the CEFCON model using `CEFCON_obj.train()`.",
+    "code": "CEFCON_obj.train()"
+  },
+  {
+    "action": "Identify driver regulators for each lineage using `CEFCON_obj.predicted_driver_regulators()`.",
+    "code": "CEFCON_obj.predicted_driver_regulators()"
+  },
+  {
+    "action": "Display the top driver regulators for the 'E_pseudotime' lineage.",
+    "code": "CEFCON_obj.cefcon_results_dict['E_pseudotime'].driver_regulator.head()"
+  },
+  {
+    "action": "Predict regulon-like gene modules (RGMs) using `CEFCON_obj.predicted_RGM()`.",
+    "code": "CEFCON_obj.predicted_RGM()"
+  },
+  {
+    "action": "Access the results for the 'E_pseudotime' lineage.",
+    "code": "CEFCON_obj.cefcon_results_dict['E_pseudotime']"
+  },
+  {
+    "action": "Store the lineage name and results in variables.",
+    "code": "lineage = 'E_pseudotime'\nresult = CEFCON_obj.cefcon_results_dict[lineage]"
+  },
+  {
+    "action": "Create an AnnData object from the gene embeddings.",
+    "code": "gene_ad=sc.AnnData(result.gene_embedding)"
+  },
+  {
+    "action": "Compute the neighborhood graph of the gene embeddings.",
+    "code": "sc.pp.neighbors(gene_ad, n_neighbors=30, use_rep='X')"
+  },
+  {
+    "action": "Perform Leiden clustering on the gene embeddings.",
+    "code": "sc.tl.leiden(gene_ad, resolution=1)"
+  },
+  {
+    "action": "Compute UMAP embeddings for the gene embeddings.",
+    "code": "sc.tl.umap(gene_ad, n_components=2, min_dist=0.3)"
+  },
+  {
+    "action": "Plot the Leiden clustering results on the UMAP embeddings.",
+    "code": "ov.utils.embedding(gene_ad,basis='X_umap',legend_loc='on data',\n                       legend_fontsize=8, legend_fontoutline=2,\n                  color='leiden',frameon='small',title='Leiden clustering using CEFCON\\nderived gene embeddings')"
+  },
+  {
+    "action": "Prepare data for plotting influence scores of driver regulators.",
+    "code": "import matplotlib.pyplot as plt\nimport seaborn as sns\ndata_for_plot = result.driver_regulator[result.driver_regulator['is_driver_regulator']]\ndata_for_plot = data_for_plot[0:20]"
+  },
+  {
+    "action": "Create a horizontal bar plot of influence scores for the top 20 driver regulators.",
+    "code": "plt.figure(figsize=(2, 20 * 0.2))\nsns.set_theme(style='ticks', font_scale=0.5)\n\nax = sns.barplot(x='influence_score', y=data_for_plot.index, data=data_for_plot, orient='h',\n                 palette=sns.color_palette(f\"ch:start=.5,rot=-.5,reverse=1,dark=0.4\", n_colors=20))\nax.set_title(result.name)\nax.set_xlabel('Influence score')\nax.set_ylabel('Driver regulators')\n\nax.spines['left'].set_position(('outward', 10))\nax.spines['bottom'].set_position(('outward', 10))\nplt.xticks(fontsize=12)\nplt.yticks(fontsize=12)\n\nplt.grid(False)\nax.spines['top'].set_visible(False)\nax.spines['right'].set_visible(False)\nax.spines['bottom'].set_visible(True)\nax.spines['left'].set_visible(True)\n\nplt.title('E_pseudotime',fontsize=12)\nplt.xlabel('Influence score',fontsize=12)\nplt.ylabel('Driver regulon',fontsize=12)\n\nsns.despine()"
+  },
+  {
+    "action": "Plot a Venn diagram of driver genes using `result.plot_driver_genes_Venn()`.",
+    "code": "result.plot_driver_genes_Venn()"
+  },
+  {
+    "action": "Create a subset of the AnnData object containing cells from the specific lineage.",
+    "code": "adata_lineage = adata[adata.obs_names[adata.obs[result.name].notna()],:]"
+  },
+  {
+    "action": "Plot a heatmap of the RGM activity matrix using `result.plot_RGM_activity_heatmap()`.",
+    "code": "result.plot_RGM_activity_heatmap(cell_label=adata_lineage.obs['cell_type_finely'],\n                                 type='out',col_cluster=True,bbox_to_anchor=(1.48, 0.25))"
+  }
+]

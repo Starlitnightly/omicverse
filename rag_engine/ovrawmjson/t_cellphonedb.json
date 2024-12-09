@@ -1,0 +1,214 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scvelo, and matplotlib. Set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scvelo as scv\nimport matplotlib.pyplot as plt\nov.ov_plot_set()"
+  },
+  {
+    "action": "Read data from 'data/tutorial_meta_den.h5ad', convert it to raw format, and store it in the 'adata' variable.",
+    "code": "adata=ov.read('data/tutorial_meta_den.h5ad')\nadata=adata.raw.to_adata()\nadata"
+  },
+  {
+    "action": "Import the omicverse library and prepare a gene set dictionary from a file using `ov.utils.geneset_prepare()`.",
+    "code": "import omicverse as ov\npathway_dict=ov.utils.geneset_prepare('../placenta/genesets/GO_Biological_Process_2021.txt',organism='Mouse')\nlen(pathway_dict.keys())"
+  },
+  {
+    "action": "Calculate pathway enrichment using AUCell with multiple workers and store the result in 'adata_aucs'.",
+    "code": "##Assest all pathways\nadata_aucs=ov.single.pathway_aucell_enrichment(adata,\n                                                pathways_dict=pathway_dict,\n                                                num_workers=8)"
+  },
+  {
+    "action": "Copy observation, observation matrices, observation pairwise distances, and unstructured data from 'adata' to 'adata_aucs' based on index.",
+    "code": "adata_aucs.obs=adata[adata_aucs.obs.index].obs\nadata_aucs.obsm=adata[adata_aucs.obs.index].obsm\nadata_aucs.obsp=adata[adata_aucs.obs.index].obsp\nadata_aucs.uns=adata[adata_aucs.obs.index].uns\n\nadata_aucs"
+  },
+  {
+    "action": "Initialize a CellFateGenie object with 'adata_aucs' and 'pt_via' as the pseudotime, then initialize the model.",
+    "code": "cfg_obj=ov.single.cellfategenie(adata_aucs,pseudotime='pt_via')\ncfg_obj.model_init()"
+  },
+  {
+    "action": "Apply Adaptive Threshold Regression (ATR) with a stopping criterion of 500.",
+    "code": "cfg_obj.ATR(stop=500)"
+  },
+  {
+    "action": "Plot the filtering results with a specified color and set the title.",
+    "code": "fig,ax=cfg_obj.plot_filtering(color='#5ca8dc')\nax.set_title('Dentategyrus Metacells\\nCellFateGenie')"
+  },
+  {
+    "action": "Fit the model and store the results in 'res'.",
+    "code": "res=cfg_obj.model_fit()"
+  },
+  {
+    "action": "Plot the raw color fitting based on the 'celltype' cluster key.",
+    "code": "cfg_obj.plot_color_fitting(type='raw',cluster_key='celltype')"
+  },
+  {
+    "action": "Plot the filtered color fitting based on the 'celltype' cluster key.",
+    "code": "cfg_obj.plot_color_fitting(type='filter',cluster_key='celltype')"
+  },
+  {
+    "action": "Perform Kendalltau filtering and store the results in 'kt_filter'.",
+    "code": "kt_filter=cfg_obj.kendalltau_filter()\nkt_filter.head()"
+  },
+  {
+    "action": "Filter variable names based on p-value and calculate gene trends using 'ov.single.gene_trends()'.",
+    "code": "var_name=kt_filter.loc[kt_filter['pvalue']<kt_filter['pvalue'].mean()].index.tolist()\ngt_obj=ov.single.gene_trends(adata_aucs,'pt_via',var_name)\ngt_obj.calculate(n_convolve=10)"
+  },
+  {
+    "action": "Print the dimension (number of selected variable names).",
+    "code": "print(f\"Dimension: {len(var_name)}\")"
+  },
+  {
+    "action": "Plot gene expression trends with a specified color and set the title.",
+    "code": "fig,ax=gt_obj.plot_trend(color=ov.utils.blue_color[3])\nax.set_title(f'Dentategyrus meta\\nCellfategenie',fontsize=13)"
+  },
+  {
+    "action": "Plot a heatmap of gene expression sorted by 'pt_via', colored by 'celltype', and set the figure size and title.",
+    "code": "g=ov.utils.plot_heatmap(adata_aucs,var_names=var_name,\n                  sortby='pt_via',col_color='celltype',\n                 n_convolve=10,figsize=(1,6),show=False)\n\ng.fig.set_size_inches(2, 6)\ng.fig.suptitle('CellFateGenie',x=0.25,y=0.83,\n               horizontalalignment='left',fontsize=12,fontweight='bold')\ng.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),fontsize=12)\nplt.show()"
+  },
+  {
+    "action": "Create a gene set word cloud object and generate the word cloud.",
+    "code": "gw_obj1=ov.utils.geneset_wordcloud(adata=adata_aucs[:,var_name],\n                                  cluster_key='celltype',pseudotime='pt_via',figsize=(3,6))\ngw_obj1.get()"
+  },
+  {
+    "action": "Plot the word cloud heatmap with specified figure width and colormap.",
+    "code": "g=gw_obj1.plot_heatmap(figwidth=6,cmap='RdBu_r')\nplt.suptitle('CellFateGenie',x=0.18,y=0.95,\n               horizontalalignment='left',fontsize=12,fontweight='bold')"
+  },
+  {
+    "action": "Import necessary libraries and set plotting parameters.",
+    "code": "import scanpy as sc\nimport matplotlib.pyplot as plt\nimport pandas as pd\nimport numpy as np\nimport omicverse as ov\nimport os\n\nov.plot_set()\n#print(f'cellphonedb version{cellphonedb.__version__}')"
+  },
+  {
+    "action": "Read the anndata object from a file and filter it based on cell labels.",
+    "code": "adata=sc.read('data/cpdb/normalised_log_counts.h5ad')\nadata=adata[adata.obs['cell_labels'].isin(['eEVT','iEVT','EVT_1','EVT_2','DC','dNK1','dNK2','dNK3',\n                                          'VCT','VCT_CCC','VCT_fusing','VCT_p','GC','SCT'])]\nadata"
+  },
+  {
+    "action": "Plot a UMAP embedding of the data, colored by cell labels.",
+    "code": "ov.pl.embedding(adata,\n               basis='X_umap',\n               color='cell_labels',\n               frameon='small',\n               palette=ov.pl.red_color+ov.pl.blue_color+ov.pl.green_color+ov.pl.orange_color+ov.pl.purple_color)"
+  },
+  {
+    "action": "Print the maximum value in the expression matrix of the anndata object.",
+    "code": "adata.X.max()"
+  },
+  {
+    "action": "Filter cells and genes based on minimum counts and create a new anndata object with filtered data.",
+    "code": "sc.pp.filter_cells(adata, min_genes=200)\nsc.pp.filter_genes(adata, min_cells=3)\nadata1=sc.AnnData(adata.X,obs=pd.DataFrame(index=adata.obs.index),\n                          var=pd.DataFrame(index=adata.var.index))\nadata1.write_h5ad('data/cpdb/norm_log.h5ad',compression='gzip')\nadata1"
+  },
+  {
+    "action": "Create and export a meta information file for cells.",
+    "code": "#meta导出\ndf_meta = pd.DataFrame(data={'Cell':list(adata[adata1.obs.index].obs.index),\n                             'cell_type':[ i for i in adata[adata1.obs.index].obs['cell_labels']]\n                            })\ndf_meta.set_index('Cell', inplace=True)\ndf_meta.to_csv('data/cpdb/meta.tsv', sep = '\\t')"
+  },
+  {
+    "action": "Get the current working directory.",
+    "code": "import os\nos.getcwd() "
+  },
+  {
+    "action": "Define file paths for CellPhoneDB analysis.",
+    "code": "cpdb_file_path = '/Users/fernandozeng/Desktop/analysis/cellphonedb-data/cellphonedb.zip'\nmeta_file_path = os.getcwd()+'/data/cpdb/meta.tsv'\ncounts_file_path = os.getcwd()+'/data/cpdb/norm_log.h5ad'\nmicroenvs_file_path = None\nactive_tf_path = None\nout_path =os.getcwd()+'/data/cpdb/test_cellphone'"
+  },
+  {
+    "action": "Run CellPhoneDB statistical analysis method with specified parameters.",
+    "code": "from cellphonedb.src.core.methods import cpdb_statistical_analysis_method\n\ncpdb_results = cpdb_statistical_analysis_method.call(\n    cpdb_file_path = cpdb_file_path,                 # mandatory: CellphoneDB database zip file.\n    meta_file_path = meta_file_path,                 # mandatory: tsv file defining barcodes to cell label.\n    counts_file_path = counts_file_path,             # mandatory: normalized count matrix - a path to the counts file, or an in-memory AnnData object\n    counts_data = 'hgnc_symbol',                     # defines the gene annotation in counts matrix.\n    active_tfs_file_path = active_tf_path,           # optional: defines cell types and their active TFs.\n    microenvs_file_path = microenvs_file_path,       # optional (default: None): defines cells per microenvironment.\n    score_interactions = True,                       # optional: whether to score interactions or not. \n    iterations = 1000,                               # denotes the number of shufflings performed in the analysis.\n    threshold = 0.1,                                 # defines the min % of cells expressing a gene for this to be employed in the analysis.\n    threads = 10,                                     # number of threads to use in the analysis.\n    debug_seed = 42,                                 # debug randome seed. To disable >=0.\n    result_precision = 3,                            # Sets the rounding for the mean values in significan_means.\n    pvalue = 0.05,                                   # P-value threshold to employ for significance.\n    subsampling = False,                             # To enable subsampling the data (geometri sketching).\n    subsampling_log = False,                         # (mandatory) enable subsampling log1p for non log-transformed data inputs.\n    subsampling_num_pc = 100,                        # Number of componets to subsample via geometric skectching (dafault: 100).\n    subsampling_num_cells = 1000,                    # Number of cells to subsample (integer) (default: 1/3 of the dataset).\n    separator = '|',                                 # Sets the string to employ to separate cells in the results dataframes \"cellA|CellB\".\n    debug = False,                                   # Saves all intermediate tables employed during the analysis in pkl format.\n    output_path = out_path,                          # Path to save results.\n    output_suffix = None                             # Replaces the timestamp in the output files by a user defined string in the  (default: None).\n    )"
+  },
+  {
+    "action": "Save the CellPhoneDB results to a pickle file.",
+    "code": "ov.utils.save(cpdb_results,'data/cpdb/gex_cpdb_test.pkl')"
+  },
+  {
+    "action": "Load the CellPhoneDB results from a pickle file.",
+    "code": "cpdb_results=ov.utils.load('data/cpdb/gex_cpdb_test.pkl')"
+  },
+  {
+    "action": "Calculate cell-cell interaction network using `ov.single.cpdb_network_cal`.",
+    "code": "interaction=ov.single.cpdb_network_cal(adata = adata,\n        pvals = cpdb_results['pvalues'],\n        celltype_key = \"cell_labels\",)"
+  },
+  {
+    "action": "Display the head of the interaction edges DataFrame.",
+    "code": "interaction['interaction_edges'].head()"
+  },
+  {
+    "action": "Set the plotting style using `ov.plot_set()`.",
+    "code": "ov.plot_set()"
+  },
+  {
+    "action": "Create and display a heatmap of cell-cell interactions.",
+    "code": "fig, ax = plt.subplots(figsize=(4,4)) \nov.pl.cpdb_heatmap(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n                   fontsize=11,\n          ax=ax,legend_kws={'fontsize':12,'bbox_to_anchor':(5, -0.9),'loc':'center left',})"
+  },
+  {
+    "action": "Create and display a heatmap of cell-cell interactions for specific source cells.",
+    "code": "fig, ax = plt.subplots(figsize=(2,4)) \nov.pl.cpdb_heatmap(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n                   source_cells=['EVT_1','EVT_2','dNK1','dNK2','dNK3'],\n          ax=ax,legend_kws={'fontsize':12,'bbox_to_anchor':(5, -0.9),'loc':'center left',})"
+  },
+  {
+    "action": "Create and display a chord diagram of cell-cell interactions.",
+    "code": "fig=ov.pl.cpdb_chord(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n          count_min=60,fontsize=12,padding=50,radius=100,save=None,)\nfig.show()"
+  },
+  {
+    "action": "Create and display a network graph of cell-cell interactions.",
+    "code": "fig, ax = plt.subplots(figsize=(4,4)) \nov.pl.cpdb_network(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n             counts_min=60,\n            nodesize_scale=5,\n                  ax=ax)"
+  },
+  {
+    "action": "Create and display a network graph of cell-cell interactions for specific source cells.",
+    "code": "fig, ax = plt.subplots(figsize=(4,4)) \nov.pl.cpdb_network(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n            counts_min=60,\n            nodesize_scale=5,\n            source_cells=['EVT_1','EVT_2','dNK1','dNK2','dNK3'],\n            ax=ax)"
+  },
+  {
+    "action": "Create and display a network graph of cell-cell interactions for specific target cells.",
+    "code": "fig, ax = plt.subplots(figsize=(4,4)) \nov.pl.cpdb_network(adata,interaction['interaction_edges'],celltype_key='cell_labels',\n            counts_min=60,\n            nodesize_scale=5,\n            target_cells=['EVT_1','EVT_2','dNK1','dNK2','dNK3'],\n            ax=ax)"
+  },
+  {
+    "action": "Plot a network of cell-cell interactions with customized appearance.",
+    "code": "ov.single.cpdb_plot_network(adata=adata,\n                  interaction_edges=interaction['interaction_edges'],\n                  celltype_key='cell_labels',\n                  nodecolor_dict=None,title='EVT Network',\n                  edgeswidth_scale=25,nodesize_scale=10,\n                  pos_scale=1,pos_size=10,figsize=(6,6),\n                  legend_ncol=3,legend_bbox=(0.8,0.2),legend_fontsize=10)"
+  },
+  {
+    "action": "Extract a subnetwork of interactions based on specified cell types.",
+    "code": "sub_i=interaction['interaction_edges']\nsub_i=sub_i.loc[sub_i['SOURCE'].isin(['EVT_1','EVT_2','dNK1','dNK2','dNK3'])]\nsub_i=sub_i.loc[sub_i['TARGET'].isin(['EVT_1','EVT_2','dNK1','dNK2','dNK3'])]"
+  },
+  {
+    "action": "Create a sub-anndata object containing only specified cell types.",
+    "code": "sub_adata=adata[adata.obs['cell_labels'].isin(['EVT_1','EVT_2','dNK1','dNK2','dNK3'])]\nsub_adata"
+  },
+  {
+    "action": "Plot the sub-interaction network between the cells in scRNA-seq for the extracted subnetwork.",
+    "code": "ov.single.cpdb_plot_network(adata=sub_adata,\n                  interaction_edges=sub_i,\n                  celltype_key='cell_labels',\n                  nodecolor_dict=None,title='Sub-EVT Network',\n                  edgeswidth_scale=25,nodesize_scale=1,\n                  pos_scale=1,pos_size=10,figsize=(5,5),\n                  legend_ncol=3,legend_bbox=(0.8,0.2),legend_fontsize=10)"
+  },
+  {
+    "action": "Create and display a chord diagram for the subnetwork.",
+    "code": "fig=ov.pl.cpdb_chord(sub_adata,sub_i,celltype_key='cell_labels',\n          count_min=10,fontsize=12,padding=60,radius=100,save=None,)\nfig.show()"
+  },
+  {
+    "action": "Create and display a network graph for the subnetwork.",
+    "code": "fig, ax = plt.subplots(figsize=(4,4)) \nov.pl.cpdb_network(sub_adata,sub_i,celltype_key='cell_labels',\n             counts_min=10,\n            nodesize_scale=5,\n                  ax=ax)"
+  },
+  {
+    "action": "Create and display a heatmap for the subnetwork.",
+    "code": "fig, ax = plt.subplots(figsize=(3,3)) \nov.pl.cpdb_heatmap(sub_adata,sub_i,celltype_key='cell_labels',\n          ax=ax,legend_kws={'fontsize':12,'bbox_to_anchor':(5, -0.9),'loc':'center left',})"
+  },
+  {
+    "action": "Extract significant interactions where 'eEVT' and 'iEVT' are targets using `ov.single.cpdb_exact_target`.",
+    "code": "sub_means=ov.single.cpdb_exact_target(cpdb_results['means'],['eEVT','iEVT'])\nsub_means=ov.single.cpdb_exact_source(sub_means,['dNK1','dNK2','dNK3'])\nsub_means.head() "
+  },
+  {
+    "action": "Plot a heatmap of interacting proteins between specified source and target cells.",
+    "code": "ov.pl.cpdb_interacting_heatmap(adata=adata,\n                         celltype_key='cell_labels',\n                            means=cpdb_results['means'],\n                            pvalues=cpdb_results['pvalues'],\n                            source_cells=['dNK1','dNK2','dNK3'],\n                            target_cells=['eEVT','iEVT'],\n                            plot_secret=True,\n                            min_means=3,\n                            nodecolor_dict=None,\n                            ax=None,\n                            figsize=(2,6),\n                            fontsize=10,)"
+  },
+  {
+    "action": "Plot a grouped heatmap showing the expression of ligands in source cells and receptors in target cells.",
+    "code": "ov.pl.cpdb_group_heatmap(adata=adata,\n                         celltype_key='cell_labels',\n                            means=cpdb_results['means'],\n                            cmap={'Target':'Blues','Source':'Reds'},\n                            source_cells=['dNK1','dNK2','dNK3'],\n                            target_cells=['eEVT','iEVT'],\n                            plot_secret=True,\n                            min_means=3,\n                            nodecolor_dict=None,\n                            ax=None,\n                            figsize=(2,6),\n                            fontsize=10,)"
+  },
+  {
+    "action": "Plot an interacting network graph showing connections between ligands, receptors, source, and target cells.",
+    "code": "ov.pl.cpdb_interacting_network(adata=adata,\n                         celltype_key='cell_labels',\n                            means=cpdb_results['means'],\n                            source_cells=['dNK1','dNK2','dNK3'],\n                            target_cells=['eEVT','iEVT'],\n                            means_min=1,\n                             means_sum_min=1,        \n                            nodecolor_dict=None,\n                            ax=None,\n                            figsize=(6,6),\n                            fontsize=10)"
+  },
+  {
+    "action": "Filter out rows with missing gene_a or gene_b, and combine gene_a and gene_b into a single list for enrichment analysis.",
+    "code": "sub_means=sub_means.loc[~sub_means['gene_a'].isnull()]\nsub_means=sub_means.loc[~sub_means['gene_b'].isnull()]\nenrichr_genes=sub_means['gene_a'].tolist()+sub_means['gene_b'].tolist()"
+  },
+  {
+    "action": "Prepare a pathway dictionary for gene set enrichment analysis using human organism data.",
+    "code": "pathway_dict=ov.utils.geneset_prepare('genesets/GO_Biological_Process_2023.txt',organism='Human')"
+  },
+  {
+    "action": "Perform gene set enrichment analysis on the list of genes using the prepared pathway dictionary.",
+    "code": "#deg_genes=dds.result.loc[dds.result['sig']!='normal'].index.tolist()\nenr=ov.bulk.geneset_enrichment(gene_list=enrichr_genes,\n                                pathways_dict=pathway_dict,\n                                pvalue_type='auto',\n                                organism='human')"
+  },
+  {
+    "action": "Set the plotting style and create a gene set enrichment plot with specified parameters.",
+    "code": "ov.plot_set()\nov.bulk.geneset_plot(enr,figsize=(2,4),fig_title='GO-Bio(EVT)',\n                    cax_loc=[2, 0.45, 0.5, 0.02],num=8,\n                    bbox_to_anchor_used=(-0.25, -13),custom_ticks=[10,100],\n                    cmap='Greens')"
+  }
+]
