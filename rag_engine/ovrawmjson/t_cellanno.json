@@ -1,0 +1,126 @@
+[
+  {
+    "action": "Import the omicverse library and print its version. Import the scanpy library and print its version. Set plotting parameters using `ov.ov_plot_set()`.",
+    "code": "import omicverse as ov\nprint(f'omicverse version:{ov.__version__}')\nimport scanpy as sc\nprint(f'scanpy version:{sc.__version__}')\nov.ov_plot_set()"
+  },
+  {
+    "action": "Create a directory named 'data'. Download the PBMC3K filtered gene-barcode matrices from 10x Genomics and save them in the 'data' directory. Extract the downloaded tar.gz file in the 'data' directory. Create a directory named 'write' for writing processed data.",
+    "code": "# !mkdir data\n# !wget http://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz -O data/pbmc3k_filtered_gene_bc_matrices.tar.gz\n# !cd data; tar -xzf pbmc3k_filtered_gene_bc_matrices.tar.gz\n# !mkdir write"
+  },
+  {
+    "action": "Read the 10x Genomics data in Matrix Market format into an AnnData object named `adata`. Use gene symbols for variable names and cache the data for faster subsequent reading.",
+    "code": "adata = sc.read_10x_mtx(\n    'data/filtered_gene_bc_matrices/hg19/',  # the directory with the `.mtx` file\n    var_names='gene_symbols',                # use gene symbols for the variable names (variables-axis index)\n    cache=True)                              # write a cache file for faster subsequent reading"
+  },
+  {
+    "action": "Perform quality control on the AnnData object `adata` using the `ov.pp.qc` function. Filter cells based on mitochondrial gene percentage, number of UMIs, and number of detected genes.",
+    "code": "#adata=ov.single.scanpy_lazy(adata)\n\n#quantity control\nadata=ov.pp.qc(adata,\n              tresh={'mito_perc': 0.05, 'nUMIs': 500, 'detected_genes': 250})"
+  },
+  {
+    "action": "Preprocess the AnnData object `adata` using the `ov.pp.preprocess` function. Normalize the data using the 'shiftlog|pearson' mode and calculate 2000 highly variable genes (HVGs).",
+    "code": "#normalize and high variable genes (HVGs) calculated\nadata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)"
+  },
+  {
+    "action": "Save the whole genes in `adata.raw` and filter out non-highly variable genes from `adata`.",
+    "code": "#save the whole genes and filter the non-HVGs\nadata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]"
+  },
+  {
+    "action": "Scale the data in `adata.X` using `ov.pp.scale`.",
+    "code": "#scale the adata.X\nov.pp.scale(adata)"
+  },
+  {
+    "action": "Perform Principal Component Analysis (PCA) on the scaled data in `adata` using `ov.pp.pca`. Use the 'scaled' layer and calculate 50 principal components.",
+    "code": "#Dimensionality Reduction\nov.pp.pca(adata,layer='scaled',n_pcs=50)"
+  },
+  {
+    "action": "Construct a neighborhood graph using `sc.pp.neighbors`. Use 15 neighbors, 50 principal components, and the 'scaled|original|X_pca' representation.",
+    "code": "#Neighbourhood graph construction\nsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50,\n               use_rep='scaled|original|X_pca')"
+  },
+  {
+    "action": "Perform Leiden clustering on the neighborhood graph using `sc.tl.leiden`.",
+    "code": "#clusters\nsc.tl.leiden(adata)"
+  },
+  {
+    "action": "Calculate Minimum Distortion Embedding (MDE) for visualization using `ov.utils.mde` and store the result in `adata.obsm[\"X_mde\"]`. Use the 'scaled|original|X_pca' representation as input.",
+    "code": "#Dimensionality Reduction for visualization(X_mde=X_umap+GPU)\nadata.obsm[\"X_mde\"] = ov.utils.mde(adata.obsm[\"scaled|original|X_pca\"])\nadata"
+  },
+  {
+    "action": "Create a pySCSA object named `scsa` from the AnnData object `adata`. Set parameters for fold change, p-value, cell type, target, tissue, and model path.",
+    "code": "scsa=ov.single.pySCSA(adata=adata,\n                      foldchange=1.5,\n                      pvalue=0.01,\n                      celltype='normal',\n                      target='cellmarker',\n                      tissue='All',\n                      model_path='temp/pySCSA_2023_v2_plus.db'                    \n)"
+  },
+  {
+    "action": "Perform cell annotation using the `scsa.cell_anno` method. Specify the clustering type as 'leiden', annotate all clusters, and calculate rank genes groups.",
+    "code": "anno=scsa.cell_anno(clustertype='leiden',\n               cluster='all',rank_rep=True)"
+  },
+  {
+    "action": "Query and display only the better-annotated results using `scsa.cell_auto_anno` and store the results in adata with the key 'scsa_celltype_cellmarker'.",
+    "code": "scsa.cell_auto_anno(adata,key='scsa_celltype_cellmarker')"
+  },
+  {
+    "action": "Create a new pySCSA object named `scsa` with the same parameters as before, but change the target to 'panglaodb'.",
+    "code": "scsa=ov.single.pySCSA(adata=adata,\n                          foldchange=1.5,\n                          pvalue=0.01,\n                          celltype='normal',\n                          target='panglaodb',\n                          tissue='All',\n                          model_path='temp/pySCSA_2023_v2_plus.db'\n                          \n)"
+  },
+  {
+    "action": "Perform cell annotation using the new `scsa` object with 'panglaodb' as the target.",
+    "code": "res=scsa.cell_anno(clustertype='leiden',\n               cluster='all',rank_rep=True)"
+  },
+  {
+    "action": "Print the cell annotation results using `scsa.cell_anno_print()`.",
+    "code": "scsa.cell_anno_print()"
+  },
+  {
+    "action": "Query and display only the better-annotated results using `scsa.cell_auto_anno` and store the results in adata with the key 'scsa_celltype_panglaodb'.",
+    "code": "scsa.cell_auto_anno(adata,key='scsa_celltype_panglaodb')"
+  },
+  {
+    "action": "Visualize the embeddings using `ov.utils.embedding`. Display the 'leiden' clusters, 'scsa_celltype_cellmarker' annotations, and 'scsa_celltype_panglaodb' annotations on the 'X_mde' embedding. Customize the legend, frame, and color palette.",
+    "code": "ov.utils.embedding(adata,\n                   basis='X_mde',\n                   color=['leiden','scsa_celltype_cellmarker','scsa_celltype_panglaodb'], \n                   legend_loc='on data', \n                   frameon='small',\n                   legend_fontoutline=2,\n                   palette=ov.utils.palette()[14:],\n                  )"
+  },
+  {
+    "action": "Assign the first 1000 cells to group 'B' and the rest to group 'A' in a new column named 'group' in `adata.obs`. Visualize the 'group' on the 'X_mde' embedding using `ov.utils.embedding`.",
+    "code": "#Randomly designate the first 1000 cells as group B and the rest as group A\nadata.obs['group']='A'\nadata.obs.loc[adata.obs.index[:1000],'group']='B'\n#Colored\nov.utils.embedding(adata,\n                   basis='X_mde',\n                   color=['group'], \n                   frameon='small',legend_fontoutline=2,\n                   palette=ov.utils.red_color,\n                  )"
+  },
+  {
+    "action": "Plot the cell type proportions using `ov.utils.plot_cellproportion`. Specify 'scsa_celltype_cellmarker' as the cell type clusters, 'group' as the visual clusters, and set the figure size.",
+    "code": "ov.utils.plot_cellproportion(adata=adata,celltype_clusters='scsa_celltype_cellmarker',\n                    visual_clusters='group',\n                    visual_name='group',figsize=(2,4))"
+  },
+  {
+    "action": "Visualize the embeddings with cell type annotations using `ov.utils.plot_embedding_celltype`. Specify the 'X_mde' embedding, 'scsa_celltype_cellmarker' as the cell type key, and customize the title and ranges.",
+    "code": "ov.utils.plot_embedding_celltype(adata,figsize=None,basis='X_mde',\n                            celltype_key='scsa_celltype_cellmarker',\n                            title='            Cell type',\n                            celltype_range=(2,6),\n                            embedding_range=(4,10),)"
+  },
+  {
+    "action": "Calculate the ratio of observed to expected cell numbers (Ro/e) for each cluster in different groups using `ov.utils.roe`. Specify 'group' as the sample key and 'scsa_celltype_cellmarker' as the cell type key.",
+    "code": "roe=ov.utils.roe(adata,sample_key='group',cell_type_key='scsa_celltype_cellmarker')"
+  },
+  {
+    "action": "Create a heatmap to visualize the Ro/e values using `seaborn.heatmap`. Transform the Ro/e values into categorical labels ('+++', '++', '+', '+/-') for annotation. Customize the colormap, axis labels, and title.",
+    "code": "import seaborn as sns\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(2,4))\n\ntransformed_roe = roe.copy()\ntransformed_roe = transformed_roe.applymap(\n    lambda x: '+++' if x >= 2 else ('++' if x >= 1.5 else ('+' if x >= 1 else '+/-')))\n\nsns.heatmap(roe, annot=transformed_roe, cmap='RdBu_r', fmt='', \n            cbar=True, ax=ax,vmin=0.5,vmax=1.5,cbar_kws={'shrink':0.5})\nplt.xticks(fontsize=12)\nplt.yticks(fontsize=12)\n\nplt.xlabel('Group',fontsize=13)\nplt.ylabel('Cell type',fontsize=13)\nplt.title('Ro/e',fontsize=13)"
+  },
+  {
+    "action": "Prepare a dictionary `res_marker_dict` containing marker genes for different cell types.",
+    "code": "res_marker_dict={\n    'Megakaryocyte':['ITGA2B','ITGB3'],\n    'Dendritic cell':['CLEC10A','IDO1'],\n    'Monocyte' :['S100A8','S100A9','LST1',],\n    'Macrophage':['CSF1R','CD68'],\n    'B cell':['MS4A1','CD79A','MZB1',],\n    'NK/NKT cell':['GNLY','KLRD1'],\n    'CD8+T cell':['CD8A','CD8B'],\n    'Treg':['CD4','CD40LG','IL7R','FOXP3','IL2RA'],\n    'CD4+T cell':['PTPRC','CD3D','CD3E'],\n\n}"
+  },
+  {
+    "action": "Calculate a dendrogram for the 'leiden' clusters using `sc.tl.dendrogram`. Create a dot plot using `sc.pl.dotplot` to visualize the expression of marker genes from `res_marker_dict` in each 'leiden' cluster. Include the dendrogram and standardize the scale by variable.",
+    "code": "sc.tl.dendrogram(adata,'leiden')\nsc.pl.dotplot(adata, res_marker_dict, 'leiden', \n              dendrogram=True,standard_scale='var')"
+  },
+  {
+    "action": "Create a dictionary `cluster2annotation` to map 'leiden' cluster IDs to manual annotation labels based on the dot plot. Annotate the cells in `adata` using `ov.single.scanpy_cellanno_from_dict` based on the `cluster2annotation` dictionary and 'leiden' clustering.",
+    "code": "# create a dictionary to map cluster to annotation label\ncluster2annotation = {\n     '0': 'T cell',\n     '1': 'T cell',\n     '2': 'Monocyte',#Germ-cell(Oid)\n     '3': 'B cell',#Germ-cell(Oid)\n     '4': 'T cell',\n     '5': 'Macrophage',\n     '6': 'NKT cells',\n     '7': 'T cell',\n    '8':'Monocyte',\n    '9':'Dendritic cell',\n    '10':'Megakaryocyte',\n\n}\nov.single.scanpy_cellanno_from_dict(adata,anno_dict=cluster2annotation,\n                                       clustertype='leiden')"
+  },
+  {
+    "action": "Compare the automatic annotation results ('scsa_celltype_cellmarker') with the manual annotation ('major_celltype') by visualizing them on the 'X_mde' embedding using `ov.utils.embedding`. Customize the legend, frame, and color palette.",
+    "code": "ov.utils.embedding(adata,\n                   basis='X_mde',\n                   color=['major_celltype','scsa_celltype_cellmarker'], \n                   legend_loc='on data', frameon='small',legend_fontoutline=2,\n                   palette=ov.utils.palette()[14:],\n                  )"
+  },
+  {
+    "action": "Obtain the marker genes for each cell type using `ov.single.get_celltype_marker`. Specify 'scsa_celltype_cellmarker' as the cluster type.",
+    "code": "marker_dict=ov.single.get_celltype_marker(adata,clustertype='scsa_celltype_cellmarker')\nmarker_dict.keys()"
+  },
+  {
+    "action": "Print the marker genes for 'B cell' from the `marker_dict`.",
+    "code": "marker_dict['B cell']"
+  },
+  {
+    "action": "Retrieve the available tissues in the database using `scsa.get_model_tissue()`.",
+    "code": "scsa.get_model_tissue()"
+  }
+]

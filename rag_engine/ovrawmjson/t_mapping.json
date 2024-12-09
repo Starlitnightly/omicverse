@@ -1,0 +1,46 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and set plotting parameters using `ov.utils.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Read single-cell data from a file, then create and display a UMAP plot colored by 'Subset' to visualize the different subsets within the data.",
+    "code": "adata_sc=ov.read('data/sc.h5ad')\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(3,3))\nov.utils.embedding(\n    adata_sc,\n    basis=\"X_umap\",\n    color=['Subset'],\n    title='Subset',\n    frameon='small',\n    wspace=0.65,\n    show=False,\n    ax=ax\n)"
+  },
+  {
+    "action": "Print the maximum value of the raw data, preprocess the single-cell data using shiftlog and Pearson residuals, select the top 3000 highly variable genes, normalize the data to a target sum of 1e4, and then print the maximum value of the normalized data.",
+    "code": "print(\"RAW\",adata_sc.X.max())\nadata_sc=ov.pp.preprocess(adata_sc,mode='shiftlog|pearson',n_HVGs=3000,target_sum=1e4)\nadata_sc.raw = adata_sc\nadata_sc = adata_sc[:, adata_sc.var.highly_variable_features]\nprint(\"Normalize\",adata_sc.X.max())"
+  },
+  {
+    "action": "Load spatial transcriptomics data from 10X Genomics for the 'V1_Human_Lymph_Node' sample, assign sample ID, and ensure unique variable names.",
+    "code": "adata = sc.datasets.visium_sge(sample_id=\"V1_Human_Lymph_Node\")\nadata.obs['sample'] = list(adata.uns['spatial'].keys())[0]\nadata.var_names_make_unique()"
+  },
+  {
+    "action": "Calculate quality control metrics for the spatial data, filter out genes with total counts less than 100, compute spatially variable genes using the 'prost' method, select the top 3000 spatially variable genes, normalize the data, and create a copy for further analysis.",
+    "code": "sc.pp.calculate_qc_metrics(adata, inplace=True)\nadata = adata[:,adata.var['total_counts']>100]\nadata=ov.space.svg(adata,mode='prost',n_svgs=3000,target_sum=1e4,platform=\"visium\",)\nadata.raw = adata\nadata = adata[:, adata.var.space_variable_features]\nadata_sp=adata.copy()\nadata_sp"
+  },
+  {
+    "action": "Initialize the Tangram model with single-cell and spatial data, using 'Subset' as the clustering key.",
+    "code": "tg=ov.space.Tangram(adata_sc,adata_sp,clusters='Subset')"
+  },
+  {
+    "action": "Train the Tangram model in 'clusters' mode for 500 epochs using a CUDA device.",
+    "code": "tg.train(mode=\"clusters\",num_epochs=500,device=\"cuda:0\")"
+  },
+  {
+    "action": "Use the trained Tangram model to infer cell locations in spatial spots and store the result in `adata_plot`.",
+    "code": "adata_plot=tg.cell2location()\nadata_plot.obs.columns"
+  },
+  {
+    "action": "Create a spatial plot showing the distribution of specified cell types using the 'magma' colormap.",
+    "code": "annotation_list=['B_Cycling', 'B_GC_LZ', 'T_CD4+_TfH_GC', 'FDC',\n                         'B_naive', 'T_CD4+_naive', 'B_plasma', 'Endo']\n\nsc.pl.spatial(adata_plot, cmap='magma',\n                  color=annotation_list,\n                  ncols=4, size=1.3,\n                  img_key='hires'\n                 )"
+  },
+  {
+    "action": "Create a dictionary mapping cell type categories to their corresponding colors from the single-cell data.",
+    "code": "color_dict=dict(zip(adata_sc.obs['Subset'].cat.categories,\n                   adata_sc.uns['Subset_colors']))"
+  },
+  {
+    "action": "Create a spatial plot of the first 5 cell types from `annotation_list`, using specified colors and adjusting the color scale and circle size.",
+    "code": "import matplotlib as mpl\nclust_labels = annotation_list[:5]\nclust_col = ['' + str(i) for i in clust_labels]\n\nwith mpl.rc_context({'figure.figsize': (8, 8),'axes.grid': False}):\n    fig = ov.pl.plot_spatial(\n        adata=adata_plot,\n        color=clust_col, labels=clust_labels,\n        show_img=True,\n        style='fast',\n        max_color_quantile=0.992,\n        circle_diameter=3,\n        reorder_cmap = [1,2,3,4,6],\n        colorbar_position='right',\n        palette=color_dict\n    )"
+  }
+]
