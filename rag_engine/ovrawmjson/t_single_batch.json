@@ -1,0 +1,138 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse and scanpy. Set plotting parameters using `ov.utils.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Read individual datasets (s1d3, s2d1, s3d7) from H5AD files, assigning batch labels.",
+    "code": "adata1=ov.read('neurips2021_s1d3.h5ad')\nadata1.obs['batch']='s1d3'\nadata2=ov.read('neurips2021_s2d1.h5ad')\nadata2.obs['batch']='s2d1'\nadata3=ov.read('neurips2021_s3d7.h5ad')\nadata3.obs['batch']='s3d7'"
+  },
+  {
+    "action": "Concatenate the three AnnData objects into a single object, merging common variables.",
+    "code": "adata=sc.concat([adata1,adata2,adata3],merge='same')\nadata"
+  },
+  {
+    "action": "Display the unique batch labels present in the combined dataset.",
+    "code": "adata.obs['batch'].unique()"
+  },
+  {
+    "action": "Convert the data type of the `.X` attribute (gene expression matrix) to `np.int64`.",
+    "code": "import numpy as np\nadata.X=adata.X.astype(np.int64)"
+  },
+  {
+    "action": "Perform quality control (QC) on the AnnData object, filtering cells based on mitochondrial percentage, number of UMIs, and detected genes. Considers batch information during QC.",
+    "code": "adata=ov.pp.qc(adata,\n              tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250},\n              batch_key='batch')\nadata"
+  },
+  {
+    "action": "Preprocess the data using shiftlog and pearson normalization, selecting the top 3000 highly variable genes (HVGs).",
+    "code": "adata=ov.pp.preprocess(adata,mode='shiftlog|pearson',\n                       n_HVGs=3000,batch_key=None)\nadata"
+  },
+  {
+    "action": "Store the raw counts in `adata.raw` and subset the data to include only highly variable genes.",
+    "code": "adata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]\nadata"
+  },
+  {
+    "action": "Save the preprocessed data to an H5AD file with gzip compression.",
+    "code": "adata.write_h5ad('neurips2021_batch_normlog.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Scale the data, perform Principal Component Analysis (PCA) on the scaled data, and compute Minimum Distortion Embedding (MDE) based on the PCA results.",
+    "code": "ov.pp.scale(adata)\nov.pp.pca(adata,layer='scaled',n_pcs=50,mask_var='highly_variable_features')\n\nadata.obsm[\"X_mde_pca\"] = ov.utils.mde(adata.obsm[\"scaled|original|X_pca\"])"
+  },
+  {
+    "action": "Visualize the data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_pca',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Perform batch correction using Harmony, specifying 'batch' as the batch key and using 50 principal components.",
+    "code": "adata_harmony=ov.single.batch_correction(adata,batch_key='batch',\n                                        methods='harmony',n_pcs=50)\nadata"
+  },
+  {
+    "action": "Compute MDE based on the Harmony-corrected data.",
+    "code": "adata.obsm[\"X_mde_harmony\"] = ov.utils.mde(adata.obsm[\"X_harmony\"])"
+  },
+  {
+    "action": "Visualize the Harmony-corrected data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_harmony',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Perform batch correction using Combat, specifying 'batch' as the batch key and using 50 principal components.",
+    "code": "adata_combat=ov.single.batch_correction(adata,batch_key='batch',\n                                        methods='combat',n_pcs=50)\nadata"
+  },
+  {
+    "action": "Compute MDE based on the Combat-corrected data.",
+    "code": "adata.obsm[\"X_mde_combat\"] = ov.utils.mde(adata.obsm[\"X_combat\"])"
+  },
+  {
+    "action": "Visualize the Combat-corrected data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_combat',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Perform batch correction using Scanorama, specifying 'batch' as the batch key and using 50 principal components.",
+    "code": "adata_scanorama=ov.single.batch_correction(adata,batch_key='batch',\n                                        methods='scanorama',n_pcs=50)\nadata"
+  },
+  {
+    "action": "Compute MDE based on the Scanorama-corrected data.",
+    "code": "adata.obsm[\"X_mde_scanorama\"] = ov.utils.mde(adata.obsm[\"X_scanorama\"])"
+  },
+  {
+    "action": "Visualize the Scanorama-corrected data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_scanorama',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Perform batch correction using scVI, specifying 'batch' as the batch key, using 2 layers, 30 latent dimensions, and the negative binomial gene likelihood.",
+    "code": "adata_scvi=ov.single.batch_correction(adata,batch_key='batch',\n                           methods='scVI',n_layers=2, n_latent=30, gene_likelihood=\"nb\")\nadata"
+  },
+  {
+    "action": "Compute MDE based on the scVI-corrected data.",
+    "code": "adata.obsm[\"X_mde_scVI\"] = ov.utils.mde(adata.obsm[\"X_scVI\"])"
+  },
+  {
+    "action": "Visualize the scVI-corrected data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_scVI',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Initialize an LDA topic model object, specifying the feature type, highly variable key, layers, batch key, and learning rate.",
+    "code": "LDA_obj=ov.utils.LDA_topic(adata,feature_type='expression',\n                  highly_variable_key='highly_variable_features',\n                 layers='counts',batch_key='batch',learning_rate=1e-3)"
+  },
+  {
+    "action": "Plot the topic contributions for topic 6.",
+    "code": "LDA_obj.plot_topic_contributions(6)"
+  },
+  {
+    "action": "Predict topic compositions for 15 topics.",
+    "code": "LDA_obj.predicted(15)"
+  },
+  {
+    "action": "Compute MDE based on the topic compositions and feature embeddings from the MIRA model.",
+    "code": "adata.obsm[\"X_mde_mira_topic\"] = ov.utils.mde(adata.obsm[\"X_topic_compositions\"])\nadata.obsm[\"X_mde_mira_feature\"] = ov.utils.mde(adata.obsm[\"X_umap_features\"])"
+  },
+  {
+    "action": "Visualize the MIRA topic-based data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_mira_topic',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Visualize the MIRA feature-based data using MDE embeddings, coloring by batch and cell type.",
+    "code": "ov.utils.embedding(adata,\n                basis='X_mde_mira_feature',frameon='small',\n                color=['batch','cell_type'],show=False)"
+  },
+  {
+    "action": "Save the AnnData object with all batch correction results to an H5AD file with gzip compression.",
+    "code": "adata.write_h5ad('neurips2021_batch_all.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Reload the saved AnnData object from the H5AD file.",
+    "code": "adata=sc.read('neurips2021_batch_all.h5ad')"
+  },
+  {
+    "action": "Copy specific embeddings to the `.obsm` attribute for benchmarking.",
+    "code": "adata.obsm['X_pca']=adata.obsm['scaled|original|X_pca'].copy()\nadata.obsm['X_mira_topic']=adata.obsm['X_topic_compositions'].copy()\nadata.obsm['X_mira_feature']=adata.obsm['X_umap_features'].copy()"
+  },
+  {
+    "action": "Initialize and run a Benchmarker object from the `scib_metrics` package to evaluate the performance of different batch correction methods.",
+    "code": "from scib_metrics.benchmark import Benchmarker\nbm = Benchmarker(\n    adata,\n    batch_key=\"batch\",\n    label_key=\"cell_type\",\n    embedding_obsm_keys=[\"X_pca\", \"X_combat\", \"X_harmony\",\n                         'X_scanorama','X_mira_topic','X_mira_feature','X_scVI'],\n    n_jobs=8,\n)\nbm.benchmark()"
+  },
+  {
+    "action": "Plot the benchmarking results as a table.",
+    "code": "bm.plot_results_table(min_max_scale=False)"
+  }
+]

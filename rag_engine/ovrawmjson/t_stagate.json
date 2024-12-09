@@ -1,0 +1,90 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and set plotting parameters using `ov.plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nov.plot_set()"
+  },
+  {
+    "action": "Read 10x Visium spatial transcriptomics data from a directory, specifying the path and count file. Ensure unique variable names.",
+    "code": "adata = sc.read_visium(path='data', count_file='151676_filtered_feature_bc_matrix.h5')\nadata.var_names_make_unique()"
+  },
+  {
+    "action": "Calculate quality control metrics and filter genes with total counts less than 100. Identify spatially variable genes (SVGs) using the `prost` method, targeting 3000 SVGs and setting the target sum for normalization to 1e4.",
+    "code": "sc.pp.calculate_qc_metrics(adata, inplace=True)\nadata = adata[:,adata.var['total_counts']>100]\nadata=ov.space.svg(adata,mode='prost',n_svgs=3000,target_sum=1e4,platform=\"visium\",)"
+  },
+  {
+    "action": "Write the processed AnnData object to an H5AD file with gzip compression.",
+    "code": "adata.write('data/cluster_svg.h5ad',compression='gzip')"
+  },
+  {
+    "action": "Read ground truth annotations from a tab-separated file, assign them to the AnnData object, and visualize the spatial distribution of the ground truth labels.",
+    "code": "import pandas as pd\nimport os\nAnn_df = pd.read_csv(os.path.join('data', '151676_truth.txt'), sep='\\t', header=None, index_col=0)\nAnn_df.columns = ['Ground Truth']\nadata.obs['Ground Truth'] = Ann_df.loc[adata.obs_names, 'Ground Truth']\nsc.pl.spatial(adata, img_key=\"hires\", color=[\"Ground Truth\"])"
+  },
+  {
+    "action": "Define a GraphST model with the AnnData object and specify the device for computation.",
+    "code": "model = ov.externel.GraphST.GraphST(adata, device='cuda:0')"
+  },
+  {
+    "action": "Train the GraphST model, specifying the number of principal components (n_pcs) to use.",
+    "code": "adata = model.train(n_pcs=30)"
+  },
+  {
+    "action": "Cluster the spatial data using the `mclust` method with specified parameters, including the number of components and model name. Refine the cluster labels using `ov.utils.refine_label`.",
+    "code": "ov.utils.cluster(adata,use_rep='graphst|original|X_pca',method='mclust',n_components=10,\n                 modelNames='EEV', random_state=112,\n                )\nadata.obs['mclust_GraphST'] = ov.utils.refine_label(adata, radius=50, key='mclust')"
+  },
+  {
+    "action": "Compute a neighborhood graph using the specified representation and cluster the data using `louvain` and `leiden` methods. Refine the cluster labels using `ov.utils.refine_label`.",
+    "code": "sc.pp.neighbors(adata, n_neighbors=15, n_pcs=20,\n               use_rep='graphst|original|X_pca')\nov.utils.cluster(adata,use_rep='graphst|original|X_pca',method='louvain',resolution=0.7)\nov.utils.cluster(adata,use_rep='graphst|original|X_pca',method='leiden',resolution=0.7)\nadata.obs['louvain_GraphST'] = ov.utils.refine_label(adata, radius=50, key='louvain') \nadata.obs['leiden_GraphST'] = ov.utils.refine_label(adata, radius=50, key='leiden')"
+  },
+  {
+    "action": "Visualize the spatial distribution of the cluster labels obtained from `mclust`, `leiden`, and `louvain` methods, along with the ground truth.",
+    "code": "sc.pl.spatial(adata, color=['mclust_GraphST','leiden_GraphST',\n                            'louvain_GraphST',\"Ground Truth\"])"
+  },
+  {
+    "action": "Assign spatial coordinates from `adata.obsm['spatial']` to `adata.obs['X']` and `adata.obs['Y']`.",
+    "code": "adata.obs['X'] = adata.obsm['spatial'][:,0]\nadata.obs['Y'] = adata.obsm['spatial'][:,1]"
+  },
+  {
+    "action": "Construct a STAGATE object with specified parameters, including the number of batches, spatial keys, radius cutoff, number of epochs, learning rate, weight decay, and hidden dimensions.",
+    "code": "STA_obj=ov.space.pySTAGATE(adata,num_batch_x=3,num_batch_y=2,\n                 spatial_key=['X','Y'],rad_cutoff=200,num_epoch = 1000,lr=0.001,\n                weight_decay=1e-4,hidden_dims = [512, 30],\n                device='cuda:0')"
+  },
+  {
+    "action": "Train the STAGATE model.",
+    "code": "STA_obj.train()"
+  },
+  {
+    "action": "Predict latent embeddings and denoised expressions using the trained STAGATE model.",
+    "code": "STA_obj.predicted()"
+  },
+  {
+    "action": "Cluster the spatial data using the `mclust` method on the STAGATE embeddings and refine the cluster labels.",
+    "code": "ov.utils.cluster(adata,use_rep='STAGATE',method='mclust',n_components=8,\n                 modelNames='EEV', random_state=112,\n                )\nadata.obs['mclust_STAGATE'] = ov.utils.refine_label(adata, radius=50, key='mclust')"
+  },
+  {
+    "action": "Compute a neighborhood graph using the STAGATE embeddings and cluster the data using `louvain` and `leiden` methods. Refine the cluster labels.",
+    "code": "sc.pp.neighbors(adata, n_neighbors=15, n_pcs=20,\n               use_rep='STAGATE')\nov.utils.cluster(adata,use_rep='STAGATE',method='louvain',resolution=0.5)\nov.utils.cluster(adata,use_rep='STAGATE',method='leiden',resolution=0.5)\nadata.obs['louvain_STAGATE'] = ov.utils.refine_label(adata, radius=50, key='louvain') \nadata.obs['leiden_STAGATE'] = ov.utils.refine_label(adata, radius=50, key='leiden')"
+  },
+  {
+    "action": "Visualize the spatial distribution of the cluster labels obtained from `mclust`, `leiden`, and `louvain` methods on the STAGATE embeddings, along with the ground truth.",
+    "code": "sc.pl.spatial(adata, color=['mclust_STAGATE','leiden_STAGATE',\n                            'louvain_STAGATE',\"Ground Truth\"])"
+  },
+  {
+    "action": "Sort genes by their spatial information score (PI) in descending order and display the top 10 genes.",
+    "code": "adata.var.sort_values('PI',ascending=False).head(10)"
+  },
+  {
+    "action": "Plot the spatial expression of a specific gene (e.g., 'MBP') in both raw and denoised (STAGATE) forms.",
+    "code": "plot_gene = 'MBP'\nimport matplotlib.pyplot as plt\nfig, axs = plt.subplots(1, 2, figsize=(8, 4))\nsc.pl.spatial(adata, img_key=\"hires\", color=plot_gene, show=False, ax=axs[0], title='RAW_'+plot_gene, vmax='p99')\nsc.pl.spatial(adata, img_key=\"hires\", color=plot_gene, show=False, ax=axs[1], title='STAGATE_'+plot_gene, layer='STAGATE_ReX', vmax='p99')"
+  },
+  {
+    "action": "Calculate the pseudo-spatial map (pSM) using the STAGATE model with specified parameters.",
+    "code": "STA_obj.cal_pSM(n_neighbors=20,resolution=1,\n                       max_cell_for_subsampling=5000)"
+  },
+  {
+    "action": "Visualize the spatial distribution of the ground truth and the calculated pSM.",
+    "code": "sc.pl.spatial(adata, color=['Ground Truth','pSM_STAGATE'],\n             cmap='RdBu_r')"
+  },
+  {
+    "action": "Evaluate the clustering performance using the Adjusted Rand Index (ARI) for different clustering methods and models (GraphST and STAGATE) compared to the ground truth.",
+    "code": "from sklearn.metrics.cluster import adjusted_rand_score\n\nobs_df = adata.obs.dropna()\n#GraphST\nARI = adjusted_rand_score(obs_df['mclust_GraphST'], obs_df['Ground Truth'])\nprint('mclust_GraphST: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['leiden_GraphST'], obs_df['Ground Truth'])\nprint('leiden_GraphST: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['louvain_GraphST'], obs_df['Ground Truth'])\nprint('louvain_GraphST: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['mclust_STAGATE'], obs_df['Ground Truth'])\nprint('mclust_STAGATE: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['leiden_STAGATE'], obs_df['Ground Truth'])\nprint('leiden_STAGATE: Adjusted rand index = %.2f' %ARI)\n\nARI = adjusted_rand_score(obs_df['louvain_STAGATE'], obs_df['Ground Truth'])\nprint('louvain_STAGATE: Adjusted rand index = %.2f' %ARI)"
+  }
+]

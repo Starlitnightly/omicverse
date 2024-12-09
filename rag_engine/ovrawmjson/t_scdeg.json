@@ -1,0 +1,122 @@
+[
+  {
+    "action": "Import necessary libraries: omicverse, scanpy, and scvelo. Set plotting parameters using `ov.utils.ov_plot_set()`.",
+    "code": "import omicverse as ov\nimport scanpy as sc\nimport scvelo as scv\n\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Load the pancreas dataset using `scv.datasets.pancreas()`.",
+    "code": "adata = scv.datasets.pancreas()\nadata"
+  },
+  {
+    "action": "Check the maximum value in the `adata.X` matrix.",
+    "code": "adata.X.max()"
+  },
+  {
+    "action": "Perform quality control, normalization, and calculate highly variable genes (HVGs). Save the whole genes and filter non-HVGs. Scale the `adata.X` matrix and perform dimensionality reduction using PCA.",
+    "code": "#quantity control\nadata=ov.pp.qc(adata,\n              tresh={'mito_perc': 0.05, 'nUMIs': 500, 'detected_genes': 250})\n#normalize and high variable genes (HVGs) calculated\nadata=ov.pp.preprocess(adata,mode='shiftlog|pearson',n_HVGs=2000,)\n\n#save the whole genes and filter the non-HVGs\nadata.raw = adata\nadata = adata[:, adata.var.highly_variable_features]\n\n#scale the adata.X\nov.pp.scale(adata)\n\n#Dimensionality Reduction\nov.pp.pca(adata,layer='scaled',n_pcs=50)"
+  },
+  {
+    "action": "Check the maximum value in the scaled `adata.X` matrix.",
+    "code": "adata.X.max()"
+  },
+  {
+    "action": "Select target cells ('Alpha' and 'Beta') for analysis, derive the expression matrix using `to_df()`, and build the differential expression analysis module using `pyDEG`.",
+    "code": "test_adata=adata[adata.obs['clusters'].isin(['Alpha','Beta'])]\ntest_adata\n\n\ndds=ov.bulk.pyDEG(test_adata.to_df(layer='lognorm').T)"
+  },
+  {
+    "action": "Drop duplicate indices in the `dds` object.",
+    "code": "dds.drop_duplicates_index()\nprint('... drop_duplicates_index success')"
+  },
+  {
+    "action": "Set up treatment and control groups based on cell types ('Alpha' and 'Beta') and perform differential expression analysis using the t-test method.",
+    "code": "treatment_groups=test_adata.obs[test_adata.obs['clusters']=='Alpha'].index.tolist()\ncontrol_groups=test_adata.obs[test_adata.obs['clusters']=='Beta'].index.tolist()\nresult=dds.deg_analysis(treatment_groups,control_groups,method='ttest')"
+  },
+  {
+    "action": "Display the top differentially expressed genes sorted by q-value.",
+    "code": "result.sort_values('qvalue').head()"
+  },
+  {
+    "action": "Set fold change threshold, p-value threshold, and maximum -log10(p-value) for visualization.",
+    "code": "# -1 means automatically calculates\ndds.foldchange_set(fc_threshold=-1,\n                   pval_threshold=0.05,\n                   logp_max=10)"
+  },
+  {
+    "action": "Plot a volcano plot of the differential expression analysis results.",
+    "code": "dds.plot_volcano(title='DEG Analysis',figsize=(4,4),\n                 plot_genes_num=8,plot_genes_fontsize=12,)"
+  },
+  {
+    "action": "Plot box plots for specific genes ('Irx1' and 'Adra2a') in the treatment and control groups.",
+    "code": "dds.plot_boxplot(genes=['Irx1','Adra2a'],treatment_groups=treatment_groups,\n                control_groups=control_groups,figsize=(2,3),fontsize=12,\n                 legend_bbox=(2,0.55))"
+  },
+  {
+    "action": "Visualize cell clusters and gene expression ('Irx1' and 'Adra2a') on a UMAP embedding.",
+    "code": "ov.utils.embedding(adata,\n                   basis='X_umap',\n                    frameon='small',\n                   color=['clusters','Irx1','Adra2a'])"
+  },
+  {
+    "action": "Create a MetaCell object using `ov.single.MetaCell` for constructing metacells.",
+    "code": "meta_obj=ov.single.MetaCell(adata,use_rep='scaled|original|X_pca',n_metacells=150,\n                           use_gpu=True)"
+  },
+  {
+    "action": "Initialize archetypes for the MetaCell object.",
+    "code": "meta_obj.initialize_archetypes()"
+  },
+  {
+    "action": "Train the MetaCell model.",
+    "code": "meta_obj.train(min_iter=10, max_iter=50)"
+  },
+  {
+    "action": "Save the trained MetaCell model.",
+    "code": "meta_obj.save('seacells/model.pkl')"
+  },
+  {
+    "action": "Load a saved MetaCell model.",
+    "code": "meta_obj.load('seacells/model.pkl')"
+  },
+  {
+    "action": "Predict metacells using the trained model with the 'soft' method and summarize the 'lognorm' layer.",
+    "code": "ad=meta_obj.predicted(method='soft',celltype_label='clusters',\n                     summarize_layer='lognorm')"
+  },
+  {
+    "action": "Check the minimum and maximum values of the predicted metacell matrix.",
+    "code": "ad.X.min(),ad.X.max()"
+  },
+  {
+    "action": "Plot the metacells on the UMAP embedding of the original data.",
+    "code": "import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(4,4))\nov.utils.embedding(\n    meta_obj.adata,\n    basis=\"X_umap\",\n    color=['clusters'],\n    frameon='small',\n    title=\"Meta cells\",\n    #legend_loc='on data',\n    legend_fontsize=14,\n    legend_fontoutline=2,\n    size=10,\n    ax=ax,\n    alpha=0.2,\n    #legend_loc='', \n    add_outline=False, \n    #add_outline=True,\n    outline_color='black',\n    outline_width=1,\n    show=False,\n    #palette=ov.utils.blue_color[:],\n    #legend_fontweight='normal'\n)\nov.single._metacell.plot_metacells(ax,meta_obj.adata,color='#CB3E35',\n                                  )"
+  },
+  {
+    "action": "Select metacells of types 'Alpha' and 'Beta' for differential expression analysis.",
+    "code": "test_adata=ad[ad.obs['celltype'].isin(['Alpha','Beta'])]\ntest_adata"
+  },
+  {
+    "action": "Create a `pyDEG` object for differential expression analysis using metacell data.",
+    "code": "dds_meta=ov.bulk.pyDEG(test_adata.to_df().T)"
+  },
+  {
+    "action": "Drop duplicate indices in the `dds_meta` object.",
+    "code": "dds_meta.drop_duplicates_index()\nprint('... drop_duplicates_index success')"
+  },
+  {
+    "action": "Set up treatment and control groups based on metacell types ('Alpha' and 'Beta') and perform differential expression analysis using the t-test method.",
+    "code": "treatment_groups=test_adata.obs[test_adata.obs['celltype']=='Alpha'].index.tolist()\ncontrol_groups=test_adata.obs[test_adata.obs['celltype']=='Beta'].index.tolist()\nresult=dds_meta.deg_analysis(treatment_groups,control_groups,method='ttest')"
+  },
+  {
+    "action": "Display the top differentially expressed genes in metacells sorted by q-value.",
+    "code": "result.sort_values('qvalue').head()"
+  },
+  {
+    "action": "Set fold change threshold, p-value threshold, and maximum -log10(p-value) for visualization in metacell analysis.",
+    "code": "# -1 means automatically calculates\ndds_meta.foldchange_set(fc_threshold=-1,\n                   pval_threshold=0.05,\n                   logp_max=10)"
+  },
+  {
+    "action": "Plot a volcano plot of the differential expression analysis results for metacells.",
+    "code": "dds_meta.plot_volcano(title='DEG Analysis',figsize=(4,4),\n                 plot_genes_num=8,plot_genes_fontsize=12,)"
+  },
+  {
+    "action": "Plot box plots for specific genes ('Ctxn2' and 'Mnx1') in the treatment and control metacell groups.",
+    "code": "dds_meta.plot_boxplot(genes=['Ctxn2','Mnx1'],treatment_groups=treatment_groups,\n                control_groups=control_groups,figsize=(2,3),fontsize=12,\n                 legend_bbox=(2,0.55))"
+  },
+  {
+    "action": "Visualize cell clusters and gene expression ('Ctxn2' and 'Mnx1') on a UMAP embedding for the original data.",
+    "code": "ov.utils.embedding(adata,\n                   basis='X_umap',\n                    frameon='small',\n                   color=['clusters','Ctxn2','Mnx1'])"
+  }
+]

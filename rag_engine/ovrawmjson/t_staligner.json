@@ -1,0 +1,46 @@
+[
+  {
+    "action": "Import necessary libraries: scipy.sparse, omicverse, scanpy, anndata, pandas, and os. Set plotting parameters using `ov.utils.ov_plot_set()`.",
+    "code": "from scipy.sparse import csr_matrix\nimport omicverse as ov\nimport scanpy as sc\nimport anndata as ad\nimport pandas as pd\nimport os\n\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Initialize empty lists `Batch_list` and `adj_list` to store AnnData objects and adjacency matrices, respectively. Define `section_ids` list containing the names of the datasets to be processed. Set the `pathway` variable to the directory containing the data files.",
+    "code": "Batch_list = []\nadj_list = []\nsection_ids = ['Slide-seqV2_MoB', 'Stereo-seq_MoB']\nprint(section_ids)\npathway = '/storage/zengjianyangLab/hulei/scRNA-seq/scripts/STAligner'"
+  },
+  {
+    "action": "Iterate through each `section_id` in `section_ids`. Load the corresponding h5ad file into an AnnData object `adata`. Check if `adata.X` is a pandas DataFrame and convert it to a sparse matrix if necessary. Make variable names unique. Prepend `section_id` to each observation name to ensure uniqueness across datasets.",
+    "code": "for section_id in section_ids:\n    print(section_id)\n    adata = sc.read_h5ad(os.path.join(pathway,section_id+\".h5ad\"))\n\n    # check whether the adata.X is sparse matrix\n    if isinstance(adata.X, pd.DataFrame):\n        adata.X = csr_matrix(adata.X)\n    else:\n        pass\n\n    adata.var_names_make_unique(join=\"++\")\n\n    # make spot name unique\n    adata.obs_names = [x+'_'+section_id for x in adata.obs_names]"
+  },
+  {
+    "action": "Construct the spatial network using `ov.space.Cal_Spatial_Net` with a specified `rad_cutoff`. Perform normalization by selecting highly variable genes using `sc.pp.highly_variable_genes`, normalizing total counts with `sc.pp.normalize_total`, and applying log transformation with `sc.pp.log1p`. Subset `adata` to include only highly variable genes. Append the adjacency matrix and the processed `adata` to `adj_list` and `Batch_list`, respectively.",
+    "code": "    # Constructing the spatial network\n    ov.space.Cal_Spatial_Net(adata, rad_cutoff=50) # the spatial network are saved in adata.uns[‘adj’]\n\n    # Normalization\n    sc.pp.highly_variable_genes(adata, flavor=\"seurat_v3\", n_top_genes=10000)\n    sc.pp.normalize_total(adata, target_sum=1e4)\n    sc.pp.log1p(adata)\n\n    adata = adata[:, adata.var['highly_variable']]\n    adj_list.append(adata.uns['adj'])\n    Batch_list.append(adata)"
+  },
+  {
+    "action": "Print the `Batch_list` which now contains the processed AnnData objects for each dataset.",
+    "code": "Batch_list"
+  },
+  {
+    "action": "Concatenate the AnnData objects in `Batch_list` into a single AnnData object `adata_concat`. Assign `slice_name` as the label for concatenation and use `section_ids` as keys. Add a new column `batch_name` to `adata_concat.obs` and set it as a categorical variable with the same values as `slice_name`. Print the shape of the concatenated AnnData object.",
+    "code": "adata_concat = ad.concat(Batch_list, label=\"slice_name\", keys=section_ids)\nadata_concat.obs[\"batch_name\"] = adata_concat.obs[\"slice_name\"].astype('category')\nprint('adata_concat.shape: ', adata_concat.shape)"
+  },
+  {
+    "action": "Train the STAligner model using the `ov.space.pySTAligner` function. Set parameters for the model, including the number of nearest neighbors (`knn_neigh`), number of epochs (`n_epochs`), integration order (`iter_comb`), batch key (`batch_key`), and the key to add the results (`key_added`). Also, pass the list of AnnData objects (`Batch_list`) to the function.",
+    "code": "get_ipython().run_cell_magic('time', '', \"# iter_comb is used to specify the order of integration. For example, (0, 1) means slice 0 will be algined with slice 1 as reference.\\niter_comb = [(i, i + 1) for i in range(len(section_ids) - 1)]\\n\\n# Here, to reduce GPU memory usage, each slice is considered as a subgraph for training.\\nSTAligner_obj = ov.space.pySTAligner(adata_concat, verbose=True, knn_neigh = 100, n_epochs = 600, iter_comb = iter_comb,\\n                                     batch_key = 'batch_name',  key_added='STAligner', Batch_list = Batch_list)\\n\")"
+  },
+  {
+    "action": "Train the STAligner model by calling the `train()` method on the `STAligner_obj`.",
+    "code": "STAligner_obj.train()"
+  },
+  {
+    "action": "Retrieve the predicted AnnData object with the latent embedding stored in `adata.obsm['STAligner']` by calling the `predicted()` method on the `STAligner_obj`.",
+    "code": "adata = STAligner_obj.predicted()"
+  },
+  {
+    "action": "Compute the neighbor graph using the 'STAligner' representation with `sc.pp.neighbors`. Perform clustering using the Leiden algorithm with `ov.utils.cluster` and a specified resolution. Calculate UMAP embeddings with `sc.tl.umap`. Visualize the UMAP embeddings colored by 'batch_name' and 'leiden' clusters using `sc.pl.umap`.",
+    "code": "sc.pp.neighbors(adata, use_rep='STAligner', random_state=666)\nov.utils.cluster(adata,use_rep='STAligner',method='leiden',resolution=0.4)\nsc.tl.umap(adata, random_state=666)\nsc.pl.umap(adata, color=['batch_name',\"leiden\"],wspace=0.5)"
+  },
+  {
+    "action": "Create a spatial plot of the clustering results. Define `spot_size` and `title_size` for plot aesthetics. Generate a subplot with two axes. Plot the spatial distribution of 'leiden' clusters for 'Slide-seqV2_MoB' and 'Stereo-seq_MoB' datasets using `sc.pl.spatial`. Adjust the title size and invert the y-axis for the 'Stereo-seq' plot.",
+    "code": "import matplotlib.pyplot as plt\nspot_size = 50\ntitle_size = 15\nfig, ax = plt.subplots(1, 2, figsize=(6, 3), gridspec_kw={'wspace': 0.05, 'hspace': 0.2})\n_sc_0 = sc.pl.spatial(adata[adata.obs['batch_name'] == 'Slide-seqV2_MoB'], img_key=None, color=['leiden'], title=['Slide-seqV2'],\n                      legend_fontsize=10, show=False, ax=ax[0], frameon=False, spot_size=spot_size, legend_loc=None)\n_sc_0[0].set_title('Slide-seqV2', size=title_size)\n\n_sc_1 = sc.pl.spatial(adata[adata.obs['batch_name'] == 'Stereo-seq_MoB'], img_key=None, color=['leiden'], title=['Stereo-seq'],\n                      legend_fontsize=10, show=False, ax=ax[1], frameon=False, spot_size=spot_size)\n_sc_1[0].set_title('Stereo-seq',size=title_size)\n_sc_1[0].invert_yaxis()\nplt.show()"
+  }
+]

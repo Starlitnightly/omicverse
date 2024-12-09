@@ -1,0 +1,78 @@
+[
+  {
+    "action": "Import the omicverse library and read scRNA-seq and scATAC-seq data from specified files.",
+    "code": "import omicverse as ov\nrna=ov.utils.read('data/sample/rna_p_n_raw.h5ad')\natac=ov.utils.read('data/sample/atac_p_n_raw.h5ad')"
+  },
+  {
+    "action": "Display the loaded scRNA-seq and scATAC-seq data.",
+    "code": "rna,atac"
+  },
+  {
+    "action": "Create a MOFA model using the omicverse library, incorporating both scRNA-seq and scATAC-seq data, and assigning names to each omics type.",
+    "code": "test_mofa=ov.single.pyMOFA(omics=[rna,atac],\n                             omics_name=['RNA','ATAC'])"
+  },
+  {
+    "action": "Preprocess the MOFA model and run it, saving the output to a specified HDF5 file.",
+    "code": "test_mofa.mofa_preprocess()\ntest_mofa.mofa_run(outfile='models/brac_rna_atac.hdf5')"
+  },
+  {
+    "action": "Import the omicverse library and set plotting parameters using `ov_plot_set()`.",
+    "code": "import omicverse as ov\nov.utils.ov_plot_set()"
+  },
+  {
+    "action": "Read scRNA-seq data from a specified file.",
+    "code": "rna=ov.utils.read('data/sample/rna_test.h5ad')"
+  },
+  {
+    "action": "Extract factor values from a pre-computed MOFA model (stored in an HDF5 file) and add them to the scRNA-seq AnnData object.",
+    "code": "rna=ov.single.factor_exact(rna,hdf5_path='data/sample/MOFA_POS.hdf5')\nrna"
+  },
+  {
+    "action": "Calculate and display the correlation between factors and cell types in the scRNA-seq data.",
+    "code": "ov.single.factor_correlation(adata=rna,cluster='cell_type',factor_list=[1,2,3,4,5])"
+  },
+  {
+    "action": "Retrieve and display the gene/feature weights for a specific factor and view from the MOFA model.",
+    "code": "ov.single.get_weights(hdf5_path='data/sample/MOFA_POS.hdf5',view='RNA',factor=1)"
+  },
+  {
+    "action": "Initialize a MOFA visualization object using a pre-computed MOFA model from a specified HDF5 file.",
+    "code": "pymofa_obj=ov.single.pyMOFAART(model_path='data/sample/MOFA_POS.hdf5')"
+  },
+  {
+    "action": "Extract the factor values for each cell in the scRNA-seq data using the MOFA visualization object.",
+    "code": "pymofa_obj.get_factors(rna)\nrna"
+  },
+  {
+    "action": "Plot the variance explained (R-squared) for each factor in each view of the MOFA model.",
+    "code": "pymofa_obj.plot_r2()"
+  },
+  {
+    "action": "Retrieve and display the R-squared values for each factor in each view.",
+    "code": "pymofa_obj.get_r2()"
+  },
+  {
+    "action": "Plot the correlation between factors and cell types using the MOFA visualization object.",
+    "code": "pymofa_obj.plot_cor(rna,'cell_type')"
+  },
+  {
+    "action": "Plot the values of two specified factors against each other, colored by a specific cell type ('Epi').",
+    "code": "pymofa_obj.plot_factor(rna,'cell_type','Epi',figsize=(3,3),\n                    factor1=6,factor2=10,)"
+  },
+  {
+    "action": "Calculate and visualize UMAP embeddings of the scRNA-seq data, colored by 'factor6' and 'cell_type'.",
+    "code": "import scanpy as sc\nsc.pp.neighbors(rna)\nsc.tl.umap(rna)\nsc.pl.embedding(\n    rna,\n    basis=\"X_umap\",\n    color=[\"factor6\",\"cell_type\"],\n    frameon=False,\n    ncols=2,\n    #palette=ov.utils.pyomic_palette(),\n    show=False,\n    cmap='Greens',\n    vmin=0,\n)\n#plt.savefig(\"figures/umap_factor6.png\",dpi=300,bbox_inches = 'tight')"
+  },
+  {
+    "action": "Plot the weights of genes/features for two specified factors in a scatter plot, highlighting the top weighted genes.",
+    "code": "pymofa_obj.plot_weight_gene_d1(view='RNA',factor1=6,factor2=10,)"
+  },
+  {
+    "action": "Plot the weights of genes/features for a specific factor, ordered by weight and colored.",
+    "code": "pymofa_obj.plot_weights(view='RNA',factor=6,color='#5de25d',\n                        ascending=True)"
+  },
+  {
+    "action": "Plot a heatmap showing the top weighted features for each factor in a specific view ('RNA').",
+    "code": "pymofa_obj.plot_top_feature_heatmap(view='RNA')"
+  }
+]
