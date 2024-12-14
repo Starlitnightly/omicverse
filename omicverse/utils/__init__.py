@@ -37,3 +37,4 @@ from ._roe import roe
 from ._paga import cal_paga,plot_paga
 from ._cluster import cluster,LDA_topic,filtered,refine_label
 from ._venn import venny4py
+from ._lsi import *
