@@ -1,0 +1,102 @@
+2024-12-13 08:07:11,111 - INFO - Successfully loaded KBI data from /Users/kq_m3m/PycharmProjects/OVMaster/ovrawmjson/KBI.json
+2024-12-13 08:07:11,112 - ERROR - Unexpected error in create_kbi_vectorstore: Could not import gpt4all library. Please install the gpt4all library to use this embedding model: pip install gpt4all
+2024-12-13 08:08:02,732 - INFO - Successfully loaded KBI data from /Users/kq_m3m/PycharmProjects/OVMaster/ovrawmjson/KBI.json
+2024-12-13 08:08:08,739 - INFO - Created vector store with 43 chunks
+2024-12-13 08:18:51,414 - INFO - Successfully loaded KBI data from /Users/kq_m3m/PycharmProjects/OVMaster/ovrawmjson/KBI.json
+2024-12-13 08:18:53,679 - INFO - Created vector store with 43 chunks
+2024-12-13 08:19:16,427 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:19:16,427 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:19:16,428 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:19:19,364 - INFO - Found relevant files: ['t_visualize_colorsystem.json', 't_anno_trans.json']
+2024-12-13 08:19:19,367 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:19:19,367 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:19:20,865 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:19:20,865 - INFO - Generating answer...
+2024-12-13 08:20:17,143 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:20:17,143 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:20:17,143 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:20:17,557 - INFO - Found relevant files: ['t_preprocess_cpu.json', 't_single_batch.json']
+2024-12-13 08:20:17,560 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:20:17,560 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:20:18,978 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:20:18,979 - INFO - Generating answer...
+2024-12-13 08:21:30,294 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:21:30,294 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:21:30,294 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:21:30,566 - INFO - Found relevant files: ['t_preprocess.json']
+2024-12-13 08:21:30,568 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:21:30,568 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:21:32,685 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:21:32,685 - INFO - Generating answer...
+2024-12-13 08:21:48,099 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:21:48,099 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:21:48,099 - INFO - Cache hit for query: how to use mRNA analysis step by step
+2024-12-13 08:21:48,103 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:21:48,103 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:21:49,556 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:21:49,556 - INFO - Generating answer...
+2024-12-13 08:22:06,733 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:06,733 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:06,733 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:22:07,104 - INFO - Found relevant files: ['t_preprocess_cpu.json', 't_scdeg.json']
+2024-12-13 08:22:07,106 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:07,106 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:08,522 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:22:08,523 - INFO - Generating answer...
+2024-12-13 08:22:30,574 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:30,574 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:30,575 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:22:30,949 - INFO - Found relevant files: ['t_preprocess_cpu.json', 't_preprocess.csv', 't_preprocess.json']
+2024-12-13 08:22:30,952 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:30,952 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:30,952 - ERROR - Error processing query: File t_preprocess.csv not found
+2024-12-13 08:22:41,967 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:41,967 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:41,968 - INFO - Cache hit for query:  mRNA analysis step by step using omicverse
+2024-12-13 08:22:41,972 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:41,972 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:41,973 - ERROR - Error processing query: File t_preprocess.csv not found
+2024-12-13 08:22:50,765 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:50,765 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:50,766 - INFO - Cache hit for query:  mRNA analysis step by step using omicverse
+2024-12-13 08:22:50,771 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:22:50,771 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:22:50,772 - ERROR - Error processing query: File t_preprocess.csv not found
+2024-12-13 08:23:10,819 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:23:10,819 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:23:10,820 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 08:23:11,095 - INFO - Found relevant files: ['t_preprocess.json', 't_preprocess_cpu.json']
+2024-12-13 08:23:11,097 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 08:23:11,097 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 08:23:12,697 - INFO - Using model qwen2.5-coder:7b for query processing
+2024-12-13 08:23:12,697 - INFO - Generating answer...
+2024-12-13 23:51:37,735 - ERROR - Unexpected error in create_kbi_vectorstore: expected str, bytes or os.PathLike object, not NoneType
+2024-12-13 23:59:01,671 - INFO - Created vector store for Converted_Jsons with 464 chunks.
+2024-12-13 23:59:23,964 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-13 23:59:23,964 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-13 23:59:23,964 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-13 23:59:23,968 - ERROR - Error in find_relevant_file: 1 validation error for StuffDocumentsChain
+  Value error, document_variable_name context was not found in llm_chain input_variables: ['question'] [type=value_error, input_value={'llm_chain': LLMChain(ve...None, 'callbacks': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/value_error
+2024-12-14 00:03:54,470 - INFO - Created vector store for Converted_Jsons with 464 chunks.
+2024-12-14 00:04:11,030 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-14 00:04:11,030 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-14 00:04:11,030 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-14 00:04:11,033 - ERROR - Error in find_relevant_file: Missing some input keys: {'query'}
+2024-12-14 00:06:57,291 - INFO - Created vector store for Converted_Jsons with 464 chunks.
+2024-12-14 00:07:22,908 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-14 00:07:22,908 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-14 00:07:22,908 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-14 00:07:22,934 - ERROR - Error in find_relevant_file: Missing some input keys: {'query'}
+2024-12-14 00:11:37,283 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-14 00:11:37,284 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-14 00:11:37,284 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-14 00:11:37,307 - ERROR - Error in find_relevant_file: Missing some input keys: {'query'}
+2024-12-14 00:13:52,468 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-14 00:13:52,468 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-14 00:13:52,469 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-14 00:13:52,491 - ERROR - Error in find_relevant_file: Missing some input keys: {'query'}
+2024-12-14 00:17:54,769 - INFO - Available models: ['qwen2.5-coder:7b', 'llama2:latest', 'llama3.2:3b', 'bge-large:latest', 'qwen2.5-coder:3b', 'llama2:7b', 'llama3.2:latest', 'llama3.1:latest']
+2024-12-14 00:17:54,769 - INFO - Required models: ['qwen2.5-coder:3b', 'qwen2.5-coder:7b']
+2024-12-14 00:17:54,769 - INFO - Using model qwen2.5-coder:3b for file selection
+2024-12-14 00:17:54,791 - ERROR - Error in find_relevant_file: Missing some input keys: {'query'}

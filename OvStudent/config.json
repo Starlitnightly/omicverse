@@ -1,0 +1,7 @@
+{
+  "file_selection_model": "qwen2.5-coder:7b",
+  "query_processing_model": "gemini-2.0-flash-exp",
+  "rate_limit": 5,
+  "converted_jsons_directory": "/Users/kq_m3m/PycharmProjects/OVMaster/Converted_Jsons",
+  "annotated_scripts_directory": "/Users/kq_m3m/PycharmProjects/OVMaster/Converted_Scripts_Annotated"
+}
