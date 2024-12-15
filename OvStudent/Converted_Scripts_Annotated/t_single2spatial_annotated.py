@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  Import the scanpy library for single-cell analysis. -- import scanpy as sc
 # Line 2:  Import the pandas library for data manipulation. -- import pandas as pd
 # Line 3:  Import the numpy library for numerical operations. -- import numpy as np
