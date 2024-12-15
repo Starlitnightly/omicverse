@@ -1,4 +1,4 @@
-# Welcome to Omicverse’s documentation!
+# Welcome to Omicverse✨’s documentation!
 
 ![omicverse-light](img/omicverse.png#gh-light-mode-only)
 ![omicverse-dark](img/omicverse_dark.png#gh-dark-mode-only)
@@ -8,7 +8,7 @@
 
 ![Image title](img/logo.png){ align=right width=300 }
 
-Omicverse is the fundamental package for multi omics included bulk and single cell RNA-seq analysis with Python.
+Omicverse is the fundamental package for multi omics included **bulk**, **single cell** and **spatial** RNA-seq analysis with Python.
 
 To get started with `omicverse`, check out the [Installation](Installation_guild) and [Tutorials](Tutorial).
 
