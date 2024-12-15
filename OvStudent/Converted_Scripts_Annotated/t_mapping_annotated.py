@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Imports the omicverse library and assigns it the alias ov. -- import omicverse as ov
 # Line 3: Imports the scanpy library and assigns it the alias sc. -- import scanpy as sc
 # Line 5: Sets the plotting parameters for omicverse. -- ov.utils.ov_plot_set()
