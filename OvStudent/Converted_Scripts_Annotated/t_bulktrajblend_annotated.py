@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  Import the omicverse library as ov -- import omicverse as ov
 # Line 2:  Import the mde function from omicverse.utils -- from omicverse.utils import mde
 # Line 3:  Import the scanpy library as sc -- import scanpy as sc
