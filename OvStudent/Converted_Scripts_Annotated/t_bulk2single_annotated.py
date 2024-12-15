@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Import the scanpy library for single-cell analysis -- import scanpy as sc
 # Line 2: Import the omicverse library for omics data analysis -- import omicverse as ov
 # Line 3: Import the matplotlib plotting library -- import matplotlib.pyplot as plt
