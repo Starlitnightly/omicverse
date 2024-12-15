@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: import os -- import os
 # Line 3: import scanpy as sc -- import scanpy as sc
 # Line 4: import omicverse as ov -- import omicverse as ov
