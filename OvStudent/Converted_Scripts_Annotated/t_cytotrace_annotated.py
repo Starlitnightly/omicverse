@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  Import the omicverse library as ov. -- import omicverse as ov
 # Line 2: Apply default plotting settings from omicverse. -- ov.plot_set()
 # Line 4: Import the scvelo library as scv. -- import scvelo as scv
