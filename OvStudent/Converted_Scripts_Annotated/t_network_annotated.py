@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Import the omicverse library as ov. -- import omicverse as ov
 # Line 2: Set plot settings for omicverse. -- ov.utils.ov_plot_set()
 # Line 4: Create a list of gene names. -- gene_list=['FAA4','POX1','FAT1','FAS2','FAS1','FAA1','OLE1','YJU3','TGL3','INA1','TGL5']
