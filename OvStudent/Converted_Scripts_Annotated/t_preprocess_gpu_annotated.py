@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  import omicverse as ov -- import omicverse as ov
 # Line 2:  import scanpy as sc -- import scanpy as sc
 # Line 3:  ov.plot_set() -- ov.plot_set()
