@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: import omicverse as ov -- import omicverse as ov
 # Line 2: rna=ov.utils.read('data/sample/rna_p_n_raw.h5ad') -- rna=ov.utils.read('data/sample/rna_p_n_raw.h5ad')
 # Line 3: atac=ov.utils.read('data/sample/atac_p_n_raw.h5ad') -- atac=ov.utils.read('data/sample/atac_p_n_raw.h5ad')
