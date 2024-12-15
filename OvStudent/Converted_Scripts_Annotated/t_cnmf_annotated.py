@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  Import the scanpy library for single-cell analysis -- import scanpy as sc
 # Line 2:  Import the omicverse library, likely for multi-omics analysis and visualization -- import omicverse as ov
 # Line 3:  Set plotting style using omicverse's plot_set function -- ov.plot_set()
