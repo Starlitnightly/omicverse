@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Imports the omicverse library as ov -- import omicverse as ov
 # Line 2: Imports the anndata library -- import anndata
 # Line 3: Imports the scanpy library as sc -- import scanpy as sc
