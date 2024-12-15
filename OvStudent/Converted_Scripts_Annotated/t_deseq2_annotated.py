@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Imports the omicverse library as ov. -- import omicverse as ov
 # Line 2: Sets the plotting style for omicverse. -- ov.utils.ov_plot_set()
 # Line 3: Reads data from a URL into a pandas DataFrame, using the first column as the index and the second row as the header. -- data=ov.utils.read('https://raw.githubusercontent.com/Starlitnightly/Pyomic/master/sample/counts.txt',index_col=0,header=1)
