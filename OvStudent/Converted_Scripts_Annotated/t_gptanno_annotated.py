@@ -1,4 +1,4 @@
-```python
+```
 # Line 1:  -- import omicverse as ov
 # Line 1: Imports the omicverse library and assigns it the alias 'ov'.
 # Line 2:  -- print(f'omicverse version:{ov.__version__}')
