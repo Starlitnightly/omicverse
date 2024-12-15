@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Import the omicverse library. -- import omicverse as ov
 # Line 2: Set the plotting parameters for omicverse. -- ov.utils.ov_plot_set()
 # Line 4: Read RNA data from an h5ad file. -- rna=ov.utils.read("chen_rna-emb.h5ad")
