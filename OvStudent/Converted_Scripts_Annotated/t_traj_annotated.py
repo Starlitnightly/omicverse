@@ -1,4 +1,4 @@
-```python
+```
 # Line 1: Import the scanpy library for single-cell data analysis. -- import scanpy as sc
 # Line 2: Import the scvelo library for RNA velocity analysis. -- import scvelo as scv
 # Line 3: Import matplotlib's pyplot for plotting. -- import matplotlib.pyplot as plt
