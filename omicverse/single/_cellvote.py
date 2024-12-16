@@ -74,7 +74,7 @@ class CellVote(object):
                               species=species, organization=organization,
                              model=model,base_url=base_url,provider=provider)
         adata.obs[result_key] = adata.obs['best_clusters'].map(result).astype('category')
-        adata.obs[result_key]=[i.capitalize() for i in adata.obs['best_celltype'].tolist()]
+        adata.obs[result_key]=[i.capitalize() for i in adata.obs[result_key].tolist()]
         return result
 
 

@@ -94,14 +94,12 @@ spring_festival = {
 }
 
 today = datetime.now()
+chinese_new_year = spring_festival[today.year]
 if today.month == 12 and (today.day == 25 or today.day == 24):
     # december 12.25 or 12.24 (christmas)
     print(days_christmas)
-# Check for Chinese New Year (3 days after and 1 day before)
-elif today.year in spring_festival:
-    chinese_new_year = spring_festival[today.year]
-    if chinese_new_year - timedelta(days=1) <= today <= chinese_new_year + timedelta(days=3):
-        print(days_chinese_new_year)
+elif (today.year in spring_festival) and (chinese_new_year - timedelta(days=1) <= today <= chinese_new_year + timedelta(days=3)):
+    print(days_chinese_new_year)
 else:
     print(omics)
 
