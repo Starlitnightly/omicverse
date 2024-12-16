@@ -516,8 +516,10 @@ Support Raw Windows platform
 
 - Added `MultiMap` module to integrate multi species
 - Added `CellVote` to vote the best cells
+- Added `CellANOVA` to integrate samples and correct the batch effect
 
 ### Space Module
 
 - Added `ov.space.cluster` to identify the spatial domain
 - Added `Binary` for spatial cluster
+- Added `Spateo` to calculate the SVG
