@@ -517,6 +517,7 @@ Support Raw Windows platform
 - Added `MultiMap` module to integrate multi species
 - Added `CellVote` to vote the best cells
 - Added `CellANOVA` to integrate samples and correct the batch effect
+- Added `StaVia` to calculate the pseudotime and infer trajectory.
 
 ### Space Module
 
