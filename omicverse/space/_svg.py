@@ -2,7 +2,7 @@ import scanpy as sc
 from ..externel.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
 
 def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
-        mt_startwith='MT-'):
+        mt_startwith='MT-',**kwargs):
     """
     Find the spatial variable genes.
     """
@@ -28,7 +28,29 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         adata = feature_selection(adata, 
                                   by = mode, n_top_genes = n_svgs)
         #print(f'{n_svgs} SVGs are selected!')
+    elif mode=='pearsonr':
+        from ..pp import preprocess
+        adata=preprocess(adata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
+        adata.var['space_variable_features']=adata.var['highly_variable_features']
+        #adata.raw = adata
+        #adata = adata[:, adata.var.highly_variable_features]
+    elif mode=='spateo':
+        import spateo as st
+        adata=preprocess(adata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
+        e16_w, _ = st.svg.cal_wass_dis_bs(adata, **kwargs)
+        # Add positive rate before smoothing for each gene
+        st.svg.add_pos_ratio_to_adata(adata, layer='counts')
+        e16_w['pos_ratio_raw'] = adata.var['pos_ratio_raw']
+        # We obtain 529 significant SVGs
+        sig_df = e16_w[(e16_w['log2fc']>=1) & (e16_w['rank_p']<=0.05) & (e16_w['pos_ratio_raw']>=0.05) & (e16_w['adj_pvalue']<=0.05)]
+        adata.var['space_variable_features'] = False
+        adata.var.loc[sig_df.index, 'space_variable_features'] = True
+        print(f'{len(sig_df)} SVGs are selected!')
+        print('In mode of spateo, the SVGs are selected based on the spatial expression pattern.')
+
     else:
         raise ValueError(f"mode {mode} is not supported")
+    
+    adata.var['highly_variable'] = adata.var['space_variable_features']
     return adata
     # End-of-file (EOF)
