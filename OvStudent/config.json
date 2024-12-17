@@ -1,7 +1,7 @@
 {
-  "file_selection_model": "qwen2.5-coder:7b",
-  "query_processing_model": "gemini-2.0-flash-exp",
+  "file_selection_model": "qwen2.5-coder:3b",
+  "query_processing_model": "qwen2.5-coder:7b",
   "rate_limit": 5,
-  "converted_jsons_directory": "/Users/kq_m3m/PycharmProjects/OVMaster/Converted_Jsons",
-  "annotated_scripts_directory": "/Users/kq_m3m/PycharmProjects/OVMaster/Converted_Scripts_Annotated"
+  "converted_jsons_directory": "/Users/fernandozeng/Desktop/analysis/OV_Agent/Converted_Jsons",
+  "annotated_scripts_directory": "/Users/fernandozeng/Desktop/analysis/OV_Agent/Converted_Scripts_Annotated"
 }
