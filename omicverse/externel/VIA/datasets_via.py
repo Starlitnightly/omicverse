@@ -1,7 +1,7 @@
 import pandas as pd
 import scanpy as sc
 from scanpy import read
-import wget
+
 
 import os
 from scipy.io import loadmat
@@ -91,7 +91,7 @@ def toy_multifurcating(foldername="./"):
     # read files as pandas objects
     data_path = foldername + "toy_multifurcating_M8_n1000d1000.csv"
     ids_path = foldername + "toy_multifurcating_M8_n1000d1000_ids_with_truetime.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_multifurcating_M8_n1000d1000.csv"
         wget.download(data_url, data_path)
@@ -133,7 +133,7 @@ def toy_disconnected(foldername="./"):
     # read files as pandas objects
     data_path = foldername + "toy_disconnected_M9_n1000d1000.csv"
     ids_path = foldername + "toy_disconnected_M9_n1000d1000_ids_with_truetime.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/toy_disconnected_M9_n1000d1000.csv"
         wget.download(data_url, data_path)
@@ -165,7 +165,7 @@ def cell_cycle_cyto_data(foldername="./"):
 
     :return: anndata
     '''
-
+    import wget
     data_path = foldername + "cell_cycle_cyto.h5ad"
     if not os.path.isfile(data_path):
         ids_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/cell_cycle_cyto.h5ad"
@@ -192,7 +192,7 @@ def scRNA_hematopoiesis(foldername="./"):
     # read files as pandas objects
     data_path = foldername + "human_cd34_bm_rep1.h5ad"
     ids_path = foldername + "Nover_Cor_PredFine_notLogNorm.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://docs.google.com/uc?id=1ZSZbMeTQQPfPBGcnfUNDNL4om98UiNcO"
         gdown.download(data_url, data_path, quiet=False)
@@ -243,7 +243,7 @@ def scATAC_hematopoiesis(foldername="./"):
     """
     # read files as pandas objects
     data_path = foldername + "scATAC_hemato_Buenrostro.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/scATAC_hemato_Buenrostro.csv"
         wget.download(data_url, data_path)
@@ -290,7 +290,7 @@ def cell_cycle(foldername="./"):
     # read files as pandas objects
     data_path = foldername + "mcf7_38features.csv"
     ids_path = foldername + "mcf7_phases.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://raw.githubusercontent.com/ShobiStassen/VIA/master/Datasets/mcf7_38features.csv"
         wget.download(data_url, data_path)
@@ -325,7 +325,7 @@ def embryoid_body(foldername="./"):
     # read files as pandas objects
     data_path = foldername + "EBdata.mat"
     emb_path = foldername + "EB_phate_embedding.csv"
-
+    import wget
     if not os.path.isfile(data_path):
         data_url = "https://docs.google.com/uc?id=1yz3zR1KAmghjYB_nLLUZoIlKN9Ew4RHf"
         gdown.download(data_url, data_path, quiet=False)
