@@ -4,7 +4,7 @@ import sklearn.neighbors
 import scipy.sparse as sp
 import seaborn as sns
 import matplotlib.pyplot as plt
-import ot
+
 import scanpy as sc
 import torch
 from torch_geometric.data import Data
@@ -98,6 +98,7 @@ def Refine_label(adata, radius=30, key='label'):
     old_type = adata.obs[key].values
     
     #calculate distance
+    import ot
     position = adata.obsm['spatial']
     distance = ot.dist(position, position, metric='euclidean')
            
