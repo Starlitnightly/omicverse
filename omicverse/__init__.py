@@ -106,3 +106,20 @@ else:
 print(f'Version: {__version__}, Tutorials: https://omicverse.readthedocs.io/')
 
 from ._settings import settings
+
+
+# 导入 matplotlib.pyplot
+import matplotlib.pyplot as plt
+
+# 将 plt 作为 omicverse 的一个属性
+plt = plt  # 注意：确保没有其他变量名冲突
+
+import numpy as np
+
+np = np  # 注意：确保没有其他变量名冲突
+
+# 导入 pandas
+import pandas as pd
+
+# 将 pd 作为 omicverse 的一个属性
+pd = pd  # 注意：确保没有其他变量名冲突

@@ -8,7 +8,6 @@ import seaborn as sns
 from ._aucell import derive_auc_threshold,create_rankings,aucell
 #from ctxcore.recovery import enrichment4cells,aucs
 #from ctxcore.genesig import GeneSignature
-from ..utils import plot_text_set
 
 ctxcore_install=False
 
@@ -83,6 +82,61 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
         adata.obs['{}_aucell'.format(geneset_name)]=aucs(rnk,
             len(df_rnk.columns),weights,auc_threshold
             )
+        
+def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
+    """
+    Calculate the AUC-ell score for a given gene set.
+
+    Arguments:
+        adata: AnnData object
+            Annotated data matrix containing gene expression data.
+        geneset_name: str
+            Name of the gene set.
+        geneset: list of str
+            List of gene symbols for the gene set.
+        AUC_threshold: float, optional
+            AUC threshold used to determine significant interactions (default is 0.01).
+        seed: int, optional
+            Seed used to initialize the random number generator (default is 42).
+        chunk_size: int, optional
+            The number of cells to process in each chunk (default is 10000).
+
+    Returns:
+        None
+           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    """
+
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install == True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
+    matrix = adata.to_df()
+    percentiles = derive_auc_threshold(matrix)
+    auc_threshold = percentiles[AUC_threshold]
+
+    n_cells = matrix.shape[0]
+    auc_results = np.zeros(n_cells, dtype=np.float64)
+
+    for start in range(0, n_cells, chunk_size):
+        end = min(start + chunk_size, n_cells)
+        chunk = matrix.iloc[start:end]
+        df_rnk = create_rankings(chunk, seed)
+        rnk = df_rnk.iloc[:, df_rnk.columns.isin(geneset)]
+
+        if rnk.empty or (float(len(rnk.columns)) / float(len(geneset))) < 0.80:
+            print(
+                f"Less than 80% of the genes in {geneset_name} are present in the "
+                "expression matrix."
+            )
+        else:
+            weights = np.array([1 for _ in geneset])
+            auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
+
+    adata.obs[f'{geneset_name}_aucell'] = auc_results
     
 def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42):
     """
@@ -134,6 +188,64 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
                 len(df_rnk.columns),weights,auc_threshold
                 )
             
+def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
+    """
+    Calculates the area under the curve (AUC) for a set of pathways in an AnnData object.
+
+    Arguments:
+        adata: AnnData object
+            AnnData object containing the data.
+        pathway_names: list of str
+            Names of the pathways to analyze.
+        pathways_dict: dict
+            Dictionary containing the gene sets for each pathway.
+        AUC_threshold: float, optional (default: 0.01)
+            AUC threshold to use for determining significant gene-pathway associations.
+        seed: int, optional (default: 42)
+            Random seed for reproducibility.
+        chunk_size: int, optional (default: 10000)
+            The number of cells to process in each chunk.
+
+    Returns:
+        None
+            The function modifies the `adata.obs` attribute of the input AnnData object.
+    """
+
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install == True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
+    matrix = adata.to_df()
+    percentiles = derive_auc_threshold(matrix)
+    auc_threshold = percentiles[AUC_threshold]
+    
+    n_cells = matrix.shape[0]
+    
+    for pathway_name in pathway_names:
+        pathway_genes = pathways_dict[pathway_name]
+        auc_results = np.zeros(n_cells, dtype=np.float64)
+        
+        for start in range(0, n_cells, chunk_size):
+            end = min(start + chunk_size, n_cells)
+            chunk = matrix.iloc[start:end]
+            df_rnk = create_rankings(chunk, seed)
+            
+            rnk = df_rnk.iloc[:, df_rnk.columns.isin(pathway_genes)]
+            if rnk.empty or (float(len(rnk.columns)) / float(len(pathway_genes))) < 0.80:
+                print(
+                    f"Less than 80% of the genes in {pathway_name} are present in the "
+                    "expression matrix."
+                )
+            else:
+                weights = np.array([1 for _ in pathway_genes])
+                auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
+
+        adata.obs[f'{pathway_name}_aucell'] = auc_results
+            
 def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1):
     """
     Enriches cell annotations with pathway activity scores using the AUC-ell method.
@@ -173,6 +285,61 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
 
     aucs_mtx = aucell(matrix, signatures=test_gmt, auc_threshold=auc_threshold, num_workers=num_workers)
     adata_aucs=anndata.AnnData(aucs_mtx)
+    return adata_aucs
+
+def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed=42, 
+                              num_workers=1, chunk_size=10000):
+    """
+    Enriches cell annotations with pathway activity scores using the AUC-ell method.
+
+    Arguments:
+        adata: AnnData object
+            AnnData object containing the expression matrix.
+        pathways_dict: dict
+            A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
+        AUC_threshold: float, optional
+            The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. The default is 0.01.
+        seed: int, optional
+            The seed to use for the random number generator. The default is 42.
+        num_workers: int, optional
+            The number of workers to use for parallel processing. The default is 1.
+        chunk_size: int, optional
+            The number of cells to process in each chunk. The default is 10000.
+
+    Returns:
+        adata_aucs: AnnData object
+            AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+    """
+    from tqdm import tqdm
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install == True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+        
+    test_gmt = []
+    for i in pathways_dict.keys():
+        test_gmt.append(GeneSignature(name=i, gene2weight=dict(zip(pathways_dict[i], [1 for _ in pathways_dict[i]]))))
+
+    matrix = adata.to_df()
+    percentiles = derive_auc_threshold(matrix)
+    auc_threshold = percentiles[AUC_threshold]
+
+    # Process in chunks
+    aucs_mtx_list = []
+    n_cells = matrix.shape[0]
+    for start in tqdm(range(0, n_cells, chunk_size)):
+        end = min(start + chunk_size, n_cells)
+        chunk = matrix.iloc[start:end]
+        aucs_chunk = aucell(chunk, signatures=test_gmt, auc_threshold=auc_threshold, num_workers=num_workers)
+        aucs_mtx_list.append(aucs_chunk)
+
+    # Concatenate the results
+    aucs_mtx = pd.concat(aucs_mtx_list)
+
+    adata_aucs = anndata.AnnData(aucs_mtx)
     return adata_aucs
 
 
