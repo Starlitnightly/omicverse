@@ -524,3 +524,9 @@ Support Raw Windows platform
 - Added `ov.space.cluster` to identify the spatial domain
 - Added `Binary` for spatial cluster
 - Added `Spateo` to calculate the SVG
+
+## v 1.7.0
+
+### Single Module
+- Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
+- Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
