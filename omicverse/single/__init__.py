@@ -11,7 +11,9 @@ from ._cpdb import (cpdb_network_cal,cpdb_plot_network,
                     cpdb_plot_interaction,
                     cpdb_interaction_filtered,
                     cpdb_submeans_exacted,cpdb_exact_target,cpdb_exact_source)
-from ._scgsea import geneset_aucell,pathway_aucell,pathway_aucell_enrichment,pathway_enrichment,pathway_enrichment_plot
+from ._scgsea import (geneset_aucell,pathway_aucell,pathway_aucell_enrichment,
+                      geneset_aucell_tmp,pathway_aucell_tmp,pathway_aucell_enrichment_tmp,
+                      pathway_enrichment,pathway_enrichment_plot,)
 from ._via import pyVIA,scRNA_hematopoiesis
 from ._simba import pySIMBA
 from ._tosica import pyTOSICA

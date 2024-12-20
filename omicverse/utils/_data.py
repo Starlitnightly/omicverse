@@ -194,7 +194,68 @@ def download_tosica_gmt():
         model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
     print('......TOSICA gmt dataset download finished!')
 
-def geneset_prepare(geneset_path,organism='Human'):
+def geneset_prepare(geneset_path,organism='Human',):
+    r"""load geneset
+
+    Parameters
+    ----------
+    - geneset_path: `str`
+        Path of geneset file.
+    - organism: `str`
+        Organism of geneset file. Default: 'Human'
+
+    Returns
+    -------
+    - go_bio_dict: `dict`
+        A dictionary of geneset.
+    """
+    result_dict = {}
+    file_path=geneset_path
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for idx,line in enumerate(file):
+            line = line.strip()
+            if not line:
+                continue
+
+            # 自动检测第一个分隔符
+            if idx==0:
+                first_delimiter=None
+                delimiters = ['\t\t',',', '\t', ';', ' ',]
+                for delimiter in delimiters:
+                    if delimiter in line:
+                        first_delimiter = delimiter
+                        break
+            
+            if first_delimiter is None:
+                # 如果找不到分隔符，跳过这行
+                continue
+            
+            # 使用第一个分隔符分割行
+            parts = line.split(first_delimiter, 1)
+            if len(parts) != 2:
+                continue
+            
+            key = parts[0].strip()
+            # 使用剩余部分的第一个字符作为分隔符来分割
+            value = parts[1].strip().split()
+
+            # 将键值对添加到字典中
+            result_dict[key] = value
+    go_bio_dict=result_dict
+
+    if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
+        for key in go_bio_dict:
+            go_bio_dict[key]=[i.lower().capitalize() for i in go_bio_dict[key]]
+    elif (organism == 'Human') or (organism == 'human') or (organism == 'hs'):
+        for key in go_bio_dict:
+            go_bio_dict[key]=[i.upper() for i in go_bio_dict[key]]
+    else:
+        for key in go_bio_dict:
+            go_bio_dict[key]=[i for i in go_bio_dict[key]]
+
+    return go_bio_dict
+
+def geneset_prepare_old(geneset_path,organism='Human'):
     r"""load geneset
 
     Parameters

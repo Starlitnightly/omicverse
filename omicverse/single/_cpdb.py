@@ -336,3 +336,38 @@ def cpdb_exact_source(means,source_cells):
     #print(t_dict)
     source_sub=means[means.columns[:10].tolist()+t_dict]
     return source_sub
+
+
+from tqdm import tqdm
+def cpdb2cellchat(df):
+    new_columns = ['source', 'target', 'ligand', 'receptor', 'prob', 'pval', 'interaction_name', 'interaction_name_2', 'pathway_name', 'annotation', 'evidence']
+    new_df = pd.DataFrame(columns=new_columns)
+    
+    # 遍历每一行和细胞对列
+    for index, row in tqdm(df.iterrows()):
+        for col in df.columns[14:]:  # 假设从第14列开始是细胞对
+            if pd.notna(row[col]):
+                source, target = col.split('|')  # 通过 '|' 分割 source 和 target
+                if pd.notna(row['gene_a']) and pd.notna(row['gene_b']):
+                    interaction_name=row['interacting_pair'].split('_')
+                    if len(interaction_name)>2:
+                        interaction_name_2=row['interacting_pair'].split('_')[0]+' - ('+'+'.join(row['interacting_pair'].split('_')[1:])+')'
+                    else:
+                        interaction_name_2=row['interacting_pair'].split('_')[0]+' - '+'+'.join(row['interacting_pair'].split('_')[1:])
+                    new_row = {
+                        'source': source,
+                        'target': target,
+                        'ligand': row['gene_a'],
+                        'receptor': row['gene_b'],
+                        'prob': row['rank'],  # 假设 rank 是概率
+                        'pval': 0,
+                        'interaction_name': row['interacting_pair'],
+                        'interaction_name_2': interaction_name_2,  # 假设相同
+                        'pathway_name': row['classification'],
+                        'annotation': row['annotation_strategy'],
+                        'evidence': 'curated'  # 假设证据为 curated
+                    }
+                    new_df = new_df.append(new_row, ignore_index=True)
+    
+    # 显示新的 DataFrame
+    return new_df
