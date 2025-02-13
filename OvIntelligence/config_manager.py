@@ -17,7 +17,7 @@ class ConfigManager:
                 'file_selection_model': 'qwen2.5-coder:3b',
                 'query_processing_model': 'qwen2.5-coder:7b',
                 'rate_limit': 5,
-                'gemini_api_key': "AIzaSyB1u2OVaHh5jYkZhMZ0fzAV63-Sa14fh-c"
+                'gemini_api_key': "Put-Your-Key"
             }
 
     @staticmethod
