@@ -9,3 +9,6 @@ langchain-core~=0.3.24
 langchain~=0.3.11
 langchain-google-genai~=2.0.7
 sentence-transformers
+gpt4all
+tiktoken
+pyngrok
