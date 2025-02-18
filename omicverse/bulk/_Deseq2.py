@@ -557,84 +557,83 @@ class pyDEG(object):
             self.result=result
             return result
         elif method=='DEseq2':
-            import pydeseq2
-            counts_df=self.data[group1+group2].T
-            clinical_df=pd.DataFrame(index=group1+group2)
-            clinical_df['condition']=['Treatment']*len(group1)+['Control']*len(group2)
+    import pydeseq2
+    counts_df = self.data[group1+group2].T
+    clinical_df = pd.DataFrame(index=group1+group2)
+    clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
 
-            #Determining the version of pydeseq2 smaller than 0.4
-            if pydeseq2.__version__<='0.3.5':
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    clinical=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
-                    ref_level=["condition", "Control"],
-                    # column ("B" vs "A")
-                    refit_cooks=True,
-                    n_cpus=n_cpus,
-                )
-            elif pydeseq2.__version__<='0.4.1':
-                if ad.__version__>'0.10.8':
-                    raise ImportError(
-                            'Please install the 0.10.8 version of anndata: `pip install anndata==0.10.8`.'
-                        )
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    metadata=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
-                    #ref_level=["condition", "Control"],
-                    # column ("B" vs "A")
-                    refit_cooks=True,
-                    n_cpus=n_cpus,
-                )
-            else:
-                from pydeseq2.default_inference import DefaultInference
-                inference = DefaultInference(n_cpus=n_cpus)
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    metadata=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
-                    refit_cooks=True,
-                    inference=inference,
-                )
-
-            
-            dds.fit_size_factors()
-            dds.fit_genewise_dispersions()
-            dds.fit_dispersion_trend()
-            dds.fit_dispersion_prior()
-            print(
-                f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}"
+    # Determine pydeseq2 version and create the DeseqDataSet accordingly
+    if pydeseq2.__version__ <= '0.3.5':
+        dds = DeseqDataSet(
+            counts=counts_df,
+            clinical=clinical_df,
+            design_factors="condition",  # compare samples based on "condition"
+            ref_level=["condition", "Control"],
+            refit_cooks=True,
+            n_cpus=n_cpus,
+        )
+    elif pydeseq2.__version__ <= '0.4.1':
+        if ad.__version__ > '0.10.8':
+            raise ImportError(
+                'Please install the 0.10.8 version of anndata: `pip install anndata==0.10.8`.'
             )
-            dds.fit_MAP_dispersions()
-            dds.fit_LFC()
-            dds.calculate_cooks()
-            if dds.refit_cooks:
-                # Replace outlier counts
-                dds.refit()
-            stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
-            stat_res.run_wald_test()
-            if stat_res.cooks_filter:
-                stat_res._cooks_filtering()
-            if stat_res.independent_filter:
-                stat_res._independent_filtering()
-            else:
-                stat_res._p_value_adjustment()
-            self.stat_res=stat_res
-            stat_res.summary()
-            result=stat_res.results_df
-            result['qvalue']=result['padj']
-            result['-log(pvalue)'] = -np.log10(result['pvalue'])
-            result['-log(qvalue)'] = -np.log10(result['padj'])
-            result['BaseMean']=result['baseMean']
-            result['log2(BaseMean)']=np.log2(result['baseMean']+1)
-            result['log2FC'] = result['log2FoldChange']
-            result['abs(log2FC)'] = abs(result['log2FC'])
-            #result['size']  =np.abs(result['FoldChange'])/10
-            #result=result[result['padj']<alpha]
-            result['sig']='normal'
-            result.loc[result['qvalue']<alpha,'sig']='sig'
-            self.result=result
-            return result
+        dds = DeseqDataSet(
+            counts=counts_df,
+            metadata=clinical_df,
+            design_factors="condition",
+            refit_cooks=True,
+            n_cpus=n_cpus,
+        )
+    else:
+        from pydeseq2.default_inference import DefaultInference
+        inference = DefaultInference(n_cpus=n_cpus)
+        dds = DeseqDataSet(
+            counts=counts_df,
+            metadata=clinical_df,
+            design_factors="condition",
+            refit_cooks=True,
+            inference=inference,
+        )
+
+    dds.fit_size_factors()
+    dds.fit_genewise_dispersions()
+    dds.fit_dispersion_trend()
+    dds.fit_dispersion_prior()
+    print(f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}")
+    dds.fit_MAP_dispersions()
+    dds.fit_LFC()
+    dds.calculate_cooks()
+    if dds.refit_cooks:
+        dds.refit()
+
+    # Add the 'contrast' parameter here:
+    stat_res = DeseqStats(
+        dds,
+        contrast=["condition", "Treatment", "Control"],
+        alpha=alpha,
+        cooks_filter=cooks_filter,
+        independent_filter=independent_filter
+    )
+    stat_res.run_wald_test()
+    if stat_res.cooks_filter:
+        stat_res._cooks_filtering()
+    if stat_res.independent_filter:
+        stat_res._independent_filtering()
+    else:
+        stat_res._p_value_adjustment()
+    self.stat_res = stat_res
+    stat_res.summary()
+    result = stat_res.results_df
+    result['qvalue'] = result['padj']
+    result['-log(pvalue)'] = -np.log10(result['pvalue'])
+    result['-log(qvalue)'] = -np.log10(result['padj'])
+    result['BaseMean'] = result['baseMean']
+    result['log2(BaseMean)'] = np.log2(result['baseMean'] + 1)
+    result['log2FC'] = result['log2FoldChange']
+    result['abs(log2FC)'] = abs(result['log2FC'])
+    result['sig'] = 'normal'
+    result.loc[result['qvalue'] < alpha, 'sig'] = 'sig'
+    self.result = result
+    return result
         else:
             raise ValueError('The method is not supported.')
