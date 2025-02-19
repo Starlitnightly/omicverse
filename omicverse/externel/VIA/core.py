@@ -18,7 +18,7 @@ from collections import Counter
 from typing import Optional, Union
 
 from .plotting_via import *
-from .plotting_via_ov import via_streamplot_ov,plot_trajectory_curves_ov,plot_piechart_viagraph_ov,animate_streamplot_ov,animate_atlas_ov
+from .plotting_via_ov import via_streamplot_ov,plot_trajectory_curves_ov,plot_piechart_viagraph_ov,animate_streamplot_ov,animate_atlas_ov,plot_atlas_view_ov
 from .utils_via import *
 from .utils_via import _construct_knn, sequential_knn
 
@@ -664,11 +664,14 @@ class VIA:
         self.edgebundle_pruning = edgebundle_pruning
         if (root_user is None) & (velocity_matrix is None):
             root_user = []
+            dataset = ''  
+        elif root_user is None: 
+            dataset = ''
+        elif (type(root_user[0]) == str): 
+            dataset = 'group'
+        else: 
             dataset = ''
         self.root_user = root_user
-        if root_user is None:  dataset = ''
-        elif (type(root_user[0]) == str): dataset = 'group'
-        else: dataset = ''
         self.dataset = dataset
         self.knn_struct = None
         if isinstance(labels, list):
