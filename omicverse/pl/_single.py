@@ -1154,3 +1154,148 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
         plt.show()
     
     return ax
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.gridspec as gridspec
+
+def dotplot_doublegroup(adata, gene, group1, group2, cmap='Reds',
+                       standard_scale = 'group',figsize=(6, 4),layer=None):
+    # 检查输入
+    if gene not in adata.var_names:
+        raise ValueError(f"Gene '{gene}' is not in the provided AnnData object.")
+        
+    if group1 not in adata.obs.columns:
+        raise ValueError(f"Group '{group1}' is not in the provided AnnData object.")
+        
+    if group2 not in adata.obs.columns:
+        raise ValueError(f"Group '{group2}' is not in the provided AnnData object.")
+    
+    # 将分组列转换为类别类型
+    adata.obs[group1] = adata.obs[group1].astype('category')
+    adata.obs[group2] = adata.obs[group2].astype('category')
+    group1s = adata.obs[group1].cat.categories
+    group2s = adata.obs[group2].cat.categories
+
+    group_li_exp_mean_pd = pd.DataFrame(np.zeros((len(group1s), len(group2s))), index=group1s, columns=group2s)
+    group_li_exp_size_pd = pd.DataFrame(np.zeros((len(group1s), len(group2s))), index=group1s, columns=group2s)
+
+    for group1_ in group1s:
+        adata1 = adata[adata.obs[group1] == group1_, [gene]]
+        for group2_ in group2s:
+            if layer is None:
+                exp = adata1[adata1.obs[group2] == group2_, [gene]].to_df().values.reshape(-1)
+            elif layer in adata1.layers.keys():
+                exp = adata1[adata1.obs[group2] == group2_, [gene]].layers[layer].to_df().values.reshape(-1)
+            else:
+                raise ValueError(f"Layer '{layer}' is not in the provided AnnData object.")
+            exp_larger_zero = exp[exp > 0]
+            if len(exp) != 0:
+                group_li_exp_size_pd.loc[group1_, group2_] = len(exp_larger_zero) / len(exp)
+                group_li_exp_mean_pd.loc[group1_, group2_] = np.mean(exp)
+            else:
+                group_li_exp_size_pd.loc[group1_, group2_] = 0
+
+    dot_color_df = group_li_exp_mean_pd
+    
+    if standard_scale == "group":
+        dot_color_df = dot_color_df.sub(dot_color_df.min(1), axis=0)
+        dot_color_df = dot_color_df.div(dot_color_df.max(1), axis=0).fillna(0)
+    elif standard_scale == "var":
+        dot_color_df -= dot_color_df.min(0)
+        dot_color_df = (dot_color_df / dot_color_df.max(0)).fillna(0)
+    else:
+        pass
+    
+    # 设置常量
+    dot_min = 0
+    dot_max = 1
+    size_exponent = 1
+    largest_dot = 100
+    smallest_dot = 10
+    dot_edge_lw = 1
+    size_title = 'Fraction of cells\nin group (%)'
+
+    # 创建图形和网格布局
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(1, 2, width_ratios=[3, 1])
+    ax = fig.add_subplot(gs[0])
+
+    # 绘制圆点
+    for y, (label, row_mean) in enumerate(dot_color_df.iterrows()):
+        for x, (column, value_mean) in enumerate(row_mean.items()):
+            value_size = group_li_exp_size_pd.loc[label, column]
+            size = value_size * 500  # 调整大小
+            color = plt.get_cmap(cmap)(value_mean / dot_color_df.values.max())
+            ax.scatter(x, y, s=size, color=color, alpha=1, 
+                       edgecolors='w', linewidth=0.5)
+
+    # 设置轴
+    ax.set_xticks(range(len(group_li_exp_mean_pd.columns)))
+    ax.set_xticklabels(group_li_exp_mean_pd.columns, rotation=45)
+    ax.set_yticks(range(len(group_li_exp_mean_pd.index)))
+    ax.set_yticklabels(group_li_exp_mean_pd.index)
+    ax.set_title('Dot Plot')
+
+    # 添加颜色图例
+    ax1 = fig.add_subplot(gs[1])
+    legend_gs = ax1.get_subplotspec().subgridspec(10, 1)
+
+    color_legend_ax = fig.add_subplot(legend_gs[7])
+    mappable = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=group_li_exp_mean_pd.values.min(),
+                                                                   vmax=group_li_exp_mean_pd.values.max()))
+    plt.colorbar(mappable, cax=color_legend_ax, orientation="horizontal")
+    color_legend_ax.set_title('Mean expression\nin group', fontsize="small")
+    color_legend_ax.xaxis.set_tick_params(labelsize="small")
+
+    # 添加点大小图例
+    size_legend_ax = fig.add_subplot(legend_gs[2:5])
+    diff = dot_max - dot_min
+    step = 0.1 if 0.3 < diff <= 0.6 else 0.05 if diff <= 0.3 else 0.2
+
+    size_range = np.arange(dot_max, dot_min, step * -1)[::-1]
+    if dot_min != 0 or dot_max != 1:
+        dot_range = dot_max - dot_min
+        size_values = (size_range - dot_min) / dot_range
+    else:
+        size_values = size_range
+
+    size = size_values ** size_exponent
+    size = size * (largest_dot - smallest_dot) + smallest_dot
+
+    size_legend_ax.scatter(
+        np.arange(len(size)) + 0.5,
+        np.repeat(0, len(size)),
+        s=size * 5,
+        color="gray",
+        edgecolor="black",
+        linewidth=dot_edge_lw,
+        zorder=100,
+    )
+    size_legend_ax.set_xticks(np.arange(len(size)) + 0.5)
+    labels = [f"{np.round((x * 100), decimals=0).astype(int)}" for x in size_range]
+    size_legend_ax.set_xticklabels(labels, fontsize="small")
+
+    size_legend_ax.tick_params(
+        axis="y", left=False, labelleft=False, labelright=False
+    )
+
+    size_legend_ax.spines["right"].set_visible(False)
+    size_legend_ax.spines["top"].set_visible(False)
+    size_legend_ax.spines["left"].set_visible(False)
+    size_legend_ax.spines["bottom"].set_visible(False)
+    size_legend_ax.grid(visible=False)
+
+    ymax = size_legend_ax.get_ylim()[1]
+    size_legend_ax.set_ylim(-1.05 - largest_dot * 0.003, 4)
+    size_legend_ax.set_title(size_title, y=ymax + 0.45, size="small")
+
+    xmin, xmax = size_legend_ax.get_xlim()
+    size_legend_ax.set_xlim(xmin - 0.15, xmax + 0.5)
+
+    ax.grid(False)
+    ax1.grid(False)
+    ax1.axis(False)
+    plt.show()

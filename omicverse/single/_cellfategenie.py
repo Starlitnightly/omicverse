@@ -7,8 +7,31 @@ import scanpy as sc
 import anndata 
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
+import torch
 
+class PyTorchRidge:
+    def __init__(self, alpha=1.0, device='cpu'):
+        self.alpha = alpha
+        self.device = device
+        self.weights = None
+        self.coef_ = None # 初始化 coef_ 属性
 
+    def fit(self, X_train, y_train):
+        X_train_tensor = torch.tensor(X_train.values if isinstance(X_train, pd.DataFrame) else X_train, dtype=torch.float32).to(self.device)
+        y_train_tensor = torch.tensor(y_train.values if isinstance(y_train, pd.Series) else y_train, dtype=torch.float32).to(self.device)
+
+        X_t_X = torch.matmul(X_train_tensor.T, X_train_tensor)
+        I = torch.eye(X_train_tensor.shape[1]).to(self.device) # 单位矩阵
+        A = X_t_X + self.alpha * I
+        b = torch.matmul(X_train_tensor.T, y_train_tensor)
+
+        # 使用 torch.linalg.solve 解线性方程组 Aw = b
+        self.weights = torch.linalg.solve(A, b)
+        self.coef_ = self.weights.cpu().numpy().flatten() # 在 fit 后将系数赋值给 coef_ 属性
+
+    def predict(self, X_test):
+        X_test_tensor = torch.tensor(X_test.values if isinstance(X_test, pd.DataFrame) else X_test, dtype=torch.float32).to(self.device)
+        return torch.matmul(X_test_tensor, self.weights).cpu().numpy()
 
 class Fate(object):
 
@@ -43,7 +66,12 @@ class Fate(object):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, 
                                                             random_state=random_state)
         # 初始化Ridge模型并拟合训练数据
-        self.ridge = Ridge(alpha=alpha)
+        if torch.cuda.is_available():
+            self.ridge = PyTorchRidge(alpha=alpha, device='cuda')
+        else:
+            self.ridge = PyTorchRidge(alpha=alpha, device='cpu')
+       # PyTorchRidge(alpha=alpha, device='cuda' if torch.cuda.is_available() else 'cpu') # 使用 GPU 如果可用
+        #self.ridge = Ridge(alpha=alpha)
         self.ridge.fit(X_train, y_train)
 
         # 预测测试集并计算均方误差
@@ -132,7 +160,12 @@ class Fate(object):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, 
                                                                 random_state=random_state)
             # 初始化Ridge模型并拟合训练数据
-            self.ridge_t = Ridge(alpha=alpha)
+            # 初始化Ridge模型并拟合训练数据
+            if torch.cuda.is_available():
+                self.ridge_t = PyTorchRidge(alpha=alpha, device='cuda')
+            else:
+                self.ridge_t = PyTorchRidge(alpha=alpha, device='cpu')
+            #self.ridge_t = Ridge(alpha=alpha)
             self.ridge_t.fit(X_train, y_train)
     
             # 预测测试集并计算均方误差
