@@ -1472,7 +1472,7 @@ def plot_viagraph(via_object, type_data='gene', df_genes=None, gene_list:list = 
     return fig, axes
 
 
-def plot_atlas_view(hammerbundle_dict=None, via_object=None, alpha_bundle_factor=1, linewidth_bundle=2,
+def plot_atlas_view_ov(hammerbundle_dict=None, via_object=None, alpha_bundle_factor=1, linewidth_bundle=2,
                     facecolor: str = 'white', cmap: str = 'plasma', extra_title_text='', alpha_milestones: float = 0.3,
                     headwidth_bundle: float = 0.1, headwidth_alpha: float = 0.8, arrow_frequency: float = 0.05,
                     show_arrow: bool = True, sc_labels_sequential: list = None, sc_labels_expression: list = None,
@@ -1481,7 +1481,7 @@ def plot_atlas_view(hammerbundle_dict=None, via_object=None, alpha_bundle_factor
                     lineage_pathway: list = [], dpi: int = 300, fontsize_title: int = 6, fontsize_labels: int = 6,
                     global_visual_pruning=0.5, use_sc_labels_sequential_for_direction: bool = False, sc_scatter_size=3,
                     sc_scatter_alpha: float = 0.4, add_sc_embedding: bool = True, size_milestones: int = 5,
-                    colorbar_legend='pseudotime',scale_arrow_headwidth:bool = False):
+                    colorbar_legend='pseudotime',scale_arrow_headwidth:bool = False,color_dict={}):
     '''
 
     Edges can be colored by time-series numeric labels, pseudotime, lineage pathway probabilities,  or gene expression. If not specificed then time-series is chosen if available, otherwise falls back to pseudotime. to use gene expression the sc_labels_expression is provided as a list.
@@ -1562,13 +1562,17 @@ def plot_atlas_view(hammerbundle_dict=None, via_object=None, alpha_bundle_factor
                 milestone_numeric_values = hammerbundle_dict['milestone_embedding']['numeric label']
             else:
                 if (isinstance(sc_labels_expression[0], str)) == True:
-                    color_dict = {}
-                    set_labels = list(set(sc_labels_expression))
-                    set_labels.sort(reverse=True)
-                    for index, value in enumerate(set_labels):
-                        color_dict[value] = index
-                    milestone_numeric_values = [color_dict[i] for i in sc_labels_expression]
-                    sc_labels_expression = milestone_numeric_values
+                    if color_dict == {}:
+                    #color_dict = {}
+                        set_labels = list(set(sc_labels_expression))
+                        set_labels.sort(reverse=True)
+                        for index, value in enumerate(set_labels):
+                            color_dict[value] = index
+                        milestone_numeric_values = [color_dict[i] for i in sc_labels_expression]
+                        sc_labels_expression = milestone_numeric_values
+                    else:
+                        milestone_numeric_values = [color_dict[i] for i in sc_labels_expression]
+                        sc_labels_expression = milestone_numeric_values
                 else:
                     milestone_numeric_values = sc_labels_expression
             milestone_pt = hammerbundle_dict['milestone_embedding']['pt']
