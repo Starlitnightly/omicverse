@@ -616,15 +616,16 @@ class pyDEG(object):
             stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
                                   alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
             
+# Near line 643, fix the duplicate else clause:
             stat_res.run_wald_test()
             if stat_res.cooks_filter:
                 stat_res._cooks_filtering()
                 
             if stat_res.independent_filter:
                 stat_res._independent_filtering()
-                
             else:
                 stat_res._p_value_adjustment()
+                
             self.stat_res = stat_res
             stat_res.summary()
             result = stat_res.results_df
@@ -640,5 +641,5 @@ class pyDEG(object):
             self.result = result
             return result
             
-            else:
-                raise ValueError('The method is not supported.')
+        else:  # This is where the "method" check (not pydeseq2 version check) ends
+            raise ValueError('The method is not supported.')
