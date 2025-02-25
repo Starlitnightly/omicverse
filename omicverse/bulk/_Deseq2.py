@@ -619,8 +619,10 @@ class pyDEG(object):
             stat_res.run_wald_test()
             if stat_res.cooks_filter:
                 stat_res._cooks_filtering()
+                
             if stat_res.independent_filter:
                 stat_res._independent_filtering()
+                
             else:
                 stat_res._p_value_adjustment()
             self.stat_res = stat_res
@@ -637,5 +639,6 @@ class pyDEG(object):
             result.loc[result['qvalue'] < alpha, 'sig'] = 'sig'
             self.result = result
             return result
-                else:
-                    raise ValueError('The method is not supported.')
+            
+            else:
+                raise ValueError('The method is not supported.')
