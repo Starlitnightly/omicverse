@@ -460,9 +460,9 @@ class pyDEG(object):
         return rnk
 
     def deg_analysis(self,group1:list,group2:list,
-                     method:str='DEseq2',alpha:float=0.05,
-                     multipletests_method:str='fdr_bh',n_cpus:int=8,
-                     cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
+                 method:str='DEseq2',alpha:float=0.05,
+                 multipletests_method:str='fdr_bh',n_cpus:int=8,
+                 cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
         r"""
         Differential expression analysis.
 
@@ -607,13 +607,14 @@ class pyDEG(object):
         dds.refit()
 
     # Add the 'contrast' parameter here:
-    stat_res = DeseqStats(
-        dds,
-        contrast=["condition", "Treatment", "Control"],
-        alpha=alpha,
-        cooks_filter=cooks_filter,
-        independent_filter=independent_filter
-    )
+# FIX: Adding version check for DeseqStats constructor
+if pydeseq2.__version__<='0.3.5':
+    stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+else:
+    # For newer PyDESeq2 versions that require the contrast parameter
+    stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
+                          alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+    
     stat_res.run_wald_test()
     if stat_res.cooks_filter:
         stat_res._cooks_filtering()
