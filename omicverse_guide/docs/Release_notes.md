@@ -530,3 +530,8 @@ Support Raw Windows platform
 ### Single Module
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
 - Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
+- Added data enhancement of `Fate`
+- Added `plot_atlas_view_ov` in VIA
+  
+### Plot Module
+- Added `dotplot_doublegroup` to visual the genes in doublegroup.
