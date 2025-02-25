@@ -611,7 +611,7 @@ class pyDEG(object):
         # FIX: Adding version check for DeseqStats constructor
         if pydeseq2.__version__<='0.3.5':
             stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
-        elif:
+        elif pydeseq2.__version__ <= '0.4.1':
             # For newer PyDESeq2 versions that require the contrast parameter
             stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
                                   alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
