@@ -557,9 +557,10 @@ class pyDEG(object):
             self.result=result
             return result
         elif method=='DEseq2':
-    import pydeseq2
-    counts_df = self.data[group1+group2].T
-    clinical_df = pd.DataFrame(index=group1+group2)
+            import pydeseq2
+            counts_df = self.data[group1+group2].T
+            clinical_df = pd.DataFrame(index=group1+group2)
+
     clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
 
     # Determine pydeseq2 version and create the DeseqDataSet accordingly
