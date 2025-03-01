@@ -4,12 +4,12 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import scanpy as sc
-import anndata 
+import anndata
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import torch
 
-class PyTorchRidge:
+class PyTorchRidge: # 保持不变， 不需要修改
     def __init__(self, alpha=1.0, device='cpu'):
         self.alpha = alpha
         self.device = device
@@ -33,6 +33,35 @@ class PyTorchRidge:
         X_test_tensor = torch.tensor(X_test.values if isinstance(X_test, pd.DataFrame) else X_test, dtype=torch.float32).to(self.device)
         return torch.matmul(X_test_tensor, self.weights).cpu().numpy()
 
+# 数据增强函数 (可以添加到 Fate 类外部或内部，这里放在外部更模块化)
+def augment_pseudotime_jitter(y_train, jitter_std=0.05):
+    """
+    对 pseudotime 数据添加高斯噪声 (抖动).
+
+    Arguments:
+        y_train: pd.Series, 训练集的 pseudotime 数据.
+        jitter_std: float, 高斯噪声的标准差，控制抖动强度.
+
+    Returns:
+        pd.Series: 增强后的 pseudotime 数据.
+    """
+    noise = np.random.normal(0, jitter_std, size=y_train.shape)
+    return y_train + noise
+
+def augment_gene_expression_noise(X_train, noise_std=0.01):
+    """
+    对基因表达数据添加高斯噪声.
+
+    Arguments:
+        X_train: pd.DataFrame, 训练集的基因表达数据.
+        noise_std: float, 高斯噪声的标准差，控制噪声强度.
+
+    Returns:
+        pd.DataFrame: 增强后的基因表达数据.
+    """
+    noise = np.random.normal(0, noise_std, size=X_train.shape)
+    return X_train + noise
+
 class Fate(object):
 
     def __init__(self,adata:anndata.AnnData,pseudotime:str):
@@ -42,13 +71,17 @@ class Fate(object):
         Arguments:
             adata: AnnData object
             pseudotime: str, the column name of pseudotime in adata.obs
-        
+
         """
         self.adata=adata
         self.pseudotime=pseudotime
 
-    def model_init(self,test_size:float=0.3,
-                   random_state:int=112,alpha:float=0.1)->pd.DataFrame:
+    def model_init(self, test_size:float=0.3,
+                   random_state:int=112, alpha:float=0.1,
+                   use_data_augmentation: bool = False, # 新增参数：是否使用数据增强
+                   augmentation_strategy: str = 'jitter_pseudotime_noise', # 新增参数：数据增强策略
+                   augmentation_intensity: float = 0.05 # 新增参数：增强强度
+                   )->pd.DataFrame:
         """
         Initialize the model
 
@@ -56,15 +89,34 @@ class Fate(object):
             test_size: float, the proportion of test set
             random_state: int, random seed
             alpha: float, the regularization strength of Ridge regression
+            use_data_augmentation: bool, 是否使用数据增强策略
+            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
+            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
 
         Returns:
-            res_pd_ievt: pd.DataFrame, the result of ridge model 
-        
+            res_pd_ievt: pd.DataFrame, the result of ridge model
+
         """
         X = self.adata.to_df()
         y = self.adata.obs.loc[:,self.pseudotime]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, 
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state)
+
+        # 数据增强 (如果 use_data_augmentation 为 True)
+        if use_data_augmentation:
+            print(f"Applying data augmentation: {augmentation_strategy} with intensity {augmentation_intensity}")
+            if augmentation_strategy == 'jitter_pseudotime_noise':
+                y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+            elif augmentation_strategy == 'gene_expression_noise':
+                X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+            elif augmentation_strategy == 'both': # 同时增强 pseudotime 和 基因表达
+                y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+                X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+            elif augmentation_strategy == 'none':
+                pass # 不进行数据增强
+            else:
+                raise ValueError(f"Unknown augmentation strategy: {augmentation_strategy}. Choose from 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'.")
+
         # 初始化Ridge模型并拟合训练数据
         if torch.cuda.is_available():
             self.ridge = PyTorchRidge(alpha=alpha, device='cuda')
@@ -98,8 +150,8 @@ class Fate(object):
 
         self.coef=res_pd_ievt
         return res_pd_ievt
-    
-    def atac_init(self,columns,gene_name='neargene'):
+
+    def atac_init(self,columns,gene_name='neargene'): # 保持不变， 不需要修改
         """
         Initialize the atac model
 
@@ -108,25 +160,29 @@ class Fate(object):
         Arguments:
             columns: list, the columns of atac data
             gene_name: str, the column name of gene name in adata.var
-        
+
         """
         self.atac_gene_name=gene_name
         self.peak_pd=self.adata.var[columns].copy()
 
     #peak_pd=adata.var[['peaktype','neargene']].copy()
-    def get_related_peak(self,peak):
+    def get_related_peak(self,peak): # 保持不变， 不需要修改
         """
         Get the related peak of gene
 
         Arguments:
             peak: str, the peak name
-        
+
         """
         related_genes=self.peak_pd.loc[peak,self.atac_gene_name].unique()
         return self.peak_pd.loc[self.peak_pd[self.atac_gene_name].isin(related_genes)].index.tolist()
 
-    def ATR(self,test_size:float=0.4,random_state:int=112,
-            alpha:float=0.1,stop:int=100,flux=0.01,related=False)->pd.DataFrame:
+    def ATR(self, test_size:float=0.4, random_state:int=112,
+            alpha:float=0.1, stop:int=100, flux=0.01, related=False,
+            use_data_augmentation: bool = False, # 新增参数：是否使用数据增强
+            augmentation_strategy: str = 'jitter_pseudotime_noise', # 新增参数：数据增强策略
+            augmentation_intensity: float = 0.05 # 新增参数：增强强度
+            )->pd.DataFrame:
         """
         Adaptive Threshold Regression
 
@@ -137,10 +193,13 @@ class Fate(object):
             stop: int, the maximum number of iterations
             flux: float, the flux of r2
             related: bool, whether to use the related peak if you use atac data
+            use_data_augmentation: bool, 是否使用数据增强策略
+            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
+            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
 
         Returns:
             res_pd: pd.DataFrame, the result of ridge model
-        
+
         """
         res_pd=pd.DataFrame()
         coef_threshold_li=[]
@@ -157,8 +216,21 @@ class Fate(object):
 
             X = adata_t.to_df()
             y = adata_t.obs.loc[:,self.pseudotime]
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, 
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                                 random_state=random_state)
+
+            # 数据增强 (在每次 ATR 迭代中，如果 use_data_augmentation 为 True)
+            if use_data_augmentation:
+                if augmentation_strategy == 'jitter_pseudotime_noise':
+                    y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+                elif augmentation_strategy == 'gene_expression_noise':
+                    X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+                elif augmentation_strategy == 'both': # 同时增强 pseudotime 和 基因表达
+                    y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+                    X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+                elif augmentation_strategy == 'none':
+                    pass # 不进行数据增强
+
             # 初始化Ridge模型并拟合训练数据
             # 初始化Ridge模型并拟合训练数据
             if torch.cuda.is_available():
@@ -167,10 +239,10 @@ class Fate(object):
                 self.ridge_t = PyTorchRidge(alpha=alpha, device='cpu')
             #self.ridge_t = Ridge(alpha=alpha)
             self.ridge_t.fit(X_train, y_train)
-    
+
             # 预测测试集并计算均方误差
             y_pred = self.ridge_t.predict(X_test)
-    
+
             # 计算均方误差（MSE）
             #mse = mean_squared_error(y_test, y_pred)
             #rmse = mean_squared_error(y_test, y_pred, squared=False)
@@ -189,13 +261,17 @@ class Fate(object):
                 self.coef_threshold=res_pd.loc[i,'coef_threshold']
                 print("coef_threshold:{}, r2:{}".format(res_pd.loc[i,'coef_threshold'],res_pd.loc[i,'r2']))
                 break
-            
+
         self.max_threshold=res_pd
         return res_pd
 
-    def model_fit(self,test_size:float=0.3,
+    def model_fit(self, test_size:float=0.3,
                    random_state:int=112,
-                   alpha:float=0.1,related=False)->pd.DataFrame:
+                   alpha:float=0.1, related=False,
+                   use_data_augmentation: bool = False, # 新增参数：是否使用数据增强
+                   augmentation_strategy: str = 'jitter_pseudotime_noise', # 新增参数：数据增强策略
+                   augmentation_intensity: float = 0.05 # 新增参数：增强强度
+                   )->pd.DataFrame:
         """
         Fit the model
 
@@ -203,10 +279,14 @@ class Fate(object):
             test_size: float, the proportion of test set
             random_state: int, random seed
             alpha: float, the regularization strength of Ridge regression
+            related: bool, whether to use the related peak if you use atac data
+            use_data_augmentation: bool, 是否使用数据增强策略
+            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
+            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
 
         Returns:
             res_pd_ievt: pd.DataFrame, the result of ridge model
-        
+
         """
         train_idx=self.coef.loc[self.coef['abs(coef)']>=self.coef_threshold].index.values
         if related == True:
@@ -214,8 +294,22 @@ class Fate(object):
         adata_t=self.adata[:,train_idx]
         X = adata_t.to_df()
         y = adata_t.obs.loc[:,self.pseudotime]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, 
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state)
+
+        # 数据增强 (如果 use_data_augmentation 为 True)
+        if use_data_augmentation:
+            print(f"Applying data augmentation: {augmentation_strategy} with intensity {augmentation_intensity}")
+            if augmentation_strategy == 'jitter_pseudotime_noise':
+                y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+            elif augmentation_strategy == 'gene_expression_noise':
+                X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+            elif augmentation_strategy == 'both': # 同时增强 pseudotime 和 基因表达
+                y_train = augment_pseudotime_jitter(y_train, jitter_std=augmentation_intensity)
+                X_train = augment_gene_expression_noise(X_train, noise_std=augmentation_intensity)
+            elif augmentation_strategy == 'none':
+                pass # 不进行数据增强
+
         # 初始化Ridge模型并拟合训练数据
         self.ridge_f = Ridge(alpha=alpha)
         self.ridge_f.fit(X_train, y_train)
@@ -244,8 +338,8 @@ class Fate(object):
 
         self.filter_coef=res_pd_ievt
         return res_pd_ievt
-    
-    def kendalltau_filter(self):
+
+    def kendalltau_filter(self): # 保持不变， 不需要修改
         import pandas as pd
         from scipy.stats import kendalltau
         test_pd=pd.DataFrame()
@@ -262,8 +356,8 @@ class Fate(object):
         test_pd.index=self.filter_coef.index.tolist()
         self.kendalltau_filter=test_pd
         return test_pd
-    
-    def low_density(self,
+
+    def low_density(self, # 保持不变， 不需要修改
                     n_components: int = 10,
                     knn: int = 30,
                     alpha: float = 0,
@@ -281,14 +375,13 @@ class Fate(object):
         run_diffusion_maps(self.adata,n_components=n_components,knn=knn,alpha=alpha,seed=seed,
                            pca_key=pca_key,kernel_key=kernel_key,sim_key=sim_key,
                            eigval_key=eigval_key,eigvec_key=eigvec_key)
-        
+
         model = mellon.DensityEstimator(d_method="fractal")
         log_density = model.fit_predict(self.adata.obsm["DM_EigenVectors"])
         self.adata.obs["mellon_log_density_lowd"] = log_density
 
-
-    
-    def lineage_score(self,cluster_key:str,lineage=None,
+    def lineage_score(self, # 保持不变， 不需要修改
+                    cluster_key:str,lineage=None,
                     cell_mask= "specification",
                     density_key: str = "mellon_log_density_lowd",
                     localvar_key: str = "local_variability",
@@ -297,7 +390,7 @@ class Fate(object):
                     distances_key: str = "distances",
                     ):
         from ..externel.palantir.utils import run_low_density_variability,run_local_variability
-        
+
         if localvar_key not in self.adata.layers.keys():
             print("Run low_density first")
             run_local_variability(self.adata,expression_key=expression_key,
@@ -316,9 +409,7 @@ class Fate(object):
                                 )
         print(f"The lineage score stored in adata.var['change_scores_lineage']")
 
-
-    
-    def get_coef(self,type:str='raw')->pd.DataFrame:
+    def get_coef(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the coef of model
 
@@ -334,8 +425,8 @@ class Fate(object):
             return self.coef
         elif type=='filter':
             return self.filter_coef
-        
-    def get_r2(self,type:str='raw')->float:
+
+    def get_r2(self,type:str='raw')->float: # 保持不变， 不需要修改
         """
         Get the r2 of model
 
@@ -350,8 +441,8 @@ class Fate(object):
             return self.raw_r2
         elif type=='filter':
             return self.filter_r2
-        
-    def get_mse(self,type:str='raw')->pd.DataFrame:
+
+    def get_mse(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the mse of model
 
@@ -366,8 +457,8 @@ class Fate(object):
             return self.raw_mse
         elif type=='filter':
             return self.filter_mse
-        
-    def get_rmse(self,type:str='raw')->pd.DataFrame:
+
+    def get_rmse(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the rmse of model
 
@@ -382,8 +473,8 @@ class Fate(object):
             return self.raw_rmse
         elif type=='filter':
             return self.filter_rmse
-        
-    def get_mae(self,type:str='raw')->pd.DataFrame:
+
+    def get_mae(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the mae of model
 
@@ -399,7 +490,7 @@ class Fate(object):
         elif type=='filter':
             return self.filter_mae
 
-    def plot_filtering(self,figsize:tuple=(3,3),color:str='#5ca8dc',
+    def plot_filtering(self,figsize:tuple=(3,3),color:str='#5ca8dc', # 保持不变， 不需要修改
                     fontsize:int=12,alpha:float=0.8)->tuple:
         """
         Plot the filtering result
@@ -413,7 +504,7 @@ class Fate(object):
         Returns:
             fig: matplotlib.pyplot.figure, the figure of filtering result
             ax: matplotlib.pyplot.axis, the axis of filtering result
-        
+
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.scatter(self.max_threshold['coef_threshold'],
@@ -442,7 +533,7 @@ class Fate(object):
         ax.spines['left'].set_visible(True)
         return fig,ax
 
-    def plot_fitting(self,type:str='raw',
+    def plot_fitting(self,type:str='raw', # 保持不变， 不需要修改
                      figsize:tuple=(3,3),color:str='#0d6a3b',
                     fontsize:int=12)->tuple:
         """
@@ -457,7 +548,7 @@ class Fate(object):
         Returns:
             fig: matplotlib.pyplot.figure, the figure of fitting result
             ax: matplotlib.pyplot.axis, the axis of fitting result
-        
+
         """
         import seaborn as sns
         fig, ax = plt.subplots(figsize=figsize)
@@ -490,8 +581,8 @@ class Fate(object):
                          fontsize=fontsize)
 
         return fig,ax
-    
-    def plot_color_fitting(self,type:str='raw',cluster_key:str='clusters',
+
+    def plot_color_fitting(self,type:str='raw',cluster_key:str='clusters', # 保持不变， 不需要修改
                      figsize:tuple=(3,3),color:str='#6BBBA0',
                     fontsize:int=12,legend_loc:list=[0.2,0.1,0],omics='RNA')->tuple:
         """
@@ -509,7 +600,7 @@ class Fate(object):
         Returns:
             fig: matplotlib.pyplot.figure, the figure of fitting result
             ax: matplotlib.pyplot.axis, the axis of fitting result
-        
+
         """
         #fontsize=13
         fig, ax = plt.subplots(figsize=figsize)
@@ -521,7 +612,7 @@ class Fate(object):
             y_test=self.y_test_f
             y_pred=pd.Series(self.y_pred_f)
             y_pred.index=y_test.index
-        
+
         from scipy.stats import linregress
         slope, intercept, r_value, p_value, std_err = linregress(y_test, y_pred)
         line = slope * y_test + intercept
@@ -542,19 +633,18 @@ class Fate(object):
                 color_dict=dict(zip(self.adata.obs[cluster_key].cat.categories,sc.pl.palettes.default_102))
             else:
                 color_dict=dict(zip(self.adata.obs[cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
-        
 
         for i in self.adata.obs[cluster_key].cat.categories:
             ax.scatter(y_test[list(set(self.adata.obs.loc[self.adata.obs[cluster_key]==i].index)&set(y_test.index))],
                     y_pred[list(set(self.adata.obs.loc[self.adata.obs[cluster_key]==i].index)&set(y_pred.index))],
                     color=color_dict[i])
-        ax.plot(y_test, line, color=color, 
+        ax.plot(y_test, line, color=color,
                 label='Fit: y = {:.2f}x + {:.2f}'.format(slope, intercept),
             linewidth=3)
-        ax.fill_between(y_test, lower_bound, upper_bound, 
+        ax.fill_between(y_test, lower_bound, upper_bound,
                         color='grey', alpha=0.2, label='95% Confidence Interval')
 
-        #sns.regplot(x=y_test,y=y_pred,ax=ax,line_kws={'color':color},
+        #sns.regplot(x=y_test,y_pred=y_pred,ax=ax,line_kws={'color':color},
         #        color=color)
         ax.spines['left'].set_position(('outward', 10))
         ax.spines['bottom'].set_position(('outward', 10))
@@ -585,7 +675,6 @@ class Fate(object):
             ax.set_title(f'Regression {omics}\nDimension: {self.coef.shape[0]}',
                          fontsize=fontsize+1)
         return fig,ax
-
 
 class gene_trends(object):
 
