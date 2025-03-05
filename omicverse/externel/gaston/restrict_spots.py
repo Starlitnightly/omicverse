@@ -3,10 +3,12 @@ from .isodepth_scaling import adjust_isodepth
 from .cluster_plotting import plot_isodepth
 import matplotlib.colors as pltcolors
 
+
+
 def restrict_spots(counts_mat, coords_mat, S, gaston_isodepth, gaston_labels, isodepth_min=0, isodepth_max=1, 
                    adjust_physical=True, scale_factor=1, 
                    plotisodepth=False, show_streamlines=False, gaston_model=None, rotate=None, figsize=(6,3), cmap='coolwarm',
-                  arrowsize=2, neg_gradient=False):
+                  arrowsize=2, neg_gradient=False,n_neighbors=1000):
 
     counts_mat2, coords_mat2, S2, gaston_isodepth2, gaston_labels2=filter_rescale_boundary(counts_mat, coords_mat, S,
                                                                                  gaston_isodepth, gaston_labels, 
@@ -20,10 +22,12 @@ def restrict_spots(counts_mat, coords_mat, S, gaston_isodepth, gaston_labels, is
         gaston_isodepth2=adjust_isodepth(gaston_isodepth2, gaston_labels2, coords_mat2, scale_factor=scale_factor)
 
     if plotisodepth:
-        plot_isodepth(gaston_isodepth2, S2, gaston_model, figsize=figsize, streamlines=show_streamlines, rotate=rotate,cmap=cmap, norm=pltcolors.CenteredNorm(630),arrowsize=arrowsize, neg_gradient=neg_gradient)
+        plot_isodepth(gaston_isodepth2, S2, gaston_model, figsize=figsize, 
+                      streamlines=show_streamlines, rotate=rotate,cmap=cmap, 
+                      norm=pltcolors.CenteredNorm(630),arrowsize=arrowsize,
+                      neg_gradient=neg_gradient,n_neighbors=n_neighbors)
 
     return counts_mat2, coords_mat2, gaston_isodepth2, gaston_labels2, S2
-        
 
 def filter_rescale_boundary(counts_mat, coords_mat, S, gaston_isodepth, gaston_labels, isodepth_min=0, isodepth_max=1):
     locs=np.array( [i for i in range(len(gaston_isodepth)) if isodepth_min < gaston_isodepth[i] < isodepth_max] )
