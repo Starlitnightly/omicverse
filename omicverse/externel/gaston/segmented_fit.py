@@ -49,6 +49,9 @@ def pw_linear_fit(counts_mat, gaston_labels, gaston_isodepth, cell_type_df, ct_l
     
     # ONE: compute for all cell types
     print('Poisson regression for ALL cell types')
+    from scipy.sparse import issparse
+    if issparse(cmat):
+        cmat=cmat.toarray()
     s0_mat,i0_mat,s1_mat,i1_mat,pv_mat=segmented_poisson_regression(cmat,
                                                    exposures, 
                                                    gaston_labels, 
@@ -180,7 +183,7 @@ def segmented_poisson_regression(count, totalumi, dp_labels, isodepth, num_domai
             
             # need to be enough points in domain
             if len(pts_t) > 10:
-                s0, i0, s1, i1, pval = llr_poisson(count[g,pts_t], xcoords=isodepth[pts_t], exposure=totalumi[pts_t], alpha=reg)
+                s0, i0, s1, i1, pval = llr_poisson(count[g,pts_t], xcoords=isodepth[pts_t], exposure=np.array(totalumi).reshape(-1)[pts_t], alpha=reg)
             else:
                 s0=np.inf
                 i0=np.inf

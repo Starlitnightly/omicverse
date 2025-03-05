@@ -6,11 +6,12 @@ import pandas as pd
 
 def get_gaston_input_adata(data_folder, get_rgb=False, spot_umi_threshold=50):
     adata=sq.read.visium(data_folder)
+    adata.obsm['spatial']=adata.obsm['spatial'].astype(float)
     sc.pp.filter_cells(adata, min_counts=spot_umi_threshold)
 
     gene_labels=adata.var.index.to_numpy()
     counts_mat=adata.X
-    coords_mat=np.array(adata.X.todense())
+    coords_mat=np.array(adata.obsm['spatial'])
 
     if not get_rgb:
         return counts_mat, coords_mat, gene_labels

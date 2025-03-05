@@ -48,7 +48,7 @@ dependencies = [
     'boltons>=23.0',
     'ctxcore>=0.2',
     'termcolor>=2.1',
-    'pygam==0.8.0',
+    'pygam>=0.8.0',
     'pillow>=9.0',
     'gdown>=4.6',
     'igraph>=0.10',

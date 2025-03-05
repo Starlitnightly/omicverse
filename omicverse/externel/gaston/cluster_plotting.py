@@ -76,8 +76,13 @@ def plot_clusters_restrict(gaston_labels, S, gaston_isodepth, isodepth_min=0, is
 #######
 
     
-def plot_isodepth(gaston_isodepth, S, mod, figsize=(5,8), contours=True, contour_levels=4, contour_lw=1, contour_fs=10, colorbar=True,s=20,cbar_fs=10, axis_off=True, streamlines=False, streamlines_lw=1.5, rotate=None, cmap='coolwarm', norm=None,
-                 arrowsize=2, neg_gradient=False, scaling_factors=None, gaston_labels_for_scaling=None, linear_transform=None):
+def plot_isodepth(gaston_isodepth, S, mod, figsize=(5,8), contours=True, 
+                  contour_levels=4, contour_lw=1, contour_fs=10, colorbar=True,
+                  s=20,cbar_fs=10, axis_off=True, streamlines=False, streamlines_lw=1.5, 
+                  rotate=None, cmap='coolwarm', norm=None,
+                 arrowsize=2, neg_gradient=False, scaling_factors=None, 
+                 gaston_labels_for_scaling=None, linear_transform=None,
+                 n_neighbors=1000):
     
     if rotate is not None:
         S_rotated=rotate_by_theta(S,rotate)
@@ -120,7 +125,7 @@ def plot_isodepth(gaston_isodepth, S, mod, figsize=(5,8), contours=True, contour
         # CODE FROM scVelo
         smooth=None
         min_mass=None
-        n_neighbors=1000
+        
         cutoff_perc=0
         
         X_grid, V_grid = compute_velocity_on_grid(
