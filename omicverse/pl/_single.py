@@ -70,7 +70,7 @@ def embedding(
     na_color: ColorLike = "lightgray",
     na_in_legend: bool = True,
     size: Union[float, Sequence[float], None] = None,
-    frameon: Optional[bool] = None,
+    frameon: Optional[bool] = 'small',
     legend_fontsize: Union[int, float, _FontSize, None] = None,
     legend_fontweight: Union[int, _FontWeight] = 'bold',
     legend_loc: str = 'right margin',

@@ -35,6 +35,7 @@ mkdocs-glightbox==0.3.2
 mkdocstrings == 0.20.0
 mkdocs-gen-files ==0.4.0
 mkdocstrings-python ==0.9.0
+mkdocs-autorefs==0.4.1
 python-dotplot
 metatime
 tensorboard
