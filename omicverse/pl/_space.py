@@ -158,6 +158,7 @@ def plot_spatial_general(
     palette=None,
     legend_title_fontsize=12,
     return_ax=False,
+    
 ):
     r"""Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
 

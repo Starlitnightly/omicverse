@@ -88,7 +88,8 @@ def plot_ct_props(cell_type_df, gaston_labels, gaston_isodepth,
     N=len(gaston_labels)
     # need dummy counts mat and dummy gene_labels to create binning_output
     binning_output=bin_data(np.ones((N,10)), gaston_labels, gaston_isodepth, 
-                         cell_type_df, np.array(['test' for i in range(10)]), num_bins=num_bins, num_bins_per_domain=num_bins_per_domain)
+                         cell_type_df, np.array(['test' for i in range(10)]), 
+                         num_bins=num_bins, num_bins_per_domain=num_bins_per_domain)
     # print(binning_output)
     unique_binned_isodepths=binning_output['unique_binned_isodepths']
     binned_labels=binning_output['binned_labels']

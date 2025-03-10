@@ -41,6 +41,7 @@ class GASTON(object):
         
         # RGB_mean = RGB_mean[RGB_mean.index.isin(df_pos['barcode'])]
 
+        adata=self.adata
         return counts_mat, coords_mat, gene_labels, RGB_mean.to_numpy()
     
     def get_top_pearson_residuals(self,num_dims=5,clip=0.01,n_top_genes=5000,
@@ -118,6 +119,7 @@ class GASTON(object):
                                                                       self.A,
                                                                       self.S,
                                                                       num_domains)
+
 
         # DATASET-SPECIFIC: so domains are ordered with tumor being last
         gaston_isodepth= np.max(gaston_isodepth) -1 * gaston_isodepth
@@ -230,7 +232,7 @@ class GASTON(object):
     def get_restricted_adata(self,offset=10**6,):
         adata=self.adata
         adata2=adata[:,self.adata.var_names[self.idx_kept]]
-        adata2.obsm['spatial']=self.coords_mat_restrict
+        #adata2.obsm['spatial']=self.coords_mat_restrict
         adata2=adata2[:,self.gene_labels_idx]
         adata2.uns['gaston']={}
         adata2.uns['gaston']['isodepth']=self.gaston_isodepth_restrict

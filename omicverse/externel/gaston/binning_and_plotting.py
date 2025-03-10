@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from scipy.sparse import issparse
 
 from .dp_related import rotate_by_theta
 
@@ -99,7 +100,12 @@ def bin_data(counts_mat, gaston_labels, gaston_isodepth,
             ct_spots_bin_proportions=cell_type_mat[ct_spots_bin,ct_ind]
             
             if len(ct_spots_bin)>0:
-                binned_count_per_ct[ct][ind,:]=np.sum(cmat[ct_spots_bin,:].T * np.tile(ct_spots_bin_proportions,(G,1)).T, axis=0)
+                
+                if issparse(cmat):
+                    binned_count_per_ct[ct][ind,:]=np.sum(cmat[ct_spots_bin,:].T * np.tile(ct_spots_bin_proportions,(G,1)).T, axis=0)
+                else:
+                    binned_count_per_ct[ct][ind,:]=np.sum(cmat[ct_spots_bin,:] * np.tile(ct_spots_bin_proportions,(G,1)).T, axis=0)
+                #binned_count_per_ct[ct][ind,:]=np.sum(cmat[ct_spots_bin,:].T * np.tile(ct_spots_bin_proportions,(G,1)).T, axis=0)
                 binned_exposure_per_ct[ct][ind]=np.sum(exposure[ct_spots_bin] * ct_spots_bin_proportions)
                 if pc>0:
                     to_subtract_per_ct[ct]=np.log(10**6 * len(ct_spots_bin) / np.sum(exposure[ct_spots_bin]))
