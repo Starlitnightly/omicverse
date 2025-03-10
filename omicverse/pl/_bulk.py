@@ -133,11 +133,14 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
     return ax
 
 def venn(sets={}, out='./', palette='bgrc',
-             ax=False, ext='png', dpi=300, fontsize=3.5):
+             ax=False, ext='png', dpi=300, fontsize=3.5,
+             bbox_to_anchor=(.5, .99),nc=2,cs=4):
     
     from ..utils import venny4py
     venny4py(sets=sets,out=out,ce=palette,asax=ax,ext=ext,
-             dpi=dpi,size=fontsize)
+             dpi=dpi,size=fontsize,bbox_to_anchor=bbox_to_anchor,
+             nc=nc,cs=cs,
+             )
     return ax
 
 def boxplot(data,hue,x_value,y_value,width=0.6,title='',
