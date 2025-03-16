@@ -151,11 +151,43 @@ class CellLoc(object):
                 aware_multi=aware_multi,use_gpu=use_gpu,**kwargs)
         self.spatrio_decon=spatrio_decon
         return spatrio_decon
+
+    def load_map(self,map_info,
+                 sc_type: str = 'celltype',
+                 sp_type: str = 'leiden',
+                 resolution: int = 1,
+                 aware_spatial: bool = True,
+            aware_multi: bool = True,):
+        ##spatial type
+        if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
+            sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
+            sc.tl.leiden(self.adata_sp,resolution=resolution)
+            self.adata_sp.obs['type']=self.adata_sp.obs[sp_type].tolist()
+        elif sp_type=='louvain' and 'louvain' not in self.adata_sp.obs.columns:
+            sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
+            sc.tl.louvain(self.adata_sp)
+            self.adata_sp.obs['type']=self.adata_sp.obs[sp_type].tolist()
+        elif sp_type is None:
+            aware_spatial=False
+        else:
+            self.adata_sp.obs['type']=self.adata_sp.obs[sp_type].tolist()
+
+        ##single cell type
+        if sc_type is None:
+            aware_multi=False
+        else:
+            self.adata_sc.obs['type']=self.adata_sc.obs[sc_type].tolist()
+        self.spatrio_decon=map_info
+        return map_info
+
+    def save_map(self,path):
+        self.spatrio_decon.to_csv(path)
     
     def loc_prob(self,spot_cell_prob,
                  sc_type: str = 'celltype',
                  sc_prop: float = 0.5,
                  n_cpu=6,):
+
         map_info=self.spatrio_decon.copy()
         from tqdm import tqdm
         df=spot_cell_prob
@@ -163,8 +195,9 @@ class CellLoc(object):
         # 创建字典
         first_max_dict = {}
         first_max_value_dict = {}
-
-        # 找到每个索引得分第二高的列
+        
+        # 找到每个索引得分第一高的列
+        print('...finding spot prop')
         for idx in tqdm(df.index):
             series = df.loc[idx]
             sorted_series = series.sort_values(ascending=False)
@@ -173,11 +206,15 @@ class CellLoc(object):
             first_max_dict[idx] = third_max_column
             first_max_value_dict[idx]=third_max_value
 
+        map_info['spot_prop1']=map_info['spot'].map(first_max_dict)
+        map_info['spot_prop_value1']=map_info['spot'].map(first_max_value_dict)
+
         # 创建字典
         second_max_dict = {}
         second_max_value_dict = {}
-
+        
         # 找到每个索引得分第二高的列
+        print('...finding spot prop')
         for idx in tqdm(df.index):
             series = df.loc[idx]
             sorted_series = series.sort_values(ascending=False)
@@ -185,12 +222,15 @@ class CellLoc(object):
             third_max_column = list(df)[list(series).index(third_max_value)]  # 对应的列名
             second_max_dict[idx] = third_max_column
             second_max_value_dict[idx]=third_max_value
+        map_info['spot_prop2']=map_info['spot'].map(second_max_dict)
+        map_info['spot_prop_value2']=map_info['spot'].map(second_max_value_dict)
 
         # 创建字典
         third_max_dict = {}
         third_max_value_dict = {}
 
         # 找到每个索引得分第三高的列
+        print('...finding spot prop')
         for idx in tqdm(df.index):
             series = df.loc[idx]
             sorted_series = series.sort_values(ascending=False)
@@ -199,49 +239,32 @@ class CellLoc(object):
             third_max_dict[idx] = third_max_column
             third_max_value_dict[idx]=third_max_value
 
-        map_info['spot_prop1']=map_info['spot'].map(first_max_dict)
-        map_info['spot_prop2']=map_info['spot'].map(second_max_dict)
+     
         map_info['spot_prop3']=map_info['spot'].map(third_max_dict)
-
-        map_info['spot_prop_value1']=map_info['spot'].map(first_max_value_dict)
-        map_info['spot_prop_value2']=map_info['spot'].map(second_max_value_dict)
         map_info['spot_prop_value3']=map_info['spot'].map(third_max_value_dict)
+
+        print('...adding spot prop to map info')
 
         map_info['cell_type']=map_info['cell'].map(dict(zip(
             self.adata_sc.obs.index.tolist(),
             self.adata_sc.obs[sc_type].tolist()   
         )))
+        print('...adding cell type to map info')
 
-        import pandas as pd
-        from pandarallel import pandarallel
-        from tqdm import tqdm
+        cond1 = (map_info['cell_type'] == map_info['spot_prop1']) & (map_info['spot_prop_value1'] > sc_prop)
+        print('... finish spot type 1 filter')
+        cond2 = (map_info['cell_type'] == map_info['spot_prop2']) & (map_info['spot_prop_value2'] > sc_prop)
+        print('... finish spot type 2 filter')
+        cond3 = (map_info['cell_type'] == map_info['spot_prop3']) & (map_info['spot_prop_value3'] > sc_prop)
+        print('... finish spot type 3 filter')
+        mask = cond1 | cond2 | cond3
 
-        # 初始化 pandarallel
-        pandarallel.initialize(progress_bar=True,nb_workers=n_cpu)
+        print('...filtering map info')
+        # 应用过滤条件 ----------------------------------------------------------
+        map_info.loc[~mask, 'value'] = -1
+        map_info=map_info[map_info['value']!=-1]
+        self.spatrio_decon = map_info[['spot', 'cell', 'value']]
 
-        # 假设 df 是你的 DataFrame
-        # 读取数据的代码，例如：df = pd.read_csv('your_file.csv')
-        df=map_info
-
-        # 定义一个函数来检查 cell_type 是否在 spot_prop1/2/3 中
-        # 定义一个函数来检查 cell_type 和概率条件
-        def check_conditions(row):
-            in_props = row['cell_type'] in [row['spot_prop1'], row['spot_prop2'], row['spot_prop3']]
-            prob_condition = (
-                ((row['cell_type'] == row['spot_prop1']) and (row['spot_prop_value1'] > sc_prop)) or
-                ((row['cell_type'] == row['spot_prop2']) and (row['spot_prop_value2'] > sc_prop)) or
-                ((row['cell_type'] == row['spot_prop3']) and (row['spot_prop_value3'] > sc_prop))
-            )
-            return (in_props and prob_condition)
-
-        # 使用 pandarallel 并行处理，并使用 tqdm 可视化进度
-        tqdm.pandas(desc="Processing")
-        filtered_df = df[df.parallel_apply(check_conditions, axis=1)]
-
-        # prob the celltype
-        map_info.loc[list(set(map_info.index.tolist()) - set(filtered_df.index.tolist())),'value']=-1
-        map_info1=map_info[['spot','cell','value']]
-        self.spatrio_decon=map_info1
 
 
     def loc_assign(self,**kwargs):
