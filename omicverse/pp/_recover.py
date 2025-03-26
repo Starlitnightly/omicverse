@@ -66,7 +66,15 @@ def recover_counts(X, mult_value, max_range, log_base=None, chunk_size=1000):
             s = binary_search(x, max_r=max_range)
             size_factors.append(s)
         size_factors_all+=size_factors
-    
+
+    sf = np.array(size_factors_all)
+    if issparse(X):
+        # 直接利用广播实现逐行边乘
+        counts = X.multiply(sf[:, None]).astype(int)
+        counts=counts.tocsr()
+    else:
+        counts = (X * sf[:, None]).astype(int)
+    '''
     if issparse(X):
         size_factors_sparse = csr_matrix(np.diag(size_factors_all))
         counts = X.T.dot(size_factors_sparse)
@@ -74,6 +82,7 @@ def recover_counts(X, mult_value, max_range, log_base=None, chunk_size=1000):
     else:
         counts = X.T * size_factors
         counts = (counts.T).astype(int)
+    '''
     return counts, size_factors_all
 
 def binary_search(vec, min_r=0, max_r=100000):

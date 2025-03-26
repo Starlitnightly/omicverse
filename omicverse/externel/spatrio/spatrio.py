@@ -230,7 +230,8 @@ def assign_coord(
     no_repeated_cells: bool = True,
     top_num: int = None,
     expected_num: pd.DataFrame = None,
-    random: bool = False
+    random: bool = False,
+    normalize: bool = True,
     ) :
     """
     Assign coordinates for single cells according to the output of ot alignment.
@@ -266,14 +267,20 @@ def assign_coord(
         out_data = out_data.sort_values(by="value",ascending=False)
         out_data = out_data[out_data.duplicated('cell') == False]
 
-    adata1_copy=adata1.copy()
-    adata1_copy.X=adata1_copy.layers['counts']
-    adata2_copy=adata2.copy()
-    adata2_copy.X=adata2_copy.layers['counts']
+    if normalize:
+        print('Normalizing the alignment results...')
+        
+        adata1_copy=adata1.copy()
+        adata1_copy.X=adata1_copy.layers['counts']
+        adata2_copy=adata2.copy()
+        adata2_copy.X=adata2_copy.layers['counts']
 
-    adata1_copy = process_anndata(adata1_copy,ndims=50,scale=False,pca=False)
-    adata2_copy = process_anndata(adata2_copy,ndims=50,scale=False,pca=False)
-    
+        adata1_copy = process_anndata(adata1_copy,ndims=50,scale=False,pca=False)
+        adata2_copy = process_anndata(adata2_copy,ndims=50,scale=False,pca=False)
+    else:
+        adata1_copy=adata1.copy()
+        adata2_copy=adata2.copy()
+        
     common_genes = intersect(adata1_copy.var.index, adata2_copy.var.index)
     adata1_copy = adata1_copy[:, common_genes]
     adata2_copy = adata2_copy[:, common_genes]
