@@ -387,120 +387,207 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
     else:
         return ax
 
-
 def cpdb_interacting_heatmap(adata,
                              celltype_key,
-                            means,
-                            pvalues,
-                            source_cells,
-                            target_cells,
-                            min_means=3,
-                            nodecolor_dict=None,
-                            ax=None,
-                            figsize=(2,6),
-                            fontsize=12,
-                            plot_secret=True,
-                            return_table=False,):
+                             means,
+                             pvalues,
+                             source_cells,
+                             target_cells,
+                             min_means=3,
+                             nodecolor_dict=None,
+                             ax=None,
+                             figsize=(2,6),
+                             fontsize=12,
+                             plot_secret=True,
+                             return_table=False,
+                             transpose=False):
+    import numpy as np
+    import matplotlib.pyplot as plt
 
-    if nodecolor_dict!=None:
-        type_color_all=nodecolor_dict
+    # 生成颜色字典：优先使用传入的 nodecolor_dict，否则构建新的
+    if nodecolor_dict is not None:
+        type_color_all = nodecolor_dict
     else:
-        if '{}_colors'.format(celltype_key) in adata.uns:
-            type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
+        key_colors = '{}_colors'.format(celltype_key)
+        if key_colors in adata.uns:
+            type_color_all = dict(zip(adata.obs[celltype_key].cat.categories,
+                                      adata.uns[key_colors]))
         else:
-            if len(adata.obs[celltype_key].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+            categories = adata.obs[celltype_key].cat.categories
+            if len(categories) > 28:
+                type_color_all = dict(zip(categories, sc.pl.palettes.default_102))
             else:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
-    
-    sub_means=cpdb_exact_target(means,target_cells)
-    sub_means=cpdb_exact_source(sub_means,source_cells)
+                type_color_all = dict(zip(categories, sc.pl.palettes.zeileis_28))
+                
+    # 筛选 source 与 target 细胞，剔除无效的交互记录
+    sub_means = cpdb_exact_target(means, target_cells)
+    sub_means = cpdb_exact_source(sub_means, source_cells)
+    sub_means = sub_means.loc[sub_means['gene_a'].notnull()]
+    sub_means = sub_means.loc[sub_means['gene_b'].notnull()]
 
-    
-    sub_means=sub_means.loc[~sub_means['gene_a'].isnull()]
-    sub_means=sub_means.loc[~sub_means['gene_b'].isnull()]
+    # 构造交互对对应的分泌状态字典
+    secreted_dict = dict(zip(sub_means['interacting_pair'],
+                             ['Secreted' if status else 'Non' for status in sub_means['secreted']]))
 
-    secreted_dict=dict(zip(sub_means['interacting_pair'],
-                       ['Secreted' if i==True else 'Non' for i in sub_means['secreted']]
-                  ))
+    # 提取均值信息矩阵，新矩阵的新索引为交互对名称
+    new_df = sub_means.iloc[:, 10:].copy()
+    new_df.index = sub_means['interacting_pair'].tolist()
+    # 只保留 sum > min_means 的交互对
+    cor = new_df.loc[new_df.sum(axis=1) > min_means]
 
-    new=sub_means.iloc[:,10:]
-    new.index=sub_means['interacting_pair'].tolist()
-    cor=new.loc[new.sum(axis=1)[new.sum(axis=1)>min_means].index]
+    # 处理 p 值矩阵：重新对齐行列，保留至少一个显著 p 值的行
+    sub_p = pvalues.copy()
+    sub_p.index = sub_p['interacting_pair']
+    sub_p = sub_p.loc[cor.index, cor.columns]
+    significant_rows = (sub_p < 0.05).any(axis=1)
+    cor = cor.loc[significant_rows]
+    sub_p = sub_p.loc[significant_rows]
 
-    sub_p=pvalues
-    sub_p.index=sub_p['interacting_pair']
-    sub_p=sub_p.loc[cor.index,cor.columns]
-    sub_p_mat=sub_p.stack().reset_index(name="pvalue")
-
+    # 将矩阵转换为长格式数据，便于后续绘图使用
+    sub_p_mat = sub_p.stack().reset_index(name="pvalue")
     corr_mat = cor.stack().reset_index(name="means")
-    corr_mat['-logp']=-np.log10(sub_p_mat['pvalue']+0.001)
+    corr_mat['-logp'] = -np.log10(sub_p_mat["pvalue"] + 0.001)
 
-    df_row=corr_mat['level_0'].drop_duplicates().to_frame()
-    df_row['RowGroup']=df_row.level_0.apply(lambda x:x.split('|')[0])
-    df_row['Secreted']=df_row.level_0.map(secreted_dict)
-    df_row.set_index('level_0',inplace=True)
+    # 构造行和列的附加信息数据框，行信息来自交互对
+    df_row = corr_mat['level_0'].drop_duplicates().to_frame()
+    df_row['RowGroup'] = df_row['level_0'].apply(lambda x: x.split('|')[0])
+    df_row['Secreted'] = df_row['level_0'].map(secreted_dict)
+    df_row.set_index('level_0', inplace=True)
 
-    df_col=corr_mat['level_1'].drop_duplicates().to_frame()
-    df_col['Source']=df_col.level_1.apply(lambda x:x.split('|')[0])
-    df_col['Target']=df_col.level_1.apply(lambda x:x.split('|')[1])
-    df_col.set_index('level_1',inplace=True)
+    # 列信息取自 stacking 后 level_1，对应的交互pair含有 "Source|Target"
+    df_col = corr_mat['level_1'].drop_duplicates().to_frame()
+    df_col['Source'] = df_col['level_1'].apply(lambda x: x.split('|')[0])
+    df_col['Target'] = df_col['level_1'].apply(lambda x: x.split('|')[1])
+    df_col.set_index('level_1', inplace=True)
 
+    from PyComplexHeatmap import DotClustermapPlotter, HeatmapAnnotation, anno_simple
 
-    from PyComplexHeatmap import DotClustermapPlotter,HeatmapAnnotation,anno_simple,anno_label,AnnotationBase
-    if ax==None:
-        fig, ax = plt.subplots(figsize=figsize) 
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     else:
-        ax=ax
-    
-    
-    
-    col_ha = HeatmapAnnotation(Source=anno_simple(df_col.Source,
-                                                  colors=list(set([type_color_all[i] for i in  df_col.Source.drop_duplicates()])),
-                                                  text_kws={'color': 'black', 'rotation': 0,'fontsize':fontsize},
-                                                  legend=True,add_text=False,),
-                               Target=anno_simple(df_col.Target,
-                                                  colors=list(set([type_color_all[i] for i in  df_col.Target.drop_duplicates()])),
-                                                  text_kws={'color': 'black', 'rotation': 0,'fontsize':fontsize},
-                                                  legend=True,add_text=False),
-                               verbose=0,label_side='left',
-                               label_kws={'horizontalalignment':'right','fontsize':fontsize})
-    if plot_secret==True:
-        row_ha = HeatmapAnnotation(Secreted=anno_simple(df_row.Secreted,cmap='Set1',
-                                                  #colors=list(set([type_color_all[i] for i in  df_col.Source.drop_duplicates()])),
-                                                  text_kws={'color': 'black', 'rotation': 0,'fontsize':8},
-                                                  legend=True,add_text=False),
-                               verbose=0,#label_side='top',
-                               axis=0,
-                               label_kws={'horizontalalignment':'left','fontsize':0})
+        fig = ax.figure
+
+    # 针对颜色注释参数，我们传入类别→颜色的字典，保证顺序与映射正确
+    source_colors = {cat: type_color_all[cat] for cat in df_col['Source'].unique()}
+    target_colors = {cat: type_color_all[cat] for cat in df_col['Target'].unique()}
+
+    if transpose:
+        # 转置模式：x 和 y 数据字段交换，同时对应的注释也交换位置
+        # 原来的行信息 (df_row, Secreted)用于顶部注释
+        if plot_secret:
+            top_annotation = HeatmapAnnotation(
+                Secreted=anno_simple(df_row['Secreted'],
+                                     cmap='Set1',
+                                     text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                                     legend=True,
+                                     add_text=False),
+                verbose=0,
+                label_side='left',
+                label_kws={'horizontalalignment': 'right', 'fontsize': fontsize}
+            )
+        else:
+            top_annotation = None
+        # 原来的列信息 (df_col, Source & Target)用于左侧注释
+        left_annotation = HeatmapAnnotation(
+            Source=anno_simple(df_col['Source'],
+                               colors=source_colors,
+                               text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                               legend=True,
+                               add_text=False),
+            Target=anno_simple(df_col['Target'],
+                               colors=target_colors,
+                               text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                               legend=True,
+                               add_text=False),
+            verbose=0,
+            axis=0,
+            label_side='bottom',
+            label_kws={'horizontalalignment': 'right', 'fontsize': fontsize}
+        )
+        # 注意：转置后，原行数据（df_row）对应 x 轴，原列数据（df_col）对应 y 轴
+        cm = DotClustermapPlotter(corr_mat,
+                                  x='level_0',
+                                  y='level_1',
+                                  value='means',
+                                  c='means',
+                                  s='-logp',
+                                  cmap='Reds',
+                                  vmin=0,
+                                  top_annotation=top_annotation,
+                                  left_annotation=left_annotation,
+                                  row_dendrogram=True,
+                                  show_rownames=True,
+                                  show_colnames=True)
     else:
-        row_ha=None
-    
-    cm = DotClustermapPlotter(corr_mat,x='level_1',y='level_0',value='means',
-                  c='means',s='-logp',cmap='Reds',vmin=0,
-                  top_annotation=col_ha,left_annotation=row_ha,
-                  row_dendrogram=True,
-                  show_rownames=True,show_colnames=True,)
-    cm.ax_heatmap.grid(which='minor',color='gray',linestyle='--')
-    tesr=plt.gcf().axes
+        # 默认模式：保持原始 x= level_1, y= level_0 的对应关系
+        col_ha = HeatmapAnnotation(
+            Source=anno_simple(df_col['Source'],
+                               colors=source_colors,
+                               text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                               legend=True,
+                               add_text=False),
+            Target=anno_simple(df_col['Target'],
+                               colors=target_colors,
+                               text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                               legend=True,
+                               add_text=False),
+            verbose=0,
+            label_side='left',
+            label_kws={'horizontalalignment': 'right', 'fontsize': fontsize}
+        )
+        if plot_secret:
+            row_ha = HeatmapAnnotation(
+                Secreted=anno_simple(df_row['Secreted'],
+                                     cmap='Set1',
+                                     text_kws={'color': 'black', 'rotation': 0, 'fontsize': fontsize},
+                                     legend=True,
+                                     add_text=False),
+                verbose=0,
+                axis=0,
+                label_kws={'horizontalalignment': 'left', 'fontsize': fontsize}
+            )
+        else:
+            row_ha = None
+        cm = DotClustermapPlotter(corr_mat,
+                                  x='level_1',
+                                  y='level_0',
+                                  value='means',
+                                  c='means',
+                                  s='-logp',
+                                  cmap='Reds',
+                                  vmin=0,
+                                  top_annotation=col_ha,
+                                  left_annotation=row_ha,
+                                  row_dendrogram=True,
+                                  show_rownames=True,
+                                  show_colnames=True)
+
+    # 设置热图网格和 colorbar 外观
+    cm.ax_heatmap.grid(which='minor', color='gray', linestyle='--')
+
+    # 遍历所有 axes 控件，调整 colorbar 的标签字体
+    for curr_ax in plt.gcf().axes:
+        if hasattr(curr_ax, 'get_ylabel') and curr_ax.get_ylabel() == 'means':
+            curr_ax.tick_params(labelsize=fontsize)
+            curr_ax.set_ylabel('means', fontsize=fontsize)
+        curr_ax.grid(False)
+        curr_ax.tick_params(labelsize=fontsize)
+
+    # 使用 tick_params 统一设置热图 x 和 y 轴 tick 标签的字体大小，解决转置情况下字体设置失效的问题
+    cm.ax_heatmap.tick_params(axis='x', labelsize=fontsize)
+    cm.ax_heatmap.tick_params(axis='y', labelsize=fontsize)
+
     for ax in plt.gcf().axes:
-        if hasattr(ax, 'get_ylabel'):
-            if ax.get_ylabel() == 'means':  # 假设 colorbar 有一个特定的标签
-                cbar = ax
-                cbar.tick_params(labelsize=fontsize)
-                cbar.set_ylabel('means',fontsize=fontsize)
-        ax.grid(False)
-    if plot_secret==True:
-        tesr[8].set_xticklabels(tesr[8].get_xticklabels(),fontsize=fontsize)
-        tesr[8].set_yticklabels(tesr[8].get_yticklabels(),fontsize=fontsize)
-    else:
-        tesr[6].set_xticklabels(tesr[6].get_xticklabels(),fontsize=fontsize)
-        tesr[6].set_yticklabels(tesr[6].get_yticklabels(),fontsize=fontsize)
-   
-    if return_table==True:
+        leg = ax.get_legend()
+        #print(leg)
+        if leg is not None:
+            for text in leg.get_texts():
+                text.set_fontsize(fontsize) # 这里设为你想要的字体大小
+
+    if return_table:
         return cor
     else:
-        return ax
+        return cm.ax_heatmap
 
 
 def cpdb_group_heatmap(adata,
