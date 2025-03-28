@@ -98,8 +98,8 @@ def minmax_normalize(data):
 def get_image_idx_1D(image_idx_2d):
     print("\nCalculating image index 1D:")
     max_value = np.max(image_idx_2d[:])
-    image_idx_1d = np.ones(max_value).astype(int)
-    for i in tqdm(range(1, max_value + 1)):
+    image_idx_1d = np.ones(max_value).astype(np.int64)
+    for i in range(1, max_value + 1):
         idx = np.where(image_idx_2d.T.flatten() == i)[0]
         if len(idx) > 0:
             image_idx_1d[i-1] = idx[0] + 1
