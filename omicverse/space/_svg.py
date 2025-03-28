@@ -10,6 +10,12 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         if 'counts' not in adata.layers.keys():
             adata.layers['counts'] = adata.X.copy()
         # Calculate PI
+        try:
+            import cv2
+        except ImportError:
+            print("Please install the package cv2 by \"pip install opencv-python\"")
+            import sys
+            sys.exit(1)
         adata = prepare_for_PI(adata, platform=platform)
         adata = cal_PI(adata, platform=platform)
         print('PI calculation is done!')
