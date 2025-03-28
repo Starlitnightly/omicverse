@@ -237,7 +237,7 @@ def get_sub(adata, kernel_size = 5, platform="visium",del_rate = 0.01):
                     del_index[i] = 0
             else:
                 del_index[i] = 0
-            output[i, :] = gene_img_flatten(targe_image, image_idx_1d)      
+            output[i, :] = gene_img_flatten(targe_image, image_idx_1d.values)      
     #--------------------------------------------------------------------------
     else:
         output = np.zeros((gene_data.shape[0], adata.uns['shape'][0]*adata.uns['shape'][1]))
