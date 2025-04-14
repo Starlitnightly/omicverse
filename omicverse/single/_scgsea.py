@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import anndata
 import seaborn as sns
 
-from ._aucell import derive_auc_threshold,create_rankings,aucell
+from ._aucell import derive_auc_threshold,fast_rank,_rank_sparse_row,aucell
 #from ctxcore.recovery import enrichment4cells,aucs
 #from ctxcore.genesig import GeneSignature
 
@@ -25,64 +25,7 @@ def check_ctxcore():
             'Please install the ctxcore: `pip install ctxcore`.'
         )
 
-def global_imports(modulename,shortname = None, asfunction = False):
-    if shortname is None: 
-        shortname = modulename
-    if asfunction is False:
-        globals()[shortname] = __import__(modulename)
-    else:        
-        globals()[shortname] = __import__(modulename)
 
-def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
-        
-    """
-    Calculate the AUC-ell score for a given gene set.
-
-    Arguments:
-        adata: AnnData object
-            Annotated data matrix containing gene expression data.
-        geneset_name: str
-            Name of the gene set.
-        geneset: list of str
-            List of gene symbols for the gene set.
-        AUC_threshold: float, optional
-            AUC threshold used to determine significant interactions (default is 0.01).
-        seed: int, optional
-            Seed used to initialize the random number generator (default is 42).
-
-    Returns:
-        None
-           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
-    """
-
-    check_ctxcore()
-    global ctxcore_install
-    if ctxcore_install==True:
-        global aucs
-        global GeneSignature
-        from ctxcore.recovery import aucs
-        from ctxcore.genesig import GeneSignature
-
-
-    matrix = adata.to_df()
-    percentiles = derive_auc_threshold(matrix)
-    auc_threshold = percentiles[AUC_threshold]
-
-    df_rnk=create_rankings(matrix, seed)
-    rnk=df_rnk.iloc[:, df_rnk.columns.isin(geneset)]
-
-    if rnk.empty or (float(len(rnk.columns)) / float(len(geneset))) < 0.80:
-        print(
-            f"Less than 80% of the genes in {geneset_name} are present in the "
-            "expression matrix."
-        )
-        adata.obs['{}_aucell'.format(geneset_name)]=np.zeros(shape=(df_rnk.shape[0]), dtype=np.float64)
-    else:
-        weights = np.array([1 for i in geneset])
-        adata.obs['{}_aucell'.format(geneset_name)]=aucs(rnk,
-            len(df_rnk.columns),weights,auc_threshold
-            )
-        
 def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
     """
     Calculate the AUC-ell score for a given gene set.
@@ -137,6 +80,65 @@ def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42
             auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
 
     adata.obs[f'{geneset_name}_aucell'] = auc_results
+
+def global_imports(modulename,shortname = None, asfunction = False):
+    if shortname is None: 
+        shortname = modulename
+    if asfunction is False:
+        globals()[shortname] = __import__(modulename)
+    else:        
+        globals()[shortname] = __import__(modulename)
+
+def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
+        
+    """
+    Calculate the AUC-ell score for a given gene set.
+
+    Arguments:
+        adata: AnnData object
+            Annotated data matrix containing gene expression data.
+        geneset_name: str
+            Name of the gene set.
+        geneset: list of str
+            List of gene symbols for the gene set.
+        AUC_threshold: float, optional
+            AUC threshold used to determine significant interactions (default is 0.01).
+        seed: int, optional
+            Seed used to initialize the random number generator (default is 42).
+
+    Returns:
+        None
+           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    """
+
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install==True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
+
+    matrix = adata.X.copy()
+    percentiles = derive_auc_threshold(matrix)
+    auc_threshold = percentiles[AUC_threshold]
+
+    np_rnk_sparse=fast_rank(matrix, seed= seed)
+
+    rnk  = pd.DataFrame(np_rnk_sparse[:, np.where(adata.var_names.isin(geneset))[0]])
+
+    if rnk.empty or (float(np_rnk_sparse.shape[1]) / float(len(geneset))) < 0.80:
+        print(
+            f"Less than 80% of the genes in {geneset_name} are present in the "
+            "expression matrix."
+        )
+        adata.obs['{}_aucell'.format(geneset_name)]=np.zeros(shape=(rnk.shape[0]), dtype=np.float64)
+    else:
+        weights = np.array([1 for i in geneset])
+        adata.obs['{}_aucell'.format(geneset_name)]=aucs(rnk,
+        np_rnk_sparse.shape[1],weights,auc_threshold
+        )
     
 def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42):
     """
