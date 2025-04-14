@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from boltons.iterutils import chunked
 from tqdm import tqdm
+from scipy.sparse import csr_matrix
 
 LOGGER = logging.getLogger(__name__)
 # To reduce the memory footprint of a ranking matrix we use unsigned 32bit integers which provides a range from 0
@@ -75,8 +76,39 @@ def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
         - 1
     )
 
+def _rank_sparse_row(row_sparse, n_cols):
+    row = row_sparse.toarray().ravel()
+    sort_idx = np.lexsort((np.arange(n_cols), -row))
+    rank_vals = np.empty(n_cols, dtype=np.int32)
+    rank_vals[sort_idx] = np.arange(n_cols)
+    return rank_vals
 
-def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
+def fast_rank(X_sparse, seed=42):
+
+    rng = np.random.default_rng(seed)
+    n_rows, n_cols = X_sparse.shape
+
+    shuffle_order = rng.permutation(n_cols)
+    X_shuffled = X_sparse[:, shuffle_order]
+
+    # results = Parallel(n_jobs=n_jobs, backend=backend)(
+    #     delayed(_rank_sparse_row)(X_shuffled.getrow(i), n_cols) for i in range(n_rows)
+    # )
+    results = []
+    for i in tqdm(range(n_rows)):
+        row_result = _rank_sparse_row(X_shuffled.getrow(i), n_cols)
+        results.append(row_result)
+    ranks = np.stack(results)
+
+    # Undo column shuffle
+    unshuffled_ranks = np.empty_like(ranks)
+    unshuffled_ranks[:, shuffle_order] = ranks
+
+    return unshuffled_ranks
+
+
+
+def derive_auc_threshold(ex_mtx: csr_matrix) -> pd.DataFrame:
     """
     Derive AUC thresholds for an expression matrix.
 
@@ -91,7 +123,7 @@ def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
 
     """
     return (
-        pd.Series(np.count_nonzero(ex_mtx, axis=1)).quantile(
+        pd.Series(np.count_nonzero(ex_mtx.A, axis=1)).quantile(
             [0.01, 0.05, 0.10, 0.50, 1]
         )
         / ex_mtx.shape[1]
