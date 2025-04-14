@@ -25,6 +25,62 @@ def check_ctxcore():
             'Please install the ctxcore: `pip install ctxcore`.'
         )
 
+
+def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
+    """
+    Calculate the AUC-ell score for a given gene set.
+
+    Arguments:
+        adata: AnnData object
+            Annotated data matrix containing gene expression data.
+        geneset_name: str
+            Name of the gene set.
+        geneset: list of str
+            List of gene symbols for the gene set.
+        AUC_threshold: float, optional
+            AUC threshold used to determine significant interactions (default is 0.01).
+        seed: int, optional
+            Seed used to initialize the random number generator (default is 42).
+        chunk_size: int, optional
+            The number of cells to process in each chunk (default is 10000).
+
+    Returns:
+        None
+           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    """
+
+    check_ctxcore()
+    global ctxcore_install
+    if ctxcore_install == True:
+        global aucs
+        global GeneSignature
+        from ctxcore.recovery import aucs
+        from ctxcore.genesig import GeneSignature
+
+    matrix = adata.to_df()
+    percentiles = derive_auc_threshold(matrix)
+    auc_threshold = percentiles[AUC_threshold]
+
+    n_cells = matrix.shape[0]
+    auc_results = np.zeros(n_cells, dtype=np.float64)
+
+    for start in range(0, n_cells, chunk_size):
+        end = min(start + chunk_size, n_cells)
+        chunk = matrix.iloc[start:end]
+        df_rnk = create_rankings(chunk, seed)
+        rnk = df_rnk.iloc[:, df_rnk.columns.isin(geneset)]
+
+        if rnk.empty or (float(len(rnk.columns)) / float(len(geneset))) < 0.80:
+            print(
+                f"Less than 80% of the genes in {geneset_name} are present in the "
+                "expression matrix."
+            )
+        else:
+            weights = np.array([1 for _ in geneset])
+            auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
+
+    adata.obs[f'{geneset_name}_aucell'] = auc_results
+
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
         shortname = modulename
