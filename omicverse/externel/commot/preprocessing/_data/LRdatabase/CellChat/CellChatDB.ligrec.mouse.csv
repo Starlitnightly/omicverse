@@ -1,0 +1,2020 @@
+,0,1,2,3
+0,Tgfb1,Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+1,Tgfb2,Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+2,Tgfb3,Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+3,Tgfb1,Acvr1b_Tgfbr2,TGFb,Secreted Signaling
+4,Tgfb1,Acvr1c_Tgfbr2,TGFb,Secreted Signaling
+5,Tgfb2,Acvr1b_Tgfbr2,TGFb,Secreted Signaling
+6,Tgfb2,Acvr1c_Tgfbr2,TGFb,Secreted Signaling
+7,Tgfb3,Acvr1b_Tgfbr2,TGFb,Secreted Signaling
+8,Tgfb3,Acvr1c_Tgfbr2,TGFb,Secreted Signaling
+9,Tgfb1,Acvr1_Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+10,Tgfb2,Acvr1_Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+11,Tgfb3,Acvr1_Tgfbr1_Tgfbr2,TGFb,Secreted Signaling
+12,Bmp2,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+13,Bmp2,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+14,Bmp2,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+15,Bmp2,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+16,Bmp2,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+17,Bmp2,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+18,Bmp4,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+19,Bmp4,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+20,Bmp4,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+21,Bmp4,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+22,Bmp4,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+23,Bmp4,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+24,Gdf5,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+25,Gdf5,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+26,Gdf5,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+27,Gdf5,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+28,Gdf5,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+29,Gdf5,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+30,Gdf6,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+31,Gdf6,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+32,Gdf6,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+33,Gdf6,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+34,Gdf6,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+35,Gdf6,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+36,Gdf7,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+37,Gdf7,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+38,Gdf7,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+39,Gdf7,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+40,Gdf7,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+41,Gdf7,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+42,Bmp15,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+43,Bmp5,Acvr1_Acvr2a,BMP,Secreted Signaling
+44,Bmp5,Acvr1_Acvr2b,BMP,Secreted Signaling
+45,Bmp5,Acvr1_Bmpr2,BMP,Secreted Signaling
+46,Bmp5,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+47,Bmp5,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+48,Bmp5,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+49,Bmp5,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+50,Bmp5,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+51,Bmp5,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+52,Bmp6,Acvr1_Acvr2a,BMP,Secreted Signaling
+53,Bmp6,Acvr1_Acvr2b,BMP,Secreted Signaling
+54,Bmp6,Acvr1_Bmpr2,BMP,Secreted Signaling
+55,Bmp6,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+56,Bmp6,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+57,Bmp6,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+58,Bmp6,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+59,Bmp6,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+60,Bmp6,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+61,Bmp7,Acvr1_Acvr2a,BMP,Secreted Signaling
+62,Bmp7,Acvr1_Acvr2b,BMP,Secreted Signaling
+63,Bmp7,Acvr1_Bmpr2,BMP,Secreted Signaling
+64,Bmp7,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+65,Bmp7,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+66,Bmp7,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+67,Bmp7,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+68,Bmp7,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+69,Bmp7,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+70,Bmp8a,Acvr1_Acvr2a,BMP,Secreted Signaling
+71,Bmp8a,Acvr1_Acvr2b,BMP,Secreted Signaling
+72,Bmp8a,Acvr1_Bmpr2,BMP,Secreted Signaling
+73,Bmp8a,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+74,Bmp8a,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+75,Bmp8a,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+76,Bmp8a,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+77,Bmp8a,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+78,Bmp8a,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+79,Bmp8b,Acvr1_Acvr2a,BMP,Secreted Signaling
+80,Bmp8b,Acvr1_Acvr2b,BMP,Secreted Signaling
+81,Bmp8b,Acvr1_Bmpr2,BMP,Secreted Signaling
+82,Bmp8b,Bmpr1a_Acvr2a,BMP,Secreted Signaling
+83,Bmp8b,Bmpr1a_Acvr2b,BMP,Secreted Signaling
+84,Bmp8b,Bmpr1a_Bmpr2,BMP,Secreted Signaling
+85,Bmp8b,Bmpr1b_Acvr2a,BMP,Secreted Signaling
+86,Bmp8b,Bmpr1b_Acvr2b,BMP,Secreted Signaling
+87,Bmp8b,Bmpr1b_Bmpr2,BMP,Secreted Signaling
+88,Bmp10,Acvrl1_Bmpr2,BMP10,Secreted Signaling
+89,Bmp10,Acvrl1_Acvr2a,BMP10,Secreted Signaling
+90,Gdf2,Acvrl1_Bmpr2,BMP10,Secreted Signaling
+91,Gdf2,Acvrl1_Acvr2a,BMP10,Secreted Signaling
+92,Gdf9,Acvr1b_Bmpr2,GDF,Secreted Signaling
+93,Gdf10,Acvr1b_Acvr2a,GDF,Secreted Signaling
+94,Gdf11,Tgfbr1_Acvr2a,GDF,Secreted Signaling
+95,Gdf11,Tgfbr1_Acvr2b,GDF,Secreted Signaling
+96,Gdf11,Acvr1b_Acvr2b,GDF,Secreted Signaling
+97,Gdf15,Tgfbr2,GDF,Secreted Signaling
+98,Mstn,Tgfbr1_Acvr2b,MSTN,Secreted Signaling
+99,Mstn,Acvr1b_Acvr2b,MSTN,Secreted Signaling
+100,Mstn,Acvr1b_Acvr2a,MSTN,Secreted Signaling
+101,Mstn,Tgfbr1_Acvr2a,MSTN,Secreted Signaling
+102,Amh,Amhr2_Acvr1,AMH,Secreted Signaling
+103,Amh,Amhr2_Bmpr1a,AMH,Secreted Signaling
+104,Gdnf,Gfra1_Ret,GDNF,Secreted Signaling
+105,Nrtn,Gfra2_Ret,GDNF,Secreted Signaling
+106,Artn,Gfra3_Ret,GDNF,Secreted Signaling
+107,Pspn,Gfra4_Ret,GDNF,Secreted Signaling
+108,Artn,Gfra1_Ret,GDNF,Secreted Signaling
+109,Nodal,Acvr1b_Acvr2a_Cfc1,NODAL,Secreted Signaling
+110,Nodal,Acvr1c_Acvr2a_Cfc1,NODAL,Secreted Signaling
+111,Nodal,Acvr1b_Acvr2b_Cfc1,NODAL,Secreted Signaling
+112,Nodal,Acvr1c_Acvr2b_Cfc1,NODAL,Secreted Signaling
+113,Gdf1,Acvr1b_Acvr2a_Cfc1,NODAL,Secreted Signaling
+114,Gdf1,Acvr1b_Acvr2b_Cfc1,NODAL,Secreted Signaling
+115,Gdf1,Acvr1c_Acvr2a_Cfc1,NODAL,Secreted Signaling
+116,Gdf1,Acvr1c_Acvr2b_Cfc1,NODAL,Secreted Signaling
+117,Gdf3,Acvr1b_Acvr2a_Cfc1,NODAL,Secreted Signaling
+118,Gdf3,Acvr1b_Acvr2b_Cfc1,NODAL,Secreted Signaling
+119,Gdf3,Acvr1c_Acvr2a_Cfc1,NODAL,Secreted Signaling
+120,Gdf3,Acvr1c_Acvr2b_Cfc1,NODAL,Secreted Signaling
+121,Inhba,Acvr1b_Acvr2a,ACTIVIN,Secreted Signaling
+122,Inhba,Acvr1b_Acvr2b,ACTIVIN,Secreted Signaling
+123,Inhbb,Acvr1b_Acvr2a,ACTIVIN,Secreted Signaling
+124,Inhbb,Acvr1b_Acvr2b,ACTIVIN,Secreted Signaling
+125,Inhbb,Acvr1c_Acvr2a,ACTIVIN,Secreted Signaling
+126,Inhbb,Acvr1c_Acvr2b,ACTIVIN,Secreted Signaling
+127,Inhbc,Acvr1b_Acvr2a,ACTIVIN,Secreted Signaling
+128,Inhbc,Acvr1b_Acvr2b,ACTIVIN,Secreted Signaling
+129,Inhbc,Acvr1c_Acvr2a,ACTIVIN,Secreted Signaling
+130,Inhbc,Acvr1c_Acvr2b,ACTIVIN,Secreted Signaling
+131,Inhbe,Acvr1b_Acvr2a,ACTIVIN,Secreted Signaling
+132,Inhbe,Acvr1b_Acvr2b,ACTIVIN,Secreted Signaling
+133,Inhbe,Acvr1c_Acvr2a,ACTIVIN,Secreted Signaling
+134,Inhbe,Acvr1c_Acvr2b,ACTIVIN,Secreted Signaling
+135,Inhba_Inhbb,Acvr1b_Acvr2a,ACTIVIN,Secreted Signaling
+136,Inhba_Inhbb,Acvr1b_Acvr2b,ACTIVIN,Secreted Signaling
+137,Inhba_Inhbb,Acvr1c_Acvr2a,ACTIVIN,Secreted Signaling
+138,Inhba_Inhbb,Acvr1c_Acvr2b,ACTIVIN,Secreted Signaling
+139,Inha_Inhba,Acvr2a,ACTIVIN,Secreted Signaling
+140,Inha_Inhbb,Acvr2b,ACTIVIN,Secreted Signaling
+141,Wnt1,Fzd1_Lrp5,WNT,Secreted Signaling
+142,Wnt1,Fzd10_Lrp5,WNT,Secreted Signaling
+143,Wnt1,Fzd2_Lrp5,WNT,Secreted Signaling
+144,Wnt1,Fzd3_Lrp5,WNT,Secreted Signaling
+145,Wnt1,Fzd4_Lrp5,WNT,Secreted Signaling
+146,Wnt1,Fzd5_Lrp5,WNT,Secreted Signaling
+147,Wnt1,Fzd6_Lrp5,WNT,Secreted Signaling
+148,Wnt1,Fzd7_Lrp5,WNT,Secreted Signaling
+149,Wnt1,Fzd8_Lrp5,WNT,Secreted Signaling
+150,Wnt1,Fzd9_Lrp5,WNT,Secreted Signaling
+151,Wnt10a,Fzd1_Lrp5,WNT,Secreted Signaling
+152,Wnt10a,Fzd10_Lrp5,WNT,Secreted Signaling
+153,Wnt10a,Fzd2_Lrp5,WNT,Secreted Signaling
+154,Wnt10a,Fzd3_Lrp5,WNT,Secreted Signaling
+155,Wnt10a,Fzd4_Lrp5,WNT,Secreted Signaling
+156,Wnt10a,Fzd5_Lrp5,WNT,Secreted Signaling
+157,Wnt10a,Fzd6_Lrp5,WNT,Secreted Signaling
+158,Wnt10a,Fzd7_Lrp5,WNT,Secreted Signaling
+159,Wnt10a,Fzd8_Lrp5,WNT,Secreted Signaling
+160,Wnt10a,Fzd9_Lrp5,WNT,Secreted Signaling
+161,Wnt10b,Fzd1_Lrp5,WNT,Secreted Signaling
+162,Wnt10b,Fzd10_Lrp5,WNT,Secreted Signaling
+163,Wnt10b,Fzd2_Lrp5,WNT,Secreted Signaling
+164,Wnt10b,Fzd3_Lrp5,WNT,Secreted Signaling
+165,Wnt10b,Fzd4_Lrp5,WNT,Secreted Signaling
+166,Wnt10b,Fzd5_Lrp5,WNT,Secreted Signaling
+167,Wnt10b,Fzd6_Lrp5,WNT,Secreted Signaling
+168,Wnt10b,Fzd7_Lrp5,WNT,Secreted Signaling
+169,Wnt10b,Fzd8_Lrp5,WNT,Secreted Signaling
+170,Wnt10b,Fzd9_Lrp5,WNT,Secreted Signaling
+171,Wnt16,Fzd1_Lrp5,WNT,Secreted Signaling
+172,Wnt16,Fzd10_Lrp5,WNT,Secreted Signaling
+173,Wnt16,Fzd2_Lrp5,WNT,Secreted Signaling
+174,Wnt16,Fzd3_Lrp5,WNT,Secreted Signaling
+175,Wnt16,Fzd4_Lrp5,WNT,Secreted Signaling
+176,Wnt16,Fzd5_Lrp5,WNT,Secreted Signaling
+177,Wnt16,Fzd6_Lrp5,WNT,Secreted Signaling
+178,Wnt16,Fzd7_Lrp5,WNT,Secreted Signaling
+179,Wnt16,Fzd8_Lrp5,WNT,Secreted Signaling
+180,Wnt16,Fzd9_Lrp5,WNT,Secreted Signaling
+181,Wnt2,Fzd1_Lrp5,WNT,Secreted Signaling
+182,Wnt2,Fzd10_Lrp5,WNT,Secreted Signaling
+183,Wnt2,Fzd2_Lrp5,WNT,Secreted Signaling
+184,Wnt2,Fzd3_Lrp5,WNT,Secreted Signaling
+185,Wnt2,Fzd4_Lrp5,WNT,Secreted Signaling
+186,Wnt2,Fzd5_Lrp5,WNT,Secreted Signaling
+187,Wnt2,Fzd6_Lrp5,WNT,Secreted Signaling
+188,Wnt2,Fzd7_Lrp5,WNT,Secreted Signaling
+189,Wnt2,Fzd8_Lrp5,WNT,Secreted Signaling
+190,Wnt2,Fzd9_Lrp5,WNT,Secreted Signaling
+191,Wnt2b,Fzd1_Lrp5,WNT,Secreted Signaling
+192,Wnt2b,Fzd10_Lrp5,WNT,Secreted Signaling
+193,Wnt2b,Fzd2_Lrp5,WNT,Secreted Signaling
+194,Wnt2b,Fzd3_Lrp5,WNT,Secreted Signaling
+195,Wnt2b,Fzd4_Lrp5,WNT,Secreted Signaling
+196,Wnt2b,Fzd5_Lrp5,WNT,Secreted Signaling
+197,Wnt2b,Fzd6_Lrp5,WNT,Secreted Signaling
+198,Wnt2b,Fzd7_Lrp5,WNT,Secreted Signaling
+199,Wnt2b,Fzd8_Lrp5,WNT,Secreted Signaling
+200,Wnt2b,Fzd9_Lrp5,WNT,Secreted Signaling
+201,Wnt3,Fzd1_Lrp5,WNT,Secreted Signaling
+202,Wnt3,Fzd10_Lrp5,WNT,Secreted Signaling
+203,Wnt3,Fzd2_Lrp5,WNT,Secreted Signaling
+204,Wnt3,Fzd3_Lrp5,WNT,Secreted Signaling
+205,Wnt3,Fzd4_Lrp5,WNT,Secreted Signaling
+206,Wnt3,Fzd5_Lrp5,WNT,Secreted Signaling
+207,Wnt3,Fzd6_Lrp5,WNT,Secreted Signaling
+208,Wnt3,Fzd7_Lrp5,WNT,Secreted Signaling
+209,Wnt3,Fzd8_Lrp5,WNT,Secreted Signaling
+210,Wnt3,Fzd9_Lrp5,WNT,Secreted Signaling
+211,Wnt3a,Fzd1_Lrp5,WNT,Secreted Signaling
+212,Wnt3a,Fzd10_Lrp5,WNT,Secreted Signaling
+213,Wnt3a,Fzd2_Lrp5,WNT,Secreted Signaling
+214,Wnt3a,Fzd3_Lrp5,WNT,Secreted Signaling
+215,Wnt3a,Fzd4_Lrp5,WNT,Secreted Signaling
+216,Wnt3a,Fzd5_Lrp5,WNT,Secreted Signaling
+217,Wnt3a,Fzd6_Lrp5,WNT,Secreted Signaling
+218,Wnt3a,Fzd7_Lrp5,WNT,Secreted Signaling
+219,Wnt3a,Fzd8_Lrp5,WNT,Secreted Signaling
+220,Wnt3a,Fzd9_Lrp5,WNT,Secreted Signaling
+221,Wnt4,Fzd1_Lrp5,WNT,Secreted Signaling
+222,Wnt4,Fzd10_Lrp5,WNT,Secreted Signaling
+223,Wnt4,Fzd2_Lrp5,WNT,Secreted Signaling
+224,Wnt4,Fzd3_Lrp5,WNT,Secreted Signaling
+225,Wnt4,Fzd4_Lrp5,WNT,Secreted Signaling
+226,Wnt4,Fzd5_Lrp5,WNT,Secreted Signaling
+227,Wnt4,Fzd6_Lrp5,WNT,Secreted Signaling
+228,Wnt4,Fzd7_Lrp5,WNT,Secreted Signaling
+229,Wnt4,Fzd8_Lrp5,WNT,Secreted Signaling
+230,Wnt4,Fzd9_Lrp5,WNT,Secreted Signaling
+231,Wnt6,Fzd1_Lrp5,WNT,Secreted Signaling
+232,Wnt6,Fzd10_Lrp5,WNT,Secreted Signaling
+233,Wnt6,Fzd2_Lrp5,WNT,Secreted Signaling
+234,Wnt6,Fzd3_Lrp5,WNT,Secreted Signaling
+235,Wnt6,Fzd4_Lrp5,WNT,Secreted Signaling
+236,Wnt6,Fzd5_Lrp5,WNT,Secreted Signaling
+237,Wnt6,Fzd6_Lrp5,WNT,Secreted Signaling
+238,Wnt6,Fzd7_Lrp5,WNT,Secreted Signaling
+239,Wnt6,Fzd8_Lrp5,WNT,Secreted Signaling
+240,Wnt6,Fzd9_Lrp5,WNT,Secreted Signaling
+241,Wnt7a,Fzd1_Lrp5,WNT,Secreted Signaling
+242,Wnt7a,Fzd10_Lrp5,WNT,Secreted Signaling
+243,Wnt7a,Fzd2_Lrp5,WNT,Secreted Signaling
+244,Wnt7a,Fzd3_Lrp5,WNT,Secreted Signaling
+245,Wnt7a,Fzd4_Lrp5,WNT,Secreted Signaling
+246,Wnt7a,Fzd5_Lrp5,WNT,Secreted Signaling
+247,Wnt7a,Fzd6_Lrp5,WNT,Secreted Signaling
+248,Wnt7a,Fzd7_Lrp5,WNT,Secreted Signaling
+249,Wnt7a,Fzd8_Lrp5,WNT,Secreted Signaling
+250,Wnt7a,Fzd9_Lrp5,WNT,Secreted Signaling
+251,Wnt7b,Fzd1_Lrp5,WNT,Secreted Signaling
+252,Wnt7b,Fzd10_Lrp5,WNT,Secreted Signaling
+253,Wnt7b,Fzd2_Lrp5,WNT,Secreted Signaling
+254,Wnt7b,Fzd3_Lrp5,WNT,Secreted Signaling
+255,Wnt7b,Fzd4_Lrp5,WNT,Secreted Signaling
+256,Wnt7b,Fzd5_Lrp5,WNT,Secreted Signaling
+257,Wnt7b,Fzd6_Lrp5,WNT,Secreted Signaling
+258,Wnt7b,Fzd7_Lrp5,WNT,Secreted Signaling
+259,Wnt7b,Fzd8_Lrp5,WNT,Secreted Signaling
+260,Wnt7b,Fzd9_Lrp5,WNT,Secreted Signaling
+261,Wnt8a,Fzd1_Lrp5,WNT,Secreted Signaling
+262,Wnt8a,Fzd10_Lrp5,WNT,Secreted Signaling
+263,Wnt8a,Fzd2_Lrp5,WNT,Secreted Signaling
+264,Wnt8a,Fzd3_Lrp5,WNT,Secreted Signaling
+265,Wnt8a,Fzd4_Lrp5,WNT,Secreted Signaling
+266,Wnt8a,Fzd5_Lrp5,WNT,Secreted Signaling
+267,Wnt8a,Fzd6_Lrp5,WNT,Secreted Signaling
+268,Wnt8a,Fzd7_Lrp5,WNT,Secreted Signaling
+269,Wnt8a,Fzd8_Lrp5,WNT,Secreted Signaling
+270,Wnt8a,Fzd9_Lrp5,WNT,Secreted Signaling
+271,Wnt8b,Fzd1_Lrp5,WNT,Secreted Signaling
+272,Wnt8b,Fzd10_Lrp5,WNT,Secreted Signaling
+273,Wnt8b,Fzd2_Lrp5,WNT,Secreted Signaling
+274,Wnt8b,Fzd3_Lrp5,WNT,Secreted Signaling
+275,Wnt8b,Fzd4_Lrp5,WNT,Secreted Signaling
+276,Wnt8b,Fzd5_Lrp5,WNT,Secreted Signaling
+277,Wnt8b,Fzd6_Lrp5,WNT,Secreted Signaling
+278,Wnt8b,Fzd7_Lrp5,WNT,Secreted Signaling
+279,Wnt8b,Fzd8_Lrp5,WNT,Secreted Signaling
+280,Wnt8b,Fzd9_Lrp5,WNT,Secreted Signaling
+281,Wnt9a,Fzd1_Lrp5,WNT,Secreted Signaling
+282,Wnt9a,Fzd10_Lrp5,WNT,Secreted Signaling
+283,Wnt9a,Fzd2_Lrp5,WNT,Secreted Signaling
+284,Wnt9a,Fzd3_Lrp5,WNT,Secreted Signaling
+285,Wnt9a,Fzd4_Lrp5,WNT,Secreted Signaling
+286,Wnt9a,Fzd5_Lrp5,WNT,Secreted Signaling
+287,Wnt9a,Fzd6_Lrp5,WNT,Secreted Signaling
+288,Wnt9a,Fzd7_Lrp5,WNT,Secreted Signaling
+289,Wnt9a,Fzd8_Lrp5,WNT,Secreted Signaling
+290,Wnt9a,Fzd9_Lrp5,WNT,Secreted Signaling
+291,Wnt9b,Fzd1_Lrp5,WNT,Secreted Signaling
+292,Wnt9b,Fzd10_Lrp5,WNT,Secreted Signaling
+293,Wnt9b,Fzd2_Lrp5,WNT,Secreted Signaling
+294,Wnt9b,Fzd3_Lrp5,WNT,Secreted Signaling
+295,Wnt9b,Fzd4_Lrp5,WNT,Secreted Signaling
+296,Wnt9b,Fzd5_Lrp5,WNT,Secreted Signaling
+297,Wnt9b,Fzd6_Lrp5,WNT,Secreted Signaling
+298,Wnt9b,Fzd7_Lrp5,WNT,Secreted Signaling
+299,Wnt9b,Fzd8_Lrp5,WNT,Secreted Signaling
+300,Wnt9b,Fzd9_Lrp5,WNT,Secreted Signaling
+301,Wnt1,Fzd1_Lrp6,WNT,Secreted Signaling
+302,Wnt1,Fzd10_Lrp6,WNT,Secreted Signaling
+303,Wnt1,Fzd2_Lrp6,WNT,Secreted Signaling
+304,Wnt1,Fzd3_Lrp6,WNT,Secreted Signaling
+305,Wnt1,Fzd4_Lrp6,WNT,Secreted Signaling
+306,Wnt1,Fzd5_Lrp6,WNT,Secreted Signaling
+307,Wnt1,Fzd6_Lrp6,WNT,Secreted Signaling
+308,Wnt1,Fzd7_Lrp6,WNT,Secreted Signaling
+309,Wnt1,Fzd8_Lrp6,WNT,Secreted Signaling
+310,Wnt1,Fzd9_Lrp6,WNT,Secreted Signaling
+311,Wnt10a,Fzd1_Lrp6,WNT,Secreted Signaling
+312,Wnt10a,Fzd10_Lrp6,WNT,Secreted Signaling
+313,Wnt10a,Fzd2_Lrp6,WNT,Secreted Signaling
+314,Wnt10a,Fzd3_Lrp6,WNT,Secreted Signaling
+315,Wnt10a,Fzd4_Lrp6,WNT,Secreted Signaling
+316,Wnt10a,Fzd5_Lrp6,WNT,Secreted Signaling
+317,Wnt10a,Fzd6_Lrp6,WNT,Secreted Signaling
+318,Wnt10a,Fzd7_Lrp6,WNT,Secreted Signaling
+319,Wnt10a,Fzd8_Lrp6,WNT,Secreted Signaling
+320,Wnt10a,Fzd9_Lrp6,WNT,Secreted Signaling
+321,Wnt10b,Fzd1_Lrp6,WNT,Secreted Signaling
+322,Wnt10b,Fzd10_Lrp6,WNT,Secreted Signaling
+323,Wnt10b,Fzd2_Lrp6,WNT,Secreted Signaling
+324,Wnt10b,Fzd3_Lrp6,WNT,Secreted Signaling
+325,Wnt10b,Fzd4_Lrp6,WNT,Secreted Signaling
+326,Wnt10b,Fzd5_Lrp6,WNT,Secreted Signaling
+327,Wnt10b,Fzd6_Lrp6,WNT,Secreted Signaling
+328,Wnt10b,Fzd7_Lrp6,WNT,Secreted Signaling
+329,Wnt10b,Fzd8_Lrp6,WNT,Secreted Signaling
+330,Wnt10b,Fzd9_Lrp6,WNT,Secreted Signaling
+331,Wnt16,Fzd1_Lrp6,WNT,Secreted Signaling
+332,Wnt16,Fzd10_Lrp6,WNT,Secreted Signaling
+333,Wnt16,Fzd2_Lrp6,WNT,Secreted Signaling
+334,Wnt16,Fzd3_Lrp6,WNT,Secreted Signaling
+335,Wnt16,Fzd4_Lrp6,WNT,Secreted Signaling
+336,Wnt16,Fzd5_Lrp6,WNT,Secreted Signaling
+337,Wnt16,Fzd6_Lrp6,WNT,Secreted Signaling
+338,Wnt16,Fzd7_Lrp6,WNT,Secreted Signaling
+339,Wnt16,Fzd8_Lrp6,WNT,Secreted Signaling
+340,Wnt16,Fzd9_Lrp6,WNT,Secreted Signaling
+341,Wnt2,Fzd1_Lrp6,WNT,Secreted Signaling
+342,Wnt2,Fzd10_Lrp6,WNT,Secreted Signaling
+343,Wnt2,Fzd2_Lrp6,WNT,Secreted Signaling
+344,Wnt2,Fzd3_Lrp6,WNT,Secreted Signaling
+345,Wnt2,Fzd4_Lrp6,WNT,Secreted Signaling
+346,Wnt2,Fzd5_Lrp6,WNT,Secreted Signaling
+347,Wnt2,Fzd6_Lrp6,WNT,Secreted Signaling
+348,Wnt2,Fzd7_Lrp6,WNT,Secreted Signaling
+349,Wnt2,Fzd8_Lrp6,WNT,Secreted Signaling
+350,Wnt2,Fzd9_Lrp6,WNT,Secreted Signaling
+351,Wnt2b,Fzd1_Lrp6,WNT,Secreted Signaling
+352,Wnt2b,Fzd10_Lrp6,WNT,Secreted Signaling
+353,Wnt2b,Fzd2_Lrp6,WNT,Secreted Signaling
+354,Wnt2b,Fzd3_Lrp6,WNT,Secreted Signaling
+355,Wnt2b,Fzd4_Lrp6,WNT,Secreted Signaling
+356,Wnt2b,Fzd5_Lrp6,WNT,Secreted Signaling
+357,Wnt2b,Fzd6_Lrp6,WNT,Secreted Signaling
+358,Wnt2b,Fzd7_Lrp6,WNT,Secreted Signaling
+359,Wnt2b,Fzd8_Lrp6,WNT,Secreted Signaling
+360,Wnt2b,Fzd9_Lrp6,WNT,Secreted Signaling
+361,Wnt3,Fzd1_Lrp6,WNT,Secreted Signaling
+362,Wnt3,Fzd10_Lrp6,WNT,Secreted Signaling
+363,Wnt3,Fzd2_Lrp6,WNT,Secreted Signaling
+364,Wnt3,Fzd3_Lrp6,WNT,Secreted Signaling
+365,Wnt3,Fzd4_Lrp6,WNT,Secreted Signaling
+366,Wnt3,Fzd5_Lrp6,WNT,Secreted Signaling
+367,Wnt3,Fzd6_Lrp6,WNT,Secreted Signaling
+368,Wnt3,Fzd7_Lrp6,WNT,Secreted Signaling
+369,Wnt3,Fzd8_Lrp6,WNT,Secreted Signaling
+370,Wnt3,Fzd9_Lrp6,WNT,Secreted Signaling
+371,Wnt3a,Fzd1_Lrp6,WNT,Secreted Signaling
+372,Wnt3a,Fzd10_Lrp6,WNT,Secreted Signaling
+373,Wnt3a,Fzd2_Lrp6,WNT,Secreted Signaling
+374,Wnt3a,Fzd3_Lrp6,WNT,Secreted Signaling
+375,Wnt3a,Fzd4_Lrp6,WNT,Secreted Signaling
+376,Wnt3a,Fzd5_Lrp6,WNT,Secreted Signaling
+377,Wnt3a,Fzd6_Lrp6,WNT,Secreted Signaling
+378,Wnt3a,Fzd7_Lrp6,WNT,Secreted Signaling
+379,Wnt3a,Fzd8_Lrp6,WNT,Secreted Signaling
+380,Wnt3a,Fzd9_Lrp6,WNT,Secreted Signaling
+381,Wnt4,Fzd1_Lrp6,WNT,Secreted Signaling
+382,Wnt4,Fzd10_Lrp6,WNT,Secreted Signaling
+383,Wnt4,Fzd2_Lrp6,WNT,Secreted Signaling
+384,Wnt4,Fzd3_Lrp6,WNT,Secreted Signaling
+385,Wnt4,Fzd4_Lrp6,WNT,Secreted Signaling
+386,Wnt4,Fzd5_Lrp6,WNT,Secreted Signaling
+387,Wnt4,Fzd6_Lrp6,WNT,Secreted Signaling
+388,Wnt4,Fzd7_Lrp6,WNT,Secreted Signaling
+389,Wnt4,Fzd8_Lrp6,WNT,Secreted Signaling
+390,Wnt4,Fzd9_Lrp6,WNT,Secreted Signaling
+391,Wnt6,Fzd1_Lrp6,WNT,Secreted Signaling
+392,Wnt6,Fzd10_Lrp6,WNT,Secreted Signaling
+393,Wnt6,Fzd2_Lrp6,WNT,Secreted Signaling
+394,Wnt6,Fzd3_Lrp6,WNT,Secreted Signaling
+395,Wnt6,Fzd4_Lrp6,WNT,Secreted Signaling
+396,Wnt6,Fzd5_Lrp6,WNT,Secreted Signaling
+397,Wnt6,Fzd6_Lrp6,WNT,Secreted Signaling
+398,Wnt6,Fzd7_Lrp6,WNT,Secreted Signaling
+399,Wnt6,Fzd8_Lrp6,WNT,Secreted Signaling
+400,Wnt6,Fzd9_Lrp6,WNT,Secreted Signaling
+401,Wnt7a,Fzd1_Lrp6,WNT,Secreted Signaling
+402,Wnt7a,Fzd10_Lrp6,WNT,Secreted Signaling
+403,Wnt7a,Fzd2_Lrp6,WNT,Secreted Signaling
+404,Wnt7a,Fzd3_Lrp6,WNT,Secreted Signaling
+405,Wnt7a,Fzd4_Lrp6,WNT,Secreted Signaling
+406,Wnt7a,Fzd5_Lrp6,WNT,Secreted Signaling
+407,Wnt7a,Fzd6_Lrp6,WNT,Secreted Signaling
+408,Wnt7a,Fzd7_Lrp6,WNT,Secreted Signaling
+409,Wnt7a,Fzd8_Lrp6,WNT,Secreted Signaling
+410,Wnt7a,Fzd9_Lrp6,WNT,Secreted Signaling
+411,Wnt7b,Fzd1_Lrp6,WNT,Secreted Signaling
+412,Wnt7b,Fzd10_Lrp6,WNT,Secreted Signaling
+413,Wnt7b,Fzd2_Lrp6,WNT,Secreted Signaling
+414,Wnt7b,Fzd3_Lrp6,WNT,Secreted Signaling
+415,Wnt7b,Fzd4_Lrp6,WNT,Secreted Signaling
+416,Wnt7b,Fzd5_Lrp6,WNT,Secreted Signaling
+417,Wnt7b,Fzd6_Lrp6,WNT,Secreted Signaling
+418,Wnt7b,Fzd7_Lrp6,WNT,Secreted Signaling
+419,Wnt7b,Fzd8_Lrp6,WNT,Secreted Signaling
+420,Wnt7b,Fzd9_Lrp6,WNT,Secreted Signaling
+421,Wnt8a,Fzd1_Lrp6,WNT,Secreted Signaling
+422,Wnt8a,Fzd10_Lrp6,WNT,Secreted Signaling
+423,Wnt8a,Fzd2_Lrp6,WNT,Secreted Signaling
+424,Wnt8a,Fzd3_Lrp6,WNT,Secreted Signaling
+425,Wnt8a,Fzd4_Lrp6,WNT,Secreted Signaling
+426,Wnt8a,Fzd5_Lrp6,WNT,Secreted Signaling
+427,Wnt8a,Fzd6_Lrp6,WNT,Secreted Signaling
+428,Wnt8a,Fzd7_Lrp6,WNT,Secreted Signaling
+429,Wnt8a,Fzd8_Lrp6,WNT,Secreted Signaling
+430,Wnt8a,Fzd9_Lrp6,WNT,Secreted Signaling
+431,Wnt8b,Fzd1_Lrp6,WNT,Secreted Signaling
+432,Wnt8b,Fzd10_Lrp6,WNT,Secreted Signaling
+433,Wnt8b,Fzd2_Lrp6,WNT,Secreted Signaling
+434,Wnt8b,Fzd3_Lrp6,WNT,Secreted Signaling
+435,Wnt8b,Fzd4_Lrp6,WNT,Secreted Signaling
+436,Wnt8b,Fzd5_Lrp6,WNT,Secreted Signaling
+437,Wnt8b,Fzd6_Lrp6,WNT,Secreted Signaling
+438,Wnt8b,Fzd7_Lrp6,WNT,Secreted Signaling
+439,Wnt8b,Fzd8_Lrp6,WNT,Secreted Signaling
+440,Wnt8b,Fzd9_Lrp6,WNT,Secreted Signaling
+441,Wnt9a,Fzd1_Lrp6,WNT,Secreted Signaling
+442,Wnt9a,Fzd10_Lrp6,WNT,Secreted Signaling
+443,Wnt9a,Fzd2_Lrp6,WNT,Secreted Signaling
+444,Wnt9a,Fzd3_Lrp6,WNT,Secreted Signaling
+445,Wnt9a,Fzd4_Lrp6,WNT,Secreted Signaling
+446,Wnt9a,Fzd5_Lrp6,WNT,Secreted Signaling
+447,Wnt9a,Fzd6_Lrp6,WNT,Secreted Signaling
+448,Wnt9a,Fzd7_Lrp6,WNT,Secreted Signaling
+449,Wnt9a,Fzd8_Lrp6,WNT,Secreted Signaling
+450,Wnt9a,Fzd9_Lrp6,WNT,Secreted Signaling
+451,Wnt9b,Fzd1_Lrp6,WNT,Secreted Signaling
+452,Wnt9b,Fzd10_Lrp6,WNT,Secreted Signaling
+453,Wnt9b,Fzd2_Lrp6,WNT,Secreted Signaling
+454,Wnt9b,Fzd3_Lrp6,WNT,Secreted Signaling
+455,Wnt9b,Fzd4_Lrp6,WNT,Secreted Signaling
+456,Wnt9b,Fzd5_Lrp6,WNT,Secreted Signaling
+457,Wnt9b,Fzd6_Lrp6,WNT,Secreted Signaling
+458,Wnt9b,Fzd7_Lrp6,WNT,Secreted Signaling
+459,Wnt9b,Fzd8_Lrp6,WNT,Secreted Signaling
+460,Wnt9b,Fzd9_Lrp6,WNT,Secreted Signaling
+461,Wnt5a,Fzd1,ncWNT,Secreted Signaling
+462,Wnt5a,Fzd10,ncWNT,Secreted Signaling
+463,Wnt5a,Fzd2,ncWNT,Secreted Signaling
+464,Wnt5a,Fzd3,ncWNT,Secreted Signaling
+465,Wnt5a,Fzd4,ncWNT,Secreted Signaling
+466,Wnt5a,Fzd5,ncWNT,Secreted Signaling
+467,Wnt5a,Fzd6,ncWNT,Secreted Signaling
+468,Wnt5a,Fzd7,ncWNT,Secreted Signaling
+469,Wnt5a,Fzd8,ncWNT,Secreted Signaling
+470,Wnt5a,Fzd9,ncWNT,Secreted Signaling
+471,Wnt5a,Mcam,ncWNT,Secreted Signaling
+472,Wnt5b,Fzd1,ncWNT,Secreted Signaling
+473,Wnt5b,Fzd10,ncWNT,Secreted Signaling
+474,Wnt5b,Fzd2,ncWNT,Secreted Signaling
+475,Wnt5b,Fzd3,ncWNT,Secreted Signaling
+476,Wnt5b,Fzd4,ncWNT,Secreted Signaling
+477,Wnt5b,Fzd5,ncWNT,Secreted Signaling
+478,Wnt5b,Fzd6,ncWNT,Secreted Signaling
+479,Wnt5b,Fzd7,ncWNT,Secreted Signaling
+480,Wnt5b,Fzd8,ncWNT,Secreted Signaling
+481,Wnt5b,Fzd9,ncWNT,Secreted Signaling
+482,Wnt11,Fzd1,ncWNT,Secreted Signaling
+483,Wnt11,Fzd10,ncWNT,Secreted Signaling
+484,Wnt11,Fzd2,ncWNT,Secreted Signaling
+485,Wnt11,Fzd3,ncWNT,Secreted Signaling
+486,Wnt11,Fzd4,ncWNT,Secreted Signaling
+487,Wnt11,Fzd5,ncWNT,Secreted Signaling
+488,Wnt11,Fzd6,ncWNT,Secreted Signaling
+489,Wnt11,Fzd7,ncWNT,Secreted Signaling
+490,Wnt11,Fzd8,ncWNT,Secreted Signaling
+491,Wnt11,Fzd9,ncWNT,Secreted Signaling
+492,Egf,Egfr,EGF,Secreted Signaling
+493,Egf,Egfr_Erbb2,EGF,Secreted Signaling
+494,Tgfa,Egfr,EGF,Secreted Signaling
+495,Tgfa,Egfr_Erbb2,EGF,Secreted Signaling
+496,Areg,Egfr,EGF,Secreted Signaling
+497,Areg,Egfr_Erbb2,EGF,Secreted Signaling
+498,Btc,Egfr,EGF,Secreted Signaling
+499,Btc,Egfr_Erbb2,EGF,Secreted Signaling
+500,Btc,Erbb4,EGF,Secreted Signaling
+501,Btc,Erbb2_Erbb4,EGF,Secreted Signaling
+502,Hbegf,Egfr,EGF,Secreted Signaling
+503,Hbegf,Egfr_Erbb2,EGF,Secreted Signaling
+504,Hbegf,Erbb4,EGF,Secreted Signaling
+505,Hbegf,Erbb2_Erbb4,EGF,Secreted Signaling
+506,Ereg,Egfr,EGF,Secreted Signaling
+507,Ereg,Egfr_Erbb2,EGF,Secreted Signaling
+508,Ereg,Erbb4,EGF,Secreted Signaling
+509,Ereg,Erbb2_Erbb4,EGF,Secreted Signaling
+510,Nrg1,Erbb3,NRG,Secreted Signaling
+511,Nrg1,Erbb2_Erbb3,NRG,Secreted Signaling
+512,Nrg1,Erbb4,NRG,Secreted Signaling
+513,Nrg1,Erbb2_Erbb4,NRG,Secreted Signaling
+514,Nrg2,Erbb3,NRG,Secreted Signaling
+515,Nrg2,Erbb2_Erbb3,NRG,Secreted Signaling
+516,Nrg2,Erbb4,NRG,Secreted Signaling
+517,Nrg2,Erbb2_Erbb4,NRG,Secreted Signaling
+518,Nrg3,Erbb4,NRG,Secreted Signaling
+519,Nrg3,Erbb2_Erbb4,NRG,Secreted Signaling
+520,Nrg4,Erbb4,NRG,Secreted Signaling
+521,Nrg4,Erbb2_Erbb4,NRG,Secreted Signaling
+522,Nrg1,Itgav_Itgb3,NRG,Secreted Signaling
+523,Fgf1,Fgfr1,FGF,Secreted Signaling
+524,Fgf1,Fgfr2,FGF,Secreted Signaling
+525,Fgf1,Fgfr3,FGF,Secreted Signaling
+526,Fgf1,Fgfr4,FGF,Secreted Signaling
+527,Fgf2,Fgfr1,FGF,Secreted Signaling
+528,Fgf2,Fgfr2,FGF,Secreted Signaling
+529,Fgf2,Fgfr3,FGF,Secreted Signaling
+530,Fgf2,Fgfr4,FGF,Secreted Signaling
+531,Fgf4,Fgfr1,FGF,Secreted Signaling
+532,Fgf4,Fgfr2,FGF,Secreted Signaling
+533,Fgf4,Fgfr3,FGF,Secreted Signaling
+534,Fgf4,Fgfr4,FGF,Secreted Signaling
+535,Fgf5,Fgfr1,FGF,Secreted Signaling
+536,Fgf5,Fgfr2,FGF,Secreted Signaling
+537,Fgf5,Fgfr3,FGF,Secreted Signaling
+538,Fgf5,Fgfr4,FGF,Secreted Signaling
+539,Fgf6,Fgfr1,FGF,Secreted Signaling
+540,Fgf6,Fgfr2,FGF,Secreted Signaling
+541,Fgf6,Fgfr3,FGF,Secreted Signaling
+542,Fgf6,Fgfr4,FGF,Secreted Signaling
+543,Fgf7,Fgfr1,FGF,Secreted Signaling
+544,Fgf7,Fgfr2,FGF,Secreted Signaling
+545,Fgf3,Fgfr1,FGF,Secreted Signaling
+546,Fgf3,Fgfr2,FGF,Secreted Signaling
+547,Fgf10,Fgfr1,FGF,Secreted Signaling
+548,Fgf10,Fgfr2,FGF,Secreted Signaling
+549,Fgf22,Fgfr2,FGF,Secreted Signaling
+550,Fgf8,Fgfr1,FGF,Secreted Signaling
+551,Fgf8,Fgfr2,FGF,Secreted Signaling
+552,Fgf8,Fgfr3,FGF,Secreted Signaling
+553,Fgf8,Fgfr4,FGF,Secreted Signaling
+554,Fgf17,Fgfr1,FGF,Secreted Signaling
+555,Fgf17,Fgfr2,FGF,Secreted Signaling
+556,Fgf17,Fgfr3,FGF,Secreted Signaling
+557,Fgf17,Fgfr4,FGF,Secreted Signaling
+558,Fgf18,Fgfr1,FGF,Secreted Signaling
+559,Fgf18,Fgfr2,FGF,Secreted Signaling
+560,Fgf18,Fgfr3,FGF,Secreted Signaling
+561,Fgf18,Fgfr4,FGF,Secreted Signaling
+562,Fgf9,Fgfr1,FGF,Secreted Signaling
+563,Fgf9,Fgfr2,FGF,Secreted Signaling
+564,Fgf9,Fgfr3,FGF,Secreted Signaling
+565,Fgf9,Fgfr4,FGF,Secreted Signaling
+566,Fgf20,Fgfr1,FGF,Secreted Signaling
+567,Fgf20,Fgfr2,FGF,Secreted Signaling
+568,Fgf20,Fgfr3,FGF,Secreted Signaling
+569,Fgf20,Fgfr4,FGF,Secreted Signaling
+570,Fgf16,Fgfr1,FGF,Secreted Signaling
+571,Fgf16,Fgfr2,FGF,Secreted Signaling
+572,Fgf16,Fgfr3,FGF,Secreted Signaling
+573,Fgf16,Fgfr4,FGF,Secreted Signaling
+574,Fgf15,Fgfr1,FGF,Secreted Signaling
+575,Fgf15,Fgfr2,FGF,Secreted Signaling
+576,Fgf15,Fgfr3,FGF,Secreted Signaling
+577,Fgf15,Fgfr4,FGF,Secreted Signaling
+578,Fgf21,Fgfr1,FGF,Secreted Signaling
+579,Fgf21,Fgfr3,FGF,Secreted Signaling
+580,Fgf23,Fgfr1,FGF,Secreted Signaling
+581,Fgf23,Fgfr3,FGF,Secreted Signaling
+582,Fgf23,Fgfr4,FGF,Secreted Signaling
+583,Pdgfa,Pdgfra,PDGF,Secreted Signaling
+584,Pdgfa,Pdgfrb,PDGF,Secreted Signaling
+585,Pdgfb,Pdgfra,PDGF,Secreted Signaling
+586,Pdgfb,Pdgfrb,PDGF,Secreted Signaling
+587,Pdgfc,Pdgfra,PDGF,Secreted Signaling
+588,Pdgfd,Pdgfrb,PDGF,Secreted Signaling
+589,Vegfa,Flt1,VEGF,Secreted Signaling
+590,Vegfa,Kdr,VEGF,Secreted Signaling
+591,Vegfb,Flt1,VEGF,Secreted Signaling
+592,Vegfc,Flt4,VEGF,Secreted Signaling
+593,Vegfc,Kdr,VEGF,Secreted Signaling
+594,Vegfd,Flt4,VEGF,Secreted Signaling
+595,Vegfd,Kdr,VEGF,Secreted Signaling
+596,Pgf,Flt1,VEGF,Secreted Signaling
+597,Vegfa,Flt1_Kdr,VEGF,Secreted Signaling
+598,Vegfc,Flt4_Kdr,VEGF,Secreted Signaling
+599,Vegfd,Flt4_Kdr,VEGF,Secreted Signaling
+600,Igf1,Igf1r,IGF,Secreted Signaling
+601,Igf2,Igf1r,IGF,Secreted Signaling
+602,Igf2,Igf2r,IGF,Secreted Signaling
+603,Igf1,Itgav_Itgb3,IGF,Secreted Signaling
+604,Igf1,Itga6_Itgb4,IGF,Secreted Signaling
+605,Igf2,Itgav_Itgb3,IGF,Secreted Signaling
+606,Igf2,Itga6_Itgb4,IGF,Secreted Signaling
+607,Igfl3,Igflr1,IGF,Secreted Signaling
+608,Ins1,Insr,INSULIN,Secreted Signaling
+609,Ins2,Insr,INSULIN,Secreted Signaling
+610,Apln,Aplnr,APELIN,Secreted Signaling
+611,Dhh,Ptch1_Smo,HH,Secreted Signaling
+612,Ihh,Ptch1_Smo,HH,Secreted Signaling
+613,Shh,Ptch1_Smo,HH,Secreted Signaling
+614,Dhh,Ptch2_Smo,HH,Secreted Signaling
+615,Ihh,Ptch2_Smo,HH,Secreted Signaling
+616,Shh,Ptch2_Smo,HH,Secreted Signaling
+617,Ccl5,Ccr1,CCL,Secreted Signaling
+618,Ccl3,Ccr1,CCL,Secreted Signaling
+619,Ccl8,Ccr1,CCL,Secreted Signaling
+620,Ccl9,Ccr1,CCL,Secreted Signaling
+621,Ccl6,Ccr1,CCL,Secreted Signaling
+622,Ccl7,Ccr1,CCL,Secreted Signaling
+623,Ccl5,Ccr1l1,CCL,Secreted Signaling
+624,Ccl3,Ccr1l1,CCL,Secreted Signaling
+625,Ccl8,Ccr1l1,CCL,Secreted Signaling
+626,Ccl9,Ccr1l1,CCL,Secreted Signaling
+627,Ccl6,Ccr1l1,CCL,Secreted Signaling
+628,Ccl7,Ccr1l1,CCL,Secreted Signaling
+629,Ccl8,Ccr2,CCL,Secreted Signaling
+630,Ccl6,Ccr2,CCL,Secreted Signaling
+631,Ccl7,Ccr2,CCL,Secreted Signaling
+632,Ccl2,Ccr2,CCL,Secreted Signaling
+633,Ccl12,Ccr2,CCL,Secreted Signaling
+634,Ccl27a,Ccr2,CCL,Secreted Signaling
+635,Ccl27b,Ccr2,CCL,Secreted Signaling
+636,Ccl5,Ccr3,CCL,Secreted Signaling
+637,Ccl6,Ccr3,CCL,Secreted Signaling
+638,Ccl7,Ccr3,CCL,Secreted Signaling
+639,Ccl11,Ccr3,CCL,Secreted Signaling
+640,Ccl24,Ccr3,CCL,Secreted Signaling
+641,Ccl26,Ccr3,CCL,Secreted Signaling
+642,Ccl28,Ccr3,CCL,Secreted Signaling
+643,Ccl27a,Ccr3,CCL,Secreted Signaling
+644,Ccl27b,Ccr3,CCL,Secreted Signaling
+645,Ccl17,Ccr4,CCL,Secreted Signaling
+646,Ccl22,Ccr4,CCL,Secreted Signaling
+647,Ccl5,Ccr4,CCL,Secreted Signaling
+648,Ccl4,Ccr5,CCL,Secreted Signaling
+649,Ccl5,Ccr5,CCL,Secreted Signaling
+650,Ccl3,Ccr5,CCL,Secreted Signaling
+651,Ccl8,Ccr5,CCL,Secreted Signaling
+652,Ccl20,Ccr6,CCL,Secreted Signaling
+653,Ccl19,Ccr7,CCL,Secreted Signaling
+654,Ccl21a,Ccr7,CCL,Secreted Signaling
+655,Ccl21b,Ccr7,CCL,Secreted Signaling
+656,Ccl21c,Ccr7,CCL,Secreted Signaling
+657,Ccl19,Ackr4,CCL,Secreted Signaling
+658,Ccl21a,Ackr4,CCL,Secreted Signaling
+659,Ccl21b,Ackr4,CCL,Secreted Signaling
+660,Ccl21c,Ackr4,CCL,Secreted Signaling
+661,Ccl1,Ccr8,CCL,Secreted Signaling
+662,Ccl25,Ccr9,CCL,Secreted Signaling
+663,Ccl25,Ackr4,CCL,Secreted Signaling
+664,Ccl28,Ccr10,CCL,Secreted Signaling
+665,Ccl27a,Ccr10,CCL,Secreted Signaling
+666,Ccl27b,Ccr10,CCL,Secreted Signaling
+667,Ccl1,Ackr4,CCL,Secreted Signaling
+668,Ccl8,Ackr4,CCL,Secreted Signaling
+669,Ccl1,Ackr1,CCL,Secreted Signaling
+670,Ccl2,Ackr1,CCL,Secreted Signaling
+671,Ccl2,Ackr2,CCL,Secreted Signaling
+672,Ccl3,Ackr2,CCL,Secreted Signaling
+673,Ccl4,Ackr2,CCL,Secreted Signaling
+674,Ccl5,Ackr1,CCL,Secreted Signaling
+675,Ccl5,Ackr2,CCL,Secreted Signaling
+676,Ccl7,Ackr1,CCL,Secreted Signaling
+677,Ccl8,Ackr1,CCL,Secreted Signaling
+678,Ccl11,Ackr1,CCL,Secreted Signaling
+679,Ccl11,Ackr2,CCL,Secreted Signaling
+680,Ccl22,Ackr2,CCL,Secreted Signaling
+681,Ccl24,Ackr2,CCL,Secreted Signaling
+682,Ccl26,Ackr2,CCL,Secreted Signaling
+683,Ccl17,Ackr1,CCL,Secreted Signaling
+684,Ccl17,Ackr2,CCL,Secreted Signaling
+685,Cxcl1,Cxcr1,CXCL,Secreted Signaling
+686,Cxcl5,Cxcr1,CXCL,Secreted Signaling
+687,Cxcl2,Cxcr1,CXCL,Secreted Signaling
+688,Cxcl3,Cxcr1,CXCL,Secreted Signaling
+689,Cxcl1,Cxcr2,CXCL,Secreted Signaling
+690,Cxcl5,Cxcr2,CXCL,Secreted Signaling
+691,Cxcl2,Cxcr2,CXCL,Secreted Signaling
+692,Cxcl3,Cxcr2,CXCL,Secreted Signaling
+693,Ppbp,Cxcr2,CXCL,Secreted Signaling
+694,Pf4,Cxcr3,CXCL,Secreted Signaling
+695,Cxcl9,Cxcr3,CXCL,Secreted Signaling
+696,Cxcl10,Cxcr3,CXCL,Secreted Signaling
+697,Cxcl11,Cxcr3,CXCL,Secreted Signaling
+698,Cxcl13,Cxcr3,CXCL,Secreted Signaling
+699,Pf4,Cxcr3,CXCL,Secreted Signaling
+700,Cxcl12,Cxcr4,CXCL,Secreted Signaling
+701,Cxcl12,Ackr3,CXCL,Secreted Signaling
+702,Cxcl13,Cxcr5,CXCL,Secreted Signaling
+703,Cxcl16,Cxcr6,CXCL,Secreted Signaling
+704,Cxcl1,Ackr1,CXCL,Secreted Signaling
+705,Cxcl2,Ackr1,CXCL,Secreted Signaling
+706,Cxcl3,Ackr1,CXCL,Secreted Signaling
+707,Cxcl5,Ackr1,CXCL,Secreted Signaling
+708,Cxcl9,Ackr1,CXCL,Secreted Signaling
+709,Cxcl10,Ackr1,CXCL,Secreted Signaling
+710,Cxcl11,Ackr1,CXCL,Secreted Signaling
+711,Cxcl11,Ackr3,CXCL,Secreted Signaling
+712,Cxcl13,Ackr1,CXCL,Secreted Signaling
+713,Mif,Cd74_Cxcr4,MIF,Secreted Signaling
+714,Mif,Cd74_Cd44,MIF,Secreted Signaling
+715,Mif,Cd74_Cxcr2,MIF,Secreted Signaling
+716,Mif,Ackr3,MIF,Secreted Signaling
+717,Cx3cl1,Cx3cr1,CX3C,Secreted Signaling
+718,Xcl1,Xcr1,XCR,Secreted Signaling
+719,Il2,Il2ra_Il2rb_Il2rg,IL2,Secreted Signaling
+720,Il2,Il2rb_Il2rg,IL2,Secreted Signaling
+721,Il4,Il4ra_Il2rg,IL2,Secreted Signaling
+722,Il7,Il7r_Il2rg,IL2,Secreted Signaling
+723,Il9,Il9r_Il2rg,IL2,Secreted Signaling
+724,Il15,Il15ra_Il2rb_Il2rg,IL2,Secreted Signaling
+725,Il21,Il21r_Il2rg,IL2,Secreted Signaling
+726,Tslp,Il7r_Crlf2,IL2,Secreted Signaling
+727,Il3,Il3ra_Csf2rb,IL4,Secreted Signaling
+728,Il5,Il5ra_Csf2rb,IL4,Secreted Signaling
+729,Csf2,Csf2ra_Csf2rb,IL4,Secreted Signaling
+730,Il4,Il4ra,IL4,Secreted Signaling
+731,Il4,Il4ra_Il13ra1,IL4,Secreted Signaling
+732,Il4,Il4ra_Il13ra2,IL4,Secreted Signaling
+733,Il13,Il4ra_Il13ra1,IL4,Secreted Signaling
+734,Il13,Il4ra_Il13ra2,IL4,Secreted Signaling
+735,Il13,Il13ra1,IL4,Secreted Signaling
+736,Il13,Il13ra2,IL4,Secreted Signaling
+737,Il6,Il6ra_Il6st,IL6,Secreted Signaling
+738,Il11,Il11ra1_Il6st,IL6,Secreted Signaling
+739,Il11,Il11ra2_Il6st,IL6,Secreted Signaling
+740,Il12a_Il12b,Il12rb1_Il12rb2,IL12,Secreted Signaling
+741,Il12b_Il23a,Il23r_Il12rb1,IL12,Secreted Signaling
+742,Il27_Ebi3,Il27ra_Il6st,IL12,Secreted Signaling
+743,Il31,Il31ra_Osmr,IL6,Secreted Signaling
+744,Cntf,Cntfr_Lifr_Il6st,LIFR,Secreted Signaling
+745,Clcf1,Cntfr_Lifr_Il6st,LIFR,Secreted Signaling
+746,Ctf1,Lifr_Il6st,LIFR,Secreted Signaling
+747,Lif,Lifr_Il6st,LIFR,Secreted Signaling
+748,Osm,Lifr_Il6st,OSM,Secreted Signaling
+749,Osm,Osmr_Il6st,OSM,Secreted Signaling
+750,Il10,Il10ra_Il10rb,IL10,Secreted Signaling
+751,Il19,Il20ra_Il20rb,IL10,Secreted Signaling
+752,Il20,Il20ra_Il20rb,IL10,Secreted Signaling
+753,Il24,Il20ra_Il20rb,IL10,Secreted Signaling
+754,Il20,Il22ra1_Il20rb,IL10,Secreted Signaling
+755,Il24,Il22ra1_Il20rb,IL10,Secreted Signaling
+756,Il22,Il22ra1_Il10rb,IL10,Secreted Signaling
+757,Il1a,Il1r1_Il1rap,IL1,Secreted Signaling
+758,Il1b,Il1r1_Il1rap,IL1,Secreted Signaling
+759,Il1f5,Il1rl2_Il1rap,IL1,Secreted Signaling
+760,Il1f6,Il1rl2_Il1rap,IL1,Secreted Signaling
+761,Il1f8,Il1rl2_Il1rap,IL1,Secreted Signaling
+762,Il1f9,Il1rl2_Il1rap,IL1,Secreted Signaling
+763,Il1f10,Il1rl2_Il1rap,IL1,Secreted Signaling
+764,Il18,Il18r1_Il18rap,IL1,Secreted Signaling
+765,Il33,Il1rl1_Il1rap,IL1,Secreted Signaling
+766,Il17a,Il17ra_Il17rc,IL17,Secreted Signaling
+767,Il17f,Il17ra_Il17rc,IL17,Secreted Signaling
+768,Il17a_Il17f,Il17ra_Il17rc,IL17,Secreted Signaling
+769,Il17b,Il17rb,IL17,Secreted Signaling
+770,Il17c,Il17ra_Il17re,IL17,Secreted Signaling
+771,Il25,Il17ra_Il17rb,IL17,Secreted Signaling
+772,Il34,Csf1r,CSF,Secreted Signaling
+773,Csf1,Csf1r,CSF,Secreted Signaling
+774,Il16,Cd4,IL16,Secreted Signaling
+775,Epo,Epor,EPO,Secreted Signaling
+776,Gh,Ghr,GH,Secreted Signaling
+777,Prl,Prlr,PRL,Secreted Signaling
+778,Thpo,Mpl,THPO,Secreted Signaling
+779,Csf3,Csf3r,CSF3,Secreted Signaling
+780,Ifna,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+781,Ifnb1,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+782,Ifnk,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+783,Ifne,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+784,Ifna11,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+785,Ifna1,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+786,Ifna2,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+787,Ifna4,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+788,Ifna5,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+789,Ifna6,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+790,Ifna7,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+791,Ifna9,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+792,Ifnab,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+793,Ifna12,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+794,Ifna13,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+795,Ifna14,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+796,Ifna15,Ifnar1_Ifnar2,IFN-I,Secreted Signaling
+797,Ifng,Ifngr1_Ifngr2,IFN-II,Secreted Signaling
+798,Ifnl2,Ifnlr1_Il10rb,IFN-lII,Secreted Signaling
+799,Ifnl3,Ifnlr1_Il10rb,IFN-lII,Secreted Signaling
+800,Tnf,Tnfrsf1a,TNF,Secreted Signaling
+801,Tnf,Tnfrsf1b,TNF,Secreted Signaling
+802,Lta,Tnfrsf1a,LT,Secreted Signaling
+803,Lta,Tnfrsf1b,LT,Secreted Signaling
+804,Lta,Tnfrsf14,LT,Secreted Signaling
+805,Lta_Ltb,Ltbr,LT,Secreted Signaling
+806,Tnfsf14,Ltbr,LIGHT,Secreted Signaling
+807,Tnfsf14,Tnfrsf14,LIGHT,Secreted Signaling
+808,Fasl,Fas,FASLG,Secreted Signaling
+809,Tnfsf15,Tnfrsf25,VEGI,Secreted Signaling
+810,Tnfsf10,Tnfrsf10b,TRAIL,Secreted Signaling
+811,Eda,Edar,EDA,Secreted Signaling
+812,Eda,Eda2r,EDA,Secreted Signaling
+813,Ngf,Ngfr,NGF,Secreted Signaling
+814,Klk1b4,Ngfr,NGF,Secreted Signaling
+815,Tnfsf11,Tnfrsf11a,RANKL,Secreted Signaling
+816,Tnfsf11,Tnfrsf11b,RANKL,Secreted Signaling
+817,Tnfsf12,Tnfrsf12a,TWEAK,Secreted Signaling
+818,Cd70,Cd27,CD70,Secreted Signaling
+819,Tnfsf8,Tnfrsf8,CD30,Secreted Signaling
+820,Tnfsf9,Tnfrsf9,CD137,Secreted Signaling
+821,Tnfsf4,Tnfrsf4,OX40,Secreted Signaling
+822,Tnfsf18,Tnfrsf18,GITRL,Secreted Signaling
+823,Tnfsf13,Tnfrsf17,APRIL,Secreted Signaling
+824,Tnfsf13,Tnfrsf13b,APRIL,Secreted Signaling
+825,Tnfsf13b,Tnfrsf17,BAFF,Secreted Signaling
+826,Tnfsf13b,Tnfrsf13b,BAFF,Secreted Signaling
+827,Tnfsf13b,Tnfrsf13c,BAFF,Secreted Signaling
+828,Cd40lg,Itga2b_Itgb3,CD40,Secreted Signaling
+829,Cd40lg,Itga5_Itgb1,CD40,Secreted Signaling
+830,Cd40lg,Itgam_Itgb2,CD40,Secreted Signaling
+831,Spp1,Cd44,SPP1,Secreted Signaling
+832,Spp1,Itgav_Itgb3,SPP1,Secreted Signaling
+833,Spp1,Itgav_Itgb1,SPP1,Secreted Signaling
+834,Spp1,Itgav_Itgb5,SPP1,Secreted Signaling
+835,Spp1,Itgav_Itgb6,SPP1,Secreted Signaling
+836,Spp1,Itga4_Itgb1,SPP1,Secreted Signaling
+837,Spp1,Itga9_Itgb1,SPP1,Secreted Signaling
+838,Spp1,Itga8_Itgb1,SPP1,Secreted Signaling
+839,Spp1,Itga5_Itgb1,SPP1,Secreted Signaling
+840,Adipoq,Adipor1,ADIPONECTIN,Secreted Signaling
+841,Adipoq,Adipor2,ADIPONECTIN,Secreted Signaling
+842,Retn,Tlr4,RESISTIN,Secreted Signaling
+843,Retn,Cap1,RESISTIN,Secreted Signaling
+844,Nampt,Insr,VISFATIN,Secreted Signaling
+845,Nampt,Itga5_Itgb1,VISFATIN,Secreted Signaling
+846,Angptl1,Itga1_Itgb1,ANGPTL,Secreted Signaling
+847,Angptl2,Itga5_Itgb1,ANGPTL,Secreted Signaling
+848,Angptl2,Tlr4,ANGPTL,Secreted Signaling
+849,Angptl2,Pirb,ANGPTL,Secreted Signaling
+850,Angptl1,Pirb,ANGPTL,Secreted Signaling
+851,Angptl7,Pirb,ANGPTL,Secreted Signaling
+852,Angptl4,Itga5_Itgb1,ANGPTL,Secreted Signaling
+853,Angptl4,Itgav_Itgb3,ANGPTL,Secreted Signaling
+854,Angptl4,Cdh5,ANGPTL,Secreted Signaling
+855,Angptl4,Cdh11,ANGPTL,Secreted Signaling
+856,Angptl4,Sdc1,ANGPTL,Secreted Signaling
+857,Angptl4,Sdc2,ANGPTL,Secreted Signaling
+858,Angptl4,Sdc3,ANGPTL,Secreted Signaling
+859,Angptl4,Sdc4,ANGPTL,Secreted Signaling
+860,Angptl3,Itgav_Itgb3,ANGPTL,Secreted Signaling
+861,Angpt1,Tek,ANGPT,Secreted Signaling
+862,Angpt2,Tek,ANGPT,Secreted Signaling
+863,Angpt2,Itga5_Itgb1,ANGPT,Secreted Signaling
+864,Mdk,Sdc1,MK,Secreted Signaling
+865,Mdk,Sdc2,MK,Secreted Signaling
+866,Mdk,Sdc4,MK,Secreted Signaling
+867,Mdk,Ptprz1,MK,Secreted Signaling
+868,Mdk,Itga4_Itgb1,MK,Secreted Signaling
+869,Mdk,Itga6_Itgb1,MK,Secreted Signaling
+870,Mdk,Lrp1,MK,Secreted Signaling
+871,Mdk,Ncl,MK,Secreted Signaling
+872,Mdk,Alk,MK,Secreted Signaling
+873,Ptn,Ptprz1,PTN,Secreted Signaling
+874,Ptn,Sdc1,PTN,Secreted Signaling
+875,Ptn,Sdc2,PTN,Secreted Signaling
+876,Ptn,Sdc3,PTN,Secreted Signaling
+877,Ptn,Sdc4,PTN,Secreted Signaling
+878,Ptn,Itgav_Itgb3,PTN,Secreted Signaling
+879,Ptn,Ncl,PTN,Secreted Signaling
+880,Ptn,Alk,PTN,Secreted Signaling
+881,Postn,Itgav_Itgb3,PERIOSTIN,Secreted Signaling
+882,Postn,Itgav_Itgb5,PERIOSTIN,Secreted Signaling
+883,Agt,Agtr1a,AGT,Secreted Signaling
+884,Agt,Agtr1b,AGT,Secreted Signaling
+885,Grp,Grpr,GPR,Secreted Signaling
+886,Nmb,Nmbr,GPR,Secreted Signaling
+887,Kng1,Bdkrb1,BRADYKININ,Secreted Signaling
+888,Kng1,Bdkrb2,BRADYKININ,Secreted Signaling
+889,Kng2,Bdkrb1,BRADYKININ,Secreted Signaling
+890,Kng2,Bdkrb2,BRADYKININ,Secreted Signaling
+891,C3,C3ar1,COMPLEMENT,Secreted Signaling
+892,C3,Cr2,COMPLEMENT,Secreted Signaling
+893,C3,Itgam_Itgb2,COMPLEMENT,Secreted Signaling
+894,C3,Itgax_Itgb2,COMPLEMENT,Secreted Signaling
+895,C4a,C3ar1,COMPLEMENT,Secreted Signaling
+896,C4b,Cr2,COMPLEMENT,Secreted Signaling
+897,Hc,C5ar1,COMPLEMENT,Secreted Signaling
+898,Cck,Cckar,CCK,Secreted Signaling
+899,Cck,Cckbr,CCK,Secreted Signaling
+900,Edn1,Ednra,EDN,Secreted Signaling
+901,Edn2,Ednra,EDN,Secreted Signaling
+902,Edn3,Ednra,EDN,Secreted Signaling
+903,Edn1,Ednrb,EDN,Secreted Signaling
+904,Edn2,Ednrb,EDN,Secreted Signaling
+905,Edn3,Ednrb,EDN,Secreted Signaling
+906,Gal,Galr1,GALANIN,Secreted Signaling
+907,Gal,Galr2,GALANIN,Secreted Signaling
+908,Gal,Galr3,GALANIN,Secreted Signaling
+909,Galp,Galr1,GALANIN,Secreted Signaling
+910,Galp,Galr2,GALANIN,Secreted Signaling
+911,Ghrl,Ghsr,GHRELIN,Secreted Signaling
+912,Kiss1,Kiss1r,KISS1,Secreted Signaling
+913,Pomc,Mc1r,MELANOCORTIN,Secreted Signaling
+914,Pomc,Mc2r,MELANOCORTIN,Secreted Signaling
+915,Pomc,Mc3r,MELANOCORTIN,Secreted Signaling
+916,Pomc,Mc4r,MELANOCORTIN,Secreted Signaling
+917,Pomc,Mc5r,MELANOCORTIN,Secreted Signaling
+918,Nmu,Nmur1,NMU,Secreted Signaling
+919,Nmu,Nmur2,NMU,Secreted Signaling
+920,Nms,Nmur1,NMU,Secreted Signaling
+921,Nms,Nmur2,NMU,Secreted Signaling
+922,Npff,Npffr1,NPFF,Secreted Signaling
+923,Npff,Npffr2,NPFF,Secreted Signaling
+924,Npy,Npy1r,NPY,Secreted Signaling
+925,Npy,Npy2r,NPY,Secreted Signaling
+926,Npy,Npy4r,NPY,Secreted Signaling
+927,Npy,Npy5r,NPY,Secreted Signaling
+928,Npy,Npy6r,NPY,Secreted Signaling
+929,Npy,Gpr83,NPY,Secreted Signaling
+930,Npy,Pgr15l,NPY,Secreted Signaling
+931,Ppy,Npy1r,NPY,Secreted Signaling
+932,Ppy,Npy2r,NPY,Secreted Signaling
+933,Ppy,Npy4r,NPY,Secreted Signaling
+934,Ppy,Npy5r,NPY,Secreted Signaling
+935,Ppy,Npy6r,NPY,Secreted Signaling
+936,Ppy,Gpr83,NPY,Secreted Signaling
+937,Ppy,Pgr15l,NPY,Secreted Signaling
+938,Pyy,Npy1r,NPY,Secreted Signaling
+939,Pyy,Npy2r,NPY,Secreted Signaling
+940,Pyy,Npy4r,NPY,Secreted Signaling
+941,Pyy,Npy5r,NPY,Secreted Signaling
+942,Pyy,Npy6r,NPY,Secreted Signaling
+943,Pyy,Gpr83,NPY,Secreted Signaling
+944,Pyy,Pgr15l,NPY,Secreted Signaling
+945,Npb,Npbwr1,NPW-B,Secreted Signaling
+946,Npw,Npbwr1,NPW-B,Secreted Signaling
+947,Nts,Ntsr1,NTS,Secreted Signaling
+948,Nts,Ntsr2,NTS,Secreted Signaling
+949,Pdyn,Oprd1,OPIOID,Secreted Signaling
+950,Pdyn,Oprk1,OPIOID,Secreted Signaling
+951,Pdyn,Oprl1,OPIOID,Secreted Signaling
+952,Pdyn,Oprm1,OPIOID,Secreted Signaling
+953,Penk,Oprd1,OPIOID,Secreted Signaling
+954,Penk,Oprk1,OPIOID,Secreted Signaling
+955,Penk,Oprl1,OPIOID,Secreted Signaling
+956,Penk,Oprm1,OPIOID,Secreted Signaling
+957,Pomc,Oprd1,OPIOID,Secreted Signaling
+958,Pomc,Oprk1,OPIOID,Secreted Signaling
+959,Pomc,Oprl1,OPIOID,Secreted Signaling
+960,Pomc,Oprm1,OPIOID,Secreted Signaling
+961,Hcrt,Hcrtr1,HCRT,Secreted Signaling
+962,Hcrt,Hcrtr2,HCRT,Secreted Signaling
+963,Oxt,Oxtr,OXT,Secreted Signaling
+964,Sst,Sstr1,SEMATOSTATIN,Secreted Signaling
+965,Sst,Sstr2,SEMATOSTATIN,Secreted Signaling
+966,Sst,Sstr3,SEMATOSTATIN,Secreted Signaling
+967,Sst,Sstr4,SEMATOSTATIN,Secreted Signaling
+968,Sst,Sstr5,SEMATOSTATIN,Secreted Signaling
+969,Cort,Sstr1,SEMATOSTATIN,Secreted Signaling
+970,Cort,Sstr2,SEMATOSTATIN,Secreted Signaling
+971,Cort,Sstr3,SEMATOSTATIN,Secreted Signaling
+972,Cort,Sstr4,SEMATOSTATIN,Secreted Signaling
+973,Cort,Sstr5,SEMATOSTATIN,Secreted Signaling
+974,Tac1,Tacr1,TAC,Secreted Signaling
+975,Tac4,Tacr1,TAC,Secreted Signaling
+976,Tac1,Tacr2,TAC,Secreted Signaling
+977,Tac2,Tacr3,TAC,Secreted Signaling
+978,Uts2,Uts2r,UTS2,Secreted Signaling
+979,Avp,Avpr2,AVP,Secreted Signaling
+980,Avp,Avpr1a,AVP,Secreted Signaling
+981,Avp,Avpr1b,AVP,Secreted Signaling
+982,Prlh,Prlhr,PRLH,Secreted Signaling
+983,Gm10334,F2r,PARs,Secreted Signaling
+984,Try5,F2r,PARs,Secreted Signaling
+985,Ctsg,F2r,PARs,Secreted Signaling
+986,F2,F2r,PARs,Secreted Signaling
+987,Gzma,F2r,PARs,Secreted Signaling
+988,Prss2,F2r,PARs,Secreted Signaling
+989,Try4,F2r,PARs,Secreted Signaling
+990,Try10,F2r,PARs,Secreted Signaling
+991,Gm10334,F2rl1,PARs,Secreted Signaling
+992,Try5,F2rl1,PARs,Secreted Signaling
+993,Ctsg,F2rl1,PARs,Secreted Signaling
+994,F2,F2rl1,PARs,Secreted Signaling
+995,Gzma,F2rl1,PARs,Secreted Signaling
+996,Prss2,F2rl1,PARs,Secreted Signaling
+997,Try4,F2rl1,PARs,Secreted Signaling
+998,Try10,F2rl1,PARs,Secreted Signaling
+999,Gm10334,F2rl2,PARs,Secreted Signaling
+1000,Try5,F2rl2,PARs,Secreted Signaling
+1001,Ctsg,F2rl2,PARs,Secreted Signaling
+1002,F2,F2rl2,PARs,Secreted Signaling
+1003,Gzma,F2rl2,PARs,Secreted Signaling
+1004,Prss2,F2rl2,PARs,Secreted Signaling
+1005,Try4,F2rl2,PARs,Secreted Signaling
+1006,Try10,F2rl2,PARs,Secreted Signaling
+1007,Gm10334,F2rl3,PARs,Secreted Signaling
+1008,Try5,F2rl3,PARs,Secreted Signaling
+1009,Ctsg,F2rl3,PARs,Secreted Signaling
+1010,F2,F2rl3,PARs,Secreted Signaling
+1011,Gzma,F2rl3,PARs,Secreted Signaling
+1012,Plg,F2rl3,PARs,Secreted Signaling
+1013,Prss2,F2rl3,PARs,Secreted Signaling
+1014,Try4,F2rl3,PARs,Secreted Signaling
+1015,Try10,F2rl3,PARs,Secreted Signaling
+1016,Gm10334,Pard3,PARs,Secreted Signaling
+1017,Try5,Pard3,PARs,Secreted Signaling
+1018,Ctsg,Pard3,PARs,Secreted Signaling
+1019,F2,Pard3,PARs,Secreted Signaling
+1020,Gzma,Pard3,PARs,Secreted Signaling
+1021,Plg,Pard3,PARs,Secreted Signaling
+1022,Prss2,Pard3,PARs,Secreted Signaling
+1023,Try4,Pard3,PARs,Secreted Signaling
+1024,Try10,Pard3,PARs,Secreted Signaling
+1025,Pmch,Mchr1,PMCH,Secreted Signaling
+1026,Prok1,Prokr2,PROK,Secreted Signaling
+1027,Prok1,Prokr1,PROK,Secreted Signaling
+1028,Prok2,Prokr1,PROK,Secreted Signaling
+1029,Prok2,Prokr2,PROK,Secreted Signaling
+1030,Adcyap1,Adcyap1r1,PACAP,Secreted Signaling
+1031,Vip,Vipr1,VIP,Secreted Signaling
+1032,Vip,Vipr2,VIP,Secreted Signaling
+1033,Nppa,Npr1,NPR1,Secreted Signaling
+1034,Nppb,Npr1,NPR1,Secreted Signaling
+1035,Nppc,Npr2,NPR2,Secreted Signaling
+1036,Kitl,Kit,KIT,Secreted Signaling
+1037,Gcg,Gipr,GIPR,Secreted Signaling
+1038,Gip,Gipr,GIPR,Secreted Signaling
+1039,Fshb,Fshr,FSH,Secreted Signaling
+1040,Cga,Fshr,FSH,Secreted Signaling
+1041,Lhb,Lhcgr,LHB,Secreted Signaling
+1042,Cga,Lhcgr,LHB,Secreted Signaling
+1043,Tshb,Tshr,TSH,Secreted Signaling
+1044,Cga,Tshr,TSH,Secreted Signaling
+1045,Bdnf,Ntrk2,NT,Secreted Signaling
+1046,Ngf,Ntrk1,NT,Secreted Signaling
+1047,Flt3l,Flt3,FLT3,Secreted Signaling
+1048,Hgf,Met,HGF,Secreted Signaling
+1049,Klk1b4,Ntrk1,NT,Secreted Signaling
+1050,Ntf3,Ntrk1,NT,Secreted Signaling
+1051,Ntf3,Ntrk2,NT,Secreted Signaling
+1052,Ntf3,Ntrk3,NT,Secreted Signaling
+1053,Ntf5,Ntrk2,NT,Secreted Signaling
+1054,Sema3a,Nrp1_Plxna1,SEMA3,Secreted Signaling
+1055,Sema3a,Nrp1_Plxna2,SEMA3,Secreted Signaling
+1056,Sema3a,Nrp1_Plxna3,SEMA3,Secreted Signaling
+1057,Sema3a,Nrp1_Plxna4,SEMA3,Secreted Signaling
+1058,Sema3b,Nrp1_Plxna1,SEMA3,Secreted Signaling
+1059,Sema3b,Nrp1_Plxna2,SEMA3,Secreted Signaling
+1060,Sema3b,Nrp1_Plxna3,SEMA3,Secreted Signaling
+1061,Sema3b,Nrp1_Plxna4,SEMA3,Secreted Signaling
+1062,Sema3c,Nrp1_Plxna1,SEMA3,Secreted Signaling
+1063,Sema3c,Nrp1_Plxna2,SEMA3,Secreted Signaling
+1064,Sema3c,Nrp1_Plxna3,SEMA3,Secreted Signaling
+1065,Sema3c,Nrp1_Plxna4,SEMA3,Secreted Signaling
+1066,Sema3d,Nrp1_Plxna1,SEMA3,Secreted Signaling
+1067,Sema3d,Nrp1_Plxna2,SEMA3,Secreted Signaling
+1068,Sema3d,Nrp1_Plxna3,SEMA3,Secreted Signaling
+1069,Sema3d,Nrp1_Plxna4,SEMA3,Secreted Signaling
+1070,Sema3b,Nrp2_Plxna1,SEMA3,Secreted Signaling
+1071,Sema3b,Nrp2_Plxna2,SEMA3,Secreted Signaling
+1072,Sema3b,Nrp2_Plxna3,SEMA3,Secreted Signaling
+1073,Sema3b,Nrp2_Plxna4,SEMA3,Secreted Signaling
+1074,Sema3c,Nrp2_Plxna1,SEMA3,Secreted Signaling
+1075,Sema3c,Nrp2_Plxna2,SEMA3,Secreted Signaling
+1076,Sema3c,Nrp2_Plxna3,SEMA3,Secreted Signaling
+1077,Sema3c,Nrp2_Plxna4,SEMA3,Secreted Signaling
+1078,Sema3d,Nrp2_Plxna1,SEMA3,Secreted Signaling
+1079,Sema3d,Nrp2_Plxna2,SEMA3,Secreted Signaling
+1080,Sema3d,Nrp2_Plxna3,SEMA3,Secreted Signaling
+1081,Sema3d,Nrp2_Plxna4,SEMA3,Secreted Signaling
+1082,Sema3f,Nrp2_Plxna1,SEMA3,Secreted Signaling
+1083,Sema3f,Nrp2_Plxna2,SEMA3,Secreted Signaling
+1084,Sema3f,Nrp2_Plxna3,SEMA3,Secreted Signaling
+1085,Sema3f,Nrp2_Plxna4,SEMA3,Secreted Signaling
+1086,Sema3g,Nrp2_Plxna1,SEMA3,Secreted Signaling
+1087,Sema3g,Nrp2_Plxna2,SEMA3,Secreted Signaling
+1088,Sema3g,Nrp2_Plxna3,SEMA3,Secreted Signaling
+1089,Sema3g,Nrp2_Plxna4,SEMA3,Secreted Signaling
+1090,Sema3c,Nrp1_Nrp2_Plxnd1,SEMA3,Secreted Signaling
+1091,Sema3c,Plxnd1,SEMA3,Secreted Signaling
+1092,Sema3e,Plxnd1,SEMA3,Secreted Signaling
+1093,Adm,Calcr,CALCR,Secreted Signaling
+1094,Adm,Calcrl,CALCR,Secreted Signaling
+1095,Agt,Mas1,AGT,Secreted Signaling
+1096,Anxa1,Fpr2,ANNEXIN,Secreted Signaling
+1097,Anxa1,Fpr1,ANNEXIN,Secreted Signaling
+1098,Apela,Aplnr,APJ,Secreted Signaling
+1099,Calca,Calcr,CALCR,Secreted Signaling
+1100,Calca,Calcrl,CALCR,Secreted Signaling
+1101,Calcb,Calcr,CALCR,Secreted Signaling
+1102,Calcb,Calcrl,CALCR,Secreted Signaling
+1103,Crh,Crhr1,CRH,Secreted Signaling
+1104,Crh,Crhr2,CRH,Secreted Signaling
+1105,Enho,Gpr19,ENHO,Secreted Signaling
+1106,Gas6,Axl,GAS,Secreted Signaling
+1107,Gas6,Mertk,GAS,Secreted Signaling
+1108,Gas6,Tyro3,GAS,Secreted Signaling
+1109,Gcg,Gcgr,GCG,Secreted Signaling
+1110,Gcg,Glp1r,GCG,Secreted Signaling
+1111,Gcg,Glp2r,GCG,Secreted Signaling
+1112,Gh,Ghr,GH,Secreted Signaling
+1113,Gh,Prlr,GH,Secreted Signaling
+1114,Ghrh,Vipr1,GHRH,Secreted Signaling
+1115,Ghrh,Vipr2,GHRH,Secreted Signaling
+1116,Ghrh,Ghsr,GHRH,Secreted Signaling
+1117,Ghrh,Ghrhr,GHRH,Secreted Signaling
+1118,Gnrh1,Gnrhr,GNRH,Secreted Signaling
+1119,Grn,Sort1,GRN,Secreted Signaling
+1120,Guca2a,Gucy2c,GUCA,Secreted Signaling
+1121,Guca2b,Gucy2c,GUCA,Secreted Signaling
+1122,Iapp,Calcr,CALCR,Secreted Signaling
+1123,Iapp,Calcrl,CALCR,Secreted Signaling
+1124,Insl3,Rxfp2,RLN,Secreted Signaling
+1125,Insl3,Rxfp1,RLN,Secreted Signaling
+1126,Insl3,Rxfp4,RLN,Secreted Signaling
+1127,Insl3,Rxfp3,RLN,Secreted Signaling
+1128,Insl5,Rxfp4,RLN,Secreted Signaling
+1129,Insl5,Rxfp3,RLN,Secreted Signaling
+1130,Insl5,Rxfp2,RLN,Secreted Signaling
+1131,Insl5,Rxfp1,RLN,Secreted Signaling
+1132,Lep,Lepr,LEP,Secreted Signaling
+1133,Lgals9,Ptprc,GALECTIN,Secreted Signaling
+1134,Lgals9,Ighm,GALECTIN,Secreted Signaling
+1135,Nps,Npsr1,NPS,Secreted Signaling
+1136,Npvf,Npffr1,NPVF,Secreted Signaling
+1137,Npvf,Npffr2,NPVF,Secreted Signaling
+1138,Ostn,Npr3,OSTN,Secreted Signaling
+1139,Pmch,Mertk,PMCH,Secreted Signaling
+1140,Pros1,Axl,PROS,Secreted Signaling
+1141,Pros1,Tyro3,PROS,Secreted Signaling
+1142,Psap,Gpr37l1,PSAP,Secreted Signaling
+1143,Psap,Gpr37,PSAP,Secreted Signaling
+1144,Pth,Pth1r,PTH,Secreted Signaling
+1145,Pth,Pth2r,PTH,Secreted Signaling
+1146,Pth2,Pth1r,PTH,Secreted Signaling
+1147,Pth2,Pth2r,PTH,Secreted Signaling
+1148,Pthlh,Pth1r,PTH,Secreted Signaling
+1149,Qrfp,Qrfpr,QRFP,Secreted Signaling
+1150,Rarres2,Gpr1,CHEMERIN,Secreted Signaling
+1151,Rarres2,Cmklr1,CHEMERIN,Secreted Signaling
+1152,Rln1,Rxfp2,RLN,Secreted Signaling
+1153,Rln1,Rxfp1,RLN,Secreted Signaling
+1154,Rln1,Rxfp3,RLN,Secreted Signaling
+1155,Rln1,Rxfp4,RLN,Secreted Signaling
+1156,Rln3,Rxfp3,RLN,Secreted Signaling
+1157,Rln3,Rxfp1,RLN,Secreted Signaling
+1158,Rln3,Rxfp4,RLN,Secreted Signaling
+1159,Rln3,Rxfp2,RLN,Secreted Signaling
+1160,Saa2,Fpr2,SAA,Secreted Signaling
+1161,Scgb3a2,Marco,UGRP1,Secreted Signaling
+1162,Sct,Sctr,SCT,Secreted Signaling
+1163,Slurp1,Chrnb1,SLURP,Secreted Signaling
+1164,Slurp1,Chrnb2,SLURP,Secreted Signaling
+1165,Slurp1,Chrnb3,SLURP,Secreted Signaling
+1166,Slurp1,Chrnb4,SLURP,Secreted Signaling
+1167,Slurp1,Chrna1,SLURP,Secreted Signaling
+1168,Slurp1,Chrna2,SLURP,Secreted Signaling
+1169,Slurp1,Chrna3,SLURP,Secreted Signaling
+1170,Slurp1,Chrna4,SLURP,Secreted Signaling
+1171,Slurp1,Chrna5,SLURP,Secreted Signaling
+1172,Slurp1,Chrna6,SLURP,Secreted Signaling
+1173,Slurp1,Chrna9,SLURP,Secreted Signaling
+1174,Slurp1,Chrna10,SLURP,Secreted Signaling
+1175,Slurp1,Chrnd,SLURP,Secreted Signaling
+1176,Slurp1,Chrne,SLURP,Secreted Signaling
+1177,Slurp1,Chrng,SLURP,Secreted Signaling
+1178,Slurp1,Chrna7,SLURP,Secreted Signaling
+1179,Slurp2,Chrnb1,SLURP,Secreted Signaling
+1180,Slurp2,Chrnb2,SLURP,Secreted Signaling
+1181,Slurp2,Chrnb3,SLURP,Secreted Signaling
+1182,Slurp2,Chrnb4,SLURP,Secreted Signaling
+1183,Slurp2,Chrna1,SLURP,Secreted Signaling
+1184,Slurp2,Chrna2,SLURP,Secreted Signaling
+1185,Slurp2,Chrna3,SLURP,Secreted Signaling
+1186,Slurp2,Chrna4,SLURP,Secreted Signaling
+1187,Slurp2,Chrna5,SLURP,Secreted Signaling
+1188,Slurp2,Chrna6,SLURP,Secreted Signaling
+1189,Slurp2,Chrna7,SLURP,Secreted Signaling
+1190,Slurp2,Chrna9,SLURP,Secreted Signaling
+1191,Slurp2,Chrna10,SLURP,Secreted Signaling
+1192,Slurp2,Chrnd,SLURP,Secreted Signaling
+1193,Slurp2,Chrne,SLURP,Secreted Signaling
+1194,Slurp2,Chrng,SLURP,Secreted Signaling
+1195,Btla,Tnfrsf14,BTLA,Secreted Signaling
+1196,Trh,Trhr,TRH,Secreted Signaling
+1197,Trh,Trhr2,TRH,Secreted Signaling
+1198,Ucn,Crhr1,UCN,Secreted Signaling
+1199,Ucn,Crhr2,UCN,Secreted Signaling
+1200,Ucn2,Crhr1,UCN,Secreted Signaling
+1201,Ucn2,Crhr2,UCN,Secreted Signaling
+1202,Ucn3,Crhr1,UCN,Secreted Signaling
+1203,Ucn3,Crhr2,UCN,Secreted Signaling
+1204,Uts2b,Uts2r,UROTENSIN,Secreted Signaling
+1205,Uts2b,Sstr5,UROTENSIN,Secreted Signaling
+1206,Bag6,Ncr3-ps,BAG,Secreted Signaling
+1207,Lgals9,Havcr2,GALECTIN,Secreted Signaling
+1208,Lgals9,Cd44,GALECTIN,Secreted Signaling
+1209,Col1a1,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1210,Col1a2,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1211,Col2a1,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1212,Col4a1,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1213,Col4a2,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1214,Col4a3,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1215,Col4a4,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1216,Col4a5,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1217,Col4a6,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1218,Col6a1,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1219,Col6a2,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1220,Col6a3,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1221,Col6a4,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1222,Col6a5,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1223,Col6a6,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1224,Col9a1,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1225,Col9a2,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1226,Col9a3,Itga1_Itgb1,COLLAGEN,ECM-Receptor
+1227,Col1a1,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1228,Col1a2,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1229,Col2a1,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1230,Col4a1,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1231,Col4a2,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1232,Col4a3,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1233,Col4a4,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1234,Col4a5,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1235,Col4a6,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1236,Col6a1,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1237,Col6a2,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1238,Col6a3,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1239,Col6a4,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1240,Col6a5,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1241,Col6a6,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1242,Col9a1,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1243,Col9a2,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1244,Col9a3,Itga2_Itgb1,COLLAGEN,ECM-Receptor
+1245,Fn1,Itga3_Itgb1,FN1,ECM-Receptor
+1246,Fn1,Itga4_Itgb1,FN1,ECM-Receptor
+1247,Fn1,Itga5_Itgb1,FN1,ECM-Receptor
+1248,Fn1,Itga8_Itgb1,FN1,ECM-Receptor
+1249,Lama1,Itga1_Itgb1,LAMININ,ECM-Receptor
+1250,Lama2,Itga1_Itgb1,LAMININ,ECM-Receptor
+1251,Lama3,Itga1_Itgb1,LAMININ,ECM-Receptor
+1252,Lama4,Itga1_Itgb1,LAMININ,ECM-Receptor
+1253,Lama5,Itga1_Itgb1,LAMININ,ECM-Receptor
+1254,Lamb1,Itga1_Itgb1,LAMININ,ECM-Receptor
+1255,Lamb2,Itga1_Itgb1,LAMININ,ECM-Receptor
+1256,Lamb3,Itga1_Itgb1,LAMININ,ECM-Receptor
+1257,Lamc1,Itga1_Itgb1,LAMININ,ECM-Receptor
+1258,Lamc2,Itga1_Itgb1,LAMININ,ECM-Receptor
+1259,Lamc3,Itga1_Itgb1,LAMININ,ECM-Receptor
+1260,Lama1,Itga2_Itgb1,LAMININ,ECM-Receptor
+1261,Lama2,Itga2_Itgb1,LAMININ,ECM-Receptor
+1262,Lama3,Itga2_Itgb1,LAMININ,ECM-Receptor
+1263,Lama4,Itga2_Itgb1,LAMININ,ECM-Receptor
+1264,Lama5,Itga2_Itgb1,LAMININ,ECM-Receptor
+1265,Lamb1,Itga2_Itgb1,LAMININ,ECM-Receptor
+1266,Lamb2,Itga2_Itgb1,LAMININ,ECM-Receptor
+1267,Lamb3,Itga2_Itgb1,LAMININ,ECM-Receptor
+1268,Lamc1,Itga2_Itgb1,LAMININ,ECM-Receptor
+1269,Lamc2,Itga2_Itgb1,LAMININ,ECM-Receptor
+1270,Lamc3,Itga2_Itgb1,LAMININ,ECM-Receptor
+1271,Chad,Itga2_Itgb1,CHAD,ECM-Receptor
+1272,Lama1,Itga3_Itgb1,LAMININ,ECM-Receptor
+1273,Lama2,Itga3_Itgb1,LAMININ,ECM-Receptor
+1274,Lama3,Itga3_Itgb1,LAMININ,ECM-Receptor
+1275,Lama4,Itga3_Itgb1,LAMININ,ECM-Receptor
+1276,Lama5,Itga3_Itgb1,LAMININ,ECM-Receptor
+1277,Lamb1,Itga3_Itgb1,LAMININ,ECM-Receptor
+1278,Lamb2,Itga3_Itgb1,LAMININ,ECM-Receptor
+1279,Lamb3,Itga3_Itgb1,LAMININ,ECM-Receptor
+1280,Lamc1,Itga3_Itgb1,LAMININ,ECM-Receptor
+1281,Lamc2,Itga3_Itgb1,LAMININ,ECM-Receptor
+1282,Lamc3,Itga3_Itgb1,LAMININ,ECM-Receptor
+1283,Reln,Itga3_Itgb1,RELN,ECM-Receptor
+1284,Thbs1,Itga3_Itgb1,THBS,ECM-Receptor
+1285,Thbs2,Itga3_Itgb1,THBS,ECM-Receptor
+1286,Thbs3,Itga3_Itgb1,THBS,ECM-Receptor
+1287,Thbs4,Itga3_Itgb1,THBS,ECM-Receptor
+1288,Comp,Itga3_Itgb1,THBS,ECM-Receptor
+1289,Col1a1,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1290,Col1a2,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1291,Col2a1,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1292,Col4a1,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1293,Col4a2,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1294,Col4a3,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1295,Col4a4,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1296,Col4a5,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1297,Col4a6,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1298,Col6a1,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1299,Col6a2,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1300,Col6a3,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1301,Col6a4,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1302,Col6a5,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1303,Col6a6,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1304,Col9a1,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1305,Col9a2,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1306,Col9a3,Itga3_Itgb1,COLLAGEN,ECM-Receptor
+1307,Lama1,Itga6_Itgb1,LAMININ,ECM-Receptor
+1308,Lama2,Itga6_Itgb1,LAMININ,ECM-Receptor
+1309,Lama3,Itga6_Itgb1,LAMININ,ECM-Receptor
+1310,Lama4,Itga6_Itgb1,LAMININ,ECM-Receptor
+1311,Lama5,Itga6_Itgb1,LAMININ,ECM-Receptor
+1312,Lamb1,Itga6_Itgb1,LAMININ,ECM-Receptor
+1313,Lamb2,Itga6_Itgb1,LAMININ,ECM-Receptor
+1314,Lamb3,Itga6_Itgb1,LAMININ,ECM-Receptor
+1315,Lamc1,Itga6_Itgb1,LAMININ,ECM-Receptor
+1316,Lamc2,Itga6_Itgb1,LAMININ,ECM-Receptor
+1317,Lamc3,Itga6_Itgb1,LAMININ,ECM-Receptor
+1318,Lama1,Itga7_Itgb1,LAMININ,ECM-Receptor
+1319,Lama2,Itga7_Itgb1,LAMININ,ECM-Receptor
+1320,Lama3,Itga7_Itgb1,LAMININ,ECM-Receptor
+1321,Lama4,Itga7_Itgb1,LAMININ,ECM-Receptor
+1322,Lama5,Itga7_Itgb1,LAMININ,ECM-Receptor
+1323,Lamb1,Itga7_Itgb1,LAMININ,ECM-Receptor
+1324,Lamb2,Itga7_Itgb1,LAMININ,ECM-Receptor
+1325,Lamb3,Itga7_Itgb1,LAMININ,ECM-Receptor
+1326,Lamc1,Itga7_Itgb1,LAMININ,ECM-Receptor
+1327,Lamc2,Itga7_Itgb1,LAMININ,ECM-Receptor
+1328,Lamc3,Itga7_Itgb1,LAMININ,ECM-Receptor
+1329,Vtn,Itga8_Itgb1,VTN,ECM-Receptor
+1330,Tnc,Itga8_Itgb1,TENASCIN,ECM-Receptor
+1331,Tnr,Itga8_Itgb1,TENASCIN,ECM-Receptor
+1332,Tnn,Itga8_Itgb1,TENASCIN,ECM-Receptor
+1333,Tnxb,Itga8_Itgb1,TENASCIN,ECM-Receptor
+1334,Npnt_Fras1_Frem1,Itga8_Itgb1,NPNT,ECM-Receptor
+1335,Npnt_Fras1_Frem2,Itga8_Itgb1,NPNT,ECM-Receptor
+1336,Tnc,Itga9_Itgb1,TENASCIN,ECM-Receptor
+1337,Tnr,Itga9_Itgb1,TENASCIN,ECM-Receptor
+1338,Tnn,Itga9_Itgb1,TENASCIN,ECM-Receptor
+1339,Tnxb,Itga9_Itgb1,TENASCIN,ECM-Receptor
+1340,Col1a1,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1341,Col1a2,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1342,Col2a1,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1343,Col4a1,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1344,Col4a2,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1345,Col4a3,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1346,Col4a4,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1347,Col4a5,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1348,Col4a6,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1349,Col6a1,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1350,Col6a2,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1351,Col6a3,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1352,Col6a4,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1353,Col6a5,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1354,Col6a6,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1355,Col9a1,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1356,Col9a2,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1357,Col9a3,Itga9_Itgb1,COLLAGEN,ECM-Receptor
+1358,Lama1,Itga9_Itgb1,LAMININ,ECM-Receptor
+1359,Lama2,Itga9_Itgb1,LAMININ,ECM-Receptor
+1360,Lama3,Itga9_Itgb1,LAMININ,ECM-Receptor
+1361,Lama4,Itga9_Itgb1,LAMININ,ECM-Receptor
+1362,Lama5,Itga9_Itgb1,LAMININ,ECM-Receptor
+1363,Lamb1,Itga9_Itgb1,LAMININ,ECM-Receptor
+1364,Lamb2,Itga9_Itgb1,LAMININ,ECM-Receptor
+1365,Lamb3,Itga9_Itgb1,LAMININ,ECM-Receptor
+1366,Lamc1,Itga9_Itgb1,LAMININ,ECM-Receptor
+1367,Lamc2,Itga9_Itgb1,LAMININ,ECM-Receptor
+1368,Lamc3,Itga9_Itgb1,LAMININ,ECM-Receptor
+1369,Col1a1,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1370,Col1a2,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1371,Col2a1,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1372,Col4a1,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1373,Col4a2,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1374,Col4a3,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1375,Col4a4,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1376,Col4a5,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1377,Col4a6,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1378,Col6a1,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1379,Col6a2,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1380,Col6a3,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1381,Col6a4,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1382,Col6a5,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1383,Col6a6,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1384,Col9a1,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1385,Col9a2,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1386,Col9a3,Itga10_Itgb1,COLLAGEN,ECM-Receptor
+1387,Col1a1,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1388,Col1a2,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1389,Col2a1,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1390,Col4a1,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1391,Col4a2,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1392,Col4a3,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1393,Col4a4,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1394,Col4a5,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1395,Col4a6,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1396,Col6a1,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1397,Col6a2,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1398,Col6a3,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1399,Col6a4,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1400,Col6a5,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1401,Col6a6,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1402,Col9a1,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1403,Col9a2,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1404,Col9a3,Itga11_Itgb1,COLLAGEN,ECM-Receptor
+1405,Fn1,Itgav_Itgb1,FN1,ECM-Receptor
+1406,Vtn,Itgav_Itgb1,VTN,ECM-Receptor
+1407,Dspp,Itgav_Itgb1,DSPP,ECM-Receptor
+1408,Fn1,Itga4_Itgb7,FN1,ECM-Receptor
+1409,Fn1,Itgav_Itgb3,FN1,ECM-Receptor
+1410,Vtn,Itgav_Itgb3,VTN,ECM-Receptor
+1411,Vwf,Itgav_Itgb3,VWF,ECM-Receptor
+1412,Tnc,Itgav_Itgb3,TENASCIN,ECM-Receptor
+1413,Tnr,Itgav_Itgb3,TENASCIN,ECM-Receptor
+1414,Tnn,Itgav_Itgb3,TENASCIN,ECM-Receptor
+1415,Tnxb,Itgav_Itgb3,TENASCIN,ECM-Receptor
+1416,Ibsp,Itgav_Itgb3,BSP,ECM-Receptor
+1417,Thbs1,Itgav_Itgb3,THBS,ECM-Receptor
+1418,Thbs2,Itgav_Itgb3,THBS,ECM-Receptor
+1419,Thbs3,Itgav_Itgb3,THBS,ECM-Receptor
+1420,Thbs4,Itgav_Itgb3,THBS,ECM-Receptor
+1421,Comp,Itgav_Itgb3,THBS,ECM-Receptor
+1422,Dmp1,Itgav_Itgb3,DMP1,ECM-Receptor
+1423,Fn1,Itga2b_Itgb3,FN1,ECM-Receptor
+1424,Vtn,Itga2b_Itgb3,VTN,ECM-Receptor
+1425,Vwf,Itga2b_Itgb3,VWF,ECM-Receptor
+1426,Tnc,Itga2b_Itgb3,TENASCIN,ECM-Receptor
+1427,Tnr,Itga2b_Itgb3,TENASCIN,ECM-Receptor
+1428,Tnn,Itga2b_Itgb3,TENASCIN,ECM-Receptor
+1429,Tnxb,Itga2b_Itgb3,TENASCIN,ECM-Receptor
+1430,Vtn,Itgav_Itgb5,VTN,ECM-Receptor
+1431,Ibsp,Itgav_Itgb5,BSP,ECM-Receptor
+1432,Tnc,Itgav_Itgb6,TENASCIN,ECM-Receptor
+1433,Tnr,Itgav_Itgb6,TENASCIN,ECM-Receptor
+1434,Tnn,Itgav_Itgb6,TENASCIN,ECM-Receptor
+1435,Tnxb,Itgav_Itgb6,TENASCIN,ECM-Receptor
+1436,Fn1,Itgav_Itgb6,FN1,ECM-Receptor
+1437,Dspp,Itgav_Itgb6,DSPP,ECM-Receptor
+1438,Vtn,Itgav_Itgb8,VTN,ECM-Receptor
+1439,Fn1,Itgav_Itgb8,FN1,ECM-Receptor
+1440,Lama1,Itgav_Itgb8,LAMININ,ECM-Receptor
+1441,Lama2,Itgav_Itgb8,LAMININ,ECM-Receptor
+1442,Lama3,Itgav_Itgb8,LAMININ,ECM-Receptor
+1443,Lama4,Itgav_Itgb8,LAMININ,ECM-Receptor
+1444,Lama5,Itgav_Itgb8,LAMININ,ECM-Receptor
+1445,Lamb1,Itgav_Itgb8,LAMININ,ECM-Receptor
+1446,Lamb2,Itgav_Itgb8,LAMININ,ECM-Receptor
+1447,Lamb3,Itgav_Itgb8,LAMININ,ECM-Receptor
+1448,Lamc1,Itgav_Itgb8,LAMININ,ECM-Receptor
+1449,Lamc2,Itgav_Itgb8,LAMININ,ECM-Receptor
+1450,Lamc3,Itgav_Itgb8,LAMININ,ECM-Receptor
+1451,Col1a1,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1452,Col1a2,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1453,Col2a1,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1454,Col4a1,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1455,Col4a2,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1456,Col4a3,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1457,Col4a4,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1458,Col4a5,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1459,Col4a6,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1460,Col6a1,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1461,Col6a2,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1462,Col6a3,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1463,Col6a4,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1464,Col6a5,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1465,Col6a6,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1466,Col9a1,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1467,Col9a2,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1468,Col9a3,Itgav_Itgb8,COLLAGEN,ECM-Receptor
+1469,Lama1,Itga6_Itgb4,LAMININ,ECM-Receptor
+1470,Lama2,Itga6_Itgb4,LAMININ,ECM-Receptor
+1471,Lama3,Itga6_Itgb4,LAMININ,ECM-Receptor
+1472,Lama4,Itga6_Itgb4,LAMININ,ECM-Receptor
+1473,Lama5,Itga6_Itgb4,LAMININ,ECM-Receptor
+1474,Lamb1,Itga6_Itgb4,LAMININ,ECM-Receptor
+1475,Lamb2,Itga6_Itgb4,LAMININ,ECM-Receptor
+1476,Lamb3,Itga6_Itgb4,LAMININ,ECM-Receptor
+1477,Lamc1,Itga6_Itgb4,LAMININ,ECM-Receptor
+1478,Lamc2,Itga6_Itgb4,LAMININ,ECM-Receptor
+1479,Lamc3,Itga6_Itgb4,LAMININ,ECM-Receptor
+1480,Fn1,Cd44,FN1,ECM-Receptor
+1481,Col1a1,Cd44,COLLAGEN,ECM-Receptor
+1482,Col1a2,Cd44,COLLAGEN,ECM-Receptor
+1483,Col2a1,Cd44,COLLAGEN,ECM-Receptor
+1484,Col4a1,Cd44,COLLAGEN,ECM-Receptor
+1485,Col4a2,Cd44,COLLAGEN,ECM-Receptor
+1486,Col4a3,Cd44,COLLAGEN,ECM-Receptor
+1487,Col4a4,Cd44,COLLAGEN,ECM-Receptor
+1488,Col4a5,Cd44,COLLAGEN,ECM-Receptor
+1489,Col4a6,Cd44,COLLAGEN,ECM-Receptor
+1490,Col6a1,Cd44,COLLAGEN,ECM-Receptor
+1491,Col6a2,Cd44,COLLAGEN,ECM-Receptor
+1492,Col6a3,Cd44,COLLAGEN,ECM-Receptor
+1493,Col6a4,Cd44,COLLAGEN,ECM-Receptor
+1494,Col6a5,Cd44,COLLAGEN,ECM-Receptor
+1495,Col6a6,Cd44,COLLAGEN,ECM-Receptor
+1496,Col9a1,Cd44,COLLAGEN,ECM-Receptor
+1497,Col9a2,Cd44,COLLAGEN,ECM-Receptor
+1498,Col9a3,Cd44,COLLAGEN,ECM-Receptor
+1499,Lama1,Cd44,LAMININ,ECM-Receptor
+1500,Lama2,Cd44,LAMININ,ECM-Receptor
+1501,Lama3,Cd44,LAMININ,ECM-Receptor
+1502,Lama4,Cd44,LAMININ,ECM-Receptor
+1503,Lama5,Cd44,LAMININ,ECM-Receptor
+1504,Lamb1,Cd44,LAMININ,ECM-Receptor
+1505,Lamb2,Cd44,LAMININ,ECM-Receptor
+1506,Lamb3,Cd44,LAMININ,ECM-Receptor
+1507,Lamc1,Cd44,LAMININ,ECM-Receptor
+1508,Lamc2,Cd44,LAMININ,ECM-Receptor
+1509,Lamc3,Cd44,LAMININ,ECM-Receptor
+1510,Col1a1,Sdc1,COLLAGEN,ECM-Receptor
+1511,Col1a2,Sdc1,COLLAGEN,ECM-Receptor
+1512,Col2a1,Sdc1,COLLAGEN,ECM-Receptor
+1513,Col4a1,Sdc1,COLLAGEN,ECM-Receptor
+1514,Col4a2,Sdc1,COLLAGEN,ECM-Receptor
+1515,Col4a3,Sdc1,COLLAGEN,ECM-Receptor
+1516,Col4a4,Sdc1,COLLAGEN,ECM-Receptor
+1517,Col4a5,Sdc1,COLLAGEN,ECM-Receptor
+1518,Col4a6,Sdc1,COLLAGEN,ECM-Receptor
+1519,Col6a1,Sdc1,COLLAGEN,ECM-Receptor
+1520,Col6a2,Sdc1,COLLAGEN,ECM-Receptor
+1521,Col6a3,Sdc1,COLLAGEN,ECM-Receptor
+1522,Col6a4,Sdc1,COLLAGEN,ECM-Receptor
+1523,Col6a5,Sdc1,COLLAGEN,ECM-Receptor
+1524,Col6a6,Sdc1,COLLAGEN,ECM-Receptor
+1525,Col9a1,Sdc1,COLLAGEN,ECM-Receptor
+1526,Col9a2,Sdc1,COLLAGEN,ECM-Receptor
+1527,Col9a3,Sdc1,COLLAGEN,ECM-Receptor
+1528,Fn1,Sdc1,FN1,ECM-Receptor
+1529,Tnc,Sdc1,TENASCIN,ECM-Receptor
+1530,Tnr,Sdc1,TENASCIN,ECM-Receptor
+1531,Tnn,Sdc1,TENASCIN,ECM-Receptor
+1532,Tnxb,Sdc1,TENASCIN,ECM-Receptor
+1533,Thbs1,Sdc1,THBS,ECM-Receptor
+1534,Thbs2,Sdc1,THBS,ECM-Receptor
+1535,Thbs3,Sdc1,THBS,ECM-Receptor
+1536,Thbs4,Sdc1,THBS,ECM-Receptor
+1537,Comp,Sdc1,THBS,ECM-Receptor
+1538,Col1a1,Sdc4,COLLAGEN,ECM-Receptor
+1539,Col1a2,Sdc4,COLLAGEN,ECM-Receptor
+1540,Col2a1,Sdc4,COLLAGEN,ECM-Receptor
+1541,Col4a1,Sdc4,COLLAGEN,ECM-Receptor
+1542,Col4a2,Sdc4,COLLAGEN,ECM-Receptor
+1543,Col4a3,Sdc4,COLLAGEN,ECM-Receptor
+1544,Col4a4,Sdc4,COLLAGEN,ECM-Receptor
+1545,Col4a5,Sdc4,COLLAGEN,ECM-Receptor
+1546,Col4a6,Sdc4,COLLAGEN,ECM-Receptor
+1547,Col6a1,Sdc4,COLLAGEN,ECM-Receptor
+1548,Col6a2,Sdc4,COLLAGEN,ECM-Receptor
+1549,Col6a3,Sdc4,COLLAGEN,ECM-Receptor
+1550,Col6a4,Sdc4,COLLAGEN,ECM-Receptor
+1551,Col6a5,Sdc4,COLLAGEN,ECM-Receptor
+1552,Col6a6,Sdc4,COLLAGEN,ECM-Receptor
+1553,Col9a1,Sdc4,COLLAGEN,ECM-Receptor
+1554,Col9a2,Sdc4,COLLAGEN,ECM-Receptor
+1555,Col9a3,Sdc4,COLLAGEN,ECM-Receptor
+1556,Fn1,Sdc4,FN1,ECM-Receptor
+1557,Tnc,Sdc4,TENASCIN,ECM-Receptor
+1558,Tnr,Sdc4,TENASCIN,ECM-Receptor
+1559,Tnn,Sdc4,TENASCIN,ECM-Receptor
+1560,Tnxb,Sdc4,TENASCIN,ECM-Receptor
+1561,Thbs1,Sdc4,THBS,ECM-Receptor
+1562,Thbs2,Sdc4,THBS,ECM-Receptor
+1563,Thbs3,Sdc4,THBS,ECM-Receptor
+1564,Thbs4,Sdc4,THBS,ECM-Receptor
+1565,Comp,Sdc4,THBS,ECM-Receptor
+1566,Lama1,Sv2a,LAMININ,ECM-Receptor
+1567,Lama2,Sv2a,LAMININ,ECM-Receptor
+1568,Lama3,Sv2a,LAMININ,ECM-Receptor
+1569,Lama4,Sv2a,LAMININ,ECM-Receptor
+1570,Lama5,Sv2a,LAMININ,ECM-Receptor
+1571,Lamb1,Sv2a,LAMININ,ECM-Receptor
+1572,Lamb2,Sv2a,LAMININ,ECM-Receptor
+1573,Lamb3,Sv2a,LAMININ,ECM-Receptor
+1574,Lamc1,Sv2a,LAMININ,ECM-Receptor
+1575,Lamc2,Sv2a,LAMININ,ECM-Receptor
+1576,Lamc3,Sv2a,LAMININ,ECM-Receptor
+1577,Lama1,Sv2b,LAMININ,ECM-Receptor
+1578,Lama2,Sv2b,LAMININ,ECM-Receptor
+1579,Lama3,Sv2b,LAMININ,ECM-Receptor
+1580,Lama4,Sv2b,LAMININ,ECM-Receptor
+1581,Lama5,Sv2b,LAMININ,ECM-Receptor
+1582,Lamb1,Sv2b,LAMININ,ECM-Receptor
+1583,Lamb2,Sv2b,LAMININ,ECM-Receptor
+1584,Lamb3,Sv2b,LAMININ,ECM-Receptor
+1585,Lamc1,Sv2b,LAMININ,ECM-Receptor
+1586,Lamc2,Sv2b,LAMININ,ECM-Receptor
+1587,Lamc3,Sv2b,LAMININ,ECM-Receptor
+1588,Lama1,Sv2c,LAMININ,ECM-Receptor
+1589,Lama2,Sv2c,LAMININ,ECM-Receptor
+1590,Lama3,Sv2c,LAMININ,ECM-Receptor
+1591,Lama4,Sv2c,LAMININ,ECM-Receptor
+1592,Lama5,Sv2c,LAMININ,ECM-Receptor
+1593,Lamb1,Sv2c,LAMININ,ECM-Receptor
+1594,Lamb2,Sv2c,LAMININ,ECM-Receptor
+1595,Lamb3,Sv2c,LAMININ,ECM-Receptor
+1596,Lamc1,Sv2c,LAMININ,ECM-Receptor
+1597,Lamc2,Sv2c,LAMININ,ECM-Receptor
+1598,Lamc3,Sv2c,LAMININ,ECM-Receptor
+1599,Thbs1,Cd36,THBS,ECM-Receptor
+1600,Thbs2,Cd36,THBS,ECM-Receptor
+1601,Thbs3,Cd36,THBS,ECM-Receptor
+1602,Thbs4,Cd36,THBS,ECM-Receptor
+1603,Comp,Cd36,THBS,ECM-Receptor
+1604,Vwf,Gp1ba_Gp1bb_Gp5_Gp9,VWF,ECM-Receptor
+1605,Col1a1,Gp6,COLLAGEN,ECM-Receptor
+1606,Col1a2,Gp6,COLLAGEN,ECM-Receptor
+1607,Col2a1,Gp6,COLLAGEN,ECM-Receptor
+1608,Col4a1,Gp6,COLLAGEN,ECM-Receptor
+1609,Col4a2,Gp6,COLLAGEN,ECM-Receptor
+1610,Col4a3,Gp6,COLLAGEN,ECM-Receptor
+1611,Col4a4,Gp6,COLLAGEN,ECM-Receptor
+1612,Col4a5,Gp6,COLLAGEN,ECM-Receptor
+1613,Col4a6,Gp6,COLLAGEN,ECM-Receptor
+1614,Col6a1,Gp6,COLLAGEN,ECM-Receptor
+1615,Col6a2,Gp6,COLLAGEN,ECM-Receptor
+1616,Col6a3,Gp6,COLLAGEN,ECM-Receptor
+1617,Col6a4,Gp6,COLLAGEN,ECM-Receptor
+1618,Col6a5,Gp6,COLLAGEN,ECM-Receptor
+1619,Col6a6,Gp6,COLLAGEN,ECM-Receptor
+1620,Col9a1,Gp6,COLLAGEN,ECM-Receptor
+1621,Col9a2,Gp6,COLLAGEN,ECM-Receptor
+1622,Col9a3,Gp6,COLLAGEN,ECM-Receptor
+1623,Thbs1,Cd47,THBS,ECM-Receptor
+1624,Thbs2,Cd47,THBS,ECM-Receptor
+1625,Thbs3,Cd47,THBS,ECM-Receptor
+1626,Thbs4,Cd47,THBS,ECM-Receptor
+1627,Comp,Cd47,THBS,ECM-Receptor
+1628,Agrn,Dag1,AGRN,ECM-Receptor
+1629,Hspg2,Dag1,HSPG,ECM-Receptor
+1630,Lama1,Dag1,LAMININ,ECM-Receptor
+1631,Lama2,Dag1,LAMININ,ECM-Receptor
+1632,Lama3,Dag1,LAMININ,ECM-Receptor
+1633,Lama4,Dag1,LAMININ,ECM-Receptor
+1634,Lama5,Dag1,LAMININ,ECM-Receptor
+1635,Lamb1,Dag1,LAMININ,ECM-Receptor
+1636,Lamb2,Dag1,LAMININ,ECM-Receptor
+1637,Lamb3,Dag1,LAMININ,ECM-Receptor
+1638,Lamc1,Dag1,LAMININ,ECM-Receptor
+1639,Lamc2,Dag1,LAMININ,ECM-Receptor
+1640,Lamc3,Dag1,LAMININ,ECM-Receptor
+1641,Adgre5,Cd55b,ADGRE5,Cell-Cell Contact
+1642,Alcam,Cd6,ALCAM,Cell-Cell Contact
+1643,Anxa1,Fpr2_Fpr3,ANXA1,Cell-Cell Contact
+1644,App,Cd74,APP,Cell-Cell Contact
+1645,Bst2,Pira2,BST2,Cell-Cell Contact
+1646,Cadm1,Cadm1,CADM,Cell-Cell Contact
+1647,Cadm3,Cadm3,CADM,Cell-Cell Contact
+1648,Cd1d2,Pira2,CD1D2,Cell-Cell Contact
+1649,Cd200,Cd200r1,CD200,Cell-Cell Contact
+1650,Cd200,Cd200r2,CD200,Cell-Cell Contact
+1651,Cd200,Cd200r3,CD200,Cell-Cell Contact
+1652,Cd200,Cd200r4,CD200,Cell-Cell Contact
+1653,Cd22,Ptprc,CD22,Cell-Cell Contact
+1654,Cd226,Nectin2,CD226,Cell-Cell Contact
+1655,Cd226,Pvr,CD226,Cell-Cell Contact
+1656,Fcer2a,Itgam_Itgb2,CD23,Cell-Cell Contact
+1657,Fcer2a,Itgax_Itgb2,CD23,Cell-Cell Contact
+1658,Fcer2a,Itgav_Itgb3,CD23,Cell-Cell Contact
+1659,Fcer2a,Cr2,CD23,Cell-Cell Contact
+1660,Cd34,Selp,CD34,Cell-Cell Contact
+1661,Entpd1,Adora1,CD39,Cell-Cell Contact
+1662,Entpd1,Adora2a,CD39,Cell-Cell Contact
+1663,Entpd1,Adora2b,CD39,Cell-Cell Contact
+1664,Entpd1,Tmigd3,CD39,Cell-Cell Contact
+1665,Cd40lg,Cd40,CD40,Cell-Cell Contact
+1666,Ptprc,Cd22,CD45,Cell-Cell Contact
+1667,Ptprc,Mrc1,CD45,Cell-Cell Contact
+1668,Cd46,Jag1,CD46,Cell-Cell Contact
+1669,Cd48,Cd244a,CD48,Cell-Cell Contact
+1670,Cd52,Siglecg,CD52,Cell-Cell Contact
+1671,Cd6,Alcam,CD6,Cell-Cell Contact
+1672,Cd80,Cd274,CD80,Cell-Cell Contact
+1673,Cd80,Cd28,CD80,Cell-Cell Contact
+1674,Cd80,Ctla4,CD80,Cell-Cell Contact
+1675,Cd86,Cd28,CD86,Cell-Cell Contact
+1676,Cd86,Ctla4,CD86,Cell-Cell Contact
+1677,Cd96,Nectin1,CD96,Cell-Cell Contact
+1678,Cd96,Pvr,CD96,Cell-Cell Contact
+1679,Cd99,Pilra,CD99,Cell-Cell Contact
+1680,Cd99,Cd99,CD99,Cell-Cell Contact
+1681,Cdh15,Cdh15,CDH,Cell-Cell Contact
+1682,Cdh4,Cdh4,CDH,Cell-Cell Contact
+1683,Cdh2,Cdh2,CDH,Cell-Cell Contact
+1684,Cdh1,Cdh1,CDH,Cell-Cell Contact
+1685,Cdh1,Itga2_Itgb1,CDH1,Cell-Cell Contact
+1686,Cdh1,Itgae_Itgb7,CDH1,Cell-Cell Contact
+1687,Cdh1,Klrg1,CDH1,Cell-Cell Contact
+1688,Cdh5,Cdh5,CDH5,Cell-Cell Contact
+1689,Cd1d1,Ceacam5,CEACAM,Cell-Cell Contact
+1690,Cd209a,Ceacam1,CEACAM,Cell-Cell Contact
+1691,Cd8a,Ceacam5,CEACAM,Cell-Cell Contact
+1692,Ceacam1,Ceacam5,CEACAM,Cell-Cell Contact
+1693,Sele,Ceacam1,CEACAM,Cell-Cell Contact
+1694,Cldn11,Cldn11,CLDN,Cell-Cell Contact
+1695,Clec2d,Klrb1b,CLEC,Cell-Cell Contact
+1696,Clec2g,Klrb1,CLEC,Cell-Cell Contact
+1697,Clec2h,Klrb1,CLEC,Cell-Cell Contact
+1698,Clec2i,Klrb1,CLEC,Cell-Cell Contact
+1699,Clec2f,Klrb1f,CLEC,Cell-Cell Contact
+1700,Clec2g,Klrb1f,CLEC,Cell-Cell Contact
+1701,Clec2i,Klrb1f,CLEC,Cell-Cell Contact
+1702,Nfasc,Cntn1_Cntnap1,CNTN,Cell-Cell Contact
+1703,Cntn2,Cntn2_Cntnap2,CNTN,Cell-Cell Contact
+1704,Cntn2,L1cam,CNTN,Cell-Cell Contact
+1705,Cntn2,Cntn2,CNTN,Cell-Cell Contact
+1706,Cntn1,Nrcam,CNTN,Cell-Cell Contact
+1707,Cspg4,Itga3_Itgb1,CSPG4,Cell-Cell Contact
+1708,Dsc1,Dsg1c,DESMOSOME,Cell-Cell Contact
+1709,Dsc1,Dsg2,DESMOSOME,Cell-Cell Contact
+1710,Dsc2,Dsg1c,DESMOSOME,Cell-Cell Contact
+1711,Dsc2,Dsg2,DESMOSOME,Cell-Cell Contact
+1712,Dsg1c,Dsc3,DESMOSOME,Cell-Cell Contact
+1713,Dsg2,Dsc3,DESMOSOME,Cell-Cell Contact
+1714,Epgn,Egfr,EPGN,Cell-Cell Contact
+1715,Efna1,Epha1,EPHA,Cell-Cell Contact
+1716,Efna1,Epha2,EPHA,Cell-Cell Contact
+1717,Efna1,Epha3,EPHA,Cell-Cell Contact
+1718,Efna1,Epha4,EPHA,Cell-Cell Contact
+1719,Efna1,Epha5,EPHA,Cell-Cell Contact
+1720,Efna1,Epha7,EPHA,Cell-Cell Contact
+1721,Efna1,Epha8,EPHA,Cell-Cell Contact
+1722,Efna2,Epha1,EPHA,Cell-Cell Contact
+1723,Efna2,Epha2,EPHA,Cell-Cell Contact
+1724,Efna2,Epha3,EPHA,Cell-Cell Contact
+1725,Efna2,Epha4,EPHA,Cell-Cell Contact
+1726,Efna2,Epha5,EPHA,Cell-Cell Contact
+1727,Efna2,Epha7,EPHA,Cell-Cell Contact
+1728,Efna2,Epha8,EPHA,Cell-Cell Contact
+1729,Efna3,Epha1,EPHA,Cell-Cell Contact
+1730,Efna3,Epha2,EPHA,Cell-Cell Contact
+1731,Efna3,Epha3,EPHA,Cell-Cell Contact
+1732,Efna3,Epha4,EPHA,Cell-Cell Contact
+1733,Efna3,Epha5,EPHA,Cell-Cell Contact
+1734,Efna3,Epha7,EPHA,Cell-Cell Contact
+1735,Efna3,Epha8,EPHA,Cell-Cell Contact
+1736,Efna4,Epha1,EPHA,Cell-Cell Contact
+1737,Efna4,Epha2,EPHA,Cell-Cell Contact
+1738,Efna4,Epha3,EPHA,Cell-Cell Contact
+1739,Efna4,Epha4,EPHA,Cell-Cell Contact
+1740,Efna4,Epha5,EPHA,Cell-Cell Contact
+1741,Efna4,Epha7,EPHA,Cell-Cell Contact
+1742,Efna4,Epha8,EPHA,Cell-Cell Contact
+1743,Efna5,Epha1,EPHA,Cell-Cell Contact
+1744,Efna5,Epha2,EPHA,Cell-Cell Contact
+1745,Efna5,Epha3,EPHA,Cell-Cell Contact
+1746,Efna5,Epha4,EPHA,Cell-Cell Contact
+1747,Efna5,Epha5,EPHA,Cell-Cell Contact
+1748,Efna5,Epha7,EPHA,Cell-Cell Contact
+1749,Efna5,Epha8,EPHA,Cell-Cell Contact
+1750,Efna5,Ephb2,EPHA,Cell-Cell Contact
+1751,Efnb1,Epha4,EPHB,Cell-Cell Contact
+1752,Efnb1,Ephb1,EPHB,Cell-Cell Contact
+1753,Efnb1,Ephb2,EPHB,Cell-Cell Contact
+1754,Efnb1,Ephb3,EPHB,Cell-Cell Contact
+1755,Efnb1,Ephb4,EPHB,Cell-Cell Contact
+1756,Efnb2,Epha4,EPHB,Cell-Cell Contact
+1757,Efnb2,Ephb1,EPHB,Cell-Cell Contact
+1758,Efnb2,Ephb2,EPHB,Cell-Cell Contact
+1759,Efnb2,Ephb3,EPHB,Cell-Cell Contact
+1760,Efnb2,Ephb4,EPHB,Cell-Cell Contact
+1761,Efnb3,Epha4,EPHB,Cell-Cell Contact
+1762,Efnb3,Ephb1,EPHB,Cell-Cell Contact
+1763,Efnb3,Ephb2,EPHB,Cell-Cell Contact
+1764,Efnb3,Ephb3,EPHB,Cell-Cell Contact
+1765,Efnb3,Ephb4,EPHB,Cell-Cell Contact
+1766,Efnb3,Ephb6,EPHB,Cell-Cell Contact
+1767,Esam,Esam,ESAM,Cell-Cell Contact
+1768,Gp1ba,Itgam_Itgb2,GP1BA,Cell-Cell Contact
+1769,Icam1,Itgax_Itgb2,ICAM,Cell-Cell Contact
+1770,Icam1,Itgal_Itgb2,ICAM,Cell-Cell Contact
+1771,Icam2,Itgal_Itgb2,ICAM,Cell-Cell Contact
+1772,Icam1,Itgam_Itgb2,ICAM,Cell-Cell Contact
+1773,Icam2,Itgam_Itgb2,ICAM,Cell-Cell Contact
+1774,Icam1,Itgal_Itgb2l,ICAM,Cell-Cell Contact
+1775,Icam2,Itgal_Itgb2l,ICAM,Cell-Cell Contact
+1776,Icam1,Itgam_Itgb2l,ICAM,Cell-Cell Contact
+1777,Icam2,Itgam_Itgb2l,ICAM,Cell-Cell Contact
+1778,Icam1,Itgal,ICAM,Cell-Cell Contact
+1779,Icam1,Spn,ICAM,Cell-Cell Contact
+1780,Icam5,Cd209a,ICAM,Cell-Cell Contact
+1781,Icam5,Cd209f,ICAM,Cell-Cell Contact
+1782,Icosl,Icos,ICOS,Cell-Cell Contact
+1783,Icosl,Cd28,ICOS,Cell-Cell Contact
+1784,Icosl,Ctla4,ICOS,Cell-Cell Contact
+1785,Itgal_Itgb2,Cd226,ITGAL-ITGB2,Cell-Cell Contact
+1786,Itgal_Itgb2,Icam1,ITGAL-ITGB2,Cell-Cell Contact
+1787,Itgal_Itgb2,Icam2,ITGAL-ITGB2,Cell-Cell Contact
+1788,Itgal_Itgb2l,Cd226,ITGAL-ITGB2,Cell-Cell Contact
+1789,Itgal_Itgb2l,Icam1,ITGAL-ITGB2,Cell-Cell Contact
+1790,Itgal_Itgb2l,Icam2,ITGAL-ITGB2,Cell-Cell Contact
+1791,Jam2,Itga3_Itgb1,JAM,Cell-Cell Contact
+1792,Jam2,Itgav_Itgb1,JAM,Cell-Cell Contact
+1793,Jam3,Itgam_Itgb2,JAM,Cell-Cell Contact
+1794,F11r,Itgal_Itgb2,JAM,Cell-Cell Contact
+1795,Jam3,Itgam_Itgb2l,JAM,Cell-Cell Contact
+1796,Jam2,Jam3,JAM,Cell-Cell Contact
+1797,F11r,F11r,JAM,Cell-Cell Contact
+1798,F11r,Jam2,JAM,Cell-Cell Contact
+1799,F11r,Jam3,JAM,Cell-Cell Contact
+1800,Jam2,F11r,JAM,Cell-Cell Contact
+1801,Jam2,Jam2,JAM,Cell-Cell Contact
+1802,Jam3,F11r,JAM,Cell-Cell Contact
+1803,Jam3,Jam2,JAM,Cell-Cell Contact
+1804,Jam3,Jam3,JAM,Cell-Cell Contact
+1805,L1cam,Itgav_Itgb3,L1CAM,Cell-Cell Contact
+1806,L1cam,Itga4_Itgb7,L1CAM,Cell-Cell Contact
+1807,L1cam,L1cam,L1CAM,Cell-Cell Contact
+1808,Lair1,Pira2,LAIR1,Cell-Cell Contact
+1809,Lck,Cd8a_Cd8b1,LCK,Cell-Cell Contact
+1810,Madcam1,Itga4_Itgb7,MADCAM,Cell-Cell Contact
+1811,Mag,Mag,MAG,Cell-Cell Contact
+1812,H2-T23,Klrd1_Klrc1,MHC-I,Cell-Cell Contact
+1813,H2-T23,Klrd1_Klrc2,MHC-I,Cell-Cell Contact
+1814,H2-M2,Cd8a,MHC-I,Cell-Cell Contact
+1815,H2-M3,Cd8a,MHC-I,Cell-Cell Contact
+1816,H2-M9,Cd8a,MHC-I,Cell-Cell Contact
+1817,H2-Q1,Cd8a,MHC-I,Cell-Cell Contact
+1818,H2-Q10,Cd8a,MHC-I,Cell-Cell Contact
+1819,H2-Q2,Cd8a,MHC-I,Cell-Cell Contact
+1820,H2-Q7,Cd8a,MHC-I,Cell-Cell Contact
+1821,H2-Q8,Cd8a,MHC-I,Cell-Cell Contact
+1822,H2-T22,Cd8a,MHC-I,Cell-Cell Contact
+1823,H2-T23,Cd8a,MHC-I,Cell-Cell Contact
+1824,H2-T24,Cd8a,MHC-I,Cell-Cell Contact
+1825,H2-T3,Cd8a,MHC-I,Cell-Cell Contact
+1826,H2-T9,Cd8a,MHC-I,Cell-Cell Contact
+1827,H2-M10.4,Cd8a,MHC-I,Cell-Cell Contact
+1828,H2-M11,Cd8a,MHC-I,Cell-Cell Contact
+1829,H2-M1,Cd8a,MHC-I,Cell-Cell Contact
+1830,H2-M10.5,Cd8a,MHC-I,Cell-Cell Contact
+1831,H2-M10.2,Cd8a,MHC-I,Cell-Cell Contact
+1832,H2-M10.6,Cd8a,MHC-I,Cell-Cell Contact
+1833,H2-T10,Cd8a,MHC-I,Cell-Cell Contact
+1834,H2-Q6,Cd8a,MHC-I,Cell-Cell Contact
+1835,H2-M10.3,Cd8a,MHC-I,Cell-Cell Contact
+1836,H2-Bl,Cd8a,MHC-I,Cell-Cell Contact
+1837,H2-D1,Cd8a,MHC-I,Cell-Cell Contact
+1838,H2-K1,Cd8a,MHC-I,Cell-Cell Contact
+1839,H2-M10.1,Cd8a,MHC-I,Cell-Cell Contact
+1840,H2-T18,Cd8a,MHC-I,Cell-Cell Contact
+1841,H2-Q9,Cd8a,MHC-I,Cell-Cell Contact
+1842,Gm8909,Cd8a,MHC-I,Cell-Cell Contact
+1843,H2-L,Cd8a,MHC-I,Cell-Cell Contact
+1844,Gm10499,Cd8a,MHC-I,Cell-Cell Contact
+1845,H2-Q4,Cd8a,MHC-I,Cell-Cell Contact
+1846,H2-T-ps,Cd8a,MHC-I,Cell-Cell Contact
+1847,Gm11127,Cd8a,MHC-I,Cell-Cell Contact
+1848,H2-M5,Cd8a,MHC-I,Cell-Cell Contact
+1849,Gm7030,Cd8a,MHC-I,Cell-Cell Contact
+1850,H2-M2,Cd8b1,MHC-I,Cell-Cell Contact
+1851,H2-M3,Cd8b1,MHC-I,Cell-Cell Contact
+1852,H2-M9,Cd8b1,MHC-I,Cell-Cell Contact
+1853,H2-Q1,Cd8b1,MHC-I,Cell-Cell Contact
+1854,H2-Q10,Cd8b1,MHC-I,Cell-Cell Contact
+1855,H2-Q2,Cd8b1,MHC-I,Cell-Cell Contact
+1856,H2-Q7,Cd8b1,MHC-I,Cell-Cell Contact
+1857,H2-Q8,Cd8b1,MHC-I,Cell-Cell Contact
+1858,H2-T22,Cd8b1,MHC-I,Cell-Cell Contact
+1859,H2-T23,Cd8b1,MHC-I,Cell-Cell Contact
+1860,H2-T24,Cd8b1,MHC-I,Cell-Cell Contact
+1861,H2-T3,Cd8b1,MHC-I,Cell-Cell Contact
+1862,H2-T9,Cd8b1,MHC-I,Cell-Cell Contact
+1863,H2-M10.4,Cd8b1,MHC-I,Cell-Cell Contact
+1864,H2-M11,Cd8b1,MHC-I,Cell-Cell Contact
+1865,H2-M1,Cd8b1,MHC-I,Cell-Cell Contact
+1866,H2-M10.5,Cd8b1,MHC-I,Cell-Cell Contact
+1867,H2-M10.2,Cd8b1,MHC-I,Cell-Cell Contact
+1868,H2-M10.6,Cd8b1,MHC-I,Cell-Cell Contact
+1869,H2-T10,Cd8b1,MHC-I,Cell-Cell Contact
+1870,H2-Q6,Cd8b1,MHC-I,Cell-Cell Contact
+1871,H2-M10.3,Cd8b1,MHC-I,Cell-Cell Contact
+1872,H2-Bl,Cd8b1,MHC-I,Cell-Cell Contact
+1873,H2-D1,Cd8b1,MHC-I,Cell-Cell Contact
+1874,H2-K1,Cd8b1,MHC-I,Cell-Cell Contact
+1875,H2-M10.1,Cd8b1,MHC-I,Cell-Cell Contact
+1876,H2-T18,Cd8b1,MHC-I,Cell-Cell Contact
+1877,H2-Q9,Cd8b1,MHC-I,Cell-Cell Contact
+1878,Gm8909,Cd8b1,MHC-I,Cell-Cell Contact
+1879,H2-L,Cd8b1,MHC-I,Cell-Cell Contact
+1880,Gm10499,Cd8b1,MHC-I,Cell-Cell Contact
+1881,H2-Q4,Cd8b1,MHC-I,Cell-Cell Contact
+1882,H2-T-ps,Cd8b1,MHC-I,Cell-Cell Contact
+1883,Gm11127,Cd8b1,MHC-I,Cell-Cell Contact
+1884,H2-M5,Cd8b1,MHC-I,Cell-Cell Contact
+1885,Gm7030,Cd8b1,MHC-I,Cell-Cell Contact
+1886,H2-Bl,Kir3dl1,MHC-I,Cell-Cell Contact
+1887,H2-D1,Kir3dl1,MHC-I,Cell-Cell Contact
+1888,H2-K1,Kir3dl1,MHC-I,Cell-Cell Contact
+1889,H2-Q1,Kir3dl1,MHC-I,Cell-Cell Contact
+1890,H2-Q10,Kir3dl1,MHC-I,Cell-Cell Contact
+1891,H2-Q2,Kir3dl1,MHC-I,Cell-Cell Contact
+1892,H2-Q4,Kir3dl1,MHC-I,Cell-Cell Contact
+1893,H2-Q6,Kir3dl1,MHC-I,Cell-Cell Contact
+1894,H2-Q7,Kir3dl1,MHC-I,Cell-Cell Contact
+1895,H2-D,Klra,MHC-I,Cell-Cell Contact
+1896,H2-K1,Klra,MHC-I,Cell-Cell Contact
+1897,Ulbp1,Klrk1,MHC-I,Cell-Cell Contact
+1898,Raet1a,Klrk1,MHC-I,Cell-Cell Contact
+1899,H60a,Klrk1,MHC-I,Cell-Cell Contact
+1900,H2-Ea,Cd4,MHC-II,Cell-Cell Contact
+1901,H2-Aa,Cd4,MHC-II,Cell-Cell Contact
+1902,H2-Ab1,Cd4,MHC-II,Cell-Cell Contact
+1903,H2-Eb1,Cd4,MHC-II,Cell-Cell Contact
+1904,H2-DMa,Cd4,MHC-II,Cell-Cell Contact
+1905,H2-DMb1,Cd4,MHC-II,Cell-Cell Contact
+1906,H2-DMb2,Cd4,MHC-II,Cell-Cell Contact
+1907,H2-Oa,Cd4,MHC-II,Cell-Cell Contact
+1908,H2-Ob,Cd4,MHC-II,Cell-Cell Contact
+1909,Mpz,Mpzl1,MPZ,Cell-Cell Contact
+1910,Mpz,Mpz,MPZ,Cell-Cell Contact
+1911,Mpzl1,Mpzl1,MPZ,Cell-Cell Contact
+1912,Ncam1,Fgfr1,NCAM,Cell-Cell Contact
+1913,Ncam1,Ncam1,NCAM,Cell-Cell Contact
+1914,Ncam1,Ncam2,NCAM,Cell-Cell Contact
+1915,Ncam1,L1cam,NCAM,Cell-Cell Contact
+1916,Ncam2,L1cam,NCAM,Cell-Cell Contact
+1917,Nectin1,Cadm3,NECTIN,Cell-Cell Contact
+1918,Nectin1,Cd96,NECTIN,Cell-Cell Contact
+1919,Nectin1,Nectin4,NECTIN,Cell-Cell Contact
+1920,Nectin3,Nectin1,NECTIN,Cell-Cell Contact
+1921,Nectin3,Nectin2,NECTIN,Cell-Cell Contact
+1922,Nectin3,Pvr,NECTIN,Cell-Cell Contact
+1923,Nectin3,Tigit,NECTIN,Cell-Cell Contact
+1924,Nectin2,Cd226,NECTIN,Cell-Cell Contact
+1925,Nectin2,Tigit,NECTIN,Cell-Cell Contact
+1926,Nectin1,Nectin3,NECTIN,Cell-Cell Contact
+1927,Negr1,Negr1,NEGR,Cell-Cell Contact
+1928,Lrrc4c,Ntng1,NGL,Cell-Cell Contact
+1929,Lrrc4,Ntng2,NGL,Cell-Cell Contact
+1930,Lrrc4b,Ptprf,NGL,Cell-Cell Contact
+1931,Ulbp1,Klrk1_Hcst,NKG2D,Cell-Cell Contact
+1932,Dlk1,Notch1,NOTCH,Cell-Cell Contact
+1933,Dlk1,Notch2,NOTCH,Cell-Cell Contact
+1934,Dlk1,Notch3,NOTCH,Cell-Cell Contact
+1935,Dlk1,Notch4,NOTCH,Cell-Cell Contact
+1936,Dll1,Notch1,NOTCH,Cell-Cell Contact
+1937,Dll1,Notch3,NOTCH,Cell-Cell Contact
+1938,Dll1,Notch4,NOTCH,Cell-Cell Contact
+1939,Dll3,Notch1,NOTCH,Cell-Cell Contact
+1940,Dll3,Notch2,NOTCH,Cell-Cell Contact
+1941,Dll3,Notch3,NOTCH,Cell-Cell Contact
+1942,Dll3,Notch4,NOTCH,Cell-Cell Contact
+1943,Dll4,Notch1,NOTCH,Cell-Cell Contact
+1944,Dll4,Notch2,NOTCH,Cell-Cell Contact
+1945,Dll4,Notch3,NOTCH,Cell-Cell Contact
+1946,Dll4,Notch4,NOTCH,Cell-Cell Contact
+1947,Jag1,Notch1,NOTCH,Cell-Cell Contact
+1948,Jag1,Notch2,NOTCH,Cell-Cell Contact
+1949,Jag1,Notch3,NOTCH,Cell-Cell Contact
+1950,Jag1,Notch4,NOTCH,Cell-Cell Contact
+1951,Jag2,Notch1,NOTCH,Cell-Cell Contact
+1952,Jag2,Notch2,NOTCH,Cell-Cell Contact
+1953,Jag2,Notch3,NOTCH,Cell-Cell Contact
+1954,Jag2,Notch4,NOTCH,Cell-Cell Contact
+1955,Dll1,Notch2,NOTCH,Cell-Cell Contact
+1956,Nrxn1,Nlgn1,NRXN,Cell-Cell Contact
+1957,Nrxn1,Nlgn2,NRXN,Cell-Cell Contact
+1958,Nrxn1,Nlgn3,NRXN,Cell-Cell Contact
+1959,Nrxn2,Nlgn1,NRXN,Cell-Cell Contact
+1960,Nrxn2,Nlgn2,NRXN,Cell-Cell Contact
+1961,Nrxn2,Nlgn3,NRXN,Cell-Cell Contact
+1962,Nrxn3,Nlgn1,NRXN,Cell-Cell Contact
+1963,Nrxn3,Nlgn2,NRXN,Cell-Cell Contact
+1964,Nrxn3,Nlgn3,NRXN,Cell-Cell Contact
+1965,Ocln,Ocln,OCLN,Cell-Cell Contact
+1966,Cd274,Pdcd1,PD-L1,Cell-Cell Contact
+1967,Pdcd1lg2,Pdcd1,PDL2,Cell-Cell Contact
+1968,Pecam1,Pecam1,PECAM1,Cell-Cell Contact
+1969,Ptprm,Ptprm,PTPRM,Cell-Cell Contact
+1970,Pvr,Cd226,PVR,Cell-Cell Contact
+1971,Pvr,Tigit,PVR,Cell-Cell Contact
+1972,Sele,Cd44,SELE,Cell-Cell Contact
+1973,Sele,Glg1,SELE,Cell-Cell Contact
+1974,Sell,Cd34,SELL,Cell-Cell Contact
+1975,Sell,Podxl,SELL,Cell-Cell Contact
+1976,Sell,Glycam1,SELL,Cell-Cell Contact
+1977,Sell,Madcam1,SELL,Cell-Cell Contact
+1978,Selplg,Sele,SELPLG,Cell-Cell Contact
+1979,Selplg,Sell,SELPLG,Cell-Cell Contact
+1980,Selplg,Selp,SELPLG,Cell-Cell Contact
+1981,Sema4a,Nrp1_Plxna1,SEMA4,Cell-Cell Contact
+1982,Sema4a,Nrp1_Plxna2,SEMA4,Cell-Cell Contact
+1983,Sema4a,Nrp1_Plxna3,SEMA4,Cell-Cell Contact
+1984,Sema4a,Nrp1_Plxna4,SEMA4,Cell-Cell Contact
+1985,Sema4a,Plxnb1,SEMA4,Cell-Cell Contact
+1986,Sema4a,Plxnb2,SEMA4,Cell-Cell Contact
+1987,Sema4a,Plxnb3,SEMA4,Cell-Cell Contact
+1988,Sema4d,Plxnb1,SEMA4,Cell-Cell Contact
+1989,Sema4d,Plxnb2,SEMA4,Cell-Cell Contact
+1990,Sema4d,Plxnb3,SEMA4,Cell-Cell Contact
+1991,Sema4c,Plxnb2,SEMA4,Cell-Cell Contact
+1992,Sema4g,Plxnb2,SEMA4,Cell-Cell Contact
+1993,Sema4a,Timd2,SEMA4,Cell-Cell Contact
+1994,Sema4d,Cd72,SEMA4,Cell-Cell Contact
+1995,Sema5a,Plxna1,SEMA5,Cell-Cell Contact
+1996,Sema5b,Plxna1,SEMA5,Cell-Cell Contact
+1997,Sema5a,Plxna3,SEMA5,Cell-Cell Contact
+1998,Sema5b,Plxna3,SEMA5,Cell-Cell Contact
+1999,Sema5a,Plxnb3,SEMA5,Cell-Cell Contact
+2000,Sema6d,Plxna1_Kdr,SEMA6,Cell-Cell Contact
+2001,Sema6d,Plxna1_Trem2_Tyrobp,SEMA6,Cell-Cell Contact
+2002,Sema6d,Plxna1,SEMA6,Cell-Cell Contact
+2003,Sema6a,Plxna2,SEMA6,Cell-Cell Contact
+2004,Sema6b,Plxna2,SEMA6,Cell-Cell Contact
+2005,Sema6a,Plxna4,SEMA6,Cell-Cell Contact
+2006,Sema6b,Plxna4,SEMA6,Cell-Cell Contact
+2007,Sema7a,Itgb1_Itga1,SEMA7,Cell-Cell Contact
+2008,Sema7a,Plxnc1,SEMA7,Cell-Cell Contact
+2009,Siglec1,Spn,SN,Cell-Cell Contact
+2010,Thy1,Itgam_Itgb2,THY1,Cell-Cell Contact
+2011,Thy1,Itgax_Itgb2,THY1,Cell-Cell Contact
+2012,Thy1,Itgav_Itgb3,THY1,Cell-Cell Contact
+2013,Tigit,Nectin2,TIGIT,Cell-Cell Contact
+2014,Tigit,Pvr,TIGIT,Cell-Cell Contact
+2015,Itga4_Itgb1,Vcam1,VCAM,Cell-Cell Contact
+2016,Itga9_Itgb1,Vcam1,VCAM,Cell-Cell Contact
+2017,Itga4_Itgb7,Vcam1,VCAM,Cell-Cell Contact
+2018,Vsir,Igsf11,VISTA,Cell-Cell Contact

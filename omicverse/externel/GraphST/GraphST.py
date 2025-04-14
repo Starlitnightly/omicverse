@@ -29,7 +29,8 @@ class GraphST():
         lamda1 = 10,
         lamda2 = 1,
         deconvolution = False,
-        datatype = '10X'
+        datatype = '10X',
+        n_pcs=50
         ):
         '''\
 
@@ -90,6 +91,7 @@ class GraphST():
         self.lamda2 = lamda2
         self.deconvolution = deconvolution
         self.datatype = datatype
+        self.n_pcs=n_pcs
         
         fix_seed(self.random_seed)
         
@@ -149,7 +151,9 @@ class GraphST():
            self.n_cell = adata_sc.n_obs
            self.n_spot = adata.n_obs
             
-    def train(self,n_pcs=50):
+    def train(self,n_pcs=None):
+        if n_pcs is None:
+            n_pcs=self.n_pcs
         if self.datatype in ['Stereo', 'Slide']:
            self.model = Encoder_sparse(self.dim_input, self.dim_output, self.graph_neigh).to(self.device)
         else:

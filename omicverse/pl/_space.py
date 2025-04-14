@@ -156,6 +156,9 @@ def plot_spatial_general(
     image_cmap="Greys_r",
     white_spacing=20,
     palette=None,
+    legend_title_fontsize=12,
+    return_ax=False,
+    
 ):
     r"""Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
 
@@ -360,7 +363,7 @@ def plot_spatial_general(
 
                 cbar.ax.tick_params(labelsize=colorbar_tick_size)
                 max_color = rgb_function(max_color_intensity / 1.5)
-                cbar.ax.set_title(labels[c], **{**{"size": 20, "color": max_color, "alpha": 1}, **colorbar_label_kw})
+                cbar.ax.set_title(labels[c], **{**{"size": legend_title_fontsize, "color": max_color, "alpha": 1}, **colorbar_label_kw})
 
             colors[:, c] = color
             weights[:, c] = np.clip(counts[:, c] / (max_color_intensity + 1e-10), 0, 1)
@@ -400,8 +403,10 @@ def plot_spatial_general(
                 from adjustText import adjust_text
 
                 adjust_text(texts, arrowprops=dict(arrowstyle="->", color="w", lw=0.5))
-
-    return fig
+    if return_ax==True:
+        return fig,ax
+    else:
+        return fig
 
 
 def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
@@ -430,5 +435,114 @@ def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
         kwargs["coords"] = adata.obsm["spatial"]
 
     fig = plot_spatial_general(adata,value_df=adata.obs[color], **kwargs)  # cell abundance values
+    fig.axes[0].set_xlim(kwargs["coords"][:,0].min(),kwargs["coords"][:,0].max())
+    fig.axes[0].set_ylim(kwargs["coords"][:,1].max(),kwargs["coords"][:,1].min())
 
     return fig
+
+def create_colormap(R, G, B):
+        spacing = int(20 * 2.55)
+
+        N = 255
+        M = 3
+
+        alphas = np.concatenate([[0] * spacing * M, np.linspace(0, 1.0, (N - spacing) * M)])
+
+        vals = np.ones((N * M, 4))
+        #         vals[:, 0] = np.linspace(1, R / 255, N * M)
+        #         vals[:, 1] = np.linspace(1, G / 255, N * M)
+        #         vals[:, 2] = np.linspace(1, B / 255, N * M)
+        for i, color in enumerate([R, G, B]):
+            vals[:, i] = color / 255
+        vals[:, 3] = alphas
+
+        return ListedColormap(vals)
+
+def spatial_value(adata,color,library_id,
+            dot_size=4,white_spacing=20,
+            colorbar_show=True,
+            colorbar_tick_size=12,cmap=create_colormap(255, 0, 0),
+            legend_title_fontsize=12,
+            legend_title_color=None,
+            colorbar_label_kw={},res='hires',
+            img_show=True,ax=None,alpha_img=1):
+
+    #ax_input=False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(4,4))
+
+    img=adata.uns["spatial"][library_id]["images"][res]
+    if img_show:
+        ax.imshow(img, aspect="equal", alpha=alpha_img, origin="lower", cmap=cmap)
+        ax.invert_yaxis()
+    ax.axis(False)
+    coords=adata.obsm['spatial']*adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
+    if color in adata.obs.columns:
+        weighted_colors=adata.obs[color].values.reshape(-1)
+    elif color in adata.var_names:
+        weighted_colors=adata[:,color].to_df().values.reshape(-1)
+    elif adata.raw is not None and color in adata.raw.var_names:
+        weighted_colors=adata.raw[:,color].to_adata().to_df().values.reshape(-1)
+    ax.scatter(x=coords[:, 0], y=coords[:, 1], c=weighted_colors, s=dot_size**2,
+              cmap=cmap)
+    
+    ax.set_xlim(coords[:,0].min(),coords[:,0].max())
+    ax.set_ylim(coords[:,1].max(),coords[:,1].min())
+    
+    
+    colorbar_grid=None
+    labels=[color]
+    colorbar_shape={}
+    if colorbar_grid is None:
+        if len(labels) <= 3:
+            colorbar_grid = (1, len(labels))
+        else:
+            n_rows = round(len(labels) / 3 + 0.5 - 1e-9)
+            colorbar_grid = (n_rows, 3)
+    
+    shape = {"vertical_gaps": 1, "horizontal_gaps": 0.6, "width": 0.5, "height": 0.05}
+    shape = {**shape, **colorbar_shape}
+    
+    gs = GridSpec(
+        nrows=colorbar_grid[0] + 1,
+        ncols=colorbar_grid[1] + 2,
+        width_ratios=[0.3, *[shape["width"]] * colorbar_grid[1], 0.3],
+        height_ratios=[1, *[shape["height"]] * colorbar_grid[0]],
+        hspace=shape["vertical_gaps"],
+        wspace=shape["horizontal_gaps"],
+    )
+    
+    #ax1 = fig.add_subplot(gs[0, :], aspect="equal", rasterized=True)
+    if colorbar_show is True:
+        fig=plt.gcf()
+        cbar_axes = []
+        for row in range(1, colorbar_grid[0] + 1):
+            for column in range(1, colorbar_grid[1] + 1):
+                cbar_axes.append(fig.add_subplot(gs[row, column]))
+        
+        n_excess = colorbar_grid[0] * colorbar_grid[1] - len(labels)
+        if n_excess > 0:
+            for i in range(1, n_excess + 1):
+                cbar_axes[-i].set_visible(False)
+        
+        norm=mpl.colors.Normalize(vmin=min(weighted_colors), vmax=max(weighted_colors))
+        rgb_function = get_rgb_function(cmap=cmap,
+                                        min_value=min(weighted_colors), max_value=max(weighted_colors))
+
+        cbar = fig.colorbar(
+            mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
+            cax=cbar_axes[0],
+            orientation="horizontal",
+            extend="both",
+            #ticks=cbar_ticks,
+        )
+        cbar.ax.tick_params(labelsize=colorbar_tick_size)
+        if legend_title_color is None:
+            max_color = rgb_function(max(weighted_colors) / 1.5)
+        else:
+            max_color=legend_title_color
+        cbar.ax.set_title(labels[0], **{**{"size": legend_title_fontsize, 
+                                        "color": max_color, "alpha": 1},
+                                            **colorbar_label_kw})
+
+    return ax

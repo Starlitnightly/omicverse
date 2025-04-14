@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import statsmodels.api as sm
+import anndata as ad
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib
@@ -459,9 +460,9 @@ class pyDEG(object):
         return rnk
 
     def deg_analysis(self,group1:list,group2:list,
-                     method:str='DEseq2',alpha:float=0.05,
-                     multipletests_method:str='fdr_bh',n_cpus:int=8,
-                     cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
+                 method:str='DEseq2',alpha:float=0.05,
+                 multipletests_method:str='fdr_bh',n_cpus:int=8,
+                 cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
         r"""
         Differential expression analysis.
 
@@ -557,28 +558,30 @@ class pyDEG(object):
             return result
         elif method=='DEseq2':
             import pydeseq2
-            counts_df=self.data[group1+group2].T
-            clinical_df=pd.DataFrame(index=group1+group2)
-            clinical_df['condition']=['Treatment']*len(group1)+['Control']*len(group2)
+            counts_df = self.data[group1+group2].T
+            clinical_df = pd.DataFrame(index=group1+group2)
 
-            #Determining the version of pydeseq2 smaller than 0.4
-            if pydeseq2.__version__<='0.3.5':
+            clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
+
+            # Determine pydeseq2 version and create the DeseqDataSet accordingly
+            if pydeseq2.__version__ <= '0.3.5':
                 dds = DeseqDataSet(
                     counts=counts_df,
                     clinical=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
+                    design_factors="condition",  # compare samples based on "condition"
                     ref_level=["condition", "Control"],
-                    # column ("B" vs "A")
                     refit_cooks=True,
                     n_cpus=n_cpus,
                 )
-            elif pydeseq2.__version__<='0.4.1':
+            elif pydeseq2.__version__ <= '0.4.1':
+                if ad.__version__ > '0.10.8':
+                    raise ImportError(
+                        'Please install the 0.10.8 version of anndata: `pip install anndata==0.10.8`.'
+                    )
                 dds = DeseqDataSet(
                     counts=counts_df,
                     metadata=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
-                    #ref_level=["condition", "Control"],
-                    # column ("B" vs "A")
+                    design_factors="condition",
                     refit_cooks=True,
                     n_cpus=n_cpus,
                 )
@@ -588,48 +591,55 @@ class pyDEG(object):
                 dds = DeseqDataSet(
                     counts=counts_df,
                     metadata=clinical_df,
-                    design_factors="condition",  # compare samples based on the "condition"
+                    design_factors="condition",
                     refit_cooks=True,
                     inference=inference,
                 )
-
-            
+        
             dds.fit_size_factors()
             dds.fit_genewise_dispersions()
             dds.fit_dispersion_trend()
             dds.fit_dispersion_prior()
-            print(
-                f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}"
-            )
+            print(f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}")
             dds.fit_MAP_dispersions()
             dds.fit_LFC()
             dds.calculate_cooks()
             if dds.refit_cooks:
-                # Replace outlier counts
                 dds.refit()
+        
+            # Add the 'contrast' parameter here:
+        # FIX: Adding version check for DeseqStats constructor
+        if pydeseq2.__version__<='0.3.5':
             stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+        elif pydeseq2.__version__ <= '0.4.1':
+            # For newer PyDESeq2 versions that require the contrast parameter
+            stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
+                                  alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+            
+# Near line 643, fix the duplicate else clause:
             stat_res.run_wald_test()
             if stat_res.cooks_filter:
                 stat_res._cooks_filtering()
+                
             if stat_res.independent_filter:
                 stat_res._independent_filtering()
             else:
                 stat_res._p_value_adjustment()
-            self.stat_res=stat_res
+                
+            self.stat_res = stat_res
             stat_res.summary()
-            result=stat_res.results_df
-            result['qvalue']=result['padj']
+            result = stat_res.results_df
+            result['qvalue'] = result['padj']
             result['-log(pvalue)'] = -np.log10(result['pvalue'])
             result['-log(qvalue)'] = -np.log10(result['padj'])
-            result['BaseMean']=result['baseMean']
-            result['log2(BaseMean)']=np.log2(result['baseMean']+1)
+            result['BaseMean'] = result['baseMean']
+            result['log2(BaseMean)'] = np.log2(result['baseMean'] + 1)
             result['log2FC'] = result['log2FoldChange']
             result['abs(log2FC)'] = abs(result['log2FC'])
-            #result['size']  =np.abs(result['FoldChange'])/10
-            #result=result[result['padj']<alpha]
-            result['sig']='normal'
-            result.loc[result['qvalue']<alpha,'sig']='sig'
-            self.result=result
+            result['sig'] = 'normal'
+            result.loc[result['qvalue'] < alpha, 'sig'] = 'sig'
+            self.result = result
             return result
-        else:
+            
+        else:  # This is where the "method" check (not pydeseq2 version check) ends
             raise ValueError('The method is not supported.')

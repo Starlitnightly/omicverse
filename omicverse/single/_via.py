@@ -934,7 +934,8 @@ def draw_piechart_graph_pyomic(adata,clusters,via_object, type_data='pt',
     n_groups = len(set(via_object.labels))
     n_truegroups = len(set(reference_labels))
     group_pop = np.zeros([n_groups, 1])
-    group_frac = pd.DataFrame(np.zeros([n_groups, n_truegroups]), columns=list(adata.obs[clusters].cat.categories))
+    group_frac = pd.DataFrame(np.zeros([n_groups, n_truegroups]), 
+                              columns=list(adata.obs[clusters].cat.categories))
     via_object.cluster_population_dict = {}
     for group_i in set(via_object.labels):
         loc_i = np.where(via_object.labels == group_i)[0]
@@ -1142,7 +1143,8 @@ def get_gene_expression_pyomic(via0, gene_exp:pd.DataFrame, cmap:str='jet', figs
                             axs[r,c].legend().set_visible(False)
                             axs[r,c].grid(False)
                         else:
-                            axs[c].plot(xval, yg, color=cmap_[i_terminal], linewidth=linewidth, zorder=3,   label=f"Lineage:{via0.terminal_clusters[i_terminal]}")
+                            axs[c].plot(xval, yg, color=cmap_[i_terminal], linewidth=linewidth, zorder=3,   
+                                        label=f"Lineage:{via0.terminal_clusters[i_terminal]}")
                             axs[c].set_title(gene_i, fontsize=fontsize_)
                             # Set tick font size
                             for label in (axs[c].get_xticklabels() + axs[c].get_yticklabels()):

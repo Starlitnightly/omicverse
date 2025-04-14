@@ -2,7 +2,8 @@ import numpy as np
 from numpy.linalg import inv
 from sklearn.mixture import GaussianMixture
 
-def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_land = 1.1, N_grid = 100, coord_key = 'X_umap'):
+def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, 
+                        scale_land = 1.1, N_grid = 100, coord_key = 'X_umap'):
     """
     Function to construct the landscape of the multi-stable attractors
     
@@ -32,7 +33,7 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
     mu_hat = sc_object.uns['da_out']['mu_hat']
     rho = sc_object.obsm['rho']
     projection = sc_object.obsm[coord_key][:,0:2]
-    p_hat=adata.uns['da_out']['P_hat']
+    p_hat=sc_object.uns['da_out']['P_hat']
     
     
     labels = np.argmax(rho,axis = 1)
@@ -61,6 +62,7 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
         
     trans_coord = np.matmul(rho,centers)
     
+    
     centers = []
     for i in range(K):
         index = labels==i
@@ -80,7 +82,8 @@ def construct_landscape(sc_object,thresh_cal_cov = 0.3, scale_axis = 1.0, scale_
         precision[i,:,:] = inv(np.cov(coord_select.T))
     
 
-    gmm = GaussianMixture(n_components = K, weights_init=mu_hat, means_init = mu,precisions_init=precision, max_iter = 20,reg_covar = 1e-03)
+    gmm = GaussianMixture(n_components = K, weights_init=mu_hat, 
+                          means_init = mu,precisions_init=precision, max_iter = 20,reg_covar = 1e-03)
     gmm.fit(trans_coord)
     land_cell = -gmm.score_samples(trans_coord)
 

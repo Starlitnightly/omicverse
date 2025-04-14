@@ -151,6 +151,7 @@ def predict(ranked_data, cell_names, model_dir, batch_size = 10000):
     all_order_test = []
     
     all_models_path = pd.Series(np.array([os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(model_dir)) for f in fn]))
+    all_models_path = all_models_path.astype(str)  # 确保所有元素都是字符串
     all_models_path = all_models_path[all_models_path.str.endswith('.pt')]
     
 

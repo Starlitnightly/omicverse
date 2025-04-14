@@ -316,11 +316,13 @@ class SEACellsCPU:
             print(
                 f"Computing diffusion components from {self.build_kernel_on} for waypoint initialization ... "
             )
-        import palantir
-        dm_res = palantir.utils.run_diffusion_maps(
+        from ..palantir.utils import run_diffusion_maps, determine_multiscale_space
+        from ..palantir.core import _max_min_sampling
+        #import palantir
+        dm_res = run_diffusion_maps(
             pca_components, n_components=self.n_neighbors
         )
-        dc_components = palantir.utils.determine_multiscale_space(
+        dc_components = determine_multiscale_space(
             dm_res, n_eigs=self.n_waypoint_eigs
         )
         if self.verbose:
@@ -329,7 +331,7 @@ class SEACellsCPU:
         # Initialize SEACells via waypoint sampling
         if self.verbose:
             print("Sampling waypoints ...")
-        waypoint_init = palantir.core._max_min_sampling(
+        waypoint_init = _max_min_sampling(
             data=dc_components, num_waypoints=k
         )
         dc_components["iix"] = np.arange(len(dc_components))

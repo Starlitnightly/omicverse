@@ -97,9 +97,12 @@ def minmax_normalize(data):
 @numba.jit
 def get_image_idx_1D(image_idx_2d):
     print("\nCalculating image index 1D:")
-    image_idx_1d = np.ones(np.max(image_idx_2d[:])).astype(int)
-    for i in range(1, np.max(image_idx_2d[:])+1):   
-        image_idx_1d[i-1] = np.where(image_idx_2d.T.flatten() == i)[0]+1
+    max_value = np.max(image_idx_2d[:])
+    image_idx_1d = np.ones(max_value).astype(int)
+    for i in tqdm(range(1, max_value + 1)):
+        idx = np.where(image_idx_2d.T.flatten() == i)[0]
+        if len(idx) > 0:
+            image_idx_1d[i-1] = idx[0] + 1
     return image_idx_1d
 
 
@@ -309,7 +312,7 @@ def refine_clusters(result, adj, p=0.5):
         adj = adj.A
 
     pred_after = []  
-    for i in range(result.shape[0]):
+    for i in tqdm(range(result.shape[0])):
         temp = list(adj[i])  
         temp_list = []
         for index, value in enumerate(temp):

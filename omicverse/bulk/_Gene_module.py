@@ -21,8 +21,11 @@ from scipy.cluster.hierarchy import linkage,dendrogram
 from ..utils import pyomic_palette,plot_network
 import os
 
+from ..externel.PyWGCNA.wgcna import pyWGCNA
+from ..externel.PyWGCNA.utils import readWGCNA
 
-class pyWGCNA(object):
+
+class pyWGCNA_old(object):
     r"""
         pyWGCNA: Weighted correlation network analysis in Python
     """

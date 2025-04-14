@@ -126,8 +126,8 @@ def create_data_pyomic(single_data:anndata.AnnData,
                        ):
     print("...loading data")
     input_data = {}
-    sc_gene=single_data.var._stat_axis.values.tolist()
-    st_gene=spatial_data.var._stat_axis.values.tolist()
+    sc_gene=single_data.var.index.values.tolist()
+    st_gene=spatial_data.var.index.values.tolist()
     intersection_genes=[]
     for i in sc_gene:
         if i in st_gene:
@@ -166,8 +166,8 @@ def create_data_pyomic(single_data:anndata.AnnData,
 
 def create_data(generate_sc_meta, generate_sc_data, st_data, spot_num, cell_num, top_marker_num, marker_used,
                 mul_train):
-    sc_gene = generate_sc_data._stat_axis.values.tolist()
-    st_gene = st_data._stat_axis.values.tolist()
+    sc_gene = generate_sc_data.index.values.tolist()
+    st_gene = st_data.index.values.tolist()
 
     intersection_genes=[]
     for i in sc_gene:
@@ -317,8 +317,9 @@ class DFRunner:
 
         self.sc_test = self.sc_test_allgene  # pd.DataFrame, test cell-gene expression data.
         self.st_test = self.st_data  # pd.DataFrame, test spot-gene expression data.
-        sc_gene = self.sc_test._stat_axis.values.tolist()
-        st_gene = self.st_test._stat_axis.values.tolist()
+        sc_gene = self.sc_test.index.values.tolist()
+        st_gene = self.st_test.index.values.tolist()
+        
         intersect_gene = list(set(sc_gene).intersection(set(st_gene)))
         self.sc_test = self.sc_test.loc[intersect_gene]
         self.st_test = self.st_test.loc[intersect_gene]

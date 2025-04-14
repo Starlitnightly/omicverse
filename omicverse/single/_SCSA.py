@@ -111,8 +111,13 @@ class Annotator(object):
         if outtag.lower() == "ms-excel":
             h_values.to_excel(wb,sheet_name = "Cluster " + cname + " " + title,index=False)
         else:
-            h_values.to_csv(wb,sep="\t",quotechar = "\t",index=False,header=False)
-        pass
+            def clean_non_printable_chars(value):
+                """移除字符串中的非打印字符"""
+                if isinstance(value, str):
+                    return ''.join(c for c in value if c.isprintable())
+                return value
+            h_values = h_values.applymap(clean_non_printable_chars)
+            h_values.to_csv(wb,sep="\t",quotechar = "\t",index=False,header=False,encoding='gbk')
 
     @staticmethod
     def translate_go(name="go.obo"):
@@ -138,10 +143,23 @@ class Annotator(object):
 
     def do_go_annotation(self,gof,fore,back,cname,gtype):
         """return go annotation with significance tag"""
-        fil = gof[2].map(lambda value: len(set([value]) & fore) > 0)
-        fgnames = gof[fil].groupby(by=4)[2].unique()
-        bfil = gof[2].map(lambda value: len(set([value]) & back) > 0)
-        bgnames = gof[bfil].groupby(by=4)[2].unique()
+
+        if self.year == 2024:
+            fil = gof['2'].map(lambda value: len(set([value]) & fore) > 0)
+            fgnames = gof[fil].groupby(by="4")["2"].unique()
+            bfil = gof["2"].map(lambda value: len(set([value]) & back) > 0)
+            bgnames = gof[bfil].groupby(by="4")["2"].unique()
+        elif self.year == 2023:
+            fil = gof[2].map(lambda value: len(set([value]) & fore) > 0)
+            fgnames = gof[fil].groupby(by=4)[2].unique()
+            bfil = gof[2].map(lambda value: len(set([value]) & back) > 0)
+            bgnames = gof[bfil].groupby(by=4)[2].unique()
+        else:
+            fil = gof[2].map(lambda value: len(set([value]) & fore) > 0)
+            fgnames = gof[fil].groupby(by=4)[2].unique()
+            bfil = gof[2].map(lambda value: len(set([value]) & back) > 0)
+            bgnames = gof[bfil].groupby(by=4)[2].unique()
+            
         dat = DataFrame({"genes":fgnames,"othergenes":bgnames})
         num1 = len(fore)
         num2 = len(back)
@@ -278,7 +296,7 @@ class Annotator(object):
                     if all_outs.size == 0:
                         all_outs = outs
                     else:
-                        all_outs = all_outs.append(outs)
+                        all_outs = pd.concat([all_outs,outs])
                     if self.noprint == False:
                         print()
                 if self.output:
@@ -338,9 +356,9 @@ class Annotator(object):
                 self.wb = ExcelWriter(self.output)
                 self.wbgo = self.wb
             elif self.outfmt.lower() == "txt":
-                self.wb = open(self.output,"w")
+                self.wb = open(self.output,"w", encoding='utf-8')
                 self.wb.write("Cell Type\tZ-score\tCluster\n")
-                self.wbgo = open(self.output + ".go","w")
+                self.wbgo = open(self.output + ".go","w", encoding='utf-8')
                 self.wbgo.write('ids\tgene_num\tothergene_num\tp-value\tq-value\tsig\tname\tcluster\tgo_class\n')
             else:
                 print("Error output format: -m, --outfmt,(ms-excel,[txt])")
@@ -461,12 +479,12 @@ class Annotator(object):
                 self.wb = ExcelWriter(self.output)
                 self.wbgo = self.wb
             elif self.outfmt.lower() == "txt":
-                self.wb = open(self.output,"w")
+                self.wb = open(self.output,"w", encoding='utf-8')
                 if self.target == "cancersea":
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
                 else:
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
-                self.wbgo = open(self.output + ".go","w")
+                self.wbgo = open(self.output + ".go","w", encoding='utf-8')
                 self.wbgo.write('ids\tgene_num\tothergene_num\tp-value\tq-value\tsig\tname\tcluster\tgo_class\n')
             else:
                 print("Error output format: -m, -outfmt,(ms-excel,[txt])")
@@ -587,12 +605,12 @@ class Annotator(object):
                 self.wb = ExcelWriter(self.output)
                 self.wbgo = self.wb
             elif self.outfmt.lower() == "txt":
-                self.wb = open(self.output,"w")
+                self.wb = open(self.output,"w", encoding='utf-8')
                 if self.target == "cancersea":
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
                 else:
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
-                self.wbgo = open(self.output + ".go","w")
+                self.wbgo = open(self.output + ".go","w", encoding='utf-8')
                 self.wbgo.write('ids\tgene_num\tothergene_num\tp-value\tq-value\tsig\tname\tcluster\tgo_class\n')
             else:
                 print("Error output format: -m, -outfmt,(ms-excel,[txt])")
@@ -730,12 +748,12 @@ class Annotator(object):
                 self.wb = ExcelWriter(self.output)
                 self.wbgo = self.wb
             elif self.outfmt.lower() == "txt":
-                self.wb = open(self.output,"w")
+                self.wb = open(self.output,"w", encoding='utf-8')
                 if self.target == "cancersea":
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
                 else:
                     self.wb.write("Cell Type\tZ-score\tCluster\n")
-                self.wbgo = open(self.output + ".go","w")
+                self.wbgo = open(self.output + ".go","w", encoding='utf-8')
                 self.wbgo.write('ids\tgene_num\tothergene_num\tp-value\tq-value\tsig\tname\tcluster\tgo_class\n')
             else:
                 print("Error output format: -m, -outfmt,(ms-excel,[txt])")
@@ -1122,6 +1140,7 @@ class Annotator(object):
         #print(rownames)
         #print(colnames)
         #print(cell_matrix)
+        
 
         if self.noprint == False:
             if usertag:
@@ -1152,9 +1171,42 @@ class Annotator(object):
             if self.noprint == False:
                 print("User cells:", len(self.usermarkers['cellName'].unique()))
                 print("User genes:", len(self.usermarkers[colname].unique()))
+    
+    def save_pickle_module(self, db):
+        """save whole database"""
+        handler = gzip.open(db, "wb")
+        dump(self.gos, handler)
+        dump(self.human_gofs, handler)
+        dump(self.mouse_gofs, handler)
+        dump(self.cmarkers, handler)
+        dump(self.smarkers, handler)
+        dump(self.snames, handler)
+        dump(self.ensem_hgncs, handler)
+        dump(self.ensem_mouse, handler)
+        
+        if 'plus' in db:
+            dump(self.pmarkers, handler)
+        else:
+            dump(self.smarkers, handler)
+        
+        handler.close()
 
     def load_pickle_module(self,db):
         """read whole database"""
+        if '2023' in db:
+            self.year=2023
+            if pd.__version__ > "1.5.3":
+                print("2023 database build on pandas<2, please downgrade your pandas version!")
+                raise ValueError("2023 database build on pandas<2, please downgrade your pandas version!")
+        elif '2024' in db:
+            self.year=2024
+            if pd.__version__ <= "1.5.3":
+                print("2024 database build on pandas>2 or higher, please update your pandas version!")
+                raise ValueError("2024 database build on pandas>2 or higher, please update your pandas version!")
+        else:
+            self.year=2023
+            print("Your database version is unknown, please check your database version!")
+
         handler = gzip.open(db,"rb")
         self.gos = load(handler)
         self.human_gofs = load(handler)
@@ -1177,9 +1229,14 @@ class Annotator(object):
         if self.cellrange!=None:
             self.cmarkers = self.cmarkers[self.cmarkers['cellName'].str.contains(self.cellrange)]
         #self.smarkers = self.smarkers[~self.smarkers['cellName'].isin(fil)]
-
+        
         #if self.noprint == False:
-        print("Version V2.1 [2023/06/27]")
+        if self.year == 2023:
+            print("Version V2.1 [2023/06/27]")
+        elif self.year == 2024:
+            print("Version V2.2 [2024/12/18]")
+        else:
+            print("Unknown version")
         if 'plus' not in db:
             print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
                     len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
