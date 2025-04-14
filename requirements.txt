@@ -1,9 +1,8 @@
 scipy < 1.12
 scikit-image == 0.21.0
 omicverse
-pandas == 1.5.3
+pandas
 scanpy
-gseapy == 0.10.8
 matplotlib
 seaborn
 scikit-learn
@@ -36,10 +35,12 @@ mkdocs-glightbox==0.3.2
 mkdocstrings == 0.20.0
 mkdocs-gen-files ==0.4.0
 mkdocstrings-python ==0.9.0
+mkdocs-autorefs==0.4.1
 python-dotplot
 metatime
 tensorboard
 mellon
 ctxcore
-pydeseq2==0.4.0
+pydeseq2 > 0.3
 mkdocs-plotly-plugin
+bioservices

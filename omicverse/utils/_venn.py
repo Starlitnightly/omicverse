@@ -42,14 +42,15 @@ def get_unique(shared):
 
 #plot Venn
 def venny4py(sets={}, out='./', ce='bgrc',
-             asax=False, ext='png', dpi=300, size=3.5):
+             asax=False, ext='png', dpi=300, size=3.5,
+             bbox_to_anchor=(.5, .99),nc=2,cs=4):
     shared = get_shared(sets)
     unique = get_unique(shared)
-    ce = ce #colors
+    #ce = ce #colors
     lw = size*.12 #line width
     fs = size*2 #font size
-    nc = 2 #legend cols
-    cs = 4 #columnspacing
+    #nc = 2 #legend cols
+    #cs = 4 #columnspacing
     
     with open(f'{out}/Intersections_{len(sets)}.txt', 'w') as f:
         for k, v in unique.items():
@@ -157,7 +158,7 @@ def venny4py(sets={}, out='./', ce='bgrc',
     #legend
     handles = [mpatches.Patch(color=ce[i], label=l, alpha=.3) for i, l in enumerate(sets)]
     ax.legend(labels=sets, handles=handles, fontsize=fs*1.1, frameon=False, 
-              bbox_to_anchor=(.5, .99), bbox_transform=ax.transAxes, loc=9, 
+              bbox_to_anchor=bbox_to_anchor, bbox_transform=ax.transAxes, loc=9, 
               handlelength=1.5, ncol=nc, columnspacing=cs, handletextpad=.5)
     if asax == False:
         fig.savefig(f'{out}/Venn_{len(sets)}.{ext}', bbox_inches='tight', facecolor='w', )

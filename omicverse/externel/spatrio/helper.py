@@ -164,7 +164,7 @@ def construct_graph(X, k, mode= "connectivity", metric="minkowski",p=2):
     return c_graph
 
 # Distance calculation
-def distances_cal(graph,type_aware=None,aware_power=2):
+def distances_cal(graph, type_aware=None, aware_power=2):
     """
     Calculate distance between cells/spots based on graph.
     
@@ -176,37 +176,35 @@ def distances_cal(graph,type_aware=None,aware_power=2):
     Returns:
         -The distance matrix of cells/spots. 
     """
+    from tqdm.auto import tqdm  # 自动选择适合环境的进度条
     
-    shortestPath=dijkstra(csgraph= csr_matrix(graph), directed=False, return_predecessors=False)
+    # 计算最短路径时添加进度条
+    with tqdm(total=1, desc='Calculating shortest paths') as pbar:
+        shortestPath = dijkstra(csgraph=csr_matrix(graph), directed=False, return_predecessors=False)
+        pbar.update(1)
+
     if type_aware is not None:
-        shortestPath = to_dense_array(shortestPath)
-        shortestPath = pd.DataFrame(shortestPath)
-        shortestPath.index = type_aware.index
-        shortestPath.columns = type_aware.index
-        shortestPath['id1']=shortestPath.index
-        shortestPath = shortestPath.melt(id_vars=['id1'], var_name ='id2', value_name='value')
+        # 类型感知处理步骤添加进度条
+        with tqdm(total=4, desc='Applying type adjustments') as pbar:
+            shortestPath = to_dense_array(shortestPath)
+            pbar.update(1)
+            
+            # 获取类型信息并创建掩码矩阵
+            type_ids = type_aware.iloc[:, 1].values
+            type_mask = (type_ids[:, None] != type_ids[None, :])
+            pbar.update(1)
+            
+            # 应用类型感知调整
+            shortestPath = shortestPath * np.where(type_mask, aware_power, 1)
+            pbar.update(1)
+            
+            # 保持矩阵对称性
+            shortestPath = np.maximum(shortestPath, shortestPath.T)
+            pbar.update(1)
 
-        meta1 = type_aware.copy()
-        meta1.columns = ['id1','type1']
-        meta2 = type_aware.copy()
-        meta2.columns = ['id2','type2']
-
-        shortestPath = pd.merge(shortestPath, meta1, on='id1',how="left")
-        shortestPath = pd.merge(shortestPath, meta2, on='id2',how="left")
-
-        shortestPath['same_type'] = shortestPath['type1']==shortestPath['type2']
-        shortestPath.loc[(shortestPath.same_type == False), 'value'] = shortestPath.loc[(shortestPath.same_type == False), 'value']*aware_power
-        shortestPath.drop(['type1','type2','same_type'],axis=1,inplace=True)
-        shortestPath = shortestPath.pivot(index='id1', columns='id2',values = 'value')
-        
-        order = type_aware.index.tolist()
-        shortestPath = shortestPath[order]
-        shortestPath = shortestPath.loc[order]
-        shortestPath = shortestPath.values
-
-    the_max=np.nanmax(shortestPath[shortestPath != np.inf])
+    the_max = np.nanmax(shortestPath[shortestPath != np.inf])
     shortestPath[shortestPath > the_max] = the_max
-    C_dis=shortestPath/shortestPath.max()
+    C_dis = shortestPath / shortestPath.max()
     C_dis -= np.mean(C_dis)
     return C_dis
 
@@ -326,4 +324,4 @@ def intersect(lst1, lst2):
     
     temp = set(lst2)
     lst3 = [value for value in lst1 if value in temp]
-    return lst3 
+    return lst3

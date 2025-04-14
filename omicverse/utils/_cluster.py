@@ -2,6 +2,7 @@
 from sklearn.mixture import GaussianMixture
 import scanpy as sc
 import pandas as pd
+import numpy as np
 import anndata
 
 mira_install=False
@@ -91,32 +92,60 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
                 'Please install the schist using conda `conda install -c conda-forge schist` \nor `pip install git+https://github.com/dawe/schist.git`'
             )
         schist.inference.nested_model(adata, **kwargs)
+    elif method=='mclust_R':
+        np.random.seed(random_state)
+        import rpy2.robjects as robjects
+        robjects.r.library("mclust")
+
+        import rpy2.robjects.numpy2ri
+        rpy2.robjects.numpy2ri.activate()
+        r_random_seed = robjects.r['set.seed']
+        r_random_seed(random_state)
+        rmclust = robjects.r['Mclust']
+
+        res = rmclust(rpy2.robjects.numpy2ri.numpy2rpy(adata.obsm[use_rep]), n_components, 'EEE')
+        mclust_res = np.array(res[-2])
+
+        adata.obs[method] = mclust_res
+        adata.obs[method] = adata.obs[method].astype('int')
+        adata.obs[method] = adata.obs[method].astype('category')
+        print(f"""finished: found {n_components} clusters and added
+    'mclust', the cluster labels (adata.obs, categorical)""")
 
       
-def refine_label(adata, radius=50, key='label'):
-    import ot
+def refine_label(adata, use_rep='spatial',radius=50, key='label'):
+    """
+    Optimize the label by majority voting in the neighborhood.
+
+    Args:
+        adata: an Anndata object, after normalization.
+        radius: the radius of the neighborhood.
+        key: the key in `.obs` that corresponds to the cluster labels.
+    """
+    from scipy.spatial import distance
+    from tqdm import tqdm
     n_neigh = radius
     new_type = []
     old_type = adata.obs[key].values
-    
-    #calculate distance
-    position = adata.obsm['spatial']
-    distance = ot.dist(position, position, metric='euclidean')
-           
-    n_cell = distance.shape[0]
-    
-    for i in range(n_cell):
-        vec  = distance[i, :]
+
+    # calculate distance
+    position = adata.obsm[use_rep]
+    dist_matrix = distance.cdist(position, position, metric="euclidean")
+
+    n_cell = dist_matrix.shape[0]
+
+    for i in tqdm(range(n_cell)):
+        vec = dist_matrix[i, :]
         index = vec.argsort()
         neigh_type = []
-        for j in range(1, n_neigh+1):
+        for j in range(1, n_neigh + 1):
             neigh_type.append(old_type[index[j]])
         max_type = max(neigh_type, key=neigh_type.count)
         new_type.append(max_type)
-        
-    new_type = [str(i) for i in list(new_type)]    
-    #adata.obs['label_refined'] = np.array(new_type)
-    
+
+    new_type = [str(i) for i in list(new_type)]
+    # adata.obs['label_refined'] = np.array(new_type)
+
     return new_type
         
 def filtered(adata:anndata.AnnData,

@@ -12,7 +12,7 @@ OmicVerse can be installed via conda or pip, but you need to install `PyTorch` f
 Installation methods vary depending on the platform:
 
 - **Windows-WSL**: Install the [WSL subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and `conda` within WSL to configure the OmicVerse environment.
-- **Windows-Native**: From version `1.6.2`, OmicVerse supports native Windows, but you need to install `torch`, `torch_geometric`, and `python-annoy` first.
+- **Windows-Native**: From version `1.6.2`, OmicVerse supports native Windows, but you need to install `torch`, `torch_geometric` first.
 - **Linux**: Install [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) and use conda to configure the OmicVerse environment.
 - **Mac OS**: Use [`miniforge`](https://github.com/conda-forge/miniforge) or [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/) to configure the environment.
 
@@ -70,7 +70,7 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
 5. **Install OmicVerse**:
 
     ```shell
-    conda install python-annoy -c conda-forge
+    #conda install python-annoy -c conda-forge
     conda install omicverse -c conda-forge
     ```
 
@@ -150,7 +150,7 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
         ---
 
 
-3. **Configure Annoy (Windows Native only)**:
+3. **Configure Annoy (Windows Native only) (Removed)**:
 
     ```shell
     conda install python-annoy -c conda-forge
@@ -241,6 +241,9 @@ conda env create -f conda/omicverse_gpu.yml
 mamba env create -f conda/omicverse_gpu.yml
 ```
 
+## Docker
+
+If you plan on running omicverse in a containerized environment, we provide various [Docker images](https://hub.docker.com/r/starlitnightly/omicverse) hosted on Docker Hub.
 
 
 ## Jupyter-lab

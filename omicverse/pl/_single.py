@@ -38,14 +38,10 @@ import scanpy as sc
 from scanpy.plotting import _utils 
 
 from scanpy.plotting._utils import (
-    _IGraphLayout,
     _FontWeight,
     _FontSize,
     ColorLike,
     VBound,
-    circles,
-    check_projection,
-    check_colornorm,
 )
 
 def embedding(
@@ -74,7 +70,7 @@ def embedding(
     na_color: ColorLike = "lightgray",
     na_in_legend: bool = True,
     size: Union[float, Sequence[float], None] = None,
-    frameon: Optional[bool] = None,
+    frameon: Optional[bool] = 'small',
     legend_fontsize: Union[int, float, _FontSize, None] = None,
     legend_fontweight: Union[int, _FontWeight] = 'bold',
     legend_loc: str = 'right margin',
@@ -133,7 +129,7 @@ def embedding(
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False):
+                       legend:bool=False,legend_awargs={'ncol':1}):
     """
     Plot cell proportion of each cell type in each visual cluster.
 
@@ -166,7 +162,8 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
         b=pd.concat([b,b1])
     
     plt_data2=adata.obs[celltype_clusters].value_counts()
-    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
+    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,
+                                   adata.uns['{}_colors'.format(celltype_clusters)]))
     plt_data3=adata.obs[visual_clusters].value_counts()
     plot_data3_color_dict=dict(zip([i.replace('Retinoblastoma_','') for i in adata.obs[visual_clusters].cat.categories],adata.uns['{}_colors'.format(visual_clusters)]))
     b['cell_type_color'] = b['cell_type'].map(plot_data2_color_dict)
@@ -191,7 +188,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
             bottoms+=test1['value'].values
         n+=1
     if legend!=False:
-        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10,**legend_awargs)
     
     plt.grid(False)
     
@@ -949,3 +946,356 @@ def plot_boxplots(  # pragma: no cover
             if not (show or save):
                 return ax
             return None
+        
+
+def cellstackarea(adata,celltype_clusters:str,groupby:str,
+                       groupby_li=None,figsize:tuple=(4,6),
+                       ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
+                       legend:bool=False,legend_awargs=None,text_show=False,):
+    """
+    Plot the cell type percentage in each groupby category
+    
+    """
+    df = adata.obs[[groupby, celltype_clusters]]
+
+    # 计算每个样本类型中每个细胞类型的数量
+    count_df = df.groupby([groupby, celltype_clusters]).size().reset_index(name='count')
+    
+    # 计算每个样本类型中的总数
+    total_count_df = count_df.groupby(groupby)['count'].sum().reset_index(name='total_count')
+    
+    # 将总数合并回原数据框
+    count_df = count_df.merge(total_count_df, on=groupby)
+    
+    # 计算百分比
+    count_df['percentage'] = count_df['count'] / count_df['total_count'] * 100
+    
+    # 将数据从长格式转换为宽格式，以便绘制面积图
+    pivot_df = count_df.pivot(index=groupby, columns=celltype_clusters, values='percentage').fillna(0)
+    if groupby_li!=None:
+        pivot_df=pivot_df.loc[groupby_li]
+
+    
+    # 使用 matplotlib 绘制面积图
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize)
+    
+    # 为每种细胞类型绘制面积图
+    cell_types = pivot_df.columns
+    bottom = pd.Series([0] * len(pivot_df), index=pivot_df.index)
+
+    adata.obs[celltype_clusters]=adata.obs[celltype_clusters].astype('category')
+    if '{}_colors'.format(celltype_clusters) in adata.uns.keys():
+        print('{}_colors'.format(celltype_clusters))
+        type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
+    else:
+        if len(adata.obs[celltype_clusters].cat.categories)>28:
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.default_102))
+        else:
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.zeileis_28))
+    
+    
+    
+    for cell_type in cell_types:
+        ax.fill_between(pivot_df.index, bottom, bottom + pivot_df[cell_type], label=cell_type,
+                       color=type_color_all[cell_type])
+        max_index = pivot_df[cell_type].idxmax()
+        if text_show==True:
+            ax.text(max_index,bottom[max_index]+pivot_df.loc[max_index,cell_type]/2,cell_type,fontsize=ticks_fontsize-1)
+        
+        bottom += pivot_df[cell_type]
+    
+    if legend!=False:
+        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,
+                   fontsize=labels_fontsize,**legend_awargs)
+    
+    plt.grid(False)
+    
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+
+    # 设置左边和下边的坐标刻度为透明色
+    #ax.yaxis.tick_left()
+    #ax.xaxis.tick_bottom()
+    #ax.xaxis.set_tick_params(color='none')
+    #ax.yaxis.set_tick_params(color='none')
+
+    # 设置左边和下边的坐标轴线为独立的线段
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+
+    plt.xticks(fontsize=ticks_fontsize,rotation=90)
+    plt.yticks(fontsize=ticks_fontsize)
+    plt.xlabel(groupby,fontsize=labels_fontsize)
+    plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
+    #fig.tight_layout()
+    if ax==None:
+        return fig,ax
+
+
+
+def violin(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=12,
+           ticks_fontsize=None,rotation=90,**kwargs):
+    if ax==None:
+        fig, ax = plt.subplots(figsize=figsize)
+    sc.pl.violin(adata,keys=keys,groupby=groupby,ax=ax,show=False,**kwargs)
+    plt.grid(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+    if ticks_fontsize==None:
+        ticks_fontsize=fontsize-1
+
+    plt.xticks(fontsize=ticks_fontsize,rotation=rotation)
+    plt.yticks(fontsize=ticks_fontsize)
+    plt.xlabel(groupby,fontsize=fontsize)
+    plt.ylabel(keys,fontsize=fontsize)
+
+    if ax==None:
+        return fig,ax
+
+    #plt.xticks(fontsize=ticks_fontsize,rotation=90)
+    #plt.yticks(fontsize=ticks_fontsize)
+
+def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_strip_points=1000):
+    import colorcet
+    from scipy.sparse import issparse  
+    
+    # 获取 y 数据
+    y = None
+    if not adata.raw is None and keys in adata.raw.var_names:
+        y = adata.raw[:, keys].X
+    elif keys in adata.obs.columns:
+        y = adata.obs[keys].values
+    elif keys in adata.var_names:
+        y = adata[:, keys].X
+    else:
+        raise ValueError(f'{keys} not found in adata.raw.var_names, adata.var_names, or adata.obs.columns')
+    
+    if issparse(y):
+        y = y.toarray().reshape(-1)
+    else:
+        y = y.reshape(-1)
+    
+    # 获取 x 数据
+    x = adata.obs[groupby].values.reshape(-1)
+    
+    # 创建绘图数据
+    plot_data = pd.DataFrame({groupby: x, keys: y})
+    
+    # 创建图形和轴
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+    
+    # 获取或设置颜色
+    if f'{groupby}_colors' not in adata.uns or adata.uns[f'{groupby}_colors'] is None:
+        #colors = ['#%02x%02x%02x' % tuple([int(k * 255) for k in i]) for i in colorcet.glasbey_bw_minc_20_maxl_70]
+        if len(adata.obs[groupby].unique())>28:
+            colors=sc.pl.palettes.default_102
+        else:
+            colors=sc.pl.palettes.zeileis_28
+        adata.uns[f'{groupby}_colors'] = colors[:len(adata.obs[groupby].unique())]
+    
+    # 绘制小提琴图
+    sns.violinplot(x=groupby, y=keys, data=plot_data, hue=groupby, dodge=False,
+                   palette=adata.uns[f'{groupby}_colors'], scale="width", inner=None, ax=ax,
+                   legend=False)
+    
+    # 调整小提琴图
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    for violin in ax.collections:
+        bbox = violin.get_paths()[0].get_extents()
+        x0, y0, width, height = bbox.bounds
+        violin.set_clip_path(plt.Rectangle((x0, y0), width / 2, height, transform=ax.transData))
+    
+    
+    
+    # 限制 stripplot 的数据点数量
+    if len(plot_data) > max_strip_points:
+        plot_data = plot_data.sample(max_strip_points)
+    
+    # 绘制 stripplot
+    old_len_collections = len(ax.collections)
+    sns.stripplot(x=groupby, y=keys, data=plot_data, hue=groupby,
+                  palette=adata.uns[f'{groupby}_colors'], dodge=False, ax=ax,
+                  )
+    
+    # 调整 stripplot 点的位置
+    for dots in ax.collections[old_len_collections:]:
+        dots.set_offsets(dots.get_offsets() + np.array([0.12, 0]))
+
+    # 绘制箱线图
+    sns.boxplot(x=groupby, y=keys, data=plot_data, saturation=1, showfliers=False,
+                width=0.3, boxprops={'zorder': 3, 'facecolor': 'none'}, ax=ax,
+                )
+    
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
+    #remove legend
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
+    #ax.legend().set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+    ax.spines['left'].set_position(('outward', 10))
+    ax.spines['bottom'].set_position(('outward', 10))
+    #
+
+    if show:
+        plt.show()
+    
+    return ax
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.gridspec as gridspec
+
+def dotplot_doublegroup(adata, gene, group1, group2, cmap='Reds',
+                       standard_scale = 'group',figsize=(6, 4),layer=None):
+    # 检查输入
+    if gene not in adata.var_names:
+        raise ValueError(f"Gene '{gene}' is not in the provided AnnData object.")
+        
+    if group1 not in adata.obs.columns:
+        raise ValueError(f"Group '{group1}' is not in the provided AnnData object.")
+        
+    if group2 not in adata.obs.columns:
+        raise ValueError(f"Group '{group2}' is not in the provided AnnData object.")
+    
+    # 将分组列转换为类别类型
+    adata.obs[group1] = adata.obs[group1].astype('category')
+    adata.obs[group2] = adata.obs[group2].astype('category')
+    group1s = adata.obs[group1].cat.categories
+    group2s = adata.obs[group2].cat.categories
+
+    group_li_exp_mean_pd = pd.DataFrame(np.zeros((len(group1s), len(group2s))), index=group1s, columns=group2s)
+    group_li_exp_size_pd = pd.DataFrame(np.zeros((len(group1s), len(group2s))), index=group1s, columns=group2s)
+
+    for group1_ in group1s:
+        adata1 = adata[adata.obs[group1] == group1_, [gene]]
+        for group2_ in group2s:
+            if layer is None:
+                exp = adata1[adata1.obs[group2] == group2_, [gene]].to_df().values.reshape(-1)
+            elif layer in adata1.layers.keys():
+                exp = adata1[adata1.obs[group2] == group2_, [gene]].layers[layer].to_df().values.reshape(-1)
+            else:
+                raise ValueError(f"Layer '{layer}' is not in the provided AnnData object.")
+            exp_larger_zero = exp[exp > 0]
+            if len(exp) != 0:
+                group_li_exp_size_pd.loc[group1_, group2_] = len(exp_larger_zero) / len(exp)
+                group_li_exp_mean_pd.loc[group1_, group2_] = np.mean(exp)
+            else:
+                group_li_exp_size_pd.loc[group1_, group2_] = 0
+
+    dot_color_df = group_li_exp_mean_pd
+    
+    if standard_scale == "group":
+        dot_color_df = dot_color_df.sub(dot_color_df.min(1), axis=0)
+        dot_color_df = dot_color_df.div(dot_color_df.max(1), axis=0).fillna(0)
+    elif standard_scale == "var":
+        dot_color_df -= dot_color_df.min(0)
+        dot_color_df = (dot_color_df / dot_color_df.max(0)).fillna(0)
+    else:
+        pass
+    
+    # 设置常量
+    dot_min = 0
+    dot_max = 1
+    size_exponent = 1
+    largest_dot = 100
+    smallest_dot = 10
+    dot_edge_lw = 1
+    size_title = 'Fraction of cells\nin group (%)'
+
+    # 创建图形和网格布局
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(1, 2, width_ratios=[3, 1])
+    ax = fig.add_subplot(gs[0])
+
+    # 绘制圆点
+    for y, (label, row_mean) in enumerate(dot_color_df.iterrows()):
+        for x, (column, value_mean) in enumerate(row_mean.items()):
+            value_size = group_li_exp_size_pd.loc[label, column]
+            size = value_size * 500  # 调整大小
+            color = plt.get_cmap(cmap)(value_mean / dot_color_df.values.max())
+            ax.scatter(x, y, s=size, color=color, alpha=1, 
+                       edgecolors='w', linewidth=0.5)
+
+    # 设置轴
+    ax.set_xticks(range(len(group_li_exp_mean_pd.columns)))
+    ax.set_xticklabels(group_li_exp_mean_pd.columns, rotation=45)
+    ax.set_yticks(range(len(group_li_exp_mean_pd.index)))
+    ax.set_yticklabels(group_li_exp_mean_pd.index)
+    ax.set_title('Dot Plot')
+
+    # 添加颜色图例
+    ax1 = fig.add_subplot(gs[1])
+    legend_gs = ax1.get_subplotspec().subgridspec(10, 1)
+
+    color_legend_ax = fig.add_subplot(legend_gs[7])
+    mappable = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=group_li_exp_mean_pd.values.min(),
+                                                                   vmax=group_li_exp_mean_pd.values.max()))
+    plt.colorbar(mappable, cax=color_legend_ax, orientation="horizontal")
+    color_legend_ax.set_title('Mean expression\nin group', fontsize="small")
+    color_legend_ax.xaxis.set_tick_params(labelsize="small")
+
+    # 添加点大小图例
+    size_legend_ax = fig.add_subplot(legend_gs[2:5])
+    diff = dot_max - dot_min
+    step = 0.1 if 0.3 < diff <= 0.6 else 0.05 if diff <= 0.3 else 0.2
+
+    size_range = np.arange(dot_max, dot_min, step * -1)[::-1]
+    if dot_min != 0 or dot_max != 1:
+        dot_range = dot_max - dot_min
+        size_values = (size_range - dot_min) / dot_range
+    else:
+        size_values = size_range
+
+    size = size_values ** size_exponent
+    size = size * (largest_dot - smallest_dot) + smallest_dot
+
+    size_legend_ax.scatter(
+        np.arange(len(size)) + 0.5,
+        np.repeat(0, len(size)),
+        s=size * 5,
+        color="gray",
+        edgecolor="black",
+        linewidth=dot_edge_lw,
+        zorder=100,
+    )
+    size_legend_ax.set_xticks(np.arange(len(size)) + 0.5)
+    labels = [f"{np.round((x * 100), decimals=0).astype(int)}" for x in size_range]
+    size_legend_ax.set_xticklabels(labels, fontsize="small")
+
+    size_legend_ax.tick_params(
+        axis="y", left=False, labelleft=False, labelright=False
+    )
+
+    size_legend_ax.spines["right"].set_visible(False)
+    size_legend_ax.spines["top"].set_visible(False)
+    size_legend_ax.spines["left"].set_visible(False)
+    size_legend_ax.spines["bottom"].set_visible(False)
+    size_legend_ax.grid(visible=False)
+
+    ymax = size_legend_ax.get_ylim()[1]
+    size_legend_ax.set_ylim(-1.05 - largest_dot * 0.003, 4)
+    size_legend_ax.set_title(size_title, y=ymax + 0.45, size="small")
+
+    xmin, xmax = size_legend_ax.get_xlim()
+    size_legend_ax.set_xlim(xmin - 0.15, xmax + 0.5)
+
+    ax.grid(False)
+    ax1.grid(False)
+    ax1.axis(False)
+    plt.show()

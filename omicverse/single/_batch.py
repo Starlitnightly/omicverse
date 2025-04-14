@@ -34,11 +34,13 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             )
         
         adata3=adata.copy()
-        scale(adata3)
-        pca(adata3,layer='scaled',n_pcs=n_pcs)
+        if 'scaled|original|X_pca' not in adata3.obsm.keys():
+            scale(adata3)
+            pca(adata3,layer='scaled',n_pcs=n_pcs)
         sc.external.pp.harmony_integrate(adata3, batch_key,basis=use_rep,**kwargs)
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
-        return adata3
+        del adata3
+        #return adata3
     elif methods=='combat':
         adata2=adata.copy()
         sc.pp.combat(adata2, key=batch_key,**kwargs)
@@ -46,16 +48,18 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         pca(adata2,layer='scaled',n_pcs=n_pcs)
         adata2.obsm['X_combat']=adata2.obsm[use_rep].copy()
         adata.obsm['X_combat']=adata2.obsm['X_combat'].copy()
-        return adata2
+        del adata2
+        #return adata2
     elif methods=='scanorama':
         try:
-            import scanorama
+            import intervaltree
+            import fbpca
             #print('mofax have been install version:',mfx.__version__)
         except ImportError:
             raise ImportError(
-                'Please install the scanorama: `pip install scanorama`.'
+                'Please install the intervaltree: `pip install intervaltree fbpca`.'
             )
-        import scanorama
+        from ..externel.scanorama import integrate_scanpy
         batches = adata.obs[batch_key].cat.categories.tolist()
         alldata = {}
         for batch in batches:
@@ -69,7 +73,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         adatas = list(alldata2.values())
         
         # run scanorama.integrate
-        scanorama.integrate_scanpy(adatas, dimred = n_pcs,**kwargs)
+        integrate_scanpy(adatas, dimred = n_pcs,**kwargs)
         scanorama_int = [ad.obsm['X_scanorama'] for ad in adatas]
 
         # make into one matrix.
@@ -93,7 +97,19 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         model.train()
         SCVI_LATENT_KEY = "X_scVI"
         adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
-        return adata
+        return model
+    elif methods=='CellANOVA':
+        from ..externel.cellanova.model import calc_ME,calc_BE,calc_TE
+        if ('highly_variable_features' in adata.var.columns) and ('highly_variable' not in adata.var.columns):
+            adata.var['highly_variable']=adata.var['highly_variable_features']
+        adata= calc_ME(adata, integrate_key=batch_key)
+        adata = calc_BE(adata,  integrate_key=batch_key, **kwargs)
+        adata = calc_TE(adata,  integrate_key=batch_key)
+        from scipy.sparse import csr_matrix
+        adata.layers['denoised']=csr_matrix(adata.layers['denoised'])
+        ## create an independent anndata object for cellanova-integrated data
+        pca(adata,layer='denoised',n_pcs=n_pcs)
+        adata.obsm['X_cellanova']=adata.obsm['denoised|original|X_pca'].copy()
     else:
         print('Not supported')
 

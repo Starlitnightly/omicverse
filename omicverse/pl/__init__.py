@@ -6,3 +6,6 @@ from ._multi import *
 from ._bulk import *
 from ._space import *
 from ._cpdb import *
+from ._flowsig import *
+from ._embedding import *
+from ._density import *

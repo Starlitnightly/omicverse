@@ -420,16 +420,121 @@ Support Raw Windows platform
 ### Pl Module
 
 - Fixed the 'celltyep_key' error of `ov.pl.cpdb_group_heatmap` #109
+- Fixed an error in `ov.utils.roe` when some expected frequencies are less than expected value.
+- Added `cellstackarea` to visual the Percent stacked area chart of celltype in samples.
+
+### Single Module
+- Fixed the bug of `ov.single.cytotrace2` when adata.X is not sparse data. #115, #116
+- Fixed the groupby error in `ov.single.get_obs_value` of SEACells.
+- Fixed the error of cNMF #107, #85
+- Fixed the plot error when `Pycomplexheatmap` version > 1.7 #136
+
 
 ### Bulk Module
 
 - Fixed an key error in `ov.bulk.Matrix_ID_mapping`
 - Added `enrichment_multi_concat` in `ov.bulk` to concat the result of enrichment.
+- Fixed the pandas version error in gseapy #137
 
-### Bulk Module
+### Bulk2Single Module
 
 - Added `adata.var_names_make_unique()` to avoid mat shape error if gene not unique. #100
 
 ### Space Module
 
 - Fixed an error in `construct_landscape` of `ov.space.STT`
+- Fixed an error of `get_image_idx_1D` in `ov.space.svg` #117
+- Added `COMMOT` to calculate the cell-cell interaction of spatial RNA-seq.
+- Added `starfysh` to deconvolute spatial transcriptomic without scRNA-seq (#108)
+
+### PP Module
+
+- Updated constraint error of ov.pp.mde #129
+- Fixed type error of `float128` #134
+
+
+## v 1.6.7
+
+### Space Module
+
+- Added `n_jobs` argument to adjust thread in `extenel.STT.pl.plot_tensor_single`
+- Fixed an error in `extenel.STT.tl.construct_landscape`
+- Updated the tutorial of `COMMOT` and `Flowsig`
+  
+
+### Pl Module
+
+- Added `legend_awargs` to adjust the legend set in `pl.cellstackarea` and `pl.cellproportion`
+
+### Single Module
+
+- Fixed the error of `get_results` and `get_results_rfc` in `cNMF` module. (#143) (#139)
+- Added `sccaf` to obtain the best clusters.
+- Fixed the `.str` error in cytotrace2 (#146)
+
+### Bulk Module
+
+- Fixed the import error of `gseapy` in `bulk.geneset_enrichment`
+- Optimized code logic for offline enrichment analysis, added background parameter
+- Added `pyWGCNA` package replace the raw calculation of pyWGCNA (#162)
+
+### Bulk2Single Module
+
+- Remove `_stat_axis` in `bulk2single_data_prepare` and use `index` instead of it (#160).
+
+### PP Module
+
+- Fixed a return bugs in `pp.regress_and_scale` (#156)
+- Fixed a scanpy version error when using `ov.pp.pca` (#154)
+
+## v 1.6.8
+
+### Bulk Module
+
+- Fixed the error of log_init in gsea_obj.enrichment (#184)
+- Added `ax` argument to visualize the `geneset_plot`
+
+### Space Module
+
+- Added CAST to integrate multi slice
+- Added `crop_space_visium` in `omicverse.tl` to crop the sub area of space data
+
+### Pl Module
+
+- Added `legend` argument to visualize the `cpdb_heatmap`
+- Added `text_show` argument to visualize the `cellstackarea`
+- Added `ForbiddenCity` color system
+
+## v 1.6.9
+
+### PP Module
+
+- Added `recover_counts` to recover `counts` after `ov.pp.preprocess`
+- removed the lognorm layers added in `ov.pp.pca`
+
+### Single Module
+
+- Added `MultiMap` module to integrate multi species
+- Added `CellVote` to vote the best cells
+- Added `CellANOVA` to integrate samples and correct the batch effect
+- Added `StaVia` to calculate the pseudotime and infer trajectory.
+
+### Space Module
+
+- Added `ov.space.cluster` to identify the spatial domain
+- Added `Binary` for spatial cluster
+- Added `Spateo` to calculate the SVG
+
+## v 1.7.0
+
+### Single Module
+- Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
+- Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
+- Added data enhancement of `Fate`
+- Added `plot_atlas_view_ov` in VIA
+
+### Space Module
+- Added `GASTON` to learn a topographic map of a tissue slice from spatially resolved transcriptomics (SRT) data (#238)
+  
+### Plot Module
+- Added `dotplot_doublegroup` to visual the genes in doublegroup.
