@@ -170,25 +170,27 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
         from ctxcore.recovery import aucs
         from ctxcore.genesig import GeneSignature
 
-    matrix = adata.to_df()
+    matrix = adata.X.copy()
     percentiles = derive_auc_threshold(matrix)
     auc_threshold = percentiles[AUC_threshold]
-    df_rnk=create_rankings(matrix, seed)
+
+    np_rnk_sparse=fast_rank(matrix, seed= seed)
 
     for pathway_name in pathway_names:
         pathway_genes=pathways_dict[pathway_name]
-        rnk=df_rnk.iloc[:, df_rnk.columns.isin(pathway_genes)]
-        if rnk.empty or (float(len(rnk.columns)) / float(len(pathway_genes))) < 0.80:
+
+        rnk  = pd.DataFrame(np_rnk_sparse[:, np.where(adata.var_names.isin(pathway_genes))[0]]).copy()
+        if rnk.empty or (float(np_rnk_sparse.shape[1]) / float(len(pathway_genes))) < 0.80:
             print(
                 f"Less than 80% of the genes in {pathway_name} are present in the "
                 "expression matrix."
             )
-            adata.obs['{}_aucell'.format(pathway_name)]=np.zeros(shape=(df_rnk.shape[0]), dtype=np.float64)
+            adata.obs['{}_aucell'.format(pathway_name)]=np.zeros(shape=(rnk.shape[0]), dtype=np.float64)
         else:
             weights = np.array([1 for i in pathway_genes])
             adata.obs['{}_aucell'.format(pathway_name)]=aucs(rnk,
-                len(df_rnk.columns),weights,auc_threshold
-                )
+            np_rnk_sparse.shape[1],weights,auc_threshold
+            )
             
 def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
     """
