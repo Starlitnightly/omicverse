@@ -1,5 +1,6 @@
 import scanpy as sc
 from ..externel.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
+from ..pp import preprocess
 
 def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         mt_startwith='MT-',**kwargs):
@@ -42,6 +43,7 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         #adata = adata[:, adata.var.highly_variable_features]
     elif mode=='spateo':
         import spateo as st
+        from ..pp import preprocess
         adata=preprocess(adata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
         e16_w, _ = st.svg.cal_wass_dis_bs(adata, **kwargs)
         # Add positive rate before smoothing for each gene
