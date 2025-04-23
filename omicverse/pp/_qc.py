@@ -356,6 +356,27 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
     sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
 
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+    if adata.uns['status_args'] is None:
+        adata.uns['status_args'] = {}
+    adata.uns['status']['qc']=True
+    adata.uns['status_args']['qc'] = {
+        'mode': mode,
+        'min_cells': min_cells,
+        'min_genes': min_genes,
+        'nmads': nmads,
+        'max_cells_ratio': max_cells_ratio,
+        'max_genes_ratio': max_genes_ratio,
+        'batch_key': batch_key,
+        'doublets': doublets,
+        'doublets_method': doublets_method,
+        'path_viz': path_viz,
+        'mito_perc': tresh['mito_perc'],
+        'nUMIs': tresh['nUMIs'],
+        'detected_genes': tresh['detected_genes'],
+    }
+
     return adata
 
 
@@ -474,6 +495,10 @@ def qc_gpu(adata, mode='seurat',
     rsc.pp.filter_cells(adata,qc_var='detected_genes', min_count=min_genes, \
         max_count=max_genes_ratio*adata.shape[1])
     rsc.pp.filter_genes(adata, min_count=min_cells, max_count=max_cells_ratio*adata.shape[0])
+
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+    adata.uns['status']['qc']=True
     return adata
 
 

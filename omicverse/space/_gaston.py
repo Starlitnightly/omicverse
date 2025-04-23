@@ -189,7 +189,7 @@ class GASTON(object):
     
     def filter_genes(self,umi_thresh = 1000,exclude_prefix=['Mt-', 'Rpl', 'Rps']):
 
-        umi_thresh = 1000 # only analyze genes with at least 1000 total UMIs
+        #umi_thresh = 1000 # only analyze genes with at least 1000 total UMIs
         self.umi_thresh=umi_thresh
         counts_mat=self.adata.X
         if issparse(counts_mat):
