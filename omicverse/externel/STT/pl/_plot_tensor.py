@@ -8,7 +8,7 @@ def plot_tensor_single(adata, adata_aggr = None, state = 'joint',
                        attractor = None, basis = 'umap', color ='attractor', 
                        color_map = None, size = 20, alpha = 0.5, ax = None, 
                        show = None, filter_cells = False, member_thresh = 0.05, density =2,
-                       n_jobs = -1):
+                       n_jobs = -1,**kwargs):
     """
     Function to plot a single tensor graph with assgined components
     
@@ -68,16 +68,18 @@ def plot_tensor_single(adata, adata_aggr = None, state = 'joint',
     if state == 'spliced':
         adata.layers['vs'] = velo[:,gene_select,1]
         scv.tl.velocity_graph(adata, vkey = 'vs', xkey = 'Ms',n_jobs = n_jobs)
-        scv.pl.velocity_embedding_stream(adata, vkey = 'vs', basis=basis, color=color, title = title+','+'Spliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show)
+        scv.pl.velocity_embedding_stream(adata, vkey = 'vs', basis=basis, color=color, title = title+','+'Spliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show,**kwargs)
     if state == 'unspliced':
         adata.layers['vu'] = velo[:,gene_select,0]
         scv.tl.velocity_graph(adata, vkey = 'vu', xkey = 'Mu',n_jobs = n_jobs)
-        scv.pl.velocity_embedding_stream(adata, vkey = 'vu',basis=basis, color=color, title = title+','+'Unspliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show)
+        scv.pl.velocity_embedding_stream(adata, vkey = 'vu',basis=basis, color=color, title = title+','+'Unspliced',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show,**kwargs)
     if state == 'joint':
         print("check that the input includes aggregated object")
         #adata_aggr.layers['vj'] = np.concatenate((velo[:,gene_select,0],velo[:,gene_select,1]),axis = 1)
         scv.tl.velocity_graph(adata_aggr, vkey = 'vj', xkey = 'Ms',n_jobs = n_jobs)
-        scv.pl.velocity_embedding_stream(adata_aggr, vkey = 'vj',basis=basis, color=color, title = title+','+'Joint',color_map = color_map, size = size, alpha = alpha, ax = ax, show = show, density =density)
+        scv.pl.velocity_embedding_stream(adata_aggr, vkey = 'vj',basis=basis, color=color, 
+        title = title+','+'Joint',color_map = color_map, size = size, 
+        alpha = alpha, ax = ax, show = show, density =density,**kwargs)
         
     del adata_copy
     del adata_aggr_copy
@@ -144,7 +146,7 @@ def plot_tensor(adata, adata_aggr, list_state =['joint','spliced','unspliced'], 
 
 
 def plot_tensor_pathway(adata,adata_aggr,pathway_name,basis,
-                        ax=None):
+                        ax=None,**kwargs):
     """
     Function to plot the tensor graph of the pathway
     
@@ -168,7 +170,8 @@ def plot_tensor_pathway(adata,adata_aggr,pathway_name,basis,
     adata_aggr.uns['gene_subset'] = subset+[x+'_u' for x in subset]
     if ax==None:
         fig,ax=plt.subplots(1,1,figsize=(4,4))
-    plot_tensor_single(adata, adata_aggr, basis = basis, state= 'joint',ax=ax,show=False)
+    plot_tensor_single(adata, adata_aggr, basis = basis,
+     state= 'joint',ax=ax,show=False,**kwargs)
     adata.uns['gene_subset'] = subset_orig
     adata_aggr.uns['gene_subset'] = subset_orig
     return ax
