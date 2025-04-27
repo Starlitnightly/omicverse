@@ -425,6 +425,7 @@ def spatial_communication(
         heteromeric_rule = heteromeric_rule,
         heteromeric_delimiter = heteromeric_delimiter
     )
+    print('...run cot signaling')
     model.run_cot_signaling(cot_eps_p=cot_eps_p, 
         cot_eps_mu = cot_eps_mu, 
         cot_eps_nu = cot_eps_nu, 
@@ -437,7 +438,7 @@ def spatial_communication(
         smth_kernel = smth_kernel
     )
 
-    
+    print('...add pathway info')
     adata.uns['commot-'+database_name+'-info'] = {}
     df_ligrec_write = pd.DataFrame(data=df_ligrec.values, columns=['ligand','receptor','pathway'])
     adata.uns['commot-'+database_name+'-info']['df_ligrec'] = df_ligrec_write
@@ -456,7 +457,7 @@ def spatial_communication(
         S_pathway = [sparse.csr_matrix((ncell, ncell), dtype=float) for i in range(len(pathways))]
         X_sender_pathway = [np.zeros([ncell,1], float) for i in range(len(pathways))]
         X_receiver_pathway = [np.zeros([ncell,1], float) for i in range(len(pathways))]
-    for (i,j) in model.comm_network.keys():
+    for (i, j) in tqdm(model.comm_network.keys(), desc="Processing communication networks"):
         S = model.comm_network[(i,j)]
         adata.obsp['commot-'+database_name+'-'+tmp_ligs[i]+'-'+tmp_recs[j]] = S
         S_total = S_total + S

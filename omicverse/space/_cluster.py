@@ -275,6 +275,8 @@ def clusters(adata,
                                             #'lognorm':50*1e4,
                                             'n_top_genes':2000}
             adata_copy = BINARY.clean_adata(adata, save_obs=[methods_kwargs['BINARY']['obs_key']])
+            if 'counts' in adata.layers:
+                adata_copy.X=adata[adata_copy.obs.index].layers['counts']
             if 'counts' not in adata_copy.layers:
                 from ..pp import recover_counts
                 if issparse(adata_copy.X):

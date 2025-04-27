@@ -260,7 +260,7 @@ def plot_gene_pwlinear(gene_name, pw_fit_dict, gaston_labels, gaston_isodepth, b
                 left_bps.append(unique_binned_isodepths[i])
                 right_bps.append(unique_binned_isodepths[i+1])
         
-        for i in domain_list[:-1]:
+        for i in range(len(left_bps)):
             plt.axvline((left_bps[i]+right_bps[i])*0.5, color='black', ls='--', linewidth=1.5, alpha=0.2)
 
     sns.despine()

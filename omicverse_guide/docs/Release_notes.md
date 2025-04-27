@@ -527,14 +527,20 @@ Support Raw Windows platform
 
 ## v 1.7.0
 
+Added `lazy` function to calculate all function of scrna-seq
+
 ### Single Module
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
 - Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
 - Added data enhancement of `Fate`
 - Added `plot_atlas_view_ov` in VIA
+- Fixed an error when the matrix is too large in `recover_counts`.
 
 ### Space Module
 - Added `GASTON` to learn a topographic map of a tissue slice from spatially resolved transcriptomics (SRT) data (#238)
+- Added super kwargs in `plot_tensor_single` of STT.
+- Updated `COMMOT` using GPU-accerlate
   
 ### Plot Module
 - Added `dotplot_doublegroup` to visual the genes in doublegroup.
+- Added `transpose` argument of `cpdb_interacting_heatmap` to transpose the figure.

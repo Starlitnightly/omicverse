@@ -480,6 +480,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     adata.var = adata.var.drop(columns=['highly_variable'])
     #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
     print(f'End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+        adata.uns['status_args'] = {}
+    adata.uns['status']['preprocess']=True
+    adata.uns['status_args']['preprocess']={
+        'mode':mode, 'target_sum':target_sum, 'n_HVGs':n_HVGs,
+        'organism':organism,
+    }
     return adata
 def normalize_pearson_residuals(adata,**kwargs):
     '''
@@ -516,6 +524,10 @@ def scale(adata,max_value=10,layers_add='scaled'):
     else:
         import rapids_singlecell as rsc
         adata.layers['scaled']=rsc.pp.scale(adata, max_value=max_value,inplace=False)
+
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+    adata.uns['status']['scaled'] = True
 
 def regress(adata):
     """
@@ -642,6 +654,16 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
         adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
         adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
+    
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+    if adata.uns['status_args'] is None:
+        adata.uns['status_args'] = {}
+    adata.uns['status']['pca'] = True
+    adata.uns['status_args']['pca']={
+        'layer':layer,
+        'n_pcs':n_pcs,
+    }
     if inplace:
         return None
     else:
@@ -899,6 +921,15 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
                'Cenpe', 'Gtse1', 'Kif23', 'Cdc20', 'Ube2c', 'Cenpf', 'Cenpa',
                 'Hmmr', 'Ctcf', 'Psrc1', 'Cdc25c', 'Nek2', 'Gas2l3', 'G2e3']
     sc.tl.score_genes_cell_cycle(adata,s_genes=s_genes, g2m_genes=g2m_genes)
+    if adata.uns['status'] is None:
+        adata.uns['status'] = {}
+    if adata.uns['status_args'] is None:
+        adata.uns['status_args'] = {}
+    adata.uns['status']['cell_cycle'] = True
+    adata.uns['status_args']['cell_cycle']={
+        's_genes':s_genes,
+        'g2m_genes':g2m_genes
+    }
 
 
 def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
