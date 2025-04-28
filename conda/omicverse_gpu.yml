@@ -22,13 +22,13 @@ dependencies:
  - fa2
  - jupyterlab
  - pandas=1.5.3
+ - decoupler
+ - omnipath
+ - gdown
+ - wget
+ - scikit-misc
+ - harmonypy
+ - pytorch_geometric
  - pip
  - pip:
-    - decoupler
-    - omnipath
-    - gdown
-    - wget
-    - scikit-misc
-    - harmonypy
-    - rapids-singlecell
-    - torch_geometric
+   - rapids-singlecell
