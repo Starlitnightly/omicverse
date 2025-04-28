@@ -123,12 +123,55 @@ def show_system_status():
             st.metric("Memory Usage %", f"{stats['system_memory']['percent']:.1f}")
         st.progress(stats['system_memory']['percent'] / 100)
 
+
 def check_ollama_server() -> bool:
+    """Check if Ollama server is running and responsive with improved diagnostics and retries."""
+    max_retries = 3
+    timeout = 10  # Increased from 5 seconds
+
+    for attempt in range(max_retries):
+        try:
+            # Log the attempt for debugging
+            logger.info(f"Checking Ollama server (attempt {attempt + 1}/{max_retries})")
+
+            # Try to connect to the API endpoint
+            response = requests.get("http://localhost:11434/api/version", timeout=timeout)
+
+            # Log successful response for debugging
+            logger.info(f"Ollama server responded with status code: {response.status_code}")
+
+            if response.status_code == 200:
+                logger.info("Ollama server is running and responsive")
+                return True
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"Timeout connecting to Ollama server (attempt {attempt + 1})")
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"Connection error to Ollama server (attempt {attempt + 1})")
+        except requests.RequestException as e:
+            logger.warning(f"Request exception when checking Ollama: {str(e)}")
+
+        # Wait before retrying
+        if attempt < max_retries - 1:
+            time.sleep(2)
+
+    # As a fallback, check if the port is open using socket
+    import socket
     try:
-        response = requests.get("http://localhost:11434/api/version", timeout=5)
-        return response.status_code == 200
-    except requests.RequestException:
-        return False
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex(('localhost', 11434))
+        sock.close()
+
+        if result == 0:
+            logger.info("Port 11434 is open, but API is not responding")
+        else:
+            logger.info("Port 11434 is not accessible")
+
+    except Exception as e:
+        logger.warning(f"Socket check failed: {str(e)}")
+
+    return False
 
 def display_health_status():
     healthy, checks = check_system_health()
@@ -246,7 +289,7 @@ def perform_online_search(query: str) -> str:
         genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     except KeyError:
         raise EnvironmentError("GEMINI_API_KEY environment variable not set. Please set it before running.")
-    model = genai.GenerativeModel("models/gemini-2.0-flash")
+    model = genai.GenerativeModel("models/gemini-2.5-flash-preview-04-17")
     response = model.generate_content(
         contents=query,
         tools="google_search_retrieval"
@@ -283,9 +326,10 @@ def show_configuration(rag_system):
                 [
                     "qwen2.5-coder:3b",
                     "qwen2.5-coder:7b",
-                    "gemini-2.0-flash-thinking-exp-01-21",
+                    "gemini-2.5-pro-preview-03-25",
+                    "gemini-2.5-flash-preview-04-17",
                     "gemini-2.0-flash",
-                    "gemini-2.0-flash-lite-preview-02-05"
+                    "gemini-2.0-flash-lite"
                 ],
                 index=0
             )
@@ -294,9 +338,10 @@ def show_configuration(rag_system):
                 [
                     "qwen2.5-coder:7b",
                     "qwen2.5-coder:3b",
-                    "gemini-2.0-flash-thinking-exp-01-21",
+                    "gemini-2.5-pro-preview-03-25",
+                    "gemini-2.5-flash-preview-04-17",
                     "gemini-2.0-flash",
-                    "gemini-2.0-flash-lite-preview-02-05"
+                    "gemini-2.0-flash-lite"
                 ],
                 index=0
             )
