@@ -64,7 +64,7 @@ Refined Code:"""
     try:
         # Instead of using genai.models.generate_content (which no longer exists),
         # we now create a GenerativeModel instance and call its generate_content() method.
-        model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
+        model = genai.GenerativeModel("gemini-2.5-flash-preview-04-17")
         response = model.generate_content(prompt)
         if hasattr(response, "text") and response.text:
             refined_code = response.text.strip()
@@ -309,18 +309,39 @@ class SecondStageRAG:
         except Exception as e:
             logger.error(f"Failed to index documents into ChromaDB: {str(e)}", exc_info=True)
             return "An error occurred while processing your request."
-        retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": self.top_k_chunks})
-        logger.info(f"Retriever created with top_k_chunks={self.top_k_chunks}.")
+        
+        # ENHANCED: Optimized retriever with MMR search strategy for more diverse and relevant context
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",  # Changed from similarity to MMR for better result diversity
+            search_kwargs={
+                "k": self.top_k_chunks,
+                "fetch_k": self.top_k_chunks * 3,  # Fetch more documents initially for diversity
+                "lambda_mult": 0.7  # Balance between relevance and diversity
+            }
+        )
+        logger.info(f"MMR Retriever created with top_k_chunks={self.top_k_chunks}.")
+        
+        # ENHANCED: Improved prompt template with clearer instructions and guidance
         prompt_template = PromptTemplate(
             input_variables=["context", "question"],
             template=(
-                "{context}\n\n"
-                "User Request: {question}\n\n"
-                "You are an autonomous Python coding agent. Your response must include three sections:\n"
-                "1. **Query Understanding**: Briefly summarize what the user's query is asking.\n"
-                "2. **Code Snippet**: Provide a robust, optimized, production-ready Python code solution that adheres strictly to PEP8 standards.\n"
-                "3. **Code Explanation**: Offer a concise explanation of the code, including key design decisions and any enhancements made.\n\n"
-                "Return your answer as three code blocks with 'Task_understanding' written in markdown format, 'Code_snippet' written in python, and 'Code_explanation' written in markdown format."
+                "You are an expert Python developer specializing in single-cell bioinformatics. Your task is to provide accurate, "
+                "reliable code based on the following context from single-cell analysis libraries.\n\n"
+                "### CONTEXT INFORMATION:\n{context}\n\n"
+                "### USER REQUEST:\n{question}\n\n"
+                "### INSTRUCTIONS:\n"
+                "1. Carefully analyze the user request and the provided context.\n"
+                "2. Follow these specific guidelines:\n"
+                "   - Provide ONLY Python code that is directly relevant to the request\n"
+                "   - Ensure code is complete, optimized, and ready to use\n"
+                "   - Follow PEP8 standards and include proper error handling\n"
+                "   - Include helpful comments where appropriate\n"
+                "   - If importing libraries, specify exact versions if critical\n"
+                "3. Format your response as follows:\n\n"
+                "```python\n# Task understanding: Brief explanation of what you're solving\n\n"
+                "# Code solution:\n<your code here>\n\n"
+                "# Explanation of key parts:\n# - Brief notes about important design decisions\n```\n\n"
+                "If you cannot provide a solution based on the context, explicitly state this and explain why."
             )
         )
         try:
