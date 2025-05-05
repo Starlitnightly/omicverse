@@ -356,10 +356,11 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
     sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
 
-    if adata.uns['status'] is None:
+    if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
-    if adata.uns['status_args'] is None:
+    if 'status_args' not in adata.uns.keys():
         adata.uns['status_args'] = {}
+
     adata.uns['status']['qc']=True
     adata.uns['status_args']['qc'] = {
         'mode': mode,

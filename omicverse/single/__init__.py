@@ -21,7 +21,8 @@ from ._atac import atac_concat_get_index,atac_concat_inner,atac_concat_outer
 from ._batch import batch_correction
 from ._cellfategenie import Fate,gene_trends,mellon_density
 from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
-from ._traj import TrajInfer
+from ._traj import TrajInfer,fle
+from ._diffusionmap import diffmap
 from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
 from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
