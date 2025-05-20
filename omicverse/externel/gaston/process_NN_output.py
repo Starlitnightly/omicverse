@@ -1,10 +1,9 @@
 import torch
 import numpy as np
 import pandas as pd
-
 import os
-import torch
 import torch.nn as nn
+
 
 from .neural_net import get_loss
 
@@ -55,8 +54,13 @@ def process_files(output_folder, output_torch=False, epoch_number='final', seed_
     best_model_folder_path = None
     best_mod=None
 
+    # Check PyTorch version
+    if torch.__version__>='2.6.0':
+        is_torch_26_or_later = True
+    else:
+        is_torch_26_or_later = False
+
     # only look at specific seeds
-    
     if seed_list is None:
         folder_list=os.listdir(output_folder)
     else:
@@ -90,9 +94,21 @@ def process_files(output_folder, output_torch=False, epoch_number='final', seed_
                             highest_epoch_file = filename
                 model_path=os.path.join(folder_path, highest_epoch_file)
         
-            mod =  torch.load(model_path)
+            # Load model based on PyTorch version
+            if is_torch_26_or_later:
+                try:
+                    # First try with weights_only=False
+                    mod = torch.load(model_path, weights_only=False)
+                except Exception as e:
+                    # If that fails, try with safe_globals
+                    from torch.serialization import safe_globals
+                    from ..gaston.neural_net import GASTON
+                    with safe_globals([GASTON]):
+                        mod = torch.load(model_path)
+            else:
+                mod = torch.load(model_path)
+
             loss = get_loss(mod,St,At)
-            # print(f'model: {model_path}, loss:{loss}')
 
             # compare against other models with different seeds
             if loss < smallest_loss:
@@ -102,7 +118,6 @@ def process_files(output_folder, output_torch=False, epoch_number='final', seed_
                 
     print(f'\nbest model: {best_model_folder_path}')
     if best_model_folder_path:
-        # folder_name = os.path.basename(os.path.dirname(best_model_path))
         storch_path = os.path.join(best_model_folder_path, 'Storch.pt')
         atorch_path = os.path.join(best_model_folder_path, 'Atorch.pt')
 

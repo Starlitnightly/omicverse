@@ -188,7 +188,7 @@ _has_printed_logo = False  # Flag to ensure logo prints only once
 
 def plot_set(verbosity=3,dpi=80,facecolor='white'):
     global _has_printed_logo  # Use the global flag
-    check_dependencies(dependencies)
+    check_dependencies()
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     import warnings

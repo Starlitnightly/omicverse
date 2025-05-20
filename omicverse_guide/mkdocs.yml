@@ -58,6 +58,7 @@ nav:
         - Spatial transition tensor of single cells: Tutorials-space/t_stt.ipynb
         - Spatial Communication: Tutorials-space/t_commot_flowsig.ipynb
         - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
+        - Spatial IsoDepth Calculation: Tutorials-space/t_gaston.ipynb
         - Single cell spatial alignment tools: Tutorials-space/t_slat.ipynb 
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
