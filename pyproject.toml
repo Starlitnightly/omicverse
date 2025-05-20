@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 authors = [
-    {name = "Zehua Zeng", email = "starlitnightly@163.com"},
+    {name = "Zehua Zeng", email = "starlitnightly@gmail.com"},
 ]
 keywords = ["bioinformatics", "deep-learning", "scRNA-seq", "RNA-seq"]
 classifiers = [
@@ -28,10 +28,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics"
 ]
 dependencies = [
+    'tomli',
     'numpy>=1.23',
     'scanpy>=1.9',
     'pandas>=1.5',
-    'matplotlib<3.7',
+    'matplotlib>3.6',
     'scikit-learn>=1.2',
     'scipy>=1.8, <1.12',
     'networkx>=2.8',
@@ -75,7 +76,13 @@ dependencies = [
 
 ]
 
-
+[project.optional-dependencies]
+full = [
+  "dynamo-release",
+  "squidpy",
+  "spateo",
+  "tangram-sc"
+]
 
 
 [project.urls]

@@ -208,32 +208,104 @@ def calc_force_directed_layout(
     init=None,
     scaling_ratio=2.0, 
     gravity=1.0, 
-    #edge_weight_influence=1.0,
+    edge_weight_influence=1.0,
+    use_gpu=False,  # New parameter to enable GPU acceleration
+    optimized_threading=True,  # Enable optimized threading algorithm
+    compile_cython=True,  # 是否尝试编译Cython模块以加速
 ):
     """
-    TODO: Typing
+    Use our custom ForceAtlas2 implementation to calculate the layout
     """
     G = construct_graph(W)
     try:
-        import forceatlas2 as fa2
-    except ModuleNotFoundError:
-        import sys
-        print("Need forceatlas2-python!  Try 'pip install forceatlas2-python'.")
-        sys.exit(-1)
-    return fa2.forceatlas2(
-            file_name,
-            graph=G,
-            n_jobs=n_jobs,
-            target_change_per_node=target_change_per_node,
-            target_steps=target_steps,
-            is3d=is3d,
-            memory=memory,
-            random_state=random_state,
-            init=init,
-            scaling_ratio=scaling_ratio,
+        from ..externel.forcedirect2.forceatlas2 import ForceAtlas2
+        
+        # 如果请求编译并且fa2util模块需要编译
+        if compile_cython:
+            try:
+                import os
+                import sys
+                import importlib.util
+                
+                # 检查是否已经编译
+                force_dir = os.path.dirname(os.path.abspath(importlib.util.find_spec("omicverse.externel.forcedirect2.forceatlas2").origin))
+                compiled_module_exists = any(f.startswith('fa2util.') and (f.endswith('.so') or f.endswith('.pyd')) 
+                                           for f in os.listdir(force_dir))
+                
+                # 如果没有编译过，尝试编译
+                if not compiled_module_exists:
+                    print("检测到未编译的fa2util模块。尝试编译以获得10-100倍速度提升...")
+                    compile_script = os.path.join(force_dir, "compile.py")
+                    
+                    # 如果compile.py存在，执行它
+                    if os.path.exists(compile_script):
+                        import subprocess
+                        subprocess.run([sys.executable, compile_script], cwd=force_dir)
+                    else:
+                        print(f"未找到编译脚本: {compile_script}")
+                        print("请手动编译fa2util模块以获得更好性能")
+                        print("cd " + force_dir)
+                        print("python setup.py build_ext --inplace")
+            except Exception as e:
+                print(f"尝试编译模块时出错: {str(e)}")
+                print("将使用未编译的Python版本 (较慢)")
+        
+        # Initialize ForceAtlas2 with our parameters
+        forceatlas2 = ForceAtlas2(
+            # Behavior
+            outboundAttractionDistribution=True,
+            edgeWeightInfluence=edge_weight_influence,
+            
+            # Performance
+            jitterTolerance=1.0,
+            barnesHutOptimize=True,
+            barnesHutTheta=1.2,
+            multiThreaded=True if not use_gpu else False,  # Only use multithreading if not using GPU
+            numThreads=n_jobs if n_jobs > 0 else None,  # Use specified number of threads
+            useGPU=use_gpu,  # Enable GPU acceleration if requested
+            optimizedThreading=optimized_threading,  # Enable optimized threading
+            
+            # Tuning
+            scalingRatio=scaling_ratio,
+            strongGravityMode=False,
             gravity=gravity,
-            #edge_weight_influence=edge_weight_influence,
+            
+            # Log
+            verbose=True
         )
+        
+        # Convert igraph to adjacency matrix for forceatlas2
+        import numpy as np
+        from scipy.sparse import csr_matrix
+        
+        edges = G.get_edgelist()
+        weights = G.es["weight"]
+        n_vertices = G.vcount()
+        
+        rows = [edge[0] for edge in edges]
+        cols = [edge[1] for edge in edges]
+        
+        # Create sparse adjacency matrix
+        adj_matrix = csr_matrix((weights, (rows, cols)), shape=(n_vertices, n_vertices))
+        
+        # Make symmetric if graph is undirected
+        if not G.is_directed():
+            adj_matrix = adj_matrix + adj_matrix.T
+        
+        # Run ForceAtlas2
+        positions = forceatlas2.forceatlas2(adj_matrix, iterations=target_steps)
+        
+        # If 3D layout is requested, add a third coordinate with zeros
+        if is3d:
+            return np.column_stack([positions, np.zeros(len(positions))])
+        
+        return np.array(positions)
+        
+    except ImportError:
+        # Fallback to external forceatlas2 if our implementation is not available
+        import sys
+        print("Could not find custom ForceAtlas2 implementation!")
+        sys.exit(-1)
 
 
 def fle(
@@ -252,16 +324,17 @@ def fle(
     out_basis: str = "fle",
     fa2_scaling_ratio: float = 2.0,
     fa2_gravity: float = 1.0,
-    #fa2_edge_weight_influence: float = 1.0,
+    fa2_edge_weight_influence: float = 1.0,
+    use_gpu: bool = False,  # New parameter to enable GPU acceleration
+    optimized_threading: bool = True,  # Enable optimized threading algorithm
+    compile_cython: bool = True,  # 是否尝试编译Cython模块以加速
 ) -> None:
     """Construct the Force-directed (FLE) graph.
 
-    This implementation uses forceatlas2-python_ package, which is a Python wrapper of ForceAtlas2_.
+    This implementation uses our custom ForceAtlas2 implementation, which is a multilthreaded version
+    of the original ForceAtlas2 algorithm.
 
     See [Jacomy14]_ for details on FLE.
-
-    .. _forceatlas2-python: https://github.com/klarman-cell-observatory/forceatlas2-python
-    .. _ForceAtlas2: https://github.com/klarman-cell-observatory/forceatlas2
 
     Parameters
     ----------
@@ -304,6 +377,24 @@ def fle(
 
     out_basis: ``str``, optional, default: ``"fle"``
         Key name for calculated FLE coordinates to store.
+    
+    fa2_scaling_ratio: ``float``, optional, default: ``2.0``
+        Scaling ratio parameter for ForceAtlas2.
+        
+    fa2_gravity: ``float``, optional, default: ``1.0``
+        Gravity parameter for ForceAtlas2.
+        
+    fa2_edge_weight_influence: ``float``, optional, default: ``1.0``
+        Edge weight influence parameter for ForceAtlas2.
+        
+    use_gpu: ``bool``, optional, default: ``False``
+        Whether to use GPU acceleration for force calculations. Requires PyTorch to be installed.
+        
+    optimized_threading: ``bool``, optional, default: ``True``
+        Whether to use optimized threading algorithm for better parallel performance.
+        
+    compile_cython: ``bool``, optional, default: ``True``
+        Whether to try compiling fa2util module with Cython for 10-100x speedup.
 
     Returns
     -------
@@ -348,304 +439,133 @@ def fle(
         random_state,
         scaling_ratio=fa2_scaling_ratio,
         gravity=fa2_gravity,
-        #edge_weight_influence=fa2_edge_weight_influence,
+        edge_weight_influence=fa2_edge_weight_influence,
+        use_gpu=use_gpu,
+        optimized_threading=optimized_threading,
+        compile_cython=compile_cython,
     )
-    #data.register_attr(key, "basis")
 
 
-def calc_force_directed_layout_(
-    W,
-    n_jobs: int,
-    target_change_per_node: float,
-    target_steps: int,
-    random_state: int,
-    init=None,
-    fa2_scaling_ratio: float = 2.0,
-    fa2_gravity: float = 1.0,
-    fa2_edge_weight_influence: float = 1.0,
-    verbose: bool = True,
-    use_gpu: bool = True,
-    device: torch.device = None,
-    block_size: int = 1024,
-):
-    """
-    使用 ForceAtlas2 计算 2D 布局。
-    GPU 路径可直接处理稀疏边列表，避免密集矩阵转化导致 OOM。
-    返回 shape (N,2) numpy array。
-    """
-    from fa2_modified import ForceAtlas2 as CPUForceAtlas2
-    import scipy.sparse as sp
-    # 构建 networkx 图并获取 N
-    G = construct_graph(W)
-    N = W.shape[0]
-
-    # 检查 GPU 可用
-    can_gpu = use_gpu and torch.cuda.is_available()
-    if can_gpu and device is None:
-        device = torch.device('cuda')
-
-    # 初始位置
-    pos_init = None
-    if init is not None:
-        arr = np.asarray(init)
-        pos_init = torch.from_numpy(arr).float().to(device) if can_gpu else arr
-
-    # GPU 分支：直接使用边列表，不转稠密
-    if can_gpu:
-        # 从 W 获取稀疏边
-        if sp.issparse(W):
-            coo = W.tocoo()
-            src = torch.from_numpy(coo.row).long().to(device)
-            dst = torch.from_numpy(coo.col).long().to(device)
-            weights = torch.from_numpy(coo.data).float().to(device)
-        else:
-            W_arr = np.asarray(W)
-            nz = np.nonzero(np.triu(W_arr,1))
-            src = torch.from_numpy(nz[0]).long().to(device)
-            dst = torch.from_numpy(nz[1]).long().to(device)
-            weights = torch.from_numpy(W_arr[src.cpu(), dst.cpu()]).float().to(device)
-        edges = torch.stack([src, dst], dim=1)
-        # 调用 GPU 实现
-        fa2 = GPUForceAtlas2(
-            scaling_ratio=fa2_scaling_ratio,
-            edge_weight_influence=fa2_edge_weight_influence,
-            gravity=fa2_gravity,
-            jitter_tolerance=target_change_per_node,
-            barnes_hut_optimize=False,
-            barnes_hut_theta=1.2,
-            device=device,
-            block_size=block_size,
-        )
-        pos_t = fa2.forceatlas2(
-            edges=edges,
-            weights=weights,
-            N=N,
-            pos=pos_init,
-            iterations=target_steps,
-        )
-        return pos_t.cpu().numpy()
-
-    # CPU 回退
-    try:
-        fa2 = CPUForceAtlas2(
-            outboundAttractionDistribution=False,
-            linLogMode=False,
-            adjustSizes=False,
-            edgeWeightInfluence=fa2_edge_weight_influence,
-            jitterTolerance=target_change_per_node,
-            barnesHutOptimize=True,
-            barnesHutTheta=1.2,
-            scalingRatio=fa2_scaling_ratio,
-            strongGravityMode=False,
-            gravity=fa2_gravity,
-            multiThreaded=False,
-            verbose=verbose,
-        )
-    except ModuleNotFoundError:
-        print("Need the `fa2` package. Try: pip install fa2-modified", file=sys.stderr)
-        sys.exit(-1)
-
-    pos_dict = fa2.forceatlas2_networkx_layout(
-        G,
-        pos=init,
-        iterations=target_steps,
-    )
-    nodes = list(G.nodes())
-    return np.vstack([pos_dict[n] for n in nodes])
-
-
-def fle_(
-    data,
-    n_jobs: int = -1,
-    rep: str = "diffmap",
-    rep_ncomps: int = None,
-    K: int = 50,
-    full_speed: bool = False,
-    target_change_per_node: float = 2.0,
-    target_steps: int = 5000,
+def diffmap_fle(
+    adata,
+    use_rep: str = 'X_pca',
+    n_pcs: int = 50,
+    n_comps: int = 15,
+    n_neighbors: int = 30,
     random_state: int = 0,
     out_basis: str = "fle",
+    target_steps: int = 5000,
+    use_gpu: bool = False,
+    optimized_threading: bool = True,
+    compile_cython: bool = True,
     fa2_scaling_ratio: float = 2.0,
     fa2_gravity: float = 1.0,
     fa2_edge_weight_influence: float = 1.0,
-    verbose: bool = True,
-    use_gpu: bool = True,
-    gpu_device: torch.device = None,
-    block_size: int = 1024,
+    n_jobs: int = -1,
 ) -> None:
+    """Calculate diffusion map and then use it for Force-directed Layout Embedding (FLE).
+    
+    This function first computes diffusion maps using scanpy and then applies the optimized
+    ForceAtlas2 algorithm on the diffusion map coordinates to create a force-directed layout.
+    
+    Parameters
+    ----------
+    adata: ``anndata.AnnData``
+        Annotated data matrix with rows for cells and columns for genes.
+        
+    use_rep: ``str``, optional, default: ``'X_pca'``
+        The dimensional reduction to use for neighbors calculation before diffmap.
+        
+    n_pcs: ``int``, optional, default: ``50``
+        Number of PCs to use for neighbors calculation.
+        
+    n_comps: ``int``, optional, default: ``15``
+        Number of diffusion components to compute.
+        
+    n_neighbors: ``int``, optional, default: ``30``
+        Number of neighbors for building the neighborhood graph.
+        
+    random_state: ``int``, optional, default: ``0``
+        Random seed for reproducibility.
+        
+    out_basis: ``str``, optional, default: ``"fle"``
+        Key name for calculated FLE coordinates to store.
+        
+    target_steps: ``int``, optional, default: ``5000``
+        Maximum number of iterations for the ForceAtlas2 algorithm.
+        
+    use_gpu: ``bool``, optional, default: ``False``
+        Whether to use GPU acceleration for force calculations.
+        
+    optimized_threading: ``bool``, optional, default: ``True``
+        Whether to use optimized threading algorithm for better parallel performance.
+        
+    compile_cython: ``bool``, optional, default: ``True``
+        Whether to try compiling fa2util module with Cython for speedup.
+        
+    fa2_scaling_ratio: ``float``, optional, default: ``2.0``
+        Scaling ratio parameter for ForceAtlas2.
+        
+    fa2_gravity: ``float``, optional, default: ``1.0``
+        Gravity parameter for ForceAtlas2.
+        
+    fa2_edge_weight_influence: ``float``, optional, default: ``1.0``
+        Edge weight influence parameter for ForceAtlas2.
+        
+    n_jobs: ``int``, optional, default: ``-1``
+        Number of threads to use. If ``-1``, use all physical CPU cores.
+        
+    Returns
+    -------
+    ``None``
+    
+    Update ``adata.obsm``:
+        * ``adata.obsm['X_diffmap']``: Diffusion map coordinates
+        * ``adata.obsm['X_' + out_basis]``: FLE coordinates
+        
+    Examples
+    --------
+    >>> diffmap_fle(adata, use_gpu=True)
     """
-    使用 FA2 布局，优先 GPU 实现（支持稀疏），存入 data.obsm[out_basis]。
-    """
-    rep = update_rep(rep)
+    # Step 1: Compute diffusion map using scanpy
+    import scanpy as sc
+    
+    print("Computing neighbors for diffusion map...")
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs, 
+                   use_rep=use_rep, random_state=random_state)
+    
+    print(f"Computing diffusion map with {n_comps} components...")
+    sc.tl.diffmap(adata, n_comps=n_comps)
+    
+    # Store the diffusion map connectivity matrix for FLE
+    W_diffmap = adata.obsp['connectivities']
+    
+    # Step 2: Apply ForceAtlas2 on the diffusion map
+    print("Calculating force-directed layout from diffusion map...")
+    
+    import tempfile
+    _, file_name = tempfile.mkstemp()
+    
     n_jobs = eff_n_jobs(n_jobs)
-    if ("W_" + rep) not in data.uns:
-        neighbors(
-            data,
-            K=K,
-            rep=rep,
-            n_comps=rep_ncomps,
-            n_jobs=n_jobs,
-            random_state=random_state,
-            full_speed=full_speed,
-        )
+    
     key = f"X_{out_basis}"
-    data.obsm[key] = calc_force_directed_layout(
-        W_from_rep(data, rep),
+    adata.obsm[key] = calc_force_directed_layout(
+        W_diffmap,
+        file_name,
         n_jobs,
-        target_change_per_node,
+        2.0,  # target_change_per_node
         target_steps,
+        False,  # is3d
+        8,  # memory
         random_state,
-        init=None,
-        fa2_scaling_ratio=fa2_scaling_ratio,
-        fa2_gravity=fa2_gravity,
-        fa2_edge_weight_influence=fa2_edge_weight_influence,
-        verbose=verbose,
+        scaling_ratio=fa2_scaling_ratio,
+        gravity=fa2_gravity,
+        edge_weight_influence=fa2_edge_weight_influence,
         use_gpu=use_gpu,
-        device=gpu_device,
-        block_size=block_size,
+        optimized_threading=optimized_threading,
+        compile_cython=compile_cython,
     )
-
-
-import torch
-
-torch.backends.cuda.matmul.allow_tf32 = True  # allow faster matmuls
-
-
-def _batched_repulsion(x, y, mass, coefficient, block_size):
-    """
-    分块计算节点间斥力，避免一次性 OOM。
-    x,y: [N] 张量；mass: [N]；返回 dx, dy ([N],[N])
-    """
-    N = x.size(0)
-    dx = torch.zeros_like(x)
-    dy = torch.zeros_like(y)
-    pos = torch.stack([x, y], dim=1)  # [N,2]
-    for i in range(0, N, block_size):
-        i_end = min(i + block_size, N)
-        pi = pos[i:i_end].unsqueeze(1)   # [B,1,2]
-        # broadcast to [B,N,2]
-        diff = pi - pos.unsqueeze(0)     # [B,N,2]
-        dist2 = (diff * diff).sum(dim=2).clamp(min=1e-9)  # [B,N]
-        m_i = mass[i:i_end].unsqueeze(1) # [B,1]
-        m_j = mass.unsqueeze(0)         # [1,N]
-        factor = coefficient * m_i * m_j / dist2  # [B,N]
-        force = diff * factor.unsqueeze(2)       # [B,N,2]
-        net = force.sum(dim=1)                   # [B,2]
-        dx[i:i_end] += net[:,0]
-        dy[i:i_end] += net[:,1]
-    return dx, dy
-
-
-class GPUForceAtlas2:
-    def __init__(
-        self,
-        scaling_ratio: float = 2.0,
-        edge_weight_influence: float = 1.0,
-        gravity: float = 1.0,
-        jitter_tolerance: float = 1.0,
-        barnes_hut_optimize: bool = False,
-        barnes_hut_theta: float = 1.2,
-        device: torch.device = torch.device('cuda'),
-        block_size: int = 1024,
-    ):
-        self.scaling_ratio = scaling_ratio
-        self.edge_weight_influence = edge_weight_influence
-        self.gravity_const = gravity
-        self.jitter_tolerance = jitter_tolerance
-        self.barnes_hut_optimize = barnes_hut_optimize  # not used currently
-        self.barnes_hut_theta = barnes_hut_theta        # not used currently
-        self.device = device
-        self.block_size = block_size
-
-    @staticmethod
-    def _attraction(x, y, src, dst, weights, coefficient):
-        # src,dst: [E], weights: [E]
-        pos = torch.stack([x, y], dim=1)  # [N,2]
-        disp = pos[src] - pos[dst]        # [E,2]
-        wfact = (coefficient * weights).unsqueeze(1)  # [E,1]
-        f = disp * wfact                            # [E,2]
-        dx = torch.zeros_like(x)
-        dy = torch.zeros_like(y)
-        dx.index_add_(0, src,  f[:,0])
-        dy.index_add_(0, src,  f[:,1])
-        dx.index_add_(0, dst, -f[:,0])
-        dy.index_add_(0, dst, -f[:,1])
-        return dx, dy
-
-    def _gravity(self, x, y, mass):
-        dist = torch.sqrt(x*x + y*y).clamp(min=1e-9)
-        factor = mass * self.gravity_const / dist
-        return -x * factor, -y * factor
-
-    def _adjust_and_move(self, x, y, dx, dy, old_dx, old_dy, mass, speed, speed_eff):
-        N = x.size(0)
-        # 计算 swinging 和 traction
-        swinging = torch.sqrt((old_dx - dx)**2 + (old_dy - dy)**2) * mass
-        traction = 0.5 * mass * torch.sqrt((old_dx + dx)**2 + (old_dy + dy)**2)
-        total_swing = swinging.sum(); total_tract = traction.sum()
-        # 更新 jitter tolerance
-        est_jt = 0.05 * torch.sqrt(torch.tensor(N, dtype=torch.float, device=x.device))
-        jt = self.jitter_tolerance * torch.clamp(
-            est_jt * total_tract / (N*N), min=est_jt.sqrt(), max=torch.tensor(10.0, device=x.device)
-        )
-        if total_tract > 0 and (total_swing / total_tract) > 2.0:
-            speed_eff = torch.clamp(speed_eff * 0.5, min=0.05)
-            jt = torch.maximum(jt, torch.tensor(self.jitter_tolerance, device=x.device))
-        # 更新 speed
-        target = (jt * speed_eff * total_tract / total_swing) if total_swing>0 else torch.tensor(float('inf'), device=x.device)
-        speed = speed + torch.minimum(target - speed, 0.5 * speed)
-        # 应用移动
-        factor = speed / (1.0 + torch.sqrt(speed * swinging))
-        x = x + dx * factor; y = y + dy * factor
-        return x, y, speed, speed_eff
-
-    def forceatlas2(
-        self,
-        edges: torch.LongTensor,
-        weights: torch.FloatTensor,
-        N: int,
-        pos: torch.Tensor = None,
-        iterations: int = 100,
-    ) -> torch.FloatTensor:
-        """
-        基于稀疏边列表的 GPU 实现。
-        edges: [E,2], weights: [E], pos: [N,2] 或 None
-        返回: [N,2]
-        """
-        # 初始化节点
-        device = self.device
-        if pos is None:
-            x = torch.rand(N, device=device)
-            y = torch.rand(N, device=device)
-        else:
-            x = pos[:,0].to(device); y = pos[:,1].to(device)
-        mass = torch.zeros(N, device=device)
-        # mass = 1 + degree
-        deg = torch.zeros(N, device=device)
-        deg.index_add_(0, edges[:,0], torch.ones_like(weights))
-        deg.index_add_(0, edges[:,1], torch.ones_like(weights))
-        mass = 1.0 + deg
-        dx = torch.zeros(N, device=device); dy = torch.zeros(N, device=device)
-        old_dx = torch.zeros_like(dx); old_dy = torch.zeros_like(dy)
-        speed = torch.tensor(1.0, device=device)
-        speed_eff = torch.tensor(1.0, device=device)
-        src, dst = edges[:,0], edges[:,1]
-
-        for _ in tqdm(range(iterations)):
-            old_dx.copy_(dx); old_dy.copy_(dy)
-            dx.zero_(); dy.zero_()
-            # repulsion
-            drx, dry = _batched_repulsion(x, y, mass, self.scaling_ratio, self.block_size)
-            dx += drx; dy += dry
-            # gravity
-            ggx, ggy = self._gravity(x, y, mass)
-            dx += ggx; dy += ggy
-            # attraction
-            dax, day = self._attraction(x, y, src, dst, weights, self.edge_weight_influence)
-            dx += dax; dy += day
-            # move
-            x, y, speed, speed_eff = self._adjust_and_move(
-                x, y, dx, dy, old_dx, old_dy, mass, speed, speed_eff
-            )
-        return torch.stack([x, y], dim=1)
+    
+    print(f"Force-directed layout calculated and stored in adata.obsm['X_{out_basis}']")
+    return None
 

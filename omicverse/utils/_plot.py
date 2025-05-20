@@ -10,10 +10,16 @@ import anndata
 from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
 import seaborn as sns
+from datetime import datetime,timedelta
+import pkg_resources
+from pkg_resources import DistributionNotFound, VersionConflict
+import tomli
+import os
 
-sc_color=['#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
- '#EF7B77', '#279AD7','#F0EEF0', '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10',
- '#EAEFC5', '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
+sc_color=[
+ '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10', '#EF7B77', '#279AD7','#F0EEF0',
+ '#EAEFC5', '#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
+ '#01A0A7', '#75C8CC', '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3', '#A89C92', '#FEE00C', '#FEF2A1']
 
 red_color=['#F0C3C3','#E07370','#CB3E35','#A22E2A','#5A1713','#D3396D','#DBC3DC','#85539B','#5C2B80','#5C4694']
 green_color=['#91C79D','#8FC155','#56AB56','#2D5C33','#BBCD91','#6E944A','#A5C953','#3B4A25','#010000']
@@ -21,10 +27,167 @@ orange_color=['#EFBD49','#D48F3E','#AC8A3E','#7D7237','#745228','#E1C085','#CEBC
 blue_color=['#347862','#6BBBA0','#81C0DD','#3E8CB1','#88C8D2','#52B3AD','#265B58','#B2B0D4','#5860A7','#312C6C']
 purple_color=['#823d86','#825b94','#bb98c6','#c69bc6','#a69ac9','#c5a6cc','#caadc4','#d1c3d4']
 
+#more beautiful colors
+# 28-color palettes with distinct neighboring colors
+palette_28 = [
+    '#E63946', '#1D3557', '#FFB703', '#2A9D8F', '#9B2226', '#4361EE', '#FF9F1C', '#560BAD',
+    '#06D6A0', '#BC4749', '#4895EF', '#F4D03F', '#7209B7', '#52B788', '#D00000', '#4CC9F0',
+    '#F7B801', '#3C096C', '#40916C', '#DC2F02', '#48CAE4', '#F9C74F', '#240046', '#081C15',
+    '#9D0208', '#90E0EF', '#F3722C', '#14213D'
+]
+
+# 56-color palette with clear transitions
+palette_56 = [
+    '#001219', '#94D2BD', '#AE2012', '#3A0CA3', '#FF7B00', '#006466', '#E63946', '#1D3557',
+    '#FFB703', '#2A9D8F', '#9B2226', '#4361EE', '#FF9F1C', '#560BAD', '#06D6A0', '#BC4749',
+    '#4895EF', '#F4D03F', '#7209B7', '#52B788', '#D00000', '#4CC9F0', '#F7B801', '#3C096C',
+    '#40916C', '#DC2F02', '#48CAE4', '#F9C74F', '#240046', '#081C15', '#9D0208', '#90E0EF',
+    '#2D00F7', '#E76F51', '#006400', '#FF4D6D', '#073B4C', '#FF9E00', '#440154', '#55A630',
+    '#7B2CBF', '#FF4800', '#0077B6', '#F72585', '#3D405B', '#588157', '#6A040F', '#023E8A',
+    '#FF006E', '#2B9348', '#8338EC', '#F94144', '#0F4C5C', '#E85D04', '#540B0E', '#1A759F'
+]
+
+# 112-color palette with distinct transitions
+palette_112 = [
+    '#001219', '#94D2BD', '#AE2012', '#3A0CA3', '#FF7B00', '#006466', '#E63946', '#1D3557',
+    '#FFB703', '#2A9D8F', '#9B2226', '#4361EE', '#FF9F1C', '#560BAD', '#06D6A0', '#BC4749',
+    '#4895EF', '#F4D03F', '#7209B7', '#52B788', '#D00000', '#4CC9F0', '#F7B801', '#3C096C',
+    '#40916C', '#DC2F02', '#48CAE4', '#F9C74F', '#240046', '#081C15', '#9D0208', '#90E0EF',
+    '#2D00F7', '#E76F51', '#006400', '#FF4D6D', '#073B4C', '#FF9E00', '#440154', '#55A630',
+    '#7B2CBF', '#FF4800', '#0077B6', '#F72585', '#3D405B', '#588157', '#6A040F', '#023E8A',
+    '#FF006E', '#2B9348', '#8338EC', '#F94144', '#0F4C5C', '#E85D04', '#540B0E', '#1A759F',
+    '#FF0A54', '#2B9348', '#5E60CE', '#F8961E', '#073B3A', '#FF6B6B', '#2D3047', '#70E000',
+    '#5A189A', '#FF7900', '#0096C7', '#FF48B0', '#344E41', '#606C38', '#641220', '#03045E',
+    '#FF0075', '#386641', '#7400B8', '#F3722C', '#27474E', '#F48C06', '#3C1518', '#0077B6',
+    '#FF758F', '#40916C', '#6930C3', '#F9844A', '#1B4965', '#FAA307', '#582F0E', '#0096C7',
+    '#FF477E', '#2D6A4F', '#5E60CE', '#F9C74F', '#004E89', '#FF9500', '#50514F', '#70E000',
+    '#9D4EDD', '#FF6D00', '#219EBC', '#FF5C8A', '#344E41', '#606C38', '#800E13', '#0353A4',
+    '#FF0A54', '#387D44', '#480CA8', '#F3622C', '#1A5653', '#FF9F1C', '#4A4E69', '#55A630'
+]
+
+# Vibrant palette with clear distinctions (24 colors)
+vibrant_palette = [
+    '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', 
+    '#FF8000', '#FF0080', '#80FF00', '#00FF80', '#8000FF', '#0080FF',
+    '#FF3333', '#33FF33', '#3333FF', '#FFFF33', '#FF33FF', '#33FFFF',
+    '#FF9933', '#FF3399', '#99FF33', '#33FF99', '#9933FF', '#3399FF'
+]
+
+# Earth tones palette (24 colors)
+earth_palette = [
+    '#8B4513', '#DAA520', '#556B2F', '#2F4F4F', '#8B008B', '#4682B4',
+    '#CD853F', '#BDB76B', '#6B8E23', '#4F666A', '#800080', '#4169E1',
+    '#D2691E', '#F0E68C', '#9ACD32', '#5F9EA0', '#9932CC', '#1E90FF',
+    '#A0522D', '#EEE8AA', '#698B22', '#008B8B', '#9400D3', '#00BFFF'
+]
+
+# Pastel palette (24 colors)
+pastel_palette = [
+    '#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFFFBA', '#FFDFBA', '#E0BBE4',
+    '#957DAD', '#D291BC', '#FEC8D8', '#FFDFD3', '#B5EAD7', '#C7CEEA',
+    '#FFB997', '#F5B0CB', '#D4F0F0', '#FFF5BA', '#A8E6CF', '#DBB4D8',
+    '#FFD3B5', '#D4F0F0', '#B5EAD7', '#E2F0CB', '#C7CEEA', '#FFDAC1'
+]
+
+
+
+
+
 
 sc_color_cmap = LinearSegmentedColormap.from_list('Custom', sc_color, len(sc_color))
 
+
+
+omics="""
+   ____            _     _    __                  
+  / __ \____ ___  (_)___| |  / /__  _____________ 
+ / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+/ /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+\____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
+"""
+days_christmas="""
+      .
+   __/ \__
+   \     /
+   /.'o'.\
+    .o.'.         Merry Christmas!
+   .'.'o'.
+  o'.o.'.o.
+ .'.o.'.'.o.       ____ 
+.o.'.o.'.o.'.     / __ \____ ___  (_)___| |  / /__  _____________ 
+   [_____]       / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+    \___/       / /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+                \____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/
+"""
+#Tua Xiong
+days_chinese_new_year="""
+                                        ,   ,
+                                        $,  $,     ,
+                                        "ss.$ss. .s'
+                                ,     .ss$$$$$$$$$$s,
+                                $. s$$$$$$$$$$$$$$`$$Ss
+                                "$$$$$$$$$$$$$$$$$$o$$$       ,
+                               s$$$$$$$$$$$$$$$$$$$$$$$$s,  ,s
+                              s$$$$$$$$$"$$$$$$ssss$$$$$$"$$$$$,
+                              s$$$$$$$$$$sss$$$$ssssss"$$$$$$$$"
+                             s$$$$$$$$$$'         `\"\"\"ss"$"$s\"\"
+                             s$$$$$$$$$$,              `\"\"\"\"\"$  .s$$s
+                             s$$$$$$$$$$$$s,...               `s$$'  `
+                         `ssss$$$$$$$$$$$$$$$$$$$$####s.     .$$"$.   , s-
+                           `""\""$$$$$$$$$$$$$$$$$$$$#####$$$$$$"     $.$'
+                                 "$$$$$$$$$$$$$$$$$$$$$####s""     .$$$|
+                                  "$$$$$$$$$$$$$$$$$$$$$$$$##s    .$$" $
+                                   $$""$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"   `
+                                  $$"  "$"$$$$$$$$$$$$$$$$$$$$S""\""'
+                             ,   ,"     '  $$$$$$$$$$$$$$$$####s
+                             $.          .s$$$$$$$$$$$$$$$$$####"
+                 ,           "$s.   ..ssS$$$$$$$$$$$$$$$$$$$####"
+                 $           .$$$S$$$$$$$$$$$$$$$$$$$$$$$$#####"
+                 Ss     ..sS$$$$$$$$$$$$$$$$$$$$$$$$$$$######""
+                  "$$sS$$$$$$$$$$$$$$$$$$$$$$$$$$$########"
+           ,      s$$$$$$$$$$$$$$$$$$$$$$$$#########""'
+           $    s$$$$$$$$$$$$$$$$$$$$$#######""'      s'         ,
+           $$..$$$$$$$$$$$$$$$$$$######"'       ....,$$....    ,$
+            "$$$$$$$$$$$$$$$######"' ,     .sS$$$$$$$$$$$$$$$$s$$
+              $$$$$$$$$$$$#####"     $, .s$$$$$$$$$$$$$$$$$$$$$$$$s.
+   )          $$$$$$$$$$$#####'      `$$$$$$$$$###########$$$$$$$$$$$.
+  ((          $$$$$$$$$$$#####       $$$$$$$$###"       "####$$$$$$$$$$
+  ) \         $$$$$$$$$$$$####.     $$$$$$###"             "###$$$$$$$$$   s'
+ (   )        $$$$$$$$$$$$$####.   $$$$$###"                ####$$$$$$$$s$$'
+ )  ( (       $$"$$$$$$$$$$$#####.$$$$$###' -OmicVerse     .###$$$$$$$$$$"
+ (  )  )   _,$"   $$$$$$$$$$$$######.$$##'                .###$$$$$$$$$$
+ ) (  ( \.         "$$$$$$$$$$$$$#######,,,.          ..####$$$$$$$$$$$"
+(   )$ )  )        ,$$$$$$$$$$$$$$$$$$####################$$$$$$$$$$$"
+(   ($$  ( \     _sS"  `"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$S$$,
+ )  )$$$s ) )  .      .   `$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"'  `$$
+  (   $$$Ss/  .$,    .$,,s$$$$$$##S$$$$$$$$$$$$$$$$$$$$$$$$S""        '
+    \)_$$$$$$$$$$$$$$$$$$$$$$$##"  $$        `$$.        `$$.
+        `"S$$$$$$$$$$$$$$$$$#"      $          `$          `$
+            `\"""\""\""\""\""\""'         '           '           '
+"""
+
+spring_festival = { 
+    2022: datetime(2022, 2, 1), 
+    2023: datetime(2023, 1, 22), 
+    2024: datetime(2024, 2, 10), # ... 
+    2025: datetime(2025, 1, 29),
+    2026: datetime(2026, 2, 17),
+    2027: datetime(2027, 2, 6),
+}
+
+try:
+    from importlib.metadata import version
+except ModuleNotFoundError:
+    from pkg_resources import get_distribution
+    version = lambda name: get_distribution(name).version
+
+name = "omicverse"
+__version__ = version(name)
+
+_has_printed_logo = False  # Flag to ensure logo prints only once
+
 def plot_set(verbosity=3,dpi=80,facecolor='white'):
+    global _has_printed_logo  # Use the global flag
     check_dependencies(dependencies)
     sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
@@ -33,23 +196,24 @@ def plot_set(verbosity=3,dpi=80,facecolor='white'):
     warnings.simplefilter("ignore", category=FutureWarning)
     warnings.simplefilter("ignore", category=DeprecationWarning)
 
-def plotset(verbosity=3,dpi=80,facecolor='white'):
-    check_dependencies(dependencies)
-    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
-    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
-    import warnings
-    warnings.simplefilter("ignore", category=UserWarning)
-    warnings.simplefilter("ignore", category=FutureWarning)
-    warnings.simplefilter("ignore", category=DeprecationWarning)
+    # Print the logo only once
+    if not _has_printed_logo:
+        today = datetime.now()
+        chinese_new_year = spring_festival[today.year]
+        if today.month == 12 and (today.day == 25 or today.day == 24):
+            # december 12.25 or 12.24 (christmas)
+            print(days_christmas)
+        elif (today.year in spring_festival) and (chinese_new_year - timedelta(days=1) <= today <= chinese_new_year + timedelta(days=3)):
+            print(days_chinese_new_year)
+        else:
+            print(omics)
 
-def ov_plot_set(verbosity=3,dpi=80,facecolor='white'):
-    check_dependencies(dependencies)
-    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
-    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
-    import warnings
-    warnings.simplefilter("ignore", category=UserWarning)
-    warnings.simplefilter("ignore", category=FutureWarning)
-    warnings.simplefilter("ignore", category=DeprecationWarning)
+        print(f'Version: {__version__}, Tutorials: https://omicverse.readthedocs.io/')
+        _has_printed_logo = True
+
+# Create aliases for backward compatibility
+plotset = plot_set
+ov_plot_set = plot_set
 
 def pyomic_palette()->list:
     """
@@ -1011,69 +1175,42 @@ def plot_pca_variance_ratio1(adata,threshold=0.85):
     plt.xlabel('ranking')
 
 
-import pkg_resources
-from pkg_resources import DistributionNotFound, VersionConflict
-
-def check_dependencies(dependencies):
+def check_dependencies(dependencies=None, check_full=False):
     """
     Check if the installed versions of the dependencies match the specified version requirements.
+    If no dependencies are provided, it will try to read them from pyproject.toml.
 
     Parameters:
-    dependencies (list): A list of dependency strings in the format 'package_name>=version, <version'
+    dependencies (list, optional): A list of dependency strings in the format 'package_name>=version, <version'
+                                 If None, will try to read from pyproject.toml
+    check_full (bool, optional): If True, will also check dependencies from project.optional-dependencies.full
+                                Default is False
 
     Returns:
     None
     """
+    if dependencies is None:
+        try:
+            # Get the directory of the current file
+            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            pyproject_path = os.path.join(current_dir, 'pyproject.toml')
+            
+            with open(pyproject_path, 'rb') as f:
+                pyproject = tomli.load(f)
+                dependencies = pyproject['project']['dependencies']
+
+            # If check_full is True, also check full dependencies
+            if check_full and 'project' in pyproject and 'optional-dependencies' in pyproject['project']:
+                if 'full' in pyproject['project']['optional-dependencies']:
+                    full_deps = pyproject['project']['optional-dependencies']['full']
+                    dependencies.extend(full_deps)
+
+        except Exception as e:
+            print(f"Warning: Could not read dependencies from pyproject.toml: {e}")
+            return
+
     try:
         pkg_resources.require(dependencies)
         print("All dependencies are satisfied.")
     except (DistributionNotFound, VersionConflict) as e:
         print(f"Dependency error: {e}")
-
-# List of dependencies
-dependencies = [
-    'numpy>=1.23',
-    'scanpy>=1.9',
-    'pandas>=1.5',
-    'matplotlib<3.7',
-    'scikit-learn>=1.2',
-    'scipy>=1.8, <1.12',
-    'networkx>=2.8',
-    'multiprocess>=0.70',
-    'seaborn>=0.11',
-    'datetime>=4.5',
-    'statsmodels>=0.13',
-    #'gseapy==0.10.8',
-    'ipywidgets>=8.0',
-    'lifelines>=0.27',
-    'ktplotspy>=0.1',
-    'python-dotplot>=0.0.1',
-    #'pybedtools>=0.8.1',
-    'boltons>=23.0',
-    'ctxcore>=0.2',
-    'termcolor>=2.1',
-    'pygam==0.8.0',
-    'pillow>=9.0',
-    'gdown>=4.6',
-    'igraph>=0.10',
-    'leidenalg>=0.9',
-    'graphtools>=1.5',
-    'phate>=1.0',
-    'tqdm>=4.64',
-    #'pydeseq2>=0.3, <=0.4.0',
-    'mofax>=0.3',
-    'adjustText>=0.8',
-    'scikit-misc>=0.1',
-    'metatime>=1.3.0',
-    'einops>=0.6',
-    'tensorboard>=2.6',
-    #'scrublet >=0.2',
-    #'scvi-tools>=0.20.1',
-    'pynvml',
-    'plotly',
-    'numba>=0.56',
-    #'bioservices',
-    'tqdm'
-    #'cvxpy>=1.3',
-
-]
