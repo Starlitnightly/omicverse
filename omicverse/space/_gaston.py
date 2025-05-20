@@ -248,12 +248,12 @@ class GASTON(object):
             if gene_name in self.binning_output['gene_labels_idx']:
                 gene_index = np.where(self.gene_labels_idx == gene_name)[0]
 
-                outputs = np.zeros(self.gaston_isodepth.shape[0])
-                for i in range(self.gaston_isodepth.shape[0]):
-                    dom = int(self.gaston_labels[i])
+                outputs = np.zeros(self.gaston_isodepth_restrict.shape[0])
+                for i in range(self.gaston_isodepth_restrict.shape[0]):
+                    dom = int(self.gaston_labels_restrict[i])
                     slope = slope_mat[gene_index, dom]
                     intercept = intercept_mat[gene_index, dom]
-                    outputs[i] = np.log(offset) + intercept + slope * self.gaston_isodepth[i]
+                    outputs[i] = np.log(offset) + intercept + slope * self.gaston_isodepth_restrict[i]
 
                 all_gene_outputs.append(outputs)
 

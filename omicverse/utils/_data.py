@@ -665,3 +665,49 @@ def load(path):
     import pickle
     with open(path, 'rb') as f:
         return pickle.load(f)
+    
+
+import os
+import requests
+from tqdm import tqdm
+from typing import Optional
+
+def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
+    """Download data with headers and progress bar."""
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    file_name = os.path.basename(url) if file_path is None else file_path
+    file_path = os.path.join(dir, file_name)
+
+    if os.path.exists(file_path):
+        print(f"File {file_path} already exists.")
+        return file_path
+
+    print(f"Downloading data to {file_path}...")
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://cf.10xgenomics.com/",
+    }
+
+    try:
+        with requests.get(url, headers=headers, stream=True) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get('Content-Length', 0))
+            chunk_size = 8192
+            with open(file_path, 'wb') as f, tqdm(
+                total=total_size, unit='B', unit_scale=True, desc=file_name, ncols=80
+            ) as pbar:
+                for chunk in r.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+    except Exception as e:
+        print(f"Download failed: {e}")
+        raise
+
+    return file_path
+
+
