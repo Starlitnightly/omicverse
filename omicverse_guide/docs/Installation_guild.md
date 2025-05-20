@@ -180,7 +180,10 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
 5. **Install OmicVerse and Numba**:
 
     ```shell
+    # Install base OmicVerse package
     pip install -U omicverse
+
+    # Install Numba for JIT compilation and performance optimization
     pip install -U numba
     ```
 
@@ -191,6 +194,12 @@ Installing OmicVerse on a Mac with Apple Silicon is only possible using a native
     ```
 
     If no errors appear, the installation was successful.
+
+7. (optional) **Full denpendency with spatial RNA-seq**:
+
+    ```shell
+    pip install omicverse[full]
+    ```
 
 ### Nightly Version
 

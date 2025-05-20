@@ -243,7 +243,12 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     """
 
     adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
-    cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
+    if pd.__version__>="2.0.0":
+        cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
+        cell_num_pd[celltype_key]=cell_num_pd['count']
+    else:
+        cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
+        
     if '{}_colors'.format(celltype_key) in adata.uns.keys():
         cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories.tolist(),
                         adata.uns['{}_colors'.format(celltype_key)]))
@@ -283,6 +288,8 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
         show=False
     )
 
+
+
     for idx,cell in zip(range(cell_num_pd.shape[0]),
                         adata.obs[celltype_key].cat.categories):
         ax2.scatter(100,
@@ -294,11 +301,18 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     ax2.set_xlim(xlim,cell_num_pd.iloc[1].values[0]) 
     ax2.text(xlim,idx+1,title,fontsize=12)
     ax2.grid(False)
+    #ax2.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10,**legend_awargs)
     ax2.spines['top'].set_visible(False)
     ax2.spines['right'].set_visible(False)
     ax2.spines['bottom'].set_visible(False)
     ax2.spines['left'].set_visible(False)
     ax2.axis('off')
+
+    # ——关键：确保 ax2 没有图例——
+    if ax1.get_legend() is not None:   # 如果有，就移除
+        ax1.get_legend().remove()
+    if ax2.get_legend() is not None:   # 如果有，就移除
+        ax2.get_legend().remove()
 
     return fig,[ax1,ax2]
 
@@ -951,7 +965,7 @@ def plot_boxplots(  # pragma: no cover
 def cellstackarea(adata,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False,legend_awargs=None,text_show=False,):
+                       legend:bool=False,legend_awargs={},text_show=False,):
     """
     Plot the cell type percentage in each groupby category
     

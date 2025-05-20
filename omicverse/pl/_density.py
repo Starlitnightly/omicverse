@@ -3,76 +3,154 @@ import scanpy as sc
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 
-def calculate_gene_density(adata,
+
+
+def calculate_gene_density(
+    adata,
     features,
-    basis='X_umap',
+    basis="X_umap",
     dims=(0, 1),
-    method='scipy',
-    adjust=1,):
+    adjust=1,
+    min_expr=0.1,          # NEW: minimal raw expression to keep as weight > 0
+):
     """
-    根据基因表达作为权重，在指定的二维嵌入上计算加权核密度估计（gene density），
-    并使用 scanpy 进行可视化。支持的 feature 可在 adata.obs（如元数据）中存在，
-    或者在基因表达矩阵（adata.var_names）中查找。
+    Weighted KDE on a 2-D embedding with min–max scaled weights.
+    Cells whose raw expression < `min_expr` are excluded from the KDE fit.
 
-    参数：
-    adata: AnnData 对象
-    features: list，待计算密度的特征（例如基因）名称列表
-    basis: string，嵌入名称，默认 'X_umap'
-    dims: tuple，二维嵌入中使用的列索引，默认 (0, 1)
-    method: 选用的核密度估计方法，目前仅支持“scipy”（通过 gaussian_kde）
-    adjust: 数值，用于调整带宽，默认为 1
-    cmap: 颜色映射，默认 'viridis'
-    point_size: 点的大小，默认 20
-    grid_steps: 计算网格的步数（目前未使用，但可扩展用于绘制密度轮廓）
-    show: 是否立即展示图形，默认 True
+    Compute a weighted kernel density estimate (KDE) for each feature
+    and store the per-cell density values in `adata.obs`.
 
-    返回：
-    将每个 feature 的密度信息添加为 adata.obs 中的新列，并分别展示图形。
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object that contains the embedding in `adata.obsm[basis]`.
+    features : list[str]
+        Feature names (gene names or pre-computed scores) to process.
+    basis : str, default "X_umap"
+        Key in `adata.obsm` that stores the 2-D embedding (e.g., UMAP).
+    dims : tuple[int, int], default (0, 1)
+        Indices of the two embedding dimensions to use.
+    adjust : float, default 1
+        Bandwidth scaling factor passed to `scipy.stats.gaussian_kde`.
+
     """
-
-    # 检查二维嵌入维度
     if len(dims) != 2:
-        raise ValueError("只能绘制二维嵌入，请确保 dims 长度为 2")
+        raise ValueError("`dims` must have length 2")
+    if basis not in adata.obsm:
+        raise ValueError(f"Embedding '{basis}' not found.")
 
-    # 获取细胞嵌入（二维），例如 UMAP 坐标
-    if basis not in adata.obsm.keys():
-        raise ValueError(f"在 adata.obsm 中未找到 basis: {basis}")
-    embeddings = adata.obsm[basis][:, dims]  # shape: (n_cells, 2)
+    emb_all = adata.obsm[basis][:, dims]          # (n_cells, 2)
 
-    # 对每个 feature 分别计算密度
-    for feature in features:
-        # 判断 feature 是在 adata.obs 中还是在基因表达矩阵中
-        if feature in adata.obs.columns:
-            # 假设已经预先计算好、存放在 obs 中的数值（例如某种评分）
-            weights = adata.obs[feature].to_numpy()
-        elif feature in adata.var_names:
-            # 从表达矩阵中提取，注意：如果数据为稀疏格式需转换为 array
-            weights = adata[:, feature].X.toarray().reshape(-1)
+    for feat in features:
+        # ----- fetch raw weights -------------------------------------------
+        if feat in adata.obs:
+            w_raw = adata.obs[feat].to_numpy()
+        elif feat in adata.var_names:
+            w_raw = adata[:, feat].X.toarray().ravel()
         else:
-            raise ValueError(f"未在 adata.obs 或 adata.var_names 中找到 feature: {feature}")
+            raise ValueError(f"Feature '{feat}' not found in obs or var.")
 
-        # 检查嵌入及权重是否存在 NaN 或 inf
-        valid = np.isfinite(weights) & np.all(np.isfinite(embeddings), axis=1)
-        if not np.all(valid):
-            emb_valid = embeddings[valid, :]
-            weights_valid = weights[valid]
-        else:
-            emb_valid = embeddings
-            weights_valid = weights
+        # ----- validity mask: finite coords & finite expr -------------------
+        mask_finite = np.isfinite(w_raw) & np.all(np.isfinite(emb_all), axis=1)
 
-        # 使用 gaussian_kde 计算加权核密度估计
-        try:
-            # 注意：gaussian_kde 接受的数据要求 shape=(n_dim, n_samples)
-            kde = gaussian_kde(emb_valid.T, weights=weights_valid, bw_method=adjust)
-        except Exception as e:
-            print(f"在特征 {feature} 的密度估计过程中出错: {e}")
+        # ----- NEW: expression threshold -----------------------------------
+        mask_expr   = w_raw > min_expr
+        mask_train  = mask_finite & mask_expr
+
+        emb_train   = emb_all[mask_train]
+        w_train_raw = w_raw[mask_train]
+
+        if emb_train.shape[0] < 5:
+            print(f"[{feat}] too few cells above threshold; skipping KDE.")
+            adata.obs[f"density_{feat}"] = np.nan
             continue
 
-        # 计算每个细胞所在位置的密度值
-        density = kde(embeddings.T)
-        # 将密度值保存到 adata.obs 中，新列名称为 "density_<feature>"
-        density_col = f"density_{feature}"
-        adata.obs[density_col] = density
-        print(f"The density have been stored in adata.obs['{density_col}']")
+        # ----- min–max scale to 0-1 ----------------------------------------
+        w_min, w_max = w_train_raw.min(), w_train_raw.max()
+        w_train      = (w_train_raw - w_min) / (w_max - w_min)
 
+        # ----- KDE fit ------------------------------------------------------
+        kde = gaussian_kde(emb_train.T, weights=w_train, bw_method=adjust)
+
+        # ----- evaluate on ALL cells ---------------------------------------
+        density = kde(emb_all.T)
+        adata.obs[f"density_{feat}"] = density
+
+        print(f"✅ density_{feat} written (train cells = {emb_train.shape[0]})")
+
+
+import numpy as np
+from scipy.stats import gaussian_kde
+from matplotlib import pyplot as plt
+
+def add_density_contour(
+    ax,
+    embeddings,              # (n_cells, 2) array
+    weights,                 # 1-D array, will be min-max scaled
+    levels="quantile",       # "quantile" or a numeric list, see below
+    n_quantiles=5,
+    bw_adjust=0.3,
+    cmap_contour="Greys",
+    linewidth=1.0,
+    zorder=10,
+    fill=False,
+    alpha=0.4,
+):
+    """
+    Draw KDE iso-density contours on an existing matplotlib Axes.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes that already hosts your scatter / scanpy embedding.
+    embeddings : ndarray, shape (n, 2)
+        2-D coordinates (e.g. UMAP).
+    weights : ndarray, shape (n,)
+        Raw expression or any weight; will be min-max scaled to [0, 1].
+    levels : str | list[float]
+        * "quantile": use `n_quantiles` equally spaced quantiles (e.g. 0.2,0.4,…)
+        * list/tuple  : explicit contour levels.
+    n_quantiles : int
+        Number of quantile levels when `levels="quantile"`.
+    bw_adjust : float
+        Bandwidth factor for gaussian_kde (smaller = sharper contours).
+    fill : bool
+        True → use `ax.contourf` (filled), False → `ax.contour` (lines).
+    alpha : float
+        Transparency for filled contours.
+    """
+    # ---------- fit KDE ----------------------------------------------------
+    w_min, w_max = weights.min(), weights.max()
+    w_norm = None if w_max == w_min else (weights - w_min) / (w_max - w_min)
+    kde = gaussian_kde(embeddings.T, weights=w_norm, bw_method=bw_adjust)
+
+    # ---------- prepare evaluation grid -----------------------------------
+    xmin, xmax = embeddings[:, 0].min(), embeddings[:, 0].max()
+    ymin, ymax = embeddings[:, 1].min(), embeddings[:, 1].max()
+    xx, yy = np.mgrid[xmin:xmax:300j, ymin:ymax:300j]   # 300×300 grid
+    grid = kde(np.vstack([xx.ravel(), yy.ravel()])).reshape(xx.shape)
+
+    # ---------- determine contour levels ----------------------------------
+    if levels == "quantile":
+        qs = np.linspace(0, 1, n_quantiles + 2)[1:-1]   # drop 0 & 1
+        levels = np.quantile(grid, qs)
+
+    # ---------- draw -------------------------------------------------------
+    if fill:
+        cs = ax.contourf(
+            xx, yy, grid,
+            levels=levels,
+            cmap=cmap_contour,
+            alpha=alpha,
+            zorder=zorder,
+        )
+    else:
+        cs = ax.contour(
+            xx, yy, grid,
+            levels=levels,
+            cmap=cmap_contour,
+            linewidths=linewidth,
+            zorder=zorder,
+        )
+    return cs   # so you can add a colorbar if desired
 

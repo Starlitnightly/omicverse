@@ -528,6 +528,7 @@ Support Raw Windows platform
 ## v 1.7.0
 
 Added `lazy` function to calculate all function of scrna-seq
+Changed the logo presentation of Omicverse to `ov.plot_set`
 
 ### Single Module
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
@@ -535,6 +536,7 @@ Added `lazy` function to calculate all function of scrna-seq
 - Added data enhancement of `Fate`
 - Added `plot_atlas_view_ov` in VIA
 - Fixed an error when the matrix is too large in `recover_counts`.
+- Added `forceatlas2` to calculate the `X_force_directed`.
 
 ### Space Module
 - Added `GASTON` to learn a topographic map of a tissue slice from spatially resolved transcriptomics (SRT) data (#238)
@@ -544,3 +546,4 @@ Added `lazy` function to calculate all function of scrna-seq
 ### Plot Module
 - Added `dotplot_doublegroup` to visual the genes in doublegroup.
 - Added `transpose` argument of `cpdb_interacting_heatmap` to transpose the figure.
+- Added `calculate_gene_density` to plot the gene's density.
