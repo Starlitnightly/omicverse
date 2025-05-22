@@ -81,7 +81,12 @@ full = [
   "dynamo-release",
   "squidpy",
   "spateo",
-  "tangram-sc"
+  "tangram-sc",
+  "pertpy",
+  "toytree",
+  "arviz",
+  "ete3",
+  "scvi-tools"
 ]
 
 
