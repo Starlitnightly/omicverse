@@ -1,4 +1,3 @@
-
 from ..pp import *
 import scanpy as sc
 import numpy as np
@@ -35,22 +34,22 @@ def lazy(adata,
                 'batch_key': sample_key
             }
         print(f'🔧 The argument of qc we set '
-              f'   mito_perc: {qc_kwargs['tresh']['mito_perc']} '
-              f'   nUMIs: {qc_kwargs['tresh']['nUMIs']} '
-              f'   detected_genes: {qc_kwargs['tresh']['detected_genes']}'
-              f'   doublets_method: {qc_kwargs['doublets_method']}'
-              f'   batch_key: {qc_kwargs['batch_key']}'
+              f'   mito_perc: {qc_kwargs["tresh"]["mito_perc"]} '
+              f'   nUMIs: {qc_kwargs["tresh"]["nUMIs"]} '
+              f'   detected_genes: {qc_kwargs["tresh"]["detected_genes"]}'
+              f'   doublets_method: {qc_kwargs["doublets_method"]}'
+              f'   batch_key: {qc_kwargs["batch_key"]}'
               )
         adata = qc(adata,
                 **qc_kwargs)
     else:
         print('✅ QC step already finished, skipping it')
         print(f'🔧 The argument of qc we set '
-              f'   mito_perc: {adata.uns['status_args']['qc']['mito_perc']} '
-              f'   nUMIs: {adata.uns['status_args']['qc']['nUMIs']} '
-              f'   detected_genes: {adata.uns['status_args']['qc']['detected_genes']}'
-              f'   doublets_method: {adata.uns['status_args']['qc']['doublets_method']}'
-              f'   batch_key: {adata.uns['status_args']['qc']['batch_key']}'
+              f'   mito_perc: {adata.uns["status_args"]["qc"]["mito_perc"]} '
+              f'   nUMIs: {adata.uns["status_args"]["qc"]["nUMIs"]} '
+              f'   detected_genes: {adata.uns["status_args"]["qc"]["detected_genes"]}'
+              f'   doublets_method: {adata.uns["status_args"]["qc"]["doublets_method"]}'
+              f'   batch_key: {adata.uns["status_args"]["qc"]["batch_key"]}'
               )
 
     #step 2: normalization and highly variable genes:
@@ -63,17 +62,17 @@ def lazy(adata,
                 'target_sum': 50*1e4
             }
         print(f'🔧 The argument of preprocess we set '
-              f'   mode: {preprocess_kwargs['mode']} '
-              f'   n_HVGs: {preprocess_kwargs['n_HVGs']} '
-              f'   target_sum: {preprocess_kwargs['target_sum']} '
+              f'   mode: {preprocess_kwargs["mode"]} '
+              f'   n_HVGs: {preprocess_kwargs["n_HVGs"]} '
+              f'   target_sum: {preprocess_kwargs["target_sum"]} '
               )
         adata = preprocess(adata,**preprocess_kwargs)
     else:
         print('✅ Preprocess step already finished, skipping it')
         print(f'🔧 The argument of preprocess in data'
-              f'   mode: {adata.uns['status_args']['preprocess']['mode']} '
-              f'   n_HVGs: {adata.uns['status_args']['preprocess']['n_HVGs']} '
-              f'   target_sum: {adata.uns['status_args']['preprocess']['target_sum']} '
+              f'   mode: {adata.uns["status_args"]["preprocess"]["mode"]} '
+              f'   n_HVGs: {adata.uns["status_args"]["preprocess"]["n_HVGs"]} '
+              f'   target_sum: {adata.uns["status_args"]["preprocess"]["target_sum"]} '
               )
         
     if ('scaled' in adata.uns['status'].keys() and adata.uns['status']['scaled'] == False)  or ('scaled' in reforce_steps):
@@ -94,9 +93,9 @@ def lazy(adata,
         if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
             adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
         print(f'🔧 The argument of PCA we set '
-              f'   layer: {pca_kwargs['layer']} '
-              f'   n_pcs: {pca_kwargs['n_pcs']} '
-              f'   use_highly_variable: {pca_kwargs['use_highly_variable']} '
+              f'   layer: {pca_kwargs["layer"]} '
+              f'   n_pcs: {pca_kwargs["n_pcs"]} '
+              f'   use_highly_variable: {pca_kwargs["use_highly_variable"]} '
               )
         pca(adata,**pca_kwargs)
         adata.obsm['X_pca']=adata.obsm["scaled|original|X_pca"]
@@ -173,7 +172,7 @@ def lazy(adata,
             adata.uns['bench_res'][col]=adata.uns['bench_res'][col].astype(float)
         import matplotlib.pyplot as plt
         bm.plot_results_table(min_max_scale=False,show=False)
-        print(f'The Best Bench Correction Method is {adata.uns['bench_best_res']}')
+        print(f'The Best Bench Correction Method is {adata.uns["bench_best_res"]}')
         print("We can found it in `adata.uns['bench_best_res']`")
     else:
         print('✅ Best Bench Correction Eval step already finished, skipping it')

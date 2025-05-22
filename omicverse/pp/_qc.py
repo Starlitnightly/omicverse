@@ -306,6 +306,12 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             n1 = adata.shape[0]
             print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
             print('End of post sccomposite removal and QC plots.')
+    else:
+        n1 = adata.shape[0]
+    # Fix bug where n1 is not defined when doublets=False
+    if not doublets:
+        n1 = n0
+
 
     # Post seurat or mads filtering QC plot
 
