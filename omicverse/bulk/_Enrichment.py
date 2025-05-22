@@ -417,7 +417,8 @@ class pyGSEA(object):
         Returns:
             fig: A matplotlib.figure.Figure object.
         """
-        from gseapy.plot import GSEAPlot
+        from ..externel.gseapy.plot import GSEAPlot
+        #from gseapy.plot import GSEAPlot
         terms = self.enrich_res.index
         g = GSEAPlot(
         rank_metric=self.pre_res.ranking, term=terms[term_num],figsize=figsize,cmap=cmap,
