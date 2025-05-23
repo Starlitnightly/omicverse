@@ -80,13 +80,15 @@ dependencies = [
 full = [
   "dynamo-release",
   "squidpy",
-  "spateo",
   "tangram-sc",
   "pertpy",
   "toytree",
   "arviz",
   "ete3",
-  "scvi-tools"
+  "scvi-tools",
+  #"celloracle",
+  "pymde",
+  'torchdr'
 ]
 
 
