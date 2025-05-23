@@ -279,6 +279,10 @@ def umap(  # noqa: PLR0913, PLR0915
             
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
+        # Convert random_state to torch seed
+        import pymde
+        pymde.seed(random_state)
+        
         # Get neighbor graph from connectivities
         connectivities = neighbors["connectivities"]
         
@@ -301,14 +305,14 @@ def umap(  # noqa: PLR0913, PLR0915
         
         # Add dissimilar edges for better embedding
         n_similar = edges.shape[0]
-        n_dissimilar = n_similar // 2  # Use half as many dissimilar edges
+        n_dissimilar = int(n_similar * min_dist)  # Use min_dist to scale number of dissimilar edges
         
         try:
             # Try to generate dissimilar edges
             dissimilar_edges = preprocess.dissimilar_edges(
                 X.shape[0], 
-                num_edges=n_dissimilar, 
-                similar_edges=edges
+                num_edges=int(n_dissimilar), 
+                similar_edges=edges,
             )
             
             # Combine similar and dissimilar edges
@@ -348,11 +352,19 @@ def umap(  # noqa: PLR0913, PLR0915
             device=device
         )
         
-        # Compute embedding
-        embedding = mde.embed(
-            verbose=settings.verbosity > 3,
-            max_iter=n_epochs
-        )
+        # Compute embedding with initial random state
+        if isinstance(init_coords, np.ndarray):
+            embedding = mde.embed(
+                verbose=settings.verbosity > 3,
+                max_iter=n_epochs,
+                # Set random initial state if not using existing embedding
+                X=None if init_coords is None else init_coords
+            )
+        else:
+            embedding = mde.embed(
+                verbose=settings.verbosity > 3,
+                max_iter=n_epochs,
+            )
         
         X_umap = embedding.cpu().numpy()
         
