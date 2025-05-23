@@ -642,7 +642,7 @@ class Neighbors:
             )
         elif method == "torch":
             import torch
-            #from ._connectivity import umap_gpu_optimized
+            from ._connectivity import umap_gpu_optimized
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self._connectivities = umap_gpu_optimized(
                 knn_indices,
