@@ -528,7 +528,12 @@ Support Raw Windows platform
 ## v 1.7.0
 
 Added `lazy` function to calculate all function of scrna-seq
+Added `cpu-gpu-mixed` to accelerate the analysis of scrna-seq using GPU.
 Changed the logo presentation of Omicverse to `ov.plot_set`
+
+### Bulk Module
+- Added `limma`, `edgeR` in different expression gene analysis. (#238)
+- Fixed the version error of `DEseq2` analysis.
 
 ### Single Module
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
