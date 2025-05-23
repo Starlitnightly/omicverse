@@ -376,6 +376,14 @@ def umap(  # noqa: PLR0913, PLR0915
             del all_weights
         if 'distortion_function' in locals():
             del distortion_function
+        
+        del embedding
+        del edges
+        del weights
+        del all_edges
+        del all_weights
+        del distortion_function
+        
         torch.cuda.empty_cache()
         import gc
         gc.collect()
