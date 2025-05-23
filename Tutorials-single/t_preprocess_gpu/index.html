@@ -10,7 +10,7 @@
 <link href="../t_cluster/" rel="next"/>
 <link href="../../img/favicon.ico" rel="icon"/>
 <meta content="mkdocs-1.4.2, mkdocs-material-9.1.2" name="generator"/>
-<title>Preprocessing the data of scRNA-seq with omicverse[GPU] - omicverse Readthedocs</title>
+<title>Preprocessing the data of scRNA-seq with omicverse[GPU][Bug] - omicverse Readthedocs</title>
 <link href="../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -37,7 +37,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#preprocessing-the-data-of-scrna-seq-with-omicversegpu">
+<a class="md-skip" href="#preprocessing-the-data-of-scrna-seq-with-omicversegpubug">
           Skip to content
         </a>
 </div>
@@ -61,7 +61,7 @@
 <div class="md-header__topic" data-md-component="header-topic">
 <span class="md-ellipsis">
             
-              Preprocessing the data of scRNA-seq with omicverse[GPU]
+              Preprocessing the data of scRNA-seq with omicverse[GPU][Bug]
             
           </span>
 </div>
@@ -206,17 +206,17 @@
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
 <a class="md-nav__link" href="../t_preprocess_cpu/">
-        Preprocessing the data of scRNA-seq with omicverse
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
       </a>
 </li>
 <li class="md-nav__item md-nav__item--active">
 <input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
 <label class="md-nav__link md-nav__link--active" for="__toc">
-          Preprocessing the data of scRNA-seq with omicverse[GPU]
+          Preprocessing the data of scRNA-seq with omicverse[GPU][Bug]
           <span class="md-nav__icon md-icon"></span>
 </label>
 <a class="md-nav__link md-nav__link--active" href="./">
-        Preprocessing the data of scRNA-seq with omicverse[GPU]
+        Preprocessing the data of scRNA-seq with omicverse[GPU][Bug]
       </a>
 <nav aria-label="Table of contents" class="md-nav md-nav--secondary">
 <label class="md-nav__title" for="__toc">
@@ -492,6 +492,11 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../Tutorials-space/t_staligner/">
         Spatial integration and clustering
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
       </a>
 </li>
 <li class="md-nav__item">
@@ -1612,7 +1617,13 @@ Licensed under the Apache License, Version 2.0.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="preprocessing-the-data-of-scrna-seq-with-omicversegpu">Preprocessing the data of scRNA-seq with omicverse[GPU]<a class="anchor-link" href="#preprocessing-the-data-of-scrna-seq-with-omicversegpu">¶</a></h1><p>The count table, a numeric matrix of genes × cells, is the basic input data structure in the analysis of single-cell RNA-sequencing data. A common preprocessing step is to adjust the counts for variable sampling efficiency and to transform them so that the variance is similar across the dynamic range.</p>
+<h1 id="preprocessing-the-data-of-scrna-seq-with-omicversegpubug">Preprocessing the data of scRNA-seq with omicverse[GPU][Bug]<a class="anchor-link" href="#preprocessing-the-data-of-scrna-seq-with-omicversegpubug">¶</a></h1><div class="admonition warning">
+<p class="admonition-title">Note</p>
+<p>
+   “Due to recent updates in `rapids_singlecell`, the pure-GPU version is currently unavailable. We plan to fix this in a future release and support datasets with tens of millions of cells.”
+  </p>
+</div>
+<p>The count table, a numeric matrix of genes × cells, is the basic input data structure in the analysis of single-cell RNA-sequencing data. A common preprocessing step is to adjust the counts for variable sampling efficiency and to transform them so that the variance is similar across the dynamic range.</p>
 <p>Suitable methods to preprocess the scRNA-seq is important. Here, we introduce some preprocessing step to help researchers can perform downstream analysis easyier.</p>
 <p>User can compare our tutorial with <a href="https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html">scanpy'tutorial</a> to learn how to use omicverse well</p>
 <p>Colab_Reproducibility：<a href="https://colab.research.google.com/drive/1DXLSls_ppgJmAaZTUvqazNC_E7EDCxUe?usp=sharing">https://colab.research.google.com/drive/1DXLSls_ppgJmAaZTUvqazNC_E7EDCxUe?usp=sharing</a></p>

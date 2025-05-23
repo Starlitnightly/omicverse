@@ -206,12 +206,12 @@
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-single/t_preprocess_cpu/">
-        Preprocessing the data of scRNA-seq with omicverse
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
       </a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-single/t_preprocess_gpu/">
-        Preprocessing the data of scRNA-seq with omicverse[GPU]
+        Preprocessing the data of scRNA-seq with omicverse[GPU][Bug]
       </a>
 </li>
 <li class="md-nav__item">
@@ -465,6 +465,11 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-space/t_staligner/">
         Spatial integration and clustering
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
       </a>
 </li>
 <li class="md-nav__item">
@@ -1387,6 +1392,35 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-170">
+    v 1.7.0
+  </a>
+<nav aria-label="v 1.7.0" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_14">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_31">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_11">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#plot-module">
+    Plot Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </li>
@@ -2268,6 +2302,35 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-170">
+    v 1.7.0
+  </a>
+<nav aria-label="v 1.7.0" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bulk-module_14">
+    Bulk Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_31">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_11">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#plot-module">
+    Plot Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -2861,6 +2924,36 @@
 <li>Added <code>ov.space.cluster</code> to identify the spatial domain</li>
 <li>Added <code>Binary</code> for spatial cluster</li>
 <li>Added <code>Spateo</code> to calculate the SVG</li>
+</ul>
+<h2 id="v-170">v 1.7.0<a class="headerlink" href="#v-170" title="Permanent link">¶</a></h2>
+<p>Added <code>lazy</code> function to calculate all function of scrna-seq
+Added <code>cpu-gpu-mixed</code> to accelerate the analysis of scrna-seq using GPU.
+Changed the logo presentation of Omicverse to <code>ov.plot_set</code></p>
+<h3 id="bulk-module_14">Bulk Module<a class="headerlink" href="#bulk-module_14" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>limma</code>, <code>edgeR</code> in different expression gene analysis. (#238)</li>
+<li>Fixed the version error of <code>DEseq2</code> analysis.</li>
+</ul>
+<h3 id="single-module_31">Single Module<a class="headerlink" href="#single-module_31" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed <code>geneset_prepare</code> not being able to read gmt not split by <code>\t\t</code> (#235) (#238)</li>
+<li>Added <code>geneset_aucell_tmp</code>,<code>pathway_aucell_tmp</code>,<code>pathway_aucell_enrichment_tmp</code> to test the chunk_size (#238)</li>
+<li>Added data enhancement of <code>Fate</code></li>
+<li>Added <code>plot_atlas_view_ov</code> in VIA</li>
+<li>Fixed an error when the matrix is too large in <code>recover_counts</code>.</li>
+<li>Added <code>forceatlas2</code> to calculate the <code>X_force_directed</code>.</li>
+</ul>
+<h3 id="space-module_11">Space Module<a class="headerlink" href="#space-module_11" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>GASTON</code> to learn a topographic map of a tissue slice from spatially resolved transcriptomics (SRT) data (#238)</li>
+<li>Added super kwargs in <code>plot_tensor_single</code> of STT.</li>
+<li>Updated <code>COMMOT</code> using GPU-accerlate</li>
+</ul>
+<h3 id="plot-module">Plot Module<a class="headerlink" href="#plot-module" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>dotplot_doublegroup</code> to visual the genes in doublegroup.</li>
+<li>Added <code>transpose</code> argument of <code>cpdb_interacting_heatmap</code> to transpose the figure.</li>
+<li>Added <code>calculate_gene_density</code> to plot the gene's density.</li>
 </ul>
 </article>
 </div>
