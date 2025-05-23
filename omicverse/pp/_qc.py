@@ -21,6 +21,15 @@ from scipy.sparse import issparse
 
 from .._settings import settings
 
+EMOJI = {
+    "start":        "🔍",  # start
+    "cpu":          "🖥️",  # CPU mode
+    "mixed":        "⚙️",  # mixed CPU/GPU mode
+    "gpu":          "🚀",  # RAPIDS GPU mode
+    "done":         "✅",  # done
+    "error":        "❌",  # error
+}
+
 
 def mads(meta, cov, nmads=5, lt=None):
     """
@@ -191,13 +200,13 @@ def qc(adata,**kwargs):
 
 
     if settings.mode == 'gpu':
-        print('GPU mode activated')
+        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate QC...")
         return qc_gpu(adata,**kwargs)
     elif settings.mode == 'cpu-gpu-mixed':
-        print('CPU-GPU mixed mode activated')
+        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode...")
         return qc_cpu_gpu_mixed(adata,**kwargs)
     else:
-        print('CPU mode activated')
+        print(f"{EMOJI['cpu']} Using torch CPU mode...")
         return qc_cpu(adata,**kwargs)
     
 
