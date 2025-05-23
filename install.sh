@@ -141,7 +141,8 @@ pip_install_pkg \
   combat \
   pymde \
   opencv-python \
-  scikit-image
+  scikit-image \
+  memento-de
 
 #————————————————————————
 # 7. Dynamics & analysis tools 🔬
@@ -167,20 +168,17 @@ pip_install_pkg \
   pymde \
   torchdr \
 
+
+
 #————————————————————————
 # 8. Version‐locked packages 🔒
 #————————————————————————
-pip_install_pkg \
-  numpy==1.26.4 \
-  llvmlite==0.43.0 \
-  numba==0.60.0
-
 
 
 #————————————————————————
 # 9. Miscellaneous tools 🛠️
 #————————————————————————
-pip_install_pkg backports.tarfile openpyxl
+pip_install_pkg backports.tarfile openpyxl 
 
 python -c "import omicverse"
 
