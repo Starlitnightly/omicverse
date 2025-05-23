@@ -14,6 +14,17 @@ import time
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
 from .._settings import settings
+from datetime import datetime
+
+# Emoji map for UMAP status reporting
+EMOJI = {
+    "start":        "🔍",  # start
+    "cpu":          "🖥️",  # CPU mode
+    "mixed":        "⚙️",  # mixed CPU/GPU mode
+    "gpu":          "🚀",  # RAPIDS GPU mode
+    "done":         "✅",  # done
+    "error":        "❌",  # error
+}
 
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     """ 
@@ -410,7 +421,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     print('End of robust gene identification.')
     method_list = mode.split('|')
     print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
-    if settings.mode == 'cpu':
+    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         data_load_start = time.time()
         if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
             sc.pp.normalize_total(
@@ -520,7 +531,7 @@ def scale(adata,max_value=10,layers_add='scaled'):
             the expression matrix that has been scaled to unit variance and zero mean.
 
     """
-    if settings.mode == 'cpu':
+    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value)
         adata.layers[layers_add] = adata_mock.X.copy()
         del adata_mock
@@ -535,7 +546,7 @@ def scale(adata,max_value=10,layers_add='scaled'):
         
     adata.uns['status']['scaled'] = True
 
-def regress(adata):
+def regress(adata,**kwargs):
     """
     Regress out covariates from the input AnnData object.
 
@@ -550,8 +561,8 @@ def regress(adata):
             the expression matrix with covariates regressed out.
 
     """
-    if settings.mode == 'cpu':
-        adata_mock = sc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], n_jobs=8, copy=True)
+    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+        adata_mock = sc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], n_jobs=8, copy=True,**kwargs)
         adata.layers['regressed'] = adata_mock.X.copy()
         del adata_mock
     else:
@@ -652,7 +663,20 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
             adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
             adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
             adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
-
+    elif settings.mode == 'cpu-gpu-mixed':
+        if sc.__version__ <'1.10':
+            adata_mock=sc.AnnData(adata.layers[layer],obs=adata.obs,var=adata.var)
+            sc.pp.pca(adata_mock, n_comps=n_pcs)
+            adata.obsm[key + '|X_pca'] = adata_mock.obsm['X_pca']
+            adata.varm[key + '|pca_loadings'] = adata_mock.varm['PCs']
+            adata.uns[key + '|pca_var_ratios'] = adata_mock.uns['pca']['variance_ratio']
+            adata.uns[key + '|cum_sum_eigenvalues'] = adata_mock.uns['pca']['variance']
+        else:
+            sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
+            adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
+            adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
+            adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
+            adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
     else:
         import rapids_singlecell as rsc
         rsc.pp.pca(adata, layer=layer,n_comps=n_pcs)
@@ -839,6 +863,11 @@ def neighbors(
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
+    elif settings.mode == 'cpu-gpu-mixed':
+        sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
+                         random_state=random_state,method=method,metric=metric,
+                         metric_kwds=metric_kwds,
+                         key_added=key_added,copy=copy)
     else:
         import rapids_singlecell as rsc
         rsc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
@@ -848,15 +877,30 @@ def neighbors(
 
 
 def umap(adata, **kwargs):
-    '''
-    umap
-    '''
-    if settings.mode =='cpu':
-        sc.tl.umap(adata, **kwargs)
-    else:
-        import rapids_singlecell as rsc
+    """
+    Run UMAP on AnnData, choosing implementation based on settings.mode,
+    The argument could be found in `scanpy.pp.umap`
+    """
+    print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running UMAP in '{settings.mode}' mode...")
+    try:
+        if settings.mode == 'cpu':
+            print(f"{EMOJI['cpu']} Using Scanpy CPU UMAP...")
+            sc.tl.umap(adata, **kwargs)
 
-        rsc.tl.umap(adata, **kwargs)
+        elif settings.mode == 'cpu-gpu-mixed':
+            print(f"{EMOJI['mixed']} Using torchdr mixed CPU/GPU UMAP...")
+            from ._umap import umap as _torch_umap
+            _torch_umap(adata, method='torchdr', **kwargs)
+
+        else:
+            print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
+            import rapids_singlecell as rsc
+            rsc.tl.umap(adata, **kwargs)
+
+        print(f"{EMOJI['done']} UMAP completed successfully.")
+    except Exception as e:
+        print(f"{EMOJI['error']} UMAP failed: {e}")
+        raise
 
 
 def louvain(adata, **kwargs):
@@ -865,6 +909,8 @@ def louvain(adata, **kwargs):
     '''
 
     if settings.mode =='cpu':
+        sc.tl.louvain(adata, **kwargs)
+    elif settings.mode == 'cpu-gpu-mixed':
         sc.tl.louvain(adata, **kwargs)
     else:
         import rapids_singlecell as rsc
@@ -876,6 +922,8 @@ def leiden(adata, **kwargs):
     '''
 
     if settings.mode =='cpu':
+        sc.tl.leiden(adata, **kwargs)
+    elif settings.mode == 'cpu-gpu-mixed':
         sc.tl.leiden(adata, **kwargs)
     else:
         import rapids_singlecell as rsc

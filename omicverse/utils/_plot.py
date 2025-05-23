@@ -16,6 +16,12 @@ from pkg_resources import DistributionNotFound, VersionConflict
 import tomli
 import os
 
+from datetime import datetime, timedelta
+import warnings
+import platform
+import os
+import torch
+
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10', '#EF7B77', '#279AD7','#F0EEF0',
  '#EAEFC5', '#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED','#866017', '#9F987F','#E0DFED',
@@ -185,31 +191,83 @@ name = "omicverse"
 __version__ = version(name)
 
 _has_printed_logo = False  # Flag to ensure logo prints only once
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-def plot_set(verbosity=3,dpi=80,facecolor='white'):
-    global _has_printed_logo  # Use the global flag
-    check_dependencies()
-    sc.settings.verbosity = verbosity             # verbosity: errors (0), warnings (1), info (2), hints (3)
+
+# emoji map for status reporting
+EMOJI = {
+    "start":        "🔬",  # experiment start
+    "deps":         "🔗",  # dependency check
+    "settings":     "⚙️",  # configure settings
+    "warnings":     "🚫",  # suppress warnings
+    "gpu":          "🧬",  # GPU check
+    "logo":         "🌟",  # print logo
+    "done":         "✅",  # done
+}
+
+
+def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
+    """
+    Configure plotting for OmicVerse:
+      1) check deps
+      2) set scanpy/plotlib settings
+      3) suppress warnings
+      4) detect GPU
+      5) print logo & version (once)
+    """
+    global _has_printed_logo
+
+    print(f"{EMOJI['start']} Starting plot initialization...")
+
+    # 1) dependency check
+    #print(f"{EMOJI['deps']} Checking dependencies...")
+    #check_dependencies()
+    # print(f"{EMOJI['done']} Dependencies OK")
+
+    # 2) scanpy verbosity & figure params
+    #print(f"{EMOJI['settings']} Applying plotting settings (verbosity={verbosity}, dpi={dpi})")
+    sc.settings.verbosity = verbosity
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
-    import warnings
+    #print(f"{EMOJI['done']} Settings applied")
+
+    # 3) suppress user/future/deprecation warnings
+    #print(f"{EMOJI['warnings']} Suppressing common warnings")
     warnings.simplefilter("ignore", category=UserWarning)
     warnings.simplefilter("ignore", category=FutureWarning)
     warnings.simplefilter("ignore", category=DeprecationWarning)
+    #print(f"{EMOJI['done']} Warnings suppressed")
 
-    # Print the logo only once
+    # 4) GPU detection
+    print(f"{EMOJI['gpu']} Detecting CUDA devices…")
+    if not torch.cuda.is_available():
+        print(f"{EMOJI['warnings']} No CUDA devices found")
+    else:
+        try:
+            for idx in range(torch.cuda.device_count()):
+                props = torch.cuda.get_device_properties(idx)
+                print(f"{EMOJI['done']} [GPU {idx}] {props.name}")
+                print(f"    • Total memory: {props.total_memory/1024**3:.1f} GB")
+                print(f"    • Compute capability: {props.major}.{props.minor}")
+        except Exception as e:
+            print(f"{EMOJI['warnings']} GPU detection failed: {e}")
+
+    # 5) print logo & version only once
     if not _has_printed_logo:
+        #print(f"{EMOJI['logo']} OmicVerse Logo:")
         today = datetime.now()
-        chinese_new_year = spring_festival[today.year]
-        if today.month == 12 and (today.day == 25 or today.day == 24):
-            # december 12.25 or 12.24 (christmas)
+        chinese_new_year = spring_festival.get(today.year)
+        if today.month == 12 and today.day in (24, 25):
             print(days_christmas)
-        elif (today.year in spring_festival) and (chinese_new_year - timedelta(days=1) <= today <= chinese_new_year + timedelta(days=3)):
+        elif chinese_new_year and (chinese_new_year - timedelta(days=1) <= today <= chinese_new_year + timedelta(days=3)):
             print(days_chinese_new_year)
         else:
             print(omics)
-
-        print(f'Version: {__version__}, Tutorials: https://omicverse.readthedocs.io/')
+        print(f"🔖 Version: {__version__}   📚 Tutorials: https://omicverse.readthedocs.io/")
         _has_printed_logo = True
+
+    print(f"{EMOJI['done']} plot_set complete.\n")
+
 
 # Create aliases for backward compatibility
 plotset = plot_set
