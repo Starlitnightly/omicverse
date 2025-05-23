@@ -2,7 +2,7 @@
 # The only difference is that it allows for the use of GPU.
 # The original file can be found at:
 # https://github.com/scverse/scanpy/blob/main/scanpy/preprocessing/_scrublet/core.py
-
+from __future__ import annotations
 
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
@@ -19,7 +19,7 @@ from scanpy.get import _get_obs_rep
 from scanpy.preprocessing._scrublet import pipeline
 from scanpy.preprocessing._scrublet.core import Scrublet
 from .._settings import EMOJI
-from __future__ import annotations
+
 
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
