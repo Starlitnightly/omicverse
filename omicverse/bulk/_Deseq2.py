@@ -491,9 +491,11 @@ class pyDEG(object):
         """
         from pydeseq2.dds import DeseqDataSet
         from pydeseq2.ds import DeseqStats
+        from scipy.stats import ttest_ind
+        from statsmodels.stats.multitest import multipletests
+        print(f"⚙️ You are using {method} method for differential expression analysis.")
         if method=='ttest':
-            from scipy.stats import ttest_ind
-            from statsmodels.stats.multitest import multipletests
+            
             data=self.data
 
             g1_mean=data[group1].mean(axis=1)
@@ -504,6 +506,7 @@ class pyDEG(object):
             #log2fold=np.log2(fold)
             ttest = ttest_ind(data[group1].T.values, data[group2].T.values)
             pvalue=ttest[1]
+            print(f"⏰ Start to calculate qvalue...")
             qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
                                method=multipletests_method, is_sorted=False, returnsorted=False)
             #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
@@ -522,47 +525,20 @@ class pyDEG(object):
             #result=result[result['padj']<alpha]
             result['sig']='normal'
             result.loc[result['qvalue']<alpha,'sig']='sig'
+            print(f"✅ Differential expression analysis completed.")
             
             self.result=result
             return result
         elif method=='wilcox':
-            #raise ValueError('The method is not supported.')
-            from scipy.stats import ranksums
-            from statsmodels.stats.multitest import multipletests
-            data=self.data
-
-            g1_mean=data[group1].mean(axis=1)
-            g2_mean=data[group2].mean(axis=1)
-            fold=(g1_mean+0.00001)/(g2_mean+0.00001)
-            #log2fold=np.log2(fold)
-            wilcox = ranksums(data[group1].T.values, data[group2].T.values)
-            pvalue=wilcox[1]
-
-            #qvalue=fdrcorrection(np.nan_to_num(np.array(pvalue),0), alpha=0.05, method='indep', is_sorted=False)
-            qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
-                               method=multipletests_method, is_sorted=False, returnsorted=False)
-            genearray = np.asarray(pvalue)
-            result = pd.DataFrame({'pvalue':genearray,'qvalue':qvalue[1],'FoldChange':fold})
-            result=result.loc[~result['pvalue'].isnull()]
-            result['-log(pvalue)'] = -np.log10(result['pvalue'])
-            result['-log(qvalue)'] = -np.log10(result['qvalue'])
-            result['BaseMean']=(g1_mean+g2_mean)/2
-            result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
-            result['log2FC'] = np.log2(result['FoldChange'])
-            result['abs(log2FC)'] = abs(np.log2(result['FoldChange']))
-            result['size']  =np.abs(result['FoldChange'])/10
-            #result=result[result['padj']<alpha]
-            result['sig']='normal'
-            result.loc[result['qvalue']<alpha,'sig']='sig'
-            self.result=result
-            return result
+            raise ValueError('The method is not supported.')
+            print(f"⚙️ You are using {method} method for differential expression analysis.")
         elif method=='DEseq2':
             import pydeseq2
             counts_df = self.data[group1+group2].T
             clinical_df = pd.DataFrame(index=group1+group2)
 
             clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
-
+            print(f"⏰ Start to create DeseqDataSet...")
             # Determine pydeseq2 version and create the DeseqDataSet accordingly
             if pydeseq2.__version__ <= '0.3.5':
                 dds = DeseqDataSet(
@@ -609,23 +585,38 @@ class pyDEG(object):
         
             # Add the 'contrast' parameter here:
         # FIX: Adding version check for DeseqStats constructor
-        if pydeseq2.__version__<='0.3.5':
-            stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
-        elif pydeseq2.__version__ <= '0.4.1':
-            # For newer PyDESeq2 versions that require the contrast parameter
-            stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
-                                  alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
-            
-# Near line 643, fix the duplicate else clause:
-            stat_res.run_wald_test()
-            if stat_res.cooks_filter:
-                stat_res._cooks_filtering()
-                
-            if stat_res.independent_filter:
-                stat_res._independent_filtering()
+            if pydeseq2.__version__<='0.3.5':
+                stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+            elif pydeseq2.__version__ <= '0.4.1':
+                # For newer PyDESeq2 versions that require the contrast parameter
+                stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
+                                    alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
+                stat_res.run_wald_test()
+                if stat_res.cooks_filter:
+                    stat_res._cooks_filtering()
+                    
+                if stat_res.independent_filter:
+                    stat_res._independent_filtering()
+                else:
+                    stat_res._p_value_adjustment()
             else:
-                stat_res._p_value_adjustment()
-                
+                stat_res=DeseqStats(
+                            dds,
+                            contrast=["condition", "Treatment", "Control"], 
+                            alpha=alpha,
+                            cooks_filter=cooks_filter,
+                            independent_filter=independent_filter,
+                        )
+                stat_res.run_wald_test()
+                if stat_res.cooks_filter:
+                    stat_res._cooks_filtering()
+                    
+                if stat_res.independent_filter:
+                    stat_res._independent_filtering()
+                else:
+                    stat_res._p_value_adjustment()
+
+                    
             self.stat_res = stat_res
             stat_res.summary()
             result = stat_res.results_df
@@ -639,7 +630,138 @@ class pyDEG(object):
             result['sig'] = 'normal'
             result.loc[result['qvalue'] < alpha, 'sig'] = 'sig'
             self.result = result
+            print(f"✅ Differential expression analysis completed.")
             return result
+            
+        
+        elif method == 'edgepy':
+            try:
+                from inmoose.data.pasilla import pasilla
+                from inmoose.edgepy import DGEList, glmLRT, topTags
+                from patsy import dmatrix
+            except:
+                raise ImportError('Please install inmoose: `pip install inmoose`')
+            print(f"⏰ Start to create DGEList...")
+            anno1=pd.DataFrame(
+                index=group1+group2
+            )
+            anno1['condition']=['treatment' for i in group1]+['control' for i in group2]
+            var=pd.DataFrame(index=self.data.index)
+            var.index.name='gene_id'
+
+            # build a DGEList object
+            dge_list = DGEList(
+                counts=self.data[group1+group2].values, 
+                samples=anno1, 
+                group_col="condition", 
+                genes=var
+            )
+            design1 = dmatrix("~condition", data=anno1)
+            dge_list.estimateGLMCommonDisp(design=design1)
+            fit = dge_list.glmFit(design=design1)
+            lrt = glmLRT(fit)
+            lrt.index=var.index
+
+            #	log2FoldChange	lfcSE	logCPM	stat	pvalue		
+            # 
+            pvalue=lrt['pvalue'].values.reshape(-1)
+            qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
+                               method=multipletests_method, is_sorted=False, returnsorted=False)
+            
+            g1_mean=self.data[group1].mean(axis=1)
+            g2_mean=self.data[group2].mean(axis=1)
+            g=(g2_mean+g1_mean)/2
+            g=g.loc[g>0].min()
+            fold=(g1_mean+g)/(g2_mean+g)
+            print(f"⏰ Start to calculate qvalue...")
+
+            result = pd.DataFrame({'pvalue':pvalue,'qvalue':qvalue[1],'FoldChange':fold})
+            result['MaxBaseMean']=np.max([g1_mean,g2_mean],axis=0)
+            result['BaseMean']=(g1_mean+g2_mean)/2
+            result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
+            result['log2FC'] = np.log2(result['FoldChange'])
+            result['abs(log2FC)'] = abs(result['log2FC'])
+            result['size']  =np.abs(result['log2FC'])/10
+            result=result.loc[~result['pvalue'].isnull()]
+            result['-log(pvalue)'] = -np.log10(result['pvalue'])
+            result['-log(qvalue)'] = -np.log10(result['qvalue'])
+            #max mean of between each value in group1 and group2
+            #result=result[result['padj']<alpha]
+            result['sig']='normal'
+            result.loc[result['qvalue']<alpha,'sig']='sig'
+            self.result=result
+            print(f"✅ Differential expression analysis completed.")
+            return result
+
+        elif method == 'limma':
+            try:
+                from patsy import dmatrix
+                from inmoose.limma import lmFit, makeContrasts, contrasts_fit, eBayes, topTable
+            except:
+                raise ImportError('Please install inmoose: `pip install inmoose`')
+            print(f"⏰ Start to create DGEList...")
+            anno1=pd.DataFrame(
+                index=group1+group2
+            )
+            anno1['condition']=['treatment' for i in group1]+['control' for i in group2]
+
+            # 3.1 构建设计矩阵
+            design1 = dmatrix("~0 + condition", data=anno1)
+            #    列名会是 ['condition[treatment]', 'condition[control]']
+
+            # 3.2 lmFit 拟合线性模型
+            #    输入: counts_df 行基因为基因，列为样本
+            counts_df = self.data[group1+group2].values
+            fit = lmFit(counts_df, design1)
+            # 3.3 定义对比——treatment vs control
+            contrast_matrix = makeContrasts(
+                "condition[treatment] - condition[control]",
+                levels=design1
+            )
+
+            # 3.4 contrasts_fit 应用对比
+            fit_con = contrasts_fit(fit, contrast_matrix)
+
+            # 3.5 经验贝叶斯调整
+            print(f"⏰ Start to adjust pvalue...")
+            fit_eb = eBayes(fit_con)
+
+            g1_mean=self.data[group1].mean(axis=1)
+            g2_mean=self.data[group2].mean(axis=1)
+            g=(g2_mean+g1_mean)/2
+            g=g.loc[g>0].min()
+            fold=(g1_mean+g)/(g2_mean+g)
+
+            pvalue=fit_eb.p_value.values.reshape(-1)
+            qvalue = multipletests(np.nan_to_num(np.array(pvalue),0), alpha=0.5, 
+                               method=multipletests_method, is_sorted=False, returnsorted=False)
+            
+            result = pd.DataFrame({'pvalue':pvalue,'qvalue':qvalue[1],'FoldChange':fold})
+            result['MaxBaseMean']=np.max([g1_mean,g2_mean],axis=0)
+            result['BaseMean']=(g1_mean+g2_mean)/2
+            result['log2(BaseMean)']=np.log2((g1_mean+g2_mean)/2)
+            result['log2FC'] = np.log2(result['FoldChange'])
+            result['abs(log2FC)'] = abs(result['log2FC'])
+            result['size']  =np.abs(result['log2FC'])/10
+            result['sig']='normal'
+            result=result.loc[~result['pvalue'].isnull()]
+            result['-log(pvalue)'] = -np.log10(result['pvalue'])
+            result['-log(qvalue)'] = -np.log10(result['qvalue'])
+            #max mean of between each value in group1 and group2
+            #result=result[result['padj']<alpha]
+            result['sig']='normal'
+            result.loc[result['qvalue']<alpha,'sig']='sig'
+
+            result['F']=fit_eb.F.reshape(-1)
+            result['t']=fit_eb.t.values.reshape(-1)
+            self.result=result
+            print(f"✅ Differential expression analysis completed.")
+            return result
+
+            # 3.6 提取结果
+            
+            
+            
             
         else:  # This is where the "method" check (not pydeseq2 version check) ends
             raise ValueError('The method is not supported.')

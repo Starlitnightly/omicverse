@@ -4,7 +4,7 @@
 import scanpy as sc
 from anndata import AnnData
 
-class DEGCT:
+class DECT:
     def __init__(self, 
                  adata: AnnData, 
                  condition: str,
@@ -78,3 +78,40 @@ class DEGCT:
             return self.mdata["milo"].var
         
             
+
+class DEG:
+    def __init__(self,
+                 adata: AnnData,
+                 condition: str,
+                 ctrl_group: str,
+                 test_group: str,
+                 method: str='wilcoxon',
+                 ):
+        self.adata=adata
+        self.condition=condition
+        self.ctrl_group=ctrl_group
+        self.test_group=test_group
+        
+        
+    def run(self,**kwargs):
+
+        if self.method == 'wilcoxon' or self.method == 't-test':
+            self.adata_test=self.adata[self.adata.obs[self.condition].isin([self.ctrl_group, self.test_group])]
+            sc.tl.rank_genes_groups( 
+                self.adata_test,  
+                groupby=self.condition, 
+                groups=[self.test_group, self.ctrl_group], 
+                reference=self.ctrl_group, 
+                n_genes=self.adata_test.shape[1], 
+                method=self.method 
+            ) 
+            
+        
+    def get_results(self):
+        if self.method == 'wilcoxon' or self.method == 't-test':
+            md_d = ( 
+                sc.get.rank_genes_groups_df(self.adata_test, group=self.test_group) 
+                .set_index("names", drop=False) 
+            ) 
+            self.result=md_d
+            return md_d

@@ -35,3 +35,4 @@ from ._sccaf import SCCAF_assessment,plot_roc,SCCAF_optimize_all,color_long
 from ._multimap import TFIDF_LSI,Wrapper,Integration,Batch
 from ._scdiffusion import scDiffusion
 from ._cellvote import get_cluster_celltype,CellVote
+from ._deg_ct import DECT,DEG
