@@ -11,6 +11,7 @@ from scanpy._compat import old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView
 from scanpy.tools._utils import _choose_representation, get_init_pos_from_paga
+from .._settings import EMOJI
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -166,7 +167,7 @@ def umap(  # noqa: PLR0913, PLR0915
         msg = f"Did not find .uns[{neighbors_key!r}]. Run `sc.pp.neighbors` first."
         raise ValueError(msg)
 
-    start = logg.info("computing UMAP")
+    start = logg.info(f"computing UMAP{EMOJI['start']}")
 
     neighbors = NeighborsView(adata, neighbors_key)
 
@@ -233,6 +234,8 @@ def umap(  # noqa: PLR0913, PLR0915
         )
     elif method == "torchdr":
         from torchdr import UMAP
+        import torch
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         n_neighbors = neighbors["params"]["n_neighbors"]
         n_epochs = (
             500 if maxiter is None else maxiter
@@ -248,10 +251,14 @@ def umap(  # noqa: PLR0913, PLR0915
             a=a,
             b=b,
             lr = alpha,
-            device='cuda',
+            device=device,
             random_state=random_state,
         )
         X_umap = umap.fit(X_contiguous).embedding_.detach().cpu().numpy()
+        del umap
+        import gc
+        torch.cuda.empty_cache()
+        gc.collect()
         
     elif method == "rapids":
         msg = (
@@ -290,7 +297,7 @@ def umap(  # noqa: PLR0913, PLR0915
         X_umap = umap.fit_transform(X_contiguous)
     adata.obsm[key_obsm] = X_umap  # annotate samples with UMAP coordinates
     logg.info(
-        "    finished",
+        f"    finished {EMOJI['done']}",
         time=start,
         deep=(
             "added\n"

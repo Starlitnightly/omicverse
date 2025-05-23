@@ -13,18 +13,12 @@ import time
 
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
-from .._settings import settings
+from .._settings import settings,print_gpu_usage_color,EMOJI
 from datetime import datetime
 
+
 # Emoji map for UMAP status reporting
-EMOJI = {
-    "start":        "🔍",  # start
-    "cpu":          "🖥️",  # CPU mode
-    "mixed":        "⚙️",  # mixed CPU/GPU mode
-    "gpu":          "🚀",  # RAPIDS GPU mode
-    "done":         "✅",  # done
-    "error":        "❌",  # error
-}
+
 
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     """ 
@@ -665,6 +659,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
             adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
     elif settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['gpu']} Using GPU to calculate PCA...")
+        print_gpu_usage_color()
         from ._pca import pca as _pca
         _pca(adata, layer=layer,n_comps=n_pcs,use_gpu=True,**kwargs)
         adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
@@ -852,14 +847,8 @@ def neighbors(
     and in later versions it will become a hard dependency.
     
     """
-    if settings.mode =='cpu':
+    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
-        sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method=method,metric=metric,
-                         metric_kwds=metric_kwds,
-                         key_added=key_added,copy=copy)
-    elif settings.mode == 'cpu-gpu-mixed':
-        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate neighbors...")
         sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
@@ -886,6 +875,7 @@ def umap(adata, **kwargs):
 
         elif settings.mode == 'cpu-gpu-mixed':
             print(f"{EMOJI['gpu']} Using torch GPU to calculate UMAP...")
+            print_gpu_usage_color()
             from ._umap import umap as _torch_umap
             _torch_umap(adata, method='torchdr', **kwargs)
 
@@ -905,11 +895,8 @@ def louvain(adata, **kwargs):
     Louvain clustering
     '''
 
-    if settings.mode =='cpu':
+    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Louvain...")
-        sc.tl.louvain(adata, **kwargs)
-    elif settings.mode == 'cpu-gpu-mixed':
-        print(f"{EMOJI['gpu']} Using torch GPU to calculate Louvain...")
         sc.tl.louvain(adata, **kwargs)
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Louvain...")
@@ -921,11 +908,8 @@ def leiden(adata, **kwargs):
     leiden clustering
     '''
 
-    if settings.mode =='cpu':
+    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Leiden...")
-        sc.tl.leiden(adata, **kwargs)
-    elif settings.mode == 'cpu-gpu-mixed':
-        print(f"{EMOJI['gpu']} Using torch GPU to calculate Leiden...")
         sc.tl.leiden(adata, **kwargs)
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Leiden...")
@@ -991,14 +975,30 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
     }
 
 
+def tsne(adata,**kwargs):
+    '''
+    t-SNE
+    '''
+    if settings.mode == 'cpu':
+        print(f"{EMOJI['cpu']} Using Scanpy CPU t-SNE...")
+        sc.tl.tsne(adata, **kwargs)
+    elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate t-SNE...")
+        print_gpu_usage_color()
+        from ._tsne import tsne as _tsne
+        _tsne(adata, **kwargs)
+    else:
+        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate t-SNE...")
+        import rapids_singlecell as rsc
+        rsc.tl.tsne(adata, **kwargs)
+
+
 def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
         transformer=None, metric='euclidean',verbose=False,
         key_added=None,random_state=0,repulsive_fraction=0.7,constraint=None):
     '''
     MDE
     '''
-    
-    
     import pymde
     import logging
     import time

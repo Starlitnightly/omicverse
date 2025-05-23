@@ -18,7 +18,7 @@ from scanpy._compat import old_positionals
 from scanpy.get import _get_obs_rep
 from scanpy.preprocessing._scrublet import pipeline
 from scanpy.preprocessing._scrublet.core import Scrublet
-
+from .._settings import EMOJI
 from __future__ import annotations
 
 from importlib.util import find_spec
@@ -207,7 +207,7 @@ def scrublet(
     if copy:
         adata = adata.copy()
 
-    start = logg.info("Running Scrublet-CPU-GPU-Mixed")
+    start = logg.info(f"Running Scrublet{EMOJI['start']}")
 
     adata_obs = adata.copy()
 
@@ -318,7 +318,7 @@ def scrublet(
         adata.obs["predicted_doublet"] = scrubbed["obs"]["predicted_doublet"]
         adata.uns["scrublet"] = scrubbed["uns"]
 
-    logg.info("    Scrublet finished", time=start)
+    logg.info(f"    Scrublet finished{EMOJI['done']}", time=start)
 
     return adata if copy else None
 
