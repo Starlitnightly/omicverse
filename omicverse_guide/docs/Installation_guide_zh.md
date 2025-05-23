@@ -1,112 +1,112 @@
-# 🧬 OmicVerse Installation Guide
+# 🧬 OmicVerse 安装指南
 
-> 📚 For Chinese version, please check [安装指南 (中文版)](Installation_guide_zh.md)
+> 📚 For English version, please check [Installation Guide (English)](Installation_guild.md)
 
-## 📋 Prerequisites
+## 📋 前提条件
 
-OmicVerse can be installed via conda or pip, but you must install `PyTorch` first.
+OmicVerse 可以通过 conda 或 pip 安装，但首先需要安装 `PyTorch`。
 
 !!! note 
-    We recommend installing within a `conda` environment to avoid dependency conflicts. Use `pip install -U omicverse` to update existing installations.
+    我们建议在 `conda` 环境中安装，以避免依赖冲突。使用 `pip install -U omicverse` 更新现有安装。
 
-### Platform-Specific Requirements
+### 平台特定要求
 
-- **Windows (WSL)**: Install the [WSL subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and configure conda within WSL
-- **Windows (Native)**: From version `1.6.2`, OmicVerse supports native Windows (requires `torch` and `torch_geometric`)
-- **Linux**: Install [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-- **macOS**: Use [`miniforge`](https://github.com/conda-forge/miniforge) or [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/)
+- **Windows (WSL)**: 安装 [WSL 子系统](https://learn.microsoft.com/en-us/windows/wsl/install) 并在 WSL 中配置 conda
+- **Windows (原生)**: 从版本 `1.6.2` 开始，OmicVerse 支持原生 Windows（需要先安装 `torch` 和 `torch_geometric`）
+- **Linux**: 安装 [Anaconda](https://www.anaconda.com/) 或 [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+- **macOS**: 使用 [`miniforge`](https://github.com/conda-forge/miniforge) 或 [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/)
 
-### pip Prerequisites
-- If using conda/mamba: Run `conda install -c anaconda pip` and skip this section
-- Otherwise: Install Python (preferably using pyenv with pyenv-virtualenv)
+### pip 前提条件
+- 如果使用 conda/mamba: 运行 `conda install -c anaconda pip` 并跳过此部分
+- 否则: 安装 Python（最好使用 pyenv 和 pyenv-virtualenv 进行版本管理）
 
-### Apple Silicon Note
-OmicVerse requires a native version of Python on Apple Silicon Macs. Install using a native Apple Silicon version of mambaforge (available via Homebrew with `brew install --cask mambaforge`).
+### Apple Silicon 注意事项
+在搭载 Apple Silicon 的 Mac 上，OmicVerse 只能使用原生版本的 Python 安装。您可以通过原生版本的 Homebrew 安装原生版本的 mambaforge（使用 `brew install --cask mambaforge`）。
 
-## 🚀 Installation Methods
+## 🚀 安装方法
 
-### 🔥 Quick Installation (Recommended)
+### 🔥 快速安装（推荐）
 
-The easiest way to install OmicVerse is using our installation script:
+安装 OmicVerse 最简单的方法是使用我们的安装脚本：
 
 ```shell
-#Only for Linux
+#仅适用于Linux
 curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
 ```
 
-This script will automatically:
-- Set up the appropriate environment
-- Install the correct PyTorch version for your system
-- Install all required dependencies
-- Configure OmicVerse optimally for your hardware
+该脚本会自动：
+- 设置适当的环境
+- 为您的系统安装正确的 PyTorch 版本
+- 安装所有必需的依赖项
+- 为您的硬件优化配置 OmicVerse
 
-### 📦 Using Conda
+### 📦 使用 Conda
 
-1. **Create and activate environment**:
+1. **创建并激活环境**:
    ```shell
    conda create -n omicverse python=3.10
    conda activate omicverse
    ```
 
-2. **Install PyTorch and PyG**:
+2. **安装 PyTorch 和 PyG**:
    ```shell
-   # For CUDA (check your version with 'nvcc --version')
+   # 对于 CUDA（使用 'nvcc --version' 检查您的版本）
    conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
    
-   # OR for CPU only
+   # 或仅使用 CPU
    conda install pytorch torchvision torchaudio cpuonly -c pytorch
    
-   # Install PyG
+   # 安装 PyG
    conda install pyg -c pyg
    ```
 
-3. **Install OmicVerse**:
+3. **安装 OmicVerse**:
    ```shell
    conda install omicverse -c conda-forge
    ```
 
-4. **Verify installation**:
+4. **验证安装**:
    ```shell
    python -c "import omicverse"
    ```
 
-### 📦 Using pip
+### 📦 使用 pip
 
 <ol>
-<li><strong>Install PyTorch</strong>:
-   <pre><code class="language-bash"># For CUDA 11.8
+<li><strong>安装 PyTorch</strong>:
+   <pre><code class="language-bash"># 对于 CUDA 11.8
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    
-# OR for CPU only
+# 或仅使用 CPU
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu</code></pre>
 </li>
 
-<li><strong>Install PyG</strong>:
-   <pre><code class="language-bash"># Install base PyG
+<li><strong>安装 PyG</strong>:
+   <pre><code class="language-bash"># 安装基础 PyG
 pip install torch_geometric
    
-# Check versions
+# 检查版本
 python -c "import torch; print(torch.__version__)"
 python -c "import torch; print(torch.version.cuda)"</code></pre>
 </li>
 
-<li><strong>Install PyG Extensions</strong>: 
+<li><strong>安装 PyG 扩展</strong>: 
 
-   <h4>⚠️ Not Recommended Method</h4>
-   <pre><code class="language-bash"># For Windows with CPU
+   <h4>⚠️ 不推荐方法</h4>
+   <pre><code class="language-bash"># 对于仅使用 CPU 的 Windows
 pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-${TORCH}+cpu.html
    
-# For systems with CUDA
+# 对于使用 CUDA 的系统
 pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html</code></pre>
 
-   <p>Replace <code class="language-bash">${TORCH}</code> and <code>${CUDA}</code> with your version numbers:</p>
+   <p>将 <code>${TORCH}</code> 和 <code>${CUDA}</code> 替换为您的版本号：</p>
    
    <table>
      <thead>
        <tr>
-         <th>PyTorch Version</th>
-         <th>TORCH Value</th>
-         <th>CUDA Options</th>
+         <th>PyTorch 版本</th>
+         <th>TORCH 值</th>
+         <th>CUDA 选项</th>
        </tr>
      </thead>
      <tbody>
@@ -158,21 +158,21 @@ pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https:
      </tbody>
    </table>
    
-   <p>Example commands:</p>
-   <pre><code class="language-bash"># For PyTorch 2.7 with CUDA 12.4
+   <p>示例命令：</p>
+   <pre><code class="language-bash"># 对于 PyTorch 2.7 和 CUDA 12.4
 pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cu124.html
    
-# For PyTorch 2.3 with CUDA 12.1
+# 对于 PyTorch 2.3 和 CUDA 12.1
 pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.3.0+cu121.html
    
-# For PyTorch 2.2 with CUDA 11.8
+# 对于 PyTorch 2.2 和 CUDA 11.8
 pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.2.0+cu118.html</code></pre>
 
-   <h4>✅ Recommended Method</h4>
+   <h4>✅ 推荐方法</h4>
    <pre><code class="language-bash">conda install -c conda-forge pytorch_scatter pytorch_sparse pytorch_cluster pytorch_spline_conv</code></pre>
 </li>
 
-<li><strong>Linux GCC Setup</strong> (Linux only):
+<li><strong>Linux GCC 配置</strong>（仅适用于 Linux）:
    <pre><code class="language-bash"># Ubuntu
 sudo apt update
 sudo apt install build-essential
@@ -180,84 +180,85 @@ sudo apt install build-essential
 # CentOS
 sudo yum group install "Development Tools"
    
-# Verify GCC
+# 验证 GCC
 gcc --version</code></pre>
 </li>
 
-<li><strong>Install OmicVerse</strong>:
-   <pre><code class="language-bash"># Basic installation
+<li><strong>安装 OmicVerse</strong>:
+   <pre><code class="language-bash"># 基本安装
 pip install -U omicverse
    
-# Install Numba for performance optimization
+# 安装 Numba 以优化性能
 pip install -U numba
    
-# OR full installation with spatial RNA-seq support
+# 或带有空间转录组支持的完整安装
 pip install omicverse[full]</code></pre>
 </li>
 
-<li><strong>Verify installation</strong>:
+<li><strong>验证安装</strong>:
    <pre><code class="language-bash">python -c "import omicverse"</code></pre>
 </li>
 </ol>
 
-## 🔧 Advanced Options
+## 🔧 高级选项
 
-### Nightly Version
+### 开发版本
 
 ```shell
-# Option 1: Clone and install
+# 选项 1: 克隆并安装
 git clone https://github.com/Starlitnightly/omicverse.git
 cd omicverse
 pip install .
 
-# Option 2: Direct install from GitHub
+# 选项 2: 直接从 GitHub 安装
 pip install git+https://github.com/Starlitnightly/omicverse.git
 ```
 
-### GPU-Accelerated Installation
+### GPU 加速安装
 
 ```shell
-# Using conda/mamba
+# 使用 conda/mamba
 conda env create -f conda/omicverse_gpu.yml
-# OR
+# 或
 mamba env create -f conda/omicverse_gpu.yml
 ```
 
 ### Docker
 
-Docker images are available on [Docker Hub](https://hub.docker.com/r/starlitnightly/omicverse).
+Docker 镜像可在 [Docker Hub](https://hub.docker.com/r/starlitnightly/omicverse) 上获取。
 
-## 📊 Jupyter Lab Setup
+## 📊 Jupyter Lab 设置
 
-We recommend Jupyter Lab for interactive analysis:
+我们推荐使用 Jupyter Lab 进行交互式分析：
 
 ```shell
 pip install jupyter-lab
 ```
 
-After installation, run `jupyter-lab` in your terminal (from the omicverse environment). A URL will appear that you can open in your browser.
+安装完成后，在终端中（从 omicverse 环境下）运行 `jupyter-lab`。将会出现一个 URL，您可以在浏览器中打开它。
 
 ![jupyter-light](img/light_jupyter.jpg#gh-light-mode-only)
 ![jupyter-dark](img/dark_jupyter.jpg#gh-dark-mode-only)
 
-## 🛠️ Development Setup
+## 🛠️ 开发环境设置
 
-For development:
+对于开发：
 
 ```shell
 pip install -e ".[dev,docs]"
 ```
 
-## ❓ Troubleshooting
+## ❓ 故障排除
 
-- **Package installation issues**: If pip cannot install certain packages (e.g., scikit-misc), try conda:
+- **包安装问题**: 如果 pip 无法安装某些包（例如 scikit-misc），请尝试使用 conda：
   ```shell
   conda install scikit-misc -c conda-forge -c bioconda
   ```
 
-- **Apple Silicon (M1/M2) issues**:
+- **Apple Silicon (M1/M2) 问题**:
   ```shell
   conda install s_gd2 -c conda-forge
   pip install -U omicverse
   conda install pytorch::pytorch torchvision torchaudio -c pytorch
   ```
+  
