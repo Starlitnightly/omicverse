@@ -198,7 +198,7 @@ def umap(  # noqa: PLR0913, PLR0915
 
     if random_state != 0:
         adata.uns[key_uns]["params"]["random_state"] = random_state
-    random_state = check_random_state(random_state)
+    #random_state = check_random_state(random_state)
 
     neigh_params = neighbors["params"]
     X = _choose_representation(
