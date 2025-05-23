@@ -10,6 +10,8 @@ from anndata import AnnData
 from packaging.version import Version
 from sklearn.utils import check_random_state
 
+from .._settings import EMOJI
+
 
 
 from scanpy import logging as logg
@@ -217,7 +219,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         covariance matrix.
 
     """
-    logg_start = logg.info("computing PCA")
+    logg_start = logg.info(f"computing PCA{EMOJI['start']}")
     if layer is not None and chunked:
         # Current chunking implementation relies on pca being called on X
         msg = "Cannot use `layer` and `chunked` at the same time."
@@ -226,7 +228,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     # chunked calculation is not randomized, anyways
     if svd_solver in {"auto", "randomized"} and not chunked:
         logg.info(
-            "Note that scikit-learn's randomized PCA might not be exactly "
+            f"{EMOJI['warning']} scikit-learn's randomized PCA might not be exactly "
             "reproducible across different computational platforms. For exact "
             "reproducibility, choose `svd_solver='arpack'`."
         )
@@ -293,13 +295,14 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             import gc
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             X_pca = zeros((X.shape[0], n_comps), X.dtype)
+            torch.cuda.reset_peak_memory_stats(device)
             pca_ = IncrementalPCA(n_components=n_comps, device=device, 
                                   batch_size=chunk_size,
                                   **incremental_pca_kwargs)
             pca_.fit(X, check_input=True)
             X_pca = pca_.transform(X)
             # Reset GPU memory stats before fitting.
-            torch.cuda.reset_peak_memory_stats(device)
+            
             del pca_
             torch.cuda.empty_cache()
             gc.collect()
@@ -448,7 +451,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             variance_ratio=pca_.explained_variance_ratio_,
         )
 
-        logg.info("    finished", time=logg_start)
+        logg.info(f"    finished{EMOJI['done']}", time=logg_start)
         logg.debug(
             "and added\n"
             f"    {key_obsm!r}, the PCA coordinates (adata.obs)\n"
@@ -458,7 +461,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         )
         return adata if copy else None
     else:
-        logg.info("    finished", time=logg_start)
+        logg.info(f"    finished{EMOJI['done']}", time=logg_start)
         if return_info:
             return (
                 X_pca,
