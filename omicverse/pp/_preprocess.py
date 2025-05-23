@@ -847,17 +847,9 @@ def neighbors(
     and in later versions it will become a hard dependency.
     
     """
-    if settings.mode =='cpu':
+    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method=method,metric=metric,
-                         metric_kwds=metric_kwds,
-                         key_added=key_added,copy=copy)
-    elif settings.mode == 'cpu-gpu-mixed':
-        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate neighbors...")
-        print_gpu_usage_color()
-        from ._neighbors import neighbors as _neighbors
-        _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
