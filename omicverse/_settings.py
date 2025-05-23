@@ -2,7 +2,7 @@
 
 class omicverseConfig:
 
-    def __init__(self,mode='cpu-gpu-mixed'):
+    def __init__(self,mode='cpu'):
         self.mode = mode
 
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):

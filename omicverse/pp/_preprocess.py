@@ -664,19 +664,13 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
             adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
             adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
     elif settings.mode == 'cpu-gpu-mixed':
-        if sc.__version__ <'1.10':
-            adata_mock=sc.AnnData(adata.layers[layer],obs=adata.obs,var=adata.var)
-            sc.pp.pca(adata_mock, n_comps=n_pcs)
-            adata.obsm[key + '|X_pca'] = adata_mock.obsm['X_pca']
-            adata.varm[key + '|pca_loadings'] = adata_mock.varm['PCs']
-            adata.uns[key + '|pca_var_ratios'] = adata_mock.uns['pca']['variance_ratio']
-            adata.uns[key + '|cum_sum_eigenvalues'] = adata_mock.uns['pca']['variance']
-        else:
-            sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
-            adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
-            adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
-            adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
-            adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
+        print(f"{EMOJI['gpu']} Using GPU to calculate PCA...")
+        from ._pca import pca as _pca
+        _pca(adata, layer=layer,n_comps=n_pcs,use_gpu=True,**kwargs)
+        adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
+        adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
+        adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
+        adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
     else:
         import rapids_singlecell as rsc
         rsc.pp.pca(adata, layer=layer,n_comps=n_pcs)
@@ -859,16 +853,19 @@ def neighbors(
     
     """
     if settings.mode =='cpu':
+        print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
     elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate neighbors...")
         sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
     else:
+        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate neighbors...")
         import rapids_singlecell as rsc
         rsc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,algorithm=method,metric=metric,
@@ -888,7 +885,7 @@ def umap(adata, **kwargs):
             sc.tl.umap(adata, **kwargs)
 
         elif settings.mode == 'cpu-gpu-mixed':
-            print(f"{EMOJI['mixed']} Using torchdr mixed CPU/GPU UMAP...")
+            print(f"{EMOJI['gpu']} Using torch GPU to calculate UMAP...")
             from ._umap import umap as _torch_umap
             _torch_umap(adata, method='torchdr', **kwargs)
 
@@ -909,10 +906,13 @@ def louvain(adata, **kwargs):
     '''
 
     if settings.mode =='cpu':
+        print(f"{EMOJI['cpu']} Using Scanpy CPU Louvain...")
         sc.tl.louvain(adata, **kwargs)
     elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['gpu']} Using torch GPU to calculate Louvain...")
         sc.tl.louvain(adata, **kwargs)
     else:
+        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Louvain...")
         import rapids_singlecell as rsc
         rsc.tl.louvain(adata, **kwargs)
 
@@ -922,10 +922,13 @@ def leiden(adata, **kwargs):
     '''
 
     if settings.mode =='cpu':
+        print(f"{EMOJI['cpu']} Using Scanpy CPU Leiden...")
         sc.tl.leiden(adata, **kwargs)
     elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['gpu']} Using torch GPU to calculate Leiden...")
         sc.tl.leiden(adata, **kwargs)
     else:
+        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Leiden...")
         import rapids_singlecell as rsc
         rsc.tl.leiden(adata, **kwargs)
 

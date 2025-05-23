@@ -610,10 +610,12 @@ def pca_torch(
             from torchdr import PCA
         except ImportError:
             raise ImportError("torchdr is not installed. Please install it using `pip install torchdr`.")
-   
+        import torch
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         pca = PCA(
             n_components=n_prin_comps, random_state=None, svd_driver=svd_solver,
-            device="cuda",
+            device=device,
         ).fit(X_obs)
     else:
         from sklearn.decomposition import PCA
