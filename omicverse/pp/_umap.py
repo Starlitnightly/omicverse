@@ -11,7 +11,15 @@ from scanpy._compat import old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView
 from scanpy.tools._utils import _choose_representation, get_init_pos_from_paga
-from .._settings import EMOJI
+#from .._settings import EMOJI
+
+EMOJI = {
+    "start": "🚀",
+    "done": "✅",
+    "error": "❌",
+    "warning": "⚠️",
+    "info": "ℹ️",
+}
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -53,7 +61,7 @@ def umap(  # noqa: PLR0913, PLR0915
     random_state: _LegacyRandom = 0,
     a: float | None = None,
     b: float | None = None,
-    method: Literal["umap", "rapids","torchdr"] = "umap",
+    method: Literal["umap", "rapids","torchdr","mde"] = "umap",
     key_added: str | None = None,
     neighbors_key: str = "neighbors",
     copy: bool = False,
@@ -127,7 +135,7 @@ def umap(  # noqa: PLR0913, PLR0915
         Chosen implementation.
 
         ``'umap'``
-            Umap’s simplical set embedding.
+            Umap's simplical set embedding.
         ``'rapids'``
             GPU accelerated implementation.
 
@@ -255,9 +263,109 @@ def umap(  # noqa: PLR0913, PLR0915
             random_state=random_state,
         )
         X_umap = umap.fit(X_contiguous).embedding_.detach().cpu().numpy()
+
+        
         del umap
         import gc
         torch.cuda.empty_cache()
+        gc.collect()
+
+    elif method == "mde":
+        try:
+            from pymde import MDE, constraints, penalties, preprocess
+            import torch
+        except ImportError as err:
+            raise ImportError("Please install pymde package via `pip install pymde`") from err
+            
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Get neighbor graph from connectivities
+        connectivities = neighbors["connectivities"]
+        
+        # Convert to PyTorch sparse tensor
+        rows, cols = connectivities.nonzero()
+        edges = torch.tensor(np.vstack([rows, cols]).T, dtype=torch.int64)
+        
+        # Filter out self-loops and ensure each edge appears only once
+        mask = edges[:, 0] != edges[:, 1]
+        edges = edges[mask]
+        
+        # Sort edges to ensure i < j
+        sorted_edges = torch.zeros_like(edges)
+        sorted_edges[:, 0] = torch.min(edges[:, 0], edges[:, 1])
+        sorted_edges[:, 1] = torch.max(edges[:, 0], edges[:, 1])
+        edges = torch.unique(sorted_edges, dim=0)
+        
+        # Create weights for edges based on connectivities
+        weights = torch.ones(edges.shape[0], device=device)
+        
+        # Add dissimilar edges for better embedding
+        n_similar = edges.shape[0]
+        n_dissimilar = n_similar // 2  # Use half as many dissimilar edges
+        
+        try:
+            # Try to generate dissimilar edges
+            dissimilar_edges = preprocess.dissimilar_edges(
+                X.shape[0], 
+                num_edges=n_dissimilar, 
+                similar_edges=edges
+            )
+            
+            # Combine similar and dissimilar edges
+            all_edges = torch.cat([edges, dissimilar_edges.to(edges.device)])
+            
+            # Create weights: positive for similar edges, negative for dissimilar
+            all_weights = torch.cat([
+                weights,  # Positive weights for similar edges
+                -0.5 * torch.ones(dissimilar_edges.shape[0], device=device)  # Negative weights for dissimilar
+            ])
+            
+            # Create PushAndPull distortion function
+            distortion_function = penalties.PushAndPull(
+                weights=all_weights,
+                attractive_penalty=penalties.Log1p,
+                repulsive_penalty=penalties.Log,
+            )
+            
+            # Use the combined edges
+            edges_to_use = all_edges
+            
+        except Exception as e:
+            # Fallback to simple quadratic penalty if dissimilar edges fail
+            logg.warning(f"Failed to generate dissimilar edges: {str(e)}. Using quadratic penalty instead.")
+            distortion_function = penalties.Quadratic(weights)
+            edges_to_use = edges
+        
+        n_epochs = 500 if maxiter is None else maxiter
+        
+        # Create MDE problem with appropriate penalty
+        mde = MDE(
+            n_items=X.shape[0],
+            embedding_dim=n_components,
+            edges=edges_to_use.to(device),
+            distortion_function=distortion_function,
+            constraint=constraints.Standardized(),
+            device=device
+        )
+        
+        # Compute embedding
+        embedding = mde.embed(
+            verbose=settings.verbosity > 3,
+            max_iter=n_epochs
+        )
+        
+        X_umap = embedding.cpu().numpy()
+        
+        # Clean up
+        del mde, embedding, edges, weights
+        if 'all_edges' in locals():
+            del all_edges
+        if 'all_weights' in locals():
+            del all_weights
+        if 'distortion_function' in locals():
+            del distortion_function
+        torch.cuda.empty_cache()
+        import gc
         gc.collect()
         
     elif method == "rapids":
@@ -306,3 +414,6 @@ def umap(  # noqa: PLR0913, PLR0915
         ),
     )
     return adata if copy else None
+
+
+
