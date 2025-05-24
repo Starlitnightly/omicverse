@@ -96,6 +96,7 @@ EMOJI = {
     "done":         "✅",  # done
     "error":        "❌",  # error
     "bar":          "📊",  # usage bar
+    "check_mark":   "✅",  # check mark
 }
 
 settings = omicverseConfig()
