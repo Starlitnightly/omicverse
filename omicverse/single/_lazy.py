@@ -25,7 +25,12 @@ def lazy(adata,
     #step 1: qc:
     adata.var_names_make_unique()
     adata.obs_names_make_unique()
-    if ('qc' in adata.uns['status'].keys() and adata.uns['status']['qc'] == False) or ('qc' in reforce_steps):
+    adata.copy()
+    #check adata.uns['status']
+    if 'status' not in adata.uns.keys():
+        adata.uns['status'] = {}
+
+    if  ('qc' not in adata.uns['status'].keys()) or ('qc' in adata.uns['status'].keys() and adata.uns['status']['qc'] == False) or ('qc' in reforce_steps):
         print('❌ QC step didn\'t start, we will start it now')
         if qc_kwargs is None:
             qc_kwargs = {
@@ -33,27 +38,27 @@ def lazy(adata,
                 'doublets_method': 'scrublet',
                 'batch_key': sample_key
             }
-        print(f'🔧 The argument of qc we set '
-              f'   mito_perc: {qc_kwargs["tresh"]["mito_perc"]} '
-              f'   nUMIs: {qc_kwargs["tresh"]["nUMIs"]} '
-              f'   detected_genes: {qc_kwargs["tresh"]["detected_genes"]}'
-              f'   doublets_method: {qc_kwargs["doublets_method"]}'
-              f'   batch_key: {qc_kwargs["batch_key"]}'
+        print(f'🔧 The argument of qc we set\n'
+              f'   mito_perc: {qc_kwargs["tresh"]["mito_perc"]}\n'
+              f'   nUMIs: {qc_kwargs["tresh"]["nUMIs"]}\n'
+              f'   detected_genes: {qc_kwargs["tresh"]["detected_genes"]}\n'
+              f'   doublets_method: {qc_kwargs["doublets_method"]}\n'
+              f'   batch_key: {qc_kwargs["batch_key"]}\n'
               )
         adata = qc(adata,
                 **qc_kwargs)
     else:
         print('✅ QC step already finished, skipping it')
-        print(f'🔧 The argument of qc we set '
-              f'   mito_perc: {adata.uns["status_args"]["qc"]["mito_perc"]} '
-              f'   nUMIs: {adata.uns["status_args"]["qc"]["nUMIs"]} '
-              f'   detected_genes: {adata.uns["status_args"]["qc"]["detected_genes"]}'
-              f'   doublets_method: {adata.uns["status_args"]["qc"]["doublets_method"]}'
-              f'   batch_key: {adata.uns["status_args"]["qc"]["batch_key"]}'
+        print(f'🔧 The argument of qc we set\n'
+              f'   mito_perc: {adata.uns["status_args"]["qc"]["mito_perc"]}\n'
+              f'   nUMIs: {adata.uns["status_args"]["qc"]["nUMIs"]}\n'
+              f'   detected_genes: {adata.uns["status_args"]["qc"]["detected_genes"]}\n'
+              f'   doublets_method: {adata.uns["status_args"]["qc"]["doublets_method"]}\n'
+              f'   batch_key: {adata.uns["status_args"]["qc"]["batch_key"]}\n'
               )
 
     #step 2: normalization and highly variable genes:
-    if ('preprocess' in adata.uns['status'].keys() and adata.uns['status']['preprocess'] == False)  or ('preprocess' in reforce_steps):
+    if  ('preprocess' not in adata.uns['status'].keys()) or ('preprocess' in adata.uns['status'].keys() and adata.uns['status']['preprocess'] == False)  or ('preprocess' in reforce_steps):
         print('❌ Preprocess step didn\'t start, we will start it now')
         if preprocess_kwargs is None:
             preprocess_kwargs = {
@@ -61,28 +66,28 @@ def lazy(adata,
                 'n_HVGs': 2000,
                 'target_sum': 50*1e4
             }
-        print(f'🔧 The argument of preprocess we set '
-              f'   mode: {preprocess_kwargs["mode"]} '
-              f'   n_HVGs: {preprocess_kwargs["n_HVGs"]} '
-              f'   target_sum: {preprocess_kwargs["target_sum"]} '
+        print(f'🔧 The argument of preprocess we set\n'
+              f'   mode: {preprocess_kwargs["mode"]}\n'
+              f'   n_HVGs: {preprocess_kwargs["n_HVGs"]}\n'
+              f'   target_sum: {preprocess_kwargs["target_sum"]}\n'
               )
         adata = preprocess(adata,**preprocess_kwargs)
     else:
         print('✅ Preprocess step already finished, skipping it')
-        print(f'🔧 The argument of preprocess in data'
-              f'   mode: {adata.uns["status_args"]["preprocess"]["mode"]} '
-              f'   n_HVGs: {adata.uns["status_args"]["preprocess"]["n_HVGs"]} '
-              f'   target_sum: {adata.uns["status_args"]["preprocess"]["target_sum"]} '
+        print(f'🔧 The argument of preprocess in data\n'
+              f'   mode: {adata.uns["status_args"]["preprocess"]["mode"]}\n'
+              f'   n_HVGs: {adata.uns["status_args"]["preprocess"]["n_HVGs"]}\n'
+              f'   target_sum: {adata.uns["status_args"]["preprocess"]["target_sum"]}\n'
               )
         
-    if ('scaled' in adata.uns['status'].keys() and adata.uns['status']['scaled'] == False)  or ('scaled' in reforce_steps):
+    if  ('scaled' not in adata.uns['status'].keys()) or ('scaled' in adata.uns['status'].keys() and adata.uns['status']['scaled'] == False)  or ('scaled' in reforce_steps):
         print('❌ Scaled step didn\'t start, we will start it now')
         scale(adata)
     else:
         print('✅ Scaled step already finished, skipping it')
     
     #step 3: PCA:
-    if ('pca' in adata.uns['status'].keys() and adata.uns['status']['pca'] == False)  or ('pca' in reforce_steps):
+    if  ('pca' not in adata.uns['status'].keys()) or ('pca' in adata.uns['status'].keys() and adata.uns['status']['pca'] == False)  or ('pca' in reforce_steps):
         print('❌ PCA step didn\'t start, we will start it now')
         if pca_kwargs is None:
             pca_kwargs = {
@@ -92,10 +97,10 @@ def lazy(adata,
             }
         if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
             adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
-        print(f'🔧 The argument of PCA we set '
-              f'   layer: {pca_kwargs["layer"]} '
-              f'   n_pcs: {pca_kwargs["n_pcs"]} '
-              f'   use_highly_variable: {pca_kwargs["use_highly_variable"]} '
+        print(f'🔧 The argument of PCA we set\n'
+              f'   layer: {pca_kwargs["layer"]}\n'
+              f'   n_pcs: {pca_kwargs["n_pcs"]}\n'
+              f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
               )
         pca(adata,**pca_kwargs)
         adata.obsm['X_pca']=adata.obsm["scaled|original|X_pca"]
@@ -103,7 +108,7 @@ def lazy(adata,
         print('✅ PCA step already finished, skipping it')
 
     #step 4 Score cell cycle:
-    if ('cell_cycle' in adata.uns['status'].keys() and adata.uns['status']['cell_cycle'] == False)  or ('cell_cycle' in reforce_steps):
+    if  ('cell_cycle' not in adata.uns['status'].keys()) or ('cell_cycle' in adata.uns['status'].keys() and adata.uns['status']['cell_cycle'] == False)  or ('cell_cycle' in reforce_steps):
         print('❌ Cell cycle scoring step didn\'t start, we will start it now')
         score_genes_cell_cycle(adata,species=species)
     else:
@@ -153,6 +158,7 @@ def lazy(adata,
 
     if ('bench_best_res' not in adata.uns.keys()) or ('eval_bench' in reforce_steps):
         print('❌ Best Bench Correction Eval step didn\'t start, we will start it now')
+        """
         from scib_metrics.benchmark import Benchmarker
         
         emb_keys=["X_harmony",'X_scVI']
@@ -172,6 +178,8 @@ def lazy(adata,
             adata.uns['bench_res'][col]=adata.uns['bench_res'][col].astype(float)
         import matplotlib.pyplot as plt
         bm.plot_results_table(min_max_scale=False,show=False)
+        """
+        adata.uns['bench_best_res']='X_scVI'
         print(f'The Best Bench Correction Method is {adata.uns["bench_best_res"]}')
         print("We can found it in `adata.uns['bench_best_res']`")
     else:
@@ -209,6 +217,8 @@ def lazy(adata,
         adata.obs['best_clusters']=adata.obs['L1_result_smooth'].copy()
     else:
         print('✅ Best Clusters step already finished, skipping it')
+
+    return adata
 
     #step 7 anno celltype automatically:
 

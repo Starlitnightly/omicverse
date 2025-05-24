@@ -542,6 +542,8 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 - Added `plot_atlas_view_ov` in VIA
 - Fixed an error when the matrix is too large in `recover_counts`.
 - Added `forceatlas2` to calculate the `X_force_directed`.
+- Added `milo` and `scCODA` to analysis different celltype abundance.
+- Added `memento` to analysis different gene expression.
 
 ### Space Module
 - Added `GASTON` to learn a topographic map of a tissue slice from spatially resolved transcriptomics (SRT) data (#238)
