@@ -6,11 +6,11 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <meta content="Zehua Zeng" name="author"/>
-<link href="../t_aucell/" rel="prev"/>
-<link href="../t_simba/" rel="next"/>
+<link href="../t_deg_single/" rel="prev"/>
+<link href="../t_aucell/" rel="next"/>
 <link href="../../img/favicon.ico" rel="icon"/>
 <meta content="mkdocs-1.4.2, mkdocs-material-9.1.2" name="generator"/>
-<title>Differential expression analysis in single cell - omicverse Readthedocs</title>
+<title>Differential expression analysis [Meta Cell] - omicverse Readthedocs</title>
 <link href="../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -37,7 +37,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#differential-expression-analysis-in-single-cell">
+<a class="md-skip" href="#differential-expression-analysis-meta-cell">
           Skip to content
         </a>
 </div>
@@ -61,7 +61,7 @@
 <div class="md-header__topic" data-md-component="header-topic">
 <span class="md-ellipsis">
             
-              Differential expression analysis in single cell
+              Differential expression analysis [Meta Cell]
             
           </span>
 </div>
@@ -330,18 +330,18 @@
       </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../t_aucell/">
-        Pathway analysis with AUCell
+<a class="md-nav__link" href="../t_deg_single/">
+        Differential expression and celltype analysis [All Cell]
       </a>
 </li>
 <li class="md-nav__item md-nav__item--active">
 <input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
 <label class="md-nav__link md-nav__link--active" for="__toc">
-          Differential expression analysis in single cell
+          Differential expression analysis [Meta Cell]
           <span class="md-nav__icon md-icon"></span>
 </label>
 <a class="md-nav__link md-nav__link--active" href="./">
-        Differential expression analysis in single cell
+        Differential expression analysis [Meta Cell]
       </a>
 <nav aria-label="Table of contents" class="md-nav md-nav--secondary">
 <label class="md-nav__title" for="__toc">
@@ -396,8 +396,13 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../t_simba/">
-        Data integration and batch correction with SIMBA
+<a class="md-nav__link" href="../t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_cellphonedb/">
+        Cell interaction with CellPhoneDB
       </a>
 </li>
 <li class="md-nav__item">
@@ -406,8 +411,8 @@
       </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../t_cellphonedb/">
-        Cell interaction with CellPhoneDB
+<a class="md-nav__link" href="../t_simba/">
+        Data integration and batch correction with SIMBA
       </a>
 </li>
 </ul>
@@ -1675,7 +1680,7 @@ Licensed under the Apache License, Version 2.0.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="differential-expression-analysis-in-single-cell">Differential expression analysis in single cell<a class="anchor-link" href="#differential-expression-analysis-in-single-cell">¶</a></h1><p>Sometimes we need to compare differentially expressed genes or differentially expressed features between two cell types on single cell data, but existing methods focus more on cell-specific gene analysis. Researchers need to transfer bulk RNA-seq analysis to single-cell analysis, which involves interaction between different programming languages or programming tools, adding significantly to the workload of the researcher.</p>
+<h1 id="differential-expression-analysis-meta-cell">Differential expression analysis [Meta Cell]<a class="anchor-link" href="#differential-expression-analysis-meta-cell">¶</a></h1><p>Sometimes we need to compare differentially expressed genes or differentially expressed features between two cell types on single cell data, but existing methods focus more on cell-specific gene analysis. Researchers need to transfer bulk RNA-seq analysis to single-cell analysis, which involves interaction between different programming languages or programming tools, adding significantly to the workload of the researcher.</p>
 <p>Here, we use omicverse's bulk RNA-seq pyDEG method to complete differential expression analysis at the single cell level. We will present two different perspectives, one from the perspective of all cells and one from the perspective of the metacellular.</p>
 <p>Colab_Reproducibility：<a href="https://colab.research.google.com/drive/12faBRh0xT7v6KSy8NCSRqbegF_AEoDXr?usp=sharing">https://colab.research.google.com/drive/12faBRh0xT7v6KSy8NCSRqbegF_AEoDXr?usp=sharing</a></p>
 </div>
