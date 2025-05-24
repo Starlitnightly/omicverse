@@ -178,7 +178,7 @@ pip_install_pkg \
 #————————————————————————
 # 9. Miscellaneous tools 🛠️
 #————————————————————————
-pip_install_pkg backports.tarfile openpyxl 
+#pip_install_pkg backports.tarfile openpyxl 
 
 python -c "import omicverse"
 
