@@ -559,14 +559,12 @@ def get_distance_matrix(X, clusters, labels=None, metric='euclidean'):
     return pairwise_distances(np.array(centers), metric=metric)
 
 def merge_cluster(ad, old_id, new_id, groups):
-    # 假设 groups 是你希望的新类别列表
+    # 假设 categories 已经是一个 list-like，例如：
     categories = make_unique(groups.astype(str))
-
-    # 1) 先把 new_id 列设为 category
+    # 先确保 new_id 列是 categorical
     ad.obs[new_id] = ad.obs[old_id].astype('category')
-
-    # 2) 然后重命名分类
-    ad.obs[new_id].cat.rename_categories(categories, inplace=True)
+    # 再调用 rename_categories()，并把返回结果重新赋回去
+    ad.obs[new_id] = ad.obs[new_id].cat.rename_categories(categories)
     ad.obs[new_id] = ad.obs[new_id].str.split('_').str[0]
     return ad
     
