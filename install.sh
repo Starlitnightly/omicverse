@@ -180,6 +180,6 @@ pip_install_pkg \
 #————————————————————————
 #pip_install_pkg backports.tarfile openpyxl 
 
-python -c "import omicverse"
+python -c "import omicverse as ov; ov.plot_set()"
 
 echo "🎉 All set! (torch==$TORCH_VERSION, CUDA tag==$CUDA_TAG) 🚀"
