@@ -1,7 +1,7 @@
 import scanpy as sc
 from ..externel.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
 from ..pp import preprocess
-
+from .._settings import add_reference
 def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         mt_startwith='MT-',**kwargs):
     """
@@ -34,11 +34,13 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         #adata.raw = adata
         adata = feature_selection(adata, 
                                   by = mode, n_top_genes = n_svgs)
+        add_reference(adata,'PROST','spatial variable gene selection with PROST')
         #print(f'{n_svgs} SVGs are selected!')
     elif mode=='pearsonr':
         from ..pp import preprocess
         adata=preprocess(adata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
         adata.var['space_variable_features']=adata.var['highly_variable_features']
+        add_reference(adata,'scanpy','spatial variable gene selection with pearsonr')
         #adata.raw = adata
         #adata = adata[:, adata.var.highly_variable_features]
     elif mode=='spateo':
@@ -55,7 +57,7 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         adata.var.loc[sig_df.index, 'space_variable_features'] = True
         print(f'{len(sig_df)} SVGs are selected!')
         print('In mode of spateo, the SVGs are selected based on the spatial expression pattern.')
-
+        add_reference(adata,'spateo','spatial variable gene selection with spateo')
     else:
         raise ValueError(f"mode {mode} is not supported")
     

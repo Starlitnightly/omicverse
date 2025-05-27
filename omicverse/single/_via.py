@@ -13,6 +13,7 @@ from typing import Union,Tuple
 
 from ..via.utils_via import *
 from ..via.plotting_via import *
+from .._settings import add_reference
 #from ..via.utils_via import sc_loc_ofsuperCluster_PCAspace,compute_velocity_on_grid
 
 def hematopoiesis()->anndata.AnnData:
@@ -143,7 +144,9 @@ class pyVIA(object):
         """calculate the via graph and pseudotime
         
         """
+
         self.model.run_VIA()
+        add_reference(self.adata,'VIA','trajectory inference with VIA')
 
     def get_piechart_dict(self,label:int=0,clusters:str='')->dict:
         """

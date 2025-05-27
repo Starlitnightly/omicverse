@@ -4,6 +4,7 @@ from typing import Any
 import scanpy as sc
 import numpy as np
 import pandas as pd
+from .._settings import add_reference
 
 class STT(object):
     """Class representing the object of STT."""
@@ -31,6 +32,7 @@ class STT(object):
         sc.tl.leiden(adata_aggr,resolution = 0.15)
         self.adata.obs['joint_leiden'] = adata_aggr.obs['leiden'].values
         print(f"...estimate stage: {len(self.adata.obs['joint_leiden'].unique())}")
+        add_reference(self.adata,'STT','spatial transition tensor with STT')
 
     def train(self,
             n_states: int = 9,
@@ -52,6 +54,7 @@ class STT(object):
         self.adata_aggr.obsm[f'X_{self.spatial_loc}']=self.adata.obsm[self.spatial_loc]
         self.adata_aggr.obsm[f'X_{self.spatial_loc}_aggr']=self.adata.obsm[self.spatial_loc]
         self.adata.obsm[f'X_{self.spatial_loc}_aggr']=self.adata.obsm[self.spatial_loc]
+        add_reference(self.adata,'STT','spatial transition tensor with STT')
 
     def load(self,adata,adata_aggr):
         """
@@ -59,6 +62,7 @@ class STT(object):
         """
         self.adata=adata
         self.adata_aggr=adata_aggr
+        add_reference(self.adata,'STT','spatial transition tensor with STT')
 
     def compute_pathway(self,pathway_dict):
         """

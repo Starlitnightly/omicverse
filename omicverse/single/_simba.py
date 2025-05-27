@@ -8,7 +8,7 @@ import torch
 import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
-
+from .._settings import add_reference
 
 simba_install=False
 
@@ -131,6 +131,7 @@ class pySIMBA(object):
         dict_config['workers'] = num_workers
         ## start training
         si.tl.pbg_train(pbg_params = dict_config, auto_wd=auto_wd, save_wd=save_wd, output=output)
+        add_reference(self.adata,'SIMBA','batch correction with SIMBA')
 
     def load(self,model_path=None):
         """

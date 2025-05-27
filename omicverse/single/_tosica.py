@@ -26,6 +26,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 import time
 import anndata
+from .._settings import add_reference
 
 
 
@@ -178,6 +179,7 @@ class pyTOSICA(object):
             self.tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
             torch.save(self.model.state_dict(), self.project_path+"/model-{}.pth".format(epoch))
         print('Training finished!')
+        add_reference(self.adata,'TOSICA','cell type classification with TOSICA')
         return self.model
     
     def save(self,save_path=None):
@@ -310,6 +312,7 @@ class pyTOSICA(object):
         new.obs.index = pre_adata.obs.index
         new.obs['Prediction'] = new.obs['Prediction'].map(dic)
         new.obs[pre_adata.obs.columns] = pre_adata.obs[pre_adata.obs.columns].values    
+        add_reference(self.adata,'TOSICA','cell type classification with TOSICA')
 
         return(new)
 

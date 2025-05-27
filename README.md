@@ -153,6 +153,7 @@ The table contains the tools have been published
   <tr>
     <td align="center">inmoose<br><a href="https://github.com/epigenelabs/inmoose">📦</a> <a href="">📖</a></td>
     <td align="center">memento<br><a href="https://github.com/yelabucsf/scrna-parameter-estimation">📦</a> <a href="https://www.cell.com/cell/fulltext/S0092-8674(24)01144-9">📖</a></td>
+    <td align="center">GSEApy<br><a href="https://github.com/zqfang/GSEApy">📦</a> <a href="https://academic.oup.com/bioinformatics/article-abstract/39/1/btac757/6847088">📖</a></td>
   </tr>
 </table>
 </div>

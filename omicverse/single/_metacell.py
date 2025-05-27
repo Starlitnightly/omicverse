@@ -1,7 +1,8 @@
 from ..externel.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
 from ..externel.SEACells import compute_celltype_purity,separation,compactness
-
+from .._settings import add_reference
 import pandas as pd
+
 
 class MetaCell(object):
 
@@ -64,6 +65,7 @@ class MetaCell(object):
         self.model.fit(min_iter=min_iter, max_iter=max_iter,**kwargs)
         self.model.seacells_dict=dict(zip(self.adata.obs.index.tolist(),
                                           self.adata.obs['SEACell'].tolist()))
+        add_reference(self.adata,'SEACells','metacell clustering with SEACells')
 
     def predicted(self,method='soft',celltype_label='celltype',
                   summarize_layer='raw',minimum_weight=0.05):
@@ -80,6 +82,7 @@ class MetaCell(object):
                                     celltype_label=celltype_label
                                 )
         self.metacells_ad=ad
+
         
         return ad
     

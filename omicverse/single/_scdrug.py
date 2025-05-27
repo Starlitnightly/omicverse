@@ -18,6 +18,7 @@ import multiprocess as mp
 from functools import partial
 import seaborn as sns
 from matplotlib import pyplot as plt
+from .._settings import add_reference
 
 
 import time
@@ -279,6 +280,7 @@ class Drug_Response:
             print('...Predicting drug response for using CaDRReS(PRISM): {}'.format(self.model_spec_name))
             self.pred_auc_df, P_test_df= model.predict_from_model(self.cadrres_model, self.test_kernel_df, self.model_spec_name)
             print('...done!')
+        add_reference(self.adata,'scDrug','drug response prediction with CaDRReS')
 
     def cell_death_proportion(self):
         r"""

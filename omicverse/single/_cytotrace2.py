@@ -11,6 +11,8 @@ import pandas as pd
 import scanpy as sc
 
 
+from .._settings import add_reference
+
 from ..externel.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *
 
@@ -271,4 +273,5 @@ def cytotrace2(
     #    out = subprocess.run(['Rscript', plot_script, '--expression-path', input_path, '--result-path', output_dir+'/cytotrace2_results.txt', '--plot-dir', output_dir+'/plots'], capture_output=True)
 
     print('cytotrace2: Finished.')
+    add_reference(adata,'CytoTRACE2','cell potency prediction with CytoTRACE2')
     return predicted_df_final

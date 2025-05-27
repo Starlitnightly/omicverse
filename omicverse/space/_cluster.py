@@ -9,6 +9,7 @@ from anndata import AnnData
 import numpy as np
 import os
 from scipy.sparse import csr_matrix
+from .._settings import add_reference
 
 class pySTAGATE:
     """Class representing the object of pySTAGATE."""
@@ -180,6 +181,7 @@ def clusters(adata,
             adata.obsm['STAGATE']=adata_copy.obsm['STAGATE']
             adata.layers['STAGATE_ReX']=adata_copy.layers['STAGATE_ReX']
             print(f'The STAGATE embedding are stored in adata.obsm["STAGATE"].\nShape: {adata.obsm["STAGATE"].shape}')
+            add_reference(adata,'STAGATE','clustering with STAGATE')
 
         elif method=='GraphST':
             print('The GraphST method is used to embed the spatial data.')
@@ -207,6 +209,7 @@ def clusters(adata,
             adata.obsm['graphst|original|X_pca']=adata_copy.obsm['graphst|original|X_pca']
 
             print(f'The GraphST embedding are stored in adata.obsm["GraphST_embedding"]. \nShape: {adata.obsm["GraphST_embedding"].shape}')
+            add_reference(adata,'GraphST','clustering with GraphST')
 
         elif method=='CAST':
             print('The CAST method is used to embed the spatial data.')
@@ -249,7 +252,7 @@ def clusters(adata,
                 adata.obsm['X_cast'].loc[adata.obs['CAST_sample']==key]+=embed_dict[key].cpu().numpy()
             adata.obsm['X_cast']=adata.obsm['X_cast'].values
             print(f'The CAST embedding are stored in adata.obsm["X_cast"]. \nShape: {adata.obsm["X_cast"].shape}')
-
+            add_reference(adata,'CAST','embedding with CAST')
         elif method=='BINARY':
             print('The BINARY method is used to embed the spatial data.')
             from ..externel import BINARY
@@ -314,6 +317,7 @@ def clusters(adata,
             adata.obsm['BINARY']=adata_copy.obsm['BINARY']
             adata.uns['Spatial_Graph']=adata_copy.uns['Spatial_Graph']
             print(f'The binary embedding are stored in adata.obsm["BINARY"]. \nShape: {adata.obsm["BINARY"].shape}')
+            add_reference(adata,'BINARY','clustering with BINARY')
         else:
             print(f'The method {method} is not supported.')
     return adata

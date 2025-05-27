@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from typing import Iterable, Union, Optional
-
+from .._settings import add_reference
 
 
 ### Refer to: https://github.com/theislab/scanpy/blob/5533b644e796379fd146bf8e659fd49f92f718cd/scanpy/_compat.py
@@ -569,6 +569,7 @@ def cosg(
     
         
     print('**finished identifying marker genes by COSG**')
+    add_reference(adata,'COSG','marker gene identification with COSG')
         
     ### Return the result
     return adata if copy else None

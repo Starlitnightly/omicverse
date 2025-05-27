@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm
 import sys
 from ..utils._neighboors import update_rep, eff_n_jobs,neighbors,W_from_rep
-
+from .._settings import add_reference
 
 from ._cosg import cosg
 from ..externel.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
@@ -81,6 +81,7 @@ class TrajInfer(object):
             )
             
             self.adata.obs['palantir_pseudotime']=pr_res.pseudotime
+            add_reference(self.adata,'Palantir','trajectory inference with Palantir')
             return pr_res
         elif method=='diffusion_map':
             sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
@@ -92,6 +93,7 @@ class TrajInfer(object):
             sc.tl.dpt(self.adata)
             sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
                use_rep=self.use_rep)
+            add_reference(self.adata,'diffusion_map','trajectory inference with diffusion map')
         elif method=='slingshot':
             #sc.pp.neighbors(self.adata, n_neighbors=self.n_neighbors, n_pcs=self.n_comps,
             #   use_rep=self.use_rep)
@@ -107,6 +109,7 @@ class TrajInfer(object):
             pseudotime = slingshot.unified_pseudotime
             self.adata.obs['slingshot_pseudotime']=pseudotime
             self.slingshot=slingshot
+            add_reference(self.adata,'slingshot','trajectory inference with slingshot')
         else:
             print('Please input the correct method name, such as `palantir` or `diffusion_map`')
             return

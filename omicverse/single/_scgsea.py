@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import anndata
 import seaborn as sns
-
+from .._settings import add_reference
 from ._aucell import derive_auc_threshold,fast_rank,_rank_sparse_row,aucell
+
 #from ctxcore.recovery import enrichment4cells,aucs
 #from ctxcore.genesig import GeneSignature
 
@@ -191,6 +192,7 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
             adata.obs['{}_aucell'.format(pathway_name)]=aucs(rnk,
             np_rnk_sparse.shape[1],weights,auc_threshold
             )
+    add_reference(adata,'AUCell','pathway activity score with AUCell')
             
 def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
     """
@@ -289,6 +291,7 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
 
     aucs_mtx = aucell(matrix, signatures=test_gmt, auc_threshold=auc_threshold, num_workers=num_workers)
     adata_aucs=anndata.AnnData(aucs_mtx)
+    add_reference(adata,'AUCell','pathway activity score with AUCell')
     return adata_aucs
 
 def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed=42, 
@@ -449,6 +452,7 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     enrich_res['logc']=np.log(enrich_res['Odds Ratio'])
     enrich_res['num']=[int(i.split('/')[0]) for i in enrich_res['Overlap']]
     enrich_res['fraction']=[int(i.split('/')[0])/int(i.split('/')[1]) for i in enrich_res['Overlap']]
+    add_reference(adata,'GSEApy','pathway enrichment analysis with gseapy')
     
     return enrich_res
 
