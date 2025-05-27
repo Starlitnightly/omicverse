@@ -462,11 +462,16 @@ def map_spatial_auto(adata_rotated, method='phase'):
     else:
         raise ValueError("method 参数错误，请输入 'torch' 或 'phase'.")
     # 保持原有坐标修正逻辑不变 ...
-    adata_rotated.obsm['spatial1'] = adata_rotated.obsm['spatial'].copy()
-    adata_rotated.obsm['spatial1'][:,0] -= (offset[0])*(
-        adata_rotated.obsm['spatial'][:,0].mean()/(img1_from_memory.shape[0]/2))
-    adata_rotated.obsm['spatial1'][:,1] -= (offset[1])*(
-        adata_rotated.obsm['spatial'][:,1].mean()/(img1_from_memory.shape[1]/2))
+    # 1) 先把 spatial1 转成 float64
+    adata_rotated.obsm['spatial1'] = adata_rotated.obsm['spatial'].astype(np.float64)
+
+    # 2) 再做就地减法
+    adata_rotated.obsm['spatial1'][:,0] -= offset[0] * (
+        adata_rotated.obsm['spatial'][:,0].mean() / (img1_from_memory.shape[0] / 2)
+    )
+    adata_rotated.obsm['spatial1'][:,1] -= offset[1] * (
+        adata_rotated.obsm['spatial'][:,1].mean() / (img1_from_memory.shape[1] / 2)
+    )
     return adata_rotated
 
 def map_spatial_manual(

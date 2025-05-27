@@ -161,7 +161,7 @@ def lazy(adata,
         adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features]
     elif 'highly_variable' in adata_hvg.var.columns:
         adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable]
-    from ..single import batch_correction
+    from . import batch_correction
     if ('X_harmony' not in adata.obsm.keys()) or ('Harmony' in reforce_steps):
         print('❌ Batch Correction: `Harmony` step didn\'t start, we will start it now')
         if harmony_kwargs is None:
@@ -175,6 +175,20 @@ def lazy(adata,
             **harmony_kwargs
         )
         adata.obsm['X_harmony']=adata_hvg.obsm['X_harmony']
+        if 'status' not in adata.uns.keys():
+            adata.uns['status'] = {}
+        if 'status_args' not in adata.uns.keys():
+            adata.uns['status_args'] = {}
+
+        adata.uns['status']['harmony'] = True
+        adata.uns['status_args']['harmony']={
+            'n_pcs':harmony_kwargs['n_pcs'],
+        }
+        neighbors(adata=adata,n_neighbors=15,use_rep='X_harmony',n_pcs=30)
+        umap(adata)
+        tsne(adata,use_rep='X_harmony')
+        adata.obsm['X_umap_harmony']=adata.obsm['X_umap']
+        adata.obsm['X_tsne_harmony']=adata.obsm['X_tsne']
     else:
         print('✅ Batch Correction: `Harmony` step already finished, skipping it')
     
@@ -193,6 +207,22 @@ def lazy(adata,
             **scvi_kwargs
         )
         adata.obsm['X_scVI']=adata_hvg.obsm['X_scVI']
+        if 'status' not in adata.uns.keys():
+            adata.uns['status'] = {}
+        if 'status_args' not in adata.uns.keys():
+            adata.uns['status_args'] = {}
+
+        adata.uns['status']['scVI'] = True
+        adata.uns['status_args']['scVI']={
+            'n_layers':scvi_kwargs['n_layers'],
+            'n_latent':scvi_kwargs['n_latent'],
+            'gene_likelihood':scvi_kwargs['gene_likelihood'],
+        }
+        neighbors(adata=adata,n_neighbors=15,use_rep='X_scVI',n_pcs=30)
+        umap(adata)
+        tsne(adata,use_rep='X_scVI')
+        adata.obsm['X_umap_scVI']=adata.obsm['X_umap']
+        adata.obsm['X_tsne_scVI']=adata.obsm['X_tsne']
     else:
         print('✅ Batch Correction: `scVI` step already finished, skipping it')
     del adata_hvg
@@ -234,6 +264,7 @@ def lazy(adata,
         print(f"Dimensionality using :{method_test}")
         mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',
                     n_pcs=30, use_rep=adata.uns['bench_best_res'],)
+        neighbors(adata=adata,n_neighbors=15,use_rep=adata.uns['bench_best_res'],n_pcs=30)
         #预聚类
         print(f"Automatic clustering using leiden for preprocessed")
         sc.tl.leiden(adata, resolution=1.5, key_added = 'leiden_r1.5')
@@ -246,7 +277,7 @@ def lazy(adata,
             else:
                 adata.obs['L1_Round0']=adata.obs['L1_result_smooth']
                 print(f"Automatic clustering using sccaf, Times: {idx}")
-                from ..single import SCCAF_optimize_all
+                from . import SCCAF_optimize_all
                 SCCAF_optimize_all(min_acc=0.95, ad=adata, classifier='RF',n_jobs=4,
                                         use=adata.uns['bench_best_res'], basis ='X_mde',
                                         method='leiden',prefix='L1',plot=True)
@@ -282,5 +313,4 @@ def lazy(adata,
     return adata
 
     #step 7 anno celltype automatically:
-
 
