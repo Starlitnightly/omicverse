@@ -1241,7 +1241,32 @@ def _get_palette(adata, values_key: str, palette=None):
         values.categories
     ):
         #  set a default palette in case that no colors or few colors are found
-        _utils._set_default_colors_for_categorical_obs(adata, values_key)
+        if adata.obs[values_key].dtype == bool:
+            categories = (
+                adata.obs[values_key].astype(str).astype("category").cat.categories
+            )
+        else:
+            categories = adata.obs[values_key].cat.categories
+        from ..pl._palette import sc_color,palette_28,palette_56,palette_112
+        length = len(categories)
+        if len(rcParams["axes.prop_cycle"].by_key()["color"]) >= length:
+            cc = rcParams["axes.prop_cycle"]()
+            palette = [next(cc)["color"] for _ in range(length)]
+
+        elif length <= 28:
+            palette = sc_color
+        elif length <= 56:
+            palette = palette_56
+        elif length <= 112:
+            palette = palette_112
+        else:
+            palette = ["grey" for _ in range(length)]
+            logg.info(
+                f"the obs value {values_key!r} has more than 103 categories. Uniform "
+                "'grey' color will be used for all categories."
+            )
+
+        _utils._set_colors_for_categorical_obs(adata, values_key, palette[:length])
     else:
         _utils._validate_palette(adata, values_key)
     return dict(zip(values.categories, adata.uns[color_key]))

@@ -1108,12 +1108,15 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
         fig, ax = plt.subplots(1, 1, figsize=figsize)
     
     # 获取或设置颜色
+    from ._palette import palette_28,palette_56,palette_112,sc_color
     if f'{groupby}_colors' not in adata.uns or adata.uns[f'{groupby}_colors'] is None:
         #colors = ['#%02x%02x%02x' % tuple([int(k * 255) for k in i]) for i in colorcet.glasbey_bw_minc_20_maxl_70]
-        if len(adata.obs[groupby].unique())>28:
-            colors=sc.pl.palettes.default_102
+        if len(adata.obs[groupby].unique())>56:
+            colors=palette_112
+        elif len(adata.obs[groupby].unique())>28:
+            colors=palette_56
         else:
-            colors=sc.pl.palettes.zeileis_28
+            colors=sc_color
         adata.uns[f'{groupby}_colors'] = colors[:len(adata.obs[groupby].unique())]
     
     # 绘制小提琴图

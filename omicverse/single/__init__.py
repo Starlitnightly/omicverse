@@ -36,4 +36,5 @@ from ._multimap import TFIDF_LSI,Wrapper,Integration,Batch
 from ._scdiffusion import scDiffusion
 from ._cellvote import get_cluster_celltype,CellVote
 from ._deg_ct import DCT,DEG
-from ._lazy import lazy
+from ._lazy_function import lazy
+from ._lazy_report import generate_scRNA_report
