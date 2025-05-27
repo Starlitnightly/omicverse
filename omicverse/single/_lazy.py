@@ -2,6 +2,8 @@ from ..pp import *
 import scanpy as sc
 import numpy as np
 
+from .._settings import add_reference,settings
+
 def lazy(adata,
          species='human',
          reforce_steps=[],
@@ -22,6 +24,45 @@ def lazy(adata,
         sample_key: the key store in `adata.obs` to batch correction.
     
     """
+    mode=settings.mode
+    print(f'🔧 The mode of lazy is {mode}')
+    if mode == 'cpu-gpu-mixed':
+        try:
+            import pymde
+        except:
+            print('❌ pymde package not found, we will install it now')
+            import pip
+            pip.main(['install','pymde'])
+            import pymde
+    else:
+        pass
+
+    #step 0: check packages:
+    try:
+        import louvain
+    except:
+        print('❌ Louvain package not found, we will install it now')
+        import pip
+        pip.main(['install','louvain'])
+        import louvain
+    
+    try:
+        import scvi
+    except:
+        print('❌ scvi package not found, we will install it now')
+        import pip
+        pip.main(['install','scvi-tools'])
+        import scvi
+    try:
+        import louvain
+    except:
+        print('❌ louvain package not found, we will install it now')
+        import pip
+        pip.main(['install','louvain'])
+        import louvain
+        
+    print('✅ All packages used in lazy are installed')
+    
     #step 1: qc:
     adata.var_names_make_unique()
     adata.obs_names_make_unique()
@@ -215,8 +256,28 @@ def lazy(adata,
                 
         #获取最佳聚类
         adata.obs['best_clusters']=adata.obs['L1_result_smooth'].copy()
+        sc.tl.leiden(adata, resolution=1, key_added = 'leiden_clusters_L1')
+        sc.tl.louvain(adata, resolution=1, key_added = 'louvain_clusters_L1')
+        sc.tl.leiden(adata, resolution=0.5, key_added = 'leiden_clusters_L2')
+        sc.tl.louvain(adata, resolution=0.5, key_added = 'louvain_clusters_L2')
     else:
         print('✅ Best Clusters step already finished, skipping it')
+
+    #step 7 UMAP:
+    if ('X_umap' not in adata.obsm.keys()) or ('umap' in reforce_steps):
+        print('❌ UMAP step didn\'t start, we will start it now')
+        umap(adata)
+        adata.obsm['X_umap']=adata.obsm['X_umap']
+    else:
+        print('✅ UMAP step already finished, skipping it')
+
+    #step 8 tsne:
+    if ('X_tsne' not in adata.obsm.keys()) or ('tsne' in reforce_steps):
+        print('❌ tSNE step didn\'t start, we will start it now')
+        tsne(adata,use_rep=adata.uns['bench_best_res'])
+        adata.obsm['X_tsne']=adata.obsm['X_tsne']
+    else:
+        print('✅ tSNE step already finished, skipping it')
 
     return adata
 

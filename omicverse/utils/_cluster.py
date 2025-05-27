@@ -4,6 +4,7 @@ import scanpy as sc
 import pandas as pd
 import numpy as np
 import anndata
+from .._settings import add_reference
 
 mira_install=False
 def global_imports(modulename,shortname = None, asfunction = False):
@@ -73,17 +74,21 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     
     if method=='leiden':
         sc.tl.leiden(adata,**kwargs)
+        add_reference(adata,'leiden','clustering with Leiden')
     elif method=='louvain':
         sc.tl.louvain(adata,**kwargs)
+        add_reference(adata,'louvain','clustering with Louvain')
     elif method=='GMM':
         mclust_py(adata, n_components=n_components,use_rep=use_rep,random_seed=random_state,**kwargs)
         print(f"""finished: found {n_components} clusters and added
     'mclust', the cluster labels (adata.obs, categorical)""")
+        add_reference(adata,'GMM','clustering with Gaussian Mixture Model')
     elif method=='mclust':
         mclust_py(adata, n_components=n_components,use_rep=use_rep,
                   random_seed=random_state,**kwargs)
         print(f"""finished: found {n_components} clusters and added
     'mclust', the cluster labels (adata.obs, categorical)""")
+        add_reference(adata,'mclust','clustering with Gaussian Mixture Model')
     elif method=='schist':
         try:
             import schist
@@ -92,6 +97,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
                 'Please install the schist using conda `conda install -c conda-forge schist` \nor `pip install git+https://github.com/dawe/schist.git`'
             )
         schist.inference.nested_model(adata, **kwargs)
+        add_reference(adata,'schist','clustering with schist')
     elif method=='mclust_R':
         np.random.seed(random_state)
         import rpy2.robjects as robjects
@@ -111,6 +117,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         adata.obs[method] = adata.obs[method].astype('category')
         print(f"""finished: found {n_components} clusters and added
     'mclust', the cluster labels (adata.obs, categorical)""")
+        add_reference(adata,'mclust','clustering with Gaussian Mixture Model')
 
       
 def refine_label(adata, use_rep='spatial',radius=50, key='label'):

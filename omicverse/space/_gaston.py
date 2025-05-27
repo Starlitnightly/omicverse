@@ -6,7 +6,7 @@ from ..externel.gaston import neural_net,process_NN_output,dp_related,cluster_pl
 from scipy.sparse import issparse, csr_matrix
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
+from .._settings import add_reference
 
 class GASTON(object):
 
@@ -102,6 +102,8 @@ class GASTON(object):
                                 S_hidden_list=isodepth_arch, A_hidden_list=expression_fn_arch, 
                                 epochs=num_epochs, checkpoint=checkpoint, 
                                 save_dir=out_dir_seed, optim=optimizer, seed=seed, save_final=True)
+            
+        add_reference(self.adata,'GASTON','spatial depth estimation with GASTON')
 
     def get_best_model(self,out_dir='result/test_outputs',
                        max_domain_num=8,start_from=2):

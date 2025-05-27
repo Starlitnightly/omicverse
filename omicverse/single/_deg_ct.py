@@ -5,7 +5,7 @@ import numpy as np
 from scipy.sparse import issparse
 import pandas as pd
 
-from .._settings import EMOJI
+from .._settings import EMOJI,add_reference
 
 class DCT:
     def __init__(self, 
@@ -97,11 +97,15 @@ class DCT:
             self.model.run_nuts(self.sccoda_data, modality_key="coda", **kwargs)
             self.model.credible_effects(self.sccoda_data, modality_key="coda")
             print(f"{EMOJI['check_mark']} {self.method} DCT analysis completed")
+            add_reference(self.adata,'Sccoda','differential cell type abundance analysis with Sccoda')
+            add_reference(self.adata,'pertpy','Sccoda is a part of pertpy')
         elif self.method == 'milo':
             self.model.da_nhoods(self.mdata, design=f"~{self.condition}", model_contrasts=f"{self.condition}{self.test_group}-{self.condition}{self.ctrl_group}")
             self.model.build_nhood_graph(self.mdata)
             self.model.annotate_nhoods(self.mdata, anno_col=self.cell_type_key)
             print(f"{EMOJI['check_mark']} {self.method} DCT analysis completed")
+            add_reference(self.adata,'Milo','differential cell type abundance analysis with Milo')
+            add_reference(self.adata,'pertpy','Milo is a part of pertpy')
         else:
             raise ValueError(f"Method {self.method} not supported")
 
@@ -214,6 +218,7 @@ class DEG:
                     sc.pp.sample(self.adata_test, n_obs=max_cells)
                 except:
                     raise ValueError(f"Failed to downsample the data, please check the data")
+                
 
   
 
@@ -233,6 +238,9 @@ class DEG:
                 method=self.method 
             ) 
             print(f"{EMOJI['check_mark']} {self.method} DEG analysis completed")
+            add_reference(self.adata,'Wilcoxon','differential expression analysis with Wilcoxon')
+            add_reference(self.adata,'T-test','differential expression analysis with T-test')
+            add_reference(self.adata,'scanpy','differential expression analysis with SCANPY')
         elif self.method == 'memento-de':
             import memento
             self.adata_test=self.adata_test[self.adata_test.obs[self.condition].isin([self.ctrl_group, self.test_group])]
@@ -275,6 +283,7 @@ class DEG:
             )
             self.result_1d = result_1d
             print(f"{EMOJI['check_mark']} {self.method} DEG analysis completed")
+            add_reference(self.adata,'memento','differential expression analysis with memento-de')
         else:
             raise ValueError(f"Method {self.method} not supported")
  

@@ -12,6 +12,8 @@ import anndata
 from ..pp._preprocess import scale
 from ..utils import gen_mpl_labels
 
+from .._settings import add_reference
+
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
         shortname = modulename
@@ -485,6 +487,7 @@ class pySCSA(object):
 
         result=pd.read_csv('temp/rna_anno.txt',sep='\t')
         self.result=result
+        add_reference(self.adata,'pySCSA','cell annotation with SCSA')
         return result
     
     def cell_anno_print(self)->None:
@@ -635,6 +638,7 @@ class MetaTiME(object):
         #self.pdata.obs['Major_{}'.format(save_obs_name)]=[i.split('_')[0] for i in self.pdata.obs[save_obs_name]]
         print('......The predicted celltype have been saved in obs.{}'.format(save_obs_name))
         print('......The predicted major celltype have been saved in obs.Major_{}'.format(save_obs_name))
+        add_reference(self.adata,'MetaTiME','cell annotation with MetaTiME')
         return self.adata
     
     def plot(self,basis:str='X_umap',cluster_key:str='MetaTiME',fontsize:int=8, 

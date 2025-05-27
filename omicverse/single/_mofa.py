@@ -14,6 +14,8 @@ import seaborn as sns
 import scanpy as sc
 from typing import Union,Tuple
 import matplotlib
+from .._settings import add_reference
+
 
 mofax_install=False
 
@@ -421,6 +423,7 @@ class pyMOFA(object):
         ent1.build()
         ent1.run()
         ent1.save(outfile=outfile)
+        add_reference(self.adata,'MOFA','Multi-omics factor analysis with MOFA')
 
     
 

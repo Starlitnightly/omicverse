@@ -19,7 +19,7 @@ from matplotlib import rcParams
 import seaborn as sns
 from scipy.sparse import issparse
 
-from .._settings import settings,print_gpu_usage_color,EMOJI
+from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference
 
 
 
@@ -579,7 +579,7 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         'nUMIs': tresh['nUMIs'],
         'detected_genes': tresh['detected_genes'],
     }
-
+    add_reference(adata,'qc','QC with scanpy')
     return adata
 
 

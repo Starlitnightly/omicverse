@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import scanpy as sc
 from anndata import AnnData
+from .._settings import add_reference
 
 tg_install=False
 
@@ -60,6 +61,8 @@ class Tangram(object):
                       genes=self.markers,gene_to_lowercase=gene_to_lowercase)
 
         print('...Model prepared successfully')
+        add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
+        add_reference(self.adata_sp,'tangram','cell type classification with Tangram')
 
     def train(self,
             mode: str = "clusters",
@@ -83,6 +86,8 @@ class Tangram(object):
 
         tg.project_cell_annotations(ad_map, self.adata_sp, annotation=self.clusters)
         print('...Model train successfully')
+        add_reference(self.adata_sp,'tangram','cell type classification with Tangram')
+        add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
 
     def cell2location(self,annotation_list=None):
         """
@@ -95,6 +100,8 @@ class Tangram(object):
 
         df = adata_plot.obsm["tangram_ct_pred"][annotation_list]
         construct_obs_plot(df, adata_plot, perc=0)
+        add_reference(self.adata_sp,'tangram','cell type classification with Tangram')
+        add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
         return adata_plot
 
 def construct_obs_plot(df_plot: pd.DataFrame,

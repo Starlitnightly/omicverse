@@ -24,6 +24,7 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
+from .._settings import add_reference
 
 
 def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
@@ -336,6 +337,8 @@ class pySTAligner(object):
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
                 self.optimizer.step()
 
+        add_reference(self.adata,'STAligner','spatial integration with STAligner')
+
     def predicted(self):
         """store the embedding of STAligner model."""  
         self.model.eval()
@@ -346,5 +349,6 @@ class pySTAligner(object):
                 z_list.append(z.cpu().detach().numpy())
 
         self.adata.obsm[self.key_added] = np.concatenate(z_list, axis=0)
+        add_reference(self.adata,'STAligner','spatial integration with STAligner')
         return self.adata
 # End-of-file (EOF)

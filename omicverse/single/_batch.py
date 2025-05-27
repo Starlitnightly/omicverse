@@ -2,7 +2,7 @@ from ..pp import *
 import scanpy as sc
 import numpy as np
 import anndata
-
+from .._settings import add_reference
 
 def batch_correction(adata:anndata.AnnData,batch_key:str,
                      use_rep='scaled|original|X_pca',
@@ -40,6 +40,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         sc.external.pp.harmony_integrate(adata3, batch_key,basis=use_rep,**kwargs)
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
         del adata3
+        add_reference(adata,'Harmony','batch correction with Harmony')
         #return adata3
     elif methods=='combat':
         adata2=adata.copy()
@@ -49,6 +50,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         adata2.obsm['X_combat']=adata2.obsm[use_rep].copy()
         adata.obsm['X_combat']=adata2.obsm['X_combat'].copy()
         del adata2
+        add_reference(adata,'Combat','batch correction with Combat')
         #return adata2
     elif methods=='scanorama':
         try:
@@ -82,6 +84,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         
         # add to the AnnData object, create a new object first
         adata.obsm["X_scanorama"] = all_s
+        add_reference(adata,'Scanorama','batch correction with Scanorama')
         return adata
     elif methods=='scVI':
         try:
@@ -97,6 +100,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         model.train()
         SCVI_LATENT_KEY = "X_scVI"
         adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
+        add_reference(adata,'scVI','batch correction with scVI')
         return model
     elif methods=='CellANOVA':
         from ..externel.cellanova.model import calc_ME,calc_BE,calc_TE
@@ -110,6 +114,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         ## create an independent anndata object for cellanova-integrated data
         pca(adata,layer='denoised',n_pcs=n_pcs)
         adata.obsm['X_cellanova']=adata.obsm['denoised|original|X_pca'].copy()
+        add_reference(adata,'CellANOVA','batch correction with CellANOVA')
     else:
         print('Not supported')
 

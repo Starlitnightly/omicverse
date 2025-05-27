@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
 from torch_geometric.nn import GCNConv, DeepGraphInfomax
 from sklearn.neighbors import kneighbors_graph
+from .._settings import add_reference
 
 sf_install = False
 
@@ -123,6 +124,7 @@ class pySpaceFlow(object):
 
         self.sf.embedding = embedding
         self.adata.obsm['spaceflow']=self.sf.embedding.copy()
+        add_reference(self.adata,'SpaceFlow','embedding with SpaceFlow')
 
         return embedding
     def cal_pSM(self,n_neighbors:int=20,resolution:int=1,
@@ -167,7 +169,7 @@ class pySpaceFlow(object):
         sc.tl.dpt(self.adata)
         self.adata.obs.rename({"dpt_pseudotime": psm_key}, axis=1, inplace=True)
         print(f'The pseudo-spatial map values are stored in adata.obs["{psm_key}"].')
-
+        add_reference(self.adata,'SpaceFlow','pseudo-spatial map with SpaceFlow')
         psm_values = self.adata.obs[psm_key].to_numpy()
         return psm_values
 

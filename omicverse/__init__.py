@@ -18,7 +18,7 @@ name = "omicverse"
 __version__ = version(name)
 
 
-from ._settings import settings
+from ._settings import settings,generate_reference_table
 
 
 # 导入 matplotlib.pyplot

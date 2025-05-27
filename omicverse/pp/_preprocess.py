@@ -13,8 +13,9 @@ import time
 
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
-from .._settings import settings,print_gpu_usage_color,EMOJI
+from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference
 from datetime import datetime
+
 
 
 # Emoji map for UMAP status reporting
@@ -425,6 +426,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
                 max_fraction=0.2,
             )
             sc.pp.log1p(adata)
+            
         elif method_list[0] == 'pearson':
             # Perason residuals workflow
             sc.experimental.pp.normalize_pearson_residuals(adata)
@@ -496,6 +498,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         'mode':mode, 'target_sum':target_sum, 'n_HVGs':n_HVGs,
         'organism':organism,
     }
+    add_reference(adata,'scanpy','size normalization with scanpy')
     return adata
 def normalize_pearson_residuals(adata,**kwargs):
     '''
@@ -537,7 +540,7 @@ def scale(adata,max_value=10,layers_add='scaled'):
         adata.uns['status'] = {}
     if 'status_args' not in adata.uns.keys():
         adata.uns['status_args'] = {}
-        
+    add_reference(adata,'scanpy','scaling with scanpy')
     adata.uns['status']['scaled'] = True
 
 def regress(adata,**kwargs):
@@ -562,6 +565,7 @@ def regress(adata,**kwargs):
     else:
         import rapids_singlecell as rsc
         adata.layers['regressed']=rsc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], inplace=False)
+    add_reference(adata,'scanpy','regressing out covariates with scanpy')
 
 def regress_and_scale(adata):
     """
@@ -584,7 +588,7 @@ def regress_and_scale(adata):
     adata_mock.X = adata_mock.layers['regressed']
     scale(adata_mock)
     adata.layers['regressed_and_scaled'] = adata_mock.layers['scaled']
-
+    add_reference(adata,'scanpy','regressing out covariates with scanpy')
     return adata
 
 from sklearn.decomposition import PCA 
@@ -684,6 +688,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         'layer':layer,
         'n_pcs':n_pcs,
     }
+    add_reference(adata,'scanpy','PCA with scanpy')
     if inplace:
         return None
     else:
@@ -860,6 +865,7 @@ def neighbors(
                          random_state=random_state,algorithm=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
+    add_reference(adata,'scanpy','neighbors with scanpy')
 
 
 def umap(adata, **kwargs):
@@ -872,18 +878,22 @@ def umap(adata, **kwargs):
         if settings.mode == 'cpu':
             print(f"{EMOJI['cpu']} Using Scanpy CPU UMAP...")
             sc.tl.umap(adata, **kwargs)
+            add_reference(adata,'umap','UMAP with scanpy')
 
         elif settings.mode == 'cpu-gpu-mixed':
             print(f"{EMOJI['gpu']} Using torch GPU to calculate UMAP...")
             print_gpu_usage_color()
             from ._umap import umap as _umap
             _umap(adata,method='mde', **kwargs)
+            add_reference(adata,'pymde','UMAP with pymde')
+            add_reference(adata,'umap','UMAP with pymde')
             
 
         else:
             print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
             import rapids_singlecell as rsc
             rsc.tl.umap(adata, **kwargs)
+            add_reference(adata,'umap','UMAP with RAPIDS')
 
         print(f"{EMOJI['done']} UMAP completed successfully.")
     except Exception as e:
@@ -899,10 +909,12 @@ def louvain(adata, **kwargs):
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Louvain...")
         sc.tl.louvain(adata, **kwargs)
+        add_reference(adata,'louvain','Louvain clustering with scanpy')
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Louvain...")
         import rapids_singlecell as rsc
         rsc.tl.louvain(adata, **kwargs)
+        add_reference(adata,'louvain','Louvain clustering with RAPIDS')
 
 def leiden(adata, **kwargs):
     '''
@@ -912,10 +924,12 @@ def leiden(adata, **kwargs):
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Leiden...")
         sc.tl.leiden(adata, **kwargs)
+        add_reference(adata,'leiden','Leiden clustering with scanpy')
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Leiden...")
         import rapids_singlecell as rsc
         rsc.tl.leiden(adata, **kwargs)
+        add_reference(adata,'leiden','Leiden clustering with RAPIDS')
 
 
 def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
@@ -983,15 +997,18 @@ def tsne(adata,**kwargs):
     if settings.mode == 'cpu':
         print(f"{EMOJI['cpu']} Using Scanpy CPU t-SNE...")
         sc.tl.tsne(adata, **kwargs)
+        add_reference(adata,'tsne','t-SNE with scanpy')
     elif settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate t-SNE...")
         print_gpu_usage_color()
         from ._tsne import tsne as _tsne
         _tsne(adata, **kwargs)
+        add_reference(adata,'tsne','t-SNE with omicverse')
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate t-SNE...")
         import rapids_singlecell as rsc
         rsc.tl.tsne(adata, **kwargs)
+        add_reference(adata,'tsne','t-SNE with RAPIDS')
 
 
 def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
@@ -1110,5 +1127,5 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     else:
         print(f"    `.obsp['{key_added}_distances']`, distances for each pair of neighbors")
         print("    `.obsp['{}_connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(key_added,int(elapsed_time // 60), int(elapsed_time % 60)))
-
+    add_reference(adata,'pymde','MDE with pymde')
     #return emb
