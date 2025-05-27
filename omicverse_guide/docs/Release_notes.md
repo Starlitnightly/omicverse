@@ -527,7 +527,6 @@ Support Raw Windows platform
 
 ## v 1.7.0
 
-Added `lazy` function to calculate all function of scrna-seq
 Added `cpu-gpu-mixed` to accelerate the analysis of scrna-seq using GPU.
 Changed the logo presentation of Omicverse to `ov.plot_set`
 
@@ -536,6 +535,8 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 - Fixed the version error of `DEseq2` analysis.
 
 ### Single Module
+- Added `lazy` function to calculate all function of scrna-seq (#291)
+- Added `generate_scRNA_report` and `generate_reference_table` to generate the report and reference (#291) (@292)
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
 - Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
 - Added data enhancement of `Fate`
@@ -553,4 +554,4 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 ### Plot Module
 - Added `dotplot_doublegroup` to visual the genes in doublegroup.
 - Added `transpose` argument of `cpdb_interacting_heatmap` to transpose the figure.
-- Added `calculate_gene_density` to plot the gene's density.
+- Added `calculate_gene_density` to plot the gene's density. 

@@ -21,8 +21,9 @@ nav:
             - Preprocessing the data of scRNA-seq[CPU]: Tutorials-single/t_preprocess_cpu.ipynb
             - Preprocessing the data of scRNA-seq[GPU]: Tutorials-single/t_preprocess_gpu.ipynb
             - Clustering space: Tutorials-single/t_cluster.ipynb
-            - Consensus Non-negative Matrix factorization (cNMF): Tutorials-single/t_cnmf.ipynb
             - Data integration and batch correction: Tutorials-single/t_single_batch.ipynb
+            - Consensus Non-negative Matrix factorization (cNMF): Tutorials-single/t_cnmf.ipynb
+            - Lazy analysis of scRNA-seq: Tutorials-single/t_lazy.ipynb
         - Annotation: 
             - Automatic cell type annotation with GPT/Other: Tutorials-single/t_gptanno.ipynb
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
@@ -52,6 +53,7 @@ nav:
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
         - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
     - Space:
+        - Crop and Rotation of spatial transcriptomic data: Tutorials-space/t_crop_rotate.ipynb
         - Spatial clustering and denoising expressions: Tutorials-space/t_cluster_space.ipynb
         - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
         - Mapping single-cell profile onto spatial profile: Tutorials-space/t_mapping.ipynb
