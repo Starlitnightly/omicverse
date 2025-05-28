@@ -2,6 +2,17 @@
 set -euo pipefail
 
 #————————————————————————
+# Check Python version (only 3.10 and 3.11 supported)
+#————————————————————————
+PYTHON_VERSION=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+if [[ "$PYTHON_VERSION" != "3.10" && "$PYTHON_VERSION" != "3.11" ]]; then
+  echo "❌ Error: Python version $PYTHON_VERSION is not supported"
+  echo "   OmicVerse requires Python 3.10 or 3.11"
+  exit 1
+fi
+echo "✅ Python $PYTHON_VERSION detected"
+
+#————————————————————————
 # 0. Speed‐test PyPI mirrors & pick the fastest 📡
 #————————————————————————
 MIRRORS=(
