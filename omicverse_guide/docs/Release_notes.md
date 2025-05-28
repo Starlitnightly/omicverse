@@ -536,7 +536,7 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 
 ### Single Module
 - Added `lazy` function to calculate all function of scrna-seq (#291)
-- Added `generate_scRNA_report` and `generate_reference_table` to generate the report and reference (#291) (@292)
+- Added `generate_scRNA_report` and `generate_reference_table` to generate the report and reference (#291) (#292)
 - Fixed `geneset_prepare` not being able to read gmt not split by `\t\t` (#235) (#238)
 - Added `geneset_aucell_tmp`,`pathway_aucell_tmp`,`pathway_aucell_enrichment_tmp` to test the chunk_size (#238)
 - Added data enhancement of `Fate`

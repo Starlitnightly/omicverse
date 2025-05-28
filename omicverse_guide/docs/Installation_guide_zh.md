@@ -34,7 +34,15 @@ OmicVerse 可以通过 conda 或 pip 安装，但首先需要安装 `PyTorch`。
 curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
 ```
 
+如果你在国内，那么可以换一个源可能会更快一些
+
+```shell
+#仅适用于Linux(国内加速)
+curl -sSL https://starlit.oss-cn-beijing.aliyuncs.com/single/install.sh | bash -s
+```
+
 该脚本会自动：
+
 - 设置适当的环境
 - 为您的系统安装正确的 PyTorch 版本
 - 安装所有必需的依赖项
