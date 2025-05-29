@@ -97,7 +97,7 @@ else
     | head -1)"
   echo "🌟 Installing torch==$TORCH_VERSION and letting pip pick matching torchvision/torchaudio"
   pip install \
-    "torch==${TORCH_VERSION}" \
+    "torch" \
     torchvision \
     torchaudio \
     $PIP_INDEX
