@@ -118,6 +118,11 @@ echo "🔍 CUDA tag: $CUDA_TAG"
 PYG_WHL_URL="https://data.pyg.org/whl/torch-${TORCH_VERSION}+${CUDA_TAG}.html"
 echo "🔗 PyG wheel index: $PYG_WHL_URL"
 
+#————————————————————————
+# 4. Install PyG & extensions 🧩
+#————————————————————————
+pip_install_pkg torch_geometric
+
 
 #————————————————————————
 # 5. Install OmicVerse 🧬
