@@ -118,19 +118,6 @@ echo "🔍 CUDA tag: $CUDA_TAG"
 PYG_WHL_URL="https://data.pyg.org/whl/torch-${TORCH_VERSION}+${CUDA_TAG}.html"
 echo "🔗 PyG wheel index: $PYG_WHL_URL"
 
-#————————————————————————
-# 4. Install PyG & extensions 🧩
-#————————————————————————
-pip_install_pkg torch_geometric
-
-for pkg in torch_scatter torch_sparse torch_cluster torch_spline_conv; do
-  if pip show "$pkg" >/dev/null 2>&1; then
-    echo "✅ Skipping PyG extension:$pkg"
-  else
-    echo "🔄 Installing PyG extension:$pkg"
-    conda install "py$pkg" -c conda-forge -y
-  fi
-done
 
 #————————————————————————
 # 5. Install OmicVerse 🧬
@@ -141,6 +128,7 @@ pip_install_pkg omicverse
 # 6. Other deep‐bio packages 🌱
 #————————————————————————
 pip_install_pkg \
+  tangram-sc \
   fa2-modified \
   pot \
   cvxpy \
