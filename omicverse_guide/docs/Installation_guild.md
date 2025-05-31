@@ -31,7 +31,6 @@ The easiest way to install OmicVerse is using our installation script:
 
 ```shell
 #Only for Linux
-pip3 install torch torchvision torchaudio
 curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
 ```
 

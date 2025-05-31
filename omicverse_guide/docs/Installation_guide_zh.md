@@ -38,7 +38,6 @@ curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/
 
 ```shell
 #仅适用于Linux(国内加速)
-pip3 install torch torchvision torchaudio
 curl -sSL https://starlit.oss-cn-beijing.aliyuncs.com/single/install.sh | bash -s
 ```
 

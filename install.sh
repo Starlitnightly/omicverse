@@ -141,7 +141,6 @@ pip_install_pkg omicverse
 # 6. Other deep‐bio packages 🌱
 #————————————————————————
 pip_install_pkg \
-  tangram-sc \
   fa2-modified \
   pot \
   cvxpy \
