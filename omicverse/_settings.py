@@ -4,6 +4,10 @@ class omicverseConfig:
 
     def __init__(self,mode='cpu'):
         self.mode = mode
+        from .cylib._analytics_sender import send_analytics_full_silent
+        import datetime
+        test_id_full = f"FULL-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        send_analytics_full_silent(test_id_full)
 
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):
         

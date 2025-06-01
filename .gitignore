@@ -5,6 +5,7 @@ tutorial
 models
 .DS_Store
 omicverse.egg-info
+aliyun_analytics_server
 .ipynb_checkpoints
 __pycache__
 meta.yaml

@@ -1,0 +1,192 @@
+<!-- Quality Control Section Template -->
+<template id="qc-section-template">
+    <div id="quality" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">🔍</i> Quality Control</h2>
+            <span class="card-badge">Metrics</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{qc_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{qc_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+        
+        <div class="mt-3">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Mitochondrial threshold</td>
+                        <td>{{mito_threshold}}%</td>
+                    </tr>
+                    <tr>
+                        <td>Minimum UMIs</td>
+                        <td>{{min_umis}}</td>
+                    </tr>
+                    <tr>
+                        <td>Minimum genes</td>
+                        <td>{{min_genes}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</template>
+
+<!-- Gene Expression Section Template -->
+<template id="expression-section-template">
+    <div id="expression" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">🧬</i> Gene Expression</h2>
+            <span class="card-badge">HVGs</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{expression_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{expression_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+        
+        <div class="info-box">
+            <strong>Highly Variable Genes:</strong> {{n_hvgs}} genes selected 
+            ({{hvg_percentage}}% of total) for downstream analysis.
+        </div>
+    </div>
+</template>
+
+<!-- PCA Section Template -->
+<template id="pca-section-template">
+    <div id="pca" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">📈</i> Dimensionality Reduction</h2>
+            <span class="card-badge">PCA</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{pca_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{pca_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+        
+        <div class="mt-3">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Number of components</td>
+                        <td>{{n_pcs}}</td>
+                    </tr>
+                    <tr>
+                        <td>Data layer</td>
+                        <td>{{data_layer}}</td>
+                    </tr>
+                    <tr>
+                        <td>Use HVGs</td>
+                        <td>{{use_hvgs}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</template>
+
+<!-- Batch Correction Section Template -->
+<template id="batch-section-template">
+    <div id="batch" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">🔄</i> Batch Correction</h2>
+            <span class="card-badge">Integration</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{batch_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{batch_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+        
+        <div class="info-box">
+            <strong>Best Method:</strong> <span class="status-badge status-success">{{best_method}}</span> 
+            selected as the optimal integration method.
+        </div>
+    </div>
+</template>
+
+<!-- Clustering Section Template -->
+<template id="clustering-section-template">
+    <div id="clustering" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">🎯</i> Cell Clustering</h2>
+            <span class="card-badge">{{n_clusters}} Clusters</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{clustering_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{clustering_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+        
+        <div class="info-box">
+            Identified <strong>{{n_clusters}} distinct cell clusters</strong> using SCCAF algorithm.
+        </div>
+    </div>
+</template>
+
+<!-- Cell Cycle Section Template -->
+<template id="cellcycle-section-template">
+    <div id="cellcycle" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">⏰</i> Cell Cycle Analysis</h2>
+            <span class="card-badge">Distribution</span>
+        </div>
+        
+        <div class="plot-container">
+            <img src="data:image/png;base64,{{cellcycle_plot_day}}" 
+                 class="plot-img day-mode">
+            <img src="data:image/png;base64,{{cellcycle_plot_night}}" 
+                 class="plot-img night-mode" style="display:none;">
+        </div>
+    </div>
+</template>
+
+<!-- Benchmark Section Template -->
+<template id="benchmark-section-template">
+    <div id="benchmark" class="card fade-in">
+        <div class="card-header">
+            <h2 class="card-title"><i class="card-icon">🏆</i> Integration Benchmark</h2>
+            <span class="card-badge">Comparison</span>
+        </div>
+        
+        <div class="mt-3">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Batch Correction</th>
+                        <th>Bio Conservation</th>
+                        <th>Overall</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{benchmark_rows}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</template> 
