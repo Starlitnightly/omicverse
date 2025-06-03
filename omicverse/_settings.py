@@ -39,7 +39,10 @@ class omicverseConfig:
 
 
 import subprocess
-import torch
+try:
+    import torch  # Optional GPU dependency
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
 
 def check_reference_key(adata):
     if 'REFERENCE_MANU' not in adata.uns.keys():
@@ -152,7 +155,7 @@ def print_gpu_usage_color(bar_length: int = 30):
     GREY = '\033[90m'
     RESET = '\033[0m'
 
-    if not torch.cuda.is_available():
+    if torch is None or not torch.cuda.is_available():
         print(f"{RED}No CUDA devices found.{RESET}")
         return
 
