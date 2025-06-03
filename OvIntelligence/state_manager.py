@@ -15,7 +15,8 @@ DEFAULT_STATE: Dict[str, Any] = {
         "file_selection_model": "qwen2.5-coder:3b",
         "query_processing_model": "qwen2.5-coder:7b",
         "rate_limit": 5,  # seconds between queries
-        "paper_checker_mode": False
+        "paper_checker_mode": False,
+        "computer_use_agent": False
     },
     "current_user": getpass.getuser(),
     "available_packages": [

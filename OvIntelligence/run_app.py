@@ -2,6 +2,7 @@
 import streamlit as st
 import app
 import operator_mode
+import computer_use_agent
 
 # Store the original function from app.py
 original_process_query = app.process_query_with_progress
@@ -12,6 +13,12 @@ def patched_process_query_with_progress(query, rag_system, selected_package, use
         st.markdown("## Operator Mode Activated!")
         operator_mode.show_tutorial()
         # Stop so we do not continue with the normal RAG pipeline
+        st.stop()
+
+    # 1.5) Check if user wants Computer Use Agent
+    if query.strip() == "ComputerUseAgent":
+        st.markdown("## Computer Use Agent Activated!")
+        computer_use_agent.computer_use_interface()
         st.stop()
 
     # 2) Otherwise, just run the original function

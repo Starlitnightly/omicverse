@@ -38,6 +38,7 @@ from state_manager import initialize_session_state, reset_session_state
 
 # ---- NEW: Import the external paper checker mode module ----
 from paper_checker_mode import paper_checker_interface
+from computer_use_agent import computer_use_interface
 
 ###############################################################################
 #                       SESSION STATE INITIALIZATION
@@ -365,6 +366,19 @@ def show_configuration(rag_system):
                     st.session_state['config']['paper_checker_mode'] = True
                     ConfigManager.save_config(st.session_state['config'])
                     st.rerun()
+        with st.expander("Computer Use Agent"):
+            if st.session_state['config'].get('computer_use_agent', False):
+                st.success("Computer Use Agent is currently ENABLED.")
+                if st.button("Disable Computer Use Agent"):
+                    st.session_state['config']['computer_use_agent'] = False
+                    ConfigManager.save_config(st.session_state['config'])
+                    st.rerun()
+            else:
+                st.info("Computer Use Agent is currently DISABLED.")
+                if st.button("Enable Computer Use Agent"):
+                    st.session_state['config']['computer_use_agent'] = True
+                    ConfigManager.save_config(st.session_state['config'])
+                    st.rerun()
         if st.button("Save Configuration"):
             st.session_state['config'].update({
                 'file_selection_model': file_selection_model,
@@ -413,10 +427,12 @@ def main():
             return
         else:
             st.session_state['ollama_ready'] = True
-    # --- Check whether to run Paper Checker Mode or Normal RAG Query Interface ---
+    # --- Check whether to run Paper Checker Mode, Computer Use Agent or Normal RAG Query Interface ---
     if st.session_state['config'].get('paper_checker_mode', False):
         # Paper Checker Mode is now handled externally via the paper_checker_mode module.
         paper_checker_interface()
+    elif st.session_state['config'].get('computer_use_agent', False):
+        computer_use_interface()
     else:
         st.markdown("### Query Interface  🔍")
         selected_package = st.session_state['selected_package']
