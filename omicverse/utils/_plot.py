@@ -20,7 +20,10 @@ from datetime import datetime, timedelta
 import warnings
 import platform
 import os
-import torch
+try:
+    import torch  # Optional, used for GPU information
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
 
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', '#FCBC10', '#EF7B77', '#279AD7','#F0EEF0',
@@ -188,7 +191,10 @@ except ModuleNotFoundError:
     version = lambda name: get_distribution(name).version
 
 name = "omicverse"
-__version__ = version(name)
+try:
+    __version__ = version(name)
+except Exception:
+    __version__ = "unknown"
 
 _has_printed_logo = False  # Flag to ensure logo prints only once
 #!/usr/bin/env python3
@@ -240,7 +246,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
 
     # 4) GPU detection
     print(f"{EMOJI['gpu']} Detecting CUDA devices…")
-    if not torch.cuda.is_available():
+    if torch is None or not torch.cuda.is_available():
         print(f"{EMOJI['warnings']} No CUDA devices found")
     else:
         try:

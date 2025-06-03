@@ -1,10 +1,15 @@
 """copy from scvi-tools/scvi/utils/_mde.py"""
 
+from __future__ import annotations
+
 from typing import Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
-import torch
+try:
+    import torch  # Optional, used for GPU acceleration
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
 from scipy.sparse import spmatrix
 
 def mde(
@@ -59,7 +64,9 @@ def mde(
     if isinstance(data, pd.DataFrame):
         data = data.values
 
-    device = "cpu" if not torch.cuda.is_available() else "cuda"
+    device = "cpu"
+    if torch is not None and torch.cuda.is_available():
+        device = "cuda"
 
     _kwargs = {
         "embedding_dim": 2,
@@ -73,7 +80,7 @@ def mde(
 
     emb = pymde.preserve_neighbors(data, **_kwargs).embed(verbose=_kwargs["verbose"])
 
-    if isinstance(emb, torch.Tensor):
+    if torch is not None and isinstance(emb, torch.Tensor):
         emb = emb.cpu().numpy()
 
     return emb
