@@ -8,7 +8,7 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
-from . import bulk,single,utils,bulk2single,pp,space,pl,externel
+from . import bulk,single,utils,bulk2single,pp,space,pl,externel,popv
 #usually
 from .utils._data import read
 from .utils._plot import palette,ov_plot_set,plot_set
