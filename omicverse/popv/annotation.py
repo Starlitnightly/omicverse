@@ -54,7 +54,7 @@ algorithms_nt = AlgorithmsNT()
 
 def annotate_data(
     adata: anndata.AnnData,
-    methods: list | None = None,
+    methods: list | str | None = None,
     save_path: str | None = None,
     methods_kwargs: dict | None = None,
 ) -> None:
@@ -66,7 +66,9 @@ def annotate_data(
     adata
         AnnData of query and reference cells. AnnData object after running :class:`popv.preprocessing.Process_Query`.
     methods_
-        List of methods used for cell-type annotation. Defaults to all algorithms.
+        Methods used for cell-type annotation. Can be a list of algorithm names
+        or a single algorithm as string. Defaults select algorithms based on the
+        ``prediction_mode`` set during preprocessing.
     save_path
         Path were annotated query data is saved. Defaults to None and is not saving data.
     methods_kwargs
@@ -75,19 +77,19 @@ def annotate_data(
     """
     if save_path is not None and not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
-    methods = (
-        methods
-        if isinstance(methods, list)
-        else (
-            algorithms_nt.ALL_ALGORITHMS
-            if methods == "all"
-            else (
-                algorithms_nt.FAST_ALGORITHMS
-                if adata.uns["_prediction_mode"] == "fast"
-                else algorithms_nt.CURRENT_ALGORITHMS
-            )
+    if isinstance(methods, str):
+        if methods == "all":
+            methods = algorithms_nt.ALL_ALGORITHMS
+        else:
+            methods = [methods]
+    elif isinstance(methods, list):
+        pass
+    else:
+        methods = (
+            algorithms_nt.FAST_ALGORITHMS
+            if adata.uns["_prediction_mode"] == "fast"
+            else algorithms_nt.CURRENT_ALGORITHMS
         )
-    )
     if adata.uns["ref_prediction_keys"] is not None and adata.uns["_prediction_mode"] == "inference":
         if not set(methods).issubset(adata.uns["ref_prediction_keys"]):
             missing_methods = set(methods) - set(adata.uns["ref_prediction_keys"])
