@@ -21,8 +21,12 @@ from scipy.cluster.hierarchy import linkage,dendrogram
 from ..utils import pyomic_palette,plot_network
 import os
 
-from ..externel.PyWGCNA.wgcna import pyWGCNA
-from ..externel.PyWGCNA.utils import readWGCNA
+try:
+    from ..externel.PyWGCNA.wgcna import pyWGCNA
+    from ..externel.PyWGCNA.utils import readWGCNA
+except Exception:  # pragma: no cover - optional dependency
+    pyWGCNA = None
+    readWGCNA = None
 
 
 class pyWGCNA_old(object):
