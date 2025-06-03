@@ -231,57 +231,50 @@ def paperchecker_stage1_llm(paper_content: str = "", pdf_bytes: bytes = None) ->
 
 
 def get_rag_system_instance() -> RAGSystem:
-    """
-    Retrieve or initialize the RAG system instance from Streamlit session_state.
-    This encapsulates default configurations so they can be updated easily.
+    """Return a cached RAGSystem instance, creating it if needed.
+
+    The original implementation used hard-coded absolute paths which often do
+    not exist on the running machine.  This version optionally reads the base
+    path from the ``OV_DATA_ROOT`` environment variable and silently skips any
+    packages whose directories are missing.  This prevents immediate failures
+    and allows Paper Checker Mode to run even with partial data.
     """
     if 'rag_system' in st.session_state:
         return st.session_state['rag_system']
-    default_configs = [
-        PackageConfig(
-            name="CellRank",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/cellrank_notebooks",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/cellrank_notebooks",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        ),
-        PackageConfig(
-            name="Scanpy",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/scanpy-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/scanpy-tutorials",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        ),
-        PackageConfig(
-            name="scvi-tools",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/scvi-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/scvi-tutorials",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        ),
-        PackageConfig(
-            name="Spateo",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/spateo-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/spateo-tutorials",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        ),
-        PackageConfig(
-            name="Squidpy",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/squidpy_notebooks",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/squidpy_notebooks",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        ),
-        PackageConfig(
-            name="OmicVerse",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/ov_tut",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/ov_tut",
-            file_selection_model="gemini-2.0-flash-lite-preview-02-05",
-            query_processing_model="gemini-2.0-flash-lite-preview-02-05"
-        )
+
+    data_root = os.environ.get("OV_DATA_ROOT", "/Users/kq_m3m/PycharmProjects/SCMaster")
+    package_defs = [
+        ("CellRank", "cellrank_notebooks"),
+        ("Scanpy", "scanpy-tutorials"),
+        ("scvi-tools", "scvi-tutorials"),
+        ("Spateo", "spateo-tutorials"),
+        ("Squidpy", "squidpy_notebooks"),
+        ("OmicVerse", "ov_tut"),
     ]
-    rag_system_instance = RAGSystem(default_configs)
+
+    configs = []
+    for name, subdir in package_defs:
+        conv_dir = os.path.join(data_root, "6O_json_files", subdir)
+        annot_dir = os.path.join(data_root, "annotated_scripts", subdir)
+        if os.path.isdir(conv_dir) and os.path.isdir(annot_dir):
+            configs.append(
+                PackageConfig(
+                    name=name,
+                    converted_jsons_directory=conv_dir,
+                    annotated_scripts_directory=annot_dir,
+                    file_selection_model="gemini-2.0-flash-lite-preview-02-05",
+                    query_processing_model="gemini-2.0-flash-lite-preview-02-05",
+                )
+            )
+        else:
+            logger.warning(
+                f"Skipping package '{name}' due to missing directories: {conv_dir} or {annot_dir}"
+            )
+
+    if not configs:
+        logger.error("No valid package directories found for RAGSystem. Paper Checker mode will be limited.")
+
+    rag_system_instance = RAGSystem(configs)
     st.session_state['rag_system'] = rag_system_instance
     return rag_system_instance
 
