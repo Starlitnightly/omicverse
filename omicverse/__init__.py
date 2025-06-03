@@ -8,14 +8,30 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
-from . import bulk,single,utils,bulk2single,pp,space,pl,externel,popv
+# Core submodules
+from . import bulk, single, utils, bulk2single, pp, space, pl
+
+# Optional PopV module requires ``scvi-tools``. Skip if dependency missing.
+try:
+    from . import popv
+except Exception as e:  # pragma: no cover - optional dependency
+    import warnings
+
+    warnings.warn(
+        f"PopV module could not be imported: {e}. "
+        "Install 'scvi-tools' to enable related functionality.",
+        ImportWarning,
+    )
 #usually
 from .utils._data import read
 from .utils._plot import palette,ov_plot_set,plot_set
 
 
 name = "omicverse"
-__version__ = version(name)
+try:
+    __version__ = version(name)
+except Exception:
+    __version__ = "unknown"
 
 
 from ._settings import settings,generate_reference_table
