@@ -72,6 +72,7 @@ dependencies = [
     'plotly',
     'numba>=0.56',
     'tqdm',
+    'requests>=2.0',
     'transformers>=0.30',
     #'cvxpy>=1.3',
 
