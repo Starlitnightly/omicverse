@@ -710,8 +710,8 @@ def contour(ax,adata,groupby,clusters,basis='X_umap',
                         **kwargs)
 
     # 获取最外层轮廓的路径
-    outer_contour_path = contour.collections[0].get_paths()[0]
-    outer_contour_x, outer_contour_y = outer_contour_path.vertices[:, 0], outer_contour_path.vertices[:, 1]
+    #outer_contour_path = contour.collections[0].get_paths()[0]
+    #outer_contour_x, outer_contour_y = outer_contour_path.vertices[:, 0], outer_contour_path.vertices[:, 1]
 
     return ax
 
