@@ -1,25 +1,18 @@
 """Simplified preprocessing utilities for testing."""
 
-import scanpy as sc
+from ._preprocess import (identify_robust_genes,
+                          select_hvf_pegasus,
+                          highly_variable_features,
+                          remove_cc_genes,
+                          preprocess,
+                          normalize_pearson_residuals,
+                          highly_variable_genes,
+                          scale,
+                          regress,
+                          regress_and_scale,
+                          neighbors,
+                          pca,score_genes_cell_cycle,
+                          leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,mde,tsne)
 
-__all__ = ["qc", "preprocess", "scale"]
-
-
-def qc(adata, tresh=None):
-    """Placeholder quality-control function."""
-    return adata
-
-
-def preprocess(adata, mode="scanpy", target_sum=1e4, n_HVGs=2000):
-    """Minimal preprocessing: normalization and HVG selection."""
-    sc.pp.normalize_total(adata, target_sum=target_sum)
-    sc.pp.log1p(adata)
-    sc.pp.highly_variable_genes(adata, n_top_genes=n_HVGs, subset=False)
-    return adata
-
-
-def scale(adata, max_value=10, layers_add="scaled"):
-    """Scale data and store result in ``layers_add``."""
-    sc.pp.scale(adata, max_value=max_value)
-    adata.layers[layers_add] = adata.X.copy()
-    return adata
+from ._qc import quantity_control,qc,filter_cells,filter_genes
+from ._recover import recover_counts,binary_search
