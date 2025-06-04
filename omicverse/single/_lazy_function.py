@@ -46,13 +46,7 @@ def lazy(adata,
         pip.main(['install','louvain'])
         import louvain
     
-    try:
-        import scvi
-    except:
-        print('❌ scvi package not found, we will install it now')
-        import pip
-        pip.main(['install','scvi-tools'])
-        import scvi
+
     try:
         import louvain
     except:
@@ -192,40 +186,46 @@ def lazy(adata,
     else:
         print('✅ Batch Correction: `Harmony` step already finished, skipping it')
     
-    if ('X_scVI' not in adata.obsm.keys())  or ('scVI' in reforce_steps):
-        print('❌ Batch Correction: `scVI` step didn\'t start, we will start it now')
-        if scvi_kwargs is None:
-            scvi_kwargs={
-                'n_layers':2, 
-                'n_latent':30, 
-                'gene_likelihood':"nb"
-            }
-        batch_correction(
-            adata_hvg,
-            batch_key=sample_key,
-            methods='scVI',
-            **scvi_kwargs
-        )
-        adata.obsm['X_scVI']=adata_hvg.obsm['X_scVI']
-        if 'status' not in adata.uns.keys():
-            adata.uns['status'] = {}
-        if 'status_args' not in adata.uns.keys():
-            adata.uns['status_args'] = {}
+    try:
+        import scvi
+        if ('X_scVI' not in adata.obsm.keys())  or ('scVI' in reforce_steps):
+            print('❌ Batch Correction: `scVI` step didn\'t start, we will start it now')
+            if scvi_kwargs is None:
+                scvi_kwargs={
+                    'n_layers':2, 
+                    'n_latent':30, 
+                    'gene_likelihood':"nb"
+                }
+            batch_correction(
+                adata_hvg,
+                batch_key=sample_key,
+                methods='scVI',
+                **scvi_kwargs
+            )
+            adata.obsm['X_scVI']=adata_hvg.obsm['X_scVI']
+            if 'status' not in adata.uns.keys():
+                adata.uns['status'] = {}
+            if 'status_args' not in adata.uns.keys():
+                adata.uns['status_args'] = {}
 
-        adata.uns['status']['scVI'] = True
-        adata.uns['status_args']['scVI']={
-            'n_layers':scvi_kwargs['n_layers'],
-            'n_latent':scvi_kwargs['n_latent'],
-            'gene_likelihood':scvi_kwargs['gene_likelihood'],
-        }
-        neighbors(adata=adata,n_neighbors=15,use_rep='X_scVI',n_pcs=30)
-        umap(adata)
-        tsne(adata,use_rep='X_scVI')
-        adata.obsm['X_umap_scVI']=adata.obsm['X_umap']
-        adata.obsm['X_tsne_scVI']=adata.obsm['X_tsne']
-    else:
-        print('✅ Batch Correction: `scVI` step already finished, skipping it')
-    del adata_hvg
+            adata.uns['status']['scVI'] = True
+            adata.uns['status_args']['scVI']={
+                'n_layers':scvi_kwargs['n_layers'],
+                'n_latent':scvi_kwargs['n_latent'],
+                'gene_likelihood':scvi_kwargs['gene_likelihood'],
+            }
+            neighbors(adata=adata,n_neighbors=15,use_rep='X_scVI',n_pcs=30)
+            umap(adata)
+            tsne(adata,use_rep='X_scVI')
+            adata.obsm['X_umap_scVI']=adata.obsm['X_umap']
+            adata.obsm['X_tsne_scVI']=adata.obsm['X_tsne']
+        else:
+            print('✅ Batch Correction: `scVI` step already finished, skipping it')
+        del adata_hvg
+    except:
+        print('❌ scvi package not found, we will not run scVI step')
+        
+    
 
     if ('bench_best_res' not in adata.uns.keys()) or ('eval_bench' in reforce_steps):
         print('❌ Best Bench Correction Eval step didn\'t start, we will start it now')
@@ -250,7 +250,10 @@ def lazy(adata,
         import matplotlib.pyplot as plt
         bm.plot_results_table(min_max_scale=False,show=False)
         """
-        adata.uns['bench_best_res']='X_scVI'
+        if 'X_scVI' in adata.obsm.keys():
+            adata.uns['bench_best_res']='X_scVI'
+        else:
+            adata.uns['bench_best_res']='X_harmony'
         print(f'The Best Bench Correction Method is {adata.uns["bench_best_res"]}')
         print("We can found it in `adata.uns['bench_best_res']`")
     else:
