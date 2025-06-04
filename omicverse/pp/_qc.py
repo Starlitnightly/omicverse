@@ -270,6 +270,7 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     # Original QC plot
     n0 = adata.shape[0]
     print(f'Original cell number: {n0}')
+    n1 = n0
 
     if doublets is True:
         if doublets_method=='scrublet':
@@ -315,10 +316,6 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             print('End of post sccomposite removal and QC plots.')
     else:
         n1 = adata.shape[0]
-    # Fix bug where n1 is not defined when doublets=False
-    if not doublets:
-        n1 = n0
-
 
     # Post seurat or mads filtering QC plot
 
