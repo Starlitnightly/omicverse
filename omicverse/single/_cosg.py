@@ -509,7 +509,7 @@ def cosg(
 
         ## Compare the most ideal case to the worst case
         if sparse.issparse(cellxgene):
-            scores=genexlambda[:,order_i].A[:,0]
+            scores=genexlambda[:,order_i].toarray()[:,0]
         else:
             scores=genexlambda[:,order_i]
 
