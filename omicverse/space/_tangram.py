@@ -85,6 +85,8 @@ class Tangram(object):
         )
 
         tg.project_cell_annotations(ad_map, self.adata_sp, annotation=self.clusters)
+        self.ad_map=ad_map
+        
         print('...Model train successfully')
         add_reference(self.adata_sp,'tangram','cell type classification with Tangram')
         add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
@@ -103,6 +105,19 @@ class Tangram(object):
         add_reference(self.adata_sp,'tangram','cell type classification with Tangram')
         add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
         return adata_plot
+    
+    def impute(self,
+               ad_map: AnnData = None,
+               ad_sc: AnnData = None,
+                **kwargs: Any) -> None:
+        if ad_map is None:
+            ad_map=self.ad_map
+        if ad_sc is None:
+            ad_sc=self.adata_sc
+        ad_ge = tg.project_genes(adata_map=ad_map, 
+                                 adata_sc=ad_sc,**kwargs)
+        return ad_ge
+
 
 def construct_obs_plot(df_plot: pd.DataFrame,
                         adata: AnnData,
