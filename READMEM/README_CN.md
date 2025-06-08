@@ -8,7 +8,7 @@
 
 [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse) [![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![scverse](https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow)](https://scverse.org/) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg)](https://github.com/Starlitnightly/omicverse/) ![Docker Pulls](https://img.shields.io/docker/pulls/starlitnightly/omicverse)
 
-**`OmicVerse`** 是一个用于Python多组学分析的基础包，包括**大样本、单细胞和空间RNA-seq**分析。了解更多信息，请阅读我们的论文：[OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
+**`OmicVerse`** 是一个用于Python多组学分析的基础包，包括**Bulk、单细胞和空间RNA-seq**分析。了解更多信息，请阅读我们的论文：[OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
 
 > [!IMPORTANT]
 >
@@ -192,7 +192,7 @@ omicverse基于以下四种数据结构实现。
 
 ## `8` [其他](#)
 
-如果您想赞助我们项目的开发，可以前往爱发电网站(https://ifdian.net/a/starlitnightly)赞助我们。
+如果您想赞助我们项目的开发，可以前往爱发电网站 (https://ifdian.net/a/starlitnightly) 赞助我们。
 
 版权所有 © 2024 [112 Lab](https://112lab.asia/)。<br />
 本项目采用[GPL3.0](../LICENSE)许可证。
