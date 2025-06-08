@@ -53,6 +53,11 @@ class CellOntologyMapper:
         self.species = "human"
         self.study_context = None
         
+        # Cell taxonomy resource (treated as additional ontology)
+        self.taxonomy_resource = None
+        self.taxonomy_embeddings = None
+        self.taxonomy_labels = None
+        self.taxonomy_info_dict = None  # For quick lookup of detailed info
         # Initialize based on provided parameters
         if embeddings_path and os.path.exists(embeddings_path):
             print("📥 Loading existing ontology embeddings...")
@@ -950,7 +955,15 @@ Cell type abbreviation: {cell_name}"""
                         'top3_matches': []
                     }
         else:
-            print("🎯 Performing direct ontology mapping (abbreviation expansion disabled)")
+            if expand_abbreviations and self.llm_client is None:
+                print("⚠️  Abbreviation expansion requested but LLM client not configured")
+                print("💡 To enable LLM expansion, use: mapper.setup_llm_expansion()")
+                print("🎯 Performing direct ontology mapping (without abbreviation expansion)")
+            elif not expand_abbreviations:
+                print("🎯 Performing direct ontology mapping (abbreviation expansion disabled by parameter)")
+            else:
+                print("🎯 Performing direct ontology mapping (abbreviation expansion disabled)")
+                
             mapping_results = self.map_cells(cell_names, threshold)
             
             # Add expansion information
@@ -2020,6 +2033,856 @@ Cell type abbreviation: {cell_name}"""
             'cl_id': cl_id
         }
 
+    def load_cell_taxonomy_resource(self, taxonomy_file, species_filter=None):
+        """
+        📊 Load Cell Taxonomy resource as additional ontology
+        
+        This method treats Cell Taxonomy as an additional ontology source,
+        reusing the same NLP embedding and matching mechanisms as Cell Ontology.
+        
+        Parameters
+        ----------
+        taxonomy_file : str
+            📄 Path to Cell_Taxonomy_resource.txt file
+        species_filter : str or list, optional
+            🐭 Filter by species (e.g., "Homo sapiens", "Mus musculus")
+            
+        Returns
+        -------
+        success : bool
+            ✓ True if loaded successfully
+        """
+        try:
+            import pandas as pd
+            
+            print(f"📊 Loading Cell Taxonomy resource from: {taxonomy_file}")
+            
+            # Load the taxonomy file
+            df = pd.read_csv(taxonomy_file, sep='\t', dtype=str, na_values=['NA'])
+            print(f"✓ Loaded {len(df)} taxonomy entries")
+            
+            # Filter by species if specified
+            if species_filter:
+                if isinstance(species_filter, str):
+                    species_filter = [species_filter]
+                original_count = len(df)
+                df = df[df['Species'].isin(species_filter)]
+                print(f"🐭 Filtered by species {species_filter}: {len(df)}/{original_count} entries")
+            
+            self.taxonomy_resource = df
+            
+            # Create taxonomy embeddings using the same approach as ontology
+            self._create_taxonomy_embeddings()
+            
+            # Show statistics
+            species_counts = df['Species'].value_counts()
+            print(f"📈 Species distribution:")
+            for species, count in species_counts.head(5).items():
+                print(f"  🐭 {species}: {count} entries")
+            
+            cell_type_count = df['Cell_standard'].nunique()
+            print(f"🧬 Unique cell types: {cell_type_count}")
+            
+            marker_count = df['Cell_Marker'].dropna().nunique()
+            print(f"🎯 Unique markers: {marker_count}")
+            
+            return True
+            
+        except FileNotFoundError:
+            print(f"✗ File not found: {taxonomy_file}")
+            return False
+        except Exception as e:
+            print(f"✗ Failed to load taxonomy resource: {e}")
+            return False
+    
+    def _create_taxonomy_embeddings(self):
+        """🧠 Create taxonomy embeddings using the same approach as ontology"""
+        if self.taxonomy_resource is None:
+            return
+        
+        self._load_model()
+        
+        # Get unique cell types and their detailed descriptions
+        unique_cell_types = self.taxonomy_resource['Cell_standard'].dropna().unique().tolist()
+        
+        if not unique_cell_types:
+            print("⚠️  No valid cell types found in taxonomy resource")
+            return
+        
+        print(f"🧠 Creating embeddings for {len(unique_cell_types)} taxonomy cell types...")
+        
+        # Create embeddings for cell type names (same as ontology approach)
+        cell_embeddings = self.model.encode(unique_cell_types, show_progress_bar=True)
+        
+        # Store embeddings
+        self.taxonomy_embeddings = {}
+        for cell_type, embedding in zip(unique_cell_types, cell_embeddings):
+            self.taxonomy_embeddings[cell_type] = embedding
+        
+        self.taxonomy_labels = unique_cell_types
+        
+        # Create detailed info dictionary for quick lookup
+        self.taxonomy_info_dict = {}
+        for _, row in self.taxonomy_resource.iterrows():
+            cell_type = row['Cell_standard']
+            if pd.notna(cell_type):
+                if cell_type not in self.taxonomy_info_dict:
+                    self.taxonomy_info_dict[cell_type] = []
+                self.taxonomy_info_dict[cell_type].append(row.to_dict())
+        
+        print(f"✓ Created taxonomy embeddings for {len(self.taxonomy_embeddings)} cell types")
+    
+    def map_cells_with_taxonomy(self, cell_names, threshold=0.5, expand_abbreviations=True,
+                               use_taxonomy=True, species=None, tissue_context=None, study_context=None):
+        """
+        🔄 Enhanced cell mapping using both ontology and taxonomy
+        
+        This method combines Cell Ontology and Cell Taxonomy using the same NLP approach,
+        providing comprehensive mapping results with additional marker gene information.
+        
+        Parameters
+        ----------
+        cell_names : list
+            📝 List of cell names to map
+        threshold : float
+            📊 Similarity threshold
+        expand_abbreviations : bool
+            🔄 Whether to enable abbreviation expansion
+        use_taxonomy : bool
+            📊 Whether to include taxonomy resource in mapping
+        species : str, optional
+            🐭 Species information for taxonomy filtering
+        tissue_context : str or list, optional
+            🧬 Tissue context information
+        study_context : str, optional
+            🔬 Study context information
+        
+        Returns
+        -------
+        mapping_results : dict
+            📋 Combined mapping results from ontology and taxonomy
+        """
+        # First perform standard ontology mapping with expansion
+        mapping_results = self.map_cells_with_expansion(
+            cell_names, threshold, expand_abbreviations,
+            tissue_context=tissue_context, species=species, study_context=study_context
+        )
+        
+        # Enhance with taxonomy if available and requested
+        if use_taxonomy and self.taxonomy_embeddings is not None:
+            print("\n📊 Enhancing with taxonomy resource using NLP similarity...")
+            
+            self._enhance_with_taxonomy(mapping_results, cell_names, threshold, species)
+        
+        return mapping_results
+    
+    def _enhance_with_taxonomy(self, mapping_results, cell_names, threshold, species):
+        """🧬 Enhance mapping results with taxonomy information using NLP similarity"""
+        self._load_model()
+        
+        # Get taxonomy embedding matrix
+        taxonomy_emb_matrix = np.array([
+            self.taxonomy_embeddings[label] for label in self.taxonomy_labels
+        ])
+        
+        print(f"🧬 Taxonomy enhancement: Processing {len(cell_names)} cell names...")
+        
+        for cell_name in cell_names:
+            if cell_name not in mapping_results:
+                continue
+                
+            result = mapping_results[cell_name]
+            
+            # PRIORITIZE expanded name for taxonomy matching
+            names_to_check = []
+            expanded_name = result.get('expanded_name', cell_name)
+            was_expanded = result.get('was_expanded', False)
+            
+            # First priority: Use expanded name if available
+            if was_expanded and expanded_name != cell_name:
+                names_to_check.append(expanded_name)
+                print(f"  🔤 Using expanded name '{expanded_name}' (from '{cell_name}') for taxonomy matching")
+            else:
+                names_to_check.append(cell_name)
+             
+            # Secondary options: original name and best ontology match  
+            if cell_name not in names_to_check:
+                names_to_check.append(cell_name)
+                
+            best_match = result.get('best_match', '')
+            if best_match and best_match not in names_to_check:
+                names_to_check.append(best_match)
+            
+            # Find best taxonomy matches using NLP similarity (same approach as ontology)
+            best_taxonomy_match = None
+            best_taxonomy_similarity = 0
+            best_matched_from = None
+            
+            for name_to_check in names_to_check:
+                # Encode the name
+                name_embedding = self.model.encode([name_to_check])
+                
+                # Calculate similarities with taxonomy
+                similarities = cosine_similarity(name_embedding, taxonomy_emb_matrix)[0]
+                
+                # Get top matches above threshold
+                valid_indices = np.where(similarities > threshold)[0]
+                if len(valid_indices) == 0:
+                    continue
+                
+                # Sort by similarity (descending)
+                sorted_indices = valid_indices[np.argsort(similarities[valid_indices])[::-1]]
+                
+                # Try to find a match, preferring species match if specified
+                for idx in sorted_indices:
+                    similarity = similarities[idx]
+                    taxonomy_label = self.taxonomy_labels[idx]
+                    
+                    # Get detailed taxonomy info
+                    taxonomy_entries = self.taxonomy_info_dict.get(taxonomy_label, [])
+                    
+                    # Check species compatibility
+                    if species:
+                        # Filter entries by species
+                        species_entries = [
+                            entry for entry in taxonomy_entries 
+                            if entry.get('Species') == species
+                        ]
+                        if species_entries:
+                            # Found species-specific match
+                            target_entries = species_entries
+                        elif not best_taxonomy_match:
+                            # No species match yet, but this is better than nothing
+                            target_entries = taxonomy_entries
+                        else:
+                            # We already have a match, skip non-species matches
+                            continue
+                    else:
+                        # No species filter
+                        target_entries = taxonomy_entries
+                    
+                    if target_entries and similarity > best_taxonomy_similarity:
+                        best_taxonomy_similarity = similarity
+                        best_taxonomy_match = {
+                            'cell_type': taxonomy_label,
+                            'similarity': similarity,
+                            'info': target_entries[0],  # Use first match
+                            'matched_from': name_to_check
+                        }
+                        best_matched_from = name_to_check
+                        
+                        # Show successful taxonomy match with clear indication
+                        species_note = f" ({target_entries[0].get('Species', 'Unknown')})" if species else ""
+                        if was_expanded and best_matched_from == expanded_name:
+                            print(f"    ✓ Taxonomy match: '{best_matched_from}' → '{taxonomy_label}'{species_note} (sim: {similarity:.3f}) [USED EXPANDED NAME]")
+                        else:
+                            print(f"    ✓ Taxonomy match: '{best_matched_from}' → '{taxonomy_label}'{species_note} (sim: {similarity:.3f})")
+                        
+                        # If we found a species-specific match, we can break
+                        if not species or target_entries[0].get('Species') == species:
+                            break
+                
+                # If we found a good match for this name, we can stop trying other names
+                if best_taxonomy_match and (not species or best_taxonomy_match['info'].get('Species') == species):
+                    break
+            
+            # Add taxonomy information to results
+            if best_taxonomy_match:
+                info = best_taxonomy_match['info']
+                result['taxonomy_match'] = best_taxonomy_match['cell_type']
+                result['taxonomy_similarity'] = best_taxonomy_match['similarity']
+                result['taxonomy_matched_from'] = best_taxonomy_match['matched_from']
+                
+                # Add detailed taxonomy information
+                result['ct_id'] = info.get('CT_ID')
+                result['cell_marker'] = info.get('Cell_Marker')
+                result['specific_cell_ontology_id'] = info.get('Specific_Cell_Ontology_ID')
+                result['gene_info'] = {
+                    'entrez_id': info.get('Gene_ENTREZID'),
+                    'gene_alias': info.get('Gene_Alias'),
+                    'ensembl_id': info.get('Gene_Ensembl_ID'),
+                    'uniprot': info.get('Uniprot'),
+                    'pfam': info.get('PFAM'),
+                    'go_terms': info.get('GO2')
+                }
+                result['tissue_ontology_id'] = info.get('Tissue_UberonOntology_ID')
+                result['pmid'] = info.get('PMID')
+                result['source'] = info.get('Source')
+                
+                # Boost confidence if taxonomy provides strong support
+                if best_taxonomy_match['similarity'] > 0.8:
+                    if result['confidence'] == 'low':
+                        result['confidence'] = 'medium'
+                        result['confidence_reason'] = 'Enhanced by taxonomy resource'
+                    elif result['confidence'] == 'medium':
+                        result['confidence'] = 'high'  
+                        result['confidence_reason'] = 'Strong taxonomy confirmation'
+            else:
+                # Show when no taxonomy match found
+                if was_expanded:
+                    print(f"    ✗ No taxonomy match found for '{expanded_name}' (expanded from '{cell_name}')")
+                else:
+                    print(f"    ✗ No taxonomy match found for '{cell_name}'")
+    
+    def search_by_marker(self, markers, species=None, top_k=10):
+        """
+        🎯 Search cell types by gene markers using taxonomy resource
+        
+        Parameters
+        ----------
+        markers : str or list
+            🧬 Gene marker(s) to search for
+        species : str, optional
+            🐭 Species to filter by
+        top_k : int
+            📊 Maximum number of results to return
+            
+        Returns
+        -------
+        matches : list
+            📊 List of matching cell types with detailed information
+        """
+        if self.taxonomy_resource is None:
+            print("✗ No taxonomy resource loaded")
+            return []
+        
+        if isinstance(markers, str):
+            markers = [markers]
+        
+        df = self.taxonomy_resource
+        if species:
+            df = df[df['Species'] == species]
+        
+        matches = []
+        
+        for marker in markers:
+            # Search in Cell_Marker column
+            marker_matches = df[df['Cell_Marker'].str.contains(marker, na=False, case=False)]
+            
+            # Search in Gene_Alias column
+            alias_matches = df[df['Gene_Alias'].str.contains(marker, na=False, case=False)]
+            
+            # Combine matches
+            combined_matches = pd.concat([marker_matches, alias_matches]).drop_duplicates()
+            
+            for _, row in combined_matches.iterrows():
+                match_info = {
+                    'cell_type': row['Cell_standard'],
+                    'species': row['Species'],
+                    'marker': row['Cell_Marker'],
+                    'ct_id': row['CT_ID'],
+                    'gene_alias': row['Gene_Alias'],
+                    'entrez_id': row['Gene_ENTREZID'],
+                    'matched_marker': marker,
+                    'source': row.get('Source', 'Unknown')
+                }
+                matches.append(match_info)
+        
+        # Remove duplicates and limit results
+        unique_matches = []
+        seen = set()
+        for match in matches:
+            key = f"{match['cell_type']}_{match['species']}_{match['ct_id']}"
+            if key not in seen and len(unique_matches) < top_k:
+                seen.add(key)
+                unique_matches.append(match)
+        
+        print(f"🎯 Found {len(unique_matches)} cell types with markers {markers}")
+        for match in unique_matches[:5]:  # Show top 5
+            print(f"  🧬 {match['cell_type']} ({match['species']}) - Marker: {match['marker']}")
+        
+        return unique_matches
+
+    def map_adata_with_taxonomy(self, adata, cell_name_col=None, threshold=0.5, 
+                                new_col_name='cell_ontology', expand_abbreviations=True,
+                                use_taxonomy=True, species=None, tissue_context=None, study_context=None):
+        """
+        🧬 Apply taxonomy-enhanced mapping to AnnData object
+        
+        This method applies the unified ontology + taxonomy mapping to AnnData,
+        providing comprehensive cell type annotation with gene marker information.
+        
+        Parameters
+        ----------
+        adata : AnnData
+            📊 Single-cell data object
+        cell_name_col : str, optional
+            📝 Column name containing cell names, use index if None
+        threshold : float
+            📊 Similarity threshold
+        new_col_name : str
+            🏷️  Base name for new columns
+        expand_abbreviations : bool
+            🔄 Whether to enable LLM abbreviation expansion
+        use_taxonomy : bool
+            📊 Whether to include taxonomy resource enhancement
+        species : str, optional
+            🐭 Species information for taxonomy filtering
+        tissue_context : str or list, optional
+            🧬 Tissue context information
+        study_context : str, optional
+            🔬 Study context information
+        
+        Returns
+        -------
+        mapping_results : dict
+            📋 Enhanced mapping results with both ontology and taxonomy information
+        """
+        # Get cell names
+        if cell_name_col is None:
+            cell_names = adata.obs.index.unique().tolist()
+            cell_names_series = adata.obs.index.to_series()
+            print(f"📊 Using {len(cell_names)} unique cell names from index")
+        else:
+            cell_names = adata.obs[cell_name_col].unique().tolist()
+            cell_names_series = adata.obs[cell_name_col]
+            print(f"📊 Using {len(cell_names)} unique cell names from column '{cell_name_col}'")
+        
+        # Perform taxonomy-enhanced mapping
+        mapping_results = self.map_cells_with_taxonomy(
+            cell_names, threshold, expand_abbreviations, use_taxonomy,
+            species=species, tissue_context=tissue_context, study_context=study_context
+        )
+        
+        # Apply to adata
+        print("\n📝 Applying enhanced mapping results to AnnData...")
+        
+        # Helper functions for extracting information
+        def get_best_match(cell_name):
+            return mapping_results.get(cell_name, {}).get('best_match', 'Unknown')
+        
+        def get_similarity(cell_name):
+            return mapping_results.get(cell_name, {}).get('similarity', 0.0)
+        
+        def get_confidence(cell_name):
+            return mapping_results.get(cell_name, {}).get('confidence', 'low')
+        
+        def get_ontology_id(cell_name):
+            return mapping_results.get(cell_name, {}).get('ontology_id', None)
+        
+        def get_cl_id(cell_name):
+            return mapping_results.get(cell_name, {}).get('cl_id', None)
+        
+        def get_expanded_name(cell_name):
+            return mapping_results.get(cell_name, {}).get('expanded_name', cell_name)
+        
+        def was_expanded(cell_name):
+            return mapping_results.get(cell_name, {}).get('was_expanded', False)
+        
+        # Taxonomy-specific helper functions
+        def get_taxonomy_match(cell_name):
+            return mapping_results.get(cell_name, {}).get('taxonomy_match', None)
+        
+        def get_taxonomy_similarity(cell_name):
+            return mapping_results.get(cell_name, {}).get('taxonomy_similarity', 0.0)
+        
+        def get_ct_id(cell_name):
+            return mapping_results.get(cell_name, {}).get('ct_id', None)
+        
+        def get_cell_marker(cell_name):
+            return mapping_results.get(cell_name, {}).get('cell_marker', None)
+        
+        def get_gene_entrez_id(cell_name):
+            gene_info = mapping_results.get(cell_name, {}).get('gene_info', {})
+            return gene_info.get('entrez_id', None)
+        
+        def get_gene_alias(cell_name):
+            gene_info = mapping_results.get(cell_name, {}).get('gene_info', {})
+            return gene_info.get('gene_alias', None)
+        
+        def get_pmid(cell_name):
+            return mapping_results.get(cell_name, {}).get('pmid', None)
+        
+        # Apply standard ontology columns
+        adata.obs[new_col_name] = cell_names_series.apply(get_best_match)
+        adata.obs[f'{new_col_name}_similarity'] = cell_names_series.apply(get_similarity)
+        adata.obs[f'{new_col_name}_confidence'] = cell_names_series.apply(get_confidence)
+        adata.obs[f'{new_col_name}_ontology_id'] = cell_names_series.apply(get_ontology_id)
+        adata.obs[f'{new_col_name}_cl_id'] = cell_names_series.apply(get_cl_id)
+        adata.obs[f'{new_col_name}_expanded'] = cell_names_series.apply(get_expanded_name)
+        adata.obs[f'{new_col_name}_was_expanded'] = cell_names_series.apply(was_expanded)
+        
+        # Apply taxonomy enhancement columns if taxonomy is used
+        if use_taxonomy and self.taxonomy_embeddings is not None:
+            adata.obs[f'{new_col_name}_taxonomy_match'] = cell_names_series.apply(get_taxonomy_match)
+            adata.obs[f'{new_col_name}_taxonomy_similarity'] = cell_names_series.apply(get_taxonomy_similarity)
+            adata.obs[f'{new_col_name}_ct_id'] = cell_names_series.apply(get_ct_id)
+            adata.obs[f'{new_col_name}_cell_marker'] = cell_names_series.apply(get_cell_marker)
+            adata.obs[f'{new_col_name}_gene_entrez_id'] = cell_names_series.apply(get_gene_entrez_id)
+            adata.obs[f'{new_col_name}_gene_alias'] = cell_names_series.apply(get_gene_alias)
+            adata.obs[f'{new_col_name}_pmid'] = cell_names_series.apply(get_pmid)
+        
+        # Statistics
+        high_conf_count = sum(1 for r in mapping_results.values() if r['confidence'] == 'high')
+        medium_conf_count = sum(1 for r in mapping_results.values() if r['confidence'] == 'medium')
+        low_conf_count = sum(1 for r in mapping_results.values() if r['confidence'] == 'low')
+        expanded_count = sum(1 for r in mapping_results.values() if r.get('was_expanded', False))
+        
+        print(f"✓ Enhanced mapping completed:")
+        print(f"  📊 {high_conf_count}/{len(mapping_results)} high confidence mappings")
+        print(f"  📊 {medium_conf_count}/{len(mapping_results)} medium confidence mappings")
+        print(f"  📊 {low_conf_count}/{len(mapping_results)} low confidence mappings")
+        print(f"  🔄 {expanded_count}/{len(mapping_results)} abbreviation expansions")
+        
+        if use_taxonomy and self.taxonomy_embeddings is not None:
+            taxonomy_enhanced_count = sum(1 for r in mapping_results.values() if 'taxonomy_match' in r)
+            print(f"  📊 {taxonomy_enhanced_count}/{len(mapping_results)} enhanced with taxonomy resource")
+        
+        return mapping_results
+
+    def print_mapping_summary_taxonomy(self, mapping_results, top_n=10):
+        """📋 Print comprehensive mapping summary with taxonomy information"""
+        stats = self.get_statistics(mapping_results)
+        
+        print("\n" + "="*80)
+        print("ENHANCED MAPPING SUMMARY (ONTOLOGY + TAXONOMY)")
+        print("="*80)
+        print(f"Total mappings:\t\t{stats['total_mappings']}")
+        print(f"High confidence:\t{stats['high_confidence']} ({stats['high_confidence_ratio']:.2%})")
+        print(f"Low confidence:\t\t{stats['low_confidence']}")
+        print(f"Average similarity:\t{stats['mean_similarity']:.3f}")
+        
+        # Count taxonomy enhancements
+        taxonomy_enhanced = sum(1 for r in mapping_results.values() if 'taxonomy_match' in r and r['taxonomy_match'])
+        llm_expanded = sum(1 for r in mapping_results.values() if r.get('was_expanded', False))
+        
+        print(f"LLM expansions:\t\t{llm_expanded}")
+        print(f"Taxonomy enhanced:\t{taxonomy_enhanced}")
+        
+        print(f"\nDETAILED MAPPING RESULTS (Top {top_n})")
+        print("-" * 80)
+        
+        sorted_results = sorted(
+            mapping_results.items(), 
+            key=lambda x: x[1]['similarity'], 
+            reverse=True
+        )
+        
+        for i, (cell_name, result) in enumerate(sorted_results[:top_n]):
+            conf_mark = "✓" if result['confidence'] == 'high' else "?" if result['confidence'] == 'medium' else "✗"
+            
+            print(f"\n{i+1:2d}. [{conf_mark}] {cell_name}")
+            
+            # Show expansion info
+            if result.get('was_expanded', False):
+                expanded_name = result.get('expanded_name', cell_name)
+                print(f"     🔤 Expanded: {cell_name} → {expanded_name}")
+            
+            # Ontology mapping
+            print(f"     🎯 Ontology: {result['best_match']}")
+            print(f"        Similarity: {result['similarity']:.3f}")
+            cl_id = result.get('cl_id', 'N/A')
+            print(f"        CL ID: {cl_id}")
+            
+            # Taxonomy enhancement (if available)
+            taxonomy_match = result.get('taxonomy_match')
+            if taxonomy_match:
+                taxonomy_sim = result.get('taxonomy_similarity', 0)
+                matched_from = result.get('taxonomy_matched_from', 'Unknown')
+                print(f"     🧬 Taxonomy: {taxonomy_match}")
+                print(f"        Similarity: {taxonomy_sim:.3f}")
+                print(f"        Matched from: {matched_from}")
+                
+                # Show additional taxonomy info
+                ct_id = result.get('ct_id')
+                if ct_id:
+                    print(f"        CT ID: {ct_id}")
+                
+                cell_marker = result.get('cell_marker')
+                if cell_marker:
+                    print(f"        🎯 Marker: {cell_marker}")
+                
+                gene_info = result.get('gene_info', {})
+                gene_alias = gene_info.get('gene_alias')
+                if gene_alias:
+                    print(f"        🧬 Gene: {gene_alias}")
+                
+                entrez_id = gene_info.get('entrez_id')
+                if entrez_id:
+                    print(f"        🆔 ENTREZ: {entrez_id}")
+            else:
+                print(f"     🧬 Taxonomy: No match found")
+            
+            print()
+        
+        # Show summary of issues
+        no_taxonomy_matches = [
+            name for name, result in mapping_results.items() 
+            if not result.get('taxonomy_match')
+        ]
+        
+        if no_taxonomy_matches:
+            print(f"\n⚠️  CELLS WITHOUT TAXONOMY MATCHES ({len(no_taxonomy_matches)}):")
+            for name in no_taxonomy_matches:
+                result = mapping_results[name]
+                ontology_match = result.get('best_match', 'Unknown')
+                similarity = result.get('similarity', 0)
+                print(f"  - {name} → {ontology_match} (sim: {similarity:.3f})")
+        
+        print("\n" + "="*80)
+    
+    def find_similar_cells_taxonomy(self, cell_name, species=None, top_k=10):
+        """
+        🧬 Find taxonomy cell types most similar to given cell name
+        
+        Parameters
+        ----------
+        cell_name : str
+            📝 Input cell name
+        species : str, optional
+            🐭 Filter by species (e.g., "Homo sapiens", "Mus musculus")
+        top_k : int
+            📊 Return top k most similar results
+        
+        Returns
+        -------
+        similar_cells : list
+            📋 Similar cell types with similarities and taxonomy info
+        """
+        if self.taxonomy_embeddings is None:
+            print("✗ Please load taxonomy resource first using load_cell_taxonomy_resource()")
+            return []
+        
+        self._load_model()
+        
+        # Encode input cell name
+        cell_embedding = self.model.encode([cell_name])
+        
+        # Get taxonomy embedding matrix
+        taxonomy_emb_matrix = np.array([
+            self.taxonomy_embeddings[label] for label in self.taxonomy_labels
+        ])
+        
+        # Calculate similarities
+        similarities = cosine_similarity(cell_embedding, taxonomy_emb_matrix)[0]
+        
+        # Get top-k most similar
+        top_indices = np.argsort(similarities)[-top_k*3:][::-1]  # Get more to filter by species
+        
+        similar_cells = []
+        for idx in top_indices:
+            if len(similar_cells) >= top_k:
+                break
+                
+            taxonomy_label = self.taxonomy_labels[idx]
+            similarity = similarities[idx]
+            
+            # Get detailed taxonomy info
+            taxonomy_entries = self.taxonomy_info_dict.get(taxonomy_label, [])
+            
+            # Filter by species if specified
+            if species:
+                taxonomy_entries = [
+                    entry for entry in taxonomy_entries 
+                    if entry.get('Species') == species
+                ]
+            
+            if taxonomy_entries:
+                # Use first matching entry
+                entry = taxonomy_entries[0]
+                cell_info = {
+                    'cell_type': taxonomy_label,
+                    'similarity': similarity,
+                    'species': entry.get('Species'),
+                    'ct_id': entry.get('CT_ID'),
+                    'cell_marker': entry.get('Cell_Marker'),
+                    'gene_alias': entry.get('Gene_Alias'),
+                    'entrez_id': entry.get('Gene_ENTREZID'),
+                    'pmid': entry.get('PMID'),
+                    'source': entry.get('Source')
+                }
+                similar_cells.append(cell_info)
+        
+        print(f"\n🧬 Taxonomy cell types most similar to '{cell_name}':")
+        if species:
+            print(f"🐭 Filtered by species: {species}")
+        
+        for i, cell_info in enumerate(similar_cells):
+            print(f"{i+1:2d}. {cell_info['cell_type']:<40} (Similarity: {cell_info['similarity']:.3f})")
+            print(f"     🐭 Species: {cell_info['species']}")
+            if cell_info['cell_marker']:
+                print(f"     🎯 Marker: {cell_info['cell_marker']}")
+            if cell_info['ct_id']:
+                print(f"     🆔 CT ID: {cell_info['ct_id']}")
+            print()
+        
+        return similar_cells
+    
+    def download_model(self):
+        """
+        📥 Manually download and load the model
+        
+        Returns
+        -------
+        bool
+            ✓ True if successful, False otherwise
+        """
+        try:
+            self._load_model()
+            return True
+        except Exception as e:
+            print(f"✗ Model download failed: {e}")
+            return False
+
+    def get_cell_info_taxonomy(self, cell_name, species=None):
+        """
+        🧬 Get detailed taxonomy information for specific cell type
+        
+        Parameters
+        ----------
+        cell_name : str
+            📝 Cell type name
+        species : str, optional
+            🐭 Filter by species (e.g., "Homo sapiens", "Mus musculus")
+        
+        Returns
+        -------
+        info_list : list
+            📋 List of taxonomy information dictionaries
+        """
+        if self.taxonomy_resource is None:
+            print("✗ Please load taxonomy resource first using load_cell_taxonomy_resource()")
+            return []
+        
+        # Search for exact or partial matches
+        df = self.taxonomy_resource
+        
+        # Try exact match first
+        exact_matches = df[df['Cell_standard'].str.lower() == cell_name.lower()]
+        
+        if exact_matches.empty:
+            # Try partial match
+            partial_matches = df[df['Cell_standard'].str.contains(cell_name, case=False, na=False)]
+            if partial_matches.empty:
+                print(f"✗ Cell type not found in taxonomy: {cell_name}")
+                
+                # Suggest similar cells using NLP
+                if self.taxonomy_embeddings:
+                    print("💡 Searching for similar cell types...")
+                    similar = self.find_similar_cells_taxonomy(cell_name, species=species, top_k=5)
+                    if similar:
+                        print("💡 Did you mean one of these:")
+                        for s in similar[:3]:
+                            print(f"  - {s['cell_type']} (sim: {s['similarity']:.3f})")
+                return []
+            else:
+                matches = partial_matches
+        else:
+            matches = exact_matches
+        
+        # Filter by species if specified
+        if species:
+            matches = matches[matches['Species'] == species]
+            if matches.empty:
+                print(f"✗ Cell type '{cell_name}' not found for species '{species}'")
+                return []
+        
+        print(f"\n🧬 === Cell Taxonomy Information: {cell_name} ===")
+        
+        info_list = []
+        for i, (_, row) in enumerate(matches.iterrows()):
+            print(f"\n📊 Entry {i+1}:")
+            
+            info = {
+                'cell_type': row['Cell_standard'],
+                'species': row['Species'],
+                'ct_id': row.get('CT_ID'),
+                'cell_marker': row.get('Cell_Marker'),
+                'specific_cell_ontology_id': row.get('Specific_Cell_Ontology_ID'),
+                'gene_info': {
+                    'entrez_id': row.get('Gene_ENTREZID'),
+                    'gene_alias': row.get('Gene_Alias'),
+                    'ensembl_id': row.get('Gene_Ensembl_ID'),
+                    'uniprot': row.get('Uniprot'),
+                    'pfam': row.get('PFAM'),
+                    'go_terms': row.get('GO2')
+                },
+                'tissue_ontology_id': row.get('Tissue_UberonOntology_ID'),
+                'pmid': row.get('PMID'),
+                'source': row.get('Source')
+            }
+            
+            # Display information
+            print(f"🐭 Species: {info['species']}")
+            if info['ct_id']:
+                print(f"🆔 CT ID: {info['ct_id']}")
+            if info['cell_marker']:
+                print(f"🎯 Cell Marker: {info['cell_marker']}")
+            if info['specific_cell_ontology_id']:
+                print(f"🔗 Cell Ontology ID: {info['specific_cell_ontology_id']}")
+            
+            # Gene information
+            gene_info = info['gene_info']
+            if any(gene_info.values()):
+                print(f"🧬 Gene Information:")
+                if gene_info['gene_alias']:
+                    print(f"   Gene Alias: {gene_info['gene_alias']}")
+                if gene_info['entrez_id']:
+                    print(f"   ENTREZ ID: {gene_info['entrez_id']}")
+                if gene_info['ensembl_id']:
+                    print(f"   Ensembl ID: {gene_info['ensembl_id']}")
+                if gene_info['uniprot']:
+                    print(f"   UniProt: {gene_info['uniprot']}")
+                if gene_info['pfam']:
+                    print(f"   PFAM: {gene_info['pfam']}")
+                if gene_info['go_terms']:
+                    # Truncate GO terms if too long
+                    go_terms = str(gene_info['go_terms'])
+                    if len(go_terms) > 100:
+                        go_terms = go_terms[:100] + "..."
+                    print(f"   GO Terms: {go_terms}")
+            
+            if info['tissue_ontology_id']:
+                print(f"🧬 Tissue Ontology ID: {info['tissue_ontology_id']}")
+            
+            if info['pmid']:
+                print(f"📚 PMID: {info['pmid']}")
+            
+            if info['source']:
+                print(f"📄 Source: {info['source']}")
+            
+            info_list.append(info)
+            
+            if i >= 4:  # Limit to 5 entries
+                remaining = len(matches) - 5
+                if remaining > 0:
+                    print(f"\n... and {remaining} more entries (use species filter to narrow results)")
+                break
+        
+        return info_list
+    
+    def browse_ontology_by_category(self, categories=None, max_per_category=10):
+        """
+        📂 Browse ontology cell types by category
+        
+        Parameters
+        ----------
+        categories : list, optional
+            📝 List of category keywords to view
+        max_per_category : int
+            📊 Maximum number to display per category
+        """
+        if self.ontology_labels is None:
+            raise ValueError("✗ Please load or create ontology embeddings first")
+        
+        if categories is None:
+            categories = [
+                'T cell', 'B cell', 'NK cell', 'dendritic cell', 'macrophage',
+                'neutrophil', 'eosinophil', 'basophil', 'monocyte', 'lymphocyte',
+                'epithelial cell', 'endothelial cell', 'fibroblast', 'neuron',
+                'stem cell', 'progenitor cell', 'cancer cell', 'tumor cell'
+            ]
+        
+        print("📂 === Browse Ontology Cell Types by Category ===\n")
+        
+        for category in categories:
+            matches = self.search_ontology_cells(category, max_results=max_per_category)
+            if matches:
+                print(f"\n🏷️  【{category} related】 (Showing top {len(matches)}):")
+                for i, match in enumerate(matches):
+                    print(f"  {i+1}. {match}")
+            print("-" * 50)
+
 # 🛠️  Utility functions (maintaining backward compatibility)
 def get_minified_adata(adata) -> AnnData:
     """📦 Return a minified AnnData."""
@@ -2333,6 +3196,44 @@ for cell_name, result in mapping_results.items():
     for i, match in enumerate(result['top3_matches'], 1):
         print(f"    {i}. {match['label']} (CL: {match['cl_id']}, Sim: {match['similarity']:.3f})")
 
+# 5b. 📊 Load Cell Taxonomy as additional ontology (NEW FEATURE!)
+# Cell Taxonomy is treated as an additional ontology source using the same NLP approach
+mapper.load_cell_taxonomy_resource("Cell_Taxonomy_resource.txt")
+
+# Load with species filter for better performance
+mapper.load_cell_taxonomy_resource("Cell_Taxonomy_resource.txt", 
+                                   species_filter=["Homo sapiens", "Mus musculus"])
+
+# 5c. 🎯 Search by gene markers (taxonomy-specific feature)
+nk_cells = mapper.search_by_marker("CD56", species="Homo sapiens")
+t_cells = mapper.search_by_marker(["CD3", "CD4"], species="Homo sapiens")
+
+# 5d. 🔄 Enhanced mapping with taxonomy (reuses ontology NLP approach)
+enhanced_results = mapper.map_cells_with_taxonomy(
+    cell_names, 
+    threshold=0.5,
+    expand_abbreviations=True,  # LLM expansion
+    use_taxonomy=True,          # Include taxonomy
+    species="Homo sapiens"
+)
+
+# Enhanced results include taxonomy information:
+for cell_name, result in enhanced_results.items():
+    print(f"🔍 {cell_name}")
+    print(f"  🎯 Ontology match: {result['best_match']} (sim: {result['similarity']:.3f})")
+    
+    # NEW: Taxonomy enhancement (if found)
+    if 'taxonomy_match' in result:
+        print(f"  🧬 Taxonomy match: {result['taxonomy_match']} (sim: {result['taxonomy_similarity']:.3f})")
+        print(f"  🆔 CT ID: {result.get('ct_id', 'N/A')}")
+        print(f"  🔬 Cell marker: {result.get('cell_marker', 'N/A')}")
+        
+        gene_info = result.get('gene_info', {})
+        if gene_info.get('gene_alias'):
+            print(f"  🧬 Gene aliases: {gene_info['gene_alias']}")
+        if gene_info.get('go_terms'):
+            print(f"  🧬 GO terms: {gene_info['go_terms'][:100]}...")  # Truncate for display
+
 # 6. 🤖 Setup LLM expansion with context
 mapper.setup_llm_expansion(
     api_type="openai",
@@ -2480,6 +3381,11 @@ print(f"Description: {cell_info.get('description', 'N/A')}")
 # 📥 ZIP file handling for compressed downloads
 # 🇨🇳 Chinese domestic LLM support (通义千问, 文心一言, 智谱GLM, 讯飞星火, 豆包)
 # 🌐 Enhanced custom base_url support for private deployments
+# 📊 NEW: Cell Taxonomy support as additional ontology source
+# 🧬 NEW: Unified NLP approach for both ontology and taxonomy
+# 🎯 NEW: Gene marker-based cell type search
+# 🔬 NEW: Rich gene metadata integration (ENTREZ, Ensembl, GO terms)
+# 📈 NEW: Confidence boosting from multiple ontology sources
 
 # 🔧 =================== Ontology ID 问题解决方案 ===================
 
