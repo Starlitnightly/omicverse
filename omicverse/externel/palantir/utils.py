@@ -3,7 +3,7 @@ from warnings import warn
 import pandas as pd
 import numpy as np
 
-from joblib import Parallel, delayed
+
 import gc
 
 from scipy.sparse import csr_matrix, find, issparse, hstack
@@ -653,6 +653,7 @@ def run_magic_imputation(
     Union[np.ndarray, pd.DataFrame, None, csr_matrix]
         Imputed data matrix. If sc.AnnData is passed as data, the result is written to its layers[imputation_key].
     """
+    from joblib import Parallel, delayed
     if isinstance(data, sc.AnnData):
         if expression_key is not None:
             if expression_key not in data.layers.keys():

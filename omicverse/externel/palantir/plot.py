@@ -1,4 +1,4 @@
-from typing import Union, Optional, List, Tuple, Dict, Literal, Sequence
+from typing import Union, Optional, List, Tuple, Dict, Literal, Sequence, Callable, Any
 import collections.abc as cabc
 import warnings
 from copy import copy
@@ -8,23 +8,190 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import gaussian_kde
 import scanpy as sc
+from anndata import AnnData
 
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as PathEffects
 from matplotlib.colors import Normalize, Colormap
+from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from scanpy.plotting._tools.scatterplots import (
-    _get_color_source_vector,
-    _color_vector,
-    _get_vboundnorm,
-    _get_palette,
-    _FontSize,
-    _FontWeight,
-    VBound,
+# Import plot utilities
+from .plot_utils import (
+    _scatter_with_colorbar,
+    _highlight_cells,
+    _add_legend,
+    _setup_axes,
+    _get_palantir_fates_colors,
+    _plot_arrows,
+    no_mellon_log_messages,
 )
-from scanpy.plotting._utils import check_colornorm
+
+# Define type aliases and helper functions to ensure compatibility with all scanpy versions
+_FontWeight = Literal["light", "normal", "medium", "semibold", "bold", "heavy", "black"]
+_FontSize = Literal["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large"]
+VBound = Union[str, float, Callable[..., Any]]
+
+
+def check_colornorm(
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    vcenter: Optional[float] = None,
+    norm: Optional[Normalize] = None,
+) -> Normalize:
+    """
+    Checks and returns a matplotlib Normalize object for color mapping.
+    """
+    if norm is not None:
+        return norm
+
+    import matplotlib.colors as colors
+
+    if vcenter is not None:
+        return colors.TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+    else:
+        return colors.Normalize(vmin=vmin, vmax=vmax)
+
+
+
+
+def _get_vboundnorm(vmin, vmax, vcenter, norm, index, array):
+    """Get normalized values for colorbar."""
+    import numpy as np
+
+    if isinstance(array, pd.Series) and array.isna().any():
+        array = array.dropna()
+
+    if len(array) == 0:
+        vmin_float = vmax_float = vcenter_float = 0
+        norm_obj = None
+    else:
+        if vmin is None or vmin[index] is None:
+            vmin_float = np.nanmin(array)
+        else:
+            vmin_value = vmin[index]
+            if isinstance(vmin_value, str) and vmin_value.startswith("p"):
+                vmin_float = np.nanpercentile(array, float(vmin_value[1:]))
+            elif callable(vmin_value):
+                vmin_float = vmin_value(array)
+            else:
+                vmin_float = vmin_value
+
+        if vmax is None or vmax[index] is None:
+            vmax_float = np.nanmax(array)
+        else:
+            vmax_value = vmax[index]
+            if isinstance(vmax_value, str) and vmax_value.startswith("p"):
+                vmax_float = np.nanpercentile(array, float(vmax_value[1:]))
+            elif callable(vmax_value):
+                vmax_float = vmax_value(array)
+            else:
+                vmax_float = vmax_value
+
+        if vcenter is None or vcenter[index] is None:
+            vcenter_float = None
+        else:
+            vcenter_value = vcenter[index]
+            if isinstance(vcenter_value, str) and vcenter_value.startswith("p"):
+                vcenter_float = np.nanpercentile(array, float(vcenter_value[1:]))
+            elif callable(vcenter_value):
+                vcenter_float = vcenter_value(array)
+            else:
+                vcenter_float = vcenter_value
+
+        norm_obj = norm[index] if norm is not None else None
+
+    return vmin_float, vmax_float, vcenter_float, norm_obj
+
+
+def _get_palette(ad, key):
+    """Get a color palette for categorical data."""
+    if key + "_colors" in ad.uns:
+        palette = {
+            cat: color for cat, color in zip(ad.obs[key].cat.categories, ad.uns[key + "_colors"])
+        }
+    elif isinstance(ad.obs[key].dtype, pd.CategoricalDtype):
+        # Create default colors
+        set2_colors = matplotlib.colormaps["Set2"](range(len(ad.obs[key].cat.categories)))
+        palette = {
+            cat: matplotlib.colors.rgb2hex(rgba)
+            for cat, rgba in zip(ad.obs[key].cat.categories, set2_colors)
+        }
+    else:
+        # Default empty palette
+        palette = {}
+    return palette
+
+
+def _get_color_source_vector(ad, color_key, layer=None):
+    """Get the color source vector from an AnnData object."""
+    if color_key is None:
+        return pd.Series(np.ones(ad.n_obs), index=ad.obs_names)
+
+    if color_key in ad.obs:
+        return ad.obs[color_key]
+    elif color_key in ad.var_names:
+        if layer is not None and layer in ad.layers:
+            values = (
+                ad[:, color_key].layers[layer].toarray().flatten()
+                if hasattr(ad[:, color_key].layers[layer], "toarray")
+                else ad[:, color_key].layers[layer].flatten()
+            )
+        else:
+            values = (
+                ad[:, color_key].X.toarray().flatten()
+                if hasattr(ad[:, color_key].X, "toarray")
+                else ad[:, color_key].X.flatten()
+            )
+        return pd.Series(values, index=ad.obs_names)
+    else:
+        raise KeyError(f"'{color_key}' not found in .obs or .var_names")
+
+
+def _color_vector(ad, color_key, values=None, palette=None, na_color="lightgray"):
+    """Create a color vector for plotting."""
+    if values is None and color_key is None:
+        return pd.Series(np.ones(ad.n_obs), index=ad.obs_names), False
+
+    if values is None:
+        values = _get_color_source_vector(ad, color_key)
+
+    # Determine if categorical
+    is_categorical = False
+    if isinstance(values, pd.Series):
+        if values.dtype == bool or isinstance(values.dtype, pd.CategoricalDtype):
+            is_categorical = True
+        elif pd.api.types.is_numeric_dtype(values.dtype):
+            is_categorical = False
+        else:
+            is_categorical = True
+
+    # For categorical data, convert to colors
+    if is_categorical:
+        legend_palette = _get_palette(ad, color_key) if color_key in ad.obs else {}
+        if not legend_palette and palette is not None:
+            if isinstance(palette, str):
+                # Use a named palette
+                cmap = matplotlib.colormaps[palette]
+                unique_vals = sorted(values.unique())
+                colors = cmap(np.linspace(0, 1, len(unique_vals)))
+                legend_palette = {
+                    val: matplotlib.colors.rgb2hex(color) for val, color in zip(unique_vals, colors)
+                }
+            elif isinstance(palette, dict):
+                legend_palette = palette
+
+        # Convert categories to colors
+        if legend_palette:
+            color_vector = values.map(legend_palette).fillna(na_color)
+        else:
+            # Default to grayscale
+            color_vector = values.map(lambda x: na_color if pd.isna(x) else "gray")
+    else:
+        color_vector = values
+
+    return color_vector, is_categorical
 
 
 from .presults import PResults
@@ -165,7 +332,7 @@ def cell_types(tsne, clusters, cluster_colors=None, n_cols=5):
 
 
 def highlight_cells_on_umap(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     cells: Union[List[str], Dict[str, str], pd.Series, pd.Index, np.ndarray, str],
     annotation_offset: float = 0.03,
     s: float = 1,
@@ -173,13 +340,14 @@ def highlight_cells_on_umap(
     fig: Optional[plt.Figure] = None,
     ax: Optional[plt.Axes] = None,
     embedding_basis: str = "X_umap",
+    figsize: Tuple[float, float] = (6, 6),
 ) -> Tuple[plt.Figure, plt.Axes]:
     """
      Highlights and annotates specific cells on a UMAP plot.
 
      Parameters
      ----------
-     data : Union[sc.AnnData, pd.DataFrame]
+     data : Union[AnnData, pd.DataFrame]
          Either a Scanpy AnnData object or a DataFrame of UMAP coordinates.
      cells : Union[List[str], Dict[str, str], pd.Series, pd.Index, np.ndarray, str]
          Cells to highlight on the UMAP. Can be provided as:
@@ -199,6 +367,8 @@ def highlight_cells_on_umap(
          Matplotlib Axes object. If None, a new Axes object is created. Default is None.
      embedding_basis : str, optional
          The key to retrieve UMAP results from the AnnData object. Default is 'X_umap'.
+     figsize : Tuple[float, float], optional
+         Size of the figure (width, height) in inches. Default is (6, 6).
 
      Returns
      -------
@@ -214,16 +384,14 @@ def highlight_cells_on_umap(
      TypeError
          If 'cells' is neither list, dict nor pd.Series.
     """
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if embedding_basis not in data.obsm:
             raise KeyError(f"'{embedding_basis}' not found in .obsm.")
-        umap = pd.DataFrame(
-            data.obsm[embedding_basis], index=data.obs_names, columns=["x", "y"]
-        )
+        umap = pd.DataFrame(data.obsm[embedding_basis], index=data.obs_names, columns=["x", "y"])
     elif isinstance(data, pd.DataFrame):
         umap = data.copy()
     else:
-        raise TypeError("'data' should be either sc.AnnData or pd.DataFrame.")
+        raise TypeError("'data' should be either AnnData or pd.DataFrame.")
 
     if not isinstance(cells, (pd.Series, np.ndarray, pd.Index, list)):
         if isinstance(cells, str):
@@ -236,7 +404,7 @@ def highlight_cells_on_umap(
                 "'cells' should be either list, dict, pd.Series, pd.Index, string "
                 "(as column in .obs), or a boolean array-like."
             )
-    elif isinstance(data, sc.AnnData) and len(cells) == data.n_obs:
+    elif isinstance(data, AnnData) and len(cells) == data.n_obs:
         try:
             cells = data.obs_names[cells]
         except IndexError:
@@ -256,37 +424,95 @@ def highlight_cells_on_umap(
             "(as column in .obs), or a boolean array-like."
         )
 
-    xpad, ypad = (umap.max() - umap.min()) * annotation_offset
+    # Create mask for highlighted cells
+    cell_mask = np.zeros(umap.shape[0], dtype=bool)
+    for cell in cells.keys():
+        if cell in umap.index:
+            cell_mask[umap.index.get_loc(cell)] = True
 
-    fig, ax = get_fig(fig=fig, ax=ax)
+    # Setup figure and axes
+    fig, ax = _setup_axes(figsize=figsize, fig=fig, ax=ax)
+
+    # Create base plot with all cells
     ax.scatter(umap["x"], umap["y"], s=s, color=config.DESELECTED_COLOR)
 
+    # Add highlighted cells
     for cell, annotation in cells.items():
         if cell in umap.index:
             x, y = umap.loc[cell, ["x", "y"]]
             ax.scatter(x, y, c=config.SELECTED_COLOR, s=s_highlighted)
-            if annotation:
-                ax.annotate(annotation, (x, y), (x + xpad, y + ypad), "data")
-    ax.set_axis_off()
 
+            # Add annotations if provided
+            if annotation:
+                xpad, ypad = (umap.max() - umap.min()) * annotation_offset
+                ax.annotate(annotation, (x, y), (x + xpad, y + ypad), "data")
+
+    ax.set_axis_off()
     return fig, ax
 
 
-def plot_tsne_by_cell_sizes(data, tsne, fig=None, ax=None, vmin=None, vmax=None):
-    """Plot tSNE projections of the data with cells colored by molecule counts
-    :param data: Expression data, DataFrame-like
-    :param tsne: tSNE coordinates, DataFrame-like
-    :param fig: matplotlib Figure object, optional
-    :param ax: matplotlib Axis object, optional
-    :param vmin: Minimum molecule count for plotting, optional
-    :param vmax: Maximum molecule count for plotting, optional
+def plot_tsne_by_cell_sizes(
+    data: pd.DataFrame,
+    tsne: pd.DataFrame,
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    figsize: Tuple[float, float] = (6, 6),
+    s: float = 3,
+    cmap: str = "viridis",
+    colorbar_label: str = "Molecule Count",
+) -> Tuple[plt.Figure, plt.Axes]:
     """
+    Plot tSNE projections of the data with cells colored by molecule counts.
 
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Expression data, where each row is a cell and each column is a gene/feature.
+    tsne : pd.DataFrame
+        tSNE coordinates with columns 'x' and 'y'.
+    fig : Optional[plt.Figure], optional
+        Matplotlib Figure object. If None, a new figure is created. Default is None.
+    ax : Optional[plt.Axes], optional
+        Matplotlib Axes object. If None, a new Axes object is created. Default is None.
+    vmin : Optional[float], optional
+        Minimum molecule count for plotting. Default is None.
+    vmax : Optional[float], optional
+        Maximum molecule count for plotting. Default is None.
+    figsize : Tuple[float, float], optional
+        Size of the figure (width, height) in inches. Default is (6, 6).
+    s : float, optional
+        Size of the points in the scatter plot. Default is 3.
+    cmap : str, optional
+        Colormap to use for the scatter plot. Default is 'viridis'.
+    colorbar_label : str, optional
+        Label for the colorbar. Default is 'Molecule Count'.
+
+    Returns
+    -------
+    Tuple[plt.Figure, plt.Axes]
+        The figure and axes objects.
+    """
+    # Calculate molecule counts per cell
     sizes = data.sum(axis=1)
-    fig, ax = get_fig(fig, ax)
-    scatter = ax.scatter(tsne["x"], tsne["y"], s=3, c=sizes, vmin=vmin, vmax=vmax)
+
+    # Setup figure and axes
+    fig, ax = _setup_axes(figsize=figsize, fig=fig, ax=ax)
+
+    # Create scatter plot with colorbar
+    ax, _ = _scatter_with_colorbar(
+        ax=ax,
+        x=tsne["x"].values,
+        y=tsne["y"].values,
+        c=sizes.values,
+        s=s,
+        cmap=cmap,
+        norm=Normalize(vmin=vmin, vmax=vmax),
+        colorbar_label=colorbar_label,
+    )
+
     ax.set_axis_off()
-    plt.colorbar(scatter, ax=ax)
     return fig, ax
 
 
@@ -384,7 +610,7 @@ def plot_gene_expression(
 
 
 def plot_diffusion_components(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     dm_res: Optional[Union[pd.DataFrame, str]] = "DM_EigenVectors",
     embedding_basis: str = "X_umap",
     **kwargs,
@@ -394,7 +620,7 @@ def plot_diffusion_components(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, pd.DataFrame]
+    data : Union[AnnData, pd.DataFrame]
         An AnnData object from Scanpy or a DataFrame that contains tSNE or UMAP results.
     dm_res : Optional[Union[pd.DataFrame, str]], optional
         A DataFrame that contains the diffusion map results or a string key to access diffusion map
@@ -416,16 +642,14 @@ def plot_diffusion_components(
     """
 
     # Retrieve the embedding data
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if embedding_basis not in data.obsm:
             raise KeyError(f"'{embedding_basis}' not found in .obsm.")
         embedding_data = pd.DataFrame(data.obsm[embedding_basis], index=data.obs_names)
         if isinstance(dm_res, str):
             if dm_res not in data.obsm:
                 raise KeyError(f"'{dm_res}' not found in .obsm.")
-            dm_res = {
-                "EigenVectors": pd.DataFrame(data.obsm[dm_res], index=data.obs_names)
-            }
+            dm_res = {"EigenVectors": pd.DataFrame(data.obsm[dm_res], index=data.obs_names)}
     else:
         embedding_data = data
 
@@ -454,7 +678,7 @@ def plot_diffusion_components(
 
 
 def plot_palantir_results(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     pr_res: Optional[PResults] = None,
     embedding_basis: str = "X_umap",
     pseudo_time_key: str = "palantir_pseudotime",
@@ -467,7 +691,7 @@ def plot_palantir_results(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, pd.DataFrame]
+    data : Union[AnnData, pd.DataFrame]
         Either a Scanpy AnnData object or a DataFrame of tSNE or UMAP results.
     pr_res : Optional[PResults]
         Optional PResults object containing Palantir results. If None, results are expected to be found in the provided AnnData object.
@@ -487,7 +711,7 @@ def plot_palantir_results(
     matplotlib.pyplot.Figure
         A matplotlib Figure object representing the plot of the Palantir results.
     """
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if embedding_basis not in data.obsm:
             raise KeyError(f"'{embedding_basis}' not found in .obsm.")
         embedding_data = pd.DataFrame(data.obsm[embedding_basis], index=data.obs_names)
@@ -529,7 +753,7 @@ def plot_palantir_results(
         ax,
         embedding_data.iloc[:, 0],
         embedding_data.iloc[:, 1],
-        pr_res.pseudotime[embedding_data.index],
+        pr_res.pseudotime.loc[embedding_data.index],
         **kwargs,
     )
     ax.set_axis_off()
@@ -541,7 +765,7 @@ def plot_palantir_results(
         ax,
         embedding_data.iloc[:, 0],
         embedding_data.iloc[:, 1],
-        pr_res.entropy[embedding_data.index],
+        pr_res.entropy.loc[embedding_data.index],
         **kwargs,
     )
     ax.set_axis_off()
@@ -554,7 +778,7 @@ def plot_palantir_results(
             ax,
             embedding_data.iloc[:, 0],
             embedding_data.iloc[:, 1],
-            pr_res.branch_probs[branch][embedding_data.index],
+            pr_res.branch_probs.loc[embedding_data.index, branch],
             **kwargs,
         )
         ax.set_axis_off()
@@ -565,7 +789,7 @@ def plot_palantir_results(
 
 
 def plot_terminal_state_probs(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     cells: List[str],
     pr_res: Optional[PResults] = None,
     fate_prob_key: str = "palantir_fate_probabilities",
@@ -575,7 +799,7 @@ def plot_terminal_state_probs(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, pd.DataFrame]
+    data : Union[AnnData, pd.DataFrame]
         Either a Scanpy AnnData object or a DataFrame of fate probabilities.
     cells : List[str]
         List of cell for which the barplots need to be plotted.
@@ -591,7 +815,7 @@ def plot_terminal_state_probs(
     matplotlib.pyplot.Figure
         A matplotlib Figure object representing the plot of the cell fate probabilities.
     """
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if pr_res is None:
             branch_probs, _ = _validate_obsm_key(data, fate_prob_key)
     else:
@@ -633,7 +857,7 @@ def plot_terminal_state_probs(
 
 
 def plot_branch_selection(
-    ad: sc.AnnData,
+    ad: AnnData,
     pseudo_time_key: str = "palantir_pseudotime",
     fate_prob_key: str = "palantir_fate_probabilities",
     masks_key: str = "branch_masks",
@@ -647,7 +871,7 @@ def plot_branch_selection(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         Annotated data matrix. The pseudotime and fate probabilities should be stored under the keys provided.
     pseudo_time_key : str, optional
         Key to access the pseudotime from obs of the AnnData object. Default is 'palantir_pseudotime'.
@@ -809,7 +1033,7 @@ def plot_gene_trends_legacy(gene_trends, genes=None):
 
 
 def plot_gene_trends(
-    data: Union[Dict, sc.AnnData],
+    data: Union[Dict, AnnData],
     genes: Optional[List[str]] = None,
     gene_trend_key: str = "gene_trends",
     branch_names: Union[str, List] = "branch_masks",
@@ -819,7 +1043,7 @@ def plot_gene_trends(
 
     Parameters
     ----------
-    data : Union[Dict, sc.AnnData]
+    data : Union[Dict, AnnData]
         An AnnData object or a dictionary that contains the gene trends.
     genes : Optional[List[str]], optional
         A list of genes to plot. If not provided, all genes will be plotted. Default is None.
@@ -881,13 +1105,13 @@ def plot_gene_trends(
     return fig
 
 
-def _process_mask(ad: sc.AnnData, masks_key: str, branch_name: str):
+def _process_mask(ad: AnnData, masks_key: str, branch_name: str):
     """
     Processes the mask string to obtain mask indices.
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         The annotated data matrix
     masks_key : str
         The mask string
@@ -915,7 +1139,7 @@ def _process_mask(ad: sc.AnnData, masks_key: str, branch_name: str):
 
 
 def prepare_color_vector(
-    ad: sc.AnnData,
+    ad: AnnData,
     color: str,
     mask: Optional[np.ndarray] = None,
     layer: Optional[str] = None,
@@ -927,7 +1151,7 @@ def prepare_color_vector(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         The annotated data matrix
     color : str
         The color parameter
@@ -948,7 +1172,7 @@ def prepare_color_vector(
 
     color_source_vector = _get_color_source_vector(ad, color, layer=layer)
     color_vector, categorical = _color_vector(
-        ad, color, color_source_vector, palette=palette, na_color=na_color
+        ad, color, values=color_source_vector, palette=palette, na_color=na_color
     )
     if mask is not None:
         color_vector = color_vector[mask]
@@ -968,21 +1192,41 @@ def _add_categorical_legend(
     na_in_legend: bool,
 ):
     """Add a legend to the passed Axes."""
-    if na_in_legend and pd.isnull(color_source_vector).any():
-        if "NA" in color_source_vector:
-            raise NotImplementedError(
-                "No fallback for null labels has been defined if NA already in categories."
-            )
-        color_source_vector = color_source_vector.add_categories("NA").fillna("NA")
-        palette = palette.copy()
-        palette["NA"] = na_color
-    if color_source_vector.dtype == bool:
-        cats = pd.Categorical(color_source_vector.astype(str)).categories
-    else:
+    # Handle both pandas categorical and numpy array inputs
+    if isinstance(color_source_vector, pd.Categorical):
+        if na_in_legend and pd.isnull(color_source_vector).any():
+            if "NA" in color_source_vector:
+                raise NotImplementedError(
+                    "No fallback for null labels has been defined if NA already in categories."
+                )
+            color_source_vector = color_source_vector.add_categories("NA").fillna("NA")
+            palette = palette.copy()
+            palette["NA"] = na_color
         cats = color_source_vector.categories
+    else:
+        # For numpy arrays or other types
+        if color_source_vector.dtype == bool:
+            # For boolean arrays
+            cats = ["True", "False"]
+        elif na_in_legend and pd.isnull(color_source_vector).any():
+            # Create categorical data with NA values
+            color_categorical = pd.Categorical(color_source_vector)
+            unique_values = [v for v in pd.unique(color_categorical) if not pd.isnull(v)]
+            cats = list(unique_values) + ["NA"]
+            palette = palette.copy()
+            palette["NA"] = na_color
+        else:
+            # For non-boolean arrays without NA values
+            cats = pd.unique(color_source_vector)
+
+    # If palette is empty but we have categorical data, create default colors
+    if not palette and len(cats) > 0:
+        set2_colors = matplotlib.colormaps["Set2"](range(len(cats)))
+        palette = {cat: matplotlib.colors.rgb2hex(set2_colors[i]) for i, cat in enumerate(cats)}
 
     for label in cats:
-        ax.scatter([], [], c=palette[label], label=label)
+        if label in palette:
+            ax.scatter([], [], c=palette[label], label=label)
     ax.legend(
         frameon=False,
         loc="center left",
@@ -993,7 +1237,7 @@ def _add_categorical_legend(
 
 
 def plot_stats(
-    ad: sc.AnnData,
+    ad: AnnData,
     x: str,
     y: str,
     color: str = None,
@@ -1106,8 +1350,8 @@ def plot_stats(
         If input parameters do not have the expected values.
     """
 
-    if not isinstance(ad, sc.AnnData):
-        raise TypeError("Expected ad to be an instance of sc.AnnData")
+    if not isinstance(ad, AnnData):
+        raise TypeError("Expected ad to be an instance of AnnData")
     if branch_name is not None and not isinstance(branch_name, str):
         raise TypeError("Expected branch_name to be a str or None")
     if color is not None and not isinstance(color, str):
@@ -1117,9 +1361,7 @@ def plot_stats(
 
     if branch_name is not None:
         mask = (
-            _process_mask(ad, masks_key, branch_name)
-            if isinstance(masks_key, str)
-            else masks_key
+            _process_mask(ad, masks_key, branch_name) if isinstance(masks_key, str) else masks_key
         )
     else:
         mask = None
@@ -1191,10 +1433,30 @@ def plot_stats(
         ax.locator_params(axis="both", nbins=nticks)
 
     if categorical or color_vector.dtype == bool:
+        if color is not None:
+            # Check if the color column is categorical, if not, don't try to use _get_palette
+            if isinstance(ad.obs.get(color), pd.Series) and isinstance(
+                ad.obs[color].dtype, pd.CategoricalDtype
+            ):
+                legend_palette = _get_palette(ad, color)
+            else:
+                # Use a default palette for non-categorical data
+                set2_colors = matplotlib.colormaps["Set2"](range(10))
+                legend_palette = {
+                    i: matplotlib.colors.rgb2hex(rgba) for i, rgba in enumerate(set2_colors)
+                }
+        else:
+            # Default palette for when color is None
+            legend_palette = (
+                {True: config.SELECTED_COLOR, False: config.DESELECTED_COLOR}
+                if color_vector.dtype == bool
+                else {}
+            )
+
         _add_categorical_legend(
             ax,
             color_source_vector,
-            palette=_get_palette(ad, color),
+            palette=legend_palette,
             legend_anchor=legend_anchor,
             legend_fontweight=legend_fontweight,
             legend_fontsize=legend_fontsize,
@@ -1211,7 +1473,7 @@ def plot_stats(
 
 
 def plot_branch(
-    ad: sc.AnnData,
+    ad: AnnData,
     branch_name: str,
     position: str,
     color: str = None,
@@ -1357,7 +1619,7 @@ def plot_branch(
 
 
 def plot_trend(
-    ad: sc.AnnData,
+    ad: AnnData,
     branch_name: str,
     gene: str,
     color: str = None,
@@ -1475,8 +1737,8 @@ def plot_trend(
         If input parameters do not have the expected values.
     """
 
-    if not isinstance(ad, sc.AnnData):
-        raise TypeError("Expected ad to be an instance of sc.AnnData")
+    if not isinstance(ad, AnnData):
+        raise TypeError("Expected ad to be an instance of AnnData")
     if not isinstance(gene, str):
         raise TypeError("Expected gene to be a str")
     if not isinstance(branch_name, str):
@@ -1580,7 +1842,7 @@ def _scale(
 
 
 def plot_gene_trend_heatmaps(
-    data: Union[sc.AnnData, Dict],
+    data: Union[AnnData, Dict],
     genes: Optional[List[str]] = None,
     gene_trend_key: str = "gene_trends",
     branch_names: Union[str, List[str]] = "branch_masks",
@@ -1594,7 +1856,7 @@ def plot_gene_trend_heatmaps(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, Dict]
+    data : Union[AnnData, Dict]
         AnnData object or dictionary of gene trends.
     genes : Optional[List[str]], optional
         List of genes to include in the plot. If None, all genes are included.
@@ -1663,7 +1925,7 @@ def plot_gene_trend_heatmaps(
 
 
 def plot_gene_trend_clusters(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     branch_name: str = "",
     clusters: Optional[Union[pd.Series, str]] = None,
     gene_trend_key: Optional[str] = "gene_trends",
@@ -1677,7 +1939,7 @@ def plot_gene_trend_clusters(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, pd.DataFrame]
+    data : Union[AnnData, pd.DataFrame]
         AnnData object or DataFrame of gene expression trends.
     branch_name : str, optional
         Name of the branch for which to plot gene trends.
@@ -1701,15 +1963,11 @@ def plot_gene_trend_clusters(
         If `gene_trend_key` is None when `data` is an AnnData object.
     """
     # Process inputs and standardize trends
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if gene_trend_key is None:
-            raise KeyError(
-                "Must provide a gene_trend_key when data is an AnnData object."
-            )
+            raise KeyError("Must provide a gene_trend_key when data is an AnnData object.")
 
-        trends, pseudotimes = _validate_varm_key(
-            data, gene_trend_key + "_" + branch_name
-        )
+        trends, pseudotimes = _validate_varm_key(data, gene_trend_key + "_" + branch_name)
 
         if clusters is None:
             clusters = gene_trend_key + "_clusters"
@@ -1725,11 +1983,12 @@ def plot_gene_trend_clusters(
     )
 
     # Obtain unique clusters and prepare figure
-    cluster_labels = (
-        clusters.cat.categories
-        if pd.api.types.is_categorical_dtype(clusters)
-        else set(clusters)
-    )
+    if isinstance(clusters.dtype, pd.CategoricalDtype):
+        cluster_labels = clusters.cat.categories
+    else:
+        # Filter out NaN values to avoid issues with np.NaN vs np.nan
+        cluster_labels = set([x for x in clusters if not pd.isna(x)])
+
     n_rows = int(np.ceil(len(cluster_labels) / 3))
     fig = plt.figure(figsize=[5.5 * 3, 2.5 * n_rows])
 
@@ -1771,7 +2030,7 @@ def plot_gene_trend_clusters(
 
 
 def gene_score_histogram(
-    ad: sc.AnnData,
+    ad: AnnData,
     score_key: str,
     genes: Optional[List[str]] = None,
     bins: int = 100,
@@ -1784,7 +2043,7 @@ def gene_score_histogram(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         Annotated data matrix.
     score_key : str
         The key in `ad.var` data frame for the gene score.
@@ -1809,8 +2068,8 @@ def gene_score_histogram(
     ValueError
         If input parameters are not as expected.
     """
-    if not isinstance(ad, sc.AnnData):
-        raise ValueError("Input data should be of type sc.AnnData.")
+    if not isinstance(ad, AnnData):
+        raise ValueError("Input data should be of type AnnData.")
     if score_key not in ad.var.columns:
         raise ValueError(f"Score key {score_key} not found in ad.var columns.")
     scores = ad.var[score_key]
@@ -1836,7 +2095,9 @@ def gene_score_histogram(
             label=f"{quantile:.0%} percentile",
         )
 
-    ax.legend()
+    # Only create legend if we have elements with labels
+    if quantile is not None:
+        ax.legend()
     ax.set_xlabel(f"{score_key} score")
     ax.set_ylabel("# of genes")
 
@@ -1867,15 +2128,12 @@ def gene_score_histogram(
             horizontalalignment="center",
             zorder=-k,
         )
-        txt.set_path_effects(
-            [PathEffects.withStroke(linewidth=2, foreground="w", alpha=0.8)]
-        )
+        txt.set_path_effects([PathEffects.withStroke(linewidth=2, foreground="w", alpha=0.8)])
 
     return fig
 
-
 def plot_trajectory(
-    ad: sc.AnnData,
+    ad: AnnData,
     branch: str,
     ax: Optional[plt.Axes] = None,
     pseudo_time_key: str = "palantir_pseudotime",
@@ -1883,6 +2141,7 @@ def plot_trajectory(
     embedding_basis: str = "X_umap",
     cell_color: str = "branch_selection",
     smoothness: float = 1.0,
+    pseudotime_interval: Optional[Union[Tuple[float, float], List[float], np.ndarray]] = None,
     n_arrows: int = 5,
     arrowprops: Optional[dict] = dict(),
     scanpy_kwargs: Optional[dict] = dict(),
@@ -1894,7 +2153,7 @@ def plot_trajectory(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         Annotated data matrix. Pseudotime and fate probabilities should be stored under provided keys.
     branch : str
         Branch/fate to plot the trajectory for.
@@ -1911,6 +2170,8 @@ def plot_trajectory(
         If None, no coloring is applied. Defaults to 'branch_selection'.
     smoothness : float, optional
         Smoothness of fitted trajectory. Higher value means smoother. Defaults to 1.
+    pseudotime_interval : tuple, list, np.ndarray, optional
+        Interval for pseudotime values. If None, it is automatically determined.
     n_arrows : int, optional
         Number of arrows to plot. Defaults to 5.
     arrowprops : dict, optional
@@ -1953,14 +2214,17 @@ def plot_trajectory(
     mask = fate_mask[branch].astype(bool)
 
     pseudotime = pt[mask]
-    pseudotime_grid = np.linspace(np.min(pseudotime), np.max(pseudotime), 200)
-    ls = (
-        smoothness
-        * np.sqrt(np.sum((np.max(umap, axis=0) - np.min(umap, axis=0)) ** 2))
-        / 20
-    )
-    import mellon
-    umap_est = mellon.FunctionEstimator(ls=ls, sigma=ls, n_landmarks=50)
+    if pseudotime_interval is None:
+        pseudotime_interval = (np.min(pseudotime), np.max(pseudotime))
+    else:
+        if len(pseudotime_interval) != 2:
+            raise ValueError("pseudotime_interval must be a tuple of two values.")
+    pseudotime_grid = np.linspace(pseudotime_interval[0], pseudotime_interval[1], 200)
+    ls = smoothness * np.sqrt(np.sum((np.max(umap, axis=0) - np.min(umap, axis=0)) ** 2)) / 20
+    with no_mellon_log_messages():
+        # Import mellon inside the context to avoid JAX fork warnings
+        import mellon
+        umap_est = mellon.FunctionEstimator(ls=ls, sigma=ls, n_landmarks=50)
     umap_trajectory = umap_est.fit_predict(pseudotime, umap[mask, :], pseudotime_grid)
 
     # plot UMAP
@@ -1999,55 +2263,235 @@ def plot_trajectory(
     return ax
 
 
-def _plot_arrows(x, y, n=5, ax=None, arrowprops=dict(), **kwargs):
+def plot_trajectories(
+    ad,
+    groups: Optional[List[str]] = None,
+    pseudo_time_key: str = "palantir_pseudotime",
+    masks_key: str = "branch_masks",
+    embedding_basis: str = "X_umap",
+    cell_color: str = "palantir_pseudotime",
+    palantir_fates_colors: Optional[Union[List[str], Dict[str, str]]] = None,
+    smoothness: float = 1.0,
+    pseudotime_interval: Optional[Union[Tuple[float, float], List[float], np.ndarray]] = None,
+    n_arrows: int = 5,
+    arrowprops: Optional[dict] = None,
+    outline_arrowprops: Optional[dict] = None,  # Parameter controlling the outline arrows.
+    ax: Optional[plt.Axes] = None,
+    scanpy_kwargs: Optional[dict] = None,
+    figsize: Tuple[float, float] = (5, 5),
+    show_legend: bool = True,
+    legend_kwargs: Optional[dict] = None,
+    **kwargs,
+):
     """
-    Helper function to plot arrows on a trajectory line.
+    Plot trajectories for multiple branches on the UMAP embedding.
+    
+    This function plots trajectories for either a selection or all branches.
+    It colors the trajectories using a combination of predefined colors stored in ad.uns and/or
+    user-specified palette. Any missing branch colors are generated such that duplicates are avoided.
 
     Parameters
     ----------
-    x, y : array-like
-        Coordinates of the trajectory points.
-    n : int, optional
-        Number of arrows to plot. Defaults to 5.
+    ad : AnnData
+        Annotated data matrix. Pseudotime and branch masks should be stored under given keys.
+    groups : list of str, optional
+        List of branch names to plot. If None, all branches are used.
+    pseudo_time_key : str, optional
+        Key in ad.obs for pseudotime values.
+    masks_key : str, optional
+        Key in ad.obsm where branch masks are stored.
+    embedding_basis : str, optional
+        Key in ad.obsm for the low-dimensional embedding (e.g. UMAP).
+    cell_color : str or None, optional
+        How to color the cells. If "branch_selection", non-selected cells are drawn with a deselected color.
+        Otherwise, an external plotting function may be used.
+    palantir_fates_colors : dict or list, optional
+        Mapping or ordered list of colors (for each branch). Missing colors are generated uniquely.
+    smoothness : float, optional
+        Controls the smoothness of the trajectory. Higher values yield smoother curves.
+    pseudotime_interval : tuple, list, np.ndarray, optional
+        Interval for pseudotime evaluation. If None, it is determined per branch.
+    n_arrows : int, optional
+        Number of arrows to annotate the trajectory.
+    arrowprops : dict, optional
+        Properties for the arrow style of the branch-specific (foreground) arrows.
+    outline_arrowprops : dict, optional
+        Properties for the outline (background) arrows. Defaults to a thicker black arrow.
     ax : matplotlib.axes.Axes, optional
         Matplotlib axes object to plot on. If None, a new figure is created.
-    arrowprops : dict, optional
-        Properties for the arrowstyle. If None, defaults to black arrow with lw=1.
-    **kwargs
-        Extra keyword arguments are passed to the plot function.
+    scanpy_kwargs : dict, optional
+        Extra keyword arguments for an external embedding plotting function.
+    figsize : tuple of float, optional
+        Size of the figure (width, height).
+    show_legend : bool, optional
+        Whether to display a legend for the branches. Default is True.
+    legend_kwargs : dict, optional
+        Additional keyword arguments for customizing the legend appearance.
+        Defaults to {"frameon": False} if not provided.
+    **kwargs :
+        Extra keyword arguments passed to the trajectory plotting (e.g., line style).
 
     Returns
     -------
-    None
+    matplotlib.axes.Axes
+        The axis object containing the plot.
     """
-    if ax is None:
-        fig, ax = plt.subplots()
+    # Validate required keys.
+    if pseudo_time_key not in ad.obs:
+        raise KeyError(f"{pseudo_time_key} not found in ad.obs")
+    if embedding_basis not in ad.obsm:
+        raise KeyError(f"{embedding_basis} not found in ad.obsm")
 
+    # Get branch masks and branch names.
+    fate_mask, fate_mask_names = _validate_obsm_key(ad, masks_key)
+    
+    # Determine groups: if none provided, use all branches.
+    if groups is None:
+        groups = fate_mask_names
+    else:
+        missing_groups = set(groups) - set(fate_mask_names)
+        if missing_groups:
+            raise ValueError(
+                f"Specified branch names not found in masks: {', '.join(missing_groups)}"
+            )
+    
+    # Retrieve or generate colors ensuring uniqueness.
+    colors_mapping = _get_palantir_fates_colors(ad, fate_mask_names, palantir_fates_colors)
+    # Store the updated mapping in ad.uns.
+    ad.uns["palantir_fates_colors"] = colors_mapping
+
+    pt = ad.obs[pseudo_time_key]
+    umap = ad.obsm[embedding_basis]
+    
+    # Default arrow properties: use a more prominent arrow head.
+    if arrowprops is None:
+        arrowprops = {}
+
+    lw = kwargs.get("lw", 1)
+    ms = 20 * lw ** .5
+    arrowprops = {**{"lw": lw, "mutation_scale": ms}, **arrowprops}
     default_kwargs = {"color": "black"}
     default_kwargs.update(kwargs)
 
-    ax.plot(x, y, **default_kwargs)
+    
+    # Set a default for outline_arrowprops if not provided.
+    if outline_arrowprops is None:
+        outline_arrowprops = {}
 
-    if n <= 0:
-        return ax
+    lwo = arrowprops.get("lw", 1)
+    lwo = lwo + 2 * lwo ** .5
+    ms = arrowprops.get("mutation_scale", 20)
+    outline_arrowprops = {**{"lw": lwo, "color": "black", "mutation_scale": ms}, **outline_arrowprops}
 
-    default_arrowprops = dict(arrowstyle="->", lw=1)
-    default_arrowprops["color"] = default_kwargs.get("color", "black")
-    default_arrowprops.update(arrowprops)
+    if scanpy_kwargs is None:
+        scanpy_kwargs = {}
 
-    # Calculate the length of each subsection
-    total_points = len(x)
-    section_length = total_points // n
-
-    for i in range(n):
-        idx = total_points - i * section_length
-        if idx < 2:
-            break
-        # Add arrowhead at the last point of the subsection on ax
-        ax.annotate(
-            "",
-            xy=(x[idx - 1], y[idx - 1]),
-            xytext=(x[idx - 2], y[idx - 2]),
-            arrowprops=default_arrowprops,
+    # Generate a custom legend based on branch colors.
+    custom_handles = []
+    
+    # Set up the axes.
+    if ax is None:
+        _, ax = plt.subplots(1, 1, figsize=figsize)
+    
+    # Plot background cells if using branch-based selection.
+    if cell_color == "branch_selection":
+        scatter_kwargs = {"alpha": 0.5, "s": 10, "edgecolor": "none"}
+        scatter_kwargs.update(scanpy_kwargs)
+        scatter_kwargs["zorder"] = 1
+        scatter_kwargs.pop("c", None)
+        scatter_kwargs.pop("color", None)
+        combined_mask = np.zeros(ad.n_obs, dtype=bool)
+        for branch in groups:
+            combined_mask |= fate_mask[branch].astype(bool)
+        ax.scatter(
+            umap[~combined_mask, 0],
+            umap[~combined_mask, 1],
+            c=config.DESELECTED_COLOR,
+            label="Other Cells",
+            **scatter_kwargs
         )
+    elif cell_color is not None:
+        if scanpy_kwargs is None:
+            scanpy_kwargs = {}
+        b = embedding_basis[2:] if embedding_basis.startswith("X_") else embedding_basis
+        sc.pl.embedding(ad, b, color=cell_color, ax=ax, show=False, **scanpy_kwargs)
+    
+    with no_mellon_log_messages():
+        # Loop over each branch to plot its trajectory.
+        for branch in groups:
+            branch_mask = fate_mask[branch].astype(bool)
+            if cell_color == "branch_selection":
+                ax.scatter(
+                    umap[branch_mask, 0],
+                    umap[branch_mask, 1],
+                    c=colors_mapping[branch],
+                    label=f"Branch {branch}",
+                    **scatter_kwargs,
+                )
+            branch_pt = pt[branch_mask]
+            if branch_pt.size == 0:
+                continue
+            # Set pseudotime interval.
+            if pseudotime_interval is None:
+                branch_interval = (np.min(branch_pt), np.max(branch_pt))
+            else:
+                if len(pseudotime_interval) != 2:
+                    raise ValueError("pseudotime_interval must be a tuple of two values.")
+                branch_interval = pseudotime_interval
+            
+            pseudotime_grid = np.linspace(branch_interval[0], branch_interval[1], 200)
+            
+            # Calculate smoothness parameter (ls) from overall UMAP span.
+            ls = smoothness * np.sqrt(np.sum((np.max(umap, axis=0) - np.min(umap, axis=0)) ** 2)) / 20
+            # Import mellon locally to avoid JAX fork warnings
+            import mellon
+            umap_est = mellon.FunctionEstimator(ls=ls, sigma=ls, n_landmarks=50)
+            umap_trajectory = umap_est.fit_predict(branch_pt, umap[branch_mask, :], pseudotime_grid)
+            
+            branch_kwargs = default_kwargs.copy()
+            # For outline arrows we use the outline_arrowprops color.
+            branch_kwargs["color"] = outline_arrowprops.get("color", "black")
+            branch_kwargs["lw"] = branch_kwargs.get("lw", 2) + 2
+            _plot_arrows(
+                umap_trajectory[:, 0],
+                umap_trajectory[:, 1],
+                n=n_arrows,
+                ax=ax,
+                arrowprops=outline_arrowprops,
+                head_offset=.1*(lwo - lw),
+                arrow_zorder=2,
+                **branch_kwargs,
+            )
+            
+            # Now plot branch-specific colored arrows on top with higher zorder.
+            branch_arrowprops = arrowprops.copy()
+            branch_arrowprops["color"] = colors_mapping[branch]
+            branch_kwargs["color"] = colors_mapping[branch]
+            branch_kwargs["lw"] = branch_kwargs.get("lw", 4) - 2
+            _plot_arrows(
+                umap_trajectory[:, 0],
+                umap_trajectory[:, 1],
+                n=n_arrows,
+                ax=ax,
+                arrowprops=branch_arrowprops,
+                arrow_zorder=3,
+                **branch_kwargs,
+            )
+            custom_handles.append(
+            Line2D([], [], color=colors_mapping[branch],
+                lw=arrowprops.get("lw", 2),
+                label=f"Branch {branch}")
+            )
+    
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    if show_legend and custom_handles:
+        if legend_kwargs is None:
+            legend_kwargs = {"frameon": False}
+        ax.legend(handles=custom_handles, **legend_kwargs)
+    
+    # Remove fixed title assignment to let scanpy handle titles.
+    ax.axis("off")
+    
     return ax

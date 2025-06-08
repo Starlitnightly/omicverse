@@ -1,7 +1,8 @@
 """
 Core functions for running Palantir
 """
-from typing import Union, Optional, List, Dict
+
+from typing import Union, Optional, List, Dict, Tuple
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -11,22 +12,24 @@ import copy
 from sklearn.metrics import pairwise_distances
 from sklearn import preprocessing
 from sklearn.neighbors import NearestNeighbors
+
 from scipy.sparse.linalg import eigs
 
 from scipy.sparse import csr_matrix, find, csgraph
 from scipy.stats import entropy, pearsonr, norm
 from numpy.linalg import inv, pinv, LinAlgError
 from copy import deepcopy
-from .presults import PResults
-import scanpy as sc
-
 import warnings
+from anndata import AnnData
 
 from . import config
 
+warnings.filterwarnings(action="ignore", message="scipy.cluster")
+warnings.filterwarnings(action="ignore", module="scipy", message="Changing the sparsity")
+
 
 def run_palantir(
-    data: Union[pd.DataFrame, sc.AnnData],
+    data: Union[pd.DataFrame, AnnData],
     early_cell,
     terminal_states: Optional[Union[List, Dict, pd.Series]] = None,
     knn: int = 30,
@@ -42,14 +45,14 @@ def run_palantir(
     save_as_df: bool = None,
     waypoints_key: str = "palantir_waypoints",
     seed: int = 20,
-) -> Optional[PResults]:
+) -> Optional[object]:
     """
     Executes the Palantir algorithm to derive pseudotemporal ordering of cells, their fate probabilities, and
     state entropy based on the multiscale diffusion map results.
 
     Parameters
     ----------
-    data : Union[pd.DataFrame, sc.AnnData]
+    data : Union[pd.DataFrame, AnnData]
         Either a DataFrame of multiscale space diffusion components or a Scanpy AnnData object.
     early_cell : str
         Start cell for pseudotime construction.
@@ -102,7 +105,7 @@ def run_palantir(
         terminal_cells = terminal_states.index.values
     else:
         terminal_cells = terminal_states
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         ms_data = pd.DataFrame(data.obsm[eigvec_key], index=data.obs_names)
     else:
         ms_data = data
@@ -147,9 +150,7 @@ def run_palantir(
 
     # pseudotime and weighting matrix
     print("Determining pseudotime...")
-    pseudotime, W = _compute_pseudotime(
-        data_df, start_cell, knn, waypoints, n_jobs, max_iterations
-    )
+    pseudotime, W = _compute_pseudotime(data_df, start_cell, knn, waypoints, n_jobs, max_iterations)
 
     # Entropy and branch probabilities
     print("Entropy and branch probabilities...")
@@ -166,10 +167,12 @@ def run_palantir(
     )
     ent = branch_probs.apply(entropy, axis=1)
 
-    # Update results into PResults class object
+    # Import PResults class only when needed to avoid circular imports
+    from .presults import PResults
+
     pr_res = PResults(pseudotime, ent, branch_probs, waypoints)
 
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         data.obs[pseudo_time_key] = pseudotime
         data.obs[entropy_key] = ent
         data.uns[waypoints_key] = waypoints.values
@@ -184,14 +187,27 @@ def run_palantir(
     return pr_res
 
 
-def _max_min_sampling(data, num_waypoints, seed=None):
-    """Function for max min sampling of waypoints
+def _max_min_sampling(
+    data: pd.DataFrame, num_waypoints: int, seed: Optional[int] = None
+) -> pd.Index:
+    """Function for max min sampling of waypoints.
 
-    :param data: Data matrix along which to sample the waypoints,
-                 usually diffusion components
-    :param num_waypoints: Number of waypoints to sample
-    :param seed: Random number generator seed to find initial guess.
-    :return: pandas Series reprenting the sampled waypoints
+    This function implements the maxmin sampling approach to select waypoints from the data.
+    It iteratively selects points that are maximally distant from the already selected points.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Data matrix along which to sample the waypoints, usually diffusion components.
+    num_waypoints : int
+        Number of waypoints to sample.
+    seed : Optional[int], default=None
+        Random number generator seed for the initial point selection.
+
+    Returns
+    -------
+    pd.Index
+        Indices of the sampled waypoints.
     """
 
     waypoint_set = list()
@@ -233,16 +249,42 @@ def _max_min_sampling(data, num_waypoints, seed=None):
     return waypoints
 
 
-def _compute_pseudotime(data, start_cell, knn, waypoints, n_jobs, max_iterations=25):
-    """Function for compute the pseudotime
+def _compute_pseudotime(
+    data: pd.DataFrame,
+    start_cell: str,
+    knn: int,
+    waypoints: pd.Index,
+    n_jobs: int,
+    max_iterations: int = 25,
+) -> Tuple[pd.Series, pd.DataFrame]:
+    """Compute pseudotime and weight matrix using shortest path distances.
 
-    :param data: Multiscale space diffusion components
-    :param start_cell: Start cell for pseudotime construction
-    :param knn: Number of nearest neighbors for graph construction
-    :param waypoints: List of waypoints
-    :param n_jobs: Number of jobs for parallel processing
-    :param max_iterations: Maximum number of iterations for pseudotime convergence
-    :return: pseudotime and weight matrix
+    This function constructs a kNN graph and computes shortest path distances from
+    the start cell to all other cells. It then iteratively refines the pseudotime
+    by creating a perspective matrix and determining a weighted pseudotime.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Multiscale space diffusion components.
+    start_cell : str
+        Start cell for pseudotime construction.
+    knn : int
+        Number of nearest neighbors for graph construction.
+    waypoints : pd.Index
+        List of waypoints.
+    n_jobs : int
+        Number of jobs for parallel processing.
+    max_iterations : int, default=25
+        Maximum number of iterations for pseudotime convergence.
+
+    Returns
+    -------
+    Tuple[pd.Series, pd.DataFrame]
+        pseudotime : pd.Series
+            Pseudotime ordering of cells.
+        W : pd.DataFrame
+            Weight matrix for each cell.
     """
 
     # ################################################
@@ -250,9 +292,7 @@ def _compute_pseudotime(data, start_cell, knn, waypoints, n_jobs, max_iterations
     from joblib import Parallel, delayed
     print("Shortest path distances using {}-nearest neighbor graph...".format(knn))
     start = time.time()
-    nbrs = NearestNeighbors(n_neighbors=knn, metric="euclidean", n_jobs=n_jobs).fit(
-        data
-    )
+    nbrs = NearestNeighbors(n_neighbors=knn, metric="euclidean", n_jobs=n_jobs).fit(data)
     adj = nbrs.kneighbors_graph(data, mode="distance")
 
     # Connect graph if it is disconnected
@@ -267,9 +307,7 @@ def _compute_pseudotime(data, start_cell, knn, waypoints, n_jobs, max_iterations
     # Convert to distance matrix
     D = pd.DataFrame(0.0, index=waypoints, columns=data.index)
     for i, cell in enumerate(waypoints):
-        D.loc[cell, :] = pd.Series(
-            np.ravel(dists[i]), index=data.index[dists[i].index]
-        )[data.index]
+        D.loc[cell, :] = pd.Series(np.ravel(dists[i]), index=data.index[dists[i].index])[data.index]
     end = time.time()
     print("Time for shortest paths: {} minutes".format((end - start) / 60))
 
@@ -316,18 +354,52 @@ def _compute_pseudotime(data, start_cell, knn, waypoints, n_jobs, max_iterations
         pseudotime = new_traj
         iteration += 1
 
+    pseudotime -= np.min(pseudotime)
+    pseudotime /= np.max(pseudotime)
+
     return pseudotime, W
 
 
 def identify_terminal_states(
-    ms_data,
-    early_cell,
-    knn=30,
-    num_waypoints=1200,
-    n_jobs=-1,
-    max_iterations=25,
-    seed=20,
-):
+    ms_data: pd.DataFrame,
+    early_cell: str,
+    knn: int = 30,
+    num_waypoints: int = 1200,
+    n_jobs: int = -1,
+    max_iterations: int = 25,
+    seed: int = 20,
+) -> Tuple[np.ndarray, pd.Index]:
+    """
+    Identify terminal states from multi-scale data.
+    
+    This function identifies terminal states by sampling waypoints, constructing a 
+    pseudotime ordering, building a Markov chain, and analyzing its properties.
+    
+    Parameters
+    ----------
+    ms_data : pd.DataFrame
+        Multi-scale space diffusion components.
+    early_cell : str
+        Start cell for pseudotime construction.
+    knn : int, optional
+        Number of nearest neighbors for graph construction. Default is 30.
+    num_waypoints : int, optional
+        Number of waypoints to sample. Default is 1200.
+    n_jobs : int, optional
+        Number of jobs for parallel processing. Default is -1.
+    max_iterations : int, optional
+        Maximum number of iterations for pseudotime convergence. Default is 25.
+    seed : int, optional
+        Random seed for waypoint sampling. Default is 20.
+        
+    Returns
+    -------
+    Tuple[np.ndarray, pd.Index]
+        terminal_states : np.ndarray
+            Array of identified terminal state cells.
+        excluded_boundaries : pd.Index
+            Boundary cells that are not terminal states.
+    """
     # Scale components
     data = pd.DataFrame(
         preprocessing.minmax_scale(ms_data),
@@ -352,9 +424,7 @@ def identify_terminal_states(
     waypoints = pd.Index([start_cell]).append(waypoints)
 
     # Distance to start cell as pseudo pseudotime
-    pseudotime, _ = _compute_pseudotime(
-        data, start_cell, knn, waypoints, n_jobs, max_iterations
-    )
+    pseudotime, _ = _compute_pseudotime(data, start_cell, knn, waypoints, n_jobs, max_iterations)
 
     # Markov chain
     wp_data = data.loc[waypoints, :]
@@ -365,22 +435,41 @@ def identify_terminal_states(
 
     # Excluded diffusion map boundaries
     dm_boundaries = pd.Index(set(wp_data.idxmax()).union(wp_data.idxmin()))
-    excluded_boundaries = dm_boundaries.difference(terminal_states).difference(
-        [start_cell]
-    )
+    excluded_boundaries = dm_boundaries.difference(terminal_states).difference([start_cell])
     return terminal_states, excluded_boundaries
 
 
-def _construct_markov_chain(wp_data, knn, pseudotime, n_jobs):
+def _construct_markov_chain(
+    wp_data: pd.DataFrame, knn: int, pseudotime: pd.Series, n_jobs: int
+) -> csr_matrix:
+    """Constructs a Markov chain from waypoints data.
+
+    This function builds a directed graph based on pseudotime and computes
+    a transition matrix representing a Markov chain.
+
+    Parameters
+    ----------
+    wp_data : pd.DataFrame
+        Multi-scale data of the waypoints.
+    knn : int
+        Number of nearest neighbors for graph construction.
+    pseudotime : pd.Series
+        Pseudotime ordering of cells.
+    n_jobs : int
+        Number of jobs for parallel processing.
+
+    Returns
+    -------
+    csr_matrix
+        Transition matrix of the Markov chain.
+    """
     # Markov chain construction
     print("Markov chain construction...")
     waypoints = wp_data.index
 
     # kNN graph
     n_neighbors = knn
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, metric="euclidean", n_jobs=n_jobs
-    ).fit(wp_data)
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean", n_jobs=n_jobs).fit(wp_data)
     kNN = nbrs.kneighbors_graph(wp_data, mode="distance")
     dist, ind = nbrs.kneighbors(wp_data)
 
@@ -391,17 +480,13 @@ def _construct_markov_chain(wp_data, knn, pseudotime, n_jobs):
     # Directed graph construction
     # pseudotime position of all the neighbors
     traj_nbrs = pd.DataFrame(
-        pseudotime[np.ravel(waypoints.values[ind])].values.reshape(
-            [len(waypoints), n_neighbors]
-        ),
+        pseudotime[np.ravel(waypoints.values[ind])].values.reshape([len(waypoints), n_neighbors]),
         index=waypoints,
     )
 
     # Remove edges that move backwards in pseudotime except for edges that are within
     # the computed standard deviation
-    rem_edges = traj_nbrs.apply(
-        lambda x: x < pseudotime[traj_nbrs.index] - adaptive_std
-    )
+    rem_edges = traj_nbrs.apply(lambda x: x < pseudotime[traj_nbrs.index] - adaptive_std)
     rem_edges = rem_edges.stack()[rem_edges.stack()]
 
     # Determine the indices and update adjacency matrix
@@ -413,10 +498,7 @@ def _construct_markov_chain(wp_data, knn, pseudotime, n_jobs):
 
     # Affinity matrix and markov chain
     x, y, z = find(kNN)
-    aff = np.exp(
-        -(z**2) / (adaptive_std[x] ** 2) * 0.5
-        - (z**2) / (adaptive_std[y] ** 2) * 0.5
-    )
+    aff = np.exp(-(z**2) / (adaptive_std[x] ** 2) * 0.5 - (z**2) / (adaptive_std[y] ** 2) * 0.5)
     W = csr_matrix((aff, (x, y)), [len(waypoints), len(waypoints)])
 
     # Transition matrix
@@ -427,7 +509,28 @@ def _construct_markov_chain(wp_data, knn, pseudotime, n_jobs):
     return T
 
 
-def _terminal_states_from_markov_chain(T, wp_data, pseudotime):
+def _terminal_states_from_markov_chain(
+    T: csr_matrix, wp_data: pd.DataFrame, pseudotime: pd.Series
+) -> np.ndarray:
+    """Identifies terminal states from the Markov chain.
+
+    This function identifies terminal states by examining the eigenvectors of the
+    transition matrix and finding connected components of cells that have high ranks.
+
+    Parameters
+    ----------
+    T : csr_matrix
+        Transition matrix of the Markov chain.
+    wp_data : pd.DataFrame
+        Multi-scale data of the waypoints.
+    pseudotime : pd.Series
+        Pseudotime ordering of cells.
+
+    Returns
+    -------
+    np.ndarray
+        Array of terminal state identifiers.
+    """
     print("Identification of terminal states...")
 
     # Identify terminal statses
@@ -474,15 +577,39 @@ def _terminal_states_from_markov_chain(T, wp_data, pseudotime):
     return terminal_states
 
 
-def _differentiation_entropy(wp_data, terminal_states, knn, n_jobs, pseudotime):
-    """Function to compute entropy and branch probabilities
+def _differentiation_entropy(
+    wp_data: pd.DataFrame, 
+    terminal_states: Optional[np.ndarray], 
+    knn: int, 
+    n_jobs: int, 
+    pseudotime: pd.Series
+) -> Tuple[pd.Series, pd.DataFrame]:
+    """Compute entropy and branch probabilities from a Markov chain.
 
-    :param wp_data: Multi scale data of the waypoints
-    :param terminal_states: Terminal states
-    :param knn: Number of nearest neighbors for graph construction
-    :param n_jobs: Number of jobs for parallel processing
-    :param pseudotime: Pseudo time ordering of cells
-    :return: entropy and branch probabilities
+    This function constructs a Markov chain from waypoints data and computes 
+    cell branch probabilities and differentiation entropy.
+
+    Parameters
+    ----------
+    wp_data : pd.DataFrame
+        Multi-scale data of the waypoints.
+    terminal_states : Optional[np.ndarray]
+        Terminal states to use for probability calculations. If None, they will be
+        automatically detected.
+    knn : int
+        Number of nearest neighbors for graph construction.
+    n_jobs : int
+        Number of jobs for parallel processing.
+    pseudotime : pd.Series
+        Pseudotime ordering of cells.
+
+    Returns
+    -------
+    Tuple[pd.Series, pd.DataFrame]
+        entropy : pd.Series
+            Differentiation entropy for each cell.
+        branch_probs : pd.DataFrame
+            Branch probabilities for each cell and terminal state.
     """
 
     T = _construct_markov_chain(wp_data, knn, pseudotime, n_jobs)
@@ -534,11 +661,44 @@ def _differentiation_entropy(wp_data, terminal_states, knn, n_jobs, pseudotime):
     return ent, branch_probs
 
 
-def _shortest_path_helper(cell, adj):
+def _shortest_path_helper(cell: int, adj: csr_matrix) -> pd.Series:
+    """Compute shortest path distances from a cell to all other cells.
+
+    Parameters
+    ----------
+    cell : int
+        Index of the source cell.
+    adj : csr_matrix
+        Adjacency matrix representing the graph.
+
+    Returns
+    -------
+    pd.Series
+        Series containing shortest path distances.
+    """
     return pd.Series(csgraph.dijkstra(adj, False, cell))
 
 
-def _connect_graph(adj, data, start_cell):
+def _connect_graph(adj: csr_matrix, data: pd.DataFrame, start_cell: int) -> csr_matrix:
+    """Connect disconnected components in the graph to ensure all cells are reachable.
+
+    This function identifies unreachable nodes in the graph and connects them
+    to the nearest reachable node.
+
+    Parameters
+    ----------
+    adj : csr_matrix
+        Adjacency matrix representing the graph.
+    data : pd.DataFrame
+        Multiscale data matrix.
+    start_cell : int
+        Index of the start cell.
+
+    Returns
+    -------
+    csr_matrix
+        Updated adjacency matrix with all cells connected.
+    """
     # Create graph and compute distances
     graph = nx.Graph(adj)
     dists = pd.Series(nx.single_source_dijkstra_path_length(graph, start_cell))
@@ -561,9 +721,7 @@ def _connect_graph(adj, data, start_cell):
             data.iloc[farthest_reachable, :].values.reshape(1, -1),
             data.loc[unreachable_nodes, :],
         )
-        unreachable_dists = pd.Series(
-            np.ravel(unreachable_dists), index=unreachable_nodes
-        )
+        unreachable_dists = pd.Series(np.ravel(unreachable_dists), index=unreachable_nodes)
 
         # Add edge between farthest reacheable and its nearest unreachable
         add_edge = np.where(data.index == unreachable_dists.idxmin())[0][0]

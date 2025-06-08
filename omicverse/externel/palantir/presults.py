@@ -3,13 +3,14 @@ import numpy as np
 import pandas as pd
 import pickle
 import time
+import importlib.util
+import sys
 
 from collections import OrderedDict
-from joblib import delayed, Parallel
-from sklearn.preprocessing import StandardScaler
-from pygam import LinearGAM, s
-import scanpy as sc
 
+from sklearn.preprocessing import StandardScaler
+import scanpy as sc
+from anndata import AnnData
 
 from . import config
 from .validation import _validate_obsm_key, _validate_varm_key
@@ -26,9 +27,7 @@ class PResults(object):
 
     def __init__(self, pseudotime, entropy, branch_probs, waypoints):
         # Initialize
-        self._pseudotime = (pseudotime - pseudotime.min()) / (
-            pseudotime.max() - pseudotime.min()
-        )
+        self._pseudotime = pseudotime
         self._entropy = entropy
         self._branch_probs = branch_probs
         self._branch_probs[self._branch_probs < 0.01] = 0
@@ -78,7 +77,7 @@ class PResults(object):
 
 
 def compute_gene_trends_legacy(
-    data: Union[sc.AnnData, PResults],
+    data: Union[AnnData, PResults],
     gene_exprs: Optional[pd.DataFrame] = None,
     lineages: Optional[List[str]] = None,
     n_splines: int = 4,
@@ -98,7 +97,7 @@ def compute_gene_trends_legacy(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, palantir.presults.PResults]
+    data : Union[AnnData, palantir.presults.PResults]
         Either a Scanpy AnnData object or a Palantir results object.
     gene_exprs : pd.DataFrame, optional
         DataFrame of gene expressions with cells as rows and genes as columns. If not provided, gene expressions
@@ -130,18 +129,16 @@ def compute_gene_trends_legacy(
         write h5ad files with DataFrames in ad.varm. Default is palantir.SAVE_AS_DF=True.
 
     Returns
-
-
-    Returns
     -------
     Dict[str, Dict[str, pd.DataFrame]]
         Dictionary of gene expression trends and standard deviations for each branch.
     """
+    from joblib import delayed, Parallel
     if save_as_df is None:
         save_as_df = config.SAVE_AS_DF
 
     # Extract palantir results from AnnData if necessary
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         gene_exprs = data.to_df(expression_key)
         pseudo_time = pd.Series(data.obs[pseudo_time_key], index=data.obs_names)
         fate_probs, _ = _validate_obsm_key(data, fate_prob_key)
@@ -163,12 +160,8 @@ def compute_gene_trends_legacy(
         bins = np.linspace(0, pr_res.pseudotime[br_cells].max(), PSEUDOTIME_RES)
 
         # Branch results container
-        results[branch]["trends"] = pd.DataFrame(
-            0.0, index=gene_exprs.columns, columns=bins
-        )
-        results[branch]["std"] = pd.DataFrame(
-            0.0, index=gene_exprs.columns, columns=bins
-        )
+        results[branch]["trends"] = pd.DataFrame(0.0, index=gene_exprs.columns, columns=bins)
+        results[branch]["std"] = pd.DataFrame(0.0, index=gene_exprs.columns, columns=bins)
 
     # Compute for each branch
     for branch in lineages:
@@ -194,18 +187,16 @@ def compute_gene_trends_legacy(
         for i, gene in enumerate(gene_exprs.columns):
             results[branch]["trends"].loc[gene, :] = res[i][0]
             results[branch]["std"].loc[gene, :] = res[i][1]
-        if isinstance(data, sc.AnnData):
+        if isinstance(data, AnnData):
             if save_as_df:
                 df = results[branch]["trends"]
                 df.columns = df.columns.astype(str)
                 data.varm[gene_trend_key + "_" + branch] = df
             else:
-                data.varm[gene_trend_key + "_" + branch] = results[branch][
+                data.varm[gene_trend_key + "_" + branch] = results[branch]["trends"].values
+                data.uns[gene_trend_key + "_" + branch + "_pseudotime"] = results[branch][
                     "trends"
-                ].values
-                data.uns[gene_trend_key + "_" + branch + "_pseudotime"] = results[
-                    branch
-                ]["trends"].columns.values
+                ].columns.values
         end = time.time()
         print("Time for processing {}: {} minutes".format(branch, (end - start) / 60))
 
@@ -213,7 +204,7 @@ def compute_gene_trends_legacy(
 
 
 def compute_gene_trends(
-    ad: sc.AnnData,
+    ad: AnnData,
     lineages: Optional[List[str]] = None,
     masks_key: str = "branch_masks",
     expression_key: str = None,
@@ -236,7 +227,7 @@ def compute_gene_trends(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         AnnData object containing the gene expression data and pseudotime.
     lineages : List[str], optional
         Subset of lineages for which to compute the trends.
@@ -273,9 +264,7 @@ def compute_gene_trends(
         save_as_df = config.SAVE_AS_DF
     # Check the AnnData object for the necessary keys
     if pseudo_time_key not in ad.obs_keys():
-        raise ValueError(
-            f"'{pseudo_time_key}' is not found in the AnnData object's obs."
-        )
+        raise ValueError(f"'{pseudo_time_key}' is not found in the AnnData object's obs.")
 
     masks, branches = _validate_obsm_key(ad, masks_key, as_df=False)
 
@@ -291,11 +280,13 @@ def compute_gene_trends(
     else:
         lineages = branches
 
+    # Import mellon locally to avoid JAX fork warnings in other parts of the code
+    import mellon
+    
     # Set the default arguments for mellon.FunctionEstimator
     mellon_args = dict(sigma=1, ls=1)
 
     lagacy_results = dict()
-    import mellon
     # Compute the gene expression trends
     for i, branch in enumerate(branches):
         if branch not in lineages:
@@ -332,13 +323,60 @@ def gam_fit_predict(x, y, weights=None, pred_x=None, n_splines=4, spline_order=2
     """
     Function to compute individual gene trends using pyGAM
 
-    :param x: Pseudotime axis
-    :param y: Magic imputed expression for one gene
-    :param weights: Lineage branch weights
-    :param pred_x: Pseudotime axis for predicted values
-    :param n_splines: Number of splines to use. Must be non-negative.
-    :param spline_order: Order of spline to use. Must be non-negative.
+    This function requires the optional pygam package. If not installed, it will raise an
+    ImportError with instructions on how to install it.
+
+    Parameters
+    ----------
+    x : array-like
+        Pseudotime axis
+    y : array-like
+        Magic imputed expression for one gene
+    weights : array-like, optional
+        Lineage branch weights
+    pred_x : array-like, optional
+        Pseudotime axis for predicted values
+    n_splines : int, optional
+        Number of splines to use. Must be non-negative.
+    spline_order : int, optional
+        Order of spline to use. Must be non-negative.
+
+    Returns
+    -------
+    tuple
+        Predicted values and their standard deviations.
+
+    Raises
+    ------
+    ImportError
+        If pygam is not installed. Install with `pip install pygam` or
+        `pip install palantir[gam]`.
     """
+    try:
+        from pygam import LinearGAM, s
+    except ImportError:
+        raise ImportError(
+            "The pygam package is required for this function but not installed. "
+            "You can install it with:\n"
+            "    pip install pygam\n"
+            "or:\n"
+            "    pip install palantir[gam]"
+        )
+
+    # Check for known compatibility issues
+    try:
+        import scipy.sparse as sp
+
+        test_matrix = sp.csr_matrix((1, 1))
+        if not hasattr(test_matrix, "A"):
+            import warnings
+
+            warnings.warn(
+                "Your scipy version may be incompatible with the installed pygam version. "
+                "If you encounter errors, consider using an older scipy version or updating pygam."
+            )
+    except:
+        pass  # Silently ignore any errors in the compatibility check
 
     # Weights
     if weights is None:
@@ -362,9 +400,7 @@ def gam_fit_predict(x, y, weights=None, pred_x=None, n_splines=4, spline_order=2
     n = len(use_inds)
     sigma = np.sqrt(((y[use_inds] - p) ** 2).sum() / (n - 2))
     stds = (
-        np.sqrt(1 + 1 / n + (pred_x - np.mean(x)) ** 2 / ((x - np.mean(x)) ** 2).sum())
-        * sigma
-        / 2
+        np.sqrt(1 + 1 / n + (pred_x - np.mean(x)) ** 2 / ((x - np.mean(x)) ** 2).sum()) * sigma / 2
     )
 
     return y_pred, stds
@@ -383,9 +419,7 @@ def _gam_fit_predict_rpy2(x, y, weights=None, pred_x=None):
 
     # Construct dataframe
     use_inds = np.where(weights > 0)[0]
-    r_df = pandas2ri.py2rpy(
-        pd.DataFrame(np.array([x, y]).T[use_inds, :], columns=["x", "y"])
-    )
+    r_df = pandas2ri.py2rpy(pd.DataFrame(np.array([x, y]).T[use_inds, :], columns=["x", "y"]))
 
     # Fit the model
     rgam = importr("gam")
@@ -395,9 +429,7 @@ def _gam_fit_predict_rpy2(x, y, weights=None, pred_x=None):
     if pred_x is None:
         pred_x = x
     y_pred = np.array(
-        robjects.r.predict(
-            model, newdata=pandas2ri.py2rpy(pd.DataFrame(pred_x, columns=["x"]))
-        )
+        robjects.r.predict(model, newdata=pandas2ri.py2rpy(pd.DataFrame(pred_x, columns=["x"])))
     )
 
     # Standard deviations
@@ -409,16 +441,14 @@ def _gam_fit_predict_rpy2(x, y, weights=None, pred_x=None):
     n = len(use_inds)
     sigma = np.sqrt(((y[use_inds] - p) ** 2).sum() / (n - 2))
     stds = (
-        np.sqrt(1 + 1 / n + (pred_x - np.mean(x)) ** 2 / ((x - np.mean(x)) ** 2).sum())
-        * sigma
-        / 2
+        np.sqrt(1 + 1 / n + (pred_x - np.mean(x)) ** 2 / ((x - np.mean(x)) ** 2).sum()) * sigma / 2
     )
 
     return y_pred, stds
 
 
 def cluster_gene_trends(
-    data: Union[sc.AnnData, pd.DataFrame],
+    data: Union[AnnData, pd.DataFrame],
     branch_name: str,
     genes: Optional[List[str]] = None,
     gene_trend_key: Optional[str] = "gene_trends",
@@ -435,7 +465,7 @@ def cluster_gene_trends(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, pd.DataFrame]
+    data : Union[AnnData, pd.DataFrame]
         AnnData object or a DataFrame of gene expression trends.
     branch_name : str
         Name of the branch for which the gene trends are to be clustered.
@@ -458,14 +488,10 @@ def cluster_gene_trends(
     KeyError
         If `gene_trend_key` is None when `data` is an AnnData object.
     """
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if gene_trend_key is None:
-            raise KeyError(
-                "Must provide a gene_trend_key when data is an AnnData object."
-            )
-        trends, pseudotimes = _validate_varm_key(
-            data, gene_trend_key + "_" + branch_name
-        )
+            raise KeyError("Must provide a gene_trend_key when data is an AnnData object.")
+        trends, pseudotimes = _validate_varm_key(data, gene_trend_key + "_" + branch_name)
     else:
         trends = data
 
@@ -479,13 +505,19 @@ def cluster_gene_trends(
         columns=trends.columns,
     )
 
-    gt_ad = sc.AnnData(trends.values, dtype=np.float32)
+    gt_ad = AnnData(trends.values, dtype=np.float32)
     sc.pp.neighbors(gt_ad, n_neighbors=n_neighbors, use_rep="X")
-    sc.tl.leiden(gt_ad, **kwargs)
+    
+    # Add required kwargs for leiden with igraph backend to avoid FutureWarning
+    leiden_kwargs = {'flavor': 'igraph', 'n_iterations': 2, 'directed': False}
+    # Override with user-provided kwargs if any
+    leiden_kwargs.update(kwargs)
+    
+    sc.tl.leiden(gt_ad, **leiden_kwargs)
 
     communities = pd.Series(gt_ad.obs["leiden"].values, index=trends.index)
 
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         col_name = gene_trend_key + "_clusters"
         if genes is None:
             data.var[col_name] = communities
@@ -497,7 +529,7 @@ def cluster_gene_trends(
 
 
 def select_branch_cells(
-    ad: sc.AnnData,
+    ad: AnnData,
     pseudo_time_key: str = "palantir_pseudotime",
     fate_prob_key: str = "palantir_fate_probabilities",
     q: float = 1e-2,
@@ -514,7 +546,7 @@ def select_branch_cells(
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         Annotated data matrix. The pseudotime and fate probabilities should be stored under the keys provided.
     pseudo_time_key : str, optional
         Key to access the pseudotime from obs of the AnnData object. Default is 'palantir_pseudotime'.
@@ -549,12 +581,16 @@ def select_branch_cells(
     fate_probs, fate_names = _validate_obsm_key(ad, fate_prob_key, as_df=False)
     pseudotime = ad.obs[pseudo_time_key].values
 
+    fate_probs[np.isnan(fate_probs)] = 1 / fate_probs.shape[1]
+
     idx = np.argsort(pseudotime)
     sorted_fate_probs = fate_probs[idx, :]
     prob_thresholds = np.empty_like(fate_probs)
     n = fate_probs.shape[0]
 
-    step = n // PSEUDOTIME_RES
+    pseudotime_resolution = min(PSEUDOTIME_RES, n)
+
+    step = n // pseudotime_resolution
     nsteps = n // step
     for i in range(nsteps):
         l, r = i * step, (i + 1) * step
@@ -562,6 +598,7 @@ def select_branch_cells(
         prob_thresholds[l:r, :] = mprob[None, :]
     mprob = np.quantile(sorted_fate_probs, 1 - q, axis=0)
     prob_thresholds[r:, :] = mprob[None, :]
+
     prob_thresholds = np.maximum.accumulate(prob_thresholds, axis=0)
 
     masks = np.empty_like(fate_probs).astype(bool)
