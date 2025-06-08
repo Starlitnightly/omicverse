@@ -3,65 +3,59 @@
 </h1><br>
 
 <div align="center">
-  <a href="READMEM/README_CN.md">中文</a> | <a href="READMEM/README_ES.md">Español</a> | <a href="READMEM/README_JP.md">日本語</a> | <a href="READMEM/README_DE.md">Deutsch</a> | <a href="READMEM/README_FR.md">Français</a> | <a href="READMEM/README_KR.md">한국어</a>
+  <a href="../README.md">English</a> | <a href="README_CN.md">中文</a> | <a href="README_JP.md">日本語</a> | <a href="README_DE.md">Deutsch</a> | <a href="README_FR.md">Français</a> | <a href="README_KR.md">한국어</a>
 </div>
 
 [![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse) [![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![scverse](https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow)](https://scverse.org/) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg)](https://github.com/Starlitnightly/omicverse/) ![Docker Pulls](https://img.shields.io/docker/pulls/starlitnightly/omicverse)
 
-
-**`OmicVerse`** is the fundamental package for multi omics included **bulk ,single cell and spatial RNA-seq** analysis with Python. For more information, please read our paper: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
+**`OmicVerse`** es el paquete fundamental para análisis multi-ómicos que incluye análisis de **bulk, célula única y RNA-seq espacial** con Python. Para más información, lee nuestro artículo: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
 
 > [!IMPORTANT]
 >
-> **Star Us**, You will receive all release notifications from GitHub without any delay \~ ⭐️
+> **Danos una estrella**, recibirás todas las notificaciones de lanzamiento de GitHub sin demora ~ ⭐️
 >
-> If you like **OmicVerse** and want to support our mission, please consider making a [💗donation](https://ifdian.net/a/starlitnightly) to support our efforts.
+> Si te gusta **OmicVerse** y quieres apoyar nuestra misión, considera hacer una [💗donación](https://ifdian.net/a/starlitnightly) para apoyar nuestros esfuerzos.
 
 <details>
-  <summary><kbd>Star History</kbd></summary>
+  <summary><kbd>Historial de Estrellas</kbd></summary>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Starlitnightly%2Fomicverse&theme=dark&type=Date">
     <img width="100%" src="https://api.star-history.com/svg?repos=Starlitnightly%2Fomicverse&type=Date">
   </picture>
 </details>
 
+## `1` [Introducción][docs-feat-provider]
 
-
-
-
-## `1` [Introduction][docs-feat-provider]
-
-The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to **`OmicVerse`**, it aimed to solve all task in RNA-seq.
+El nombre original de omicverse era [Pyomic](https://pypi.org/project/Pyomic/), pero queríamos abordar todo un universo de transcriptómica, así que cambiamos el nombre a **`OmicVerse`**, que tiene como objetivo resolver todas las tareas en RNA-seq.
 
 > [!NOTE]
-> **BulkTrajBlend** algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of **"omission"** cells in the original scRNA-seq data.
+> El algoritmo **BulkTrajBlend** en OmicVerse que combina el autocodificador variacional Beta para deconvolución y redes neuronales gráficas para descubrimiento de comunidades superpuestas para interpolar y restaurar efectivamente la continuidad de células "omitidas" en los datos originales de scRNA-seq.
 
-![omicverse-light](omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
-![omicverse-dark](omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
+![omicverse-light](../omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
+![omicverse-dark](../omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
 
-
-## `2` [Directory structure](#)
+## `2` [Estructura de Directorios](#)
 
 ````shell
 .
-├── omicverse                  # Main Python package
-├── omicverse_guide            # Documentation files
-├── sample                     # Some test data
+├── omicverse                  # Paquete principal de Python
+├── omicverse_guide            # Archivos de documentación
+├── sample                     # Algunos datos de prueba
 ├── LICENSE
 └── README.md
 ````
 
-## `3` [Getting Started ](#)
+## `3` [Comenzando](#)
 
-OmicVerse can be installed via conda or pypi and you need to install `pytorch` at first. Please refer to the [installation tutorial](https://starlitnightly.github.io/omicverse/Installation_guild/) for more detailed installation steps and adaptations for different platforms (`Windows`, `Linux` or `Mac OS`).
+OmicVerse se puede instalar a través de conda o pypi y necesitas instalar `pytorch` primero. Consulta el [tutorial de instalación](https://starlitnightly.github.io/omicverse/Installation_guild/) para pasos de instalación más detallados y adaptaciones para diferentes plataformas (`Windows`, `Linux` o `Mac OS`).
 
-You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
+Puedes usar `conda install omicverse -c conda-forge` o `pip install -U omicverse` para la instalación.
 
-Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
+Consulta la documentación y tutoriales en [página de omicverse](https://starlitnightly.github.io/omicverse/) o [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
-## `4` [Data Framework and Reference](#)
+## `4` [Marco de Datos y Referencia](#)
 
-The omicverse is implemented as an infrastructure based on the following four data structures.
+omicverse se implementa como una infraestructura basada en las siguientes cuatro estructuras de datos.
 
 <div align="center">
 <table>
@@ -71,13 +65,12 @@ The omicverse is implemented as an infrastructure based on the following four da
     <td> <a href="https://github.com/numpy/numpy">numpy</a></td>
     <td> <a href="https://github.com/scverse/mudata">mudata</a></td>
   </tr>
-
 </table>
 </div>
 
 ---
 
-The table contains the tools have been published 
+La tabla contiene las herramientas que han sido publicadas
 
 <div align="center">
 <table>
@@ -162,22 +155,14 @@ The table contains the tools have been published
 </table>
 </div>
 
----
+## `5` [Contacto](#)
 
-**Included Package not published or preprint**
-
-- [1] [Cellula](https://github.com/andrecossa5/Cellula/) is to provide a toolkit for the exploration of scRNA-seq. These tools perform common single-cell analysis tasks
-- [2] [pegasus](https://github.com/lilab-bcb/pegasus/) is a tool for analyzing transcriptomes of millions of single cells. It is a command line tool, a python package and a base for Cloud-based analysis workflows.
-- [3] [cNMF](https://github.com/dylkot/cNMF) is an analysis pipeline for inferring gene expression programs from single-cell RNA-Seq (scRNA-Seq) data.
-
-## `5` [Contact](#)
-
-- Zehua Zeng ([starlitnightly@gmail.com](mailto:starlitnightly@gmail.com) or [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
+- Zehua Zeng ([starlitnightly@gmail.com](mailto:starlitnightly@gmail.com) o [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 - Lei Hu ([hulei@westlake.edu.cn](mailto:hulei@westlake.edu.cn))
 
-## `6` [Developer Guild and Contributing](#)
+## `6` [Guía del Desarrollador y Contribución](#)
 
-If you would like to contribute to omicverse, please refer to our [developer documentation](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
+Si deseas contribuir a omicverse, consulta nuestra [documentación para desarrolladores](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
 
 <table align="center">
     <tr>
@@ -187,30 +172,26 @@ If you would like to contribute to omicverse, please refer to our [developer doc
     </tr>
 </table>
 
-
 > [!IMPORTANT]  
-> We would like to thank the following WeChat Official Accounts for promoting Omicverse.
-> <p align="center"> <a href="https://mp.weixin.qq.com/s/egAnRfr3etccU_RsN-zIlg" target="_blank" rel="noreferrer"> <img src="README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
+> Nos gustaría agradecer a las siguientes cuentas oficiales de WeChat por promover Omicverse.
+> <p align="center"> <a href="https://mp.weixin.qq.com/s/egAnRfr3etccU_RsN-zIlg" target="_blank" rel="noreferrer"> <img src="../README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="../README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
 
+## `7` [Cita](https://doi.org/10.1038/s41467-024-50194-3)
 
-## `7` [Citation](https://doi.org/10.1038/s41467-024-50194-3)
-
-If you use `omicverse` in your work, please cite the `omicverse` publication as follows:
+Si usas `omicverse` en tu trabajo, cita la publicación de `omicverse` de la siguiente manera:
 
 > **OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing**
 >
 > Zeng, Z., Ma, Y., Hu, L. et al.
 >
-> _Nature Communication_ 2024 Jul 16. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
+> _Nature Communication_ 16 Jul 2024. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
 
+## `8` [Otros](#)
 
-## `8` [Other](#)
-
-If you would like to sponsor the development of our project, you can go to the afdian website (https://ifdian.net/a/starlitnightly) and sponsor us.
-
+Si deseas patrocinar el desarrollo de nuestro proyecto, puedes ir al sitio web de afdian (https://ifdian.net/a/starlitnightly) y patrocinarnos.
 
 Copyright © 2024 [112 Lab](https://112lab.asia/). <br />
-This project is [GPL3.0](./LICENSE) licensed.
+Este proyecto tiene licencia [GPL3.0](../LICENSE).
 
 <!-- LINK GROUP -->
-[docs-feat-provider]: https://starlitnightly.github.io/omicverse/
+[docs-feat-provider]: https://starlitnightly.github.io/omicverse/ 
