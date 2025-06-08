@@ -38,4 +38,6 @@ from ._cellvote import get_cluster_celltype,CellVote
 from ._deg_ct import DCT,DEG
 from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
+from ._diffusionmap import diffmap
+from ._cellmatch import CellOntologyMapper,download_cl
 

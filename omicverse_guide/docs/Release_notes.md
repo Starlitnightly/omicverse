@@ -555,3 +555,13 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 - Added `dotplot_doublegroup` to visual the genes in doublegroup.
 - Added `transpose` argument of `cpdb_interacting_heatmap` to transpose the figure.
 - Added `calculate_gene_density` to plot the gene's density. 
+
+
+## v 1.7.1
+
+### Single Module
+- Fixed some error of `ov.single.lazy`.
+- Fixed the format of `ov.single.generate_scRNA_report`
+- Updated some functions of `palantir`
+- Added `CellOntologyMapper` to map cell name.
+

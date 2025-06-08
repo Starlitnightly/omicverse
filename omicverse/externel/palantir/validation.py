@@ -2,6 +2,7 @@ from typing import Union, List, Dict
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from anndata import AnnData
 
 
 def _validate_obsm_key(ad, key, as_df=True):
@@ -10,7 +11,7 @@ def _validate_obsm_key(ad, key, as_df=True):
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         The annotated data matrix from which the data is to be retrieved.
     key : str
         The key for accessing the data from the AnnData object's obsm.
@@ -55,7 +56,7 @@ def _validate_varm_key(ad, key, as_df=True):
 
     Parameters
     ----------
-    ad : sc.AnnData
+    ad : AnnData
         The annotated data matrix from which the data is to be retrieved.
     key : str
         The key for accessing the data from the AnnData object's varm.
@@ -95,7 +96,7 @@ def _validate_varm_key(ad, key, as_df=True):
 
 
 def _validate_gene_trend_input(
-    data: Union[sc.AnnData, Dict],
+    data: Union[AnnData, Dict],
     gene_trend_key: str = "gene_trends",
     branch_names: Union[str, List[str]] = "branch_masks",
 ) -> Dict:
@@ -104,7 +105,7 @@ def _validate_gene_trend_input(
 
     Parameters
     ----------
-    data : Union[sc.AnnData, Dict]
+    data : Union[AnnData, Dict]
         An AnnData object or a dictionary containing gene trends.
     gene_trend_key : str, optional
         Key to access gene trends in the varm of the AnnData object. Default is 'gene_trends'.
@@ -125,7 +126,7 @@ def _validate_gene_trend_input(
     ValueError
         If 'data' is neither an AnnData object nor a dictionary.
     """
-    if isinstance(data, sc.AnnData):
+    if isinstance(data, AnnData):
         if isinstance(branch_names, str):
             if branch_names in data.uns.keys():
                 branch_names = data.uns[branch_names]

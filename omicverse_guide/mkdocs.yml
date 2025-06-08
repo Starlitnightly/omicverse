@@ -26,6 +26,7 @@ nav:
             - Lazy analysis of scRNA-seq: Tutorials-single/t_lazy.ipynb
         - Annotation: 
             - Automatic cell type annotation with GPT/Other: Tutorials-single/t_gptanno.ipynb
+            - Mapping Cell Names to the Cell Ontology: Tutorials-single/t_cellmatch.ipynb
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
             - Celltype auto annotation with MetaTiME: Tutorials-single/t_metatime.ipynb
             - Celltype annotation migration(mapping) with TOSICA: Tutorials-single/t_tosica.ipynb
