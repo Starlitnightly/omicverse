@@ -255,6 +255,11 @@
       </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellmatch/">
+        Mapping Cell Names to the Cell Ontology
+      </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-single/t_cellanno/">
         Celltype auto annotation with SCSA
       </a>
@@ -272,6 +277,11 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-single/t_scmulan/">
         Celltype auto annotation with scMulan
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-single/t_cellvote/">
+        Consensus annotation with CellVote
       </a>
 </li>
 </ul>
@@ -1436,6 +1446,20 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-171">
+    v 1.7.1
+  </a>
+<nav aria-label="v 1.7.1" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_32">
+    Single Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </li>
@@ -2346,6 +2370,20 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-171">
+    v 1.7.1
+  </a>
+<nav aria-label="v 1.7.1" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_32">
+    Single Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -2951,7 +2989,7 @@ Changed the logo presentation of Omicverse to <code>ov.plot_set</code></p>
 <h3 id="single-module_31">Single Module<a class="headerlink" href="#single-module_31" title="Permanent link">¶</a></h3>
 <ul>
 <li>Added <code>lazy</code> function to calculate all function of scrna-seq (#291)</li>
-<li>Added <code>generate_scRNA_report</code> and <code>generate_reference_table</code> to generate the report and reference (#291) (@292)</li>
+<li>Added <code>generate_scRNA_report</code> and <code>generate_reference_table</code> to generate the report and reference (#291) (#292)</li>
 <li>Fixed <code>geneset_prepare</code> not being able to read gmt not split by <code>\t\t</code> (#235) (#238)</li>
 <li>Added <code>geneset_aucell_tmp</code>,<code>pathway_aucell_tmp</code>,<code>pathway_aucell_enrichment_tmp</code> to test the chunk_size (#238)</li>
 <li>Added data enhancement of <code>Fate</code></li>
@@ -2972,6 +3010,14 @@ Changed the logo presentation of Omicverse to <code>ov.plot_set</code></p>
 <li>Added <code>dotplot_doublegroup</code> to visual the genes in doublegroup.</li>
 <li>Added <code>transpose</code> argument of <code>cpdb_interacting_heatmap</code> to transpose the figure.</li>
 <li>Added <code>calculate_gene_density</code> to plot the gene's density. </li>
+</ul>
+<h2 id="v-171">v 1.7.1<a class="headerlink" href="#v-171" title="Permanent link">¶</a></h2>
+<h3 id="single-module_32">Single Module<a class="headerlink" href="#single-module_32" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed some error of <code>ov.single.lazy</code>.</li>
+<li>Fixed the format of <code>ov.single.generate_scRNA_report</code></li>
+<li>Updated some functions of <code>palantir</code></li>
+<li>Added <code>CellOntologyMapper</code> to map cell name.</li>
 </ul>
 </article>
 </div>
