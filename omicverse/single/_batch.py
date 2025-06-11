@@ -2,7 +2,7 @@ from ..pp import *
 import scanpy as sc
 import numpy as np
 import anndata
-from .._settings import add_reference
+from .._settings import add_reference,settings
 
 def batch_correction(adata:anndata.AnnData,batch_key:str,
                      use_rep='scaled|original|X_pca',
@@ -33,15 +33,32 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
                 'Please install the harmonypy: `pip install harmonypy`.'
             )
         
+        # Try to use direct harmony library first
+        try:
+            from harmony import harmonize
+            use_direct_harmony = True
+        except ImportError:
+            use_direct_harmony = False
+            
         adata3=adata.copy()
-        if 'scaled|original|X_pca' not in adata3.obsm.keys():
+        if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
             scale(adata3)
             pca(adata3,layer='scaled',n_pcs=n_pcs)
-        sc.external.pp.harmony_integrate(adata3, batch_key,basis=use_rep,**kwargs)
+        
+        if settings.mode == 'cpu':
+            # Use scanpy's external harmony integration for CPU mode
+            sc.external.pp.harmony_integrate(adata3, batch_key, basis=use_rep, **kwargs)
+        elif settings.mode in ['cpu-gpu-mixed', 'gpu'] and use_direct_harmony:
+            # Use direct harmony library for mixed/GPU modes
+            Z = harmonize(adata3.obsm['X_pca'], adata3.obs, batch_key=batch_key, **kwargs)
+            adata3.obsm['X_pca_harmony'] = Z
+        else:
+            # Fall back to scanpy's external harmony integration
+            sc.external.pp.harmony_integrate(adata3, batch_key, basis=use_rep, **kwargs)
+        
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
         del adata3
         add_reference(adata,'Harmony','batch correction with Harmony')
-        #return adata3
     elif methods=='combat':
         adata2=adata.copy()
         sc.pp.combat(adata2, key=batch_key,**kwargs)
