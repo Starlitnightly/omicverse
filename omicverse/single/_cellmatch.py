@@ -896,9 +896,10 @@ Cell type abbreviation: {cell_name}"""
         return "|".join(context_parts)
     
     def map_cells_with_expansion(self, cell_names, threshold=0.5, expand_abbreviations=True,
-                               tissue_context=None, species=None, study_context=None):
+                           tissue_context=None, species=None, study_context=None,
+                           use_llm_selection=True, llm_candidates_count=10):
         """
-        🔄 First expand abbreviations, then perform ontology mapping
+        🔄 First expand abbreviations, then perform ontology mapping with optional LLM selection
         
         Parameters
         ----------
@@ -914,11 +915,15 @@ Cell type abbreviation: {cell_name}"""
             🐭 Species information
         study_context : str, optional
             🔬 Study context information
+        use_llm_selection : bool
+            🤖 Whether to use LLM for selecting from top candidates (when LLM is available)
+        llm_candidates_count : int
+            📊 Number of top candidates to send to LLM for selection
         
         Returns
         -------
         mapping_results : dict
-            📋 Mapping results (including original and expanded name information)
+            📋 Mapping results (including original and expanded name information + LLM selection)
         """
         if expand_abbreviations and self.llm_client is not None:
             print("📝 Step 1: Expanding abbreviations")
@@ -929,11 +934,13 @@ Cell type abbreviation: {cell_name}"""
                 study_context=study_context
             )
             
-            print("\n🎯 Step 2: Performing ontology mapping")
+            print("\n🎯 Step 2: Performing ontology mapping with LLM-enhanced selection")
             expanded_cell_names = list(expanded_names.values())
-            base_results = self.map_cells(expanded_cell_names, threshold)
+            base_results = self.map_cells(expanded_cell_names, threshold, 
+                                        use_llm_selection=use_llm_selection,
+                                        llm_candidates_count=llm_candidates_count)
             
-            # Reorganize results with original name information
+            # Reorganize results with original name information and enhanced with LLM selection
             mapping_results = {}
             for original_name in cell_names:
                 expanded_name = expanded_names[original_name]
@@ -942,6 +949,54 @@ Cell type abbreviation: {cell_name}"""
                     result['original_name'] = original_name
                     result['expanded_name'] = expanded_name
                     result['was_expanded'] = (original_name != expanded_name)
+                    
+                    # For LLM selection, also pass the expanded name for better context
+                    if use_llm_selection and result.get('selection_method') == 'llm_selection':
+                        # Re-call LLM with both original and expanded names for better context
+                        if self.llm_client is not None and original_name != expanded_name:
+                            # Get top candidates again for this specific call
+                            if self.ontology_embeddings is not None:
+                                self._load_model()
+                                # Encode the expanded name
+                                cell_embedding = self.model.encode([expanded_name])
+                                ontology_emb_matrix = np.array([
+                                    self.ontology_embeddings[label] for label in self.ontology_labels
+                                ])
+                                similarities = cosine_similarity(cell_embedding, ontology_emb_matrix)[0]
+                                
+                                # Get top candidates
+                                top_indices = np.argsort(similarities)[-llm_candidates_count:][::-1]
+                                top_candidates = []
+                                for idx in top_indices:
+                                    match_label = self.ontology_labels[idx]
+                                    match_similarity = similarities[idx]
+                                    top_candidates.append({
+                                        'label': match_label,
+                                        'similarity': match_similarity,
+                                        'index': idx
+                                    })
+                                
+                                # Call LLM with enhanced context (original + expanded)
+                                llm_result = self._call_llm_for_selection(original_name, top_candidates, expanded_name)
+                                
+                                if llm_result and 'selected_rank' in llm_result:
+                                    selected_rank = llm_result['selected_rank']
+                                    selected_idx = selected_rank - 1
+                                    
+                                    if 0 <= selected_idx < len(top_candidates):
+                                        # Update with new LLM selection that considered both names
+                                        selected_candidate = top_candidates[selected_idx]
+                                        result['best_match'] = selected_candidate['label']
+                                        result['similarity'] = selected_candidate['similarity']
+                                        result['llm_reasoning'] = llm_result.get('reasoning', '')
+                                        result['llm_confidence'] = llm_result.get('confidence', 'unknown')
+                                        result['selection_method'] = 'llm_selection_with_expansion'
+                                        
+                                        # Update ontology info
+                                        ontology_info = self._get_ontology_id(selected_candidate['label'])
+                                        result['ontology_id'] = ontology_info['ontology_id']
+                                        result['cl_id'] = ontology_info['cl_id']
+                    
                     mapping_results[original_name] = result
                 else:
                     # This shouldn't happen, but as backup
@@ -952,19 +1007,24 @@ Cell type abbreviation: {cell_name}"""
                         'original_name': original_name,
                         'expanded_name': expanded_name,
                         'was_expanded': (original_name != expanded_name),
-                        'top3_matches': []
+                        'top3_matches': [],
+                        'selection_method': 'failed',
+                        'llm_reasoning': None,
+                        'llm_confidence': None
                     }
         else:
             if expand_abbreviations and self.llm_client is None:
                 print("⚠️  Abbreviation expansion requested but LLM client not configured")
                 print("💡 To enable LLM expansion, use: mapper.setup_llm_expansion()")
-                print("🎯 Performing direct ontology mapping (without abbreviation expansion)")
+                print("🎯 Performing direct ontology mapping with LLM selection")
             elif not expand_abbreviations:
-                print("🎯 Performing direct ontology mapping (abbreviation expansion disabled by parameter)")
+                print("🎯 Performing direct ontology mapping with LLM selection (abbreviation expansion disabled by parameter)")
             else:
-                print("🎯 Performing direct ontology mapping (abbreviation expansion disabled)")
+                print("🎯 Performing direct ontology mapping with LLM selection")
                 
-            mapping_results = self.map_cells(cell_names, threshold)
+            mapping_results = self.map_cells(cell_names, threshold, 
+                                        use_llm_selection=use_llm_selection,
+                                        llm_candidates_count=llm_candidates_count)
             
             # Add expansion information
             for cell_name in mapping_results:
@@ -972,97 +1032,7 @@ Cell type abbreviation: {cell_name}"""
                 mapping_results[cell_name]['expanded_name'] = cell_name
                 mapping_results[cell_name]['was_expanded'] = False
         
-        return mapping_results
-    
-    def map_adata_with_expansion(self, adata, cell_name_col=None, threshold=0.5, 
-                                new_col_name='cell_ontology', expand_abbreviations=True,
-                                tissue_context=None, species=None, study_context=None):
-        """
-        🧬 Perform ontology mapping with abbreviation expansion on AnnData
-        
-        Parameters
-        ----------
-        adata : AnnData
-            📊 Single-cell data object
-        cell_name_col : str, optional
-            📝 Column name containing cell names
-        threshold : float
-            📊 Similarity threshold
-        new_col_name : str
-            🏷️  New column name
-        expand_abbreviations : bool
-            🔄 Whether to enable abbreviation expansion
-        tissue_context : str or list, optional
-            🧬 Tissue context information, e.g. "immune system", "brain", "liver"
-        species : str, optional
-            🐭 Species information, e.g. "human", "mouse", "rat"
-        study_context : str, optional
-            🔬 Study context information, e.g. "cancer", "development", "aging"
-        
-        Returns
-        -------
-        mapping_results : dict
-            📋 Mapping results
-        """
-        # Get cell names
-        if cell_name_col is None:
-            cell_names = adata.obs.index.unique().tolist()
-            cell_names_series = adata.obs.index.to_series()
-            print(f"📊 Using {len(cell_names)} unique cell names from index")
-        else:
-            cell_names = adata.obs[cell_name_col].unique().tolist()
-            cell_names_series = adata.obs[cell_name_col]
-            print(f"📊 Using {len(cell_names)} unique cell names from column '{cell_name_col}'")
-        
-        # Perform mapping with expansion
-        mapping_results = self.map_cells_with_expansion(
-            cell_names, threshold, expand_abbreviations,
-            tissue_context=tissue_context,
-            species=species,
-            study_context=study_context
-        )
-        
-        # Apply to adata
-        print("\n📝 Applying mapping results to AnnData...")
-        
-        def get_best_match(cell_name):
-            return mapping_results.get(cell_name, {}).get('best_match', 'Unknown')
-        
-        def get_similarity(cell_name):
-            return mapping_results.get(cell_name, {}).get('similarity', 0.0)
-        
-        def get_confidence(cell_name):
-            return mapping_results.get(cell_name, {}).get('confidence', 'low')
-        
-        def get_ontology_id(cell_name):
-            return mapping_results.get(cell_name, {}).get('ontology_id', None)
-        
-        def get_cl_id(cell_name):
-            return mapping_results.get(cell_name, {}).get('cl_id', None)
-        
-        def get_expanded_name(cell_name):
-            return mapping_results.get(cell_name, {}).get('expanded_name', cell_name)
-        
-        def was_expanded(cell_name):
-            return mapping_results.get(cell_name, {}).get('was_expanded', False)
-        
-        adata.obs[new_col_name] = cell_names_series.apply(get_best_match)
-        adata.obs[f'{new_col_name}_similarity'] = cell_names_series.apply(get_similarity)
-        adata.obs[f'{new_col_name}_confidence'] = cell_names_series.apply(get_confidence)
-        adata.obs[f'{new_col_name}_ontology_id'] = cell_names_series.apply(get_ontology_id)
-        adata.obs[f'{new_col_name}_cl_id'] = cell_names_series.apply(get_cl_id)
-        adata.obs[f'{new_col_name}_expanded'] = cell_names_series.apply(get_expanded_name)
-        adata.obs[f'{new_col_name}_was_expanded'] = cell_names_series.apply(was_expanded)
-        
-        # Statistics
-        high_conf_count = sum(1 for r in mapping_results.values() if r['confidence'] == 'high')
-        expanded_count = sum(1 for r in mapping_results.values() if r['was_expanded'])
-        
-        print(f"✓ Mapping completed:")
-        print(f"  📊 {high_conf_count}/{len(mapping_results)} cell names have high confidence mapping")
-        print(f"  🔄 {expanded_count}/{len(mapping_results)} cell names underwent abbreviation expansion")
-        
-        return mapping_results
+        return mapping_results 
     
     def show_expansion_summary(self, mapping_results):
         """📊 Show abbreviation expansion summary"""
@@ -1456,9 +1426,216 @@ Cell type abbreviation: {cell_name}"""
             for label, vec in self.ontology_embeddings.items():
                 fout.write(label + "\t" + "\t".join(map(str, vec)) + "\n")
     
-    def map_cells(self, cell_names, threshold=0.5):
+    def _call_llm_for_selection(self, cell_name, top_candidates, expanded_name=None):
         """
-        🎯 Map cell names to ontology
+        🤖 Call LLM to select the best cell type from top candidates
+        
+        Parameters
+        ----------
+        cell_name : str
+            📝 Original cell name
+        top_candidates : list
+            📋 List of candidate dictionaries with 'label' and 'similarity' keys
+        expanded_name : str, optional
+            🔤 Expanded cell name if abbreviation expansion was performed
+        
+        Returns
+        -------
+        selection_result : dict or None
+            📋 LLM selection result with selected candidate and reasoning
+        """
+        if self.llm_client is None:
+            return None
+        
+        # Build context information
+        context_parts = []
+        
+        if self.species and self.species != "human":
+            context_parts.append(f"Species: {self.species}")
+        
+        if self.tissue_context:
+            if isinstance(self.tissue_context, list):
+                tissue_info = ", ".join(self.tissue_context)
+            else:
+                tissue_info = self.tissue_context
+            context_parts.append(f"Tissue/Organ context: {tissue_info}")
+        
+        if self.study_context:
+            context_parts.append(f"Study context: {self.study_context}")
+        
+        context_str = "\n".join(context_parts) if context_parts else ""
+        
+        # Prepare candidate list for the prompt
+        candidates_text = []
+        for i, candidate in enumerate(top_candidates, 1):
+            candidates_text.append(f"{i}. {candidate['label']} (similarity: {candidate['similarity']:.3f})")
+        candidates_str = "\n".join(candidates_text)
+        
+        # Build the prompt
+        cell_info = f"Original cell name: '{cell_name}'"
+        if expanded_name and expanded_name != cell_name:
+            cell_info += f"\nExpanded cell name: '{expanded_name}'"
+        
+        prompt = f"""You are an expert in cell biology and immunology. Your task is to select the most appropriate cell type from a list of candidates based on biological context.
+
+{context_str}
+
+{cell_info}
+
+Here are the top candidate cell types ranked by semantic similarity:
+
+{candidates_str}
+
+Based on your expertise in cell biology and the provided context information, please select the most biologically appropriate cell type from the candidates above.
+
+Consider the following factors:
+1. Biological accuracy and cell type definitions
+2. Tissue/organ context compatibility 
+3. Species-specific cell type nomenclature
+4. Study context relevance (e.g., cancer, development, aging)
+5. Standard cell ontology terminology
+
+Please respond in JSON format:
+{{
+    "selected_rank": 1,
+    "selected_label": "selected cell type name",
+    "confidence": "high/medium/low",
+    "reasoning": "brief biological explanation for your selection"
+}}
+
+Please provide only the JSON response."""
+
+        # Initialize content variable
+        content = None
+        api_type = self.llm_config.get('api_type', 'unknown')
+        
+        try:
+            if api_type in ["openai", "custom_openai", "doubao"]:
+                # OpenAI API and compatible APIs
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_config['model'],
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=400,
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.choices[0].message.content
+                
+            elif api_type == "anthropic":
+                response = self.llm_client.messages.create(
+                    model=self.llm_config['model'],
+                    max_tokens=400,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}],
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.content[0].text
+                
+            elif api_type == "ollama":
+                import requests
+                response = requests.post(
+                    f"{self.base_url}/api/generate",
+                    json={
+                        "model": self.llm_config['model'],
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": 0.1, **self.llm_config.get('extra_params', {})}
+                    },
+                    timeout=30
+                )
+                response.raise_for_status()
+                content = response.json().get('response', '')
+                
+            elif api_type == "qwen":
+                # 阿里云通义千问
+                import dashscope
+                from dashscope import Generation
+                response = dashscope.Generation.call(
+                    model=self.llm_config['model'] or 'qwen-turbo',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    max_tokens=400,
+                    **self.llm_config.get('extra_params', {})
+                )
+                if response.status_code == 200:
+                    content = response.output.text
+                else:
+                    raise Exception(f"Qwen API error: {response.message}")
+                    
+            elif api_type == "ernie":
+                # 百度文心一言
+                import ernie
+                response = ernie.ChatCompletion.create(
+                    model=self.llm_config['model'] or 'ernie-bot',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.get_result()
+                
+            elif api_type == "glm":
+                # 智谱AI GLM
+                import zhipuai
+                response = zhipuai.model_api.invoke(
+                    model=self.llm_config['model'] or 'chatglm_turbo',
+                    prompt=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    **self.llm_config.get('extra_params', {})
+                )
+                if response['code'] == 200:
+                    content = response['data']['choices'][0]['content']
+                else:
+                    raise Exception(f"GLM API error: {response.get('msg', 'Unknown error')}")
+                    
+            elif api_type == "spark":
+                # 讯飞星火 (WebSocket API)
+                content = self._call_spark_api(prompt)
+                
+            else:
+                raise ValueError(f"Unsupported API type: {api_type}")
+            
+        except Exception as e:
+            print(f"✗ LLM selection call failed ({api_type}): {e}")
+            return None
+        
+        # Check if content was successfully retrieved
+        if content is None:
+            print(f"✗ No content received from {api_type} API for selection")
+            return None
+        
+        # Parse JSON response
+        try:
+            # Extract JSON part
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                # Validate the result
+                if 'selected_rank' in result and 'selected_label' in result:
+                    # Ensure selected_rank is within valid range
+                    selected_rank = int(result['selected_rank'])
+                    if 1 <= selected_rank <= len(top_candidates):
+                        return result
+                    else:
+                        print(f"⚠️  LLM selected invalid rank {selected_rank}, falling back to top similarity")
+                        return None
+                else:
+                    print(f"⚠️  LLM response missing required fields, falling back to top similarity")
+                    return None
+            else:
+                print(f"⚠️  LLM response not in JSON format, falling back to top similarity")
+                return None
+                
+        except json.JSONDecodeError:
+            print(f"⚠️  Failed to parse LLM selection response, falling back to top similarity")
+            return None
+        except ValueError:
+            print(f"⚠️  Invalid selected_rank in LLM response, falling back to top similarity")
+            return None
+
+    def map_cells(self, cell_names, threshold=0.5, use_llm_selection=False, llm_candidates_count=10):
+        """
+        🎯 Map cell names to ontology with optional LLM-enhanced selection
         
         Parameters
         ----------
@@ -1466,11 +1643,15 @@ Cell type abbreviation: {cell_name}"""
             📝 List of cell names to map
         threshold : float
             📊 Similarity threshold
+        use_llm_selection : bool
+            🤖 Whether to use LLM for selecting from top candidates (when LLM is available)
+        llm_candidates_count : int
+            📊 Number of top candidates to send to LLM for selection
         
         Returns
         -------
         mapping_results : dict
-            📋 Mapping results (now includes ontology IDs)
+            📋 Mapping results (now includes ontology IDs and LLM selection info)
         """
         if self.ontology_embeddings is None:
             raise ValueError("✗ Please load or create ontology embeddings first")
@@ -1478,6 +1659,8 @@ Cell type abbreviation: {cell_name}"""
         self._load_model()
         
         print(f"🎯 Mapping {len(cell_names)} cell names...")
+        if use_llm_selection and self.llm_client is not None:
+            print(f"🤖 LLM-enhanced selection enabled (from top {llm_candidates_count} candidates)")
         
         # Encode cell names
         cell_embeddings = self.model.encode(cell_names, show_progress_bar=True)
@@ -1491,16 +1674,64 @@ Cell type abbreviation: {cell_name}"""
         similarities = cosine_similarity(cell_embeddings, ontology_emb_matrix)
         
         mapping_results = {}
+        llm_selection_count = 0
+        
         for i, cell_name in enumerate(cell_names):
-            # Find best match
-            best_match_idx = np.argmax(similarities[i])
+            # Get top candidates for potential LLM selection
+            top_indices = np.argsort(similarities[i])[-llm_candidates_count:][::-1]
+            top_candidates = []
+            for idx in top_indices:
+                match_label = self.ontology_labels[idx]
+                match_similarity = similarities[i][idx]
+                top_candidates.append({
+                    'label': match_label,
+                    'similarity': match_similarity,
+                    'index': idx
+                })
+            
+            # Default to top similarity match
+            best_match_idx = top_indices[0]  # Highest similarity
             best_similarity = similarities[i][best_match_idx]
             best_match_label = self.ontology_labels[best_match_idx]
+            selection_method = "cosine_similarity"
+            llm_reasoning = None
+            llm_confidence = None
+            
+            # Try LLM selection if enabled and available
+            if use_llm_selection and self.llm_client is not None:
+                print(f"  🤖 [{i+1}/{len(cell_names)}] LLM selecting for: {cell_name}")
+                
+                # Call LLM for selection
+                llm_result = self._call_llm_for_selection(cell_name, top_candidates)
+                
+                if llm_result and 'selected_rank' in llm_result:
+                    selected_rank = llm_result['selected_rank']
+                    # Convert from 1-indexed to 0-indexed
+                    selected_idx = selected_rank - 1
+                    
+                    if 0 <= selected_idx < len(top_candidates):
+                        # Use LLM selection
+                        selected_candidate = top_candidates[selected_idx]
+                        best_match_idx = selected_candidate['index']
+                        best_similarity = selected_candidate['similarity']
+                        best_match_label = selected_candidate['label']
+                        selection_method = "llm_selection"
+                        llm_reasoning = llm_result.get('reasoning', '')
+                        llm_confidence = llm_result.get('confidence', 'unknown')
+                        llm_selection_count += 1
+                        
+                        print(f"    ✓ LLM selected: {best_match_label} (rank {selected_rank}, sim: {best_similarity:.3f})")
+                        if llm_reasoning:
+                            print(f"    💡 Reasoning: {llm_reasoning[:100]}...")
+                    else:
+                        print(f"    ⚠️  LLM selected invalid rank, using top similarity")
+                else:
+                    print(f"    ✗ LLM selection failed, using top similarity")
             
             # Get ontology ID information for best match
             ontology_info = self._get_ontology_id(best_match_label)
             
-            # Get top 3 best matches with their IDs
+            # Get top 3 best matches with their IDs (for compatibility)
             top3_indices = np.argsort(similarities[i])[-3:][::-1]
             top3_matches = []
             for idx in top3_indices:
@@ -1520,10 +1751,17 @@ Cell type abbreviation: {cell_name}"""
                 'confidence': 'high' if best_similarity > threshold else 'low',
                 'ontology_id': ontology_info['ontology_id'],
                 'cl_id': ontology_info['cl_id'],
-                'top3_matches': top3_matches
+                'top3_matches': top3_matches,
+                'selection_method': selection_method,
+                'llm_reasoning': llm_reasoning,
+                'llm_confidence': llm_confidence,
+                'top_candidates_count': len(top_candidates)
             }
         
-        return mapping_results
+        if use_llm_selection and self.llm_client is not None:
+            print(f"✓ LLM selection summary: {llm_selection_count}/{len(cell_names)} cells selected by LLM")
+        
+        return mapping_results 
     
     def map_adata(self, adata, cell_name_col=None, threshold=0.5, new_col_name='cell_ontology'):
         """
@@ -2133,7 +2371,8 @@ Cell type abbreviation: {cell_name}"""
         print(f"✓ Created taxonomy embeddings for {len(self.taxonomy_embeddings)} cell types")
     
     def map_cells_with_taxonomy(self, cell_names, threshold=0.5, expand_abbreviations=True,
-                               use_taxonomy=True, species=None, tissue_context=None, study_context=None):
+                               use_taxonomy=True, species=None, tissue_context=None, study_context=None,
+                               use_llm_selection=True, llm_candidates_count=10):
         """
         🔄 Enhanced cell mapping using both ontology and taxonomy
         
@@ -2165,19 +2404,22 @@ Cell type abbreviation: {cell_name}"""
         # First perform standard ontology mapping with expansion
         mapping_results = self.map_cells_with_expansion(
             cell_names, threshold, expand_abbreviations,
-            tissue_context=tissue_context, species=species, study_context=study_context
+            tissue_context=tissue_context, species=species, study_context=study_context,
+            use_llm_selection=use_llm_selection,llm_candidates_count=llm_candidates_count
         )
         
         # Enhance with taxonomy if available and requested
         if use_taxonomy and self.taxonomy_embeddings is not None:
             print("\n📊 Enhancing with taxonomy resource using NLP similarity...")
             
-            self._enhance_with_taxonomy(mapping_results, cell_names, threshold, species)
+            self._enhance_with_taxonomy(mapping_results, cell_names, threshold, species,
+                                        use_llm_selection=use_llm_selection,llm_candidates_count=llm_candidates_count)
         
         return mapping_results
     
-    def _enhance_with_taxonomy(self, mapping_results, cell_names, threshold, species):
-        """🧬 Enhance mapping results with taxonomy information using NLP similarity"""
+    def _enhance_with_taxonomy(self, mapping_results, cell_names, threshold, species,
+                               use_llm_selection=True, llm_candidates_count=10):
+        """🧬 Enhance mapping results with taxonomy information using NLP similarity and LLM selection"""
         self._load_model()
         
         # Get taxonomy embedding matrix
@@ -2185,7 +2427,14 @@ Cell type abbreviation: {cell_name}"""
             self.taxonomy_embeddings[label] for label in self.taxonomy_labels
         ])
         
+        # Determine LLM candidates count for taxonomy (similar to ontology)
+        #llm_candidates_count = 10  # Default number of taxonomy candidates for LLM selection
+        
         print(f"🧬 Taxonomy enhancement: Processing {len(cell_names)} cell names...")
+        if self.llm_client is not None:
+            print(f"🤖 LLM-enhanced taxonomy selection enabled (from top {llm_candidates_count} candidates)")
+        
+        llm_taxonomy_selection_count = 0
         
         for cell_name in cell_names:
             if cell_name not in mapping_results:
@@ -2217,6 +2466,9 @@ Cell type abbreviation: {cell_name}"""
             best_taxonomy_match = None
             best_taxonomy_similarity = 0
             best_matched_from = None
+            taxonomy_selection_method = "cosine_similarity"
+            taxonomy_llm_reasoning = None
+            taxonomy_llm_confidence = None
             
             for name_to_check in names_to_check:
                 # Encode the name
@@ -2230,61 +2482,105 @@ Cell type abbreviation: {cell_name}"""
                 if len(valid_indices) == 0:
                     continue
                 
-                # Sort by similarity (descending)
-                sorted_indices = valid_indices[np.argsort(similarities[valid_indices])[::-1]]
+                # Get top candidates for potential LLM selection
+                top_indices = np.argsort(similarities)[-llm_candidates_count:][::-1]
+                top_taxonomy_candidates = []
                 
-                # Try to find a match, preferring species match if specified
-                for idx in sorted_indices:
-                    similarity = similarities[idx]
+                for idx in top_indices:
+                    if similarities[idx] <= threshold:
+                        continue
+                        
                     taxonomy_label = self.taxonomy_labels[idx]
+                    taxonomy_similarity = similarities[idx]
                     
                     # Get detailed taxonomy info
                     taxonomy_entries = self.taxonomy_info_dict.get(taxonomy_label, [])
                     
-                    # Check species compatibility
+                    # Filter by species if specified
                     if species:
-                        # Filter entries by species
                         species_entries = [
                             entry for entry in taxonomy_entries 
                             if entry.get('Species') == species
                         ]
                         if species_entries:
-                            # Found species-specific match
                             target_entries = species_entries
-                        elif not best_taxonomy_match:
-                            # No species match yet, but this is better than nothing
-                            target_entries = taxonomy_entries
                         else:
-                            # We already have a match, skip non-species matches
-                            continue
+                            target_entries = taxonomy_entries
                     else:
-                        # No species filter
                         target_entries = taxonomy_entries
                     
-                    if target_entries and similarity > best_taxonomy_similarity:
-                        best_taxonomy_similarity = similarity
-                        best_taxonomy_match = {
+                    if target_entries:
+                        top_taxonomy_candidates.append({
                             'cell_type': taxonomy_label,
-                            'similarity': similarity,
-                            'info': target_entries[0],  # Use first match
+                            'similarity': taxonomy_similarity,
+                            'info': target_entries[0],  # Use first matching entry
                             'matched_from': name_to_check
-                        }
-                        best_matched_from = name_to_check
+                        })
+                
+                if not top_taxonomy_candidates:
+                    continue
+                
+                # Sort candidates by similarity (descending)
+                top_taxonomy_candidates.sort(key=lambda x: x['similarity'], reverse=True)
+                
+                # Try LLM selection if enabled and available
+                selected_candidate = None
+                if self.llm_client is not None and len(top_taxonomy_candidates) > 1:
+                    print(f"    🤖 LLM selecting taxonomy match for: {name_to_check}")
+                    
+                    # Call LLM for taxonomy selection
+                    llm_result = self._call_llm_for_taxonomy_selection(
+                        cell_name, top_taxonomy_candidates, expanded_name if was_expanded else None
+                    )
+                    
+                    if llm_result and 'selected_rank' in llm_result:
+                        selected_rank = llm_result['selected_rank']
+                        selected_idx = selected_rank - 1
                         
-                        # Show successful taxonomy match with clear indication
-                        species_note = f" ({target_entries[0].get('Species', 'Unknown')})" if species else ""
-                        if was_expanded and best_matched_from == expanded_name:
-                            print(f"    ✓ Taxonomy match: '{best_matched_from}' → '{taxonomy_label}'{species_note} (sim: {similarity:.3f}) [USED EXPANDED NAME]")
+                        if 0 <= selected_idx < len(top_taxonomy_candidates):
+                            # Use LLM selection
+                            selected_candidate = top_taxonomy_candidates[selected_idx]
+                            taxonomy_selection_method = "llm_selection"
+                            taxonomy_llm_reasoning = llm_result.get('reasoning', '')
+                            taxonomy_llm_confidence = llm_result.get('confidence', 'unknown')
+                            llm_taxonomy_selection_count += 1
+                            
+                            print(f"      ✓ LLM selected: {selected_candidate['cell_type']} (rank {selected_rank}, sim: {selected_candidate['similarity']:.3f})")
+                            if taxonomy_llm_reasoning:
+                                print(f"      💡 Reasoning: {taxonomy_llm_reasoning[:100]}...")
                         else:
-                            print(f"    ✓ Taxonomy match: '{best_matched_from}' → '{taxonomy_label}'{species_note} (sim: {similarity:.3f})")
-                        
-                        # If we found a species-specific match, we can break
-                        if not species or target_entries[0].get('Species') == species:
+                            print(f"      ⚠️  LLM selected invalid taxonomy rank, using top similarity")
+                    else:
+                        print(f"      ✗ LLM taxonomy selection failed, using top similarity")
+                
+                # Fallback to top similarity if LLM didn't select or failed
+                if selected_candidate is None:
+                    selected_candidate = top_taxonomy_candidates[0]  # Top similarity
+                
+                # Update best match if this is better
+                if selected_candidate['similarity'] > best_taxonomy_similarity:
+                    best_taxonomy_similarity = selected_candidate['similarity']
+                    best_taxonomy_match = selected_candidate
+                    best_matched_from = selected_candidate['matched_from']
+                    
+                    # Show successful taxonomy match with selection method
+                    species_note = f" ({selected_candidate['info'].get('Species', 'Unknown')})" if species else ""
+                    selection_note = " [LLM SELECTED]" if taxonomy_selection_method == "llm_selection" else ""
+                    
+                    if was_expanded and best_matched_from == expanded_name:
+                        print(f"      ✓ Taxonomy match: '{best_matched_from}' → '{selected_candidate['cell_type']}'{species_note} (sim: {selected_candidate['similarity']:.3f}){selection_note} [USED EXPANDED NAME]")
+                    else:
+                        print(f"      ✓ Taxonomy match: '{best_matched_from}' → '{selected_candidate['cell_type']}'{species_note} (sim: {selected_candidate['similarity']:.3f}){selection_note}")
+                    
+                    # If we found a species-specific match with good confidence, we can break
+                    if not species or selected_candidate['info'].get('Species') == species:
+                        if taxonomy_selection_method == "llm_selection" or selected_candidate['similarity'] > 0.8:
                             break
                 
                 # If we found a good match for this name, we can stop trying other names
                 if best_taxonomy_match and (not species or best_taxonomy_match['info'].get('Species') == species):
-                    break
+                    if taxonomy_selection_method == "llm_selection" or best_taxonomy_match['similarity'] > 0.8:
+                        break
             
             # Add taxonomy information to results
             if best_taxonomy_match:
@@ -2292,6 +2588,9 @@ Cell type abbreviation: {cell_name}"""
                 result['taxonomy_match'] = best_taxonomy_match['cell_type']
                 result['taxonomy_similarity'] = best_taxonomy_match['similarity']
                 result['taxonomy_matched_from'] = best_taxonomy_match['matched_from']
+                result['taxonomy_selection_method'] = taxonomy_selection_method
+                result['taxonomy_llm_reasoning'] = taxonomy_llm_reasoning
+                result['taxonomy_llm_confidence'] = taxonomy_llm_confidence
                 
                 # Add detailed taxonomy information
                 result['ct_id'] = info.get('CT_ID')
@@ -2310,19 +2609,22 @@ Cell type abbreviation: {cell_name}"""
                 result['source'] = info.get('Source')
                 
                 # Boost confidence if taxonomy provides strong support
-                if best_taxonomy_match['similarity'] > 0.8:
+                if best_taxonomy_match['similarity'] > 0.8 or taxonomy_selection_method == "llm_selection":
                     if result['confidence'] == 'low':
                         result['confidence'] = 'medium'
-                        result['confidence_reason'] = 'Enhanced by taxonomy resource'
+                        result['confidence_reason'] = f'Enhanced by taxonomy resource ({taxonomy_selection_method})'
                     elif result['confidence'] == 'medium':
                         result['confidence'] = 'high'  
-                        result['confidence_reason'] = 'Strong taxonomy confirmation'
+                        result['confidence_reason'] = f'Strong taxonomy confirmation ({taxonomy_selection_method})'
             else:
                 # Show when no taxonomy match found
                 if was_expanded:
-                    print(f"    ✗ No taxonomy match found for '{expanded_name}' (expanded from '{cell_name}')")
+                    print(f"      ✗ No taxonomy match found for '{expanded_name}' (expanded from '{cell_name}')")
                 else:
-                    print(f"    ✗ No taxonomy match found for '{cell_name}'")
+                    print(f"      ✗ No taxonomy match found for '{cell_name}'")
+        
+        if self.llm_client is not None:
+            print(f"✓ LLM taxonomy selection summary: {llm_taxonomy_selection_count} selections made by LLM")
     
     def search_by_marker(self, markers, species=None, top_k=10):
         """
@@ -2708,6 +3010,145 @@ Cell type abbreviation: {cell_name}"""
         
         return similar_cells
     
+    def map_cells_with_expansion(self, cell_names, threshold=0.5, expand_abbreviations=True,
+                           tissue_context=None, species=None, study_context=None,
+                           use_llm_selection=True, llm_candidates_count=10):
+        """
+        🔄 First expand abbreviations, then perform ontology mapping with optional LLM selection
+        
+        Parameters
+        ----------
+        cell_names : list
+            📝 List of cell names to map
+        threshold : float
+            📊 Similarity threshold
+        expand_abbreviations : bool
+            🔄 Whether to enable abbreviation expansion
+        tissue_context : str or list, optional
+            🧬 Tissue context information
+        species : str, optional
+            🐭 Species information
+        study_context : str, optional
+            🔬 Study context information
+        use_llm_selection : bool
+            🤖 Whether to use LLM for selecting from top candidates (when LLM is available)
+        llm_candidates_count : int
+            📊 Number of top candidates to send to LLM for selection
+        
+        Returns
+        -------
+        mapping_results : dict
+            📋 Mapping results (including original and expanded name information + LLM selection)
+        """
+        if expand_abbreviations and self.llm_client is not None:
+            print("📝 Step 1: Expanding abbreviations")
+            expanded_names = self.expand_abbreviations(
+                cell_names, 
+                tissue_context=tissue_context,
+                species=species, 
+                study_context=study_context
+            )
+            
+            print("\n🎯 Step 2: Performing ontology mapping with LLM-enhanced selection")
+            expanded_cell_names = list(expanded_names.values())
+            base_results = self.map_cells(expanded_cell_names, threshold, 
+                                        use_llm_selection=use_llm_selection,
+                                        llm_candidates_count=llm_candidates_count)
+            
+            # Reorganize results with original name information and enhanced with LLM selection
+            mapping_results = {}
+            for original_name in cell_names:
+                expanded_name = expanded_names[original_name]
+                if expanded_name in base_results:
+                    result = base_results[expanded_name].copy()
+                    result['original_name'] = original_name
+                    result['expanded_name'] = expanded_name
+                    result['was_expanded'] = (original_name != expanded_name)
+                    
+                    # For LLM selection, also pass the expanded name for better context
+                    if use_llm_selection and result.get('selection_method') == 'llm_selection':
+                        # Re-call LLM with both original and expanded names for better context
+                        if self.llm_client is not None and original_name != expanded_name:
+                            # Get top candidates again for this specific call
+                            if self.ontology_embeddings is not None:
+                                self._load_model()
+                                # Encode the expanded name
+                                cell_embedding = self.model.encode([expanded_name])
+                                ontology_emb_matrix = np.array([
+                                    self.ontology_embeddings[label] for label in self.ontology_labels
+                                ])
+                                similarities = cosine_similarity(cell_embedding, ontology_emb_matrix)[0]
+                                
+                                # Get top candidates
+                                top_indices = np.argsort(similarities)[-llm_candidates_count:][::-1]
+                                top_candidates = []
+                                for idx in top_indices:
+                                    match_label = self.ontology_labels[idx]
+                                    match_similarity = similarities[idx]
+                                    top_candidates.append({
+                                        'label': match_label,
+                                        'similarity': match_similarity,
+                                        'index': idx
+                                    })
+                                
+                                # Call LLM with enhanced context (original + expanded)
+                                llm_result = self._call_llm_for_selection(original_name, top_candidates, expanded_name)
+                                
+                                if llm_result and 'selected_rank' in llm_result:
+                                    selected_rank = llm_result['selected_rank']
+                                    selected_idx = selected_rank - 1
+                                    
+                                    if 0 <= selected_idx < len(top_candidates):
+                                        # Update with new LLM selection that considered both names
+                                        selected_candidate = top_candidates[selected_idx]
+                                        result['best_match'] = selected_candidate['label']
+                                        result['similarity'] = selected_candidate['similarity']
+                                        result['llm_reasoning'] = llm_result.get('reasoning', '')
+                                        result['llm_confidence'] = llm_result.get('confidence', 'unknown')
+                                        result['selection_method'] = 'llm_selection_with_expansion'
+                                        
+                                        # Update ontology info
+                                        ontology_info = self._get_ontology_id(selected_candidate['label'])
+                                        result['ontology_id'] = ontology_info['ontology_id']
+                                        result['cl_id'] = ontology_info['cl_id']
+                    
+                    mapping_results[original_name] = result
+                else:
+                    # This shouldn't happen, but as backup
+                    mapping_results[original_name] = {
+                        'best_match': 'Unknown',
+                        'similarity': 0.0,
+                        'confidence': 'low',
+                        'original_name': original_name,
+                        'expanded_name': expanded_name,
+                        'was_expanded': (original_name != expanded_name),
+                        'top3_matches': [],
+                        'selection_method': 'failed',
+                        'llm_reasoning': None,
+                        'llm_confidence': None
+                    }
+        else:
+            if expand_abbreviations and self.llm_client is None:
+                print("⚠️  Abbreviation expansion requested but LLM client not configured")
+                print("💡 To enable LLM expansion, use: mapper.setup_llm_expansion()")
+                print("🎯 Performing direct ontology mapping with LLM selection")
+            elif not expand_abbreviations:
+                print("🎯 Performing direct ontology mapping with LLM selection (abbreviation expansion disabled by parameter)")
+            else:
+                print("🎯 Performing direct ontology mapping with LLM selection")
+                
+            mapping_results = self.map_cells(cell_names, threshold, 
+                                        use_llm_selection=use_llm_selection,
+                                        llm_candidates_count=llm_candidates_count)
+            
+            # Add expansion information
+            for cell_name in mapping_results:
+                mapping_results[cell_name]['original_name'] = cell_name
+                mapping_results[cell_name]['expanded_name'] = cell_name
+                mapping_results[cell_name]['was_expanded'] = False
+        
+        return mapping_results
+    
     def download_model(self):
         """
         📥 Manually download and load the model
@@ -2850,6 +3291,321 @@ Cell type abbreviation: {cell_name}"""
                 break
         
         return info_list
+    
+    def _call_llm_for_taxonomy_selection(self, cell_name, top_taxonomy_candidates, expanded_name=None):
+        """
+        🤖 Call LLM to select the best taxonomy cell type from top candidates
+        
+        Parameters
+        ----------
+        cell_name : str
+            📝 Original cell name
+        top_taxonomy_candidates : list
+            📋 List of taxonomy candidate dictionaries with 'cell_type', 'similarity', and 'info' keys
+        expanded_name : str, optional
+            🔤 Expanded cell name if abbreviation expansion was performed
+        
+        Returns
+        -------
+        selection_result : dict or None
+            📋 LLM selection result with selected candidate and reasoning
+        """
+        if self.llm_client is None:
+            return None
+        
+        # Build context information
+        context_parts = []
+        
+        if self.species and self.species != "human":
+            context_parts.append(f"Species: {self.species}")
+        
+        if self.tissue_context:
+            if isinstance(self.tissue_context, list):
+                tissue_info = ", ".join(self.tissue_context)
+            else:
+                tissue_info = self.tissue_context
+            context_parts.append(f"Tissue/Organ context: {tissue_info}")
+        
+        if self.study_context:
+            context_parts.append(f"Study context: {self.study_context}")
+        
+        context_str = "\n".join(context_parts) if context_parts else ""
+        
+        # Prepare candidate list for the prompt
+        candidates_text = []
+        for i, candidate in enumerate(top_taxonomy_candidates, 1):
+            info = candidate['info']
+            species_info = info.get('Species', 'Unknown')
+            marker_info = info.get('Cell_Marker', 'N/A')
+            gene_alias = info.get('Gene_Alias', 'N/A')
+            
+            candidate_desc = f"{i}. {candidate['cell_type']} (similarity: {candidate['similarity']:.3f})"
+            candidate_desc += f"\n   Species: {species_info}"
+            candidate_desc += f"\n   Cell Marker: {marker_info}"
+            if gene_alias != 'N/A':
+                candidate_desc += f"\n   Gene Alias: {gene_alias}"
+            
+            candidates_text.append(candidate_desc)
+        
+        candidates_str = "\n".join(candidates_text)
+        
+        # Build the prompt
+        cell_info = f"Original cell name: '{cell_name}'"
+        if expanded_name and expanded_name != cell_name:
+            cell_info += f"\nExpanded cell name: '{expanded_name}'"
+        
+        prompt = f"""You are an expert in cell biology and immunology. Your task is to select the most appropriate cell type from a list of taxonomy candidates based on biological context and marker gene information.
+
+{context_str}
+
+{cell_info}
+
+Here are the top candidate cell types from Cell Taxonomy database ranked by semantic similarity:
+
+{candidates_str}
+
+Based on your expertise in cell biology and the provided context information, please select the most biologically appropriate cell type from the taxonomy candidates above.
+
+Consider the following factors:
+1. Biological accuracy and cell type definitions
+2. Species compatibility (if species context is provided)
+3. Tissue/organ context compatibility 
+4. Cell marker gene specificity and accuracy
+5. Gene expression patterns and cellular functions
+6. Study context relevance (e.g., cancer, development, aging)
+7. Literature evidence and experimental validation
+
+Please respond in JSON format:
+{{
+    "selected_rank": 1,
+    "selected_cell_type": "selected cell type name",
+    "confidence": "high/medium/low",
+    "reasoning": "brief biological explanation focusing on marker genes and tissue context"
+}}
+
+Please provide only the JSON response."""
+
+        # Initialize content variable
+        content = None
+        api_type = self.llm_config.get('api_type', 'unknown')
+        
+        try:
+            if api_type in ["openai", "custom_openai", "doubao"]:
+                # OpenAI API and compatible APIs
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_config['model'],
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=400,
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.choices[0].message.content
+                
+            elif api_type == "anthropic":
+                response = self.llm_client.messages.create(
+                    model=self.llm_config['model'],
+                    max_tokens=400,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}],
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.content[0].text
+                
+            elif api_type == "ollama":
+                import requests
+                response = requests.post(
+                    f"{self.base_url}/api/generate",
+                    json={
+                        "model": self.llm_config['model'],
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": 0.1, **self.llm_config.get('extra_params', {})}
+                    },
+                    timeout=30
+                )
+                response.raise_for_status()
+                content = response.json().get('response', '')
+                
+            elif api_type == "qwen":
+                # 阿里云通义千问
+                import dashscope
+                from dashscope import Generation
+                response = dashscope.Generation.call(
+                    model=self.llm_config['model'] or 'qwen-turbo',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    max_tokens=400,
+                    **self.llm_config.get('extra_params', {})
+                )
+                if response.status_code == 200:
+                    content = response.output.text
+                else:
+                    raise Exception(f"Qwen API error: {response.message}")
+                    
+            elif api_type == "ernie":
+                # 百度文心一言
+                import ernie
+                response = ernie.ChatCompletion.create(
+                    model=self.llm_config['model'] or 'ernie-bot',
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    **self.llm_config.get('extra_params', {})
+                )
+                content = response.get_result()
+                
+            elif api_type == "glm":
+                # 智谱AI GLM
+                import zhipuai
+                response = zhipuai.model_api.invoke(
+                    model=self.llm_config['model'] or 'chatglm_turbo',
+                    prompt=[{'role': 'user', 'content': prompt}],
+                    temperature=0.1,
+                    **self.llm_config.get('extra_params', {})
+                )
+                if response['code'] == 200:
+                    content = response['data']['choices'][0]['content']
+                else:
+                    raise Exception(f"GLM API error: {response.get('msg', 'Unknown error')}")
+                    
+            elif api_type == "spark":
+                # 讯飞星火 (WebSocket API)
+                content = self._call_spark_api(prompt)
+                
+            else:
+                raise ValueError(f"Unsupported API type: {api_type}")
+            
+        except Exception as e:
+            print(f"✗ LLM taxonomy selection call failed ({api_type}): {e}")
+            return None
+        
+        # Check if content was successfully retrieved
+        if content is None:
+            print(f"✗ No content received from {api_type} API for taxonomy selection")
+            return None
+        
+        # Parse JSON response
+        try:
+            # Extract JSON part
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                # Validate the result
+                if 'selected_rank' in result and 'selected_cell_type' in result:
+                    # Ensure selected_rank is within valid range
+                    selected_rank = int(result['selected_rank'])
+                    if 1 <= selected_rank <= len(top_taxonomy_candidates):
+                        return result
+                    else:
+                        print(f"⚠️  LLM selected invalid taxonomy rank {selected_rank}, falling back to top similarity")
+                        return None
+                else:
+                    print(f"⚠️  LLM taxonomy response missing required fields, falling back to top similarity")
+                    return None
+            else:
+                print(f"⚠️  LLM taxonomy response not in JSON format, falling back to top similarity")
+                return None
+                
+        except json.JSONDecodeError:
+            print(f"⚠️  Failed to parse LLM taxonomy selection response, falling back to top similarity")
+            return None
+        except ValueError:
+            print(f"⚠️  Invalid selected_rank in LLM taxonomy response, falling back to top similarity")
+            return None
+    
+    def map_adata_with_expansion(self, adata, cell_name_col=None, threshold=0.5, 
+                                new_col_name='cell_ontology', expand_abbreviations=True,
+                                tissue_context=None, species=None, study_context=None,
+                                use_llm_selection=True, llm_candidates_count=10):
+        """
+        🧬 Perform ontology mapping with abbreviation expansion on AnnData
+        
+        Parameters
+        ----------
+        adata : AnnData
+            📊 Single-cell data object
+        cell_name_col : str, optional
+            📝 Column name containing cell names
+        threshold : float
+            📊 Similarity threshold
+        new_col_name : str
+            🏷️  New column name
+        expand_abbreviations : bool
+            🔄 Whether to enable abbreviation expansion
+        tissue_context : str or list, optional
+            🧬 Tissue context information, e.g. "immune system", "brain", "liver"
+        species : str, optional
+            🐭 Species information, e.g. "human", "mouse", "rat"
+        study_context : str, optional
+            🔬 Study context information, e.g. "cancer", "development", "aging"
+        
+        Returns
+        -------
+        mapping_results : dict
+            📋 Mapping results
+        """
+        # Get cell names
+        if cell_name_col is None:
+            cell_names = adata.obs.index.unique().tolist()
+            cell_names_series = adata.obs.index.to_series()
+            print(f"📊 Using {len(cell_names)} unique cell names from index")
+        else:
+            cell_names = adata.obs[cell_name_col].unique().tolist()
+            cell_names_series = adata.obs[cell_name_col]
+            print(f"📊 Using {len(cell_names)} unique cell names from column '{cell_name_col}'")
+        
+        # Perform mapping with expansion
+        mapping_results = self.map_cells_with_expansion(
+            cell_names, threshold, expand_abbreviations,
+            tissue_context=tissue_context,
+            species=species,
+            study_context=study_context,
+            use_llm_selection=use_llm_selection, llm_candidates_count=llm_candidates_count
+        )
+        
+        # Apply to adata
+        print("\n📝 Applying mapping results to AnnData...")
+        
+        def get_best_match(cell_name):
+            return mapping_results.get(cell_name, {}).get('best_match', 'Unknown')
+        
+        def get_similarity(cell_name):
+            return mapping_results.get(cell_name, {}).get('similarity', 0.0)
+        
+        def get_confidence(cell_name):
+            return mapping_results.get(cell_name, {}).get('confidence', 'low')
+        
+        def get_ontology_id(cell_name):
+            return mapping_results.get(cell_name, {}).get('ontology_id', None)
+        
+        def get_cl_id(cell_name):
+            return mapping_results.get(cell_name, {}).get('cl_id', None)
+        
+        def get_expanded_name(cell_name):
+            return mapping_results.get(cell_name, {}).get('expanded_name', cell_name)
+        
+        def was_expanded(cell_name):
+            return mapping_results.get(cell_name, {}).get('was_expanded', False)
+        
+        adata.obs[new_col_name] = cell_names_series.apply(get_best_match)
+        adata.obs[f'{new_col_name}_similarity'] = cell_names_series.apply(get_similarity)
+        adata.obs[f'{new_col_name}_confidence'] = cell_names_series.apply(get_confidence)
+        adata.obs[f'{new_col_name}_ontology_id'] = cell_names_series.apply(get_ontology_id)
+        adata.obs[f'{new_col_name}_cl_id'] = cell_names_series.apply(get_cl_id)
+        adata.obs[f'{new_col_name}_expanded'] = cell_names_series.apply(get_expanded_name)
+        adata.obs[f'{new_col_name}_was_expanded'] = cell_names_series.apply(was_expanded)
+        
+        # Statistics
+        high_conf_count = sum(1 for r in mapping_results.values() if r['confidence'] == 'high')
+        expanded_count = sum(1 for r in mapping_results.values() if r['was_expanded'])
+        
+        print(f"✓ Mapping completed:")
+        print(f"  📊 {high_conf_count}/{len(mapping_results)} cell names have high confidence mapping")
+        print(f"  🔄 {expanded_count}/{len(mapping_results)} cell names underwent abbreviation expansion")
+        
+        return mapping_results
+    
+
     
     def browse_ontology_by_category(self, categories=None, max_per_category=10):
         """
@@ -3128,6 +3884,8 @@ def download_cl(output_dir="new_ontology", filename="cl.json"):
         except Exception as e:
             print(f"    ✗ Download failed: {e}")
             continue
+
+    
     
     print(f"\n✗ All download sources failed")
     print("Suggestions:")
