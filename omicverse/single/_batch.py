@@ -59,6 +59,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
         del adata3
         add_reference(adata,'Harmony','batch correction with Harmony')
+        
     elif methods=='combat':
         adata2=adata.copy()
         sc.pp.combat(adata2, key=batch_key,**kwargs)

@@ -4,11 +4,6 @@ from scipy.spatial import distance_matrix
 from scipy.special import wrightomega
 import matplotlib.pyplot as plt
 
-import torch
-import numpy as np
-import scipy.sparse as sp
-from tqdm import trange
-
 def unot(a,
         b,
         C,
@@ -290,7 +285,7 @@ def unot_sinkhorn_l2_sparse(a,b,C,eps,m,nitermax=10000,stopthr=1e-8,verbose=Fals
     tmp_K.data = np.exp( ( -C.data + f[C.row] + g[C.col] ) / eps )
     return tmp_K
 
-def _unot_sinkhorn_l1_sparse(a,b,C,eps,m,nitermax=10000,stopthr=1e-8,verbose=True):
+def unot_sinkhorn_l1_sparse(a,b,C,eps,m,nitermax=10000,stopthr=1e-8,verbose=False):
     """ Solve the unnormalized optimal transport with l1 penalty in sparse matrix format.
 
     Parameters
@@ -322,8 +317,7 @@ def _unot_sinkhorn_l1_sparse(a,b,C,eps,m,nitermax=10000,stopthr=1e-8,verbose=Tru
     s = np.zeros_like(b)
     niter = 0
     err = 100
-    from tqdm import tqdm
-    for i in tqdm(range(nitermax),desc='unot: '):
+    while niter <= nitermax and err > stopthr:
         fprev = f
         gprev = g
         # Iteration
@@ -341,112 +335,11 @@ def _unot_sinkhorn_l1_sparse(a,b,C,eps,m,nitermax=10000,stopthr=1e-8,verbose=Tru
             err_g = abs(g - gprev).max() / max(abs(g).max(), abs(gprev).max(), 1.)
             err = 0.5 * (err_f + err_g)
         niter = niter + 1
-        if err <= stopthr:
-            break
-    
 
     if verbose:
         print('Number of iterations in unot:', niter)
     tmp_K.data = np.exp( ( -C.data + f[C.row] + g[C.col] ) / eps )
     return tmp_K
-
-def unot_sinkhorn_l1_sparse(a, b, C_coo, eps, m, nitermax=10000, stopthr=1e-8, verbose=True, device='cuda'):
-    """
-    使用 Torch 在 GPU 上进行加速的 unot_sinkhorn_l1_sparse 版本。
-
-    参数：
-      a, b      : 一维 numpy 数组，表示源、目标分布（要求所有元素严格正）。
-      C_coo     : scipy.sparse.coo_matrix，包含行索引、列索引和数据（成本矩阵）。
-      eps, m    : 算法参数。
-      nitermax  : 最大迭代次数。
-      stopthr   : 收敛阈值。
-      verbose   : 是否打印信息。
-      device    : 使用的设备，默认 'cuda'，若无 GPU 可设置为 'cpu'。
-
-    返回：
-      result: 返回一个稀疏矩阵（这里以 torch.sparse_coo_tensor 的形式返回，如果需要最终转换成 SciPy 矩阵，可再做转换）。
-    """
-    dtype = torch.float64  # 建议使用 double 以提高精度
-    # 将输入分布转换为 torch 张量并搬到指定设备
-    a_torch = torch.tensor(a, dtype=dtype, device=device)
-    b_torch = torch.tensor(b, dtype=dtype, device=device)
-    
-    ns = a.shape[0]
-    nt = b.shape[0]
-    
-    # 将 COO 矩阵的行、列索引和成本数据转换为 torch 张量
-    # 注意：这里 row, col 的数据类型应为 torch.long
-    row = torch.tensor(C_coo.row, dtype=torch.long, device=device)
-    col = torch.tensor(C_coo.col, dtype=torch.long, device=device)
-    C_data = torch.tensor(C_coo.data, dtype=dtype, device=device)
-    
-    # 初始化 f 和 g，在 GPU 上
-    f = torch.zeros(ns, dtype=dtype, device=device)
-    g = torch.zeros(nt, dtype=dtype, device=device)
-    
-    eps0 = 1e-300  # 避免 log0
-    err = torch.tensor(100., dtype=dtype, device=device)
-    niter = 0
-    
-    # 主循环，采用 trange 展示进度条
-    for i in trange(nitermax, desc="unot_torch", leave=False):
-        f_prev = f.clone()
-        g_prev = g.clone()
-        
-        # tmp = (-C_data + f[row] + g[col]) / eps
-        tmp = (-C_data + f[row] + g[col]) / eps
-        tmp_K = torch.exp(tmp)
-        
-        # 使用 torch.bincount 进行行、列聚合，注意要指定 minlength 保证输出维度
-        # 对于行聚合:
-        sum_row = torch.bincount(row, weights=tmp_K, minlength=ns)
-        # 对于列聚合:
-        sum_col = torch.bincount(col, weights=tmp_K, minlength=nt)
-        
-        # 更新 f 和 g
-        f = eps * torch.log(a_torch + eps0) - eps * torch.log(sum_row + torch.exp((-m + f) / eps)) + f
-        g = eps * torch.log(b_torch + eps0) - eps * torch.log(sum_col + torch.exp((-m + g) / eps)) + g
-        
-        # 每 10 次迭代计算连接误差
-        if niter % 10 == 0:
-            max_val = torch.max(torch.abs(f).max(), torch.abs(f_prev).max())
-            max_val = torch.max(max_val, torch.tensor(1., dtype=dtype, device=device))
-            err_f = torch.abs(f - f_prev).max() / max_val
-
-            max_val_g = torch.max(torch.abs(g).max(), torch.abs(g_prev).max())
-            max_val_g = torch.max(max_val_g, torch.tensor(1., dtype=dtype, device=device))
-            err_g = torch.abs(g - g_prev).max() / max_val_g
-            
-            #err_f = torch.abs(f - f_prev).max() / torch.max(torch.abs(f), torch.abs(f_prev), torch.tensor(1., dtype=dtype, device=device))
-            #err_g = torch.abs(g - g_prev).max() / torch.max(torch.abs(g), torch.abs(g_prev), torch.tensor(1., dtype=dtype, device=device))
-            err = 0.5 * (err_f + err_g)
-            if err.item() < stopthr:
-                if verbose:
-                    print("达到停止阈值，err =", err.item())
-                break
-        
-        niter += 1
-    
-    if verbose:
-        print("GPU 迭代次数：", niter, "最终误差：", err.item())
-    
-    # 最终计算 tmp_K 数据
-    tmp_final = (-C_data + f[row] + g[col]) / eps
-    tmp_K_final = torch.exp(tmp_final)
-    
-    # 构造 torch 的稀疏矩阵：indices 为 2 x N 的张量，values 为对应的数据
-    indices = torch.stack([row, col], dim=0)  # shape: [2, nnz]
-    result = torch.sparse_coo_tensor(indices, tmp_K_final, size=(ns, nt))
-    
-    # 如果需要将结果转为 CPU 上 SciPy 的稀疏矩阵，可以先转为 dense numpy 数组，但当矩阵大时要注意内存占用
-    # 如下代码将 result 转至 CPU，并构造成 COO 矩阵：
-    result_cpu = result.coalesce()
-    values_cpu = result_cpu.values().cpu().numpy()
-    indices_cpu = result_cpu.indices().cpu().numpy()
-    scipy_result = sp.coo_matrix((values_cpu, (indices_cpu[0], indices_cpu[1])), shape=(ns, nt))
-    return scipy_result
-
-    #return result
 
 def unot_nesterov_l2_dense(a,b,C,eps1,eps2,m,nitermax=10000,stopthr=1e-8):
     dt = 0.01
