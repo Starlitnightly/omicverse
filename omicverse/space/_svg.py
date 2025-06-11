@@ -22,8 +22,8 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         print('PI calculation is done!')
 
         # Spatial autocorrelation test
-        spatial_autocorrelation(adata)
-        print('Spatial autocorrelation test is done!')
+        #spatial_autocorrelation(adata)
+        #print('Spatial autocorrelation test is done!')
 
         # Remove MT-gene
         drop_gene_name = mt_startwith
