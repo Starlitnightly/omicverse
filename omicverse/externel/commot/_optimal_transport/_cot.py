@@ -2,7 +2,8 @@ import numpy as np
 from scipy import sparse
 from sys import getsizeof
 
-from ._unot import unot 
+#from ._unot import unot 
+from ._unot_torch import unot_torch as unot 
 
 def cot_dense(S, D, A, M, cutoff, eps_p=1e-1, eps_mu=None, eps_nu=None, rho=1e1, nitermax=1e4, stopthr=1e-8):
     """ Solve the collective optimal transport problem with distance limits.
