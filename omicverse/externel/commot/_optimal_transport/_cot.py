@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import sparse
 from sys import getsizeof
+from tqdm import tqdm
 
 #from ._unot import unot 
 from ._unot_torch import unot_torch as unot 
@@ -289,11 +290,24 @@ def cot_sparse(S, D, A, M, cutoff, eps_p=1e-1, eps_mu=None, eps_nu=None, rho=1e1
     C_data, C_row, C_col = [], [], []
 
     max_cutoff = cutoff.max()
-    M_row, M_col = np.where(M <= max_cutoff)
-    M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
+    if sparse.issparse(M):
+        # For sparse matrices, work directly with the sparse data
+        M_coo = M.tocoo()  # Convert to COO format if not already
+        # Filter entries that are <= max_cutoff
+        valid_entries = M_coo.data <= max_cutoff
+        M_max_sp = sparse.coo_matrix(
+            (M_coo.data[valid_entries], 
+             (M_coo.row[valid_entries], M_coo.col[valid_entries])), 
+            shape=M.shape
+        )
+    else:
+        # For dense matrices, use the original approach
+        M_row, M_col = np.where(M <= max_cutoff)
+        M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
+    
     
     cost_scales = []
-    for i in range(ns_s):
+    for i in tqdm(range(ns_s), desc="Processing source species"):
         for j in range(ns_d):
             if not np.isinf(A[i,j]):
                 tmp_nzind_s = np.where(S[:,i] > 0)[0]
@@ -355,11 +369,23 @@ def cot_row_sparse(S, D, A, M, cutoff, eps_p=1e-1, eps_mu=None, eps_nu=None, rho
     n_pos_d, ns_d = D.shape
 
     max_cutoff = cutoff.max()
-    M_row, M_col = np.where(M <= max_cutoff)
-    M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
+    if sparse.issparse(M):
+        # For sparse matrices, work directly with the sparse data
+        M_coo = M.tocoo()  # Convert to COO format if not already
+        # Filter entries that are <= max_cutoff
+        valid_entries = M_coo.data <= max_cutoff
+        M_max_sp = sparse.coo_matrix(
+            (M_coo.data[valid_entries], 
+             (M_coo.row[valid_entries], M_coo.col[valid_entries])), 
+            shape=M.shape
+        )
+    else:
+        # For dense matrices, use the original approach
+        M_row, M_col = np.where(M <= max_cutoff)
+        M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
     
     P_expand = {}
-    for i in range(ns_s):
+    for i in tqdm(range(ns_s), desc="Processing source species"):
         a = S[:,i]
         D_ind = np.where(~np.isinf(A[i,:]))[0]
         b = D[:,D_ind].flatten('F')
@@ -426,11 +452,23 @@ def cot_col_sparse(S, D, A, M, cutoff, eps_p=1e-1, eps_mu=None, eps_nu=None, rho
     n_pos_d, ns_d = D.shape
 
     max_cutoff = cutoff.max()
-    M_row, M_col = np.where(M <= max_cutoff)
-    M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
+    if sparse.issparse(M):
+        # For sparse matrices, work directly with the sparse data
+        M_coo = M.tocoo()  # Convert to COO format if not already
+        # Filter entries that are <= max_cutoff
+        valid_entries = M_coo.data <= max_cutoff
+        M_max_sp = sparse.coo_matrix(
+            (M_coo.data[valid_entries], 
+             (M_coo.row[valid_entries], M_coo.col[valid_entries])), 
+            shape=M.shape
+        )
+    else:
+        # For dense matrices, use the original approach
+        M_row, M_col = np.where(M <= max_cutoff)
+        M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
     
     P_expand = {}
-    for j in range(ns_d):
+    for j in tqdm(range(ns_d), desc="Processing destination species"):
         S_ind = np.where(~np.isinf(A[:,j]))[0]
         a = S[:,S_ind].flatten('F')
         b = D[:,j]
@@ -495,11 +533,23 @@ def cot_blk_sparse(S, D, A, M, cutoff, eps_p=1e-1, eps_mu=None, eps_nu=None, rho
     n_pos_d, ns_d = D.shape
 
     max_cutoff = cutoff.max()
-    M_row, M_col = np.where(M <= max_cutoff)
-    M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
-
+    if sparse.issparse(M):
+        # For sparse matrices, work directly with the sparse data
+        M_coo = M.tocoo()  # Convert to COO format if not already
+        # Filter entries that are <= max_cutoff
+        valid_entries = M_coo.data <= max_cutoff
+        M_max_sp = sparse.coo_matrix(
+            (M_coo.data[valid_entries], 
+             (M_coo.row[valid_entries], M_coo.col[valid_entries])), 
+            shape=M.shape
+        )
+    else:
+        # For dense matrices, use the original approach
+        M_row, M_col = np.where(M <= max_cutoff)
+        M_max_sp = sparse.coo_matrix((M[M_row,M_col], (M_row,M_col)), shape=M.shape)
+    
     P_expand = {}
-    for i in range(ns_s):
+    for i in tqdm(range(ns_s), desc="Processing source species"):
         for j in range(ns_d):
             if not np.isinf(A[i,j]):
                 a = S[:,i]; b = D[:,j]

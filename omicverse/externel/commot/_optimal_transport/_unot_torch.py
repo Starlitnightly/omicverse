@@ -47,7 +47,7 @@ def unot_torch(a,
                nitermax=10000,
                stopthr=1e-8,
                verbose=False,
-               show_progress=True,
+               show_progress=False,
                momentum_dt=0.1,
                momentum_beta=0.0,
                device='cuda' if torch.cuda.is_available() else 'cpu'):
