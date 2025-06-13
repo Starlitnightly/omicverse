@@ -58,7 +58,7 @@ def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42
         from ctxcore.recovery import aucs
         from ctxcore.genesig import GeneSignature
 
-    matrix = adata.to_df()
+    matrix = adata.X.copy()
     percentiles = derive_auc_threshold(matrix)
     auc_threshold = percentiles[AUC_threshold]
 
@@ -67,18 +67,18 @@ def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42
 
     for start in range(0, n_cells, chunk_size):
         end = min(start + chunk_size, n_cells)
-        chunk = matrix.iloc[start:end]
-        df_rnk = create_rankings(chunk, seed)
-        rnk = df_rnk.iloc[:, df_rnk.columns.isin(geneset)]
+        chunk = matrix[start:end]
+        np_rnk_sparse = fast_rank(chunk, seed=seed)
+        rnk = pd.DataFrame(np_rnk_sparse[:, np.where(adata.var_names.isin(geneset))[0]])
 
-        if rnk.empty or (float(len(rnk.columns)) / float(len(geneset))) < 0.80:
+        if rnk.empty or (float(len(np.where(adata.var_names.isin(geneset))[0])) / float(len(geneset))) < 0.80:
             print(
                 f"Less than 80% of the genes in {geneset_name} are present in the "
                 "expression matrix."
             )
         else:
             weights = np.array([1 for _ in geneset])
-            auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
+            auc_results[start:end] = aucs(rnk, np_rnk_sparse.shape[1], weights, auc_threshold)
 
     adata.obs[f'{geneset_name}_aucell'] = auc_results
 
@@ -225,7 +225,7 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
         from ctxcore.recovery import aucs
         from ctxcore.genesig import GeneSignature
 
-    matrix = adata.to_df()
+    matrix = adata.X.copy()
     percentiles = derive_auc_threshold(matrix)
     auc_threshold = percentiles[AUC_threshold]
     
@@ -237,18 +237,18 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
         
         for start in range(0, n_cells, chunk_size):
             end = min(start + chunk_size, n_cells)
-            chunk = matrix.iloc[start:end]
-            df_rnk = create_rankings(chunk, seed)
+            chunk = matrix[start:end]
+            np_rnk_sparse = fast_rank(chunk, seed=seed)
             
-            rnk = df_rnk.iloc[:, df_rnk.columns.isin(pathway_genes)]
-            if rnk.empty or (float(len(rnk.columns)) / float(len(pathway_genes))) < 0.80:
+            rnk = pd.DataFrame(np_rnk_sparse[:, np.where(adata.var_names.isin(pathway_genes))[0]])
+            if rnk.empty or (float(len(np.where(adata.var_names.isin(pathway_genes))[0])) / float(len(pathway_genes))) < 0.80:
                 print(
                     f"Less than 80% of the genes in {pathway_name} are present in the "
                     "expression matrix."
                 )
             else:
                 weights = np.array([1 for _ in pathway_genes])
-                auc_results[start:end] = aucs(rnk, len(df_rnk.columns), weights, auc_threshold)
+                auc_results[start:end] = aucs(rnk, np_rnk_sparse.shape[1], weights, auc_threshold)
 
         adata.obs[f'{pathway_name}_aucell'] = auc_results
             
@@ -285,11 +285,16 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
     for i in pathways_dict.keys():
         test_gmt.append(GeneSignature(name=i,gene2weight=dict(zip(pathways_dict[i],[1 for i in pathways_dict[i]]))))
 
-    matrix = adata.to_df()
-    percentiles = derive_auc_threshold(matrix)
+    # Use sparse matrix for both derive_auc_threshold and aucell
+    matrix_sparse = adata.X.copy()
+    percentiles = derive_auc_threshold(matrix_sparse)
     auc_threshold = percentiles[AUC_threshold]
 
-    aucs_mtx = aucell(matrix, signatures=test_gmt, auc_threshold=auc_threshold, num_workers=num_workers)
+    # Pass sparse matrix directly to aucell with index and columns
+    aucs_mtx = aucell(matrix_sparse, signatures=test_gmt, auc_threshold=auc_threshold, 
+                     num_workers=num_workers, seed=seed, 
+                     index=adata.obs_names, columns=adata.var_names)
+    
     adata_aucs=anndata.AnnData(aucs_mtx)
     add_reference(adata,'AUCell','pathway activity score with AUCell')
     return adata_aucs
@@ -330,17 +335,24 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
     for i in pathways_dict.keys():
         test_gmt.append(GeneSignature(name=i, gene2weight=dict(zip(pathways_dict[i], [1 for _ in pathways_dict[i]]))))
 
-    matrix = adata.to_df()
-    percentiles = derive_auc_threshold(matrix)
+    # Use sparse matrix for derive_auc_threshold
+    matrix_sparse = adata.X.copy()
+    percentiles = derive_auc_threshold(matrix_sparse)
     auc_threshold = percentiles[AUC_threshold]
 
-    # Process in chunks
+    # Process in chunks using sparse matrix slicing
     aucs_mtx_list = []
-    n_cells = matrix.shape[0]
+    n_cells = matrix_sparse.shape[0]
+    
     for start in tqdm(range(0, n_cells, chunk_size)):
         end = min(start + chunk_size, n_cells)
-        chunk = matrix.iloc[start:end]
-        aucs_chunk = aucell(chunk, signatures=test_gmt, auc_threshold=auc_threshold, num_workers=num_workers)
+        # Slice sparse matrix directly
+        chunk_sparse = matrix_sparse[start:end]
+        chunk_index = adata.obs_names[start:end]
+        
+        aucs_chunk = aucell(chunk_sparse, signatures=test_gmt, auc_threshold=auc_threshold, 
+                           num_workers=num_workers, seed=seed,
+                           index=chunk_index, columns=adata.var_names)
         aucs_mtx_list.append(aucs_chunk)
 
     # Concatenate the results
