@@ -188,7 +188,8 @@ def aucell4r(
 
 
     if num_workers == 1:
-        # Show progress bar ...
+        # Show progress bar for pathway processing
+        print(f"Computing AUC scores for {len(signatures)} pathways using single worker...")
         aucs = pd.concat(
             [
                 enrichment4cells(
@@ -196,11 +197,13 @@ def aucell4r(
                     module.noweights() if noweights else module,
                     auc_threshold=auc_threshold,
                 )
-                for module in tqdm(signatures)
+                for module in tqdm(signatures, desc="Processing pathways")
             ]
         ).unstack("Regulon")
         aucs.columns = aucs.columns.droplevel(0)
     else:
+        # Multi-worker processing with progress info
+        print(f"Computing AUC scores for {len(signatures)} pathways using {num_workers} workers...")
         # Decompose the rankings dataframe: the index and columns are shared with the child processes via pickling.
         genes = df_rnk.columns.values
         cells = df_rnk.index.values
@@ -221,6 +224,8 @@ def aucell4r(
 
         # Do the analysis in separate child processes.
         chunk_size = ceil(float(len(signatures)) / num_workers)
+        print(f"Splitting {len(signatures)} pathways into {num_workers} chunks of ~{chunk_size} pathways each...")
+        
         processes = [
             Process(
                 target=_enrichment,
@@ -236,10 +241,13 @@ def aucell4r(
             )
             for idx, chunk in enumerate(chunked(signatures, chunk_size))
         ]
+        
+        print("Starting parallel pathway processing...")
         for p in processes:
             p.start()
         for p in processes:
             p.join()
+        print("Parallel processing completed!")
 
         # Reconstitute the results array. Using C or row-major ordering.
         aucs = pd.DataFrame(
@@ -251,35 +259,72 @@ def aucell4r(
                 data=list(map(attrgetter("name"), signatures)), name="Regulon"
             ),
         ).T
-    return aucs / aucs.max(axis=0) if normalize else aucs
+    
+    result = aucs / aucs.max(axis=0) if normalize else aucs
+    print(f"AUC calculation completed! Generated scores for {result.shape[1]} pathways across {result.shape[0]} cells.")
+    return result
 
 
 def aucell(
-    exp_mtx: pd.DataFrame,
+    exp_mtx,
     signatures,
     auc_threshold: float = 0.05,
     noweights: bool = False,
     normalize: bool = False,
     seed=None,
     num_workers: int = cpu_count(),
+    index=None,
+    columns=None,
 ) -> pd.DataFrame:
     """
     Calculate enrichment of gene signatures for single cells.
 
     Arguments:
-        exp_mtx: The expression matrix (n_cells x n_genes).
+        exp_mtx: The expression matrix (n_cells x n_genes). Can be DataFrame or sparse matrix.
         signatures: The gene signatures or regulons.
         auc_threshold: The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve.
         noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
         normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
         num_workers: The number of cores to use.
+        seed: Random seed for ranking.
+        index: Index for the output DataFrame (if exp_mtx is not a DataFrame).
+        columns: Columns for the output DataFrame (if exp_mtx is not a DataFrame).
     
     Returns:
         A dataframe with the AUCs (n_cells x n_modules).
 
     """
+    # Handle different input types
+    if isinstance(exp_mtx, pd.DataFrame):
+        # DataFrame input - extract index, columns, and convert to sparse
+        original_index = exp_mtx.index
+        original_columns = exp_mtx.columns
+        matrix_values = exp_mtx.values
+        if hasattr(matrix_values, 'toarray'):
+            matrix_sparse = matrix_values
+        else:
+            from scipy.sparse import csr_matrix
+            matrix_sparse = csr_matrix(matrix_values)
+    else:
+        # Sparse matrix input - use provided or default index/columns
+        matrix_sparse = exp_mtx
+        original_index = index if index is not None else pd.RangeIndex(exp_mtx.shape[0])
+        original_columns = columns if columns is not None else pd.RangeIndex(exp_mtx.shape[1])
+    
+    # Use fast_rank for efficient ranking
+    if seed is None:
+        seed = 42
+    rank_matrix = fast_rank(matrix_sparse, seed=seed)
+    
+    # Convert rank matrix back to DataFrame format for aucell4r
+    df_rnk = pd.DataFrame(
+        data=rank_matrix.astype(DTYPE),
+        columns=original_columns,
+        index=original_index
+    )
+    
     return aucell4r(
-        create_rankings(exp_mtx, seed),
+        df_rnk,
         signatures,
         auc_threshold,
         noweights,

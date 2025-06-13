@@ -565,3 +565,15 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 - Updated some functions of `palantir`
 - Added `CellOntologyMapper` to map cell name.
 
+
+## v 1.7.2
+
+### Pl Module
+- Optimated the plot effect of `ov.pl.box_plot`
+- Optimated the plot effect of `ov.pl.volcano`
+
+### Space Module
+- Added 3D cell-cell interaction analysis in `COMMOT`
+
+### Single Module
+- Fixed the error of pathway_enrichment. (#184)
