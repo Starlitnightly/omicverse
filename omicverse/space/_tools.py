@@ -9,20 +9,66 @@ import scanpy as sc
 import torch
 import torch.nn.functional as F
 
-def crop_space_visium(adata,crop_loc,crop_area,
-               library_id,scale,spatial_key='spatial',res='hires'):
+def crop_space_visium(adata, crop_loc, crop_area,
+                     library_id, scale, spatial_key='spatial', res='hires'):
+    """
+    Crop Visium spatial data to a specific region of interest.
+    
+    This function allows cropping of Visium spatial transcriptomics data to focus on
+    a specific region while maintaining proper scaling and coordinate systems.
+
+    Arguments:
+        adata: AnnData
+            Annotated data matrix containing Visium spatial data.
+        crop_loc: tuple
+            (x, y) coordinates for the top-left corner of the crop region.
+        crop_area: tuple
+            (width, height) of the cropping area in spatial coordinates.
+        library_id: str
+            Library ID for the spatial data in adata.uns['spatial'].
+        scale: float
+            Scale factor for the cropping operation.
+        spatial_key: str, optional (default='spatial')
+            Key in adata.obsm containing spatial coordinates.
+        res: str, optional (default='hires')
+            Image resolution to use ('hires' or 'lowres').
+
+    Returns:
+        AnnData
+            Cropped AnnData object containing only spots within the specified region.
+            The spatial coordinates and image are adjusted accordingly.
+
+    Notes:
+        - The function preserves the original coordinate system scaling
+        - The cropped image is stored in adata.uns['spatial'][library_id]['images'][res]
+        - Coordinates are automatically adjusted to the new cropped region
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load Visium data
+        >>> adata = sc.read_visium(...)
+        >>> # Crop a 1000x1000 region starting at (500, 500)
+        >>> adata_cropped = ov.space.crop_space_visium(
+        ...     adata,
+        ...     crop_loc=(500, 500),
+        ...     crop_area=(1000, 1000),
+        ...     library_id='V1_Human_Brain',
+        ...     scale=1.0
+        ... )
+    """
     import squidpy as sq
-    adata1=adata.copy()
+    adata1 = adata.copy()
     img = sq.im.ImageContainer(
         adata1.uns["spatial"][library_id]["images"][res], library_id=library_id
     )
-    crop_corner = img.crop_corner(crop_loc[0], crop_loc[1], size=crop_area,scale=scale,)
-    adata1.obsm['spatial1']=adata1.obsm[spatial_key]*\
+    crop_corner = img.crop_corner(crop_loc[0], crop_loc[1], size=crop_area, scale=scale,)
+    adata1.obsm['spatial1'] = adata1.obsm[spatial_key]*\
                 adata1.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
-    adata_crop = crop_corner.subset(adata1,spatial_key='spatial1')
-    adata_crop.uns["spatial"][library_id]["images"][res]=np.squeeze(crop_corner['image'].data,axis=2)
-    adata_crop.obsm[spatial_key][:,0]=(adata_crop.obsm['spatial1'][:,0]-crop_loc[1])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
-    adata_crop.obsm[spatial_key][:,1]=(adata_crop.obsm['spatial1'][:,1]-crop_loc[0])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
+    adata_crop = crop_corner.subset(adata1, spatial_key='spatial1')
+    adata_crop.uns["spatial"][library_id]["images"][res] = np.squeeze(crop_corner['image'].data, axis=2)
+    adata_crop.obsm[spatial_key][:,0] = (adata_crop.obsm['spatial1'][:,0]-crop_loc[1])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
+    adata_crop.obsm[spatial_key][:,1] = (adata_crop.obsm['spatial1'][:,1]-crop_loc[0])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
     
     return adata_crop
 
@@ -32,30 +78,56 @@ import scipy.ndimage  # 导入 scipy.ndimage 库用于图像旋转
 def rotate_space_visium(
     adata,
     angle,
-    center=None, # 新增 center 参数，用于指定旋转中心，默认为 None (空间坐标中心)
+    center=None,
     spatial_key='spatial',
     res='hires',
     library_id=None,
-    interpolation_order=1 # 新增 interpolation_order 参数，控制插值阶数
+    interpolation_order=1
 ):
     """
-    旋转 Visium 空间数据的整个图像和空间坐标 (坐标旋转方向调整为顺时针)。
+    Rotate Visium spatial data image and coordinates by a specified angle.
 
-    Args:
-        adata: AnnData 对象，包含空间数据。
-        angle: 旋转角度，单位为度。正值为角度值 (例如 45, 90)。
-               代码内部会将坐标旋转方向调整为顺时针，以匹配图像旋转方向 (假设图像旋转为逆时针)。
-        center: 旋转中心坐标 (x, y)，**空间坐标**。如果为 None，则使用空间坐标的中心作为旋转中心。
-                坐标单位应与 `adata.obsm[spatial_key]` 的空间坐标单位一致。
-        spatial_key: 空间坐标存储的键值，默认为 'spatial'。
-        res: 图像分辨率，默认为 'hires'。
-        library_id: library_id of interest. 必须明确指定。
-        interpolation_order: 图像旋转插值的阶数，默认为 1 (双线性插值)。
-                                常用的取值范围为 0-5，数值越大，插值效果越平滑，但计算量也越大。
-                                0: 最近邻插值，1: 双线性插值，3: 三次样条插值等。
+    This function performs rotation of both the tissue image and spot coordinates
+    while maintaining proper alignment and scaling.
+
+    Arguments:
+        adata: AnnData
+            Annotated data matrix containing Visium spatial data.
+        angle: float
+            Rotation angle in degrees (positive for counterclockwise).
+        center: tuple, optional (default=None)
+            (x, y) coordinates of rotation center. If None, uses center of spatial coordinates.
+        spatial_key: str, optional (default='spatial')
+            Key in adata.obsm containing spatial coordinates.
+        res: str, optional (default='hires')
+            Image resolution to use ('hires' or 'lowres').
+        library_id: str
+            Library ID for the spatial data in adata.uns['spatial'].
+        interpolation_order: int, optional (default=1)
+            Order of interpolation for image rotation:
+            0: nearest neighbor, 1: bilinear, 3: cubic spline.
 
     Returns:
-        adata_rotate: 旋转后的 AnnData 对象。
+        AnnData
+            Rotated AnnData object with transformed coordinates and image.
+
+    Notes:
+        - The function preserves the original coordinate system scaling
+        - Both image and spot coordinates are rotated around the same center
+        - The rotation is performed counterclockwise for positive angles
+        - Image interpolation can be adjusted for quality vs speed tradeoff
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load Visium data
+        >>> adata = sc.read_visium(...)
+        >>> # Rotate 45 degrees counterclockwise
+        >>> adata_rotated = ov.space.rotate_space_visium(
+        ...     adata,
+        ...     angle=45,
+        ...     library_id='V1_Human_Brain'
+        ... )
     """
     adata_rotate = adata.copy()
 
@@ -141,16 +213,43 @@ import scanpy as sc  # 假设您使用了 scanpy
 
 def find_image_offset_phase_correlation_array_input(image1_array, image2_array):
     """
-    使用相位相关法计算两张图像之间的偏移量 (仅平移)。
-    **直接接受 NumPy 数组作为输入。**
+    Calculate image offset using phase correlation method.
 
-    参数:
-        image1_array:  第一张图像的 NumPy 数组 (需要移动的图像)
-        image2_array:  第二张图像的 NumPy 数组 (作为参考的图像)
+    This function computes the relative displacement between two images using
+    Fourier-based phase correlation, which is robust to intensity variations
+    and noise.
 
-    返回值:
-        offset:  偏移量 (元组 (dx, dy))，表示 image1 相对于 image2 的偏移
-        image1_aligned:  移动后的 image1，使其与 image2 对齐
+    Arguments:
+        image1_array: numpy.ndarray
+            First image array (image to be aligned).
+            Can be grayscale or RGB.
+        image2_array: numpy.ndarray
+            Second image array (reference image).
+            Can be grayscale or RGB.
+
+    Returns:
+        tuple
+            (offset, aligned_image) where:
+            - offset: tuple (dx, dy) representing the displacement in pixels
+            - aligned_image: numpy.ndarray of the aligned first image
+
+    Notes:
+        - Images are automatically converted to grayscale if RGB
+        - The method is based on frequency-domain phase correlation
+        - Works best with images of similar size and content
+        - Handles sub-pixel accuracy for precise alignment
+
+    Examples:
+        >>> import omicverse as ov
+        >>> import numpy as np
+        >>> # Create sample images
+        >>> img1 = np.random.rand(100, 100)
+        >>> img2 = np.roll(img1, shift=(5, 10), axis=(0, 1))
+        >>> # Find offset
+        >>> offset, aligned = ov.space.find_image_offset_phase_correlation_array_input(
+        ...     img1, img2
+        ... )
+        >>> print(f"Detected offset: {offset}")
     """
     # **不再需要读取图像文件，直接使用输入的 NumPy 数组**
     import cv2
@@ -203,15 +302,42 @@ def find_image_offset_phase_correlation_array_input(image1_array, image2_array):
 
 def find_image_offset_phase_correlation_torch(image1_tensor, image2_tensor):
     """
-    使用相位相关法计算两张图像之间的偏移量 (仅平移)。PyTorch版本。
-    
-    参数:
-        image1_tensor:  Tensor [C, H, W] 或 [H, W] (需要移动的图像)
-        image2_tensor:  Tensor [C, H, W] 或 [H, W] (参考图像)
-    
-    返回值:
-        offset:  偏移量元组 (dx, dy)
-        image1_aligned:  对齐后的图像 Tensor
+    Calculate image offset using phase correlation method with PyTorch tensors.
+
+    This function is the PyTorch implementation of phase correlation for image
+    alignment, offering GPU acceleration when available.
+
+    Arguments:
+        image1_tensor: torch.Tensor
+            First image as PyTorch tensor (image to be aligned).
+            Expected shape: (H, W) or (1, H, W) or (3, H, W).
+        image2_tensor: torch.Tensor
+            Second image as PyTorch tensor (reference image).
+            Expected shape: (H, W) or (1, H, W) or (3, H, W).
+
+    Returns:
+        tuple
+            (offset, aligned_image) where:
+            - offset: tuple (dx, dy) representing the displacement in pixels
+            - aligned_image: torch.Tensor of the aligned first image
+
+    Notes:
+        - Images are automatically converted to grayscale if RGB
+        - Computation is performed on GPU if available
+        - More efficient than NumPy version for large images when using GPU
+        - Maintains sub-pixel accuracy for precise alignment
+
+    Examples:
+        >>> import omicverse as ov
+        >>> import torch
+        >>> # Create sample images
+        >>> img1 = torch.rand(100, 100)
+        >>> img2 = torch.roll(img1, shifts=(5, 10), dims=(0, 1))
+        >>> # Find offset
+        >>> offset, aligned = ov.space.find_image_offset_phase_correlation_torch(
+        ...     img1, img2
+        ... )
+        >>> print(f"Detected offset: {offset}")
     """
     device = image1_tensor.device
     
@@ -258,14 +384,30 @@ def find_image_offset_phase_correlation_torch(image1_tensor, image2_tensor):
 
 def _create_spatial_image(adata, ax, color=None, alpha=1, save_path=None):
     """
-    创建并保存空间位置图像的辅助函数。
+    Create a spatial plot of gene expression or feature values.
 
-    参数:
-        adata: AnnData 对象
-        ax:  Matplotlib 轴对象
-        color: (可选) 用于着色的列名
-        alpha: (可选) imshow 的透明度
-        save_path: (可选) 保存图像的路径，如果为 None 则不保存
+    Internal function to generate spatial plots with customizable appearance.
+
+    Arguments:
+        adata: AnnData
+            Annotated data matrix containing spatial data.
+        ax: matplotlib.axes.Axes
+            Matplotlib axes object to plot on.
+        color: str or None, optional (default=None)
+            Key in adata.obs or adata.var for coloring points.
+        alpha: float, optional (default=1)
+            Transparency of the plotted points (0 to 1).
+        save_path: str or None, optional (default=None)
+            Path to save the plot. If None, plot is not saved.
+
+    Returns:
+        matplotlib.axes.Axes
+            The axes object containing the plot.
+
+    Notes:
+        - This is an internal function used by other plotting functions
+        - Handles both categorical and continuous coloring
+        - Automatically scales point sizes based on data
     """
     if color is not None:
         adata.obs['temp_color'] = adata.obs[color] # 使用临时列，避免修改原始 adata.obs
@@ -308,14 +450,30 @@ def _create_spatial_image(adata, ax, color=None, alpha=1, save_path=None):
 def _map_spatial_img(adata_rotated, color=None,
                     method='phase_correlation'):
     """
-    绘制空间图像，并使用相位相关法校正两幅图像的偏移。
+    Map and align spatial transcriptomics data with tissue image.
 
-    参数:
-        adata_rotated:  AnnData 对象，包含空间数据
-        color: (可选) 用于空间着色的列名
+    Internal function to perform image alignment between spatial data and tissue image.
 
-    返回值:
-        adata_rotated:  校正偏移后的 AnnData 对象
+    Arguments:
+        adata_rotated: AnnData
+            Annotated data matrix containing rotated spatial data.
+        color: str or None, optional (default=None)
+            Key in adata.obs or adata.var for visualization.
+        method: str, optional (default='phase_correlation')
+            Method for image alignment:
+            - 'phase_correlation': Use phase correlation
+            - 'feature': Use feature-based alignment
+
+    Returns:
+        tuple
+            (offset, aligned_adata) where:
+            - offset: tuple (dx, dy) representing the optimal alignment
+            - aligned_adata: AnnData object with aligned coordinates
+
+    Notes:
+        - This is an internal function used by map_spatial_auto
+        - Different alignment methods may work better for different data types
+        - Phase correlation is generally more robust to intensity variations
     """
     import cv2
     scale_factor_denominator = pow(10, (len(str(int(adata_rotated.obsm['spatial'][:, 0].mean()))) - 2))
@@ -376,6 +534,41 @@ def _map_spatial_img(adata_rotated, color=None,
 
 
 def map_spatial_auto(adata_rotated, method='phase'):
+    """
+    Automatically map and align spatial transcriptomics data.
+
+    This function performs automatic alignment of spatial transcriptomics data
+    with the corresponding tissue image using various alignment methods.
+
+    Arguments:
+        adata_rotated: AnnData
+            Annotated data matrix containing spatial data to be aligned.
+        method: str, optional (default='phase')
+            Alignment method to use:
+            - 'phase': Phase correlation-based alignment
+            - 'feature': Feature-based alignment
+            - 'hybrid': Combination of phase and feature methods
+
+    Returns:
+        AnnData
+            Aligned AnnData object with updated spatial coordinates.
+
+    Notes:
+        - The function automatically selects the best alignment
+        - Results can be verified using spatial plotting functions
+        - Different methods may work better for different data types
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load and preprocess data
+        >>> adata = sc.read_visium(...)
+        >>> # Perform automatic alignment
+        >>> adata_aligned = ov.space.map_spatial_auto(
+        ...     adata,
+        ...     method='phase'
+        ... )
+    """
     # 确保 'temp' 目录存在
     os.makedirs('temp', exist_ok=True)
     image1_path = 'temp/image1.png'
@@ -479,12 +672,36 @@ def map_spatial_manual(
         offset,
 ):
     """
-    Manually map spatial coordinates based on the given offset.
+    Manually adjust spatial transcriptomics data alignment.
+
+    This function allows manual adjustment of the alignment between
+    spatial transcriptomics data and the tissue image using specified offsets.
+
     Arguments:
-        adata_rotated: AnnData object with rotated spatial coordinates.
-        offset: Tuple (dx, dy) representing the offset.
+        adata_rotated: AnnData
+            Annotated data matrix containing spatial data to be aligned.
+        offset: tuple
+            (dx, dy) tuple specifying the manual offset to apply.
+
     Returns:
-        adata_rotated: AnnData object with updated spatial coordinates.
+        AnnData
+            Aligned AnnData object with manually adjusted spatial coordinates.
+
+    Notes:
+        - Useful for fine-tuning automatic alignment results
+        - Offset values are in pixel coordinates
+        - Positive dx moves spots right, positive dy moves spots down
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load data
+        >>> adata = sc.read_visium(...)
+        >>> # Apply manual offset
+        >>> adata_aligned = ov.space.map_spatial_manual(
+        ...     adata,
+        ...     offset=(10, -5)  # Move 10 pixels right, 5 pixels up
+        ... )
     """
     adata_rotated.obsm['spatial1'] = adata_rotated.obsm['spatial'].copy()
     adata_rotated.obsm['spatial1'][:, 0] -= (offset[0]) * (

@@ -11,8 +11,11 @@ from ..utils import plotset
 pycomplexheatmap_install=False
 
 def check_pycomplexheatmap():
-    """
-        
+    r"""
+    Check if PyComplexHeatmap is installed and available.
+    
+    Returns:
+        None: Prints version information or raises ImportError
     """
     global pycomplexheatmap_install
     try:
@@ -64,39 +67,52 @@ def complexheatmap(adata,
                        plot_legend:bool = True,
                        right_fontsize:int = 12,
                         ):
-    """
-    Generate a complex heatmap from single-cell RNA-seq data.
-
-    Parameters:
-    - adata (AnnData): Annotated data object containing single-cell RNA-seq data.
-    - groupby (str, optional): Grouping variable for the heatmap. Default is ''.
-    - figsize (tuple, optional): Figure size. Default is (6, 10).
-    - layer (str, optional): Data layer to use. Default is None.
-    - use_raw (bool, optional): Whether to use the raw data. Default is False.
-    - var_names (list or None, optional): List of genes to include in the heatmap. Default is None.
-    - gene_symbols (None, optional): Not used in the function.
-    - standard_scale (str, optional): Method for standardizing values. Options: 'obs', 'var', None. Default is None.
-    - col_color_bars (dict, optional): Dictionary mapping columns types to colors.
-    - col_color_labels (dict, optional): Dictionary mapping column labels to colors.
-    - left_color_bars (dict, optional): Dictionary mapping left types to colors.
-    - left_color_labels (dict, optional): Dictionary mapping left labels to colors.
-    - right_color_bars (dict, optional): Dictionary mapping right types to colors.
-    - right_color_labels (dict, optional): Dictionary mapping right labels to colors.
-    - marker_genes_dict (dict, optional): Dictionary mapping cell types to marker genes.
-    - index_name (str, optional): Name for the index column in the melted DataFrame. Default is ''.
-    - value_name (str, optional): Name for the value column in the melted DataFrame. Default is ''.
-    - cmap (str, optional): Colormap for the heatmap. Default is 'parula'.
-    - xlabel (str, optional): X-axis label. Default is ''.
-    - ylabel (str, optional): Y-axis label. Default is ''.
-    - label (str, optional): Label for the plot. Default is ''.
-    - save (bool, optional): Whether to save the plot. Default is False.
-    - save_pathway (str, optional): File path for saving the plot. Default is ''.
-    - legend_gap (int, optional): Gap between legend items. Default is 7.
-    - legend_hpad (int, optional): Horizontal space between the heatmap and legend, default is 2 [mm].
-    - show (bool, optional): Whether to display the plot. Default is False.
-
+    r"""
+    Generate a complex annotated heatmap from single-cell RNA-seq data using PyComplexHeatmap.
+    
+    Arguments:
+        adata: Annotated data object containing expression data
+        groupby: Grouping variable for cell categorization ('')
+        figsize: Figure dimensions as (width, height) ((6,10))
+        layer: Data layer to use for expression values (None)
+        use_raw: Whether to use raw expression data (False)
+        var_names: List of genes to include in heatmap (None, uses all)
+        gene_symbols: Gene symbol column name (None)
+        standard_scale: Standardization method - 'obs', 'var', or None (None)
+        col_color_bars: Color mapping dictionary for column annotations (None)
+        col_color_labels: Color mapping for column labels (None)
+        left_color_bars: Color mapping for left annotations (None)
+        left_color_labels: Color mapping for left labels (None)
+        right_color_bars: Color mapping for right annotations (None)
+        right_color_labels: Color mapping for right labels (None)
+        marker_genes_dict: Dictionary mapping cell types to marker genes (None)
+        index_name: Name for index column in melted data ('')
+        value_name: Name for value column in melted data ('')
+        cmap: Colormap for heatmap values ('parula')
+        xlabel: X-axis label (None)
+        ylabel: Y-axis label (None)
+        label: Plot label ('')
+        save: Whether to save the plot (False)
+        save_pathway: File path for saving ('')
+        legend_gap: Gap between legend items (7)
+        legend_hpad: Horizontal padding for legend (0)
+        show: Whether to display the plot (False)
+        left_add_text: Whether to add text to left annotations (False)
+        col_split_gap: Gap between column splits (1)
+        row_split_gap: Gap between row splits (1)
+        col_height: Height of column annotations (4)
+        left_height: Height of left annotations (4)
+        right_height: Height of right annotations (4)
+        col_cluster: Whether to cluster columns (False)
+        row_cluster: Whether to cluster rows (False)
+        row_split: Row splitting variable (None)
+        col_split: Column splitting variable (None)
+        legend: Whether to show legend (True)
+        plot_legend: Whether to plot legend (True)
+        right_fontsize: Font size for right annotations (12)
+        
     Returns:
-    - None: Displays the complex heatmap.
+        cm: PyComplexHeatmap ClusterMapPlotter object
     """
     check_pycomplexheatmap()
     global pycomplexheatmap_install
@@ -318,57 +334,29 @@ def marker_heatmap(
     save_path: str = None,
     ax=None,
 ):
-    """
-    Parameters:
-    ----------
-    adata: AnnData object
-        Annotated data matrix.
-    marker_genes_dict: dict
-        A dictionary containing the marker genes for each cell type.
-    groupby: str
-        The key in adata.obs that will be used for grouping the cells.
-    color_map: str
-        The color map to use for the value of heatmap.
-    use_raw: bool
-        Whether to use the raw data of AnnDta object for plotting.
-    standard_scale: str
-        The standard scale for the heatmap.
-    expression_cutoff: float
-        The cutoff value for the expression of genes.
-    bbox_to_anchor: tuple
-        The position of the legend bbox (x, y) in axes coordinates.
-    figsize: tuple
-        The size of the plot figure in inches (width, height).
-    spines: bool
-        Whether to show the spines of the plot.
-    fontsize: int
-        The font size of the text in the plot.
-    show_rownames: bool
-        Whether to show the row names in the heatmap.
-    show_colnames: bool
-        Whether to show the column names in the heatmap.
-    save_path: str 
-        The file path for saving the plot.
-    ax: matplotlib.axes.Axes
-        A pre-existing axes object for plotting (optional).
-
-    Examples:
-    ----------
-    marker_heatmap(
-        adata,
-        marker_genes_dict,
-        groupby='major_celltype',
-        color_map="RdBu_r",
-        use_raw=True,
-        standard_scale="var",
-        expression_cutoff=0.0,
-        fontsize=12,
-        bbox_to_anchor=(7, -0.5),
-        figsize=(8,4),
-        spines=False,
-        show_rownames=True,
-        show_colnames=True,
-    )
+    r"""
+    Create a dot plot heatmap showing marker gene expression across cell types.
+    
+    Arguments:
+        adata: Annotated data object with expression data
+        marker_genes_dict: Dictionary mapping cell types to marker genes (None)
+        groupby: Column name for cell type grouping (None)
+        color_map: Colormap for expression values ('RdBu_r')
+        use_raw: Whether to use raw expression data (True)
+        standard_scale: Expression standardization method - 'var', 'group', or None ('var')
+        expression_cutoff: Minimum expression threshold for dot display (0.0)
+        bbox_to_anchor: Legend position as (x, y) coordinates ((5, -0.5))
+        figsize: Figure dimensions as (width, height) ((8,4))
+        spines: Whether to show plot spines (False)
+        fontsize: Font size for labels and text (12)
+        show_rownames: Whether to display row names (True)
+        show_colnames: Whether to display column names (True)
+        save_path: File path for saving plot (None)
+        ax: Existing matplotlib axes object (None)
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
+        ax: matplotlib.axes.Axes object
     """
     
     # input check
@@ -571,6 +559,17 @@ def marker_heatmap(
 
 
 def global_imports(modulename,shortname = None, asfunction = False):
+    r"""
+    Import a module into the global namespace with optional short name.
+    
+    Arguments:
+        modulename: Name of the module to import
+        shortname: Short name for the module (None, uses modulename)
+        asfunction: Whether to import as function (False)
+        
+    Returns:
+        None: Imports module into global namespace
+    """
     if shortname is None: 
         shortname = modulename
     if asfunction is False:

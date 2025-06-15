@@ -8,6 +8,15 @@ from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
 
 def html_to_rgb(html_color):
+    r"""
+    Convert HTML hex color code to RGB tuple.
+    
+    Arguments:
+        html_color: HTML hex color string (e.g., '#FF0000' or 'FF0000')
+        
+    Returns:
+        rgb_color: RGB tuple with values 0-255
+    """
     # 去掉颜色代码前的 `#`
     html_color = html_color.lstrip('#')
 
@@ -28,6 +37,17 @@ def html_to_rgb(html_color):
     return rgb_color
 
 def get_rgb_function(cmap, min_value, max_value):
+    r"""
+    Generate a function to map continuous values to RGB using colormap.
+    
+    Arguments:
+        cmap: Matplotlib colormap object
+        min_value: Minimum value for color mapping
+        max_value: Maximum value for color mapping
+        
+    Returns:
+        func: Function that maps values to RGB colors
+    """
     r"""Generate a function to map continous values to RGB values using colormap between min_value & max_value."""
 
     if min_value > max_value:
@@ -53,18 +73,14 @@ def get_rgb_function(cmap, min_value, max_value):
 
 
 def rgb_to_ryb(rgb):
-    """
-    Converts colours from RGB colorspace to RYB
-
-    Parameters
-    ----------
-
-    rgb
-        numpy array Nx3
-
-    Returns
-    -------
-    Numpy array Nx3
+    r"""
+    Convert colors from RGB colorspace to RYB (red-yellow-blue) colorspace.
+    
+    Arguments:
+        rgb: RGB color array with shape (N, 3) or (3,)
+        
+    Returns:
+        ryb: RYB color array with same shape as input
     """
     rgb = np.array(rgb)
     if len(rgb.shape) == 1:
@@ -89,18 +105,14 @@ def rgb_to_ryb(rgb):
 
 
 def ryb_to_rgb(ryb):
-    """
-    Converts colours from RYB colorspace to RGB
-
-    Parameters
-    ----------
-
-    ryb
-        numpy array Nx3
-
-    Returns
-    -------
-    Numpy array Nx3
+    r"""
+    Convert colors from RYB (red-yellow-blue) colorspace to RGB colorspace.
+    
+    Arguments:
+        ryb: RYB color array with shape (N, 3) or (3,)
+        
+    Returns:
+        rgb: RGB color array with same shape as input
     """
     ryb = np.array(ryb)
     if len(ryb.shape) == 1:
@@ -160,43 +172,46 @@ def plot_spatial_general(
     return_ax=False,
     
 ):
-    r"""Plot spatial abundance of cell types (regulatory programmes) with colour gradient and interpolation.
-
-      This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
-      'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
-
-    :param value_df: pd.DataFrame - with cell abundance or other features (only 7 allowed, columns) across locations (rows)
-    :param coords: np.ndarray - x and y coordinates (in columns) to be used for ploting spots
-    :param text: pd.DataFrame - with x, y coordinates, text to be printed
-    :param circle_diameter: diameter of circles
-    :param labels: list of strings, labels of cell types
-    :param alpha_scaling: adjust color alpha
-    :param max_col: crops the colorscale maximum value for each column in value_df.
-    :param max_color_quantile: crops the colorscale at x quantile of the data.
-    :param show_img: show image?
-    :param img: numpy array representing a tissue image.
-        If not provided a black background image is used.
-    :param img_alpha: transparency of the image
-    :param lim: x and y max limits on the plot. Minimum is always set to 0, if `lim` is None maximum
-        is set to image height and width. If 'no_limit' then no limit is set.
-    :param adjust_text: move text label to prevent overlap
-    :param plt_axis: show axes?
-    :param axis_y_flipped: flip y axis to match coordinates of the plotted image
-    :param reorder_cmap: reorder colors to make sure you get the right color for each category
-
-    :param style: plot style (matplolib.style.context):
-        'fast' - white background & dark text;
-        'dark_background' - black background & white text;
-
-    :param colorbar_position: 'bottom', 'right' or None
-    :param colorbar_label_kw: dict that will be forwarded to ax.set_label()
-    :param colorbar_shape: dict {'vertical_gaps': 1.5, 'horizontal_gaps': 1.5,
-                                    'width': 0.2, 'height': 0.2}, not obligatory to contain all params
-    :param colorbar_tick_size: colorbar ticks label size
-    :param colorbar_grid: tuple of colorbar grid (rows, columns)
-    :param image_cmap: matplotlib colormap for grayscale image
-    :param white_spacing: percent of colorbars to be hidden
-
+    r"""
+    Create spatial plot with color gradient and interpolation for cell type abundances.
+    
+    Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
+    
+    Arguments:
+        adata: Annotated data object
+        value_df: DataFrame with cell abundances or features (max 7 columns) across locations
+        coords: Array with x,y coordinates for plotting spots
+        labels: List of cell type labels
+        text: DataFrame with x,y coordinates and text for annotations (None)
+        circle_diameter: Diameter of spot circles (4.0)
+        alpha_scaling: Color transparency adjustment factor (1.0)
+        max_col: Maximum colorscale values for each column ((np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf))
+        max_color_quantile: Quantile threshold for colorscale cropping (0.98)
+        show_img: Whether to display background image (True)
+        img: Background tissue image array (None)
+        img_alpha: Transparency of background image (1.0)
+        adjust_text: Whether to adjust text labels to prevent overlap (False)
+        plt_axis: Axis display setting ('off')
+        axis_y_flipped: Whether to flip y-axis to match image coordinates (True)
+        x_y_labels: Axis labels as (x_label, y_label) (('', ''))
+        crop_x: X-axis cropping limits as (min, max) (None)
+        crop_y: Y-axis cropping limits as (min, max) (None)
+        text_box_alpha: Transparency of text boxes (0.9)
+        reorder_cmap: Color order indices for categories (range(7))
+        style: Plot style - 'fast' or 'dark_background' ('fast')
+        colorbar_position: Colorbar position - 'bottom', 'right', or None ('bottom')
+        colorbar_label_kw: Keyword arguments for colorbar labels ({})
+        colorbar_shape: Colorbar shape parameters ({})
+        colorbar_tick_size: Colorbar tick label size (12)
+        colorbar_grid: Colorbar grid dimensions as (rows, cols) (None, auto-determined)
+        image_cmap: Colormap for grayscale background image ('Greys_r')
+        white_spacing: Percentage of colorbar hidden as white space (20)
+        palette: Custom color palette as list or dict (None, uses defaults)
+        legend_title_fontsize: Font size for legend titles (12)
+        return_ax: Whether to return axes object (False)
+        
+    Returns:
+        fig: matplotlib.figure.Figure object, or (fig, ax) if return_ax=True
     """
 
     if value_df.shape[1] > 7:
@@ -410,16 +425,20 @@ def plot_spatial_general(
 
 
 def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
-    """Plot spatial abundance of cell types (regulatory programmes) with colour gradient
-    and interpolation (from Visium anndata).
-
-    This method supports only 7 cell types with these colours (in order, which can be changed using reorder_cmap).
-    'yellow' 'orange' 'blue' 'green' 'purple' 'grey' 'white'
-
-    :param adata: adata object with spatial coordinates in adata.obsm['spatial']
-    :param color: list of adata.obs column names to be plotted
-    :param kwargs: arguments to plot_spatial_general
-    :return: matplotlib figure
+    r"""
+    Create spatial plot from Visium data with color gradient and interpolation.
+    
+    Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
+    
+    Arguments:
+        adata: AnnData object with spatial coordinates in adata.obsm['spatial']
+        color: List of column names from adata.obs to plot
+        img_key: Image resolution key - 'hires' or 'lowres' ('hires')
+        show_img: Whether to display background tissue image (True)
+        **kwargs: Additional arguments passed to plot_spatial_general
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
     """
 
     if show_img is True:
@@ -441,22 +460,33 @@ def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
     return fig
 
 def create_colormap(R, G, B):
-        spacing = int(20 * 2.55)
+    r"""
+    Create a matplotlib colormap from RGB values with alpha gradient.
+    
+    Arguments:
+        R: Red component (0-255)
+        G: Green component (0-255)
+        B: Blue component (0-255)
+        
+    Returns:
+        colormap: matplotlib.colors.ListedColormap object
+    """
+    spacing = int(20 * 2.55)
 
-        N = 255
-        M = 3
+    N = 255
+    M = 3
 
-        alphas = np.concatenate([[0] * spacing * M, np.linspace(0, 1.0, (N - spacing) * M)])
+    alphas = np.concatenate([[0] * spacing * M, np.linspace(0, 1.0, (N - spacing) * M)])
 
-        vals = np.ones((N * M, 4))
-        #         vals[:, 0] = np.linspace(1, R / 255, N * M)
-        #         vals[:, 1] = np.linspace(1, G / 255, N * M)
-        #         vals[:, 2] = np.linspace(1, B / 255, N * M)
-        for i, color in enumerate([R, G, B]):
-            vals[:, i] = color / 255
-        vals[:, 3] = alphas
+    vals = np.ones((N * M, 4))
+    #         vals[:, 0] = np.linspace(1, R / 255, N * M)
+    #         vals[:, 1] = np.linspace(1, G / 255, N * M)
+    #         vals[:, 2] = np.linspace(1, B / 255, N * M)
+    for i, color in enumerate([R, G, B]):
+        vals[:, i] = color / 255
+    vals[:, 3] = alphas
 
-        return ListedColormap(vals)
+    return ListedColormap(vals)
 
 def spatial_value(adata,color,library_id,
             dot_size=4,white_spacing=20,
@@ -466,6 +496,29 @@ def spatial_value(adata,color,library_id,
             legend_title_color=None,
             colorbar_label_kw={},res='hires',
             img_show=True,ax=None,alpha_img=1):
+    r"""
+    Plot spatial expression values for a single gene or feature on tissue image.
+    
+    Arguments:
+        adata: AnnData object with spatial data
+        color: Gene name or obs column to visualize
+        library_id: Spatial library identifier
+        dot_size: Size of spots on the plot (4)
+        white_spacing: White space percentage in colormap (20)
+        colorbar_show: Whether to display colorbar (True)
+        colorbar_tick_size: Font size for colorbar ticks (12)
+        cmap: Colormap for values (create_colormap(255, 0, 0))
+        legend_title_fontsize: Font size for legend title (12)
+        legend_title_color: Color for legend title (None, auto-determined)
+        colorbar_label_kw: Additional colorbar label arguments ({})
+        res: Image resolution - 'hires' or 'lowres' ('hires')
+        img_show: Whether to show background tissue image (True)
+        ax: Existing matplotlib axes object (None)
+        alpha_img: Transparency of background image (1)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object
+    """
 
     #ax_input=False
     if ax is None:

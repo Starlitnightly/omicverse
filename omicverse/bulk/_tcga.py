@@ -10,16 +10,18 @@ from typing import List, Dict, Tuple, Optional, Union
 
 class pyTCGA(object):
     r"""
-    TCGA analysis module 
+    TCGA (The Cancer Genome Atlas) data analysis module.
+    
+    This class provides comprehensive functionality for downloading, processing,
+    and analyzing TCGA genomic and clinical data.
     """
     def __init__(self,gdc_sample_sheep:str,gdc_download_files:str,clinical_cart:str):
-        r"""
-        Init the TCGA module
+        r"""Initialize TCGA analysis module.
 
         Arguments:
-            gdc_sample_sheep: Path of the Sample Sheet button of TCGA, and we can get tsv file from it
-            gdc_download_files: Path of the Download/Cart button of TCGA, and we get tar.gz included all file you selected/
-            clinical_cart: Path of the Clinical button of TCGA, and we can get tar.gz included all clinical of your files
+            gdc_sample_sheep: Path to TCGA Sample Sheet TSV file
+            gdc_download_files: Path to downloaded TCGA data files directory
+            clinical_cart: Path to TCGA clinical data tar.gz file
 
         """
         self.gdc_sample_sheep=gdc_sample_sheep
@@ -44,11 +46,10 @@ class pyTCGA(object):
         
         
     def adata_read(self,path:str):
-        r"""
-        Read the anndata file
+        r"""Read AnnData object from file.
 
         Arguments:
-            path: Path of the anndata file
+            path: Path to AnnData file
         """
         print('... anndata reading')
         self.adata=sc.read(path)
@@ -60,15 +61,14 @@ class pyTCGA(object):
         
     def adata_meta_init(self,var_names:list=['gene_name','gene_type'],
                   obs_names:list=['Case ID','Sample Type'])->anndata.AnnData:
-        r"""
-        Init the anndata meta data
+        r"""Initialize AnnData metadata.
 
         Arguments:
-            var_names: The column name of the var meta data
-            obs_names: The column name of the obs meta data
+            var_names: Column names for variable (gene) metadata (default: ['gene_name','gene_type'])
+            obs_names: Column names for observation (sample) metadata (default: ['Case ID','Sample Type'])
 
         Returns:
-            adata: The anndata object with meta data
+            adata: AnnData object with initialized metadata
 
         """
         print('...anndata meta init',var_names,obs_names)
@@ -90,8 +90,10 @@ class pyTCGA(object):
         return adata
         
     def survial_init(self):
-        r"""
-        Init the survial data
+        r"""Initialize survival analysis data.
+        
+        Processes clinical data to extract survival information including
+        vital status and survival days.
         """
         day_li=[]
         pd_c=self.clinical_sheet
@@ -127,11 +129,10 @@ class pyTCGA(object):
         
         
     def index_init(self)->list:
-        r"""
-        Init the index of the anndata object
+        r"""Initialize gene indices for AnnData construction.
 
         Returns:
-            all_lncRNA_index: The index of the anndata object
+            all_lncRNA_index: List of all gene indices from TCGA samples
         """
         print('...index init')
         all_lncRNA_index=[]
@@ -149,8 +150,9 @@ class pyTCGA(object):
         return all_lncRNA_index
     
     def expression_init(self):
-        r"""
-        Init the expression matrix of the anndata object
+        r"""Initialize expression matrices for TCGA data.
+        
+        Creates count, TPM, and FPKM expression matrices from TCGA files.
         """
         print('... expression matrix init')
         data_pd_count=pd.DataFrame(index=self.tcga_index)
@@ -186,8 +188,10 @@ class pyTCGA(object):
         self.data_test=data_test
     
     def matrix_construct(self):
-        r"""
-        Construct the anndata object
+        r"""Construct AnnData object from expression matrices.
+        
+        Creates AnnData object with multiple layers including raw counts,
+        TPM, FPKM, and DESeq2-normalized expression.
         """
         print('...anndata construct')
         var_pd=pd.DataFrame(index=self.data_pd_count.index)
@@ -200,14 +204,13 @@ class pyTCGA(object):
         return adata
     
     def matrix_normalize(self,data:pd.DataFrame)->pd.DataFrame:
-        r"""
-        normalize the matrix by Deseq2 methods
+        r"""Normalize expression matrix using DESeq2 method.
 
         Arguments:
-            data: The matrix to be normalized
+            data: Raw count expression matrix to normalize
 
         Returns:
-            data: The normalized matrix
+            data: DESeq2-normalized expression matrix
         """
         avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf, -np.inf], np.nan).dropna()
         data1=data.loc[avg1.index]
@@ -218,18 +221,18 @@ class pyTCGA(object):
     
     
     def survival_analysis(self,gene:str,layer:str='raw',plot:bool=False,gene_threshold:str='median')->Tuple[float,float]:
-        r"""
-        Analysis the survival of the gene
+        r"""Perform survival analysis for a specific gene.
 
         Arguments:
-            gene: The gene name
-            layer: The layer of the anndata object
-            plot: Whether to plot the survival curve
-            gene_threshold: The threshold of the gene expression, can be 'median' or 'mean'
+            gene: Gene name for survival analysis
+            layer: AnnData layer to use for expression values (default: 'raw')
+            plot: Whether to generate Kaplan-Meier survival plot (default: False)
+            gene_threshold: Method to split samples into high/low expression groups
+                          (default: 'median', options: 'median', 'mean', or numeric value)
 
         Returns:
-            test_statistic: The test statistic
-            pvalue: The survival pvalue
+            test_statistic: Log-rank test statistic
+            pvalue: Log-rank test p-value
 
         """
         from scipy.sparse import issparse
@@ -295,8 +298,10 @@ class pyTCGA(object):
         return lr.test_statistic,lr.p_value
     
     def survial_analysis_all(self):
-        r"""
-        analysis the survival of all the genes
+        r"""Perform survival analysis for all genes in the dataset.
+        
+        Calculates survival statistics for every gene and stores results
+        in AnnData.var as 'survial_test_statistic' and 'survial_p' columns.
         """
         from tqdm import tqdm
         res_l_lnc=[]

@@ -18,6 +18,28 @@ def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       figsize:tuple=(4,4),title:str='',
                       fontsize:int=12,ax=None,
                      return_graph:bool=False):
+    r"""
+    Create a circular network plot of CellPhoneDB cell-cell interactions.
+    
+    Arguments:
+        adata: Annotated data object with cell type information
+        interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
+        celltype_key: Column name for cell type annotation
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        counts_min: Minimum interaction count threshold (50)
+        source_cells: List of source cell types to include (None, uses all)
+        target_cells: List of target cell types to include (None, uses all)
+        edgeswidth_scale: Scale factor for edge widths (1)
+        nodesize_scale: Scale factor for node sizes (1)
+        figsize: Figure dimensions as (width, height) ((4,4))
+        title: Plot title ('')
+        fontsize: Font size for labels (12)
+        ax: Existing matplotlib axes object (None)
+        return_graph: Whether to return NetworkX graph object (False)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object or NetworkX graph if return_graph=True
+    """
     G=nx.DiGraph()
     for i in interaction_edges.index:
         if interaction_edges.loc[i,'COUNT']>counts_min:
@@ -122,6 +144,26 @@ def cpdb_chord(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       celltype_key:str,count_min=50,nodecolor_dict=None,
                       fontsize=12,padding=80,radius=100,save='chord.svg',
                       rotation=0,bg_color = "#ffffff",bg_transparancy = 1.0):
+    r"""
+    Create a chord diagram visualization of CellPhoneDB interactions.
+    
+    Arguments:
+        adata: Annotated data object with cell type information
+        interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
+        celltype_key: Column name for cell type annotation
+        count_min: Minimum interaction count threshold (50)
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        fontsize: Font size for labels (12)
+        padding: Padding around chord diagram (80)
+        radius: Radius of the chord diagram (100)
+        save: File path to save SVG output ('chord.svg')
+        rotation: Rotation angle for the diagram (0)
+        bg_color: Background color ('#ffffff')
+        bg_transparancy: Background transparency (1.0)
+        
+    Returns:
+        fig: OpenChord figure object
+    """
     import itertools
     import openchord as ocd
     data=interaction_edges.loc[interaction_edges['COUNT']>count_min].iloc[:,:2]
@@ -163,6 +205,28 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       figsize=(3,3),fontsize=11,rotate=False,legend=True,
                       legend_kws={'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',},
                       return_table=False,**kwargs):
+    r"""
+    Create a dot heatmap of CellPhoneDB interaction counts between cell types.
+    
+    Arguments:
+        adata: Annotated data object with cell type information
+        interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
+        celltype_key: Column name for cell type annotation
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        ax: Existing matplotlib axes object (None)
+        source_cells: List of source cell types to include (None, uses all)
+        target_cells: List of target cell types to include (None, uses all)
+        figsize: Figure dimensions as (width, height) ((3,3))
+        fontsize: Font size for labels (11)
+        rotate: Whether to rotate the heatmap layout (False)
+        legend: Whether to show legend (True)
+        legend_kws: Legend keyword arguments ({'fontsize':8,'bbox_to_anchor':(5, -0.5),'loc':'center left',})
+        return_table: Whether to return data table instead (False)
+        **kwargs: Additional arguments passed to DotClustermapPlotter
+        
+    Returns:
+        ax: matplotlib.axes.Axes object or DataFrame if return_table=True
+    """
     
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -401,6 +465,28 @@ def cpdb_interacting_heatmap(adata,
                              plot_secret=True,
                              return_table=False,
                              transpose=False):
+    r"""
+    Create a detailed heatmap of specific interacting pairs with significance.
+    
+    Arguments:
+        adata: Annotated data object with cell type information
+        celltype_key: Column name for cell type annotation
+        means: CellPhoneDB means DataFrame with interaction data
+        pvalues: CellPhoneDB pvalues DataFrame with significance data
+        source_cells: List of source cell types
+        target_cells: List of target cell types
+        min_means: Minimum mean expression threshold (3)
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        ax: Existing matplotlib axes object (None)
+        figsize: Figure dimensions as (width, height) ((2,6))
+        fontsize: Font size for labels (12)
+        plot_secret: Whether to show secreted/non-secreted annotation (True)
+        return_table: Whether to return data table instead (False)
+        transpose: Whether to transpose the heatmap layout (False)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object or DataFrame if return_table=True
+    """
     import numpy as np
     import matplotlib.pyplot as plt
 
@@ -605,6 +691,27 @@ def cpdb_group_heatmap(adata,
                             plot_secret=True,
                       cmap={'Target':'Blues','Source':'Reds'},
                       return_table=False,):
+    r"""
+    Create a grouped heatmap showing ligand and receptor expression by cell type.
+    
+    Arguments:
+        adata: Annotated data object with expression and cell type data
+        celltype_key: Column name for cell type annotation
+        means: CellPhoneDB means DataFrame with interaction data
+        source_cells: List of source cell types
+        target_cells: List of target cell types
+        min_means: Minimum mean expression threshold (3)
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        ax: Existing matplotlib axes object (None)
+        figsize: Figure dimensions as (width, height) ((2,6))
+        fontsize: Font size for labels (12)
+        plot_secret: Whether to show secreted/non-secreted annotation (True)
+        cmap: Colormap dictionary for Target and Source ({'Target':'Blues','Source':'Reds'})
+        return_table: Whether to return data table instead (False)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object or DataFrame if return_table=True
+    """
 
     if nodecolor_dict!=None:
         type_color_all=nodecolor_dict
@@ -742,36 +849,25 @@ def cpdb_interacting_network(adata,
                              figsize=(6,6),
                              fontsize=10,
                              return_graph=False):
-    """
-    Creates and visualizes a network of cell-cell interactions.
-
-    Parameters:
-    adata : AnnData
-        AnnData object containing cell type and associated data.
-    celltype_key : str
-        Column name for cell types.
-    means : DataFrame
-        DataFrame containing interaction strengths.
-    source_cells : list
-        List of source cell types.
-    target_cells : list
-        List of target cell types.
-    means_min : float, optional
-        Minimum threshold for interaction strength (default is 1).
-    means_sum_min : float, optional
-        Minimum threshold for the sum of individual interactions (default is 1).
-    nodecolor_dict : dict, optional
-        Dictionary mapping cell types to colors (default is None).
-    ax : matplotlib.axes.Axes, optional
-        Axes object for the plot (default is None).
-    figsize : tuple, optional
-        Size of the figure (default is (6, 6)).
-    fontsize : int, optional
-        Font size for node labels (default is 10).
-
+    r"""
+    Create a detailed network showing ligand-receptor interactions between cell types.
+    
+    Arguments:
+        adata: Annotated data object with cell type information
+        celltype_key: Column name for cell type annotation
+        means: CellPhoneDB means DataFrame with interaction data
+        source_cells: List of source cell types
+        target_cells: List of target cell types
+        means_min: Minimum interaction strength threshold (1)
+        means_sum_min: Minimum sum threshold for individual interactions (1)
+        nodecolor_dict: Custom color mapping for cell types (None, uses default)
+        ax: Existing matplotlib axes object (None)
+        figsize: Figure dimensions as (width, height) ((6,6))
+        fontsize: Font size for node labels (10)
+        return_graph: Whether to return NetworkX graph object (False)
+        
     Returns:
-    ax : matplotlib.axes.Axes
-        Axes object with the drawn network.
+        ax: matplotlib.axes.Axes object or NetworkX graph if return_graph=True
     """
     # Determine node colors based on provided dictionary or defaults from adata
     from adjustText import adjust_text
@@ -869,6 +965,21 @@ def cpdb_interacting_network(adata,
 
 
 def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
+    r"""
+    Generate points for a curved line between two coordinates using Bezier curves.
+    
+    Arguments:
+        x0: Starting x coordinate
+        y0: Starting y coordinate
+        x1: Ending x coordinate
+        y1: Ending y coordinate
+        eps: Curve control parameter (0.8)
+        pointn: Number of points along the curve (30)
+        
+    Returns:
+        x: Array of x coordinates along the curve
+        y: Array of y coordinates along the curve
+    """
     import bezier
     x2 = (x0 + x1) / 2.0 + 0.1 ** (eps + abs(x0 - x1)) * (-1) ** (random.randint(1, 4))
     y2 = (y0 + y1) / 2.0 + 0.1 ** (eps + abs(y0 - y1)) * (-1) ** (random.randint(1, 4))
@@ -885,6 +996,21 @@ def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
 
 def curved_graph(_graph, pos=None, eps=0.2, pointn=30, 
                  linewidth=2, alpha=0.3, color_dict=None):
+    r"""
+    Draw a network graph with curved edges and arrows.
+    
+    Arguments:
+        _graph: NetworkX graph object
+        pos: Node position dictionary (None)
+        eps: Curve control parameter (0.2)
+        pointn: Number of points along each curve (30)
+        linewidth: Width of edge lines (2)
+        alpha: Transparency of edges (0.3)
+        color_dict: Color mapping for edges (None)
+        
+    Returns:
+        None: Draws on current matplotlib axes
+    """
     ax = plt.gca()
     for u, v in _graph.edges():
         x0, y0 = pos[u]
@@ -918,34 +1044,39 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
                        label_fontfamily: str = 'Arial', label_fontweight: str = 'bold', label_bbox=None,
                        legend_bbox: tuple = (0.7, 0.05), legend_ncol: int = 3, legend_fontsize: int = 12,
                        legend_fontweight: str = 'bold', curve_awarg=None):
-    """
-    Plot network graph.
-
+    r"""
+    Create a network plot with curved edges and customizable node styling.
+    
     Arguments:
-        G: networkx graph
-        G_type_dict: dict, node type dict
-        G_color_dict: dict, node color dict
-        pos_type: str, node position type, 'spring' or 'kamada_kawai'
-        pos_dim: int, node position dimension, 2 or 3
-        figsize: tuple, figure size
-        pos_scale: int, node position scale
-        pos_k: float, node position k
-        pos_alpha: float, node position alpha
-        node_size: int, node size
-        node_alpha: float, node alpha
-        node_linewidths: float, node linewidths
-        plot_node: list, plot node list
-        plot_node_num: int, plot node number
-        label_verticalalignment: str, label verticalalignment
-        label_fontsize: int, label fontsize
-        label_fontfamily: str, label fontfamily
-        label_fontweight: str, label fontweight
-        label_bbox: tuple, label bbox
-        legend_bbox: tuple, legend bbox
-        legend_ncol: int, legend ncol
-        legend_fontsize: int, legend fontsize
-        legend_fontweight: str, legend fontweight
-        curve_awarg: dict, arguments for curved graph
+        G: NetworkX graph object
+        G_type_dict: Dictionary mapping nodes to types
+        G_color_dict: Dictionary mapping nodes to colors
+        pos_type: Layout algorithm - 'spring', 'kamada_kawai', or custom positions ('spring')
+        pos_dim: Dimensionality for layout algorithm (2)
+        figsize: Figure dimensions as (width, height) ((4, 4))
+        pos_scale: Scale factor for node positions (10)
+        pos_k: Optimal distance parameter for spring layout (None)
+        pos_alpha: Transparency for position calculation (0.4)
+        node_size: Base size for nodes (50)
+        node_alpha: Transparency for nodes (0.6)
+        node_linewidths: Width of node borders (1)
+        plot_node: Specific nodes to label (None, uses top degree nodes)
+        plot_node_num: Number of top nodes to label (20)
+        node_shape: Dictionary mapping node types to shapes (None)
+        label_verticalalignment: Vertical alignment for labels ('center_baseline')
+        label_fontsize: Font size for node labels (12)
+        label_fontfamily: Font family for labels ('Arial')
+        label_fontweight: Font weight for labels ('bold')
+        label_bbox: Bounding box properties for labels (None)
+        legend_bbox: Legend position as (x, y) ((0.7, 0.05))
+        legend_ncol: Number of legend columns (3)
+        legend_fontsize: Legend font size (12)
+        legend_fontweight: Legend font weight ('bold')
+        curve_awarg: Additional arguments for curved edges (None)
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
+        ax: matplotlib.axes.Axes object
     """
     from adjustText import adjust_text
     fig, ax = plt.subplots(figsize=figsize)

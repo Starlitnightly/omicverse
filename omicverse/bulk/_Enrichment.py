@@ -15,23 +15,21 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
                        organism:str='Human',description:str='None',
                        background:list=None,
                        outdir:str='./enrichr',cutoff:float=0.5)->pd.DataFrame:
-    """
-    Performs gene set enrichment analysis using Enrichr API.
+    r"""Perform gene set enrichment analysis using Enrichr API.
 
     Arguments:
         gene_list: List of gene symbols to be tested for enrichment.
         pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
-        pvalue_threshold: P-value threshold for significant pathways. Default is 0.05.
-        pvalue_type: Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction,for small gene sets (<500 genes) and Bonferroni correction for larger gene sets.,'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction.,Default is 'auto'.
-        organism: Organism of the input gene list. Default is 'Human'.
-        description: Description of the input gene list. Default is 'None'.
-        background: Background gene list to use for enrichment analysis. Default is None. If None, the background gene list is automatically set to the organism-specific gene list.
-        outdir: Output directory for Enrichr results. Default is './enrichr'.
-        cutoff: Show enriched terms which Adjusted P-value < cutoff. Default is 0.5.
+        pvalue_threshold: P-value threshold for significant pathways. (0.05)
+        pvalue_type: Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction for small gene sets (<500 genes) and Bonferroni correction for larger gene sets. 'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction. ('auto')
+        organism: Organism of the input gene list. ('Human')
+        description: Description of the input gene list. ('None')
+        background: Background gene list to use for enrichment analysis. If None, the background gene list is automatically set to the organism-specific gene list. (None)
+        outdir: Output directory for Enrichr results. ('./enrichr')
+        cutoff: Show enriched terms which Adjusted P-value < cutoff. (0.5)
 
     Returns:
         enrich_res: A pandas DataFrame containing the enrichment results.
-
 
     """
     from ..externel.gseapy import enrichr
@@ -104,17 +102,16 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
                             processes:int=8,
                      permutation_num:int=100, # reduce number to speed up testing
                      outdir:str='./enrichr_gsea', format:str='png', seed:int=112)->dict:
-    """
-    Enrichment analysis using GSEA
+    r"""Enrichment analysis using GSEA.
 
     Arguments:
-        gene_rnk: pre-ranked correlation table or pandas DataFrame. Same input with ``GSEA`` .rnk file.
+        gene_rnk: Pre-ranked correlation table or pandas DataFrame. Same input with ``GSEA`` .rnk file.
         pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
-        processes: Number of Processes you are going to use. Default: 8.
-        permutation_num: Number of permutations for significance computation. Default: 100.
-        outdir: Output directory for Enrichr results. Default is './enrichr_gsea'.
-        format: Matplotlib figure format. Default: 'png'.
-        seed: Random seed. Default: 112.
+        processes: Number of Processes you are going to use. (8)
+        permutation_num: Number of permutations for significance computation. (100)
+        outdir: Output directory for Enrichr results. ('./enrichr_gsea')
+        format: Matplotlib figure format. ('png')
+        seed: Random seed. (112)
 
     Returns:
         pre_res: A prerank object containing the enrichment results.
@@ -140,21 +137,23 @@ def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
                         figsize:tuple=(2,4),cmap:str='YlGnBu',
                         text_knock:int=5,text_maxsize:int=20,ax=None,
                         ):
-    """
-    Enrichment multi genesets analysis using GSEA
+    r"""Enrichment multi genesets analysis using GSEA.
 
     Arguments:
         enr_dict: A dictionary of enrichment results.
         colors_dict: A dictionary of colors for each gene set.
-        num: The number of enriched terms to plot. Default is 5.
-        fontsize: The fontsize of the plot. Default is 10.
-        fig_title: The title of the plot. Default is an empty string.
-        fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
-        figsize: The size of the plot. Default is (2,4).
-        cmap: The colormap to use for the plot. Default is 'YlGnBu'.
-        text_knock: The number of characters to knock off the end of the term name. Default is 5.
-        text_maxsize: The maximum fontsize of the term names. Default is 20.
-        ax: A matplotlib.axes.Axes object.
+        num: The number of enriched terms to plot. (5)
+        fontsize: The fontsize of the plot. (10)
+        fig_title: The title of the plot. ('')
+        fig_xlabel: The label of the x-axis. ('Fractions of genes')
+        figsize: The size of the plot. ((2,4))
+        cmap: The colormap to use for the plot. ('YlGnBu')
+        text_knock: The number of characters to knock off the end of the term name. (5)
+        text_maxsize: The maximum fontsize of the term names. (20)
+        ax: A matplotlib.axes.Axes object. (None)
+
+    Returns:
+        ax: The matplotlib axes object
 
     """
     from PyComplexHeatmap import HeatmapAnnotation,DotClustermapPlotter,anno_label,anno_simple,AnnotationBase
@@ -226,25 +225,27 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         text_knock:int=5,text_maxsize:int=20,
                         bbox_to_anchor_used:tuple=(-0.45, -13),node_diameter:int=10,
                         custom_ticks:list=[5,10],ax=None)->matplotlib.axes._axes.Axes:
-    """
-    Plot the gene set enrichment result.
+    r"""Plot the gene set enrichment result.
 
     Arguments:
-        num: The number of enriched terms to plot. Default is 10.
-        node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
-        cax_loc: The location, width and height of the colorbar on the plot. Default is [2, 0.55, 0.5, 0.02].
-        cax_fontsize: The fontsize of the colorbar label. Default is 12.
-        fig_title: The title of the plot. Default is an empty string.
-        fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
-        figsize: The size of the plot. Default is (2,4).
-        cmap: The colormap to use for the plot. Default is 'YlGnBu'.
-        text_knock: The number of characters to knock off the end of the term name. Default is 2.
-        text_maxsize: The maximum fontsize of the term names. Default is 20.
-        bbox_to_anchor_used (tuple): The anchor point for placing the legend. Default is (-0.45, -13).
-        node_diameter (int): The base size for nodes in the plot. Default is 10.
+        enrich_res: Enrichment results DataFrame.
+        num: The number of enriched terms to plot. (10)
+        node_size: A list of integers defining the size of nodes in the plot. ([5,10,15])
+        cax_loc: The location, width and height of the colorbar on the plot. ([2, 0.55, 0.5, 0.02])
+        cax_fontsize: The fontsize of the colorbar label. (12)
+        fig_title: The title of the plot. ('')
+        fig_xlabel: The label of the x-axis. ('Fractions of genes')
+        figsize: The size of the plot. ((2,4))
+        cmap: The colormap to use for the plot. ('YlGnBu')
+        text_knock: The number of characters to knock off the end of the term name. (5)
+        text_maxsize: The maximum fontsize of the term names. (20)
+        bbox_to_anchor_used: The anchor point for placing the legend. ((-0.45, -13))
+        node_diameter: The base size for nodes in the plot. (10)
+        custom_ticks: Custom tick marks for the plot. ([5,10])
+        ax: Matplotlib axes object. (None)
 
     Returns:
-        A matplotlib.axes.Axes object.
+        ax: A matplotlib.axes.Axes object.
     
     """
     if ax is None:

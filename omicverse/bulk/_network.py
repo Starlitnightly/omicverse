@@ -8,14 +8,16 @@ from typing import Union,Tuple
 import matplotlib
 
 def string_interaction(gene:list,species:int) -> pd.DataFrame:
-    r"""A Python library to analysis the protein-protein interaction network by string-db
+    r"""Analyze protein-protein interaction network using STRING database.
   
     Arguments:
-        gene: The gene list to analysis PPI
-        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+        gene: List of gene names for PPI analysis
+        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
     
     Returns:
-        res: the dataframe of protein-protein interaction
+        res: DataFrame containing protein-protein interaction data with columns:
+             stringId_A, stringId_B, preferredName_A, preferredName_B, ncbiTaxonId,
+             score, nscore, fscore, pscore, ascore, escore, dscore, tscore
     
     """
     import requests ## python -m pip install requests
@@ -52,14 +54,16 @@ def string_interaction(gene:list,species:int) -> pd.DataFrame:
 
 
 def string_map(gene:list,species:int)->pd.DataFrame:
-    r"""A Python library to find the gene name in string-db
+    r"""Map gene names to STRING database identifiers.
 
     Arguments:
-        gene: The gene list to analysis PPI
-        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
+        gene: List of gene names for PPI analysis
+        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
     
     Returns:
-        res: the dataframe of query gene and new gene
+        res: DataFrame containing gene mapping information with columns:
+             queryItem, queryIndex, stringId, ncbiTaxonId, taxonName,
+             preferredName, annotation
     
     """
     import requests ## python -m pip install requests
@@ -89,7 +93,17 @@ def string_map(gene:list,species:int)->pd.DataFrame:
     return res
 
 
-def max_interaction(gene,species):
+def max_interaction(gene:list,species:int)->pd.DataFrame:
+    r"""Handle large gene lists by chunking for STRING database interaction analysis.
+
+    Arguments:
+        gene: List of gene names for PPI analysis
+        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
+    
+    Returns:
+        res: DataFrame containing protein-protein interaction data
+    
+    """
     gene_len=len(gene)
     times=gene_len//1000
     shengyu=gene_len-times*1000
@@ -107,15 +121,15 @@ def max_interaction(gene,species):
     
 
 def generate_G(gene:list,species:int,score:float=0.4) -> nx.Graph:
-    r"""A Python library to get the PPI network in string-db
+    r"""Generate protein-protein interaction network from STRING database.
 
     Arguments:
-        gene: The gene list to analysis PPI
-        species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
-        score: The threshold of protein A and B interaction
+        gene: List of gene names for PPI analysis
+        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
+        score: Threshold for protein interaction confidence (default: 0.4)
 
     Returns:
-        G: the networkx object of PPI in query gene list
+        G: NetworkX Graph object containing PPI network
     
     """
     
@@ -137,14 +151,14 @@ class pyPPI(object):
 
     def __init__(self,gene: list,species: int,gene_type_dict: dict,gene_color_dict: dict,
                  score: float = 0.4) -> None:
-        """Initialize the protein-protein interaction analysis.
+        r"""Initialize protein-protein interaction analysis.
 
         Arguments:
-            gene: The gene list to analysis PPI
-            species: NCBI taxon identifiers (e.g. Human is 9606, see: STRING organisms).
-            gene_type_dict: The gene type dict, the key is gene name, the value is gene type.
-            gene_color_dict: The gene color dict, the key is gene name, the value is gene color.
-            score: The threshold of protein A and B interaction
+            gene: List of gene names for PPI analysis
+            species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
+            gene_type_dict: Dictionary mapping gene names to gene types
+            gene_color_dict: Dictionary mapping gene names to colors for visualization
+            score: Threshold for protein interaction confidence (default: 0.4)
         """
         self.gene=gene 
         self.species=species
@@ -153,10 +167,10 @@ class pyPPI(object):
         self.gene_color_dict=gene_color_dict
 
     def interaction_analysis(self) -> nx.Graph:
-        """Analysis the protein-protein interaction.
+        r"""Perform protein-protein interaction analysis.
         
         Returns:
-            G: the networkx object of PPI in query gene list
+            G: NetworkX Graph object containing PPI network for query genes
         """
         G=generate_G(self.gene,
                           self.species,
@@ -165,11 +179,14 @@ class pyPPI(object):
         return G
     
     def plot_network(self,**kwargs) -> Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
-        """Plot the protein-protein interaction network.
+        r"""Plot protein-protein interaction network.
+
+        Arguments:
+            **kwargs: Additional keyword arguments passed to plot_network function
 
         Returns:
-            fig: the figure of PPI network
-            ax: the AxesSubplot of PPI network
+            fig: Figure object containing PPI network plot
+            ax: Axes object containing PPI network plot
         """
         return plot_network(self.G,self.gene_type_dict,self.gene_color_dict,**kwargs)
     

@@ -23,8 +23,10 @@ DTYPE_C = c_uint32
 ctxcore_install=False
 
 def check_ctxcore():
-    """
+    r"""Check if ctxcore package is installed for AUCell analysis.
     
+    Raises:
+        ImportError: If ctxcore is not installed
     """
     global ctxcore_install
     try:
@@ -45,15 +47,17 @@ def global_imports(modulename,shortname = None, asfunction = False):
         globals()[shortname] = __import__(modulename)
 
 def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
-    """
-    Create a whole genome rankings dataframe from a single cell expression profile dataframe.
+    r"""Create genome-wide gene rankings from single-cell expression data.
+
+    This function ranks genes for each cell based on expression levels,
+    creating rankings suitable for AUCell gene set enrichment analysis.
 
     Arguments:
-        ex_mtx: pandas DataFrame: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).
-        seed: int, optional (default: None): The seed for the random number generator. If None, the seed is not set.
+        ex_mtx: Expression matrix with cells as rows and genes as columns (n_cells x n_genes)
+        seed (int): Random seed for reproducible ranking (default: None)
     
     Returns:
-        data: pandas DataFrame: A genome rankings dataframe (n_cells x n_genes).
+        pd.DataFrame: Gene rankings matrix with same dimensions as input (n_cells x n_genes)
 
     """
     # Do a shuffle would be nice for exactly similar behaviour as R implementation.
@@ -276,22 +280,24 @@ def aucell(
     index=None,
     columns=None,
 ) -> pd.DataFrame:
-    """
-    Calculate enrichment of gene signatures for single cells.
+    r"""Calculate gene signature enrichment scores using AUCell algorithm.
+
+    AUCell quantifies gene set enrichment by calculating the Area Under the Curve (AUC)
+    of gene rankings for each cell, providing a robust measure of pathway activity.
 
     Arguments:
-        exp_mtx: The expression matrix (n_cells x n_genes). Can be DataFrame or sparse matrix.
-        signatures: The gene signatures or regulons.
-        auc_threshold: The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve.
-        noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
-        normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
-        num_workers: The number of cores to use.
-        seed: Random seed for ranking.
-        index: Index for the output DataFrame (if exp_mtx is not a DataFrame).
-        columns: Columns for the output DataFrame (if exp_mtx is not a DataFrame).
+        exp_mtx: Expression matrix (n_cells x n_genes) - DataFrame or sparse matrix
+        signatures: Gene signatures or regulons for enrichment analysis
+        auc_threshold (float): Fraction of ranked genes to consider for AUC calculation (default: 0.05)
+        noweights (bool): Whether to ignore gene weights in signatures (default: False)
+        normalize (bool): Whether to normalize AUC values to maximum of 1.0 per signature (default: False)
+        seed (int): Random seed for reproducible gene ranking (default: None)
+        num_workers (int): Number of CPU cores for parallel processing (default: all cores)
+        index: Custom row index for output DataFrame (default: None)
+        columns: Custom column names for output DataFrame (default: None)
     
     Returns:
-        A dataframe with the AUCs (n_cells x n_modules).
+        pd.DataFrame: AUC enrichment scores with cells as rows and signatures as columns
 
     """
     # Handle different input types

@@ -20,8 +20,21 @@ from ..externel.cytotrace2.gen_utils import *
 #pylint: disable=too-many-locals
 def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_use, 
                    species, use_model_dir, output_dir, max_pcs, seed):
-    """
-    Process a subset of the data in parallel
+    r"""Process a subset of the data in parallel for CytoTRACE2 prediction.
+    
+    Arguments:
+        idx (int): Index of the current batch
+        chunked_expression: Expression data chunk for this batch
+        smooth_batch_size (int): Batch size for smoothing operations
+        smooth_cores_to_use (int): Number of cores to use for smoothing
+        species (str): Species type ('mouse' or 'human')
+        use_model_dir (str): Path to model directory
+        output_dir (str): Output directory for results
+        max_pcs (int): Maximum number of principal components
+        seed (int): Random seed for reproducibility
+        
+    Returns:
+        pd.DataFrame: Smoothed CytoTRACE2 scores for the data chunk
     """
 
     # map and rank
@@ -71,8 +84,16 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
     return smooth_by_knn_df
 
 def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_parallelization):
-    """
-    Calculate the number of cores to use for parallel processing
+    r"""Calculate optimal number of cores for parallel processing.
+    
+    Arguments:
+        chunk_number (int): Number of data chunks
+        smooth_chunk_number (int): Number of smoothing chunks
+        max_cores (int): Maximum allowed cores
+        disable_parallelization (bool): Whether to disable parallel processing
+        
+    Returns:
+        tuple: (pred_cores_to_use, smooth_cores_to_use) number of cores for prediction and smoothing
     """
 
     pred_cores_to_use = 1
@@ -114,21 +135,25 @@ def cytotrace2(
                max_pcs = 200,
                seed = 14,
                output_dir = 'cytotrace2_results'):
-    """
-    CytoTRACE 2: A deep learning-based tool for cell potency prediction
+    r"""CytoTRACE 2: Deep learning-based cell potency prediction.
+
+    This function predicts cellular potency states using a deep learning model,
+    providing scores for developmental potential and differentiation status.
 
     Arguments:
-        adata: AnnData object containing the scRNA-seq data.
-        use_model_dir: Path to the directory containing the pre-trained model files.
-        species: The species of the input data. Default is "mouse".
-        batch_size: The number of cells to process in each batch. Default is 10000.
-        smooth_batch_size: The number of cells to process in each batch for smoothing. Default is 1000.
-        disable_parallelization: If True, disable parallel processing. Default is False.
-        max_cores: Maximum number of CPU cores to use for parallel processing. If None, all available cores will be used. Default is None.
-        max_pcs: Maximum number of principal components to use. Default is 200.
-        seed: Random seed for reproducibility. Default is 14.
-        output_dir: Directory to save the results. Default is 'cytotrace2_results'.
+        adata: AnnData object containing single-cell RNA-seq data
+        use_model_dir (str): Path to directory containing pre-trained model files
+        species (str): Species of input data - 'mouse' or 'human' (default: 'mouse')
+        batch_size (int): Number of cells to process per batch (default: 10000)
+        smooth_batch_size (int): Batch size for smoothing operations (default: 1000)
+        disable_parallelization (bool): Whether to disable parallel processing (default: False)
+        max_cores (int): Maximum CPU cores for parallel processing (default: None for all cores)
+        max_pcs (int): Maximum number of principal components to use (default: 200)
+        seed (int): Random seed for reproducibility (default: 14)
+        output_dir (str): Directory to save results (default: 'cytotrace2_results')
 
+    Returns:
+        pd.DataFrame: DataFrame containing CytoTRACE2 scores, potency categories, and relative scores
     
     """
 

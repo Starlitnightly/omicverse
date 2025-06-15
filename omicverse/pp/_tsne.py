@@ -47,7 +47,10 @@ def tsne(  # noqa: PLR0913
     copy: bool = False,
     use_gpu: bool = False,
 ) -> AnnData | None:
-    r"""t-SNE :cite:p:`vanDerMaaten2008,Amir2013,Pedregosa2011`.
+    r"""t-SNE (t-distributed Stochastic Neighbor Embedding) with GPU support.
+
+    Perform t-SNE dimensionality reduction for visualization of single-cell data
+    with optional GPU acceleration for improved performance on large datasets.
 
     t-distributed stochastic neighborhood embedding (tSNE, :cite:t:`vanDerMaaten2008`) was
     proposed for visualizating single-cell data by :cite:t:`Amir2013`. Here, by default,

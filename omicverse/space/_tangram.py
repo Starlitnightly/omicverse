@@ -1,4 +1,10 @@
-"""Module providing a encapsulation of tangram."""
+r"""Module providing encapsulation of Tangram for spatial deconvolution.
+
+This module implements a wrapper for the Tangram algorithm, which enables mapping
+between single-cell RNA sequencing data and spatial transcriptomics data. The main
+functionality includes cell type deconvolution, spatial mapping, and gene expression
+imputation.
+"""
 from typing import Any
 import pandas as pd
 import numpy as np
@@ -9,10 +15,68 @@ from .._settings import add_reference
 tg_install=False
 
 class Tangram(object):
-    """Class representing the object of Tangram."""
+    r"""Tangram spatial deconvolution class for cell type mapping.
+    
+    Tangram is a method for integrating single-cell RNA sequencing (scRNA-seq) data
+    with spatial transcriptomics data. It enables:
+    1. Mapping cell types from scRNA-seq to spatial locations
+    2. Deconvolving cell type proportions in spatial spots
+    3. Imputing gene expression in spatial data
+    4. Analyzing spatial organization of cell types
+
+    The method works by:
+    1. Identifying marker genes for each cell type
+    2. Training a mapping model using these markers
+    3. Projecting cell type annotations to spatial coordinates
+    4. Optionally imputing full gene expression profiles
+
+    Attributes:
+        adata_sc: AnnData
+            Single-cell RNA-seq data with:
+            - Gene expression matrix in X
+            - Cell type annotations in obs[clusters]
+        adata_sp: AnnData
+            Spatial transcriptomics data with:
+            - Gene expression matrix in X
+            - Spatial coordinates in obsm['spatial']
+        clusters: str
+            Column name in adata_sc.obs containing cell type labels
+        markers: list
+            Selected marker genes used for mapping
+        ad_map: AnnData
+            Mapping results after training
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load data
+        >>> adata_sc = sc.read_h5ad("sc_data.h5ad")
+        >>> adata_sp = sc.read_visium("spatial_data")
+        >>> # Initialize Tangram
+        >>> tangram = ov.space.Tangram(
+        ...     adata_sc=adata_sc,
+        ...     adata_sp=adata_sp,
+        ...     clusters='cell_type'
+        ... )
+        >>> # Train model
+        >>> tangram.train(mode='clusters', num_epochs=500)
+        >>> # Project cell types
+        >>> adata_spatial = tangram.cell2location()
+    """
     def check_tangram(self):
-        """
-        Check if tangram have been installed.
+        r"""Check if Tangram package is installed.
+        
+        This method verifies that the Tangram package is available and prints
+        its version number. If not installed, it raises an informative error.
+
+        Raises:
+            ImportError: If Tangram package is not installed, with instructions
+                for installation.
+
+        Notes:
+            - Sets global tg_install flag when successful
+            - Required before any Tangram operations
+            - Suggests pip installation command if missing
         """
         global tg_install
         try:
@@ -31,8 +95,37 @@ class Tangram(object):
             marker_size: int = 100,
             gene_to_lowercase: bool = False
         ) -> None:
-        """
-        Initialize the Tangram object.
+        r"""Initialize Tangram spatial deconvolution object.
+        
+        This method sets up the Tangram analysis by:
+        1. Checking package installation
+        2. Processing input data
+        3. Identifying marker genes
+        4. Preparing data for mapping
+
+        Arguments:
+            adata_sc: AnnData
+                Single-cell RNA-seq data containing:
+                - Normalized gene expression matrix
+                - Cell type annotations in obs[clusters]
+            adata_sp: AnnData
+                Spatial transcriptomics data containing:
+                - Normalized gene expression matrix
+                - Spatial coordinates in obsm['spatial']
+            clusters: str, optional (default='')
+                Column name in adata_sc.obs containing cell type annotations.
+            marker_size: int, optional (default=100)
+                Number of top marker genes to select per cell type.
+                More markers can improve accuracy but increase computation time.
+            gene_to_lowercase: bool, optional (default=False)
+                Whether to convert gene names to lowercase for matching between
+                datasets. Useful when gene naming conventions differ.
+
+        Notes:
+            - Automatically filters genes present in at least one cell
+            - Identifies marker genes using scanpy's rank_genes_groups
+            - Prepares data structures for Tangram mapping
+            - Adds reference annotation to both AnnData objects
         """
         self.check_tangram()
         global tg_install
@@ -40,7 +133,6 @@ class Tangram(object):
             global_imports("tangram","tg")
         ad_map_dict={}
 
-        #adata_sc=adata_raw_all
         adata_sc.uns['log1p']={}
         adata_sc.uns['log1p']['base']=None
         sc.pp.filter_genes(adata_sc, min_cells=1)
@@ -56,7 +148,6 @@ class Tangram(object):
         self.clusters=clusters
         self.markers=markers
 
-        #import tangram as tg
         tg.pp_adatas(self.adata_sc, self.adata_sp,
                       genes=self.markers,gene_to_lowercase=gene_to_lowercase)
 
@@ -70,18 +161,45 @@ class Tangram(object):
             device: str = "cuda:0",
             **kwargs: Any
         ) -> None:
-        """
-        train the model.
+        r"""Train the Tangram spatial mapping model.
+        
+        This method trains a model to map cells or clusters from scRNA-seq data
+        to spatial locations. It optimizes the mapping to preserve both gene
+        expression patterns and spatial structure.
+
+        Arguments:
+            mode: str, optional (default="clusters")
+                Mapping mode:
+                - "clusters": Map cell type proportions (faster)
+                - "cells": Map individual cells (more detailed)
+            num_epochs: int, optional (default=500)
+                Number of training epochs. More epochs may improve results
+                but increase training time.
+            device: str, optional (default="cuda:0")
+                Computing device to use:
+                - "cuda:0" (or other GPU index) for GPU acceleration
+                - "cpu" for CPU computation
+            **kwargs: Any
+                Additional arguments passed to tangram.map_cells_to_space:
+                - density_prior: Prior on spatial density
+                - lambda_d: Density regularization strength
+                - lambda_g1: Gene-expression regularization
+                - lambda_g2: Spatial regularization
+                - lambda_r: Entropy regularization
+
+        Notes:
+            - Automatically stores mapping in self.ad_map
+            - Projects cell type annotations to spatial data
+            - Adds reference annotation to both AnnData objects
+            - Progress is shown during training
+            - GPU acceleration recommended for large datasets
         """
         ad_map = tg.map_cells_to_space(self.adata_sc, self.adata_sp,
-            #mode="cells",
             mode=mode,
-            cluster_label=self.clusters,  # .obs field w cell types
-            #density_prior='rna_count_based',
+            cluster_label=self.clusters,
             num_epochs=num_epochs,
             device=device,
             **kwargs
-            #device='cpu',
         )
 
         tg.project_cell_annotations(ad_map, self.adata_sp, annotation=self.clusters)
@@ -92,11 +210,30 @@ class Tangram(object):
         add_reference(self.adata_sc,'tangram','cell type classification with Tangram')
 
     def cell2location(self,annotation_list=None):
-        """
-        Project cell type annotations to spatial coordinates.
+        r"""Project cell type annotations to spatial coordinates.
+        
+        This method creates a visualization-ready AnnData object containing the
+        predicted cell type proportions for each spatial location.
+
+        Arguments:
+            annotation_list: list, optional (default=None)
+                List of cell types to include in the projection.
+                If None, uses all cell types from training data.
+            
+        Returns:
+            AnnData
+                Modified spatial data containing:
+                - Original spatial data
+                - Cell type proportions in obsm['tangram_ct_pred']
+                - Normalized proportions in obs for each cell type
+
+        Notes:
+            - Automatically normalizes cell type proportions
+            - Clips extreme values for better visualization
+            - Adds reference annotation to both AnnData objects
+            - Results can be directly used for spatial plotting
         """
         adata_plot=self.adata_sp.copy()
-        # construct df_plot
         if annotation_list is None:
             annotation_list=list(set(self.adata_sc.obs[self.clusters]))
 
@@ -109,7 +246,34 @@ class Tangram(object):
     def impute(self,
                ad_map: AnnData = None,
                ad_sc: AnnData = None,
-                **kwargs: Any) -> None:
+                **kwargs: Any) -> AnnData:
+        r"""Impute gene expression in spatial data using trained model.
+        
+        This method uses the trained mapping to predict the expression of all genes
+        in the spatial locations, including genes not used in the mapping.
+
+        Arguments:
+            ad_map: AnnData, optional (default=None)
+                Mapping result from train(). If None, uses self.ad_map.
+            ad_sc: AnnData, optional (default=None)
+                Single-cell reference data. If None, uses self.adata_sc.
+            **kwargs: Any
+                Additional arguments passed to tangram.project_genes:
+                - scale: Whether to scale imputed values
+                - filter_genes: Whether to filter genes before imputation
+                - filter_threshold: Expression threshold for filtering
+
+        Returns:
+            AnnData
+                Spatial data with imputed gene expression for all genes
+                in the single-cell reference data.
+
+        Notes:
+            - Uses mapping weights to transfer expression
+            - Can impute genes not used in original mapping
+            - Useful for analyzing spatial patterns of any gene
+            - Computationally intensive for large gene sets
+        """
         if ad_map is None:
             ad_map=self.ad_map
         if ad_sc is None:
@@ -124,8 +288,29 @@ def construct_obs_plot(df_plot: pd.DataFrame,
                         perc: int = 0,
                         suffix = None
                     ) -> None:
-    """
-    Construct adata.obs from df_plot.
+    r"""Construct observation metadata from plotting DataFrame.
+    
+    This helper function processes cell type proportion data for visualization
+    by normalizing and optionally clipping extreme values.
+
+    Arguments:
+        df_plot: pd.DataFrame
+            DataFrame containing cell type proportions or other values
+            to be added to observation metadata.
+        adata: AnnData
+            AnnData object to update with processed values.
+        perc: int, optional (default=0)
+            Percentile for clipping values. Values outside
+            (perc, 100-perc) are clipped. Use 0 for no clipping.
+        suffix: str, optional (default=None)
+            Optional suffix to add to column names in the output.
+            Useful when storing multiple versions of the same metric.
+
+    Notes:
+        - Clips values to remove outliers if perc > 0
+        - Normalizes values to [0,1] range
+        - Adds processed values to adata.obs
+        - Preserves existing observation metadata
     """
     # clip
     df_plot = df_plot.clip(df_plot.quantile(perc), df_plot.quantile(1 - perc), axis=1)
@@ -138,8 +323,26 @@ def construct_obs_plot(df_plot: pd.DataFrame,
     adata.obs = pd.concat([adata.obs, df_plot], axis=1)
 
 def global_imports(modulename,shortname = None, asfunction = False):
-    """
-    Import a module and add it to the global namespace.
+    r"""Import a module and add it to the global namespace.
+    
+    This helper function dynamically imports a module and makes it available
+    in the global namespace, optionally with a custom name.
+
+    Arguments:
+        modulename: str
+            Name of the module to import (e.g., 'numpy').
+        shortname: str, optional (default=None)
+            Alternative name to use in the global namespace.
+            If None, uses the module name.
+        asfunction: bool, optional (default=False)
+            Whether to import as a function rather than a module.
+            Rarely needed for standard module imports.
+
+    Notes:
+        - Modifies the global namespace
+        - Use with caution to avoid naming conflicts
+        - Primarily used for dynamic package loading
+        - Consider using standard imports when possible
     """
     if shortname is None:
         shortname = modulename
@@ -147,4 +350,4 @@ def global_imports(modulename,shortname = None, asfunction = False):
         globals()[shortname] = __import__(modulename)
     else:
         globals()[shortname] = __import__(modulename)
-        # End-of-file (EOF)
+    # End-of-file (EOF)

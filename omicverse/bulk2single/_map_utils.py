@@ -19,6 +19,23 @@ from torch.utils.data import TensorDataset, DataLoader
 
 
 def create_st(generate_sc_data, generate_sc_meta, spot_num, cell_num, gene_num, marker_used):
+    r"""
+    Create synthetic spatial transcriptomics data from single-cell data.
+    
+    Generates synthetic spots by randomly sampling and aggregating single cells
+    to create spatial transcriptomics-like expression profiles.
+
+    Arguments:
+        generate_sc_data: Single-cell expression data matrix
+        generate_sc_meta: Single-cell metadata with cell types
+        spot_num: Number of synthetic spots to create
+        cell_num: Number of cells per spot
+        gene_num: Number of marker genes to use
+        marker_used: Whether to use marker genes for spot creation
+
+    Returns:
+        tuple: (sc_data, sc_meta, spots_data, spots_meta)
+    """
     sc = generate_sc_data
     sc_ct = generate_sc_meta
     cell_name = sorted(list(set(sc_ct.Cell)))
@@ -62,6 +79,21 @@ def create_st(generate_sc_data, generate_sc_meta, spot_num, cell_num, gene_num, 
 
 
 def create_sample(sc, st, meta, multiple):
+    r"""
+    Create positive and negative training samples for mapping model.
+    
+    Generates training data pairs of single cells and spatial spots with
+    positive (correct) and negative (incorrect) associations.
+
+    Arguments:
+        sc: Single-cell expression data
+        st: Spatial transcriptomics expression data
+        meta: Metadata linking cells to spots
+        multiple: Multiplier for negative samples
+
+    Returns:
+        tuple: (positive_features, negative_features)
+    """
     cell_name = meta.Cell.values.tolist()
     spot_name = meta.Spot.values.tolist()
 
@@ -115,6 +147,18 @@ def create_sample(sc, st, meta, multiple):
 
 
 def get_data(pos, neg):
+    r"""
+    Combine positive and negative samples into training dataset.
+    
+    Concatenates positive and negative feature matrices with corresponding labels.
+
+    Arguments:
+        pos: Positive sample features
+        neg: Negative sample features
+
+    Returns:
+        tuple: (combined_features, labels)
+    """
     X = np.vstack((pos, neg))
     y = np.concatenate((np.ones(pos.shape[0]), np.zeros(neg.shape[0])))
 
@@ -124,6 +168,21 @@ def create_data_pyomic(single_data:anndata.AnnData,
                        spatial_data:anndata.AnnData,
                        celltype_key:str,spot_key:list=['xcoord','ycoord'],
                        ):
+    r"""
+    Prepare integrated dataset from single-cell and spatial data.
+    
+    Aligns and formats single-cell and spatial transcriptomics data for
+    mapping analysis by finding common genes and organizing metadata.
+
+    Arguments:
+        single_data: Single-cell RNA-seq data as AnnData object
+        spatial_data: Spatial transcriptomics data as AnnData object
+        celltype_key: Column name for cell type annotations
+        spot_key: Column names for spatial coordinates (['xcoord','ycoord'])
+
+    Returns:
+        dict: Dictionary containing aligned data matrices and metadata
+    """
     print("...loading data")
     input_data = {}
     sc_gene=single_data.var.index.values.tolist()
@@ -166,6 +225,25 @@ def create_data_pyomic(single_data:anndata.AnnData,
 
 def create_data(generate_sc_meta, generate_sc_data, st_data, spot_num, cell_num, top_marker_num, marker_used,
                 mul_train):
+    r"""
+    Create training data for single-cell to spatial mapping.
+    
+    Generates synthetic training data by creating artificial spots and
+    positive/negative sample pairs for model training.
+
+    Arguments:
+        generate_sc_meta: Single-cell metadata with cell types
+        generate_sc_data: Single-cell expression matrix
+        st_data: Spatial transcriptomics reference data
+        spot_num: Number of synthetic spots to create
+        cell_num: Number of cells per spot
+        top_marker_num: Number of top marker genes to use
+        marker_used: Whether to use marker gene selection
+        mul_train: Multiplier for training sample generation
+
+    Returns:
+        tuple: (training_features, training_labels)
+    """
     sc_gene = generate_sc_data.index.values.tolist()
     st_gene = st_data.index.values.tolist()
 
@@ -274,17 +352,58 @@ def predict_for_one_spot_net_batch(model, st_test, cell_name, spot_name, spot_in
 
 # Define the model
 class SVM(nn.Module):
+    r"""
+    Simple linear Support Vector Machine model.
+    
+    PyTorch implementation of SVM for binary classification in mapping tasks.
+    """
+    
     def __init__(self, X_train,num_classes=2):
+        r"""
+        Initialize SVM with input dimensions.
+
+        Arguments:
+            X_train: Training data to determine input dimensions
+            num_classes: Number of output classes (2)
+            
+        Returns:
+            None
+        """
         super().__init__()
         torch.manual_seed(2)
         self.linear = nn.Linear(X_train.shape[1], num_classes)
 
     def forward(self, x):
+        r"""
+        Forward pass through linear layer.
+
+        Arguments:
+            x: Input tensor
+            
+        Returns:
+            torch.Tensor: Linear transformation output
+        """
         return self.linear(x)
     
 # 定义神经网络模型
 class Net(nn.Module):
+    r"""
+    Neural network for single-cell to spatial mapping.
+    
+    Simple feedforward network with one hidden layer for predicting
+    cell-spot associations in spatial mapping tasks.
+    """
+    
     def __init__(self,size):
+        r"""
+        Initialize neural network with specified input size.
+
+        Arguments:
+            size: Input feature dimension
+            
+        Returns:
+            None
+        """
         super(Net, self).__init__()
         torch.manual_seed(2)
         self.linear1 = nn.Linear(size, 256)
@@ -293,6 +412,15 @@ class Net(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        r"""
+        Forward pass through neural network.
+
+        Arguments:
+            x: Input feature tensor
+            
+        Returns:
+            torch.Tensor: Sigmoid-activated output probabilities
+        """
         x = self.linear1(x)
         x = self.relu1(x)
         x = self.linear2(x)
@@ -300,6 +428,14 @@ class Net(nn.Module):
         return x
 
 class DFRunner:
+    r"""
+    Deep learning model runner for single-cell to spatial mapping.
+    
+    Manages the training and inference pipeline for mapping single cells to
+    spatial coordinates using neural network models. Handles data preprocessing,
+    model training, and result generation.
+    """
+    
     def __init__(self,
                  generate_sc_data,
                  generate_sc_meta,
@@ -308,6 +444,23 @@ class DFRunner:
                  top_marker_num,
                  random_seed=0,
                  n_jobs=1,device=None,):
+        r"""
+        Initialize DFRunner with data and configuration.
+
+        Arguments:
+            generate_sc_data: Single-cell expression data matrix
+            generate_sc_meta: Single-cell metadata with cell types
+            st_data: Spatial transcriptomics expression data
+            st_meta: Spatial metadata with coordinates
+            marker_used: Whether to use marker gene selection
+            top_marker_num: Number of top marker genes to select
+            random_seed: Random seed for reproducibility (0)
+            n_jobs: Number of parallel jobs (1)
+            device: Computation device (None)
+            
+        Returns:
+            None
+        """
 
         self.sc_test_allgene = generate_sc_data  # pandas.DataFrame, generated gene-cell expression data
         self.cell_type = generate_sc_meta  # pandas.DataFrame, cell type
@@ -680,6 +833,24 @@ def it_sol(sdat, g_hat, d_hat, g_bar, t2, a, b, conv=0.0001):
     return np.concatenate((np.expand_dims(g_new, axis=1), np.expand_dims(d_new, axis=1)), axis=1)
 
 def joint_analysis(dat, batch, mod=None, par_prior=True, proir_plots=False, mean_only=False, ref_batch=None):
+    r"""
+    Perform batch effect correction using empirical Bayes methods.
+    
+    Implements ComBat-style batch correction to remove systematic differences
+    between batches while preserving biological variation.
+
+    Arguments:
+        dat: Expression data matrix with genes as rows
+        batch: Batch assignments for each sample
+        mod: Model matrix for covariates (None)
+        par_prior: Whether to use parametric priors (True)
+        proir_plots: Whether to generate prior plots (False)
+        mean_only: Whether to adjust means only (False)
+        ref_batch: Reference batch for correction (None)
+
+    Returns:
+        pd.DataFrame: Batch-corrected expression data
+    """
     rownames = dat.index
     colnames = dat.columns
     dat = np.array(dat)
@@ -754,6 +925,19 @@ def joint_analysis(dat, batch, mod=None, par_prior=True, proir_plots=False, mean
 
 
 def knn(data, query, k):
+    r"""
+    Find k-nearest neighbors using KDTree.
+    
+    Efficient k-nearest neighbor search for spatial mapping applications.
+
+    Arguments:
+        data: Reference data points for neighbor search
+        query: Query points to find neighbors for
+        k: Number of nearest neighbors to find
+
+    Returns:
+        tuple: (distances, indices) of k-nearest neighbors
+    """
     tree = KDTree(data)
     dist, ind = tree.query(query, k)
     

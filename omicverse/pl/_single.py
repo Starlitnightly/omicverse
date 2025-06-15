@@ -94,15 +94,59 @@ def embedding(
     marker: Union[str, Sequence[str]] = '.',
     **kwargs,
 ) -> Union[Figure, Axes, None]:
-    """\
-    Scatter plot for user specified embedding basis (e.g. umap, pca, etc)
+    r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
 
     Arguments:
         adata: Annotated data matrix.
         basis: Name of the `obsm` basis to use.
+        color: Keys for annotations of observations/cells or variables/genes. (None)
+        gene_symbols: Key for field in `.var` that stores gene symbols. (None)
+        use_raw: Use `.raw` attribute of `adata` if present. (None)
+        sort_order: For continuous annotations used as color parameter, plot data points with higher values on top of others. (True)
+        edges: Show edges between cells. (False)
+        edges_width: Width of edges. (0.1)
+        edges_color: Color of edges. ('grey')
+        neighbors_key: Key to use for neighbors. (None)
+        arrows: Show arrows for velocity. (False)
+        arrows_kwds: Keyword arguments for arrow plots. (None)
+        groups: Groups to highlight. (None)
+        components: Components to plot. (None)
+        dimensions: Dimensions to plot. (None)
+        layer: Name of the layer to use for coloring. (None)
+        projection: Type of projection ('2d' or '3d'). ('2d')
+        scale_factor: Scaling factor for sizes. (None)
+        color_map: Colormap to use for continuous variables. (None)
+        cmap: Colormap to use for continuous variables. (None)
+        palette: Colors to use for categorical variables. (None)
+        na_color: Color to use for NaN values. ('lightgray')
+        na_in_legend: Include NaN values in legend. (True)
+        size: Size of the dots. (None)
+        frameon: Draw a frame around the plot. ('small')
+        legend_fontsize: Font size for legend. (None)
+        legend_fontweight: Font weight for legend. ('bold')
+        legend_loc: Location of legend. ('right margin')
+        legend_fontoutline: Outline width for legend text. (None)
+        colorbar_loc: Location of colorbar. ('right')
+        vmax: Maximum value for colorbar. (None)
+        vmin: Minimum value for colorbar. (None)
+        vcenter: Center value for colorbar. (None)
+        norm: Normalization for colorbar. (None)
+        add_outline: Add outline to points. (False)
+        outline_width: Width of outline. ((0.3, 0.05))
+        outline_color: Color of outline. (('black', 'white'))
+        ncols: Number of columns for subplots. (4)
+        hspace: Height spacing between subplots. (0.25)
+        wspace: Width spacing between subplots. (None)
+        title: Title for the plot. (None)
+        show: Show the plot. (None)
+        save: Save the plot. (None)
+        ax: Matplotlib axes object. (None)
+        return_fig: Return figure object. (None)
+        marker: Marker style. ('.')
+        **kwargs: Additional keyword arguments.
         
     Returns:
-        If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
+        ax: If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
     """
 
     return _embedding(adata=adata, basis=basis, color=color, 
@@ -130,19 +174,22 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
                        legend:bool=False,legend_awargs={'ncol':1}):
-    """
-    Plot cell proportion of each cell type in each visual cluster.
+    r"""Plot cell proportion of each cell type in each visual cluster.
 
     Arguments:
         adata: AnnData object.
         celltype_clusters: Cell type clusters.
         groupby: Visual clusters.
-        groupby_li: Visual cluster list.
-        figsize: Figure size.
-        ticks_fontsize: Ticks fontsize.
-        labels_fontsize: Labels fontsize.
-        legend: Whether to show legend.
+        groupby_li: Visual cluster list. (None)
+        figsize: Figure size. ((4,6))
+        ticks_fontsize: Ticks fontsize. (12)
+        labels_fontsize: Labels fontsize. (12)
+        ax: Matplotlib axes object. (None)
+        legend: Whether to show legend. (False)
+        legend_awargs: Legend arguments. ({'ncol':1})
     
+    Returns:
+        None
     
     """
 

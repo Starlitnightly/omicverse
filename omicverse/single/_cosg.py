@@ -38,7 +38,17 @@ from scipy.sparse import issparse
 
 ### Import from Scanpy
 def select_groups(adata, groups_order_subset='all', key='groups'):
-    """Get subset of groups in adata.obs[key]."""
+    r"""Get subset of groups in adata.obs[key].
+    
+    Arguments:
+        adata: AnnData object
+        groups_order_subset: Groups to subset, can be 'all' or list of group names. ('all')
+        key: Key in adata.obs to use for grouping. ('groups')
+    
+    Returns:
+        groups_order_subset: Selected group names
+        groups_masks: Boolean masks for each group
+    """
     groups_order = adata.obs[key].cat.categories
     if key + '_masks' in adata.uns:
         groups_masks = adata.uns[key + '_masks']
@@ -104,13 +114,21 @@ def _get_mean_var(X, *, axis=0):
 
 
 def sparse_mean_variance_axis(mtx: sparse.spmatrix, axis: int):
-    """
-    This code and internal functions are based on sklearns
-    `sparsefuncs.mean_variance_axis`.
+    r"""Calculate mean and variance along specified axis for sparse matrix.
+    
+    This code and internal functions are based on sklearns `sparsefuncs.mean_variance_axis`.
     Modifications:
     * allow deciding on the output type, which can increase accuracy when calculating the mean and variance of 32bit floats.
     * This doesn't currently implement support for null values, but could.
     * Uses numba not cython
+    
+    Arguments:
+        mtx: Sparse matrix (CSR or CSC format)
+        axis: Axis along which to compute statistics (0 or 1)
+    
+    Returns:
+        mean: Mean values along specified axis
+        variance: Variance values along specified axis
     """
     assert axis in (0, 1)
     if isinstance(mtx, sparse.csr_matrix):
@@ -327,37 +345,31 @@ def cosg(
 
     copy:bool=False
 ):
-    """
-    Marker gene identification for single-cell sequencing data using COSG.
+    r"""Marker gene identification for single-cell sequencing data using COSG.
     
     Arguments:
         adata: Annotated data matrix. Note: input parameters are similar to the parameters used for scanpy's rank_genes_groups() function.
-        groupby: The key of the cell groups in .obs, the default value is set to 'CellTypes'.
-        groups: Subset of cell groups, e.g. ['g1', 'g2', 'g3'], to which comparison shall be restricted. The default value is 'all', and all groups will be compared.
-        mu: The penalty restricting marker genes expressing in non-target cell groups. Larger value represents more strict restrictions. mu should be >= 0, and by default, mu = 1.
-        remove_lowly_expressed: If True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. The default value is False.
-        expressed_pct: When remove_lowly_expressed is set to True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. The default value for expressed_pct is 0.1 (10%).
-        n_genes_user: The number of genes that appear in the returned tables. The default value is 50.
+        groupby: The key of the cell groups in .obs. ('CellTypes')
+        groups: Subset of cell groups, e.g. ['g1', 'g2', 'g3'], to which comparison shall be restricted. ('all')
+        mu: The penalty restricting marker genes expressing in non-target cell groups. Larger value represents more strict restrictions. mu should be >= 0. (1)
+        remove_lowly_expressed: If True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. (False)
+        expressed_pct: When remove_lowly_expressed is set to True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. (0.1)
+        n_genes_user: The number of genes that appear in the returned tables. (50)
         key_added: The key in adata.uns information is saved to.
-        calculate_logfoldchanges: Calculate logfoldchanges.
-        use_raw: Use raw attribute of adata if present.
+        calculate_logfoldchanges: Calculate logfoldchanges. (True)
+        use_raw: Use raw attribute of adata if present. (True)
         layer: Key from adata.layers whose value will be used to perform tests on.
-        reference: If 'rest', compare each group to the union of the rest of the group. If a group identifier, compare with respect to this group.
+        reference: If 'rest', compare each group to the union of the rest of the group. If a group identifier, compare with respect to this group. ('rest')
+        copy: Return a copy instead of writing to adata. (False)
 
     Returns:
-        names : structured np.ndarray (.uns['rank_genes_groups'])
-                Structured array to be indexed by group id storing the gene names. Ordered according to scores.
-        scores : structured np.ndarray (.uns['rank_genes_groups'])
-                Structured array to be indexed by group id storing COSG scores for each gene for each group. Ordered according to scores.
-
-    Notes:
-        Contact: Min Dai, daimin@zju.edu.cn
-
+        adata: AnnData object with marker gene results stored in .uns['rank_genes_groups'] or specified key_added.
+        
     Examples:
-        >>> import cosg as cosg
+        >>> import omicverse as ov
         >>> import scanpy as sc
         >>> adata = sc.datasets.pbmc68k_reduced()
-        >>> cosg.cosg(adata, key_added='cosg', groupby='bulk_labels')
+        >>> ov.single.cosg(adata, key_added='cosg', groupby='bulk_labels')
         >>> sc.pl.rank_genes_groups(adata, key='cosg')
 
     """

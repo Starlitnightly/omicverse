@@ -13,26 +13,22 @@ def calculate_gene_density(
     adjust=1,
     min_expr=0.1,          # NEW: minimal raw expression to keep as weight > 0
 ):
-    """
-    Weighted KDE on a 2-D embedding with min–max scaled weights.
-    Cells whose raw expression < `min_expr` are excluded from the KDE fit.
-
-    Compute a weighted kernel density estimate (KDE) for each feature
-    and store the per-cell density values in `adata.obs`.
-
-    Parameters
-    ----------
-    adata : AnnData
-        AnnData object that contains the embedding in `adata.obsm[basis]`.
-    features : list[str]
-        Feature names (gene names or pre-computed scores) to process.
-    basis : str, default "X_umap"
-        Key in `adata.obsm` that stores the 2-D embedding (e.g., UMAP).
-    dims : tuple[int, int], default (0, 1)
-        Indices of the two embedding dimensions to use.
-    adjust : float, default 1
-        Bandwidth scaling factor passed to `scipy.stats.gaussian_kde`.
-
+    r"""
+    Calculate weighted kernel density estimates for gene expression on 2D embeddings.
+    
+    Computes KDE for each feature using expression values as weights and stores
+    density values in adata.obs as 'density_{feature}' columns.
+    
+    Arguments:
+        adata: Annotated data object with embedding coordinates
+        features: List of gene names or feature names to process
+        basis: Key in adata.obsm containing 2D embedding coordinates ('X_umap')
+        dims: Embedding dimensions to use as (x_dim, y_dim) ((0, 1))
+        adjust: Bandwidth scaling factor for KDE (1)
+        min_expr: Minimum expression threshold for including cells (0.1)
+        
+    Returns:
+        None: Updates adata.obs with density_{feature} columns
     """
     if len(dims) != 2:
         raise ValueError("`dims` must have length 2")
@@ -96,28 +92,24 @@ def add_density_contour(
     fill=False,
     alpha=0.4,
 ):
-    """
-    Draw KDE iso-density contours on an existing matplotlib Axes.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        The axes that already hosts your scatter / scanpy embedding.
-    embeddings : ndarray, shape (n, 2)
-        2-D coordinates (e.g. UMAP).
-    weights : ndarray, shape (n,)
-        Raw expression or any weight; will be min-max scaled to [0, 1].
-    levels : str | list[float]
-        * "quantile": use `n_quantiles` equally spaced quantiles (e.g. 0.2,0.4,…)
-        * list/tuple  : explicit contour levels.
-    n_quantiles : int
-        Number of quantile levels when `levels="quantile"`.
-    bw_adjust : float
-        Bandwidth factor for gaussian_kde (smaller = sharper contours).
-    fill : bool
-        True → use `ax.contourf` (filled), False → `ax.contour` (lines).
-    alpha : float
-        Transparency for filled contours.
+    r"""
+    Add KDE-based density contours to an existing matplotlib plot.
+    
+    Arguments:
+        ax: matplotlib.axes.Axes object to draw contours on
+        embeddings: 2D coordinate array with shape (n_cells, 2)
+        weights: 1D weight array for KDE, will be min-max normalized
+        levels: Contour level specification - 'quantile' or list of values ('quantile')
+        n_quantiles: Number of quantile levels when levels='quantile' (5)
+        bw_adjust: Bandwidth adjustment factor for KDE (0.3)
+        cmap_contour: Colormap for contour lines ('Greys')
+        linewidth: Width of contour lines (1.0)
+        zorder: Drawing order for contours (10)
+        fill: Whether to fill contours (False for lines, True for filled)
+        alpha: Transparency for filled contours (0.4)
+        
+    Returns:
+        cs: matplotlib contour object for potential colorbar addition
     """
     # ---------- fit KDE ----------------------------------------------------
     w_min, w_max = weights.min(), weights.max()
@@ -153,4 +145,3 @@ def add_density_contour(
             zorder=zorder,
         )
     return cs   # so you can add a colorbar if desired
-

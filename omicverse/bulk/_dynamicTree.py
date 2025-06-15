@@ -124,6 +124,39 @@ def cutreeHybrid(link, distM,
                  maxPamDist = None,
                  respectSmallClusters = True,
                  verbose = 2, indent = 0):
+    r"""Perform dynamic tree cutting for hierarchical clustering.
+    
+    This function implements the dynamic tree cutting algorithm for identifying
+    clusters in hierarchical clustering dendrograms.
+    
+    Arguments:
+        link: Linkage matrix from hierarchical clustering
+        distM: Distance matrix used for clustering
+        cutHeight: Height at which to cut the dendrogram (default: None, auto-calculated)
+        minClusterSize: Minimum cluster size (default: 20)
+        deepSplit: Controls sensitivity of cluster splitting (default: 1, range: 0-4)
+        maxCoreScatter: Maximum scatter for cluster cores (default: None)
+        minGap: Minimum gap between clusters (default: None)
+        maxAbsCoreScatter: Absolute maximum core scatter (default: None)
+        minAbsGap: Absolute minimum gap (default: None)
+        minSplitHeight: Minimum split height (default: None)
+        minAbsSplitHeight: Absolute minimum split height (default: None)
+        externalBranchSplitFnc: External splitting function (default: None)
+        minExternalSplit: Minimum external split threshold (default: None)
+        externalSplitOptions: Options for external splitting (default: [])
+        externalSplitFncNeedsDistance: Whether external function needs distance (default: None)
+        assumeSimpleExternalSpecification: Simplify external specifications (default: True)
+        pamStage: Whether to perform PAM stage (default: True)
+        pamRespectsDendro: Whether PAM respects dendrogram (default: True)
+        useMedoids: Whether to use medoids in PAM (default: False)
+        maxPamDist: Maximum distance for PAM assignment (default: None)
+        respectSmallClusters: Whether to respect small clusters (default: True)
+        verbose: Verbosity level (default: 2)
+        indent: Indentation level for output (default: 0)
+        
+    Returns:
+        results: Dictionary containing cluster assignments and diagnostic information
+    """
     
     
     dendro_height = get_heights(link)

@@ -1,10 +1,25 @@
+"""Module for integrating spatial transcriptomics data across different conditions.
 
+This module implements STAligner, a method for integrating spatial transcriptomics data
+across different experimental conditions, technologies, and developmental stages. The
+integration preserves both gene expression patterns and spatial organization.
+
+Key features:
+1. Spatial network construction
+2. Graph neural network-based integration
+3. Mutual nearest neighbor alignment
+4. Batch effect correction
+5. Cross-condition comparison
+
+References:
+    Zhou, X., Dong, K. & Zhang, S. Integrating spatial transcriptomics data 
+    across different conditions, technologies and developmental stages. 
+    Nat Comput Sci 3, 894–906 (2023)
 """
 __author__ = "Xiang Zhou"
 __email__ = "xzhou@amss.ac.cn"
-__citation__ = Zhou, X., Dong, K. & Zhang, S. Integrating spatial transcriptomics data 
-across different conditions, technologies and developmental stages. Nat Comput Sci 3, 894–906 (2023)
-"""
+__citation__ = "Zhou, X., Dong, K. & Zhang, S. Integrating spatial transcriptomics data across different conditions, technologies and developmental stages. Nat Comput Sci 3, 894–906 (2023)"
+
 from ..externel.STAligner.mnn_utils import create_dictionary_mnn
 from ..externel.STAligner.STALIGNER import STAligner
 
@@ -29,43 +44,52 @@ from .._settings import add_reference
 
 def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
                     max_neigh=50, model='Radius', verbose=True):
-    """\
-    Construct the spatial neighbor networks.
+    r"""Construct spatial neighbor networks for spatial integration.
+    
+    This function builds a spatial neighborhood graph by connecting spots based
+    on their physical distances. It supports both radius-based and k-nearest
+    neighbor approaches for network construction.
 
-    Parameters
-    ----------
-    adata
-        AnnData object of scanpy package.
-    rad_cutoff
-        radius cutoff when model='Radius'
-    k_cutoff
-        The number of nearest neighbors when model='KNN'
-    model
-        The network construction model. When model=='Radius', 
-        the spot is connected to spots whose distance is less than rad_cutoff.
-        When model=='KNN', the spot is connected to its first k_cutoff nearest neighbors.
+    Arguments:
+        adata: AnnData
+            Input spatial data containing:
+            - Spatial coordinates in obsm['spatial']
+            - Gene expression data in X
+        rad_cutoff: float, optional (default=None)
+            Maximum distance between neighbors for 'Radius' model.
+            Only used when model='Radius'.
+        k_cutoff: int, optional (default=None)
+            Number of nearest neighbors to connect for 'KNN' model.
+            Only used when model='KNN'.
+        max_neigh: int, optional (default=50)
+            Maximum number of neighbors to consider during graph construction.
+            Helps limit memory usage for large datasets.
+        model: str, optional (default='Radius')
+            Network construction method:
+            - 'Radius': Connect spots within rad_cutoff distance
+            - 'KNN': Connect k_cutoff nearest neighbors
+        verbose: bool, optional (default=True)
+            Whether to print network statistics.
+        
+    Returns:
+        None
+            Updates adata with:
+            - adata.uns['Spatial_Net']: DataFrame of edges and distances
+            - adata.uns['adj']: Sparse adjacency matrix
 
-    Returns
-    -------
-    The spatial networks are saved in adata.uns['Spatial_Net']
-
-    Example
-    -------
-    >>> ov.space.Cal_Spatial_Net(adata, rad_cutoff=50, model='Radius')
-    or
-    >>> ov.space.Cal_Spatial_Net(adata, k_cutoff=10, model='KNN')
-    When using STAligner, it is necessary to adjust the rad_cutoff parameter according to 
-    different data to ensure that each spot has an average of 5-10 adjacent spots connected to it. 
-    Such as: "11.3356 neighbors per cell on average."
+    Notes:
+        - For STAligner, adjust rad_cutoff to ensure 5-10 neighbors per spot
+        - Includes self-loops in adjacency matrix
+        - Uses ball_tree algorithm for efficient neighbor search
+        - Memory efficient implementation for large datasets
+        - Critical for downstream integration tasks
     """
-
     assert (model in ['Radius', 'KNN'])
     if verbose:
         print('------Calculating spatial graph...')
     coor = pd.DataFrame(adata.obsm['spatial'])
     coor.index = adata.obs.index
     coor.columns = ['imagerow', 'imagecol']
-
 
     nbrs = sklearn.neighbors.NearestNeighbors(
         n_neighbors=max_neigh + 1, algorithm='ball_tree').fit(coor)
@@ -91,20 +115,12 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     Spatial_Net['Cell1'] = Spatial_Net['Cell1'].map(id_cell_trans)
     Spatial_Net['Cell2'] = Spatial_Net['Cell2'].map(id_cell_trans)
 
-    # self_loops = pd.DataFrame(zip(Spatial_Net['Cell1'].unique(), Spatial_Net['Cell1'].unique(),
-    #                  [0] * len((Spatial_Net['Cell1'].unique())))) ###add self loops
-    # self_loops.columns = ['Cell1', 'Cell2', 'Distance']
-    # Spatial_Net = pd.concat([Spatial_Net, self_loops], axis=0)
-
     if verbose:
         print(f'The graph contains {Spatial_Net.shape[0]} edges, {adata.n_obs} cells.')
-        print(f'{(Spatial_Net.shape[0] / adata.n_obs):.4f}neighbors per cell on average.')
+        print(f'{(Spatial_Net.shape[0] / adata.n_obs):.4f} neighbors per cell on average.')
     adata.uns['Spatial_Net'] = Spatial_Net
 
-    #########
-    #X = pd.DataFrame(adata.X.toarray()[:, ], index=adata.obs.index, columns=adata.var.index) 
-    #cells = np.array(X.index)
-    cells = np.array(adata.obs_names) # LeiHu update, reducing the demand of memory.
+    cells = np.array(adata.obs_names)
     cells_id_tran = dict(zip(cells, range(cells.shape[0])))
     if 'Spatial_Net' not in adata.uns.keys():
         raise ValueError("Spatial_Net is not existed! Run Cal_Spatial_Net first!")
@@ -116,7 +132,57 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     G = G + sp.eye(G.shape[0])  # self-loop
     adata.uns['adj'] = G
 
+
 class pySTAligner(object):
+    r"""STAligner for spatial transcriptomics data integration.
+    
+    STAligner is a deep learning method for integrating spatial transcriptomics
+    data across different experimental conditions, technologies, and developmental
+    stages. It combines graph neural networks with mutual nearest neighbors to
+    preserve both transcriptional and spatial relationships during integration.
+
+    The method works by:
+    1. Constructing spatial neighborhood graphs
+    2. Learning batch-invariant embeddings
+    3. Aligning similar regions across batches
+    4. Preserving spatial organization
+    5. Enabling cross-condition comparison
+
+    Attributes:
+        adata: AnnData
+            Combined data containing all batches
+        model: STAligner
+            Neural network model for integration
+        loader: DataLoader
+            PyTorch geometric data loader
+        device: torch.device
+            Computing device (GPU/CPU)
+        optimizer: torch.optim.Optimizer
+            Adam optimizer for training
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load data
+        >>> adata1 = sc.read_visium(...)
+        >>> adata2 = sc.read_visium(...)
+        >>> # Construct spatial networks
+        >>> ov.space.Cal_Spatial_Net(adata1, rad_cutoff=100)
+        >>> ov.space.Cal_Spatial_Net(adata2, rad_cutoff=100)
+        >>> # Combine data
+        >>> adata = adata1.concatenate(adata2)
+        >>> # Initialize STAligner
+        >>> staligner = ov.space.pySTAligner(
+        ...     adata=adata,
+        ...     batch_key='batch',
+        ...     Batch_list=[adata1, adata2]
+        ... )
+        >>> # Train model
+        >>> staligner.train()
+        >>> # Get integrated embeddings
+        >>> embeddings = staligner.predicted()
+    """
+    
     def __init__(self,adata,
                  hidden_dims: list = [512, 30],
                  n_epochs: int = 1000,
@@ -133,47 +199,61 @@ class pySTAligner(object):
                  Batch_list = None,
                  device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
              ) -> None:
-        r'''
-        Parameter
-        ----------
-        adata: AnnData
-            The AnnData object of your input data.
-        hidden_dims: list
-            The hidden dimensions of the neural network.
-        n_epochs: int   
-            The number of epochs for training.  
-        lr: float   
-            The learning rate for training.
-        batch_key: str  
-            The key of batch information in adata.obs.
-        key_added: str  
-            The key of the new embedding in adata.obsm.
-        gradient_clipping: float    
-            The gradient clipping value.
-        weight_decay: float
-            The weight decay value.
-        margin: float
-            The margin value for triplet loss.
-        verbose: bool
-            Whether to print the training process.
-        random_seed: int
-            The random seed for training.
-        iter_comb: list
-            The list of pairwise comparison of batches.
-        knn_neigh: int
-            The number of nearest neighbors for MNN.
-        Batch_list: list
-            The list of AnnData objects of each batch.
-        device: torch.device
-            The device for training.
+        r"""Initialize STAligner spatial integration model.
+        
+        This method sets up the STAligner model by:
+        1. Processing input data
+        2. Constructing graph neural networks
+        3. Initializing optimization parameters
+        4. Preparing batch alignment strategy
 
-        Example
-        ----------
-        >>> STAligner_obj = ov.space.pySTAligner(adata_concat, verbose=True, knn_neigh = 100,
-                                     n_epochs = 600, iter_comb = iter_comb,
-                                     batch_key = 'batch_name',  key_added='STAligner',
-                                     Batch_list = Batch_list)
-        '''
+        Arguments:
+            adata: AnnData
+                Combined data containing all batches to integrate.
+                Must have batch information in obs[batch_key].
+            hidden_dims: list, optional (default=[512, 30])
+                Dimensions of hidden layers in the neural network.
+                The final dimension determines embedding size.
+            n_epochs: int, optional (default=1000)
+                Number of training epochs.
+                More epochs may improve integration but take longer.
+            lr: float, optional (default=0.001)
+                Learning rate for Adam optimizer.
+                Adjust if training is unstable.
+            batch_key: str, optional (default='batch_name')
+                Column in adata.obs containing batch information.
+            key_added: str, optional (default='STAligner')
+                Key for storing embeddings in adata.obsm.
+            gradient_clipping: float, optional (default=5)
+                Maximum gradient norm for stability.
+            weight_decay: float, optional (default=0.0001)
+                L2 regularization strength.
+            margin: float, optional (default=1)
+                Margin for triplet loss function.
+                Larger values enforce stronger separation.
+            verbose: bool, optional (default=False)
+                Whether to print training progress.
+            random_seed: int, optional (default=666)
+                Random seed for reproducibility.
+            iter_comb: list, optional (default=None)
+                List of batch pairs to compare.
+                If None, compares all pairs.
+            knn_neigh: int, optional (default=100)
+                Number of neighbors for mutual nearest neighbors.
+            Batch_list: list, optional (default=None)
+                List of individual batch AnnData objects.
+                Must be in same order as in combined adata.
+            device: torch.device, optional (default=auto)
+                Computing device to use.
+                Automatically uses GPU if available.
+
+        Notes:
+            - Requires pre-computed spatial networks
+            - GPU acceleration recommended for large datasets
+            - Batch_list order must match batch_key order
+            - Memory usage scales with dataset size
+            - Consider reducing knn_neigh for large datasets
+        """
         self.device = device
         section_ids = np.array(adata.obs[batch_key].unique())
 
@@ -217,7 +297,28 @@ class pySTAligner(object):
             print(self.model)
 
     def train(self):
-        """Train the STAligner model."""  
+        r"""Train the STAligner spatial integration model.
+        
+        This method performs two-stage training of the STAligner model:
+        1. Pre-training with STAGATE to learn initial embeddings
+        2. Fine-tuning with STAligner using triplet loss and MNN
+
+        The training process:
+        1. Sets random seeds for reproducibility
+        2. Pre-trains with graph autoencoder
+        3. Identifies mutual nearest neighbors
+        4. Optimizes embeddings with triplet loss
+        5. Monitors training progress
+        6. Saves final embeddings
+
+        Notes:
+            - Progress shown if verbose=True
+            - Uses GPU if available
+            - Early stopping not implemented
+            - Results stored in adata.obsm[key_added]
+            - Memory usage increases during training
+            - Consider batch size for large datasets
+        """
         seed = self.random_seed
         random.seed(seed)
         torch.manual_seed(seed)
@@ -340,7 +441,11 @@ class pySTAligner(object):
         add_reference(self.adata,'STAligner','spatial integration with STAligner')
 
     def predicted(self):
-        """store the embedding of STAligner model."""  
+        r"""Generate and store the final embedding from trained STAligner model.
+        
+        Returns:
+            AnnData object with STAligner embedding stored in obsm[key_added].
+        """ 
         self.model.eval()
         with torch.no_grad():
             z_list = []

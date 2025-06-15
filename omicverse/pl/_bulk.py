@@ -327,6 +327,24 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
 def venn(sets={}, out='./', palette='bgrc',
              ax=False, ext='png', dpi=300, fontsize=3.5,
              bbox_to_anchor=(.5, .99),nc=2,cs=4):
+    r"""
+    Create a Venn diagram to visualize set overlaps.
+    
+    Arguments:
+        sets: Dictionary with set names as keys and sets as values ({})
+        out: Output directory path ('./')
+        palette: Color palette for sets ('bgrc')
+        ax: Matplotlib axes object or False to create new (False)
+        ext: File extension for output ('png')
+        dpi: Resolution for output image (300)
+        fontsize: Font size for text (3.5)
+        bbox_to_anchor: Legend position ((.5, .99))
+        nc: Number of legend columns (2)
+        cs: Font size for legend (4)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object
+    """
     
     from ..utils import venny4py
     venny4py(sets=sets,out=out,ce=palette,asax=ax,ext=ext,
@@ -338,42 +356,26 @@ def venn(sets={}, out='./', palette='bgrc',
 def boxplot(data,hue,x_value,y_value,width=0.3,title='',
                  figsize=(6,3),palette=None,fontsize=10,
                  legend_bbox=(1, 0.55),legend_ncol=1,hue_order=None):
-    """
-    Plots a boxplot with jittered points.
-
-    Parameters
-    ----------
-    - data : `pandas.DataFrame`
-        Dataframe containing the data to plot.
-    - hue : `str`
-        Column name of the dataframe containing the hue data.
-    - x_value : `str`
-        Column name of the dataframe containing the x-axis data.
-    - y_value : `str`
-        Column name of the dataframe containing the y-axis data.
-    - width : `float`, optional
-        Width of the boxplot, by default 0.3.
-    - title : `str`, optional
-        Title of the plot, by default ''.
-    - figsize : `tuple`, optional
-        Size of the figure, by default (6,3).
-    - palette : `list`, optional
-        List of colors to use for the plot, by default None.
-    - fontsize : `int`, optional
-        Font size of the plot, by default 10.
-    - legend_bbox : `tuple`, optional
-        Bounding box of the legend, by default (1, 0.55).
-    - legend_ncol : `int`, optional
-        Number of columns in the legend, by default 1.
-    - hue_order : `list`, optional
-        Order of hue categories, by default None (uses alphabetical order).
-
-    Returns
-    -------
-    - fig: `matplotlib.figure.Figure`
-        Figure object.
-    - ax: `matplotlib.axes._subplots.AxesSubplot`
-        Axes object.
+    r"""
+    Create a boxplot with jittered points to visualize data distribution across categories.
+    
+    Arguments:
+        data: DataFrame containing the data to plot
+        hue: Column name for grouping variable (color coding)
+        x_value: Column name for x-axis categories
+        y_value: Column name for y-axis values
+        width: Width of each boxplot (0.3)
+        title: Plot title ('')
+        figsize: Figure dimensions as (width, height) ((6,3))
+        palette: Color palette for groups (None, uses default)
+        fontsize: Font size for labels and ticks (10)
+        legend_bbox: Legend position as (x, y) ((1, 0.55))
+        legend_ncol: Number of legend columns (1)
+        hue_order: Custom order for hue categories (None, uses alphabetical)
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
+        ax: matplotlib.axes.Axes object
     """
 
     # Color codes for terminal output
