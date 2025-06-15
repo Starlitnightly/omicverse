@@ -5,7 +5,7 @@
 from ._cosg import cosg
 from ._anno import pySCSA,MetaTiME,scanpy_lazy,scanpy_cellanno_from_dict,get_celltype_marker
 from ._nocd import scnocd
-from ._mofa import pyMOFAART,pyMOFA,GLUE_pair,factor_exact,factor_correlation,get_weights,glue_pair
+from ._mofa import pyMOFAART,pyMOFA,GLUE_pair,factor_exact,factor_correlation,get_weights,glue_pair,get_r2_from_hdf5
 from ._scdrug import autoResolution,writeGEP,Drug_Response
 from ._cpdb import (cpdb_network_cal,cpdb_plot_network,
                     cpdb_plot_interaction,
