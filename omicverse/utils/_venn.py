@@ -4,8 +4,15 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import Ellipse
 
 
-#get shared elements for each combination of sets
 def get_shared(sets):
+    r"""Get shared elements for each combination of sets.
+    
+    Arguments:
+        sets: Dictionary of set names to sets
+        
+    Returns:
+        Dictionary of shared elements for each combination
+    """
     IDs = sets.keys()
     combs = sum([list(map(list, combinations(IDs, i))) for i in range(1, len(IDs) + 1)], [])
 
@@ -21,8 +28,15 @@ def get_shared(sets):
     return shared
 
 
-#get unique elements for each combination of sets
 def get_unique(shared):
+    r"""Get unique elements for each combination of sets.
+    
+    Arguments:
+        shared: Dictionary of shared elements
+        
+    Returns:
+        Dictionary of unique elements for each combination
+    """
     unique = {}
     for shar in shared:
         if shar == list(shared.keys())[-1]:
@@ -37,13 +51,29 @@ def get_unique(shared):
             setlist = [shared[k] for k in shared.keys() if k != shar and k.count(' and ') >= count]
             s = shared[shar].difference(*setlist)
         unique.update({shar: s})
-    return(unique)
+    return unique
 
 
-#plot Venn
 def venny4py(sets={}, out='./', ce='bgrc',
              asax=False, ext='png', dpi=300, size=3.5,
              bbox_to_anchor=(.5, .99),nc=2,cs=4):
+    r"""Create Venn diagram for 2-4 sets.
+    
+    Arguments:
+        sets: Dictionary of set names to sets ({})
+        out: Output directory ('./')
+        ce: Colors for ellipses ('bgrc')
+        asax: Use existing axes (False)
+        ext: File extension ('png')
+        dpi: Resolution for saved figure (300)
+        size: Figure size (3.5)
+        bbox_to_anchor: Legend position ((.5, .99))
+        nc: Number of legend columns (2)
+        cs: Column spacing (4)
+        
+    Returns:
+        Matplotlib figure and axes objects
+    """
     shared = get_shared(sets)
     unique = get_unique(shared)
     #ce = ce #colors
