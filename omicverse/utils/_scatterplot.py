@@ -108,15 +108,59 @@ def embedding(
     marker: Union[str, Sequence[str]] = '.',
     **kwargs,
 ) -> Union[Figure, Axes, None]:
-    """\
-    Scatter plot for user specified embedding basis (e.g. umap, pca, etc)
+    r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
 
     Arguments:
-        adata: Annotated data matrix.
-        basis: Name of the `obsm` basis to use.
+        adata: Annotated data matrix
+        basis: Name of the obsm basis to use
+        color: Keys for annotations of observations/cells or variables/genes (None)
+        gene_symbols: Column name in .var DataFrame for gene symbols (None)
+        use_raw: Whether to use .raw attribute of adata (None)
+        sort_order: Sort order for points by color values (True)
+        edges: Whether to draw edges of graph (False)
+        edges_width: Width of edges (0.1)
+        edges_color: Color of edges ('grey')
+        neighbors_key: Key to use for neighbors (None)
+        arrows: Whether to draw arrows (False) 
+        arrows_kwds: Keywords for arrow plotting (None)
+        groups: Restrict to a subset of groups (None)
+        components: Components to plot (None)
+        dimensions: Dimensions to plot (None)
+        layer: Layer to use for coloring (None)
+        projection: Projection type - '2d' or '3d' ('2d')
+        scale_factor: Scaling factor for spatial coordinates (None)
+        color_map: Colormap for continuous variables (None)
+        cmap: Alias for color_map (None)
+        palette: Colors to use for categorical variables (None)
+        na_color: Color for missing values ('lightgray')
+        na_in_legend: Include missing values in legend (True)
+        size: Point size (None)
+        frameon: Draw frame around plot (None)
+        legend_fontsize: Font size for legend (None)
+        legend_fontweight: Font weight for legend ('bold')
+        legend_loc: Location of legend ('right margin')
+        legend_fontoutline: Font outline width for legend (None)
+        colorbar_loc: Location of colorbar ('right')
+        vmax: Maximum color scale value (None)
+        vmin: Minimum color scale value (None)
+        vcenter: Center color scale value (None)
+        norm: Normalization for color scale (None)
+        add_outline: Add outline to points (False)
+        outline_width: Width of outline (0.3, 0.05)
+        outline_color: Color of outline ('black', 'white')
+        ncols: Number of columns for multi-panel plots (4)
+        hspace: Height spacing between subplots (0.25)
+        wspace: Width spacing between subplots (None)
+        title: Plot title (None)
+        show: Show the plot (None)
+        save: Save the plot (None)
+        ax: Matplotlib axes object (None)
+        return_fig: Return figure object (None)
+        marker: Marker style ('.') 
+        **kwargs: Additional arguments passed to scatter
         
     Returns:
-        If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
+        Matplotlib axes or figure object if show=False
     """
     #####################
     # Argument handling #
@@ -670,56 +714,14 @@ def _wraps_plot_scatter(wrapper):
     show_save_ax=doc_show_save_ax,
 )
 def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
-    """\
-    Scatter plot in UMAP basis.
+    r"""Scatter plot in UMAP basis.
 
-    Parameters
-    ----------
-    {adata_color_etc}
-    {edges_arrows}
-    {scatter_bulk}
-    {show_save_ax}
+    Arguments:
+        adata: Annotated data matrix
+        **kwargs: Additional arguments passed to embedding function
 
-    Returns
-    -------
-    If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
-
-    Examples
-    --------
-
-    .. plot::
-        :context: close-figs
-
-        import scanpy as sc
-        adata = sc.datasets.pbmc68k_reduced()
-        sc.pl.umap(adata)
-
-    Colour points by discrete variable (Louvain clusters).
-
-    .. plot::
-        :context: close-figs
-
-        sc.pl.umap(adata, color="louvain")
-
-    Colour points by gene expression.
-
-    .. plot::
-        :context: close-figs
-
-        sc.pl.umap(adata, color="HES4")
-
-    Plot muliple umaps for different gene expressions.
-
-    .. plot::
-        :context: close-figs
-
-        sc.pl.umap(adata, color=["HES4", "TNFRSF4"])
-
-    .. currentmodule:: scanpy
-
-    See also
-    --------
-    tl.umap
+    Returns:
+        Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'umap', **kwargs)
 
@@ -732,35 +734,14 @@ def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     show_save_ax=doc_show_save_ax,
 )
 def tsne(adata, **kwargs) -> Union[Axes, List[Axes], None]:
-    """\
-    Scatter plot in tSNE basis.
+    r"""Scatter plot in tSNE basis.
 
-    Parameters
-    ----------
-    {adata_color_etc}
-    {edges_arrows}
-    {scatter_bulk}
-    {show_save_ax}
+    Arguments:
+        adata: Annotated data matrix
+        **kwargs: Additional arguments passed to embedding function
 
-    Returns
-    -------
-    If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
-
-    Examples
-    --------
-    .. plot::
-        :context: close-figs
-
-        import scanpy as sc
-        adata = sc.datasets.pbmc68k_reduced()
-        sc.tl.tsne(adata)
-        sc.pl.tsne(adata, color='bulk_labels')
-
-    .. currentmodule:: scanpy
-
-    See also
-    --------
-    tl.tsne
+    Returns:
+        Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'tsne', **kwargs)
 
@@ -875,52 +856,18 @@ def pca(
     save: Union[bool, str, None] = None,
     **kwargs,
 ) -> Union[Axes, List[Axes], None]:
-    """\
-    Scatter plot in PCA coordinates.
+    r"""Scatter plot in PCA coordinates.
 
-    Use the parameter `annotate_var_explained` to annotate the explained variance.
+    Arguments:
+        adata: Annotated data matrix
+        annotate_var_explained: Annotate explained variance (False)
+        show: Show the plot (None)
+        return_fig: Return figure object (None)
+        save: Save the plot (None)
+        **kwargs: Additional arguments passed to embedding function
 
-    Parameters
-    ----------
-    {adata_color_etc}
-    annotate_var_explained
-    {scatter_bulk}
-    {show_save_ax}
-
-    Returns
-    -------
-    If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
-
-    Examples
-    --------
-
-    .. plot::
-        :context: close-figs
-
-        import scanpy as sc
-        adata = sc.datasets.pbmc3k_processed()
-        sc.pl.pca(adata)
-
-    Colour points by discrete variable (Louvain clusters).
-
-    .. plot::
-        :context: close-figs
-
-        sc.pl.pca(adata, color="louvain")
-
-    Colour points by gene expression.
-
-    .. plot::
-        :context: close-figs
-
-        sc.pl.pca(adata, color="CST3")
-
-    .. currentmodule:: scanpy
-
-    See also
-    --------
-    tl.pca
-    pp.pca
+    Returns:
+        Matplotlib axes or list of axes if show=False
     """
     if not annotate_var_explained:
         return embedding(

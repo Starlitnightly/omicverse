@@ -26,7 +26,18 @@ def get_initial_means(X, n_components,init_params, r):
 
 def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
               modelNames='EEE',  random_seed=2020):
-    """Clustering using Gaussian Mixture Model (GMM), similar to mclust in R."""
+    r"""Clustering using Gaussian Mixture Model (GMM), similar to mclust in R.
+    
+    Arguments:
+        adata: AnnData object
+        n_components: Number of components for GMM. (None)
+        use_rep: Representation to use for clustering. ('X_pca')
+        modelNames: Model covariance type. ('EEE')
+        random_seed: Random seed for reproducibility. (2020)
+    
+    Returns:
+        adata: Updated AnnData object with cluster labels
+    """
 
     if n_components is None:
         print('You need to input the `n_components` when methods is `GMM`')

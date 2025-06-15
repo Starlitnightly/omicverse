@@ -47,21 +47,15 @@ def read_10x_h5(**kwargs):
 
 
 def data_downloader(url,path,title):
-    r"""datasets downloader
+    r"""Download datasets from URL.
     
-    Arguments
-    ---------
-    - url: `str`
-        the download url of datasets
-    - path: `str`
-        the save path of datasets
-    - title: `str`
-        the name of datasets
+    Arguments:
+        url: The download url of datasets
+        path: The save path of datasets
+        title: The name of datasets
     
-    Returns
-    -------
-    - path: `str`
-        the save path of datasets
+    Returns:
+        path: The save path of datasets
     """
     if os.path.isfile(path):
         print("......Loading dataset from {}".format(path))

@@ -32,34 +32,31 @@ def plot_heatmap(
     save=None,
     **kwargs,
 ):
-    """Plot time series for genes as heatmap.
+    r"""Plot time series for genes as heatmap.
 
     Arguments:
-        adata: Annotated data matrix.
-        var_names: Names of variables to use for the plot.
-        sortby: Observation key to extract time data from.
-        layer: Layer key to extract count data from.
-        color_map: String denoting matplotlib color map.
-        col_color: String denoting matplotlib color map to use along the columns.
-        palette: Colors to use for plotting groups (categorical annotation).
-        n_convolve: If int is given, data is smoothed by convolution
-            along the x-axis with kernel size n_convolve.
-        standard_scale: Either 0 (rows) or 1 (columns). Whether or not to standardize that dimension
-            (each row or column), subtract minimum and divide each by its maximum.
-        sort: Wether to sort the expression values given by xkey.
-        colorbar: Whether to show colorbar.
-        {row,col}_cluster: If True, cluster the {rows, columns}.
-        context: A dictionary of parameters or the name of a preconfigured set.
-        font_scale: Scaling factor to scale the size of the font elements.
-        figsize: Figure size.
-        show: Show the plot, do not return axis.
-        save: If True or a str, save the figure. A string is appended to the default
-            filename. Infer the filetype if ending on {'.pdf', '.png', '.svg'}.
-        kwargs: Arguments passed to seaborns clustermap,
-            e.g., set `yticklabels=True` to display all gene names in all rows.
+        adata: Annotated data matrix
+        var_names: Names of variables to use for the plot
+        sortby: Observation key to extract time data from ('latent_time')
+        layer: Layer key to extract count data from ('Ms')
+        color_map: String denoting matplotlib color map ('RdBu_r')
+        col_color: String denoting matplotlib color map to use along columns (None)
+        palette: Colors to use for plotting groups ('viridis')
+        n_convolve: If int is given, data is smoothed by convolution (30)
+        standard_scale: Either 0 (rows) or 1 (columns) for standardization (0)
+        sort: Whether to sort the expression values (True)
+        colorbar: Whether to show colorbar (None)
+        col_cluster: If True, cluster the columns (False)
+        row_cluster: If True, cluster the rows (False)
+        context: Dictionary of parameters or preconfigured set name (None)
+        font_scale: Scaling factor to scale the size of font elements (None)
+        figsize: Figure size ((8, 4))
+        show: Show the plot, do not return axis (None)
+        save: If True or str, save the figure (None)
+        kwargs: Arguments passed to seaborn's clustermap
 
     Returns:
-        matplotlib.Axis`
+        Matplotlib clustermap object
 
     """
     import seaborn as sns
@@ -150,7 +147,15 @@ def plot_heatmap(
 
 # TODO: Add docstrings
 def default_color(adata, add_outline=None):
-    """TODO."""
+    r"""Get default color for plotting based on available metadata.
+    
+    Arguments:
+        adata: AnnData object
+        add_outline: Outline parameter (None)
+        
+    Returns:
+        Default color key string
+    """
     if (
         isinstance(add_outline, str)
         and add_outline in adata.var.keys()
@@ -168,7 +173,14 @@ def default_color(adata, add_outline=None):
 
 # TODO: Add docstrings
 def make_dense(X):
-    """TODO."""
+    r"""Convert sparse matrix to dense array.
+    
+    Arguments:
+        X: Input matrix (sparse or dense)
+        
+    Returns:
+        Dense numpy array
+    """
     if issparse(X):
         XA = X.A if X.ndim == 2 else X.A1
     else:
@@ -177,7 +189,14 @@ def make_dense(X):
 
 # TODO: Add docstrings
 def default_palette(palette=None):
-    """TODO."""
+    r"""Get default color palette for plotting.
+    
+    Arguments:
+        palette: Input palette (None)
+        
+    Returns:
+        Cycler object with color palette
+    """
     from cycler import Cycler, cycler
     if palette is None:
         return rcParams["axes.prop_cycle"]
@@ -188,7 +207,15 @@ def default_palette(palette=None):
     
 # TODO: Add docstrings
 def adjust_palette(palette, length):
-    """TODO."""
+    r"""Adjust palette to match required length.
+    
+    Arguments:
+        palette: Input color palette
+        length: Required number of colors
+        
+    Returns:
+        Adjusted color palette
+    """
     from cycler import Cycler, cycler
     islist = False
     if isinstance(palette, list):
@@ -213,7 +240,15 @@ def adjust_palette(palette, length):
 
 # TODO: Add docstrings
 def get_colors(adata, c):
-    """TODO."""
+    r"""Get colors for categorical or continuous variables.
+    
+    Arguments:
+        adata: AnnData object
+        c: Color specification
+        
+    Returns:
+        Array of colors
+    """
     if is_color_like(c):
         return c
     else:
@@ -237,7 +272,18 @@ def get_colors(adata, c):
 
 # TODO: Add docstrings
 def interpret_colorkey(adata, c=None, layer=None, perc=None, use_raw=None):
-    """TODO."""
+    r"""Interpret color key specification for plotting.
+    
+    Arguments:
+        adata: AnnData object
+        c: Color key specification (None)
+        layer: Layer to use for gene expression (None)
+        perc: Percentile clipping values (None)
+        use_raw: Whether to use raw data (None)
+        
+    Returns:
+        Interpreted color values
+    """
     if c is None:
         c = default_color(adata)
     if issparse(c):
@@ -309,7 +355,15 @@ def interpret_colorkey(adata, c=None, layer=None, perc=None, use_raw=None):
 
 # TODO: Add docstrings
 def clip(c, perc):
-    """TODO."""
+    r"""Clip values to specified percentile range.
+    
+    Arguments:
+        c: Values to clip
+        perc: Percentile range for clipping
+        
+    Returns:
+        Clipped values
+    """
     if np.size(perc) < 2:
         perc = [perc, 100] if perc < 50 else [0, perc]
     lb, ub = np.percentile(c, perc)
@@ -317,7 +371,14 @@ def clip(c, perc):
 
 # TODO: Finish docstrings
 def strings_to_categoricals(adata):
-    """Transform string annotations to categoricals."""
+    r"""Transform string annotations to categoricals.
+    
+    Arguments:
+        adata: AnnData object
+        
+    Returns:
+        None (modifies adata in place)
+    """
     from pandas import Categorical
     from pandas.api.types import is_bool_dtype, is_integer_dtype, is_string_dtype
 
@@ -344,12 +405,27 @@ def strings_to_categoricals(adata):
 
 # TODO: Add docstrings
 def is_list(key):
-    """TODO."""
+    r"""Check if key is a list-like object.
+    
+    Arguments:
+        key: Object to check
+        
+    Returns:
+        Boolean indicating if key is list-like
+    """
     return isinstance(key, (list, tuple, np.record))
 
 # TODO: Add docstrings
 def is_list_of_str(key, max_len=None):
-    """TODO."""
+    r"""Check if key is a list of strings.
+    
+    Arguments:
+        key: Object to check
+        max_len: Maximum length allowed (None)
+        
+    Returns:
+        Boolean indicating if key is list of strings
+    """
     if max_len is not None:
         return (
             is_list_or_array(key)
@@ -361,13 +437,28 @@ def is_list_of_str(key, max_len=None):
     
 # TODO: Add docstrings
 def is_list_or_array(key):
-    """TODO."""
+    r"""Check if key is a list or array-like object.
+    
+    Arguments:
+        key: Object to check
+        
+    Returns:
+        Boolean indicating if key is list or array-like
+    """
     return isinstance(key, (list, tuple, np.record, np.ndarray))
 
 
 # TODO: Add docstrings
 def to_list(key, max_len=20):
-    """TODO."""
+    r"""Convert key to list format.
+    
+    Arguments:
+        key: Object to convert
+        max_len: Maximum length allowed (20)
+        
+    Returns:
+        List representation of key
+    """
     from pandas import Index
     if isinstance(key, Index) or is_list_of_str(key, max_len):
         key = list(key)
@@ -375,7 +466,14 @@ def to_list(key, max_len=20):
 
 # TODO: Add docstrings
 def is_view(adata):
-    """TODO."""
+    r"""Check if AnnData object is a view.
+    
+    Arguments:
+        adata: AnnData object
+        
+    Returns:
+        Boolean indicating if adata is a view
+    """
     return (
         adata.is_view
         if hasattr(adata, "is_view")
@@ -388,7 +486,15 @@ def is_view(adata):
 
 # TODO: Add docstrings
 def is_categorical(data, c=None):
-    """TODO."""
+    r"""Check if data or column is categorical.
+    
+    Arguments:
+        data: Data object to check
+        c: Column name to check (None)
+        
+    Returns:
+        Boolean indicating if data/column is categorical
+    """
     from pandas.api.types import is_categorical_dtype as cat
 
     if c is None:
@@ -415,18 +521,17 @@ additional_colors = {
 
 # adapted from scanpy
 def set_colors_for_categorical_obs(adata, value_to_plot, palette=None):
-    """Sets adata.uns[f'{value_to_plot}_colors'] to given palette or default colors.
+    r"""Set colors for categorical observation in AnnData object.
 
-    Parameters
-    ----------
-    adata
-        annData object
-    value_to_plot
-        name of a valid categorical observation
-    palette
-        Palette should be either a valid :func:`~matplotlib.pyplot.colormaps` string,
-        a sequence of colors (in a format that can be understood by matplotlib,
-        eg. RGB, RGBS, hex, or a cycler object with key='color'
+    Arguments:
+        adata: AnnData object
+        value_to_plot: Name of valid categorical observation
+        palette: Color palette specification (None)
+            Can be matplotlib colormap string, sequence of colors,
+            or cycler object with 'color' key
+            
+    Returns:
+        None (modifies adata.uns in place)
     """
     from matplotlib.colors import to_hex
     import matplotlib.pyplot as pl

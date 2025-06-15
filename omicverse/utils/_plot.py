@@ -214,13 +214,18 @@ EMOJI = {
 
 
 def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
-    """
-    Configure plotting for OmicVerse:
-      1) check deps
-      2) set scanpy/plotlib settings
-      3) suppress warnings
-      4) detect GPU
-      5) print logo & version (once)
+    r"""Configure plotting settings for OmicVerse.
+    
+    Sets up scanpy verbosity, matplotlib parameters, suppresses warnings,
+    detects GPU devices, and displays the OmicVerse logo.
+    
+    Arguments:
+        verbosity: Scanpy verbosity level (3)
+        dpi: Resolution for matplotlib figures (80) 
+        facecolor: Background color for figures ('white')
+        
+    Returns:
+        None
     """
     global _has_printed_logo
 
@@ -280,76 +285,63 @@ plotset = plot_set
 ov_plot_set = plot_set
 
 def pyomic_palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns the default OmicVerse color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of hex color codes for plotting
     """ 
     return sc_color
 
 def palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns the default OmicVerse color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of hex color codes for plotting
     """ 
     return sc_color
 
 def red_palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns a red-themed color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of red-themed hex color codes
     """ 
     return red_color
 
 def green_palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns a green-themed color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of green-themed hex color codes
     """ 
     return green_color
 
 def orange_palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns an orange-themed color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of orange-themed hex color codes
     """ 
     return orange_color
 
 def blue_palette()->list:
-    """
-    Returns a dictionary of colors for various plots used in pyomic package.
-
+    r"""Returns a blue-themed color palette.
+    
     Returns:
-        sc_color: List containing the hex codes as values.
+        List of blue-themed hex color codes
     """ 
     return blue_color
 
 def plot_text_set(text, text_knock=2, text_maxsize=20):
-    """
-    Formats the text to fit in a plot by adding line breaks.
-
-    Parameters
-    ----------
-    - text : str
-        Text to format.
-    - text_knock : int, optional
-        Number of words to skip between two line breaks, by default 2.
-    - text_maxsize : int, optional
-        Maximum length of the text before formatting, by default 20.
-
-    Returns
-    -------
-    - text: str
-        Formatted text.
+    r"""Format text for plotting by adding line breaks.
+    
+    Arguments:
+        text: Text string to format
+        text_knock: Number of words between line breaks (2)
+        text_maxsize: Maximum text length before formatting (20)
+        
+    Returns:
+        Formatted text string with line breaks
     """
     if len(text) <= text_maxsize:
         return text
@@ -365,20 +357,14 @@ def plot_text_set(text, text_knock=2, text_maxsize=20):
 
     
 def ticks_range(x,width):
-    """
-    Returns a list of ticks for a plot.
+    r"""Generate tick positions for multi-group plots.
     
-    Parameters
-    ----------
-    - x : `int`
-        Number of ticks.
-    - width : `float`
-        Width of the plot.
-
-    Returns
-    -------
-    - ticks: `list`
-        List of ticks.
+    Arguments:
+        x: Number of ticks
+        width: Width spacing between ticks
+        
+    Returns:
+        List of tick positions
     """
     nticks=[]
     pticks=[]
@@ -398,40 +384,23 @@ def ticks_range(x,width):
 def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
                  figsize=(6,3),palette=None,fontsize=10,
                  legend_bbox=(1, 0.55),legend_ncol=1,):
-    """
-    Plots a boxplot with jittered points.
-
-    Parameters
-    ----------
-    - data : `pandas.DataFrame`
-        Dataframe containing the data to plot.
-    - hue : `str`
-        Column name of the dataframe containing the hue data.
-    - x_value : `str`
-        Column name of the dataframe containing the x-axis data.
-    - y_value : `str`
-        Column name of the dataframe containing the y-axis data.
-    - width : `float`, optional
-        Width of the boxplot, by default 0.6.
-    - title : `str`, optional
-        Title of the plot, by default ''.
-    - figsize : `tuple`, optional
-        Size of the figure, by default (6,3).
-    - palette : `list`, optional
-        List of colors to use for the plot, by default None.
-    - fontsize : `int`, optional
-        Font size of the plot, by default 10.
-    - legend_bbox : `tuple`, optional
-        Bounding box of the legend, by default (1, 0.55).
-    - legend_ncol : `int`, optional
-        Number of columns in the legend, by default 1.
-
-    Returns
-    -------
-    - fig: `matplotlib.figure.Figure`
-        Figure object.
-    - ax: `matplotlib.axes._subplots.AxesSubplot`
-        Axes object.
+    r"""Create boxplot with jittered points for grouped data.
+    
+    Arguments:
+        data: DataFrame containing the data to plot
+        hue: Column name for grouping variable
+        x_value: Column name for x-axis categories
+        y_value: Column name for y-axis values
+        width: Width of boxplots (0.6)
+        title: Plot title ('')
+        figsize: Figure size ((6,3))
+        palette: List of colors (None)
+        fontsize: Font size for labels (10)
+        legend_bbox: Legend bounding box ((1, 0.55))
+        legend_ncol: Number of legend columns (1)
+        
+    Returns:
+        Tuple of (figure, axes) objects
     """
 
     #获取需要分割的数据
@@ -523,35 +492,35 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
                 label_fontfamily:str='Arial',label_fontweight:str='bold',label_bbox=None,
                 legend_bbox:tuple=(0.7, 0.05),legend_ncol:int=3,legend_fontsize:int=12,
                 legend_fontweight:str='bold'):
-    """
-    Plot network graph.
-
-    Arguments:
-        G: networkx graph
-        G_type_dict: dict, node type dict
-        G_color_dict: dict, node color dict
-        pos_type: str, node position type, 'spring' or 'kamada_kawai'
-        pos_dim: int, node position dimension, 2 or 3
-        figsize: tuple, figure size
-        pos_scale: int, node position scale
-        pos_k: float, node position k
-        pos_alpha: float, node position alpha
-        node_size: int, node size
-        node_alpha: float, node alpha
-        node_linewidths: float, node linewidths
-        plot_node: list, plot node list
-        plot_node_num: int, plot node number
-        label_verticalalignment: str, label verticalalignment
-        label_fontsize: int, label fontsize
-        label_fontfamily: str, label fontfamily
-        label_fontweight: str, label fontweight
-        label_bbox: tuple, label bbox
-        legend_bbox: tuple, legend bbox
-        legend_ncol: int, legend ncol
-        legend_fontsize: int, legend fontsize
-        legend_fontweight: str, legend fontweight
-
+    r"""Plot network graph with customizable node and edge properties.
     
+    Arguments:
+        G: NetworkX graph object
+        G_type_dict: Dictionary mapping nodes to types
+        G_color_dict: Dictionary mapping nodes to colors
+        pos_type: Layout algorithm - 'spring' or 'kamada_kawai' ('spring')
+        pos_dim: Layout dimension - 2 or 3 (2)
+        figsize: Figure size ((4,4))
+        pos_scale: Layout scale factor (10)
+        pos_k: Spring layout k parameter (None)
+        pos_alpha: Edge transparency (0.4)
+        node_size: Base node size (50)
+        node_alpha: Node transparency (0.6)
+        node_linewidths: Node border width (1)
+        plot_node: Specific nodes to label (None)
+        plot_node_num: Number of top degree nodes to label (20)
+        label_verticalalignment: Label vertical alignment ('center_baseline')
+        label_fontsize: Label font size (12)
+        label_fontfamily: Label font family ('Arial')
+        label_fontweight: Label font weight ('bold')
+        label_bbox: Label bounding box properties (None)
+        legend_bbox: Legend position ((0.7, 0.05))
+        legend_ncol: Legend columns (3)
+        legend_fontsize: Legend font size (12)
+        legend_fontweight: Legend font weight ('bold')
+        
+    Returns:
+        Tuple of (figure, axes) objects
     """
     
 
@@ -627,21 +596,21 @@ def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clust
                        visual_li=None,visual_name:str='',figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,
                        legend:bool=False):
-    """
-    Plot cell proportion of each cell type in each visual cluster.
-
+    r"""Plot stacked bar chart showing cell type proportions across groups.
+    
     Arguments:
-        adata: AnnData object.
-        celltype_clusters: Cell type clusters.
-        visual_clusters: Visual clusters.
-        visual_li: Visual cluster list.
-        visual_name: Visual cluster name.
-        figsize: Figure size.
-        ticks_fontsize: Ticks fontsize.
-        labels_fontsize: Labels fontsize.
-        legend: Whether to show legend.
-    
-    
+        adata: AnnData object
+        celltype_clusters: Column name for cell types
+        visual_clusters: Column name for grouping variable
+        visual_li: List of groups to plot (None)
+        visual_name: Label for x-axis ('')
+        figsize: Figure size ((4,6))
+        ticks_fontsize: Font size for tick labels (12)
+        labels_fontsize: Font size for axis labels (12)
+        legend: Whether to show legend (False)
+        
+    Returns:
+        Tuple of (figure, axes) objects
     """
 
     b=pd.DataFrame(columns=['cell_type','value','Week'])
@@ -715,23 +684,20 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
                             celltype_range:tuple=(2,9),
                             embedding_range:tuple=(3,10),
                             xlim:int=-1000)->tuple:
-    """
-    Plot embedding with celltype color by omicverse
-
-    Arguments:
-        adata: AnnData object  
-        figsize: figure size
-        basis: embedding method
-        celltype_key: celltype key in adata.obs
-        title: figure title
-        celltype_range: celltype range to plot
-        embedding_range: embedding range to plot
-        xlim: x axis limit
-
-    Returns:
-        fig : figure and axis
-        ax: axis
+    r"""Create combined embedding plot with cell type legend and counts.
     
+    Arguments:
+        adata: AnnData object
+        figsize: Figure size ((6,4))
+        basis: Embedding basis name ('umap')
+        celltype_key: Column name for cell types ('major_celltype')
+        title: Plot title (None)
+        celltype_range: Grid range for cell type panel ((2,9))
+        embedding_range: Grid range for embedding panel ((3,10))
+        xlim: X-axis limit for counts (-1000)
+        
+    Returns:
+        Tuple of (figure, [embedding_axis, celltype_axis])
     """
 
     adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
@@ -798,8 +764,19 @@ def gen_mpl_labels(
     adata, groupby, exclude=(), 
     basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
 ):
-    """ 
-    Get locations of cluster median . Borrowed from scanpy github forum.
+    r"""Add cluster labels at median positions in embedding plots.
+    
+    Arguments:
+        adata: AnnData object
+        groupby: Column name for grouping
+        exclude: Groups to exclude from labeling (())
+        basis: Embedding basis name ('X_umap')
+        ax: Matplotlib axes object (None)
+        adjust_kwargs: Parameters for text adjustment (None)
+        text_kwargs: Parameters for text styling (None)
+        
+    Returns:
+        None
     """
     if adjust_kwargs is None:
         adjust_kwargs = {"text_from_points": False}
@@ -824,21 +801,18 @@ def gen_mpl_labels(
 
 def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
                    figsize:tuple=(4,4),**kwargs):
+    r"""Create embedding plot with customizable colors.
     
-    """
-    Plot embedding with celltype color by omicverse
-
     Arguments:
         adata: AnnData object
-        basis: embedding method
-        color: celltype key in adata.obs
-        figsize: figure size
-        kwargs: other parameters for sc.pl.embedding
-
+        basis: Embedding basis name
+        color: Column name for coloring
+        color_dict: Custom color mapping (None)
+        figsize: Figure size ((4,4))
+        **kwargs: Additional parameters for sc.pl.embedding
+        
     Returns:
-        fig : figure
-        ax: axes
-    
+        Tuple of (figure, axes) objects
     """
     if type(color)!=str:
         print("Only one color could be input, don't input list")
@@ -889,25 +863,22 @@ def stacking_vol(data_dict:dict,color_dict:dict,
                  plot_genes_num:int=10,
                  plot_genes_fontsize:int=8,
                 plot_genes_weight:str='bold')->tuple:
-    """
-    Plot the stacking volcano plot for multiple omics
-
+    r"""Create stacked volcano plots for comparing multiple datasets.
+    
     Arguments:
-        data_dict: dict, in each key, there is a dataframe with columns of ['logfoldchanges','pvals_adj','names']
-        color_dict: dict, in each key, there is a color for each omic
-        pval_threshold: float, pvalue threshold for significant genes
-        log2fc_threshold: float, log2fc threshold for significant genes
-        figsize: tuple, figure size
-        sig_color: str, color for significant genes
-        normal_color: str, color for non-significant genes
-        plot_genes_num: int, number of genes to plot
-        plot_genes_fontsize: int, fontsize for gene names
-        plot_genes_weight: str, weight for gene names
-    
+        data_dict: Dictionary with DataFrames containing 'logfoldchanges', 'pvals_adj', 'names'
+        color_dict: Dictionary mapping dataset names to colors
+        pval_threshold: P-value significance threshold (0.01)
+        log2fc_threshold: Log2 fold change threshold (2)
+        figsize: Figure size ((8,4))
+        sig_color: Color for significant points ('#a51616')
+        normal_color: Color for non-significant points ('#c7c7c7')
+        plot_genes_num: Number of top genes to label (10)
+        plot_genes_fontsize: Font size for gene labels (8)
+        plot_genes_weight: Font weight for gene labels ('bold')
+        
     Returns:
-        fig: figure
-        axes: the dict of axes
-    
+        Tuple of (figure, axes_dict)
     """
     
     fig = plt.figure(figsize=figsize)
@@ -981,21 +952,19 @@ def stacking_vol(data_dict:dict,color_dict:dict,
 
 def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
-    """
-    Plot the ConvexHull for a cluster in embedding
-
+    r"""Add convex hull outline for a specific cluster in embedding plot.
+    
     Arguments:
         adata: AnnData object
-        basis: embedding method in adata.obsm
-        cluster_key: cluster key in adata.obs
-        hull_cluster: cluster to plot for ConvexHull
-        ax: axes
-        color: color for ConvexHull
-        alpha: alpha for ConvexHull
-
+        basis: Embedding basis name in adata.obsm
+        cluster_key: Column name for cluster assignments
+        hull_cluster: Specific cluster to outline
+        ax: Matplotlib axes object
+        color: Hull color (None for automatic)
+        alpha: Hull transparency (0.2)
+        
     Returns:
-        ax: axes
-    
+        Modified matplotlib axes object
     """
     
     adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
@@ -1240,18 +1209,14 @@ def plot_pca_variance_ratio1(adata,threshold=0.85):
 
 
 def check_dependencies(dependencies=None, check_full=False):
-    """
-    Check if the installed versions of the dependencies match the specified version requirements.
-    If no dependencies are provided, it will try to read them from pyproject.toml.
-
-    Parameters:
-    dependencies (list, optional): A list of dependency strings in the format 'package_name>=version, <version'
-                                 If None, will try to read from pyproject.toml
-    check_full (bool, optional): If True, will also check dependencies from project.optional-dependencies.full
-                                Default is False
-
+    r"""Check if installed package versions match requirements.
+    
+    Arguments:
+        dependencies: List of dependency strings (None)
+        check_full: Whether to check optional dependencies (False)
+        
     Returns:
-    None
+        None
     """
     if dependencies is None:
         try:
