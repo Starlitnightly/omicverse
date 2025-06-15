@@ -4,7 +4,14 @@ import anndata
 def batch_correction(adata:anndata.AnnData,
                      batch_key=None,
                      key_added:str='batch_correction'):
+    r"""Perform batch effect correction using ComBat algorithm.
     
+    Arguments:
+        adata: AnnData object containing expression data
+        batch_key: Key in adata.obs containing batch information
+        key_added: Name for the corrected data layer (default: 'batch_correction')
+    
+    """
     
     try:
         from combat.pycombat import pycombat

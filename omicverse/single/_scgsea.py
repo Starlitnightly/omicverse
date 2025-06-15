@@ -13,8 +13,10 @@ from ._aucell import derive_auc_threshold,fast_rank,_rank_sparse_row,aucell
 ctxcore_install=False
 
 def check_ctxcore():
-    """
+    r"""Check if ctxcore is installed and import it.
     
+    Returns:
+        None: Raises ImportError if ctxcore is not installed
     """
     global ctxcore_install
     try:
@@ -28,26 +30,18 @@ def check_ctxcore():
 
 
 def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
-    """
-    Calculate the AUC-ell score for a given gene set.
+    r"""Calculate the AUC-ell score for a given gene set.
 
     Arguments:
-        adata: AnnData object
-            Annotated data matrix containing gene expression data.
-        geneset_name: str
-            Name of the gene set.
-        geneset: list of str
-            List of gene symbols for the gene set.
-        AUC_threshold: float, optional
-            AUC threshold used to determine significant interactions (default is 0.01).
-        seed: int, optional
-            Seed used to initialize the random number generator (default is 42).
-        chunk_size: int, optional
-            The number of cells to process in each chunk (default is 10000).
+        adata: AnnData object containing gene expression data.
+        geneset_name: Name of the gene set.
+        geneset: List of gene symbols for the gene set.
+        AUC_threshold: AUC threshold used to determine significant interactions. (0.01)
+        seed: Seed used to initialize the random number generator. (42)
+        chunk_size: The number of cells to process in each chunk. (10000)
 
     Returns:
-        None
-           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+        None: Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
     """
 
     check_ctxcore()
@@ -91,25 +85,17 @@ def global_imports(modulename,shortname = None, asfunction = False):
         globals()[shortname] = __import__(modulename)
 
 def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
-        
-    """
-    Calculate the AUC-ell score for a given gene set.
+    r"""Calculate the AUC-ell score for a given gene set.
 
     Arguments:
-        adata: AnnData object
-            Annotated data matrix containing gene expression data.
-        geneset_name: str
-            Name of the gene set.
-        geneset: list of str
-            List of gene symbols for the gene set.
-        AUC_threshold: float, optional
-            AUC threshold used to determine significant interactions (default is 0.01).
-        seed: int, optional
-            Seed used to initialize the random number generator (default is 42).
+        adata: AnnData object containing gene expression data.
+        geneset_name: Name of the gene set.
+        geneset: List of gene symbols for the gene set.
+        AUC_threshold: AUC threshold used to determine significant interactions. (0.01)
+        seed: Seed used to initialize the random number generator. (42)
 
     Returns:
-        None
-           Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+        None: Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
     """
 
     check_ctxcore()
@@ -142,24 +128,17 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
         )
     
 def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42):
-    """
-    Calculates the area under the curve (AUC) for a set of pathways in an AnnData object.
+    r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
 
     Arguments:
-        adata: AnnData object
-            AnnData object containing the data.
-        pathway_names: list of str
-            Names of the pathways to analyze.
-        pathways_dict: dict
-            Dictionary containing the gene sets for each pathway.
-        AUC_threshold: float, optional (default: 0.01)
-            AUC threshold to use for determining significant gene-pathway associations.
-        seed: int, optional (default: 42)
-            Random seed for reproducibility.
+        adata: AnnData object containing the data.
+        pathway_names: Names of the pathways to analyze.
+        pathways_dict: Dictionary containing the gene sets for each pathway.
+        AUC_threshold: AUC threshold to use for determining significant gene-pathway associations. (0.01)
+        seed: Random seed for reproducibility. (42)
 
     Returns:
-        None
-            The function modifies the `adata.obs` attribute of the input AnnData object.
+        None: The function modifies the `adata.obs` attribute of the input AnnData object.
     """
 
 
@@ -195,26 +174,18 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
     add_reference(adata,'AUCell','pathway activity score with AUCell')
             
 def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
-    """
-    Calculates the area under the curve (AUC) for a set of pathways in an AnnData object.
+    r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
 
     Arguments:
-        adata: AnnData object
-            AnnData object containing the data.
-        pathway_names: list of str
-            Names of the pathways to analyze.
-        pathways_dict: dict
-            Dictionary containing the gene sets for each pathway.
-        AUC_threshold: float, optional (default: 0.01)
-            AUC threshold to use for determining significant gene-pathway associations.
-        seed: int, optional (default: 42)
-            Random seed for reproducibility.
-        chunk_size: int, optional (default: 10000)
-            The number of cells to process in each chunk.
+        adata: AnnData object containing the data.
+        pathway_names: Names of the pathways to analyze.
+        pathways_dict: Dictionary containing the gene sets for each pathway.
+        AUC_threshold: AUC threshold to use for determining significant gene-pathway associations. (0.01)
+        seed: Random seed for reproducibility. (42)
+        chunk_size: The number of cells to process in each chunk. (10000)
 
     Returns:
-        None
-            The function modifies the `adata.obs` attribute of the input AnnData object.
+        None: The function modifies the `adata.obs` attribute of the input AnnData object.
     """
 
     check_ctxcore()
@@ -253,24 +224,17 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
         adata.obs[f'{pathway_name}_aucell'] = auc_results
             
 def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1):
-    """
-    Enriches cell annotations with pathway activity scores using the AUC-ell method.
+    r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
     Arguments:
-        adata: AnnData object
-            AnnData object containing the expression matrix.
-        pathways_dict: dict
-            A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-        AUC_threshold: float, optional
-            The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. The default is 0.01.
-        seed: int, optional
-            The seed to use for the random number generator. The default is 42.
-        num_workers: int, optional
-            The number of workers to use for parallel processing. The default is 1.
+        adata: AnnData object containing the expression matrix.
+        pathways_dict: A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
+        AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
+        seed: The seed to use for the random number generator. (42)
+        num_workers: The number of workers to use for parallel processing. (1)
 
     Returns:
-        adata_aucs: AnnData object
-            AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+        adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
     """
 
     check_ctxcore()
@@ -301,26 +265,18 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
 
 def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed=42, 
                               num_workers=1, chunk_size=10000):
-    """
-    Enriches cell annotations with pathway activity scores using the AUC-ell method.
+    r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
     Arguments:
-        adata: AnnData object
-            AnnData object containing the expression matrix.
-        pathways_dict: dict
-            A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-        AUC_threshold: float, optional
-            The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. The default is 0.01.
-        seed: int, optional
-            The seed to use for the random number generator. The default is 42.
-        num_workers: int, optional
-            The number of workers to use for parallel processing. The default is 1.
-        chunk_size: int, optional
-            The number of cells to process in each chunk. The default is 10000.
+        adata: AnnData object containing the expression matrix.
+        pathways_dict: A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
+        AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
+        seed: The seed to use for the random number generator. (42)
+        num_workers: The number of workers to use for parallel processing. (1)
+        chunk_size: The number of cells to process in each chunk. (10000)
 
     Returns:
-        adata_aucs: AnnData object
-            AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+        adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
     """
     from tqdm import tqdm
     check_ctxcore()
@@ -364,32 +320,20 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
 
 def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain', 
                        cutoff=0.05, logfc_threshold=2,pvalue_type='adjust',plot=True):
-    
-    """
-    Perform pathway enrichment analysis on gene expression data.
+    r"""Perform pathway enrichment analysis on gene expression data.
     
     Arguments:
-        adata: anndata.AnnData
-            Annotated data matrix containing gene expression data.
-        pathways_dict: dict
-            A dictionary of gene sets with their gene members.
-        organism: str, optional (default: 'Human')
-            The organism to be used for the enrichment analysis. Can be either 'Human' or 'Mouse'.
-        group_by: str, optional (default: 'louvain')
-            The group label of the cells in adata.obs to perform the enrichment analysis on.
-        cutoff: float, optional (default: 0.05)
-            The adjusted p-value cutoff used to filter enriched pathways.
-        logfc_threshold: float, optional (default: 2)
-            The log2 fold change cutoff used to define differentially expressed genes.
-        pvalue_type: str, optional (default: 'adjust')
-            The type of p-value used for filtering enriched pathways. Can be either 'adjust' or 'raw'.
-        plot: bool, optional (default: True)
-            If True, generate a bar plot for each cluster of enriched pathways.
+        adata: Annotated data matrix containing gene expression data.
+        pathways_dict: A dictionary of gene sets with their gene members.
+        organism: The organism to be used for the enrichment analysis. Can be either 'Human' or 'Mouse'. ('Human')
+        group_by: The group label of the cells in adata.obs to perform the enrichment analysis on. ('louvain')
+        cutoff: The adjusted p-value cutoff used to filter enriched pathways. (0.05)
+        logfc_threshold: The log2 fold change cutoff used to define differentially expressed genes. (2)
+        pvalue_type: The type of p-value used for filtering enriched pathways. Can be either 'adjust' or 'raw'. ('adjust')
+        plot: If True, generate a bar plot for each cluster of enriched pathways. (True)
     
     Returns:
-        enrich_res: pandas.DataFrame
-            A pandas dataframe containing the enriched pathways information including term name, 
-            p-value, adjusted p-value, overlap genes, odds ratio, log2 fold change, and cluster name.
+        enrich_res: A pandas dataframe containing the enriched pathways information including term name, p-value, adjusted p-value, overlap genes, odds ratio, log2 fold change, and cluster name.
     
     Examples:
         >>> # Perform pathway enrichment analysis on adata using pathways_dict
@@ -469,27 +413,18 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     return enrich_res
 
 def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,10),plot_title='',**kwds):
-    
-    """
-    Visualize the pathway enrichment analysis results as a heatmap.
+    r"""Visualize the pathway enrichment analysis results as a heatmap.
 
-    Parameters:
-        enrich_res: pandas DataFrame
-            The output from the pathway_enrichment() function.
-        term_num: int, optional
-            The number of enriched terms to display for each cluster. Default is 5.
-        return_table: bool, optional
-            Whether to return the heatmap table as a DataFrame. Default is False.
-        figsize: tuple, optional
-            The size of the plot. Default is (3,10).
-        plot_title: str, optional
-            The title of the plot. Default is an empty string.
-        **kwds: optional
-            Other keyword arguments to pass to the seaborn heatmap function.
+    Arguments:
+        enrich_res: The output from the pathway_enrichment() function.
+        term_num: The number of enriched terms to display for each cluster. (5)
+        return_table: Whether to return the heatmap table as a DataFrame. (False)
+        figsize: The size of the plot. ((3,10))
+        plot_title: The title of the plot. ('')
+        **kwds: Other keyword arguments to pass to the seaborn heatmap function.
 
     Returns:
-        ax: matplotlib Axes object
-            The heatmap plot.
+        ax: The heatmap plot.
 
     Examples:
         >>> res = pathway_enrichment(adata, pathways_dict)

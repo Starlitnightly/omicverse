@@ -39,15 +39,14 @@ class pyVIA(object):
                  time_series_labels:list=None, knn_sequential:int = 10, knn_sequential_reverse:int = 0,t_diff_step:int = 1,single_cell_transition_matrix = None,
                  embedding_type:str='via-mds',do_compute_embedding:bool=False, color_dict:dict=None,user_defined_terminal_cell:list=[], user_defined_terminal_group:list=[],
                  do_gaussian_kernel_edgeweights:bool=False,RW2_mode:bool=False,working_dir_fp:str ='/home/shobi/Trajectory/Datasets/') -> None:
-        r"""
-        Initialize a pyVIA object.
+        r"""Initialize a pyVIA object for trajectory inference.
 
         Arguments:
-            adata: An AnnData object containing the scRNA-seq.
-            adata_key: the key of the AnnData in obsm to perform VIA on. default: 'X_pca'
-            adata_ncomps: the number of components to use from the AnnData in obsm to perform VIA on. default: 80
-            basis: the key of the AnnData in obsm to use as the basis for the embedding. default: 'X_umap'
-            clusters: the clusters to use for the VIA analysis. default: ''
+            adata: An AnnData object containing the single-cell RNA-seq data
+            adata_key (str): The key of the AnnData in obsm to perform VIA on (default: 'X_pca')
+            adata_ncomps (int): The number of components to use from the AnnData in obsm (default: 80)
+            basis (str): The key of the AnnData in obsm to use as the basis for embedding (default: 'X_umap')
+            clusters (str): The clusters to use for the VIA analysis (default: '')
             dist_std_local: local level of pruning for PARC graph clustering stage. Range (0.1,3) higher numbers mean more edge retention
             jac_std_global: (optional, default = 0.15, can also set as 'median') global level graph pruning for PARC clustering stage. Number of standard deviations below the network’s mean-jaccard-weighted edges. 0.1-1 provide reasonable pruning.higher value means less pruning (more edges retained). e.g. a value of 0.15 means all edges that are above mean(edgeweight)-0.15*std(edge-weights) are retained. We find both 0.15 and ‘median’ to yield good results/starting point and resulting in pruning away ~ 50-60% edges
             labels: default is None. and PARC clusters are used for the viagraph. alternatively provide a list of clustermemberships that are integer values (not strings) to construct the viagraph using another clustering method or available annotations
@@ -141,23 +140,24 @@ class pyVIA(object):
                  do_gaussian_kernel_edgeweights=do_gaussian_kernel_edgeweights,RW2_mode=RW2_mode,working_dir_fp=working_dir_fp
                  )
     def run(self):
-        """calculate the via graph and pseudotime
+        r"""Calculate the VIA graph and pseudotime.
         
+        This method runs the main VIA algorithm to construct the trajectory graph
+        and compute pseudotime for each cell.
         """
 
         self.model.run_VIA()
         add_reference(self.adata,'VIA','trajectory inference with VIA')
 
     def get_piechart_dict(self,label:int=0,clusters:str='')->dict:
-        """
-        Cluster composition graph
+        r"""Get cluster composition dictionary for pie chart visualization.
 
         Arguments:
-            label: int (default=0) cluster label of pie chart
-            clusters: the celltype you want interested
+            label (int): Cluster label of pie chart (default: 0)
+            clusters (str): The celltype column name of interest (default: '')
         
         Returns:
-            res_dict: cluster composition graph
+            dict: Cluster composition dictionary for visualization
         """
         if clusters=='':
             clusters=self.clusters
@@ -167,11 +167,11 @@ class pyVIA(object):
         return res_dict
     
     def get_pseudotime(self,adata=None):
-        """
-        Extract the pseudotime of VIA
+        r"""Extract the pseudotime values computed by VIA.
 
         Arguments:
-            adata: an adata object of you interested,if None, it will be added to `self.adata.obs['pt_via']`
+            adata: An AnnData object to add pseudotime to (default: None)
+                  If None, pseudotime will be added to self.adata.obs['pt_via']
 
         """
 
@@ -190,26 +190,28 @@ class pyVIA(object):
                                 show_legend:bool=True, pie_size_scale:float=0.8, fontsize:float=8)->Tuple[matplotlib.figure.Figure,
                                                                                                           matplotlib.axes._axes.Axes,
                                                                                                           matplotlib.axes._axes.Axes]:
-        """plot two subplots with a clustergraph level representation of the viagraph showing true-label composition (lhs) and pseudotime/gene expression (rhs)
+        r"""Plot two subplots with clustergraph representation showing cluster composition and pseudotime/gene expression.
     
         Arguments:
-            clusters : column name of the adata.obs dataframe that contains the cluster labels
-            type_data : string  default 'pt' for pseudotime colored nodes. or 'gene'
-            gene_exp : list of values (column of dataframe) corresponding to feature or gene expression to be used to color nodes at CLUSTER level
-            title : string
-            cmap : default None. automatically chooses coolwarm for gene expression or viridis_r for pseudotime
-            ax_text : Bool default= True. Annotates each node with cluster number and population of membership
-            dpi : int default = 150
-            headwidth_bundle : default = 0.1. width of arrowhead used to directed edges
-            reference : None or list. list of categorical (str) labels for cluster composition of the piecharts (LHS subplot) length = n_samples.
-            pie_size_scale : float default=0.8 scaling factor of the piechart nodes
-            fontsize : float default=8. fontsize of the text in the piecharts
-            figsize : tuple default=(8,4). size of the figure
+            clusters (str): Column name of the adata.obs dataframe containing cluster labels (default: '')
+            type_data (str): Type of data for coloring nodes - 'pt' for pseudotime or 'gene' (default: 'pt')
+            gene_exp (list): List of values for gene expression to color nodes at cluster level (default: [])
+            title (str): Title for the plot (default: '')
+            cmap (str): Colormap - automatically chooses coolwarm for gene or viridis_r for pseudotime (default: None)
+            ax_text (bool): Whether to annotate nodes with cluster number and population (default: True)
+            figsize (tuple): Figure size (default: (8,4))
+            dpi (int): DPI for the figure (default: 150)
+            headwidth_arrow (float): Width of arrowhead for directed edges (default: 0.1)
+            alpha_edge (float): Transparency of edges (default: 0.4)
+            linewidth_edge (float): Width of edges (default: 2)
+            edge_color (str): Color of edges (default: 'darkblue')
+            reference: List of categorical labels for cluster composition (default: None)
+            show_legend (bool): Whether to show legend (default: True)
+            pie_size_scale (float): Scaling factor of the piechart nodes (default: 0.8)
+            fontsize (float): Font size of text in piecharts (default: 8)
 
         Returns:
-            fig: Returns matplotlib figure with two axes that plot the clustergraph using edge bundling
-            ax: left axis shows the clustergraph with each node colored by annotated ground truth membership.
-            ax1: right axis shows the same clustergraph with each node colored by the pseudotime or gene expression
+            tuple: (fig, ax, ax1) where fig is matplotlib figure, ax is left axis with cluster composition, ax1 is right axis with pseudotime/gene expression
         """
 
 

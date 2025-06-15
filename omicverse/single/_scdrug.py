@@ -23,17 +23,16 @@ from .._settings import add_reference
 
 import time
 def autoResolution(adata,cpus=4):
-    r"""
-    Automatically determine clustering resolution
+    r"""Automatically determine clustering resolution.
 
     Arguments:
-        adata : `scanpy.AnnData` The single cell data.
-        cpus : `int`, optional (default: 4) The number of cpus used for parallel computing.
+        adata: The single cell data.
+        cpus: The number of cpus used for parallel computing. (4)
     
     Returns:
-        adata : `scanpy.AnnData` The single cell data with the clustering resolution.
-        res : `float` The clustering resolution.
-        df_sil: `pandas.DataFrame` The silhouette score of each clustering resolution.
+        adata: The single cell data with the clustering resolution.
+        res: The clustering resolution.
+        df_sil: The silhouette score of each clustering resolution.
     """
     print("Automatically determine clustering resolution...")
     start = time.time()
@@ -104,14 +103,14 @@ def autoResolution(adata,cpus=4):
     return adata, res, df_sil
 
 def writeGEP(adata_GEP,path):
-    r"""
-    Write the gene expression profile to a file
+    r"""Write the gene expression profile to a file.
 
     Arguments:
-        adata_GEP : `scanpy.AnnData` The single cell data with gene expression profile. 
-        path : `str` The path to save the gene expression profile.
+        adata_GEP: The single cell data with gene expression profile.
+        path: The path to save the gene expression profile.
     
     Returns:
+        None
 
     """
     print('Exporting GEP...')
@@ -133,20 +132,18 @@ class Drug_Response:
     def __init__(self,adata,scriptpath,modelpath,output='./',model='GDSC',clusters='All',
                  cell='A549',cpus=4,n_drugs=10):
         
-        """
-        Initializes the Drug_Response class.
+        r"""Initialize the Drug_Response class.
 
         Arguments:
             adata: Annotated data matrix with cells as rows and genes as columns.
             scriptpath: Path to the directory containing the CaDRReS scripts for the analysis. You need to download the scripts according to `git clone https://github.com/CSB5/CaDRReS-Sc.git` and set the path to the directory.
-            modelpath: Path to the directory containing the pre-trained models.
-                You need to download the models according to `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()` and set the path to the directory.
-            output: Path to the directory where the output files will be saved (default: './').
-            model: The name of the pre-trained model to be used for the analysis (default: 'GDSC').
-            clusters: The cluster labels to be used for the analysis. Default is all cells (default: 'All').
-            cell: The cell line to be analyzed (default: 'A549').
-            cpus: The number of CPUs to be used for the analysis (default: 4).
-            n_drugs: The number of top drugs to be selected based on the predicted sensitivity (default: 10).
+            modelpath: Path to the directory containing the pre-trained models. You need to download the models according to `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()` and set the path to the directory.
+            output: Path to the directory where the output files will be saved. ('./')
+            model: The name of the pre-trained model to be used for the analysis. ('GDSC')
+            clusters: The cluster labels to be used for the analysis. Default is all cells. ('All')
+            cell: The cell line to be analyzed. ('A549')
+            cpus: The number of CPUs to be used for the analysis. (4)
+            n_drugs: The number of top drugs to be selected based on the predicted sensitivity. (10)
 
         Returns:
             None
@@ -179,8 +176,10 @@ class Drug_Response:
         self.figure_output()
 
     def load_model(self):
-        r"""
-        load the pre-trained model.
+        r"""Load the pre-trained model.
+
+        Returns:
+            None
 
         """
         from cadrres_sc import pp, model, evaluation, utility

@@ -22,8 +22,10 @@ def global_imports(modulename,shortname = None, asfunction = False):
         globals()[shortname] = __import__(modulename)
 
 def check_kpy():
-    """
+    r"""Check if ktplotspy package is installed for CellPhoneDB analysis.
     
+    Raises:
+        ImportError: If ktplotspy is not installed
     """
     global kpy_install
     try:
@@ -181,30 +183,29 @@ def cpdb_plot_interaction(adata:anndata.AnnData,cell_type1:str,cell_type2:str,
                          max_size:int=1,highlight_size:float = 0.75,standard_scale:bool = True,
                          cmap_name:str='viridis',
                          ytickslabel_fontsize:int=8,xtickslabel_fontsize:int=8,title_fontsize:int=10)->matplotlib.axes._axes.Axes:
-    r"""
-    Plot a CellPhoneDB interaction.
+    r"""Plot CellPhoneDB cell-cell interactions between two cell types.
 
     Arguments:
-        adata: AnnData object containing the data.
-        cell_type1: Name of cell type 1.
-        cell_type2: Name of cell type 2.
-        means: DataFrame containing the means for each interaction.
-        pvals: DataFrame containing the p-values for each interaction.
-        celltype_key: Key in adata.obs that contains the cell type information.
-        genes: List of genes to include in the plot. If None, all genes are included.
-        keep_significant_only: Whether to keep only significant interactions.
-        figsize: Figure size.
-        title: Title of the plot.
-        max_size: Maximum size of the dots.
-        highlight_size: Size of the dots for the highlighted interaction.
-        standard_scale: Whether to standard scale the data.
-        cmap_name: Name of the colormap to use.
-        ytickslabel_fontsize: Fontsize of the yticks labels.
-        xtickslabel_fontsize: Fontsize of the xticks labels.
-        title_fontsize: Fontsize of the title.
+        adata: AnnData object containing single-cell data
+        cell_type1 (str): Name of first cell type
+        cell_type2 (str): Name of second cell type
+        means: DataFrame containing interaction means from CellPhoneDB
+        pvals: DataFrame containing p-values from CellPhoneDB
+        celltype_key (str): Key in adata.obs containing cell type information
+        genes (list): List of genes to include in plot (default: None for all genes)
+        keep_significant_only (bool): Whether to show only significant interactions (default: True)
+        figsize (tuple): Figure size (default: (4,8))
+        title (str): Plot title (default: '')
+        max_size (int): Maximum dot size (default: 1)
+        highlight_size (float): Size for highlighted interactions (default: 0.75)
+        standard_scale (bool): Whether to standard scale the data (default: True)
+        cmap_name (str): Name of the colormap to use (default: 'viridis')
+        ytickslabel_fontsize (int): Font size of the y-axis tick labels (default: 8)
+        xtickslabel_fontsize (int): Font size of the x-axis tick labels (default: 8)
+        title_fontsize (int): Font size of the title (default: 10)
     
     Returns:
-        ax: Axes object containing the plot.
+        matplotlib.axes.Axes: Axes object containing the interaction plot
 
     """
     check_kpy()
@@ -242,16 +243,15 @@ def cpdb_plot_interaction(adata:anndata.AnnData,cell_type1:str,cell_type2:str,
     return fig.get_axes()[0]
 
 def cpdb_submeans_exacted(means:pd.DataFrame,cell_names:str,cell_type:str='ligand')->pd.DataFrame:
-    r"""
-    Returns a subset of the means DataFrame for a given cell type and cell name.
+    r"""Extract subset of CellPhoneDB means DataFrame for specific cell type.
 
     Arguments:
-        means: DataFrame containing the means for each interaction.
-        cell_names: Name of the cell type.
-        cell_type: Whether the cell type is a ligand or a receptor.
+        means: DataFrame containing interaction means from CellPhoneDB
+        cell_names (str): Name of the cell type to extract
+        cell_type (str): Whether to extract as 'ligand' or 'receptor' (default: 'ligand')
 
     Returns:
-        means: Subset of the means DataFrame for a given cell type and cell name.
+        pd.DataFrame: Subset of means DataFrame for specified cell type and role
 
     """
     if cell_type=='ligand':

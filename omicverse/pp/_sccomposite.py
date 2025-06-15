@@ -305,19 +305,25 @@ def rna_fit_goodness(data, alpha, beta, theta, decay, k=3):
 def composite_rna(adata, multiomics = False,
                   n=3, lr=0.001, p=0.7, stable_criterion = "signal",
                   stable_number = None, tolerance = 10):
-    '''
-    N: the maximum number of cells in a droplet that will be modeled
-    lr: learning rate in the maximum likelihood estimation step; 
-    Note that the recommanded learning rates for different modalities are different
-    p: user estimated singlet proportion
-    stable_criterion: By default, stable features are selected to have high signal-to-noise ratio.
-    User may set it to "mean" so that 
-    stable features are selected to have high mean expression level
-    stable_number: number of stable features to be selected for modeling
-    tolerance: Controls early stopping. Increasing this number may slightly 
-    improve model performance but will significantly increase computing time
+    r"""Perform RNA-based doublet detection using COMPOSITE method.
     
-    '''
+    COMPOSITE is a probabilistic method for detecting doublets in single-cell
+    RNA-seq data using mixture modeling of gene expression profiles with
+    maximum likelihood estimation and GPU acceleration.
+
+    Arguments:
+        adata: Annotated data matrix of shape n_obs × n_vars
+        multiomics (bool): Whether to return results for multiomics integration (default: False)
+        n (int): Maximum number of cells in a droplet to model (default: 3)
+        lr (float): Learning rate for maximum likelihood estimation (default: 0.001)
+        p (float): Estimated singlet proportion (default: 0.7)
+        stable_criterion (str): Method for selecting stable features, 'signal' or 'mean' (default: 'signal')
+        stable_number (int): Number of stable features to select (default: None)
+        tolerance (int): Early stopping tolerance for convergence (default: 10)
+
+    Returns:
+        doublet_classification, consistency: Doublet predictions and consistency scores
+    """
     global dev
     if torch.cuda.is_available():
         dev = "cuda:0"

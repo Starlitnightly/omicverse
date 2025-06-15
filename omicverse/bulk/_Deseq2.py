@@ -15,8 +15,7 @@ from ..utils import plot_boxplot
 from ..pl import volcano
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
-    """
-    Maps gene IDs in the input data to gene symbols using a reference table.
+    r"""Map gene IDs in the input data to gene symbols using a reference table.
 
     Arguments:
         data: The input data containing gene IDs as index.
@@ -43,14 +42,13 @@ def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
 
 
 def deseq2_normalize(data:pd.DataFrame)->pd.DataFrame:
-    r"""
-    Normalize the data using DESeq2 method:
+    r"""Normalize the data using DESeq2 method.
 
     Arguments:
-        data: the data to be normalized.
+        data: The data to be normalized.
     
     Returns:
-        data: the normalized data.
+        data: The normalized data.
 
     """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
@@ -64,14 +62,15 @@ def normalize_bulk(df_counts, df_lengths, normalization_type):
     counts = df_counts.values
     lengths = df_lengths['feature_length'].astype(float).values.reshape(1, -1)  # Ensure lengths is a column vector
     
-    """
-    Normalize the count data.
+    r"""Normalize the count data.
 
     Arguments:
         df_counts: Gene expression count matrix (number of cells x number of genes).
         df_lengths: Vector of gene lengths.
         normalization_type: Type of normalization (e.g., 'CPM', 'TPM', 'FPKM', 'RPKM').
 
+    Returns:
+        normalized_data: Normalized data as DataFrame
     """
     
     if normalization_type == 'CPM':
@@ -96,23 +95,20 @@ def normalize_bulk(df_counts, df_lengths, normalization_type):
 
 
 def estimateSizeFactors(data:pd.DataFrame)->pd.Series:
-    """
-    Estimate size factors for data normalization.
+    r"""Estimate size factors for data normalization.
 
     Arguments:
-        data:  A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
+        data: A pandas DataFrame of gene expression data where rows correspond to samples and columns correspond to genes.
+    
     Returns:
         scale: A pandas Series of size factors, one for each sample.
 
     Examples:
-    --------
-    ```python
-    import pandas as pd
-    import numpy as np
-    import Pyomic
-    data = pd.DataFrame(np.random.rand(100, 10), columns=list('abcdefghij'))
-    size_factors = Pyomic.bulk.estimateSizeFactors(data)
-    ```
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> import omicverse as ov
+        >>> data = pd.DataFrame(np.random.rand(100, 10), columns=list('abcdefghij'))
+        >>> size_factors = ov.bulk.estimateSizeFactors(data)
     """
     avg1=data.apply(np.log,axis=1).mean(axis=1).replace([np.inf,-np.inf],np.nan).dropna()
     data1=data.loc[avg1.index]
@@ -122,12 +118,10 @@ def estimateSizeFactors(data:pd.DataFrame)->pd.Series:
 
 
 def estimateDispersions(counts:pd.DataFrame)->pd.Series:
-    """
-    Estimates the dispersion parameter of the Negative Binomial distribution
-    for each gene in the input count matrix.
+    r"""Estimate the dispersion parameter of the Negative Binomial distribution for each gene in the input count matrix.
 
     Arguments:
-        counts:Input count matrix with shape (n_genes, n_samples).
+        counts: Input count matrix with shape (n_genes, n_samples).
 
     Returns:
         disp: Array of dispersion values for each gene in the input count matrix.
@@ -148,8 +142,7 @@ def estimateDispersions(counts:pd.DataFrame)->pd.Series:
     return disp
 
 def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
-    r"""
-    Drop the duplicated index of data.
+    r"""Drop the duplicated index of data.
 
     Arguments:
         data: The data to be processed.
@@ -168,30 +161,30 @@ class pyDEG(object):
 
 
     def __init__(self,raw_data:pd.DataFrame) -> None:
-        """Initialize the pyDEG class.
+        r"""Initialize the pyDEG class.
 
         Arguments:
             raw_data: The raw data to be processed.
         
+        Returns:
+            None
         """
         self.raw_data=raw_data
         self.data=raw_data.copy()
         
     def drop_duplicates_index(self)->pd.DataFrame:
-        r"""
-        Drop the duplicated index of data.
+        r"""Drop the duplicated index of data.
 
-        Returns
+        Returns:
             data: The data after dropping the duplicated index.
         """
         self.data=data_drop_duplicates_index(self.data)
         return self.data
 
     def normalize(self)->pd.DataFrame:
-        r"""
-        Normalize the data using DESeq2 method.
+        r"""Normalize the data using DESeq2 method.
         
-        Returns
+        Returns:
             data: The normalized data.
         """
         self.size_factors=estimateSizeFactors(self.data)
@@ -199,15 +192,16 @@ class pyDEG(object):
         return self.data
     
     def foldchange_set(self,fc_threshold:int=-1,pval_threshold:float=0.05,logp_max:int=6,fold_threshold:int=0):
-        """
-        Sets fold-change and p-value thresholds to classify differentially expressed genes as up-regulated, down-regulated, or not significant.
+        r"""Set fold-change and p-value thresholds to classify differentially expressed genes as up-regulated, down-regulated, or not significant.
 
         Arguments:
-            fc_threshold: Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes.
-            pval_threshold: p-value threshold for determining significance.
-            logp_max: Maximum value for log-transformed p-values.
-            fold_threshold: Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1).
+            fc_threshold: Absolute fold-change threshold. If set to -1, the threshold is calculated based on the histogram of log2 fold-changes. (-1)
+            pval_threshold: p-value threshold for determining significance. (0.05)
+            logp_max: Maximum value for log-transformed p-values. (6)
+            fold_threshold: Index of the histogram bin corresponding to the fold-change threshold (only applicable if fc_threshold=-1). (0)
 
+        Returns:
+            None
         """
         if fc_threshold==-1:
             foldp=np.histogram(self.result['log2FC'].dropna())
@@ -232,23 +226,28 @@ class pyDEG(object):
                      legend_bbox:tuple=(0.8, -0.2),legend_ncol:int=2,legend_fontsize:int=12,
                      plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
                      ticks_fontsize:int=12,ax=None):
-        """
-        Generate a volcano plot for the differential gene expression analysis results.
+        r"""Generate a volcano plot for the differential gene expression analysis results.
 
         Arguments:
-            figsize: The size of the generated figure, by default (4,4).
-            title: The title of the plot, by default ''.
-            titlefont: A dictionary of font properties for the plot title, by default {'weight':'normal','size':14,}.
-            up_color: The color of the up-regulated genes in the plot, by default '#e25d5d'.
-            down_color: The color of the down-regulated genes in the plot, by default '#7388c1'.
-            normal_color: The color of the non-significant genes in the plot, by default '#d7d7d7'.
-            legend_bbox: A tuple containing the coordinates of the legend's bounding box, by default (0.8, -0.2).
-            legend_ncol: The number of columns in the legend, by default 2.
-            legend_fontsize: The font size of the legend, by default 12.
-            plot_genes: A list of genes to be plotted on the volcano plot, by default None.
-            plot_genes_num: The number of genes to be plotted on the volcano plot, by default 10.
-            plot_genes_fontsize: The font size of the genes to be plotted on the volcano plot, by default 10.
-            ticks_fontsize: The font size of the ticks, by default 12.
+            figsize: The size of the generated figure. ((4,4))
+            pval_name: Column name for p-values. ('qvalue')
+            fc_name: Column name for fold changes. ('log2FC')
+            title: The title of the plot. ('')
+            titlefont: A dictionary of font properties for the plot title. ({'weight':'normal','size':14,})
+            up_color: The color of the up-regulated genes in the plot. ('#e25d5d')
+            down_color: The color of the down-regulated genes in the plot. ('#7388c1')
+            normal_color: The color of the non-significant genes in the plot. ('#d7d7d7')
+            up_fontcolor: Font color for up-regulated gene labels. ('#e25d5d')
+            down_fontcolor: Font color for down-regulated gene labels. ('#7388c1')
+            normal_fontcolor: Font color for normal gene labels. ('#d7d7d7')
+            legend_bbox: A tuple containing the coordinates of the legend's bounding box. ((0.8, -0.2))
+            legend_ncol: The number of columns in the legend. (2)
+            legend_fontsize: The font size of the legend. (12)
+            plot_genes: A list of genes to be plotted on the volcano plot. (None)
+            plot_genes_num: The number of genes to be plotted on the volcano plot. (10)
+            plot_genes_fontsize: The font size of the genes to be plotted on the volcano plot. (10)
+            ticks_fontsize: The font size of the ticks. (12)
+            ax: Matplotlib axis object. (None)
 
         Returns:
             ax: The generated volcano plot.

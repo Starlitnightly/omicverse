@@ -8,6 +8,27 @@ def embedding_atlas(adata,basis,color,
                     title=None,figsize=(4,4),ax=None,cmap='RdBu',
                     legend_loc = 'right margin',frameon='small',
                     fontsize=12):
+    r"""
+    Create high-resolution embedding plots using Datashader for large datasets.
+    
+    Uses Datashader to render embeddings at high resolution, suitable for datasets
+    with millions of cells where standard scatter plots become ineffective.
+    
+    Arguments:
+        adata: Annotated data object with embedding coordinates
+        basis: Key in adata.obsm containing embedding coordinates (e.g., 'X_umap')
+        color: Gene name or obs column to color cells by
+        title: Plot title (None, uses color name)
+        figsize: Figure dimensions as (width, height) ((4,4))
+        ax: Existing matplotlib axes object (None)
+        cmap: Colormap for continuous values ('RdBu')
+        legend_loc: Legend position ('right margin')
+        frameon: Frame style - False, 'small', or True ('small')
+        fontsize: Font size for labels and title (12)
+        
+    Returns:
+        ax: matplotlib.axes.Axes object with rendered embedding
+    """
     import scanpy as sc
     import pandas as pd
     import datashader as ds

@@ -5,6 +5,21 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
 def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
+    r"""
+    Generate points for a curved line between two coordinates using Bezier curves.
+    
+    Arguments:
+        x0: Starting x coordinate
+        y0: Starting y coordinate
+        x1: Ending x coordinate
+        y1: Ending y coordinate
+        eps: Curve control parameter (0.8)
+        pointn: Number of points along the curve (30)
+        
+    Returns:
+        x: Array of x coordinates along the curve
+        y: Array of y coordinates along the curve
+    """
     import bezier
     x2 = (x0 + x1) / 2.0 + 0.1 ** (eps + abs(x0 - x1)) * (-1) ** (random.randint(1, 4))
     y2 = (y0 + y1) / 2.0 + 0.1 ** (eps + abs(y0 - y1)) * (-1) ** (random.randint(1, 4))
@@ -21,6 +36,21 @@ def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
 
 def curved_graph(_graph, pos=None, eps=0.2, pointn=30, 
                  linewidth=2, alpha=0.3, color_dict=None):
+    r"""
+    Draw a network graph with curved edges and arrows.
+    
+    Arguments:
+        _graph: NetworkX graph object
+        pos: Node position dictionary (None)
+        eps: Curve control parameter (0.2)
+        pointn: Number of points along each curve (30)
+        linewidth: Width of edge lines (2)
+        alpha: Transparency of edges (0.3)
+        color_dict: Color mapping for edges (None)
+        
+    Returns:
+        None: Draws on current matplotlib axes
+    """
     ax = plt.gca()
     for u, v in _graph.edges():
         x0, y0 = pos[u]
@@ -61,34 +91,42 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
                        label_fontfamily: str = 'Arial', label_fontweight: str = 'bold', label_bbox=None,
                        legend_bbox: tuple = (0.7, 0.05), legend_ncol: int = 3, legend_fontsize: int = 12,
                        legend_fontweight: str = 'bold', curve_awarg=None,ylim=(-0.5,0.5),xlim=(-3,3),ax=None):
-    """
-    Plot network graph.
-
+    r"""
+    Create a network plot with curved edges and customizable node styling.
+    
     Arguments:
-        G: networkx graph
-        G_type_dict: dict, node type dict
-        G_color_dict: dict, node color dict
-        pos_type: str, node position type, 'spring' or 'kamada_kawai'
-        pos_dim: int, node position dimension, 2 or 3
-        figsize: tuple, figure size
-        pos_scale: int, node position scale
-        pos_k: float, node position k
-        pos_alpha: float, node position alpha
-        node_size: int, node size
-        node_alpha: float, node alpha
-        node_linewidths: float, node linewidths
-        plot_node: list, plot node list
-        plot_node_num: int, plot node number
-        label_verticalalignment: str, label verticalalignment
-        label_fontsize: int, label fontsize
-        label_fontfamily: str, label fontfamily
-        label_fontweight: str, label fontweight
-        label_bbox: tuple, label bbox
-        legend_bbox: tuple, legend bbox
-        legend_ncol: int, legend ncol
-        legend_fontsize: int, legend fontsize
-        legend_fontweight: str, legend fontweight
-        curve_awarg: dict, arguments for curved graph
+        G: NetworkX graph object
+        G_type_dict: Dictionary mapping nodes to types
+        G_color_dict: Dictionary mapping nodes to colors
+        pos_type: Layout algorithm - 'spring', 'kamada_kawai', or custom positions ('spring')
+        pos_dim: Dimensionality for layout algorithm (2)
+        figsize: Figure dimensions as (width, height) ((4, 4))
+        pos_scale: Scale factor for node positions (10)
+        pos_k: Optimal distance parameter for spring layout (None)
+        pos_alpha: Transparency for position calculation (0.4)
+        node_size: Base size for nodes (50)
+        node_alpha: Transparency for nodes (0.6)
+        node_linewidths: Width of node borders (1)
+        plot_node: Specific nodes to label (None, uses top degree nodes)
+        plot_node_num: Number of top nodes to label (20)
+        node_shape: Dictionary mapping node types to shapes (None)
+        label_verticalalignment: Vertical alignment for labels ('center_baseline')
+        label_fontsize: Font size for node labels (12)
+        label_fontfamily: Font family for labels ('Arial')
+        label_fontweight: Font weight for labels ('bold')
+        label_bbox: Bounding box properties for labels (None)
+        legend_bbox: Legend position as (x, y) ((0.7, 0.05))
+        legend_ncol: Number of legend columns (3)
+        legend_fontsize: Legend font size (12)
+        legend_fontweight: Legend font weight ('bold')
+        curve_awarg: Additional arguments for curved edges (None)
+        ylim: Y-axis limits as (min, max) ((-0.5,0.5))
+        xlim: X-axis limits as (min, max) ((-3,3))
+        ax: Existing matplotlib axes object (None)
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
+        ax: matplotlib.axes.Axes object
     """
     from adjustText import adjust_text
     if ax is None:
@@ -201,6 +239,21 @@ def plot_flowsig_network(flow_network,
                         curve_awarg={'eps':2},
                         node_shape={'GEM':'^','Sender':'o','Receptor':'o'},
                         **kwargs):
+    r"""
+    Create a flowsig network visualization showing GEM modules and gene flows.
+    
+    Arguments:
+        flow_network: NetworkX graph with flow connections
+        gem_plot: List of GEM modules to include in plot
+        figsize: Figure dimensions as (width, height) ((8,4))
+        curve_awarg: Arguments for curved edge drawing ({'eps':2})
+        node_shape: Dictionary mapping node types to shapes ({'GEM':'^','Sender':'o','Receptor':'o'})
+        **kwargs: Additional arguments passed to plot_curve_network
+        
+    Returns:
+        fig: matplotlib.figure.Figure object
+        ax: matplotlib.axes.Axes object
+    """
     
     gem_li=[i for i in flow_network.nodes if 'GEM' in i]
     receptor_li=[i for i,j in flow_network.edges if ('GEM' in j)and('GEM' not in i)]

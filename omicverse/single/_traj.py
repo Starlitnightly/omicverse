@@ -20,11 +20,26 @@ from ..externel.palantir.presults import select_branch_cells,compute_gene_trends
 
 
 class TrajInfer(object):
+    r"""Trajectory inference class for single-cell data analysis.
+    
+    This class provides methods for inferring developmental trajectories using
+    various algorithms including Palantir, diffusion maps, and Slingshot.
+    """
     
     def __init__(self,adata:anndata.AnnData,
                  basis:str='X_umap',use_rep:str='X_pca',n_comps:int=50,
                  n_neighbors:int=15,
                 groupby:str='clusters',):
+        r"""Initialize trajectory inference object.
+        
+        Arguments:
+            adata: AnnData object containing single-cell data
+            basis (str): Embedding key in adata.obsm for visualization (default: 'X_umap')
+            use_rep (str): Representation key in adata.obsm for trajectory computation (default: 'X_pca')
+            n_comps (int): Number of components to use from representation (default: 50)
+            n_neighbors (int): Number of neighbors for graph construction (default: 15)
+            groupby (str): Key in adata.obs containing cluster annotations (default: 'clusters')
+        """
         self.adata=adata
         self.use_rep=use_rep
         self.n_comps=n_comps
@@ -36,12 +51,31 @@ class TrajInfer(object):
         self.terminal=None
         
     def set_terminal_cells(self,terminal:list):
+        r"""Set terminal cell types for trajectory inference.
+        
+        Arguments:
+            terminal (list): List of terminal cell type names
+        """
         self.terminal=terminal
         
     def set_origin_cells(self,origin:str):
+        r"""Set origin cell type for trajectory inference.
+        
+        Arguments:
+            origin (str): Name of the origin cell type
+        """
         self.origin=origin
         
     def inference(self,method:str='palantir',**kwargs):
+        r"""Perform trajectory inference using specified method.
+        
+        Arguments:
+            method (str): Trajectory inference method - 'palantir', 'diffusion_map', or 'slingshot' (default: 'palantir')
+            **kwargs: Additional arguments passed to the chosen method
+            
+        Returns:
+            Depends on method: Palantir results object, None, or sets internal attributes
+        """
         
         if method=='palantir':
 
@@ -115,16 +149,31 @@ class TrajInfer(object):
             return
         
     def palantir_plot_pseudotime(self,**kwargs):
-
+        r"""Plot Palantir pseudotime results.
+        
+        Arguments:
+            **kwargs: Additional arguments passed to plot_palantir_results
+        """
         plot_palantir_results(self.adata,**kwargs)
         
     def palantir_cal_branch(self,**kwargs):
-
+        r"""Calculate and plot branch selection for Palantir results.
+        
+        Arguments:
+            **kwargs: Additional arguments passed to select_branch_cells
+        """
         masks = select_branch_cells(self.adata, **kwargs)
         plot_branch_selection(self.adata)
 
     def palantir_cal_gene_trends(self,layers:str="MAGIC_imputed_data"):
-
+        r"""Calculate gene expression trends along Palantir trajectories.
+        
+        Arguments:
+            layers (str): Key for expression data layer (default: "MAGIC_imputed_data")
+            
+        Returns:
+            Gene trends object containing trajectory-associated expression patterns
+        """
         gene_trends = compute_gene_trends(
             self.adata,
             expression_key=layers,
@@ -132,8 +181,15 @@ class TrajInfer(object):
         return gene_trends
         
     def palantir_plot_gene_trends(self,genes):
+        r"""Plot gene expression trends along Palantir trajectories.
+        
+        Arguments:
+            genes (list): List of gene names to plot
+            
+        Returns:
+            Matplotlib figure object containing gene trend plots
+        """
         #genes = ['Cdca3','Rasl10a','Mog','Aqp4']
-
         return plot_gene_trends(self.adata, genes)
     
 import networkx as nx

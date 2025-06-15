@@ -1,7 +1,52 @@
-"""Single-cell omics analysis utilities."""
+r"""
+Single-cell omics analysis utilities.
+
+This module provides comprehensive tools for single-cell RNA-seq analysis including:
+- Cell type annotation and automated identification
+- Trajectory inference and pseudotime analysis
+- Gene regulatory network analysis
+- Cell-cell communication analysis
+- Multi-modal integration (RNA + ATAC)
+- Drug response prediction
+- Pathway enrichment and functional analysis
+
+Key classes:
+    pyMOFA: Multi-Omics Factor Analysis
+    pyVIA: Velocity and pseudotime analysis 
+    pySIMBA: Single-cell integration and batch alignment
+    pyTOSICA: Trajectory inference and cell fate analysis
+    pyCEFCON: Cell-cell communication analysis
+    MetaCell: Metacell construction and analysis
+    pyDEG: Single-cell differential expression
+
+Annotation tools:
+    pySCSA: Automated cell type annotation
+    MetaTiME: Tumor microenvironment annotation
+    gptcelltype: GPT-based cell type identification
+    CellVote: Consensus cell type annotation
+
+Trajectory analysis:
+    TrajInfer: Trajectory inference framework
+    scLTNN: Lineage tracing with neural networks
+    cytotrace2: Developmental potential scoring
+
+Examples:
+    >>> import omicverse as ov
+    >>> # Automated cell annotation
+    >>> ov.single.pySCSA(adata, tissue='lung', species='human')
+    >>> 
+    >>> # Trajectory analysis
+    >>> via = ov.single.pyVIA(adata)
+    >>> via.run_via()
+    >>> 
+    >>> # Multi-omics integration
+    >>> mofa = ov.single.pyMOFA(data_dict)
+    >>> mofa.build_mofa()
+"""
 
 # Heavy functionality lives in submodules and is imported lazily.
 
+# Core gene selection and differential expression
 from ._cosg import cosg
 from ._anno import pySCSA,MetaTiME,scanpy_lazy,scanpy_cellanno_from_dict,get_celltype_marker
 from ._nocd import scnocd
@@ -40,4 +85,115 @@ from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
 from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
+
+__all__ = [
+    # Core analysis functions
+    'cosg',
+    'lazy',
+    'aucell',
+    
+    # Cell type annotation
+    'pySCSA',
+    'MetaTiME', 
+    'scanpy_lazy',
+    'scanpy_cellanno_from_dict',
+    'get_celltype_marker',
+    'gptcelltype',
+    'gpt4celltype',
+    'get_cluster_celltype',
+    'gptcelltype_local',
+    'CellVote',
+    'CellOntologyMapper',
+    'download_cl',
+    
+    # Multi-omics integration
+    'pyMOFAART',
+    'pyMOFA',
+    'GLUE_pair',
+    'factor_exact',
+    'factor_correlation',
+    'get_weights',
+    'glue_pair',
+    'get_r2_from_hdf5',
+    'pySIMBA',
+    'pyTOSICA',
+    'TFIDF_LSI',
+    'Wrapper',
+    'Integration',
+    'Batch',
+    
+    # Trajectory and pseudotime analysis
+    'pyVIA',
+    'scRNA_hematopoiesis',
+    'TrajInfer',
+    'fle',
+    'diffmap',
+    'scLTNN',
+    'plot_origin_tesmination',
+    'find_related_gene',
+    'cytotrace2',
+    
+    # Cell fate and development
+    'Fate',
+    'gene_trends',
+    'mellon_density',
+    
+    # Network and communication analysis
+    'scnocd',
+    'pyCEFCON',
+    'convert_human_to_mouse_network',
+    'load_human_prior_interaction_network',
+    'mouse_hsc_nestorowa16',
+    'cpdb_network_cal',
+    'cpdb_plot_network',
+    'cpdb_plot_interaction',
+    'cpdb_interaction_filtered',
+    'cpdb_submeans_exacted',
+    'cpdb_exact_target',
+    'cpdb_exact_source',
+    
+    # Pathway and functional analysis
+    'geneset_aucell',
+    'pathway_aucell',
+    'pathway_aucell_enrichment',
+    'geneset_aucell_tmp',
+    'pathway_aucell_tmp',
+    'pathway_aucell_enrichment_tmp',
+    'pathway_enrichment',
+    'pathway_enrichment_plot',
+    
+    # Drug response analysis
+    'autoResolution',
+    'writeGEP',
+    'Drug_Response',
+    'scDiffusion',
+    
+    # ATAC-seq analysis
+    'atac_concat_get_index',
+    'atac_concat_inner',
+    'atac_concat_outer',
+    
+    # Batch correction and preprocessing  
+    'batch_correction',
+    
+    # Quality control and assessment
+    'SCCAF_assessment',
+    'plot_roc',
+    'SCCAF_optimize_all',
+    'color_long',
+    
+    # Metacells and aggregation
+    'MetaCell',
+    'plot_metacells',
+    'get_obs_value',
+    
+    # Differential expression
+    'DCT',
+    'DEG',
+    'pyMDIC3',
+    
+    # Additional analysis tools  
+    'cnmf',
+    'generate_scRNA_report',
+]
 

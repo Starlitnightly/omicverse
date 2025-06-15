@@ -13,7 +13,31 @@ import copy
 
 
 class VAE(nn.Module):
+    r"""
+    Variational Autoencoder for bulk-to-single-cell generation.
+    
+    This VAE implementation is designed for learning the mapping between bulk and
+    single-cell expression patterns. The model uses a beta-VAE framework with
+    customizable encoder-decoder architecture for generating synthetic single cells.
+    
+    The architecture consists of:
+    - Multi-layer encoder producing mean and variance parameters
+    - Latent space sampling with reparameterization trick
+    - Multi-layer decoder reconstructing single-cell expressions
+    """
+    
     def __init__(self, embedding_size, hidden_size_list: list, mid_hidden):
+        r"""
+        Initialize VAE with specified architecture.
+
+        Arguments:
+            embedding_size: Input feature dimension (number of genes)
+            hidden_size_list: List of hidden layer sizes for encoder/decoder
+            mid_hidden: Latent space dimensionality
+            
+        Returns:
+            None
+        """
         super(VAE, self).__init__()
         self.embedding_size = embedding_size
         self.hidden_size_list = hidden_size_list
@@ -30,6 +54,18 @@ class VAE(nn.Module):
              range(len(self.dec_feature_size_list) - 1, 0, -1)])
 
     def encode(self, x):
+        r"""
+        Encode input to latent parameters.
+        
+        Passes input through encoder layers to produce mean and log variance
+        parameters for the latent distribution.
+
+        Arguments:
+            x: Input tensor of shape (batch_size, embedding_size)
+            
+        Returns:
+            torch.Tensor: Concatenated mean and log variance parameters
+        """
         for i, layer in enumerate(self.encoder):
             x = self.encoder[i](x)
             if i != len(self.encoder) - 1:
@@ -37,12 +73,36 @@ class VAE(nn.Module):
         return x
 
     def decode(self, x):
+        r"""
+        Decode latent representation to output space.
+        
+        Passes latent samples through decoder layers to reconstruct
+        single-cell expression profiles.
+
+        Arguments:
+            x: Latent tensor of shape (batch_size, mid_hidden)
+            
+        Returns:
+            torch.Tensor: Reconstructed expression tensor
+        """
         for i, layer in enumerate(self.decoder):
             x = self.decoder[i](x)
             x = F.relu(x)
         return x
 
     def forward(self, x, used_device):
+        r"""
+        Forward pass through VAE.
+        
+        Performs encoding, latent sampling, decoding, and KL divergence calculation.
+
+        Arguments:
+            x: Input expression tensor
+            used_device: Device for computation (CPU/GPU)
+            
+        Returns:
+            tuple: (reconstructed_x, kl_divergence)
+        """
         x = x.to(used_device)
         encoder_output = self.encode(x)
         mu, sigma = torch.chunk(encoder_output, 2, dim=1)  # mu, log_var
@@ -52,6 +112,17 @@ class VAE(nn.Module):
         return x_hat, kl_div
 
     def get_hidden(self, x):
+        r"""
+        Extract latent representation from input.
+        
+        Encodes input and samples from the latent distribution.
+
+        Arguments:
+            x: Input expression tensor
+            
+        Returns:
+            torch.Tensor: Sampled latent representation
+        """
         encoder_output = self.encode(x)
         mu, sigma = torch.chunk(encoder_output, 2, dim=1)  # mu, log_var
         hidden = torch.randn_like(sigma) * torch.exp(sigma) ** 0.5 + mu  # var => std
@@ -59,22 +130,75 @@ class VAE(nn.Module):
 
 
 # bulk deconvolution
-class BulkDataset(Dataset):  
+class BulkDataset(Dataset):
+    r"""
+    PyTorch Dataset for single-cell data with labels.
+    
+    Wraps single-cell expression data and corresponding labels for use
+    with PyTorch DataLoader in VAE training.
+    """
+    
     def __init__(self, single_cell, label):
+        r"""
+        Initialize dataset with expression data and labels.
+
+        Arguments:
+            single_cell: Single-cell expression matrix
+            label: Cell type labels
+            
+        Returns:
+            None
+        """
         self.sc = single_cell
         self.label = label
 
     def __getitem__(self, idx):
+        r"""
+        Get single item from dataset.
+
+        Arguments:
+            idx: Index of item to retrieve
+            
+        Returns:
+            tuple: (expression_data, label)
+        """
         tmp_x = self.sc[idx]
         tmp_y_tag = self.label[idx]
 
         return (tmp_x, tmp_y_tag) 
 
     def __len__(self):
+        r"""
+        Get dataset size.
+        
+        Returns:
+            int: Number of samples in dataset
+        """
         return self.label.shape[0]
 
 
 def train_vae(single_cell, label, used_device, batch_size, feature_size, epoch_num, learning_rate, hidden_size, patience=10):
+    r"""
+    Train VAE model for bulk-to-single-cell generation.
+    
+    Trains a beta-VAE model using single-cell reference data with early stopping
+    based on reconstruction loss. The model learns to generate realistic single-cell
+    expression profiles.
+
+    Arguments:
+        single_cell: Single-cell expression matrix (cells x genes)
+        label: Cell type labels for single cells
+        used_device: Computation device (CPU/GPU)
+        batch_size: Training batch size
+        feature_size: Number of input features (genes)
+        epoch_num: Maximum training epochs
+        learning_rate: Optimizer learning rate
+        hidden_size: Latent space dimensionality
+        patience: Early stopping patience (10)
+
+    Returns:
+        tuple: (best_model, training_history)
+    """
     batch_size = batch_size
     feature_size = feature_size
     epoch_num = epoch_num
@@ -135,6 +259,20 @@ def train_vae(single_cell, label, used_device, batch_size, feature_size, epoch_n
 
 
 def load_vae(feature_size, hidden_size, path, used_device):
+    r"""
+    Load pre-trained VAE model from file.
+    
+    Loads a previously trained VAE model with specified architecture.
+
+    Arguments:
+        feature_size: Number of input features (genes)
+        hidden_size: Latent space dimensionality
+        path: Path to saved model state dict
+        used_device: Computation device (CPU/GPU)
+
+    Returns:
+        VAE: Loaded VAE model
+    """
     hidden_list = [2048, 1024, 512]
     vae = VAE(feature_size, hidden_list, hidden_size).to(used_device)
     vae.load_state_dict(torch.load(path, map_location=used_device))
@@ -144,6 +282,25 @@ def load_vae(feature_size, hidden_size, path, used_device):
 
 def generate_vae(net, ratio, single_cell, label, breed_2_list, index_2_gene, cell_number_target_num=None,
                  used_device=None):
+    r"""
+    Generate synthetic single-cell data using trained VAE.
+    
+    Uses a trained VAE model to generate synthetic single-cell expression profiles
+    matching specified cell-type target numbers.
+
+    Arguments:
+        net: Trained VAE model
+        ratio: Generation ratio (usually 1)
+        single_cell: Reference single-cell expression matrix
+        label: Cell type labels for reference cells
+        breed_2_list: List mapping label indices to cell type names
+        index_2_gene: List of gene names
+        cell_number_target_num: Target number of cells per type (None)
+        used_device: Computation device (CPU/GPU) (None)
+
+    Returns:
+        tuple: (generated_metadata, generated_expression_data)
+    """
     # net in cuda now
     for p in net.parameters():  # reset requires_grad
         p.requires_grad = False  # avoid computation
@@ -216,6 +373,21 @@ def generate_vae(net, ratio, single_cell, label, breed_2_list, index_2_gene, cel
 
 
 def prepare_data(cell_all_generate, label_all_generate, breed_2_list, index_2_gene):
+    r"""
+    Format generated data into structured DataFrames.
+    
+    Converts generated expression arrays and labels into properly formatted
+    DataFrames with cell and gene annotations.
+
+    Arguments:
+        cell_all_generate: Generated expression matrix
+        label_all_generate: Generated cell type labels
+        breed_2_list: List mapping indices to cell type names
+        index_2_gene: List of gene names
+
+    Returns:
+        tuple: (metadata_dataframe, expression_dataframe)
+    """
     cell_all_generate = np.array(cell_all_generate)
     label_all_generate = np.array(label_all_generate)
 

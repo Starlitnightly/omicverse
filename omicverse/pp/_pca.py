@@ -95,18 +95,11 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     copy: bool = False,
     use_gpu: bool = False,
 ) -> AnnData | np.ndarray | CSBase | None:
-    r"""Principal component analysis :cite:p:`Pedregosa2011`.
+    r"""Principal component analysis with GPU acceleration support.
 
-    Computes PCA coordinates, loadings and variance decomposition.
-    Uses the implementation of *scikit-learn* :cite:p:`Pedregosa2011`.
-
-    .. versionchanged:: 1.5.0
-
-        In previous versions, computing a PCA on a sparse matrix would make
-        a dense copy of the array for mean centering.
-        As of scanpy 1.5.0, mean centering is implicit.
-        While results are extremely similar, they are not exactly the same.
-        If you would like to reproduce the old results, pass a dense array.
+    Compute PCA coordinates, loadings and variance decomposition for single-cell data.
+    This implementation includes GPU acceleration options using PyTorch/TorchDR 
+    for improved performance on large datasets.
 
     Parameters
     ----------

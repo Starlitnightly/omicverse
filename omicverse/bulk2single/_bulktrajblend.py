@@ -12,27 +12,38 @@ from ..single import scnocd
 from ._vae import train_vae, generate_vae, load_vae
 
 class BulkTrajBlend(object):
-    """
-    BulkTrajBlend: A class for bulk and single cell data integration and trajectory inference using beta-VAE and GNN.
-
-
+    r"""
+    Bulk-to-single-cell trajectory blending using VAE and GNN integration.
+    
+    This class implements a comprehensive workflow for integrating bulk RNA-seq data
+    with single-cell data to infer cellular trajectories and transition states.
+    The method combines:
+    - VAE-based bulk-to-single-cell deconvolution
+    - Graph Neural Network (GNN) analysis for trajectory inference
+    - Non-overlapping cell-type decomposition (NOCD) for transition states
+    
+    The workflow enables identification of intermediate cell states and trajectory
+    dynamics that bridge bulk expression profiles with single-cell resolution.
     """
 
     def __init__(self,bulk_seq:pd.DataFrame,single_seq:anndata.AnnData,
                  celltype_key:str,bulk_group=None,max_single_cells:int=5000,
                  top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0) -> None:
-        """
-        Initialize the BulkTrajBlend class
+        r"""
+        Initialize BulkTrajBlend for trajectory inference and cell blending.
 
         Arguments:
-            bulk_seq: The bulk data. The index is gene name and the columns is cell name.
-            single_seq: The single cell data. The index is cell name and the columns is gene name.
-            celltype_key: The key of cell type in the single cell data.
-            top_marker_num: The number of top marker genes for each cell type.
-            ratio_num: The number of cells to be selected for each cell type.
-            gpu: The gpu id or 'cpu' or 'mps'.
-            max_single_cells: The maximum number of single cells to be used. Default is 5000.
-
+            bulk_seq: Bulk RNA-seq data with genes as rows and samples as columns
+            single_seq: Single-cell RNA-seq reference data as AnnData object
+            celltype_key: Column name in single_seq.obs containing cell type annotations
+            bulk_group: Column names in bulk_seq for sample grouping (None)
+            max_single_cells: Maximum number of single cells to use (5000)
+            top_marker_num: Number of top marker genes per cell type (500)
+            ratio_num: Cell selection ratio for each cell type (1)
+            gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon (0)
+            
+        Returns:
+            None
         """
 
         self.bulk_seq = bulk_seq.copy()
@@ -56,11 +67,17 @@ class BulkTrajBlend(object):
         pass
 
     def bulk_preprocess_lazy(self,)->None:
-        """
-        Preprocess the bulk data
+        r"""
+        Preprocess bulk RNA-seq data for trajectory analysis.
+        
+        Performs normalization, log transformation, and optional group averaging
+        of bulk data for downstream trajectory inference.
 
         Arguments:
-            group: The group of the bulk data. Default is None. It need to set to calculate the mean of each group.
+            None
+            
+        Returns:
+            None: Updates self.bulk_seq and self.bulk_seq_group in place
         """
 
         print("......drop duplicates index in bulk data")
@@ -80,12 +97,17 @@ class BulkTrajBlend(object):
         return None
     
     def single_preprocess_lazy(self,target_sum:int=1e4)->None:
-        """
-        Preprocess the single data
+        r"""
+        Preprocess single-cell reference data for trajectory analysis.
+        
+        Normalizes single-cell data and makes cell/gene names unique for
+        consistent integration with bulk data.
 
         Arguments:
-            target_sum: The target sum of the normalize. Default is 1e4.
-
+            target_sum: Target sum for total count normalization (10000)
+            
+        Returns:
+            None: Updates self.single_seq in place
         """
 
         print("......normalize the single data")
@@ -97,13 +119,18 @@ class BulkTrajBlend(object):
         return None
     
     def vae_configure(self,cell_target_num=None,**kwargs):
-        """
-        Configure the vae model
+        r"""
+        Configure the VAE model for bulk-to-single-cell generation.
+        
+        Sets up the Bulk2Single model with cell-type target numbers either from
+        deconvolution prediction or manual specification.
 
         Arguments:
-            cell_target_num: The number of cell types to be generated. Default is 100.
-
-        
+            cell_target_num: Number of cells per type to generate (None for auto-prediction)
+            **kwargs: Additional arguments passed to predicted_fraction method
+            
+        Returns:
+            None: Initializes self.vae_model and preprocessing steps
         """
         self.vae_model=Bulk2Single(bulk_data=self.bulk_seq,single_data=self.single_seq,
                                    celltype_key=self.celltype_key,bulk_group=self.group,
@@ -135,20 +162,25 @@ class BulkTrajBlend(object):
             epoch_num:int=5000,
             patience:int=50,save:bool=True):
         r"""
-        Train the VAE model of BulkTrajBlend.
+        Train the VAE model for trajectory-aware single-cell generation.
+        
+        Trains the underlying Bulk2Single VAE model to generate synthetic single
+        cells that preserve trajectory information from bulk data.
 
         Arguments:
-            vae_save_dir: The directory to save the trained VAE model. Default is 'save_model'.
-            vae_save_name: The name to save the trained VAE model. Default is 'vae'.
-            generate_save_dir: The directory to save the generated single-cell data. Default is 'output'.
-            generate_save_name: The name to save the generated single-cell data. Default is 'output'.
-            batch_size: The batch size for training the VAE model. Default is 512.
-            learning_rate: The learning rate for training the VAE model. Default is 1e-4.
-            hidden_size: The hidden size for the encoder and decoder networks. Default is 256.
-            epoch_num: The epoch number for training the VAE model. Default is 5000.
-            patience: The patience for training the VAE model. Default is 50.
-            save: Whether to save the trained VAE model. Default is True.
-
+            vae_save_dir: Directory to save trained VAE model ('save_model')
+            vae_save_name: Filename for saved VAE model ('vae')
+            generate_save_dir: Directory for generated data output ('output')
+            generate_save_name: Filename for generated data ('output')
+            batch_size: Training batch size (512)
+            learning_rate: Optimizer learning rate (1e-4)
+            hidden_size: Hidden layer dimensions (256)
+            epoch_num: Maximum training epochs (5000)
+            patience: Early stopping patience (50)
+            save: Whether to save trained model (True)
+            
+        Returns:
+            None: Updates self.vae_net with trained model
         """
         
         self.vae_net=self.vae_model.train(
@@ -165,11 +197,17 @@ class BulkTrajBlend(object):
         
     def vae_load(self,vae_load_dir:str,hidden_size:int=256):
         r"""
-        load the trained VAE model of BulkTrajBlend.
+        Load a pre-trained VAE model for trajectory analysis.
+        
+        Loads a previously trained VAE model for generating trajectory-aware
+        single-cell data.
 
         Arguments:
-            vae_load_dir: The directory to load the trained VAE model.
-            hidden_size: The hidden size for the encoder and decoder networks. Default is 256.
+            vae_load_dir: Directory containing the trained VAE model
+            hidden_size: Hidden layer dimensions matching training (256)
+            
+        Returns:
+            None: Updates self.vae_net with loaded model
         """
 
         print(f'loading model from {vae_load_dir}')
@@ -178,19 +216,21 @@ class BulkTrajBlend(object):
 
     def vae_generate(self,highly_variable_genes:bool=True,max_value:float=10,
                      n_comps:int=100,svd_solver:str='auto',leiden_size:int=50)->anndata.AnnData:
-        """
-        Generate the single-cell data from the trained VAE model.
+        r"""
+        Generate trajectory-aware single-cell data with quality filtering.
+        
+        Uses the trained VAE to generate synthetic single cells and applies
+        quality control filtering to remove noisy clusters.
 
         Arguments:
-            highly_variable_genes: Whether to use highly variable genes. Default is True.
-            max_value: The maximum value for the scaled data. Default is 10.
-            n_comps: The number of principal components. Default is 100.
-            svd_solver: The solver for the PCA. Default is 'auto'.
-            leiden_size: The minimum size of the leiden clusters. Default is 50.
+            highly_variable_genes: Whether to select highly variable genes (True)
+            max_value: Maximum value for data scaling (10)
+            n_comps: Number of principal components for PCA (100)
+            svd_solver: SVD solver for PCA ('auto')
+            leiden_size: Minimum cluster size threshold for filtering (50)
 
         Returns:
-            generate_adata: The generated single-cell data.
-
+            anndata.AnnData: Generated and filtered single-cell data
         """
 
         generate_adata=self.vae_model.generate()
@@ -221,24 +261,30 @@ class BulkTrajBlend(object):
                      balance_loss:bool=True,
                      stochastic_loss:bool=True,
                      batch_size:int=2000,num_workers:int=5,):
-        """
-        Configure the GNN model of BulkTrajBlend.
+        r"""
+        Configure Graph Neural Network for trajectory and transition state analysis.
+        
+        Sets up the NOCD (Non-Overlapping Cell-type Decomposition) GNN model
+        for identifying cellular trajectories and intermediate states.
 
         Arguments:
-            gpu: The GPU ID for training the GNN model. Default is 0.
-            hidden_size: The hidden size for the GNN model. Default is 128.
-            weight_decay: The weight decay for the GNN model. Default is 1e-2.
-            dropout: The dropout for the GNN model. Default is 0.5.
-            batch_norm: Whether to use batch normalization for the GNN model. Default is True.
-            lr: The learning rate for the GNN model. Default is 1e-3.
-            max_epochs: The maximum epoch number for training the GNN model. Default is 500.
-            display_step: The display step for training the GNN model. Default is 25.
-            balance_loss: Whether to use the balance loss for training the GNN model. Default is True.
-            stochastic_loss: Whether to use the stochastic loss for training the GNN model. Default is True.
-            batch_size: The batch size for training the GNN model. Default is 2000.
-            num_workers: The number of workers for training the GNN model. Default is 5.
-
-
+            use_rep: Representation to use for GNN input ('X')
+            neighbor_rep: Representation for neighbor graph construction ('X_pca')
+            gpu: GPU device ID for training (0)
+            hidden_size: Hidden layer dimensions in GNN (128)
+            weight_decay: L2 regularization strength (1e-2)
+            dropout: Dropout probability (0.5)
+            batch_norm: Whether to use batch normalization (True)
+            lr: Learning rate for GNN training (1e-3)
+            max_epochs: Maximum training epochs (500)
+            display_step: Frequency of progress updates (25)
+            balance_loss: Whether to use balanced loss function (True)
+            stochastic_loss: Whether to use stochastic loss (True)
+            batch_size: Training batch size (2000)
+            num_workers: Number of data loading workers (5)
+            
+        Returns:
+            None: Initializes self.nocd_obj with configured GNN model
         """
         nocd_obj=scnocd(self.generate_adata,use_rep=use_rep,
                         neighbor_rep=neighbor_rep,gpu=gpu)
@@ -256,14 +302,19 @@ class BulkTrajBlend(object):
     
     def gnn_train(self,thresh:float=0.5,gnn_save_dir:str='save_model',
             gnn_save_name:str='gnn'):
-        """
-        Train the GNN model of BulkTrajBlend.
+        r"""
+        Train the GNN model for trajectory and transition state inference.
+        
+        Trains the NOCD model to identify cellular trajectories and overlapping
+        cell communities representing transition states.
 
         Arguments:
-            thresh: The threshold for the GNN model. Default is 0.5.
-            gnn_save_dir: The directory for saving the GNN model. Default is 'save_model'.
-            gnn_save_name: The name for saving the GNN model. Default is 'gnn'.
-        
+            thresh: Threshold for community assignment (0.5)
+            gnn_save_dir: Directory to save trained GNN model ('save_model')
+            gnn_save_name: Filename for saved GNN model ('gnn')
+            
+        Returns:
+            None: Trains model and computes trajectory results
         """
         self.nocd_obj.GNN_model()
         self.nocd_obj.GNN_result(thresh=thresh)
@@ -271,25 +322,34 @@ class BulkTrajBlend(object):
         self.nocd_obj.save(gnn_save_dir=gnn_save_dir,gnn_save_name=gnn_save_name)
 
     def gnn_load(self,gnn_load_dir:str,thresh:float=0.5,):
-        """
-        Load the GNN model of BulkTrajBlend.
+        r"""
+        Load a pre-trained GNN model for trajectory analysis.
+        
+        Loads a previously trained NOCD model and computes trajectory results.
 
         Arguments:
-            gnn_load_dir: The directory for loading the GNN model.
-            thresh: The threshold for the GNN model. Default is 0.5.
-        
+            gnn_load_dir: Directory containing the trained GNN model
+            thresh: Threshold for community assignment (0.5)
+            
+        Returns:
+            None: Loads model and computes trajectory results
         """
         self.nocd_obj.load(gnn_load_dir)
         self.nocd_obj.GNN_result(thresh=thresh)
         self.nocd_obj.cal_nocd()
     
     def gnn_generate(self)->pd.DataFrame:
-        """
-        Generate the overlap cell community.
-
-        Returns:
-            res_pd: The overlap cell community.
+        r"""
+        Generate overlapping cell communities representing transition states.
         
+        Identifies and names cell communities based on trajectory analysis,
+        creating binary matrix indicating community membership for each cell.
+
+        Arguments:
+            None
+            
+        Returns:
+            pd.DataFrame: Binary matrix of cell community assignments with community names
         """
         '''
         pair_dict_r={}
@@ -335,15 +395,18 @@ class BulkTrajBlend(object):
         return res_pd 
     
     def interpolation(self,celltype:str,adata:anndata.AnnData=None,)->anndata.AnnData:
-        """
-        Interpolate the cell community to raw data.
+        r"""
+        Interpolate trajectory communities back to original data space.
+        
+        Integrates identified cell communities from generated data back with
+        original single-cell reference data for downstream analysis.
 
         Arguments:
-            celltype: The cell type for interpolation.
-            adata: The raw data for interpolation. If is None, will use the single_seq data. Default is None.
+            celltype: Cell type or community name to interpolate
+            adata: Original data for interpolation; uses self.single_seq if None (None)
 
         Returns:
-            adata1: The adata after interpolated .
+            anndata.AnnData: Combined data with interpolated community information
         """
         if adata is None:
             adata=self.single_seq

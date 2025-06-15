@@ -38,23 +38,22 @@ class pyTOSICA(object):
                  embed_dim:int=48,depth:int=1,num_heads:int=4,batch_size:int=8,
                  device:str='cuda:0'
                  ) -> None:
-        """
-        Initialize a pyTOSICA object.
+        r"""Initialize a pyTOSICA object for cell type classification.
 
         Arguments:
-            adata: AnnData object.
-            project_path: Path to save the results.
-            gmt_path: The name (human_gobp; human_immune; human_reactome; human_tf; mouse_gobp; mouse_reactome and mouse_tf) or path of mask to be used.
-            label_name: The column name of the label you want to prediect. Should in adata.obs.columns.
-            mask_ratio: The ratio of the connection reserved when there is no available mask.
-            max_g: The maximum number of genes to be used.
-            max_gs: The maximum number of pathways to be used.
-            n_unannotated: The number of unannotated genes to be added.
-            embed_dim: The dimension of the embedding.
-            depth: The depth of the model.
-            num_heads: The number of heads in the model.
-            batch_size: The batch size.
-            device: The device to be used.
+            adata: AnnData object containing single-cell data
+            project_path (str): Path to save the results and model files
+            gmt_path (str): Gene set name or path - choose from 'human_gobp', 'human_immune', 'human_reactome', 'human_tf', 'mouse_gobp', 'mouse_reactome', 'mouse_tf' (default: None)
+            label_name (str): Column name of the label to predict in adata.obs (default: 'Celltype')
+            mask_ratio (float): Ratio of connections reserved when no mask is available (default: 0.015)
+            max_g (int): Maximum number of genes per pathway (default: 300)
+            max_gs (int): Maximum number of pathways/tokens (default: 300)
+            n_unannotated (int): Number of unannotated/fully-connected tokens to add (default: 1)
+            embed_dim (int): Dimension of pathway/token embedding (default: 48)
+            depth (int): Number of transformer layers (default: 1)
+            num_heads (int): Number of attention heads (default: 4)
+            batch_size (int): Batch size for training (default: 8)
+            device (str): Device for computation (default: 'cuda:0')
 
         
         """
@@ -135,17 +134,16 @@ class pyTOSICA(object):
         pass
 
     def train(self,pre_weights:str='',lr:float=0.001, epochs:int= 10, lrf:float=0.01):
-        """
-        Trainning the tosica model.
+        r"""Train the TOSICA model for cell type classification.
 
         Arguments:
-            pre_weights: The path of the pre-trained weights.
-            lr: The learning rate.
-            epochs: The number of epochs.
-            lrf: The learning rate of the last layer.
+            pre_weights (str): Path to pre-trained weights (default: '')
+            lr (float): Learning rate for optimization (default: 0.001)
+            epochs (int): Number of training epochs (default: 10)
+            lrf (float): Learning rate factor for cosine annealing (default: 0.01)
 
         Returns:
-            model: The trained model.
+            torch.nn.Module: The trained TOSICA model
         
         """
         if pre_weights != "":
@@ -183,11 +181,11 @@ class pyTOSICA(object):
         return self.model
     
     def save(self,save_path=None):
-        """
-        Save the model.
+        r"""Save the trained TOSICA model.
 
         Arguments:
-            save_path: The path of the saved model.
+            save_path (str): Path to save the model (default: None)
+                           If None, saves to project_path/model-best.pth
         
         """
         if save_path==None:
@@ -196,11 +194,11 @@ class pyTOSICA(object):
         print('Model saved!')
 
     def load(self,load_path=None):
-        """
-        Load the model.
+        r"""Load a pre-trained TOSICA model.
 
         Arguments:
-            load_path: The path of the loaded model.
+            load_path (str): Path to the model file (default: None)
+                           If None, loads from project_path/model-best.pth
 
         """
         if load_path==None:
@@ -211,18 +209,17 @@ class pyTOSICA(object):
         
     def predicted(self,pre_adata:anndata.AnnData,laten:bool=False,n_step:int=10000,cutoff:float=0.1,
         batch_size:int=50,):
-        """
-        Predict the cell type of the new data.
+        r"""Predict cell types for new single-cell data.
 
         Arguments:
-            pre_adata: The new data.
-            laten: Whether to get the latent representation.
-            n_step: The number of steps of the random walk.
-            cutoff: The cutoff of the random walk.
-            batch_size: The batch size of the random walk.
+            pre_adata: AnnData object containing new data for prediction
+            laten (bool): Whether to return latent representation instead of pathway attention (default: False)
+            n_step (int): Number of steps for batch processing (default: 10000)
+            cutoff (float): Confidence cutoff for predictions (default: 0.1)
+            batch_size (int): Batch size for prediction (default: 50)
 
         Returns:
-            new_adata: The new data with predicted cell type.
+            AnnData: New AnnData object with predicted cell types and confidence scores
         
         """
 

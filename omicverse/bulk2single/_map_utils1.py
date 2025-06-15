@@ -18,6 +18,23 @@ from tqdm import tqdm,trange
 
 
 def create_st(generate_sc_data, generate_sc_meta, spot_num, cell_num, gene_num, marker_used):
+    r"""
+    Create synthetic spatial transcriptomics data from single-cell data.
+    
+    Alternative implementation for generating synthetic spots by randomly sampling
+    and aggregating single cells to create spatial transcriptomics-like expression profiles.
+
+    Arguments:
+        generate_sc_data: Single-cell expression data matrix
+        generate_sc_meta: Single-cell metadata with cell types
+        spot_num: Number of synthetic spots to create
+        cell_num: Number of cells per spot
+        gene_num: Number of marker genes to use
+        marker_used: Whether to use marker genes for spot creation
+
+    Returns:
+        tuple: (sc_data, sc_meta, spots_data, spots_meta)
+    """
     sc = generate_sc_data
     sc_ct = generate_sc_meta
     cell_name = sorted(list(set(sc_ct.Cell)))
@@ -61,6 +78,21 @@ def create_st(generate_sc_data, generate_sc_meta, spot_num, cell_num, gene_num, 
 
 
 def create_sample(sc, st, meta, multiple):
+    r"""
+    Create positive and negative training samples for mapping model.
+    
+    Alternative implementation for generating training data pairs of single cells
+    and spatial spots with positive (correct) and negative (incorrect) associations.
+
+    Arguments:
+        sc: Single-cell expression data
+        st: Spatial transcriptomics expression data
+        meta: Metadata linking cells to spots
+        multiple: Multiplier for negative samples
+
+    Returns:
+        tuple: (positive_features, negative_features)
+    """
     cell_name = meta.Cell.values.tolist()
     spot_name = meta.Spot.values.tolist()
 
@@ -114,6 +146,18 @@ def create_sample(sc, st, meta, multiple):
 
 
 def get_data(pos, neg):
+    r"""
+    Combine positive and negative samples into training dataset.
+    
+    Concatenates positive and negative feature matrices with corresponding labels.
+
+    Arguments:
+        pos: Positive sample features
+        neg: Negative sample features
+
+    Returns:
+        tuple: (combined_features, labels)
+    """
     X = np.vstack((pos, neg))
     y = np.concatenate((np.ones(pos.shape[0]), np.zeros(neg.shape[0])))
 
@@ -123,6 +167,21 @@ def create_data_pyomic(single_data:anndata.AnnData,
                        spatial_data:anndata.AnnData,
                        celltype_key:str,spot_key:list=['xcoord','ycoord'],
                        ):
+    r"""
+    Alternative implementation for preparing integrated dataset from single-cell and spatial data.
+    
+    Aligns and formats single-cell and spatial transcriptomics data for
+    mapping analysis with alternative handling of gene indices.
+
+    Arguments:
+        single_data: Single-cell RNA-seq data as AnnData object
+        spatial_data: Spatial transcriptomics data as AnnData object
+        celltype_key: Column name for cell type annotations
+        spot_key: Column names for spatial coordinates (['xcoord','ycoord'])
+
+    Returns:
+        dict: Dictionary containing aligned data matrices and metadata
+    """
     print("...loading data")
     input_data = {}
     sc_gene=single_data.var._stat_axis.values.tolist()
@@ -165,6 +224,25 @@ def create_data_pyomic(single_data:anndata.AnnData,
 
 def create_data(generate_sc_meta, generate_sc_data, st_data, spot_num, cell_num, top_marker_num, marker_used,
                 mul_train):
+    r"""
+    Alternative implementation for creating training data for spatial mapping.
+    
+    Generates synthetic training data by creating artificial spots and
+    positive/negative sample pairs using alternative gene indexing.
+
+    Arguments:
+        generate_sc_meta: Single-cell metadata with cell types
+        generate_sc_data: Single-cell expression matrix
+        st_data: Spatial transcriptomics reference data
+        spot_num: Number of synthetic spots to create
+        cell_num: Number of cells per spot
+        top_marker_num: Number of top marker genes to use
+        marker_used: Whether to use marker gene selection
+        mul_train: Multiplier for training sample generation
+
+    Returns:
+        tuple: (training_features, training_labels)
+    """
     sc_gene = generate_sc_data._stat_axis.values.tolist()
     st_gene = st_data._stat_axis.values.tolist()
 
@@ -186,6 +264,23 @@ def create_data(generate_sc_meta, generate_sc_data, st_data, spot_num, cell_num,
 
 
 def creat_pre_data(st, cell_name, spot_name, spot_indx, cfeat, return_np=False):
+    r"""
+    Create prediction features for a single spot.
+    
+    Prepares feature vectors combining cell and spot expression data
+    for prediction by machine learning models.
+
+    Arguments:
+        st: Spatial transcriptomics expression data
+        cell_name: List of cell names
+        spot_name: List of spot names
+        spot_indx: Index of the spot to process
+        cfeat: Cell features matrix
+        return_np: Whether to return numpy array instead of tensor (False)
+
+    Returns:
+        torch.Tensor or numpy.ndarray: Combined feature matrix
+    """
     spot = spot_name[spot_indx]
     spot_feat = st[spot].values
     tlist = np.isnan(spot_feat).tolist()
@@ -211,6 +306,23 @@ def creat_pre_data(st, cell_name, spot_name, spot_indx, cfeat, return_np=False):
 
 
 def predict_for_one_spot(model, st_test, cell_name, spot_name, spot_indx, cfeat):
+    r"""
+    Predict cell-spot associations for a single spot using trained model.
+    
+    Uses the trained classifier to predict probability scores for all cells
+    being assigned to a specific spatial spot.
+
+    Arguments:
+        model: Trained classification model
+        st_test: Spatial transcriptomics test data
+        cell_name: List of cell names
+        spot_name: List of spot names
+        spot_indx: Index of the spot to predict for
+        cfeat: Cell features matrix
+
+    Returns:
+        tuple: (spot_index, prediction_scores)
+    """
     feats = creat_pre_data(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
     outputs = model.predict_proba(feats)[:, 1]
     # outputs = np.where(outputs>0.5, 1, 0)
@@ -219,6 +331,22 @@ def predict_for_one_spot(model, st_test, cell_name, spot_name, spot_indx, cfeat)
 
 
 def predict_for_one_spot_svm(model, st_test, cell_name, spot_name, spot_indx, cfeat):
+    r"""
+    Predict cell-spot associations using SVM model.
+    
+    Uses the trained SVM model to predict cell-spot associations for a single spot.
+
+    Arguments:
+        model: Trained SVM model
+        st_test: Spatial transcriptomics test data
+        cell_name: List of cell names
+        spot_name: List of spot names
+        spot_indx: Index of the spot to predict for
+        cfeat: Cell features matrix
+
+    Returns:
+        tuple: (spot_index, prediction_scores)
+    """
     feats = creat_pre_data(st_test, cell_name, spot_name, spot_indx, cfeat, return_np=True)
     outputs = model(feats)[:, 1]
     # outputs = np.where(outputs>0.5, 1, 0)
@@ -228,15 +356,49 @@ def predict_for_one_spot_svm(model, st_test, cell_name, spot_name, spot_indx, cf
 
 # Define the model
 class SVM(nn.Module):
+    r"""
+    Support Vector Machine model for mapping classification.
+    
+    PyTorch implementation of SVM for binary classification in spatial mapping tasks.
+    Alternative implementation with different initialization.
+    """
+    
     def __init__(self, X_train,num_classes=2):
+        r"""
+        Initialize SVM with input dimensions.
+
+        Arguments:
+            X_train: Training data to determine input dimensions
+            num_classes: Number of output classes (2)
+            
+        Returns:
+            None
+        """
         super().__init__()
         torch.manual_seed(2)
         self.linear = nn.Linear(X_train.shape[1], num_classes)
 
     def forward(self, x):
+        r"""
+        Forward pass through linear layer.
+
+        Arguments:
+            x: Input tensor
+            
+        Returns:
+            torch.Tensor: Linear transformation output
+        """
         return self.linear(x)
 
 class DFRunner:
+    r"""
+    Alternative Deep Forest model runner for single-cell to spatial mapping.
+    
+    Manages the training and inference pipeline using CascadeForestClassifier
+    for mapping single cells to spatial coordinates. This implementation uses
+    traditional machine learning methods rather than neural networks.
+    """
+    
     def __init__(self,
                  generate_sc_data,
                  generate_sc_meta,
@@ -245,6 +407,23 @@ class DFRunner:
                  top_marker_num,
                  random_seed=0,
                  n_jobs=1,device=None):
+        r"""
+        Initialize DFRunner with data and configuration for Deep Forest model.
+
+        Arguments:
+            generate_sc_data: Single-cell expression data matrix
+            generate_sc_meta: Single-cell metadata with cell types
+            st_data: Spatial transcriptomics expression data
+            st_meta: Spatial metadata with coordinates
+            marker_used: Whether to use marker gene selection
+            top_marker_num: Number of top marker genes to select
+            random_seed: Random seed for reproducibility (0)
+            n_jobs: Number of parallel jobs (1)
+            device: Computation device (None)
+            
+        Returns:
+            None
+        """
 
         self.sc_test_allgene = generate_sc_data  # pandas.DataFrame, generated gene-cell expression data
         self.cell_type = generate_sc_meta  # pandas.DataFrame, cell type

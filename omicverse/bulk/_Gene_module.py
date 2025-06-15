@@ -34,11 +34,14 @@ class pyWGCNA_old(object):
         pyWGCNA: Weighted correlation network analysis in Python
     """
     def __init__(self,data:pd.DataFrame,save_path:str=''):
-        r"""Initialize the pyWGCNA module
+        r"""Initialize the pyWGCNA module.
         
         Arguments:
             data: The dataframe of gene expression data
-            save_path: The path to save the results
+            save_path: The path to save the results. ('')
+        
+        Returns:
+            None
         """
         self.data=data.fillna(0)
         self.data_len=len(data)
@@ -46,24 +49,27 @@ class pyWGCNA_old(object):
         self.save_path=save_path
 
     def mad_filtered(self,gene_num:int=5000):
-        """
-        Filter genes by MAD to construct a scale-free network
+        r"""Filter genes by MAD to construct a scale-free network.
 
         Arguments:
-            gene_num: The number of genes to be saved
+            gene_num: The number of genes to be saved. (5000)
         
+        Returns:
+            None
         """
         from statsmodels import robust #import package
         gene_mad=self.data.T.apply(robust.mad) #use function to calculate MAD
         self.data=self.data.loc[gene_mad.sort_values(ascending=False).index[:gene_num]]
 
     def calculate_correlation_direct(self,method:str='pearson',save:bool=False):
-        """calculate the correlation coefficient matrix
+        r"""Calculate the correlation coefficient matrix.
 
         Arguments:
-            method: The method to calculate the correlation coefficient matrix
-            save: Whether to save the result
+            method: The method to calculate the correlation coefficient matrix. ('pearson')
+            save: Whether to save the result. (False)
         
+        Returns:
+            None
         """
         print('...correlation coefficient matrix is being calculated')
         self.result=self.data.T.corr(method)
@@ -73,10 +79,13 @@ class pyWGCNA_old(object):
 
 
     def calculate_correlation_indirect(self,save:bool=False):
-        """calculate the indirect correlation coefficient matrix
+        r"""Calculate the indirect correlation coefficient matrix.
         
         Arguments:
-            save: Whether to save the result
+            save: Whether to save the result. (False)
+        
+        Returns:
+            None
         """
         print('...indirect correlation matrix is being calculated')
         np.fill_diagonal(self.result.values, 0)

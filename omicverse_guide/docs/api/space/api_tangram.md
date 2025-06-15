@@ -1,13 +1,12 @@
-::: omicverse.bulk2single.Bulk2Single
+::: omicverse.space.Tangram
     handler: python
     selection:
         options:
         members:
             - __init__
+            - check_tangram
             - train
-            - generate
-            - load
-            - load_and_generate
-            - plot_loss
+            - cell2location
+            - impute
         show_root_heading: true
         show_source: true

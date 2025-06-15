@@ -19,31 +19,22 @@ def embedding_multi(
     layer: Optional[str] = None,
     **kwargs,
 ):
-    """
-    Scatter plot for .obs
-
-    Produce a scatter plot in the define basis,
-    which can also be a basis inside any modality,
-    e.g. ``"rna:X_pca"``.
-
-    See :func:`omicverse.pl.embedding` for details.
-
-    Parameters
-    ----------
-    data : Union[AnnData, MuData]
-        MuData or AnnData object
-    basis : str
-        Name of the `obsm` basis to use
-    color : Optional[Union[str, typing.Sequence[str]]], optional (default: None)
-        Keys for variables or annotations of observations (.obs columns).
-        Can be from any modality.
-    use_raw : Optional[bool], optional (default: None)
-        Use `.raw` attribute of the modality where a feature (from `color`) is derived from.
-        If `None`, defaults to `True` if `.raw` is present and a valid `layer` is not provided.
-    layer : Optional[str], optional (default: None)
-        Name of the layer in the modality where a feature (from `color`) is derived from.
-        No layer is used by default. If a valid `layer` is provided, this takes precedence
-        over `use_raw=True`.
+    r"""
+    Create embedding scatter plots for multi-modal data (MuData) or single-cell data.
+    
+    Produces scatter plots on specified embeddings, supporting cross-modality feature visualization.
+    For modality-specific embeddings, use format 'modality:embedding' (e.g., 'rna:X_pca').
+    
+    Arguments:
+        data: AnnData or MuData object containing embedding and feature data
+        basis: Name of embedding in obsm (e.g., 'X_umap') or modality-specific ('rna:X_pca')
+        color: Gene names or obs columns to color points by (None)
+        use_raw: Whether to use .raw attribute for features (None, auto-determined)
+        layer: Specific data layer to use for coloring (None)
+        **kwargs: Additional arguments passed to embedding plotting function
+        
+    Returns:
+        Plot axes or figure depending on underlying plotting function
     """
     if isinstance(data, AnnData):
         return embedding(

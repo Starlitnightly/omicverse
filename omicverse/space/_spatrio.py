@@ -1,4 +1,4 @@
-"""Module providing a encapsulation of spatrio."""
+"""Module providing encapsulation of SpatRio for spatial cell mapping."""
 from typing import Any
 import pandas as pd
 import numpy as np
@@ -6,7 +6,50 @@ import scanpy as sc
 from ..externel.spatrio.spatrio import ot_alignment,assign_coord
 
 class CellMap(object):
-    """Class representing the object of CellMap."""
+    """
+    SpatRio CellMap class for mapping single cells to spatial coordinates.
+
+    This class implements optimal transport-based mapping of single cells to spatial
+    coordinates using expression similarity and spatial awareness. It provides methods
+    for both mapping and coordinate assignment.
+
+    Arguments:
+        adata_sc: AnnData
+            Single-cell RNA sequencing data object.
+        adata_sp: AnnData
+            Spatial transcriptomics data object.
+        use_rep_sc: str, optional (default='X_pca')
+            Key in adata_sc.obsm for single-cell dimensional reduction.
+        use_rep_sp: str, optional (default='X_pca')
+            Key in adata_sp.obsm for spatial data dimensional reduction.
+
+    Attributes:
+        adata_sc: AnnData
+            Single-cell RNA sequencing data.
+        adata_sp: AnnData
+            Spatial transcriptomics data.
+        use_rep_sc: str
+            Representation key for single-cell data.
+        use_rep_sp: str
+            Representation key for spatial data.
+        spatrio_decon: pandas.DataFrame
+            Deconvolution results after mapping.
+        spatrio_map: pandas.DataFrame
+            Coordinate assignment results.
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load data
+        >>> adata_sc = sc.read_h5ad('single_cell.h5ad')
+        >>> adata_sp = sc.read_h5ad('spatial.h5ad')
+        >>> # Initialize CellMap
+        >>> cm = ov.space.CellMap(
+        ...     adata_sc=adata_sc,
+        ...     adata_sp=adata_sp,
+        ...     use_rep_sc='X_pca'
+        ... )
+    """
     def __init__(self,
                     adata_sc,
                     adata_sp,
@@ -35,7 +78,42 @@ class CellMap(object):
             use_gpu: bool = True,
             **kwargs: Any
         ) -> pd.DataFrame:
+        """
+        Map single cells to spatial locations using optimal transport.
 
+        This method performs the core mapping operation using optimal transport,
+        considering both expression similarity and spatial relationships.
+
+        Arguments:
+            sc_type: str, optional (default='celltype')
+                Column in adata_sc.obs containing cell type annotations.
+            sp_type: str, optional (default='leiden')
+                Column in adata_sp.obs containing spatial cluster annotations.
+                If not present, will be computed using Leiden clustering.
+            alpha: float, optional (default=0.1)
+                Balance parameter for optimal transport cost.
+            aware_power: int, optional (default=2)
+                Power parameter for distance-based cost.
+            resolution: int, optional (default=1)
+                Resolution parameter for Leiden clustering if needed.
+            aware_spatial: bool, optional (default=True)
+                Whether to use spatial information in mapping.
+            aware_multi: bool, optional (default=True)
+                Whether to use multiple cell type information.
+            use_gpu: bool, optional (default=True)
+                Whether to use GPU acceleration.
+            **kwargs:
+                Additional arguments passed to ot_alignment.
+
+        Returns:
+            pandas.DataFrame
+                Mapping results containing cell-to-spot assignments.
+
+        Notes:
+            - If sp_type is 'leiden' or 'louvain' and not present in data,
+              clustering will be performed automatically
+            - GPU acceleration is recommended for large datasets
+        """
         ##spatial type
         if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
             sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
@@ -65,7 +143,30 @@ class CellMap(object):
 
     def assign_coord(self,**kwargs):
         """
-        Assign spatial coordinates to single cell data.
+        Assign spatial coordinates to mapped single cells.
+
+        This method takes the mapping results and assigns specific spatial
+        coordinates to each mapped single cell, creating a spatially-aware
+        single-cell dataset.
+
+        Arguments:
+            **kwargs:
+                Additional arguments passed to assign_coord function.
+
+        Returns:
+            AnnData
+                Copy of single-cell data with added spatial coordinates and
+                mapping information in:
+                - adata.obsm['spatial']: Assigned coordinates
+                - adata.obs['Cell_xcoord']: X coordinates
+                - adata.obs['Cell_ycoord']: Y coordinates
+                - adata.obs['spot_type']: Mapped spot types
+                - adata.obs['spot']: Mapped spot IDs
+                - adata.obs['spot_value']: Mapping confidence scores
+
+        Notes:
+            - Only cells that were successfully mapped will be included
+            - Original spatial metadata is preserved in adata.uns['spatial']
         """
         spatrio_map = assign_coord(adata1 = self.adata_sp,adata2 = self.adata_sc,
                                    out_data = self.spatrio_decon,**kwargs)
@@ -95,7 +196,49 @@ class CellMap(object):
 
 
 class CellLoc(object):
-    """Class representing the object of CellMap."""
+    """
+    SpatRio CellLoc class for probabilistic cell localization.
+
+    This class extends CellMap with probabilistic filtering based on cell type
+    proportions for more accurate spatial localization. It provides methods for
+    mapping, saving/loading results, and probabilistic assignment.
+
+    Arguments:
+        adata_sc: AnnData
+            Single-cell RNA sequencing data object.
+        adata_sp: AnnData
+            Spatial transcriptomics data object.
+        use_rep_sc: str, optional (default='X_pca')
+            Key in adata_sc.obsm for single-cell dimensional reduction.
+        use_rep_sp: str, optional (default='X_pca')
+            Key in adata_sp.obsm for spatial data dimensional reduction.
+
+    Attributes:
+        adata_sc: AnnData
+            Single-cell RNA sequencing data.
+        adata_sp: AnnData
+            Spatial transcriptomics data.
+        use_rep_sc: str
+            Representation key for single-cell data.
+        use_rep_sp: str
+            Representation key for spatial data.
+        spatrio_decon: pandas.DataFrame
+            Deconvolution results after mapping.
+        spatrio_map: pandas.DataFrame
+            Coordinate assignment results.
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load data
+        >>> adata_sc = sc.read_h5ad('single_cell.h5ad')
+        >>> adata_sp = sc.read_h5ad('spatial.h5ad')
+        >>> # Initialize CellLoc
+        >>> cl = ov.space.CellLoc(
+        ...     adata_sc=adata_sc,
+        ...     adata_sp=adata_sp
+        ... )
+    """
     def __init__(self,
                     adata_sc,
                     adata_sp,
@@ -124,7 +267,36 @@ class CellLoc(object):
             use_gpu: bool = True,
             **kwargs: Any
         ) -> pd.DataFrame:
+        """
+        Map single cells to spatial locations with probabilistic filtering.
 
+        Similar to CellMap.map() but includes additional probabilistic considerations
+        for more accurate localization.
+
+        Arguments:
+            sc_type: str, optional (default='celltype')
+                Column in adata_sc.obs containing cell type annotations.
+            sp_type: str, optional (default='leiden')
+                Column in adata_sp.obs containing spatial cluster annotations.
+            alpha: float, optional (default=0.1)
+                Balance parameter for optimal transport cost.
+            aware_power: int, optional (default=2)
+                Power parameter for distance-based cost.
+            resolution: int, optional (default=1)
+                Resolution parameter for Leiden clustering if needed.
+            aware_spatial: bool, optional (default=True)
+                Whether to use spatial information in mapping.
+            aware_multi: bool, optional (default=True)
+                Whether to use multiple cell type information.
+            use_gpu: bool, optional (default=True)
+                Whether to use GPU acceleration.
+            **kwargs:
+                Additional arguments passed to ot_alignment.
+
+        Returns:
+            pandas.DataFrame
+                Probabilistic mapping results.
+        """
         ##spatial type
         if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
             sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
@@ -158,6 +330,30 @@ class CellLoc(object):
                  resolution: int = 1,
                  aware_spatial: bool = True,
             aware_multi: bool = True,):
+        """
+        Load pre-computed mapping results.
+
+        This method allows loading previously computed mapping results while
+        maintaining the proper data structure and annotations.
+
+        Arguments:
+            map_info: pandas.DataFrame
+                Pre-computed mapping results to load.
+            sc_type: str, optional (default='celltype')
+                Column in adata_sc.obs containing cell type annotations.
+            sp_type: str, optional (default='leiden')
+                Column in adata_sp.obs containing spatial cluster annotations.
+            resolution: int, optional (default=1)
+                Resolution parameter for Leiden clustering if needed.
+            aware_spatial: bool, optional (default=True)
+                Whether spatial information was used in mapping.
+            aware_multi: bool, optional (default=True)
+                Whether multiple cell type information was used.
+
+        Returns:
+            pandas.DataFrame
+                Loaded mapping results.
+        """
         ##spatial type
         if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
             sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
@@ -181,13 +377,39 @@ class CellLoc(object):
         return map_info
 
     def save_map(self,path):
+        """
+        Save mapping results to a file.
+
+        Arguments:
+            path: str
+                Path where to save the mapping results CSV file.
+        """
         self.spatrio_decon.to_csv(path)
     
     def loc_prob(self,spot_cell_prob,
                  sc_type: str = 'celltype',
                  sc_prop: float = 0.5,
                  n_cpu=6,):
+        """
+        Calculate localization probabilities for mapped cells.
 
+        This method computes probabilistic scores for cell localization based on
+        cell type proportions and mapping confidence.
+
+        Arguments:
+            spot_cell_prob: float
+                Probability threshold for spot-cell assignments.
+            sc_type: str, optional (default='celltype')
+                Column in adata_sc.obs containing cell type annotations.
+            sc_prop: float, optional (default=0.5)
+                Minimum proportion of cells to consider for each type.
+            n_cpu: int, optional (default=6)
+                Number of CPU cores to use for parallel processing.
+
+        Returns:
+            pandas.DataFrame
+                Updated mapping results with probability scores.
+        """
         map_info=self.spatrio_decon.copy()
         from tqdm import tqdm
         df=spot_cell_prob

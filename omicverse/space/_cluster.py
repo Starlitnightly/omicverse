@@ -12,7 +12,59 @@ from scipy.sparse import csr_matrix
 from .._settings import add_reference
 
 class pySTAGATE:
-    """Class representing the object of pySTAGATE."""
+    """
+    A class representing the PyTorch implementation of STAGATE (Spatial Transcriptomics Analysis using Graph Attention autoEncoder).
+
+    Arguments:
+        adata: AnnData object
+            Annotated data matrix containing spatial transcriptomics data.
+        num_batch_x: int
+            Number of batches in x direction for spatial partitioning.
+        num_batch_y: int
+            Number of batches in y direction for spatial partitioning.
+        spatial_key: list, optional (default=['X','Y'])
+            List of keys in adata.obs containing spatial coordinates.
+        batch_size: int, optional (default=1)
+            Size of batches for training.
+        rad_cutoff: int, optional (default=200)
+            Radius cutoff for spatial network construction.
+        num_epoch: int, optional (default=1000)
+            Number of epochs for training.
+        lr: float, optional (default=0.001)
+            Learning rate for optimization.
+        weight_decay: float, optional (default=1e-4)
+            Weight decay (L2 penalty) for optimization.
+        hidden_dims: list, optional (default=[512, 30])
+            List of hidden dimensions for the neural network layers.
+        device: str, optional (default='cuda:0')
+            Device to run the model on ('cuda:0' or 'cpu').
+
+    Attributes:
+        device: torch.device
+            Device where the model is running.
+        loader: DataLoader
+            PyTorch DataLoader for batch processing.
+        model: STAGATE
+            The STAGATE model instance.
+        optimizer: torch.optim.Adam
+            Adam optimizer for model training.
+        adata: AnnData
+            Input annotated data matrix.
+        data: torch_geometric.data.Data
+            PyTorch geometric data object.
+
+    Notes:
+        The STAGATE model is designed for analyzing spatial transcriptomics data by incorporating
+        spatial information through a graph attention autoencoder architecture.
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> adata = sc.read_h5ad('spatial_data.h5ad')
+        >>> stagate = ov.space.pySTAGATE(adata, num_batch_x=3, num_batch_y=2)
+        >>> stagate.train()
+        >>> stagate.predicted()
+    """
 
     def __init__(self,
                  adata: AnnData,
@@ -64,7 +116,24 @@ class pySTAGATE:
                                             weight_decay=self.weight_decay)
 
     def train(self):
-        """Train the STAGATE model."""       
+        """
+        Train the STAGATE model using the configured parameters.
+
+        This method performs training of the STAGATE model for the specified number of epochs.
+        For each epoch, it processes batches of data, computes the loss using mean squared error,
+        and updates the model parameters through backpropagation.
+
+        Arguments:
+            None
+
+        Returns:
+            None
+
+        Notes:
+            - The training progress is displayed using a progress bar.
+            - Gradient clipping is applied with a maximum norm of 5.
+            - The model is automatically moved to the specified device (GPU/CPU).
+        """       
         for epoch in tqdm(range(1, self.num_epoch+1)):
             for batch in self.loader:
                 self.model.train()
@@ -79,7 +148,23 @@ class pySTAGATE:
 
     def predicted(self):
         """
-        Predict the STAGATE representation and ReX values for all cells.
+        Generate STAGATE representations and reconstruction values for all cells.
+
+        This method runs the trained model in evaluation mode to generate:
+        1. STAGATE embeddings (stored in adata.obsm['STAGATE'])
+        2. Reconstructed expression values (stored in adata.layers['STAGATE_ReX'])
+
+        Arguments:
+            None
+
+        Returns:
+            None
+
+        Notes:
+            - Negative values in reconstructed expression are set to 0
+            - Results are stored directly in the AnnData object:
+                - STAGATE embeddings: adata.obsm['STAGATE']
+                - Reconstructed expression: adata.layers['STAGATE_ReX']
         """
         self.model.eval()
         z, out = self.model(self.data.x, self.data.edge_index)
@@ -93,27 +178,38 @@ class pySTAGATE:
         print('The STAGATE representation values are stored in adata.obsm["STAGATE"].')
         print('The rex values are stored in adata.layers["STAGATE_ReX"].')
 
-    def cal_pSM(self,n_neighbors:int=20,resolution:int=1,
-                       max_cell_for_subsampling:int=5000,
-                       psm_key='pSM_STAGATE'):
+    def cal_pSM(self, n_neighbors:int=20, resolution:int=1,
+                max_cell_for_subsampling:int=5000,
+                psm_key:str='pSM_STAGATE'):
         """
         Calculate the pseudo-spatial map using diffusion pseudotime (DPT) algorithm.
 
-        Parameters
-        ----------
-        n_neighbors: int
-            Number of neighbors for constructing the kNN graph.
-        resolution: float
-            Resolution for clustering.
-        max_cell_for_subsampling: int
-            Maximum number of cells for subsampling. 
-            If the number of cells is larger than this value, the subsampling will be performed.
+        This method computes a pseudo-spatial map by:
+        1. Constructing a kNN graph using STAGATE embeddings
+        2. Performing UMAP and Leiden clustering
+        3. Computing diffusion pseudotime
+        4. Storing results in the AnnData object
 
-        Returns
-        -------
-        pSM_values: numpy.ndarray
-            The pseudo-spatial map values.
-        
+        Arguments:
+            n_neighbors: int, optional (default=20)
+                Number of neighbors for the kNN graph construction.
+            resolution: float, optional (default=1)
+                Resolution parameter for Leiden clustering.
+            max_cell_for_subsampling: int, optional (default=5000)
+                Maximum number of cells to use for distance calculation.
+                If exceeded, cells will be subsampled.
+            psm_key: str, optional (default='pSM_STAGATE')
+                Key under which to store the pseudo-spatial map in adata.obs.
+
+        Returns:
+            numpy.ndarray
+                Array containing the computed pseudo-spatial map values.
+
+        Notes:
+            - If number of cells exceeds max_cell_for_subsampling, random subsampling is performed
+            - The root cell for pseudotime calculation is chosen as the cell with maximum
+              total distance to all other cells
+            - Results are stored in adata.obs[psm_key]
         """
 
         from scipy.spatial import distance_matrix
@@ -151,8 +247,52 @@ def clusters(adata,
              lognorm=50*1e4,
              ):
     """
-    This function is used to cluster the spot in spatial RNA-seq data.
-    
+    Perform clustering analysis on spatial transcriptomics data using multiple methods.
+
+    This function supports multiple clustering methods including STAGATE, GraphST, CAST, and BINARY.
+    Each method processes the spatial data differently and stores its results in the AnnData object.
+
+    Arguments:
+        adata: AnnData
+            Annotated data matrix containing spatial transcriptomics data.
+        methods: list
+            List of methods to use for clustering. Supported methods are:
+            - 'STAGATE': Graph attention autoencoder-based clustering
+            - 'GraphST': Graph-based spatial transcriptomics clustering
+            - 'CAST': Clustering And Spatial Transcriptomics
+            - 'BINARY': Binary-based spatial clustering
+        methods_kwargs: dict
+            Dictionary containing method-specific parameters. Each key should correspond
+            to a method name and contain a dictionary of parameters for that method.
+        batch_key: str, optional (default=None)
+            Key in adata.obs for batch information. If None, all cells are treated as one batch.
+        lognorm: float, optional (default=50*1e4)
+            Normalization factor for log transformation when recovering counts.
+
+    Returns:
+        AnnData
+            The input AnnData object with added clustering results in various slots:
+            - STAGATE: Results in adata.obsm['STAGATE'] and adata.layers['STAGATE_ReX']
+            - GraphST: Results in adata.obsm['GraphST_embedding']
+            - CAST: Results in adata.obsm['X_cast']
+            - BINARY: Results in adata.obsm['BINARY']
+
+    Notes:
+        - For STAGATE: If n_top_genes is specified, highly variable genes are selected
+        - For GraphST: Requires counts matrix in adata.layers['counts']
+        - For CAST: Requires spatial coordinates in adata.obsm['spatial']
+        - For BINARY: Can handle both raw counts and normalized data
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> adata = sc.read_h5ad('spatial_data.h5ad')
+        >>> methods = ['STAGATE', 'GraphST']
+        >>> methods_kwargs = {
+        ...     'STAGATE': {'num_batch_x': 3, 'num_batch_y': 2},
+        ...     'GraphST': {'device': 'cuda:0', 'n_pcs': 30}
+        ... }
+        >>> adata = ov.space.clusters(adata, methods, methods_kwargs)
     """
     from scipy.sparse import issparse
     from ..externel.GraphST import GraphST
@@ -322,8 +462,58 @@ def clusters(adata,
             print(f'The method {method} is not supported.')
     return adata
 
-def merge_cluster(adata,groupby='mclust',use_rep='STAGATE',
-                  threshold=0.05,plot=True,start_idx=0,**kwargs):
+def merge_cluster(adata,
+                  groupby='mclust',
+                  use_rep='STAGATE',
+                  threshold=0.05,
+                  plot=True,
+                  start_idx=0,
+                  **kwargs):
+    """
+    Merge clusters based on hierarchical clustering of their representation.
+
+    This function performs hierarchical clustering on existing clusters and merges them
+    based on a distance threshold. It can optionally visualize the dendrogram showing
+    the merging process.
+
+    Arguments:
+        adata: AnnData
+            Annotated data matrix containing cluster information.
+        groupby: str, optional (default='mclust')
+            Key in adata.obs containing the cluster labels to be merged.
+        use_rep: str, optional (default='STAGATE')
+            Key in adata.obsm to use for calculating distances between clusters.
+        threshold: float, optional (default=0.05)
+            Distance threshold for merging clusters. Lower values result in more merging.
+        plot: bool, optional (default=True)
+            Whether to plot the dendrogram with the merging threshold line.
+        start_idx: int, optional (default=0)
+            Starting index for cluster numbering in the output.
+        **kwargs:
+            Additional arguments passed to scanpy.pl.dendrogram().
+
+    Returns:
+        dict
+            Dictionary mapping original cluster labels to merged cluster labels.
+
+    Notes:
+        - The function uses scipy's hierarchical clustering implementation
+        - Merged clusters are stored in adata.obs[f'{groupby}_tree']
+        - The dendrogram is stored in adata.uns[f'dendrogram_{groupby}']
+        - Cluster labels in the output are prefixed with 'c'
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> adata = sc.read_h5ad('clustered_data.h5ad')
+        >>> # Merge clusters using STAGATE representation
+        >>> cluster_map = ov.space.merge_cluster(adata, 
+        ...                                      groupby='leiden',
+        ...                                      use_rep='STAGATE',
+        ...                                      threshold=0.1)
+        >>> # Access merged clusters
+        >>> print(adata.obs['leiden_tree'])
+    """
     sc.tl.dendrogram(adata,groupby=groupby,use_rep=use_rep)
     import numpy as np
     from scipy.cluster.hierarchy import fcluster

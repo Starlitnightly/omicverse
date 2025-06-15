@@ -24,8 +24,10 @@ def global_imports(modulename,shortname = None, asfunction = False):
 
 metatime_install=False
 def check_metatime():
-    """
+    r"""Check if metatime is installed and import it.
     
+    Returns:
+        None: Raises ImportError if metatime is not installed
     """
     global metatime_install
     try:
@@ -39,21 +41,15 @@ def check_metatime():
 
 
 def data_downloader(url,path,title):
-    r"""datasets downloader
+    r"""Download datasets from URL.
     
-    Parameters
-    ----------
-    - url: `str`
-        the download url of datasets
-    - path: `str`
-        the save path of datasets
-    - title: `str`
-        the name of datasets
+    Arguments:
+        url: The download url of datasets
+        path: The save path of datasets
+        title: The name of datasets
     
-    Returns
-    -------
-    - path: `str`
-        the save path of datasets
+    Returns:
+        path: The save path of datasets
     """
     if os.path.isfile(path):
         print("......Loading dataset from {}".format(path))
@@ -91,19 +87,17 @@ def data_downloader(url,path,title):
 
 def data_preprocess(adata,clustertype='leiden',
                     path='temp/rna.csv',layer='scaled',rank_rep=False):
-    r"""data preprocess for SCSA
+    r"""Data preprocess for SCSA.
     
-    Parameters
-    ----------
-    - adata: `AnnData`
-        AnnData object
-    - path: `str`   
-        the save path of datasets
+    Arguments:
+        adata: AnnData object
+        clustertype: Clustering name used in scanpy. ('leiden')
+        path: The save path of datasets. ('temp/rna.csv')
+        layer: Layer to use for processing. ('scaled')
+        rank_rep: Whether to repeat ranking. (False)
 
-    Returns
-    -------
-    - adata: `AnnData`
-        AnnData object
+    Returns:
+        dat: Preprocessed data as DataFrame
     """
     dirname, _ = os.path.split(path)
     try:
@@ -132,41 +126,25 @@ def __cell_annotate(data,
                 outfmt='txt',Gensymbol=True,
                 species='Human',weight=100,tissue='All',
                 celltype='normal',norefdb=False,noprint=True,list_tissue=False):
-    r"""cell annotation by SCSA
+    r"""Cell annotation by SCSA.
     
-    Parameters
-    ----------
-    - data: `AnnData`
-        AnnData object
-    - foldchange: `float`
-        foldchange threshold
-    - pvalue: `float`
-        pvalue threshold
-    - output: `str`
-        the save path of annotation result
-    - outfmt: `str`
-        the format of annotation result
-    - Gensymbol: `bool`
-        whether to use gene symbol
-    - species: `str`
-        the species of datasets
-    - weight: `int`
-        the weight of datasets
-    - tissue: `str`
-        the tissue of datasets
-    - celltype: `str`
-        the celltype of datasets
-    - norefdb: `bool`
-        whether to use reference database
-    - noprint: `bool`
-        whether to print the result
-    - list_tissue: `bool`
-        whether to list the tissue of datasets
+    Arguments:
+        data: AnnData object
+        foldchange: Foldchange threshold. (1.5)
+        pvalue: Pvalue threshold. (0.05)
+        output: The save path of annotation result. ('temp/rna_anno.txt')
+        outfmt: The format of annotation result. ('txt')
+        Gensymbol: Whether to use gene symbol. (True)
+        species: The species of datasets. ('Human')
+        weight: The weight of datasets. (100)
+        tissue: The tissue of datasets. ('All')
+        celltype: The celltype of datasets. ('normal')
+        norefdb: Whether to use reference database. (False)
+        noprint: Whether to print the result. (True)
+        list_tissue: Whether to list the tissue of datasets. (False)
     
-    Returns
-    -------
-    - result: `pandas.DataFrame`
-        the annotation result
+    Returns:
+        result: The annotation result
     """
     data.to_csv('temp/rna.csv')
 
@@ -206,15 +184,13 @@ def __cell_annotate(data,
 
 
 def __cell_anno_print(anno):
-    r"""print the annotation result
+    r"""Print the annotation result.
     
-    Parameters
-    ----------
-    - anno: `pandas.DataFrame`
-        the annotation result
-    Returns
-    -------
-
+    Arguments:
+        anno: The annotation result
+    
+    Returns:
+        None
     """
     for i in set(anno['Cluster']):
         test=anno.loc[anno['Cluster']==i].iloc[:2]
@@ -231,25 +207,25 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
                 n_comps:int=100, svd_solver:str="auto",
                 n_neighbors:int=15, random_state:int = 112, n_pcs:int=50,
                 )->anndata.AnnData:
-    r"""scanpy lazy analysis
+    r"""Scanpy lazy analysis pipeline.
     
     Arguments:
         adata: AnnData object
-        min_genes: the min number of genes
-        min_cells: the min number of cells
-        drop_doublet: whether to drop doublet
-        n_genes_by_counts: the max number of genes
-        pct_counts_mt: the max proportion of mito-genes
-        target_sum: the max counts of total_counts
-        min_mean: the min mean of genes
-        max_mean: the max mean of genes
-        min_disp: the min dispersion of genes
-        max_value: the max value of genes
-        n_comps: the number of components
-        svd_solver: the solver of svd
-        n_neighbors: the number of neighbors
-        random_state: the random state
-        n_pcs: the number of pcs
+        min_genes: The min number of genes. (200)
+        min_cells: The min number of cells. (3)
+        drop_doublet: Whether to drop doublet. (True)
+        n_genes_by_counts: The max number of genes. (4300)
+        pct_counts_mt: The max proportion of mito-genes. (25)
+        target_sum: The max counts of total_counts. (1e4)
+        min_mean: The min mean of genes. (0.0125)
+        max_mean: The max mean of genes. (3)
+        min_disp: The min dispersion of genes. (0.5)
+        max_value: The max value of genes. (10)
+        n_comps: The number of components. (100)
+        svd_solver: The solver of svd. ('auto')
+        n_neighbors: The number of neighbors. (15)
+        random_state: The random state. (112)
+        n_pcs: The number of pcs. (50)
 
     Returns:
         adata: AnnData object
@@ -297,14 +273,16 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                anno_name:str='major',
                                clustertype:str='leiden',
                                )->None:
-    r"""add cell type annotation from dict to anndata object
+    r"""Add cell type annotation from dict to anndata object.
 
     Arguments:
         adata: AnnData object of scRNA-seq after preprocessing
-        anno_dict: dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`
-        anno_name: the name of annotation
-        clustertype: Clustering name used in scanpy. (leiden)
+        anno_dict: Dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`
+        anno_name: The name of annotation. ('major')
+        clustertype: Clustering name used in scanpy. ('leiden')
 
+    Returns:
+        None
     """
 
     adata.obs[anno_name+'_celltype'] = adata.obs[clustertype].map(anno_dict).astype('category')
@@ -365,26 +343,28 @@ class pySCSA(object):
                 celltype:str='normal',norefdb:bool=False,cellrange:str=None,
                 noprint:bool=True,list_tissue:bool=False) -> None:
 
-        r"""Initialize the pySCSA class
+        r"""Initialize the pySCSA class.
 
         Arguments:
             adata: AnnData object of scRNA-seq after preprocessing
-            foldchange: Fold change threshold for marker filtering. (2.0)
+            foldchange: Fold change threshold for marker filtering. (1.5)
             pvalue: P-value threshold for marker filtering. (0.05)
-            output: Output file for marker annotation.(temp/rna_anno.txt)
-            model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet.
-            outfmt: Output format for marker annotation. (txt)
-            Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation.
-            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
+            output: Output file for marker annotation. ('temp/rna_anno.txt')
+            model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet. ('')
+            outfmt: Output format for marker annotation. ('txt')
+            Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation. (True)
+            species: Species for annotation. Only used for cellmarker database. ('Human')
             weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)
             tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')
-            target: Target to annotation class in Database. (cellmarker,[cancersea,panglaodb])
-            celltype: Cell type for annotation. (normal,[cancer])
-            norefdb: Only using user-defined marker database for annotation.
-            noprint: Do not print any detail results.
-            list_tissue: List all available tissues in the database.
-            cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.)
+            target: Target to annotation class in Database. ('cellmarker')
+            celltype: Cell type for annotation. ('normal')
+            norefdb: Only using user-defined marker database for annotation. (False)
+            cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.) (None)
+            noprint: Do not print any detail results. (True)
+            list_tissue: List all available tissues in the database. (False)
         
+        Returns:
+            None
         """
 
         #create temp directory
@@ -420,8 +400,10 @@ class pySCSA(object):
         r"""List all available tissues in the database.
         
         Arguments:
-            species: Species for annotation. Only used for cellmarker database. ('Human',['Mouse'])
+            species: Species for annotation. Only used for cellmarker database. ('Human')
 
+        Returns:
+            None
         """
         
         anno = Annotator(foldchange=self.foldchange,
@@ -453,8 +435,12 @@ class pySCSA(object):
         r"""Annotate cell type for each cluster.
         
         Arguments:
-            clustertype: Clustering name used in scanpy. (leiden)
-            cluster: Only deal with one cluster of marker genes. (all,[1],[1,2,3],[...])
+            clustertype: Clustering name used in scanpy. ('leiden')
+            cluster: Only deal with one cluster of marker genes. ('all')
+            rank_rep: Whether to repeat ranking. (False)
+        
+        Returns:
+            result: Annotation result as DataFrame
         """
 
         dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv',rank_rep=rank_rep)
@@ -491,8 +477,10 @@ class pySCSA(object):
         return result
     
     def cell_anno_print(self)->None:
-        r"""print the annotation result
+        r"""Print the annotation result.
         
+        Returns:
+            None
         """
         for i in set(self.result['Cluster']):
             test=self.result.loc[self.result['Cluster']==i].iloc[:2]
@@ -505,11 +493,15 @@ class pySCSA(object):
 
     def cell_auto_anno(self,adata:anndata.AnnData,
                        clustertype:str='leiden',key='scsa_celltype')->None:
-        r"""Add cell type annotation to anndata.obs['scsa_celltype']
+        r"""Add cell type annotation to anndata.obs['scsa_celltype'].
         
         Arguments:
             adata: anndata object
-            clustertype: Clustering name used in scanpy. (leiden)
+            clustertype: Clustering name used in scanpy. ('leiden')
+            key: Key to store cell type annotation. ('scsa_celltype')
+        
+        Returns:
+            None
         """
         test_li=[]
         for i in adata.obs[clustertype].value_counts().index:

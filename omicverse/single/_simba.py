@@ -23,8 +23,10 @@ def global_imports(modulename,shortname = None, asfunction = False):
 class pySIMBA(object):
 
     def check_simba(self):
-        """
-        Check if simba have been installed.
+        r"""Check if SIMBA package has been installed.
+        
+        Raises:
+            ImportError: If SIMBA package is not installed
         """
         global simba_install
         try:
@@ -38,12 +40,11 @@ class pySIMBA(object):
             )
 
     def __init__(self,adata,workdir="simba_result") -> None:
-        """
-        SIMBA method for batch correction.
+        r"""Initialize SIMBA object for batch correction and multimodal analysis.
 
         Arguments:
-            adata: AnnData object.
-            workdir: The working directory for saving the results.
+            adata: AnnData object containing single-cell data
+            workdir (str): Working directory for saving results (default: "simba_result")
         
         """
 
@@ -57,15 +58,14 @@ class pySIMBA(object):
 
     def preprocess(self,batch_key='batch',min_n_cells=3,
                     method='lib_size',n_top_genes=3000,n_bins=5):
-        """
-        The preprocess of the adata by simba
+        r"""Preprocess the AnnData object for SIMBA analysis.
 
         Arguments:
-            batch_key: The key of batch in adata.obs.
-            min_n_cells: The minimum number of cells for a gene to be considered.
-            method: The method for normalization.
-            n_top_genes: The number of top genes to keep.
-            n_bins: The number of bins for discretization.
+            batch_key (str): Key of batch information in adata.obs (default: 'batch')
+            min_n_cells (int): Minimum number of cells for a gene to be considered (default: 3)
+            method (str): Method for normalization (default: 'lib_size')
+            n_top_genes (int): Number of top variable genes to keep (default: 3000)
+            n_bins (int): Number of bins for discretization (default: 5)
 
         
         """
@@ -84,14 +84,13 @@ class pySIMBA(object):
 
     def gen_graph(self,n_components=15, k=15,
                     copy=False,dirname='graph0'):
-        """
-        Generate the graph for batch correction.
+        r"""Generate the graph structure for batch correction.
 
         Arguments:
-            n_components: The number of components for the graph.
-            k: The number of neighbors for the graph.
-            copy: Whether to copy the adata.
-            dirname: The name of the graph.
+            n_components (int): Number of components for dimensionality reduction (default: 15)
+            k (int): Number of neighbors for graph construction (default: 15)
+            copy (bool): Whether to copy the adata object (default: False)
+            dirname (str): Directory name for saving graph results (default: 'graph0')
         
         """
 
@@ -113,15 +112,13 @@ class pySIMBA(object):
                     dirname=dirname)
         
     def train(self,num_workers=12,auto_wd=True, save_wd=True, output='model'):
-        """
-
-        Train the model for batch correction.
+        r"""Train the SIMBA model for batch correction.
 
         Arguments:
-            num_workers: The number of workers for training.
-            auto_wd: Whether to use the automatic weight decay.
-            save_wd: Whether to save the weight decay.
-            output: The output directory for saving the model.
+            num_workers (int): Number of workers for parallel training (default: 12)
+            auto_wd (bool): Whether to use automatic weight decay (default: True)
+            save_wd (bool): Whether to save weight decay parameters (default: True)
+            output (str): Output directory for saving the trained model (default: 'model')
 
         """
 
@@ -134,11 +131,11 @@ class pySIMBA(object):
         add_reference(self.adata,'SIMBA','batch correction with SIMBA')
 
     def load(self,model_path=None):
-        """
-        Load the model for batch correction.
+        r"""Load a pre-trained SIMBA model for batch correction.
 
         Arguments:
-            model_path: The path of the model.
+            model_path (str): Path to the model directory (default: None)
+                            If None, loads from default location
 
         
         """
@@ -152,12 +149,13 @@ class pySIMBA(object):
        
 
     def batch_correction(self,use_precomputed=False):
-        """
-        Batch correction by SIMBA
+        r"""Perform batch correction using the trained SIMBA model.
 
         Arguments:
-            use_precomputed: Whether to use the precomputed model.
+            use_precomputed (bool): Whether to use precomputed embeddings (default: False)
 
+        Returns:
+            AnnData: Batch-corrected AnnData object with X_simba embedding
         """
         dict_adata = si.read_embedding()
         adata_dict={}

@@ -1,13 +1,13 @@
-
-::: omicverse.bulk2single.Single2Spatial
+::: omicverse.space.CellLoc
     handler: python
     selection:
         options:
         members:
             - __init__
-            - train
-            - load
-            - save
-            - spot_assess
+            - loc_map
+            - load_map
+            - save_map
+            - loc_prob
+            - loc_assign
         show_root_heading: true
         show_source: true

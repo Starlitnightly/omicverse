@@ -647,7 +647,7 @@ class VIA:
                  edgebundle_pruning_twice=False, pca_loadings=None, time_series=False,
                  time_series_labels: list = None, knn_sequential: int = 10, knn_sequential_reverse: int = 0,
                  t_diff_step: int = 1, single_cell_transition_matrix=None,
-                 embedding_type: str = 'via-mds', do_compute_embedding: bool = False, color_dict: {} = None,
+                 embedding_type: str = 'via-mds', do_compute_embedding: bool = False, color_dict: dict = None,
                  user_defined_terminal_cell: list = [], user_defined_terminal_group: list = [],
                  do_gaussian_kernel_edgeweights: bool = False, RW2_mode: bool = False,
                  working_dir_fp: str = '/home/', memory=5, viagraph_decay=0.9, p_memory=1, graph_init_pos: np.ndarray=None, spatial_coords:np.ndarray=None, do_spatial_knn:bool=False, do_spatial_layout:bool=False, spatial_knn:int = 15, spatial_aux:list = []):

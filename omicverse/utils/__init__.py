@@ -1,30 +1,67 @@
 r"""
-utils (Pyomic.utils)
+Utility functions for data handling and analysis.
 
+This module provides essential utility functions for data I/O, manipulation,
+visualization, clustering, and various computational tasks across the omicverse
+ecosystem. It serves as the foundation for many higher-level analysis functions.
+
+Data I/O and manipulation:
+    read: Universal data reader for various formats
+    read_csv, read_10x_mtx, read_h5ad, read_10x_h5: Format-specific readers
+    data_downloader: Download datasets and models
+    geneset_prepare: Prepare gene sets for analysis
+    get_gene_annotation: Gene annotation utilities
+    
+Visualization utilities:
+    palette: Color palette management
+    ov_plot_set, plot_set: Global plot settings
+    Various plotting helper functions
+    
+Clustering and analysis:
+    cluster: General clustering functions
+    LDA_topic: Topic modeling for single-cell data
+    filtered, refine_label: Data filtering and label refinement
+    
+Statistical and computational tools:
+    correlation_pseudotime: Pseudotime correlation analysis
+    np_mean, np_std: Numpy-based statistical functions
+    neighbors: Neighbor graph construction
+    mde: Minimum distortion embedding
+    
+Data structures and conversion:
+    anndata_sparse: Sparse matrix utilities for AnnData
+    store_layers, retrieve_layers: Layer management
+    
+Specialized analysis:
+    roe: Ratio of expression analysis
+    cal_paga, plot_paga: PAGA trajectory analysis
+    venny4py: Venn diagram utilities
+    syn: Synthetic data generation
+    scatterplot: Advanced scatter plot functions
+    knn: K-nearest neighbors utilities
+    heatmap: Heatmap generation and customization
+    lsi: Latent semantic indexing
+
+Examples:
+    >>> import omicverse as ov
+    >>> # Data reading
+    >>> adata = ov.utils.read('data.h5ad')
+    >>> 
+    >>> # Clustering
+    >>> labels = ov.utils.cluster(
+    ...     adata.obsm['X_pca'], 
+    ...     method='leiden', 
+    ...     resolution=0.5
+    ... )
+    >>> 
+    >>> # Visualization setup
+    >>> ov.utils.ov_plot_set()
+    >>> 
+    >>> # Download data
+    >>> ov.utils.data_downloader('pbmc3k')
 """
 
-'''
-from ._data import (read,
-                    read_csv,
-                    read_10x_mtx,
-                    read_h5ad,
-                    read_10x_h5,
-                    data_downloader,
-                    download_CaDRReS_model,
-                    download_GDSC_data,
-                    download_pathway_database,
-                    download_geneid_annotation_pair,
-                    download_tosica_gmt,
-                    geneset_prepare,
-                    get_gene_annotation,
-                    correlation_pseudotime,
-                    np_mean,
-                    np_std,
-                    anndata_sparse,
-                    store_layers,
-                    retrieve_layers,
-                    easter_egg
-                    )'''
+# All functions imported via wildcard imports from submodules
 from ._data import *
 from ._plot import *
 #from ._genomics import *

@@ -2,6 +2,17 @@ import numpy as np
 
 
 def mahalanobis(X1, X2, S1, S2):
+    r"""Calculate Mahalanobis distance between two points with covariance matrices.
+    
+    Arguments:
+        X1: First point coordinates
+        X2: Second point coordinates
+        S1: Covariance matrix for first point
+        S2: Covariance matrix for second point
+        
+    Returns:
+        float: Mahalanobis distance
+    """
     S_inv = np.linalg.inv(S1 + S2)
     diff = (X1 - X2).reshape(-1, 1)
     return np.matmul(np.matmul(diff.T, S_inv), diff)
@@ -23,9 +34,24 @@ def isstr(x):
     return isinstance(x, str)
 
 def scale_to_range(x, a=0, b=1):
+    r"""Scale array values to specified range.
+    
+    Arguments:
+        x: Input array to scale
+        a (float): Lower bound of target range (default: 0)
+        b (float): Upper bound of target range (default: 1)
+        
+    Returns:
+        np.ndarray: Scaled array
+    """
     return ((x - x.min()) / (x.max() - x.min())) * (b - a) + a
 
 class Lineage:
+    r"""Represents a lineage trajectory through clusters.
+    
+    Arguments:
+        clusters: List of cluster IDs forming the lineage
+    """
     def __init__(self, clusters):
         self.clusters = clusters
 
@@ -213,16 +239,16 @@ class Slingshot:
             end_nodes=None,
             debug_level=None
     ):
-        """
-        Constructs a new `Slingshot` object.
-        Args:
-            data: either an AnnData object or a numpy array containing the dimensionality-reduced data of shape (num_cells, 2)
-            cluster_labels: cluster assignments of shape (num_cells). Only required if `data` is not an AnnData object.
-            celltype_key: key into AnnData.obs indicating cell type. Only required if `data` is an AnnData object.
-            obsm_key: key into AnnData.obsm indicating the dimensionality-reduced data. Only required if `data` is an AnnData object.
-            start_node: the starting node of the minimum spanning tree
-            end_nodes: any terminal nodes
-            debug_level:
+        r"""Initialize Slingshot trajectory inference object.
+        
+        Arguments:
+            data: AnnData object or numpy array with dimensionality-reduced data (num_cells, 2)
+            cluster_labels_onehot: One-hot encoded cluster labels (default: None)
+            celltype_key (str): Key in AnnData.obs for cell type labels (default: None)
+            obsm_key (str): Key in AnnData.obsm for dimensionality-reduced data (default: 'X_umap')
+            start_node: Starting cluster for trajectory (default: 0)
+            end_nodes: List of terminal clusters (default: None)
+            debug_level: Debug verbosity level (default: None)
         """
         if isinstance(data, AnnData):
             assert celltype_key is not None, "Must provide celltype key if data is an AnnData object"
@@ -303,11 +329,13 @@ class Slingshot:
         self.debug_plot_avg = axes is not None
 
     def construct_mst(self, start_node):
-        """
+        r"""Construct minimum spanning tree for trajectory inference.
+        
         Arguments:
-            start_node: the starting node of the minimum spanning tree
+            start_node: Starting cluster node for the MST
+            
         Returns:
-            children: a dictionary mapping clusters to the children of each cluster
+            dict: Dictionary mapping clusters to their children in the MST
         """
         # Calculate empirical covariance of clusters
         emp_covs = np.stack([np.cov(self.data[self.cluster_label_indices == i].T) for i in range(self.num_clusters)])

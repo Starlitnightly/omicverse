@@ -22,24 +22,18 @@ from datetime import datetime
 
 
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
-    """ 
-    Identify robust genes as candidates for HVG selection and remove genes 
-    that are not expressed in any cells.
+    r"""Identify robust genes as candidates for HVG selection and remove genes that are not expressed in any cells.
 
     Arguments:
         data: Use current selected modality in data, which should contain one RNA expression matrix.
-        percent_cells: Only assign genes to be ``robust`` that are expressed in at least 
-        ``percent_cells`` % of cells.
+        percent_cells: Only assign genes to be ``robust`` that are expressed in at least ``percent_cells`` % of cells. (0.05)
 
-
-    Update ``data.var``:
-
-        * ``n_cells``: Total number of cells in which each gene is measured.
-        * ``percent_cells``: Percent of cells in which each gene is measured.
-        * ``robust``: Boolean type indicating if a gene is robust based on the QC metrics.
-        * ``highly_variable_features``: Boolean type indicating if a gene 
-        is a highly variable feature. 
-        By default, set all robust genes as highly variable features.
+    Returns:
+        None: Updates ``data.var`` with new columns:
+            * ``n_cells``: Total number of cells in which each gene is measured.
+            * ``percent_cells``: Percent of cells in which each gene is measured.
+            * ``robust``: Boolean type indicating if a gene is robust based on the QC metrics.
+            * ``highly_variable_features``: Boolean type indicating if a gene is a highly variable feature.
 
     """
 
@@ -83,7 +77,14 @@ def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: \
         return calc_stat_per_batch_dense(X.shape[0], X.shape[1], X, nbatch, codes)
 
 def estimate_feature_statistics(data: anndata.AnnData, batch: str) -> None:
-    """ Estimate feature (gene) statistics per channel, such as mean, var etc.
+    r"""Estimate feature (gene) statistics per channel, such as mean, var etc.
+    
+    Arguments:
+        data: AnnData object
+        batch: Batch column name in data.obs
+    
+    Returns:
+        None: Updates data.var with mean and variance statistics
     """
     if batch is None:
         data.var["mean"], data.var["var"] = calc_mean_and_var(data.X, axis=0)
@@ -103,7 +104,16 @@ def estimate_feature_statistics(data: anndata.AnnData, batch: str) -> None:
 def select_hvf_pegasus(
     data: anndata.AnnData, batch: str, n_top: int = 2000, span: float = 0.02
 ) -> None:
-    """ Select highly variable features using the pegasus method
+    r"""Select highly variable features using the pegasus method.
+    
+    Arguments:
+        data: AnnData object
+        batch: Batch column name in data.obs
+        n_top: Number of top variable features to select. (2000)
+        span: Loess span parameter. (0.02)
+    
+    Returns:
+        None: Updates data.var with highly variable feature annotations
     """
     if "robust" not in data.var:
         raise ValueError("Please run `identify_robust_genes` to identify robust genes")

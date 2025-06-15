@@ -6,14 +6,19 @@ import pandas as pd
 def gptcelltype(input, tissuename=None, speciename='human',
                 provider='qwen',model='qwen-plus', topgenenumber=10,
                 base_url=None):
-    """
-    Annotation of cell types using AGI model.
+    r"""Annotate cell types using AGI (Artificial General Intelligence) models.
 
     Arguments:
-        input: dict, input dictionary with clusters as keys and gene markers as values.
-        tissuename: str, tissue name.
-        provider: str, provider of the model. Default: 'qwen', you can select from ['openai','kimi','qwen'] now.
+        input: Dictionary with clusters as keys and gene markers as values, or DataFrame with cluster information
+        tissuename (str): Tissue name for context (default: None)
+        speciename (str): Species name for annotation context (default: 'human')
+        provider (str): AI model provider - choose from 'openai', 'kimi', 'qwen' (default: 'qwen')
+        model (str): Specific model name to use (default: 'qwen-plus')
+        topgenenumber (int): Number of top genes to use for annotation (default: 10)
+        base_url (str): Custom API base URL (default: None)
 
+    Returns:
+        dict or str: Cell type annotations for each cluster, or prompt string if API key not found
     """
     from openai import OpenAI
     import os
@@ -84,14 +89,19 @@ def gptcelltype(input, tissuename=None, speciename='human',
 def gpt4celltype(input_data, tissuename=None, speciename='human',
                 provider='qwen', model='qwen-plus', topgenenumber=10,
                 base_url=None):
-    """
-    Annotation of cell types using AGI model.
+    r"""Enhanced cell type annotation using AGI models with improved processing.
 
     Arguments:
-        input: dict, input dictionary with clusters as keys and gene markers as values.
-        tissuename: str, tissue name.
-        provider: str, provider of the model. Default: 'qwen', you can select from ['openai','kimi','qwen'] now.
+        input_data: Dictionary with clusters as keys and gene markers as values, or DataFrame with cluster information
+        tissuename (str): Tissue name for context (default: None)
+        speciename (str): Species name for annotation context (default: 'human')
+        provider (str): AI model provider - choose from 'openai', 'kimi', 'qwen' (default: 'qwen')
+        model (str): Specific model name to use (default: 'qwen-plus')
+        topgenenumber (int): Number of top genes to use for annotation (default: 10)
+        base_url (str): Custom API base URL (default: None)
 
+    Returns:
+        dict or str: Cell type annotations for each cluster, or prompt string if API key not found
     """
     input=input_data.copy()
     input_data=input

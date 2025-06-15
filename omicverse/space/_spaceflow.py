@@ -1,4 +1,4 @@
-"""Module providing a encapsulation of spaceflow."""
+r"""Module providing encapsulation of SpaceFlow for spatial flow analysis."""
 import random
 import numpy as np
 import pandas as pd
@@ -16,13 +16,65 @@ from .._settings import add_reference
 sf_install = False
 
 class pySpaceFlow(object):
-    """Class representing the object of pySpaceFlow."""
+    r"""SpaceFlow spatial flow analysis class.
+    
+    SpaceFlow is a deep learning method for analyzing spatial transcriptomics data
+    by learning spatially-aware cell representations. It combines graph neural networks
+    with spatial regularization to capture both transcriptional and spatial relationships
+    between cells.
+
+    The method:
+    1. Constructs a spatial neighborhood graph
+    2. Learns embeddings using deep graph infomax
+    3. Applies spatial regularization to preserve spatial structure
+    4. Generates pseudo-spatial maps for trajectory analysis
+
+    Attributes:
+        adata: AnnData
+            Input annotated data matrix containing:
+            - Gene expression data in adata.X
+            - Spatial coordinates in adata.obsm['spatial']
+        sf: SpaceFlow
+            Internal SpaceFlow object for computations
+        embedding: array
+            Learned spatial-aware embeddings after training
+
+    Examples:
+        >>> import scanpy as sc
+        >>> import omicverse as ov
+        >>> # Load spatial data
+        >>> adata = sc.read_visium(...)
+        >>> # Initialize SpaceFlow
+        >>> spaceflow = ov.space.pySpaceFlow(adata)
+        >>> # Train model
+        >>> embedding = spaceflow.train(
+        ...     spatial_regularization_strength=0.1,
+        ...     z_dim=50,
+        ...     epochs=1000
+        ... )
+        >>> # Calculate pseudo-spatial map
+        >>> psm = spaceflow.cal_pSM(n_neighbors=20)
+    """
     def __init__(self,adata) -> None:
+        r"""Initialize SpaceFlow spatial analysis object.
+        
+        Arguments:
+            adata: AnnData
+                Annotated data matrix containing:
+                - Gene expression data in adata.X
+                - Spatial coordinates in adata.obsm['spatial']
+                The data should be preprocessed (normalized, scaled)
+
+        Notes:
+            - Automatically checks for SpaceFlow package installation
+            - Constructs initial spatial neighborhood graph
+            - Uses 10 nearest neighbors for graph construction
+            - Stores SpaceFlow object in self.sf
+        """
         global sf_install
         try:
             from ..externel.spaceflow import SpaceFlow
             sf_install=True
-            #print('mofax have been install version:',mfx.__version__)
         except ImportError as e:
             raise ImportError(
                 'Please install the SpaceFlow: `pip install SpaceFlow`.'
@@ -30,7 +82,6 @@ class pySpaceFlow(object):
         from ..externel.spaceflow import SpaceFlow
         sf = SpaceFlow(adata=adata, 
                          spatial_locs=adata.obsm['spatial'])
-
 
         spatial_locs = adata.obsm['spatial']
         spatial_graph = sf.graph_alpha(spatial_locs, n_neighbors=10)
@@ -44,6 +95,46 @@ class pySpaceFlow(object):
               z_dim=50, lr=1e-3, epochs=1000, max_patience=50, 
               min_stop=100, random_seed=42, gpu=0, 
               regularization_acceleration=True, edge_subset_sz=1000000):
+        r"""Train SpaceFlow model for spatial embedding.
+        
+        This method trains a graph neural network to learn spatially-aware cell
+        representations using deep graph infomax with spatial regularization.
+
+        Arguments:
+            spatial_regularization_strength: float, optional (default=0.1)
+                Weight for spatial regularization term.
+                Higher values enforce stronger spatial consistency.
+            z_dim: int, optional (default=50)
+                Dimensionality of learned embedding space.
+            lr: float, optional (default=1e-3)
+                Learning rate for Adam optimizer.
+            epochs: int, optional (default=1000)
+                Maximum number of training epochs.
+            max_patience: int, optional (default=50)
+                Number of epochs to wait for improvement before early stopping.
+            min_stop: int, optional (default=100)
+                Minimum number of epochs before allowing early stopping.
+            random_seed: int, optional (default=42)
+                Random seed for reproducibility.
+            gpu: int, optional (default=0)
+                GPU device index to use. Uses CPU if GPU unavailable.
+            regularization_acceleration: bool, optional (default=True)
+                Whether to use subsampling for faster regularization.
+            edge_subset_sz: int, optional (default=1000000)
+                Number of edges to sample for accelerated regularization.
+            
+        Returns:
+            numpy.ndarray
+                Learned embedding matrix of shape (n_cells, z_dim).
+
+        Notes:
+            - Uses deep graph infomax for self-supervised learning
+            - Applies spatial regularization to preserve spatial structure
+            - Employs early stopping based on loss convergence
+            - Supports GPU acceleration when available
+            - Results are stored in adata.obsm['spaceflow']
+            - Progress is shown with a progress bar
+        """
         from ..externel.spaceflow import sparse_mx_to_torch_edge_list, corruption
 
         adata_preprocessed, spatial_graph = self.sf.adata_preprocessed, self.sf.spatial_graph
@@ -127,35 +218,48 @@ class pySpaceFlow(object):
         add_reference(self.adata,'SpaceFlow','embedding with SpaceFlow')
 
         return embedding
+
     def cal_pSM(self,n_neighbors:int=20,resolution:int=1,
                        max_cell_for_subsampling:int=5000,
                        psm_key='pSM_spaceflow'):
-        """
-        Calculate the pseudo-spatial map using diffusion pseudotime (DPT) algorithm.
-
-        Parameters
-        ----------
-        n_neighbors: int
-            Number of neighbors for constructing the kNN graph.
-        resolution: float
-            Resolution for clustering.
-        max_cell_for_subsampling: int
-            Maximum number of cells for subsampling. 
-            If the number of cells is larger than this value, the subsampling will be performed.
-
-        Returns
-        -------
-        pSM_values: numpy.ndarray
-            The pseudo-spatial map values.
+        r"""Calculate pseudo-spatial map using diffusion pseudotime.
         
-        """
+        This method constructs a pseudo-spatial map by computing diffusion pseudotime
+        on the learned embeddings, useful for analyzing spatial trajectories and
+        organization patterns.
 
+        Arguments:
+            n_neighbors: int, optional (default=20)
+                Number of neighbors for kNN graph construction.
+                Higher values create denser connectivity.
+            resolution: int, optional (default=1)
+                Resolution parameter for Leiden clustering.
+                Higher values yield more fine-grained clusters.
+            max_cell_for_subsampling: int, optional (default=5000)
+                Maximum number of cells to use for distance calculations.
+                Enables analysis of large datasets through subsampling.
+            psm_key: str, optional (default='pSM_spaceflow')
+                Key in adata.obs where pseudo-spatial map values will be stored.
+
+        Returns:
+            numpy.ndarray
+                Pseudo-spatial map values for each cell.
+
+        Notes:
+            - Constructs neighborhood graph from embeddings
+            - Performs UMAP and Leiden clustering
+            - Uses PAGA for trajectory inference
+            - Computes diffusion pseudotime
+            - Results are stored in adata.obs[psm_key]
+            - Useful for ordering cells along spatial axes
+            - Handles large datasets through subsampling
+        """
         sc.pp.neighbors(self.adata, n_neighbors=n_neighbors,
                use_rep='spaceflow')
         sc.tl.umap(self.adata)
         sc.tl.leiden(self.adata, resolution=resolution)
         sc.tl.paga(self.adata)
-       # max_cell_for_subsampling = max_cell_for_subsampling
+
         if self.adata.shape[0] < max_cell_for_subsampling:
             sub_adata_x = self.adata.obsm['spaceflow']
         else:
@@ -175,9 +279,31 @@ class pySpaceFlow(object):
 
 
 class GraphEncoder(nn.Module):
-    """
-    This class implements a graph encoder, with input channels of in_channels 
-    and hidden layer channels of hidden_channels.
+    r"""Graph convolutional encoder for SpaceFlow.
+    
+    This class implements a two-layer graph convolutional network (GCN) that serves
+    as the encoder component in the SpaceFlow model. It learns to transform gene
+    expression data into a spatially-aware latent representation.
+
+    Architecture:
+    1. Input layer: Gene expression features
+    2. First GCN layer with PReLU activation
+    3. Second GCN layer with PReLU activation
+    4. Output layer: Learned embeddings
+
+    Attributes:
+        conv1: GCNConv
+            First graph convolutional layer
+        conv2: GCNConv
+            Second graph convolutional layer
+        prelu: PReLU
+            Parametric ReLU activation function
+
+    Notes:
+        - Uses PyTorch Geometric's GCNConv implementation
+        - Learns spatially-aware representations
+        - Preserves both local and global structure
+        - Part of the deep graph infomax framework
     """
     def __init__(self, in_channels, hidden_channels):
         super(GraphEncoder, self).__init__()
@@ -187,7 +313,15 @@ class GraphEncoder(nn.Module):
         self.prelu2 = nn.PReLU(hidden_channels)
 
     def forward(self, x, edge_index):
-        """Define the forward propagation method"""
+        r"""Forward propagation through graph encoder.
+        
+        Arguments:
+            x: Input node features.
+            edge_index: Graph edge indices.
+            
+        Returns:
+            Encoded node representations.
+        """
         x = self.conv(x, edge_index)
         x = self.prelu(x)
         x = self.conv2(x, edge_index)

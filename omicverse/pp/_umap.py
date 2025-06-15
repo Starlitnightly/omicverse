@@ -66,103 +66,32 @@ def umap(  # noqa: PLR0913, PLR0915
     neighbors_key: str = "neighbors",
     copy: bool = False,
 ) -> AnnData | None:
-    r"""Embed the neighborhood graph using UMAP :cite:p:`McInnes2018`.
+    r"""Embed the neighborhood graph using UMAP with multiple backend options.
 
-    UMAP (Uniform Manifold Approximation and Projection) is a manifold learning
-    technique suitable for visualizing high-dimensional data. Besides tending to
-    be faster than tSNE, it optimizes the embedding such that it best reflects
-    the topology of the data, which we represent throughout Scanpy using a
-    neighborhood graph. tSNE, by contrast, optimizes the distribution of
-    nearest-neighbor distances in the embedding such that these best match the
-    distribution of distances in the high-dimensional space.
-    We use the implementation of umap-learn_ :cite:p:`McInnes2018`.
-    For a few comparisons of UMAP with tSNE, see :cite:t:`Becht2018`.
+    UMAP (Uniform Manifold Approximation and Projection) implementation with support
+    for multiple computational backends including GPU-accelerated variants using
+    TorchDR and MDE for improved performance on large datasets.
 
-    .. _umap-learn: https://github.com/lmcinnes/umap
+    Arguments:
+        adata: Annotated data matrix of shape n_obs × n_vars
+        min_dist (float): Minimum distance between embedded points (default: 0.5)
+        spread (float): Scale at which embedded points are spread out (default: 1.0)
+        n_components (int): Number of dimensions for the embedding (default: 2)
+        maxiter (int): Number of optimization iterations (default: None)
+        alpha (float): Initial learning rate for optimization (default: 1.0)
+        gamma (float): Weighting for negative samples (default: 1.0)
+        negative_sample_rate (int): Number of negative samples per positive sample (default: 5)
+        init_pos: Initialization method for embedding positions (default: 'spectral')
+        random_state (int): Random seed for reproducible results (default: 0)
+        a (float): UMAP curve parameter (default: None)
+        b (float): UMAP curve parameter (default: None)
+        method (str): Implementation method: 'umap', 'torchdr', 'mde', 'rapids' (default: 'umap')
+        key_added (str): Key for storing results in AnnData (default: None)
+        neighbors_key (str): Key for accessing neighbor information (default: 'neighbors')
+        copy (bool): Return copy instead of modifying in place (default: False)
 
-    Parameters
-    ----------
-    adata
-        Annotated data matrix.
-    min_dist
-        The effective minimum distance between embedded points. Smaller values
-        will result in a more clustered/clumped embedding where nearby points on
-        the manifold are drawn closer together, while larger values will result
-        on a more even dispersal of points. The value should be set relative to
-        the ``spread`` value, which determines the scale at which embedded
-        points will be spread out. The default of in the `umap-learn` package is
-        0.1.
-    spread
-        The effective scale of embedded points. In combination with `min_dist`
-        this determines how clustered/clumped the embedded points are.
-    n_components
-        The number of dimensions of the embedding.
-    maxiter
-        The number of iterations (epochs) of the optimization. Called `n_epochs`
-        in the original UMAP.
-    alpha
-        The initial learning rate for the embedding optimization.
-    gamma
-        Weighting applied to negative samples in low dimensional embedding
-        optimization. Values higher than one will result in greater weight
-        being given to negative samples.
-    negative_sample_rate
-        The number of negative edge/1-simplex samples to use per positive
-        edge/1-simplex sample in optimizing the low dimensional embedding.
-    init_pos
-        How to initialize the low dimensional embedding. Called `init` in the
-        original UMAP. Options are:
-
-        * Any key for `adata.obsm`.
-        * 'paga': positions from :func:`~scanpy.pl.paga`.
-        * 'spectral': use a spectral embedding of the graph.
-        * 'random': assign initial embedding positions at random.
-        * A numpy array of initial embedding positions.
-    random_state
-        If `int`, `random_state` is the seed used by the random number generator;
-        If `RandomState` or `Generator`, `random_state` is the random number generator;
-        If `None`, the random number generator is the `RandomState` instance used
-        by `np.random`.
-    a
-        More specific parameters controlling the embedding. If `None` these
-        values are set automatically as determined by `min_dist` and
-        `spread`.
-    b
-        More specific parameters controlling the embedding. If `None` these
-        values are set automatically as determined by `min_dist` and
-        `spread`.
-    method
-        Chosen implementation.
-
-        ``'umap'``
-            Umap's simplical set embedding.
-        ``'rapids'``
-            GPU accelerated implementation.
-
-            .. deprecated:: 1.10.0
-                Use :func:`rapids_singlecell.tl.umap` instead.
-    key_added
-        If not specified, the embedding is stored as
-        :attr:`~anndata.AnnData.obsm`\ `['X_umap']` and the the parameters in
-        :attr:`~anndata.AnnData.uns`\ `['umap']`.
-        If specified, the embedding is stored as
-        :attr:`~anndata.AnnData.obsm`\ ``[key_added]`` and the the parameters in
-        :attr:`~anndata.AnnData.uns`\ ``[key_added]``.
-    neighbors_key
-        Umap looks in
-        :attr:`~anndata.AnnData.uns`\ ``[neighbors_key]`` for neighbors settings and
-        :attr:`~anndata.AnnData.obsp`\ ``[.uns[neighbors_key]['connectivities_key']]`` for connectivities.
-    copy
-        Return a copy instead of writing to adata.
-
-    Returns
-    -------
-    Returns `None` if `copy=False`, else returns an `AnnData` object. Sets the following fields:
-
-    `adata.obsm['X_umap' | key_added]` : :class:`numpy.ndarray` (dtype `float`)
-        UMAP coordinates of data.
-    `adata.uns['umap' | key_added]` : :class:`dict`
-        UMAP parameters.
+    Returns:
+        adata with UMAP embedding if copy=False, otherwise returns modified copy
 
     """
     adata = adata.copy() if copy else adata

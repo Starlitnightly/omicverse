@@ -102,13 +102,11 @@ def neighbors(  # noqa: PLR0913
     key_added: str | None = None,
     copy: bool = False,
 ) -> AnnData | None:
-    """Compute the nearest neighbors distance matrix and a neighborhood graph of observations :cite:p:`McInnes2018`.
+    r"""Compute nearest neighbors distance matrix and neighborhood graph with GPU acceleration.
 
-    The neighbor search efficiency of this heavily relies on UMAP :cite:p:`McInnes2018`,
-    which also provides a method for estimating connectivities of data points -
-    the connectivity of the manifold (`method=='umap'`). If `method=='gauss'`,
-    connectivities are computed according to :cite:t:`Coifman2005`, in the adaption of
-    :cite:t:`Haghverdi2016`.
+    Compute the k-nearest neighbors graph and distance matrix for single-cell data.
+    This implementation includes GPU-accelerated options using PyTorch for improved
+    performance on large datasets.
 
     Parameters
     ----------

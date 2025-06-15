@@ -28,8 +28,10 @@ def global_imports(modulename,shortname = None, asfunction = False):
         globals()[shortname] = __import__(modulename)
 
 def check_mofax():
-    """
+    r"""Check if mofax is installed and import it.
     
+    Returns:
+        None: Raises ImportError if mofax is not installed
     """
     global mofax_install
     try:
@@ -45,14 +47,14 @@ class GLUE_pair(object):
 
     def __init__(self,rna:anndata.AnnData,
               atac:anndata.AnnData) -> None:
-        r"""
-        Pair the cells between RNA and ATAC using result of GLUE.
+        r"""Pair the cells between RNA and ATAC using result of GLUE.
 
         Arguments:
-            rna: the AnnData of RNA-seq.
-            atac: the AnnData of ATAC-seq.
-            depth: the depth of the search for the nearest neighbor.
+            rna: The AnnData of RNA-seq.
+            atac: The AnnData of ATAC-seq.
         
+        Returns:
+            None
         """
         
         print('......Extract GLUE layer from obs')
@@ -60,9 +62,10 @@ class GLUE_pair(object):
         self.atac_loc=pd.DataFrame(atac.obsm['X_glue'], index=atac.obs.index)
 
     def correlation(self):
-        """
-        Perform Pearson Correlation analysis in the layer of GLUE
+        r"""Perform Pearson Correlation analysis in the layer of GLUE.
         
+        Returns:
+            None: Updates self.rna_pd and self.atac_pd attributes
         """
         
         print('......Prepare for pair')
@@ -102,14 +105,14 @@ class GLUE_pair(object):
         self.atac_pd=n_pd
 
     def find_neighbor_cell(self,depth:int=10,cor:float=0.9)->pd.DataFrame:
-        """
-        Find the neighbor cells between two omics using pearson
+        r"""Find the neighbor cells between two omics using pearson correlation.
         
         Arguments:
-            depth: the depth of the search for the nearest neighbor.
+            depth: The depth of the search for the nearest neighbor. (10)
+            cor: Correlation threshold for pairing. (0.9)
 
         Returns:
-            result: the pair result
+            result: The pair result as DataFrame
 
         """
 
@@ -143,16 +146,15 @@ class GLUE_pair(object):
         return result
     
     def pair_omic(self,omic1:anndata.AnnData,omic2:anndata.AnnData)->Tuple[anndata.AnnData,anndata.AnnData]:
-        """
-        Pair the omics using the result of find_neighbor_cell
+        r"""Pair the omics using the result of find_neighbor_cell.
 
         Arguments:
-            omic1: the AnnData of omic1.
-            omic2: the AnnData of omic2.
+            omic1: The AnnData of first omic.
+            omic2: The AnnData of second omic.
 
         Returns:
-            rna1: the paired AnnData of omic1.
-            atac1: the paired AnnData of omic2.
+            rna1: The paired AnnData of first omic.
+            atac1: The paired AnnData of second omic.
 
         """
         rna1=omic1[self.res_pair['omic_1']].copy()
