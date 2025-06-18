@@ -127,7 +127,7 @@ def derive_auc_threshold(ex_mtx: csr_matrix) -> pd.DataFrame:
 
     """
     return (
-        pd.Series(np.count_nonzero(ex_mtx.A, axis=1)).quantile(
+        pd.Series(np.count_nonzero(ex_mtx.toarray(), axis=1)).quantile(
             [0.01, 0.05, 0.10, 0.50, 1]
         )
         / ex_mtx.shape[1]
