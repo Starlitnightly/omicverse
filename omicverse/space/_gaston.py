@@ -343,10 +343,11 @@ class GASTON(object):
             - Colors represent depth values
             - Useful for understanding tissue organization
         """
-        from ..externel.gaston.dp_related import plot_isodepth
+        from ..externel.gaston.cluster_plotting import plot_isodepth
         rotate=np.radians(rotate_angle)
-        plot_isodepth(self.model,self.A,self.S,show_streamlines=show_streamlines,
-                      rotate=rotate,arrowsize=arrowsize,figsize=figsize,**kwargs)
+        plot_isodepth(self.gaston_isodepth,self.S, 
+                      self.model, figsize=figsize, streamlines=show_streamlines, 
+                      rotate=rotate,arrowsize=arrowsize,**kwargs) # since we did isodepth -> -1*isodepth above, we also need to do gradient -> -1*gradient
 
     def plot_clusters(self,domain_colors,figsize=(6,6),
                       s=20,lgd=False,show_boundary=True,
@@ -500,6 +501,8 @@ class GASTON(object):
         self.gaston_isodepth_restrict=gaston_isodepth_restrict
         self.gaston_labels_restrict=gaston_labels_restrict
         self.S_restrict=S_restrict
+        # for get_restricted_adata
+        self.locs=np.array( [i for i in range(len(self.gaston_isodepth)) if isodepth_min < self.gaston_isodepth[i] < isodepth_max] )
 
         return counts_mat_restrict, coords_mat_restrict, gaston_isodepth_restrict, gaston_labels_restrict, S_restrict
     
@@ -527,19 +530,20 @@ class GASTON(object):
             - Useful for focusing on tissue-specific genes
             - Results can be used for downstream analysis
         """
-        from ..externel.gaston.binning_and_plotting import filter_genes
+        self.umi_thresh=umi_thresh
+        from ..externel.gaston.filter_genes import filter_genes
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
             counts_mat_restrict=self.counts_mat_restrict
-        gene_labels_idx, idx_kept = filter_genes(counts_mat_restrict, self.adata.var.index.to_numpy(), 
+        idx_kept, gene_labels_idx = filter_genes(counts_mat_restrict, self.adata.var.index.to_numpy(), 
                                                 umi_thresh = umi_thresh,exclude_prefix=exclude_prefix)
         self.gene_labels_idx=gene_labels_idx
         self.idx_kept=idx_kept
-        return gene_labels_idx, idx_kept
+        return idx_kept, gene_labels_idx
 
-    def pw_linear_fit(self,cell_type_df=None,
-                        ct_list=[],**kwargs):
+    def pw_linear_fit(self,cell_type_df=None,ct_list=[],
+                      isodepth_mult_factor=0.01, **kwargs):
         r"""Perform piecewise linear fitting of gene expression.
         
         This method fits piecewise linear functions to gene expression patterns
@@ -563,13 +567,17 @@ class GASTON(object):
             - Identifies expression breakpoints
             - Useful for finding spatial transition points
         """
-        from ..externel.gaston.binning_and_plotting import pw_linear_fit
+        from ..externel.gaston.segmented_fit import pw_linear_fit
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
             counts_mat_restrict=self.counts_mat_restrict
-        return pw_linear_fit(counts_mat_restrict[:,self.idx_kept], self.gaston_isodepth_restrict, 
-                            cell_type_df=cell_type_df,ct_list=ct_list,**kwargs)
+            
+        pw_fit_dict=pw_linear_fit(counts_mat_restrict, self.gaston_labels_restrict, self.gaston_isodepth_restrict,
+                                  cell_type_df, ct_list, idx_kept=self.idx_kept, umi_threshold=self.umi_thresh, 
+                                  isodepth_mult_factor=isodepth_mult_factor, **kwargs)                
+        self.pw_fit_dict=pw_fit_dict
+        return pw_fit_dict
 
     def bin_data(self,cell_type_df=None,
                  num_bins=15,q_discont=0.95,q_cont=0.8,**kwargs):
@@ -604,13 +612,22 @@ class GASTON(object):
             - Useful for trajectory analysis
         """
         from ..externel.gaston.binning_and_plotting import bin_data
+        from ..externel.gaston.spatial_gene_classification import get_discont_genes, get_cont_genes
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
             counts_mat_restrict=self.counts_mat_restrict
-        return bin_data(counts_mat_restrict[:,self.idx_kept], self.gaston_isodepth_restrict, 
-                        cell_type_df=cell_type_df,num_bins=num_bins,
-                        q_discont=q_discont,q_cont=q_cont,**kwargs)
+            
+        binning_output=bin_data(counts_mat_restrict, 
+                                self.gaston_labels_restrict, 
+                                self.gaston_isodepth_restrict, 
+                                cell_type_df, self.adata.var.index.to_numpy(), 
+                                idx_kept=self.idx_kept, num_bins=num_bins, umi_threshold=self.umi_thresh,
+                                **kwargs)
+        self.binning_output=binning_output
+        self.discont_genes_layer=get_discont_genes(self.pw_fit_dict, binning_output,q=q_discont)
+        self.cont_genes_layer=get_cont_genes(self.pw_fit_dict, binning_output,q=q_cont) 
+        return binning_output
 
     def get_restricted_adata(self,offset=10**6,):
         r"""Create AnnData object from restricted data.
@@ -632,14 +649,37 @@ class GASTON(object):
             - Maintains spatial coordinates
             - Useful for downstream analysis
         """
-        from ..externel.gaston.binning_and_plotting import get_restricted_adata
-        if issparse(self.counts_mat_restrict):
-            counts_mat_restrict=self.counts_mat_restrict.toarray()
-        else:
-            counts_mat_restrict=self.counts_mat_restrict
-        return get_restricted_adata(counts_mat_restrict[:,self.idx_kept], self.coords_mat_restrict, 
-                                    self.gaston_isodepth_restrict, self.gaston_labels_restrict, 
-                                    self.gene_labels_idx, offset=offset)
+        adata=self.adata
+        # get restricted adata subset
+        adata2=adata[self.locs, self.adata.var_names[self.idx_kept]]
+        #adata2.obsm['spatial']=self.coords_mat_restrict
+        adata2=adata2[:,self.gene_labels_idx]
+        adata2.uns['gaston']={}
+        adata2.uns['gaston']['isodepth']=self.gaston_isodepth_restrict
+        adata2.uns['gaston']['labels']=self.gaston_labels_restrict
+
+        slope_mat, intercept_mat, _, _ = self.pw_fit_dict['all_cell_types']
+
+        gene_list = list(self.binning_output['gene_labels_idx']) # 获取基因列表
+        adata2=adata2[:,gene_list]
+        all_gene_outputs = []
+
+        for gene_name in tqdm(gene_list):
+            if gene_name in self.binning_output['gene_labels_idx']:
+                gene_index = np.where(self.gene_labels_idx == gene_name)[0]
+
+                outputs = np.zeros(self.gaston_isodepth_restrict.shape[0])
+                for i in range(self.gaston_isodepth_restrict.shape[0]):
+                    dom = int(self.gaston_labels_restrict[i])
+                    slope = slope_mat[gene_index, dom]
+                    intercept = intercept_mat[gene_index, dom]
+                    outputs[i] = np.log(offset) + intercept + slope * self.gaston_isodepth_restrict[i]
+
+                all_gene_outputs.append(outputs)
+
+        sparse_output_matrix = csr_matrix(all_gene_outputs)
+        adata2.layers['GASTON_ReX']=sparse_output_matrix.T
+        return adata2
 
     def plot_gene_pwlinear(self,gene,domain_colors,offset=10**6,
                            cell_type_list=None,pt_size=50,linear_fit=True,
@@ -682,15 +722,17 @@ class GASTON(object):
             - Can show multiple cell types
             - Useful for understanding spatial patterns
         """
+        gene_name=gene
+        print(f'gene {gene_name}: discontinuous jump after domain(s) {self.discont_genes_layer[gene_name]}') 
+        print(f'gene {gene_name}: continuous gradient in domain(s) {self.cont_genes_layer[gene_name]}')
+
+        # display log CPM (if you want to do CP500, set offset=500)
+        #offset=10**6
         from ..externel.gaston.binning_and_plotting import plot_gene_pwlinear
-        if issparse(self.counts_mat_restrict):
-            counts_mat_restrict=self.counts_mat_restrict.toarray()
-        else:
-            counts_mat_restrict=self.counts_mat_restrict
-        plot_gene_pwlinear(gene, self.gene_labels_idx, counts_mat_restrict[:,self.idx_kept], 
-                          self.gaston_isodepth_restrict, self.gaston_labels_restrict, domain_colors,
-                          offset=offset,cell_type_list=cell_type_list,pt_size=pt_size,linear_fit=linear_fit,
-                          ticksize=ticksize, figsize=figsize,lw=lw,domain_boundary_plotting=domain_boundary_plotting)
+        plot_gene_pwlinear(gene_name, self.pw_fit_dict, self.gaston_labels_restrict, self.gaston_isodepth_restrict, 
+                           self.binning_output, cell_type_list=cell_type_list, pt_size=pt_size, colors=domain_colors, 
+                           linear_fit=linear_fit, ticksize=ticksize, figsize=figsize, offset=offset, lw=lw,
+                           domain_boundary_plotting=domain_boundary_plotting)
 
     def plot_gene_raw(self,gene_name,rotate_angle=-90,
                       vmin=5,figsize=(6,3),s=10,**kwargs):
@@ -763,11 +805,9 @@ class GASTON(object):
             - Useful for detailed pattern analysis
         """
         rotate=np.radians(rotate_angle)
-        from ..externel.gaston.binning_and_plotting import plot_gene_gastonrex
-        if issparse(self.counts_mat_restrict):
-            counts_mat_restrict=self.counts_mat_restrict.toarray()
-        else:
-            counts_mat_restrict=self.counts_mat_restrict
-        plot_gene_gastonrex(gene_name, self.gene_labels_idx, counts_mat_restrict[:,self.idx_kept], 
-                            self.S_restrict, figsize=figsize,s=s,rotate=rotate,**kwargs)
-        plt.title(f'{gene_name} GASTON-Rex')
+        from ..externel.gaston.binning_and_plotting import plot_gene_function
+
+        plot_gene_function(gene_name, self.S_restrict, self.pw_fit_dict, 
+                           self.gaston_labels_restrict, self.gaston_isodepth_restrict, 
+                           self.binning_output, figsize=figsize, s=s, rotate=rotate, **kwargs)
+        plt.title(f'{gene_name} GASTON ReX')
