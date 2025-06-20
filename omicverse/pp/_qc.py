@@ -682,7 +682,7 @@ def qc_gpu(adata, mode='seurat',
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-    removed = QC_test.loc[lambda x : x is False]
+    removed = QC_test.loc[~QC_test.values]
     removed_cells.extend(list(removed.index.values))
     print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): \
     {n1-np.sum(QC_test)}')
@@ -692,16 +692,15 @@ def qc_gpu(adata, mode='seurat',
     print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
 
     # Last gene and cell filter
-    rsc.pp.filter_cells(adata,qc_var='detected_genes', min_count=min_genes, \
-        max_count=max_genes_ratio*adata.shape[1])
-    rsc.pp.filter_genes(adata, min_count=min_cells, max_count=max_cells_ratio*adata.shape[0])
+    rsc.pp.filter_cells(adata, min_counts=min_genes)
+    rsc.pp.filter_cells(adata, max_counts=max_genes_ratio*adata.shape[1])
+    rsc.pp.filter_genes(adata, min_counts=min_cells)
+    rsc.pp.filter_genes(adata, max_counts=max_cells_ratio*adata.shape[0])
 
-    if adata.uns['status'] is None:
+    if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
     adata.uns['status']['qc']=True
     return adata
-
-
 
 
 def filter_cells(adata: anndata.AnnData,
