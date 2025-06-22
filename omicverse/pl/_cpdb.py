@@ -10,9 +10,10 @@ from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
 
 from ..single import cpdb_exact_target,cpdb_exact_source
+from ._cpdbviz import CellChatViz
 
 def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
-                      celltype_key:str,nodecolor_dict=None,counts_min=50,
+                      celltype_key:str,nodecolor_dict=None,count_min=50,
                        source_cells=None,target_cells=None,
                       edgeswidth_scale:int=1,nodesize_scale:int=1,
                       figsize:tuple=(4,4),title:str='',
@@ -26,7 +27,7 @@ def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
         interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
         celltype_key: Column name for cell type annotation
         nodecolor_dict: Custom color mapping for cell types (None, uses default)
-        counts_min: Minimum interaction count threshold (50)
+        count_min: Minimum interaction count threshold (50)
         source_cells: List of source cell types to include (None, uses all)
         target_cells: List of target cell types to include (None, uses all)
         edgeswidth_scale: Scale factor for edge widths (1)
@@ -42,7 +43,7 @@ def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
     """
     G=nx.DiGraph()
     for i in interaction_edges.index:
-        if interaction_edges.loc[i,'COUNT']>counts_min:
+        if interaction_edges.loc[i,'COUNT']>count_min:
             G.add_edge(interaction_edges.loc[i,'SOURCE'],
                        interaction_edges.loc[i,'TARGET'],
                        weight=interaction_edges.loc[i,'COUNT'],)
