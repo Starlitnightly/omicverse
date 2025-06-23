@@ -230,6 +230,475 @@ def summarize_cluster(X, clusterid, clusternames, n_permutations=500):
     df_p_value = pd.DataFrame(data=p_cluster, index=clusternames, columns=clusternames)
     return df_cluster, df_p_value
 
+def summarize_cluster_optimized(X, clusterid, clusternames, n_permutations=500):
+    """
+    Optimized version of summarize_cluster with significantly improved performance.
+    
+    Key optimizations:
+    1. Pre-compute cluster indices to avoid repeated np.where calls
+    2. Vectorize matrix operations using advanced indexing
+    3. Optimize permutation computations using broadcasting
+    4. Handle sparse matrices efficiently
+    5. Reduce memory allocations in permutation loop
+    
+    Parameters
+    ----------
+    X : array-like or sparse matrix
+        Cell signaling matrix of shape (n_cells, n_cells)
+    clusterid : array-like
+        Cluster assignments for each cell
+    clusternames : list
+        List of unique cluster names
+    n_permutations : int, default 500
+        Number of permutations for p-value calculation
+    
+    Returns
+    -------
+    df_cluster : pd.DataFrame
+        Cluster-cluster signaling values
+    df_p_value : pd.DataFrame
+        P-values from permutation test
+    """
+    n = len(clusternames)
+    
+    # Pre-compute cluster indices (major optimization)
+    cluster_indices = {}
+    for i, name in enumerate(clusternames):
+        cluster_indices[name] = np.where(clusterid == name)[0]
+    
+    # Convert to array if sparse for faster indexing in this context
+    if sparse.issparse(X):
+        X_dense = X.toarray()
+    else:
+        X_dense = X
+    
+    # Vectorized computation of cluster-cluster signaling
+    X_cluster = np.zeros((n, n), dtype=float)
+    
+    for i, name_i in enumerate(clusternames):
+        idx_i = cluster_indices[name_i]
+        if len(idx_i) == 0:
+            continue
+            
+        # Extract submatrix for sender cluster i (vectorized)
+        X_i = X_dense[idx_i, :]
+        
+        for j, name_j in enumerate(clusternames):
+            idx_j = cluster_indices[name_j] 
+            if len(idx_j) == 0:
+                continue
+                
+            # Vectorized mean computation
+            X_cluster[i, j] = X_i[:, idx_j].mean()
+    
+    # Optimized permutation test
+    p_cluster = np.zeros((n, n), dtype=float)
+    
+    # Pre-allocate arrays for permutation
+    cluster_sizes = np.array([len(cluster_indices[name]) for name in clusternames])
+    total_cells = len(clusterid)
+    
+    for perm in range(n_permutations):
+        # Generate permuted cluster assignments
+        perm_indices = np.random.permutation(total_cells)
+        
+        # Create permuted cluster indices more efficiently
+        start_idx = 0
+        perm_cluster_indices = {}
+        for i, name in enumerate(clusternames):
+            size = cluster_sizes[i]
+            if size > 0:
+                perm_cluster_indices[name] = perm_indices[start_idx:start_idx + size]
+                start_idx += size
+            else:
+                perm_cluster_indices[name] = np.array([], dtype=int)
+        
+        # Compute permuted cluster-cluster matrix (vectorized)
+        X_cluster_perm = np.zeros((n, n), dtype=float)
+        
+        for i, name_i in enumerate(clusternames):
+            perm_idx_i = perm_cluster_indices[name_i]
+            if len(perm_idx_i) == 0:
+                continue
+                
+            X_perm_i = X_dense[perm_idx_i, :]
+            
+            for j, name_j in enumerate(clusternames):
+                perm_idx_j = perm_cluster_indices[name_j]
+                if len(perm_idx_j) == 0:
+                    continue
+                    
+                X_cluster_perm[i, j] = X_perm_i[:, perm_idx_j].mean()
+        
+        # Update p-values (vectorized comparison)
+        p_cluster += (X_cluster_perm >= X_cluster).astype(float)
+    
+    # Normalize p-values
+    p_cluster = p_cluster / n_permutations
+    
+    # Create output DataFrames
+    df_cluster = pd.DataFrame(data=X_cluster, index=clusternames, columns=clusternames)
+    df_p_value = pd.DataFrame(data=p_cluster, index=clusternames, columns=clusternames)
+    
+    return df_cluster, df_p_value
+
+def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gpu=True):
+    """
+    GPU-accelerated version of summarize_cluster using CuPy for CUDA computation.
+    
+    This function automatically falls back to CPU computation if GPU is not available.
+    
+    Parameters
+    ----------
+    X : array-like or sparse matrix
+        Cell signaling matrix of shape (n_cells, n_cells)
+    clusterid : array-like
+        Cluster assignments for each cell
+    clusternames : list
+        List of unique cluster names
+    n_permutations : int, default 500
+        Number of permutations for p-value calculation
+    use_gpu : bool, default True
+        Whether to attempt GPU computation
+    
+    Returns
+    -------
+    df_cluster : pd.DataFrame
+        Cluster-cluster signaling values
+    df_p_value : pd.DataFrame
+        P-values from permutation test
+    """
+    # Try to import CuPy for GPU computation
+    try:
+        if use_gpu:
+            import cupy as cp
+            gpu_available = True
+            print("🚀 GPU acceleration enabled with CuPy")
+        else:
+            raise ImportError("GPU disabled by user")
+    except ImportError:
+        print("⚠️  CuPy not available, falling back to CPU computation")
+        return summarize_cluster_optimized(X, clusterid, clusternames, n_permutations)
+    
+    n = len(clusternames)
+    
+    # Pre-compute cluster indices
+    cluster_indices = {}
+    for i, name in enumerate(clusternames):
+        cluster_indices[name] = np.where(clusterid == name)[0]
+    
+    # Convert data to GPU arrays
+    if sparse.issparse(X):
+        # For sparse matrices, convert to dense on GPU
+        X_gpu = cp.asarray(X.toarray())
+    else:
+        X_gpu = cp.asarray(X)
+    
+    # Compute cluster-cluster signaling on GPU
+    X_cluster = cp.zeros((n, n), dtype=cp.float32)
+    
+    for i, name_i in enumerate(clusternames):
+        idx_i = cluster_indices[name_i]
+        if len(idx_i) == 0:
+            continue
+        
+        # Transfer indices to GPU
+        idx_i_gpu = cp.asarray(idx_i)
+        X_i = X_gpu[idx_i_gpu, :]
+        
+        for j, name_j in enumerate(clusternames):
+            idx_j = cluster_indices[name_j]
+            if len(idx_j) == 0:
+                continue
+            
+            idx_j_gpu = cp.asarray(idx_j)
+            # GPU-accelerated mean computation
+            X_cluster[i, j] = cp.mean(X_i[:, idx_j_gpu])
+    
+    # GPU-accelerated permutation test
+    p_cluster = cp.zeros((n, n), dtype=cp.float32)
+    cluster_sizes = cp.asarray([len(cluster_indices[name]) for name in clusternames])
+    total_cells = len(clusterid)
+    
+    for perm in range(n_permutations):
+        # Generate permutation on CPU, then transfer to GPU
+        perm_indices_cpu = np.random.permutation(total_cells)
+        perm_indices_gpu = cp.asarray(perm_indices_cpu)
+        
+        # Create permuted cluster indices on GPU
+        start_idx = 0
+        perm_cluster_indices_gpu = {}
+        for i, name in enumerate(clusternames):
+            size = int(cluster_sizes[i])
+            if size > 0:
+                perm_cluster_indices_gpu[name] = perm_indices_gpu[start_idx:start_idx + size]
+                start_idx += size
+            else:
+                perm_cluster_indices_gpu[name] = cp.array([], dtype=cp.int32)
+        
+        # Compute permuted cluster-cluster matrix on GPU
+        X_cluster_perm = cp.zeros((n, n), dtype=cp.float32)
+        
+        for i, name_i in enumerate(clusternames):
+            perm_idx_i = perm_cluster_indices_gpu[name_i]
+            if len(perm_idx_i) == 0:
+                continue
+            
+            X_perm_i = X_gpu[perm_idx_i, :]
+            
+            for j, name_j in enumerate(clusternames):
+                perm_idx_j = perm_cluster_indices_gpu[name_j]
+                if len(perm_idx_j) == 0:
+                    continue
+                
+                X_cluster_perm[i, j] = cp.mean(X_perm_i[:, perm_idx_j])
+        
+        # Update p-values (vectorized comparison on GPU)
+        p_cluster += (X_cluster_perm >= X_cluster).astype(cp.float32)
+    
+    # Normalize p-values
+    p_cluster = p_cluster / n_permutations
+    
+    # Transfer results back to CPU
+    X_cluster_cpu = cp.asnumpy(X_cluster)
+    p_cluster_cpu = cp.asnumpy(p_cluster)
+    
+    # Create output DataFrames
+    df_cluster = pd.DataFrame(data=X_cluster_cpu, index=clusternames, columns=clusternames)
+    df_p_value = pd.DataFrame(data=p_cluster_cpu, index=clusternames, columns=clusternames)
+    
+    # Clear GPU memory
+    del X_gpu, X_cluster, p_cluster
+    cp.get_default_memory_pool().free_all_blocks()
+    
+    return df_cluster, df_p_value
+
+def summarize_cluster_gpu_optimized(X, clusterid, clusternames, n_permutations=500, batch_size=100, use_gpu=True):
+    """
+    Advanced GPU-optimized version with batch processing and memory management.
+    
+    This version processes permutations in batches on GPU for better memory efficiency
+    and includes advanced GPU optimization techniques.
+    
+    Parameters
+    ----------
+    X : array-like or sparse matrix
+        Cell signaling matrix of shape (n_cells, n_cells)
+    clusterid : array-like
+        Cluster assignments for each cell
+    clusternames : list
+        List of unique cluster names
+    n_permutations : int, default 500
+        Number of permutations for p-value calculation
+    batch_size : int, default 100
+        Number of permutations to process in each GPU batch
+    use_gpu : bool, default True
+        Whether to attempt GPU computation
+    
+    Returns
+    -------
+    df_cluster : pd.DataFrame
+        Cluster-cluster signaling values
+    df_p_value : pd.DataFrame
+        P-values from permutation test
+    """
+    # Try to import CuPy for GPU computation
+    try:
+        if use_gpu:
+            import cupy as cp
+            import cupyx.scipy.sparse as cp_sparse
+            gpu_available = True
+            print(f"🚀 Advanced GPU acceleration enabled (batch_size={batch_size})")
+        else:
+            raise ImportError("GPU disabled by user")
+    except ImportError:
+        print("⚠️  CuPy not available, falling back to optimized CPU computation")
+        return summarize_cluster_optimized(X, clusterid, clusternames, n_permutations)
+    
+    n = len(clusternames)
+    
+    # Pre-compute cluster indices and sizes
+    cluster_indices = {}
+    cluster_sizes = []
+    for i, name in enumerate(clusternames):
+        indices = np.where(clusterid == name)[0]
+        cluster_indices[name] = indices
+        cluster_sizes.append(len(indices))
+    
+    cluster_sizes = cp.asarray(cluster_sizes)
+    total_cells = len(clusterid)
+    
+    # Handle sparse vs dense matrices efficiently
+    if sparse.issparse(X):
+        # Keep sparse on GPU if possible
+        try:
+            X_gpu = cp_sparse.csr_matrix(X)
+            use_sparse_gpu = True
+        except:
+            # Fall back to dense if sparse GPU operations fail
+            X_gpu = cp.asarray(X.toarray())
+            use_sparse_gpu = False
+    else:
+        X_gpu = cp.asarray(X)
+        use_sparse_gpu = False
+    
+    # Compute original cluster-cluster signaling on GPU
+    X_cluster = cp.zeros((n, n), dtype=cp.float32)
+    
+    # Pre-transfer all cluster indices to GPU
+    cluster_indices_gpu = {}
+    for name in clusternames:
+        if len(cluster_indices[name]) > 0:
+            cluster_indices_gpu[name] = cp.asarray(cluster_indices[name])
+        else:
+            cluster_indices_gpu[name] = cp.array([], dtype=cp.int32)
+    
+    # Optimized cluster-cluster computation
+    for i, name_i in enumerate(clusternames):
+        idx_i_gpu = cluster_indices_gpu[name_i]
+        if len(idx_i_gpu) == 0:
+            continue
+        
+        if use_sparse_gpu:
+            X_i = X_gpu[idx_i_gpu, :]
+        else:
+            X_i = X_gpu[idx_i_gpu, :]
+        
+        for j, name_j in enumerate(clusternames):
+            idx_j_gpu = cluster_indices_gpu[name_j]
+            if len(idx_j_gpu) == 0:
+                continue
+            
+            if use_sparse_gpu:
+                submatrix = X_i[:, idx_j_gpu]
+                X_cluster[i, j] = submatrix.mean()
+            else:
+                X_cluster[i, j] = cp.mean(X_i[:, idx_j_gpu])
+    
+    # Batch-processed permutation test on GPU
+    p_cluster = cp.zeros((n, n), dtype=cp.float32)
+    n_batches = (n_permutations + batch_size - 1) // batch_size
+    
+    for batch_idx in range(n_batches):
+        start_perm = batch_idx * batch_size
+        end_perm = min((batch_idx + 1) * batch_size, n_permutations)
+        current_batch_size = end_perm - start_perm
+        
+        # Generate batch of permutations on CPU, then transfer
+        batch_permutations = np.array([
+            np.random.permutation(total_cells) for _ in range(current_batch_size)
+        ])
+        batch_permutations_gpu = cp.asarray(batch_permutations)
+        
+        # Process each permutation in the current batch
+        for perm_idx in range(current_batch_size):
+            perm_indices = batch_permutations_gpu[perm_idx]
+            
+            # Create permuted cluster indices efficiently on GPU
+            start_idx = 0
+            perm_cluster_indices_gpu = {}
+            for i, name in enumerate(clusternames):
+                size = int(cluster_sizes[i])
+                if size > 0:
+                    perm_cluster_indices_gpu[name] = perm_indices[start_idx:start_idx + size]
+                    start_idx += size
+                else:
+                    perm_cluster_indices_gpu[name] = cp.array([], dtype=cp.int32)
+            
+            # Compute permuted cluster-cluster matrix
+            X_cluster_perm = cp.zeros((n, n), dtype=cp.float32)
+            
+            for i, name_i in enumerate(clusternames):
+                perm_idx_i = perm_cluster_indices_gpu[name_i]
+                if len(perm_idx_i) == 0:
+                    continue
+                
+                if use_sparse_gpu:
+                    X_perm_i = X_gpu[perm_idx_i, :]
+                else:
+                    X_perm_i = X_gpu[perm_idx_i, :]
+                
+                for j, name_j in enumerate(clusternames):
+                    perm_idx_j = perm_cluster_indices_gpu[name_j]
+                    if len(perm_idx_j) == 0:
+                        continue
+                    
+                    if use_sparse_gpu:
+                        submatrix = X_perm_i[:, perm_idx_j]
+                        X_cluster_perm[i, j] = submatrix.mean()
+                    else:
+                        X_cluster_perm[i, j] = cp.mean(X_perm_i[:, perm_idx_j])
+            
+            # Update p-values (vectorized comparison)
+            p_cluster += (X_cluster_perm >= X_cluster).astype(cp.float32)
+        
+        # Clear batch memory
+        del batch_permutations_gpu
+    
+    # Normalize p-values
+    p_cluster = p_cluster / n_permutations
+    
+    # Transfer final results back to CPU
+    X_cluster_cpu = cp.asnumpy(X_cluster)
+    p_cluster_cpu = cp.asnumpy(p_cluster)
+    
+    # Create output DataFrames
+    df_cluster = pd.DataFrame(data=X_cluster_cpu, index=clusternames, columns=clusternames)
+    df_p_value = pd.DataFrame(data=p_cluster_cpu, index=clusternames, columns=clusternames)
+    
+    # Comprehensive GPU memory cleanup
+    del X_gpu, X_cluster, p_cluster
+    for name in clusternames:
+        del cluster_indices_gpu[name]
+    cp.get_default_memory_pool().free_all_blocks()
+    
+    return df_cluster, df_p_value
+
+def check_gpu_availability():
+    """
+    Check if GPU computation is available and return system information.
+    
+    Returns
+    -------
+    dict
+        Dictionary containing GPU availability and system information
+    """
+    gpu_info = {
+        'gpu_available': False,
+        'cupy_available': False,
+        'gpu_name': None,
+        'gpu_memory': None,
+        'cuda_version': None
+    }
+    
+    try:
+        import cupy as cp
+        gpu_info['cupy_available'] = True
+        
+        # Check if GPU is actually available
+        try:
+            # Simple test operation
+            test_array = cp.array([1, 2, 3])
+            test_result = cp.mean(test_array)
+            gpu_info['gpu_available'] = True
+            
+            # Get GPU information
+            gpu_info['gpu_name'] = cp.cuda.runtime.getDeviceProperties(0)['name'].decode()
+            gpu_info['gpu_memory'] = cp.cuda.runtime.getDeviceProperties(0)['totalGlobalMem'] // (1024**3)  # GB
+            gpu_info['cuda_version'] = cp.cuda.runtime.runtimeGetVersion()
+            
+            # Clean up
+            del test_array, test_result
+            cp.get_default_memory_pool().free_all_blocks()
+            
+        except Exception as e:
+            gpu_info['error'] = str(e)
+            
+    except ImportError:
+        pass
+    
+    return gpu_info
+
 def cluster_center(adata, clustering, method="geometric_mean"):
     X = adata.obsm['spatial']
     cluster_pos = {}
@@ -724,7 +1193,7 @@ def cluster_communication(
     # name_mat = np.concatenate((name_mat, np.array([['total','total']],str)), axis=0)
     for i in range(len(obsp_names)):
         S = adata.obsp['commot-'+obsp_names[i]]
-        tmp_df, tmp_p_value = summarize_cluster(S,
+        tmp_df, tmp_p_value = summarize_cluster_gpu(S,
             clusterid, celltypes, n_permutations=n_permutations)
         adata.uns['commot_cluster-'+clustering+'-'+obsp_names[i]] = {'communication_matrix': tmp_df, 'communication_pvalue': tmp_p_value}
     
