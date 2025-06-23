@@ -26,7 +26,7 @@ class CellChatViz:
     CellChat-like visualization for CellPhoneDB AnnData
     """
     
-    def __init__(self, adata):
+    def __init__(self, adata, palette=None):
         """
         Initialize with CellPhoneDB AnnData object
         
@@ -37,10 +37,16 @@ class CellChatViz:
             - obs: 'sender', 'receiver'
             - var: interaction information including 'classification'
             - layers: 'pvalues', 'means'
+        palette : dict or list, optional
+            Color palette for cell types. Can be:
+            - dict: mapping cell type names to colors
+            - list: list of colors (will be mapped to cell types in alphabetical order)
+            - None: use default color scheme
         """
         self.adata = adata
         self.cell_types = self._get_unique_cell_types()
         self.n_cell_types = len(self.cell_types)
+        self.palette = self._validate_palette(palette)
         self._color_cache = None  # Cache for consistent colors across all methods
         
     def _get_unique_cell_types(self):
@@ -49,41 +55,88 @@ class CellChatViz:
         receivers = self.adata.obs['receiver'].unique()
         return sorted(list(set(list(senders) + list(receivers))))
     
+    def _validate_palette(self, palette):
+        """
+        Validate and process the palette parameter
+        
+        Parameters:
+        -----------
+        palette : dict, list, or None
+            Color palette specification
+            
+        Returns:
+        --------
+        dict or None
+            Validated palette as dict mapping cell types to colors, or None
+        """
+        if palette is None:
+            return None
+        
+        if isinstance(palette, dict):
+            # Validate that all cell types have colors
+            missing_types = set(self.cell_types) - set(palette.keys())
+            if missing_types:
+                import warnings
+                warnings.warn(f"Palette missing colors for cell types: {missing_types}. Will use default colors for missing types.")
+            return palette
+        
+        elif isinstance(palette, (list, tuple)):
+            # Map colors to cell types in alphabetical order
+            if len(palette) < len(self.cell_types):
+                import warnings
+                warnings.warn(f"Palette has {len(palette)} colors but {len(self.cell_types)} cell types. Colors will be recycled.")
+            
+            # Create mapping
+            palette_dict = {}
+            for i, cell_type in enumerate(self.cell_types):
+                palette_dict[cell_type] = palette[i % len(palette)]
+            return palette_dict
+        
+        else:
+            raise ValueError("Palette must be a dictionary, list, or None")
+    
     def _get_cell_type_colors(self):
         """获取细胞类型颜色映射，确保所有方法使用相同的颜色"""
         # 如果已经有缓存的颜色，直接返回
         if self._color_cache is not None:
             return self._color_cache
         
-        # 尝试从adata.uns中获取颜色信息
-        color_keys = [key for key in self.adata.uns.keys() if key.endswith('_colors')]
-        
-        # 寻找可能的细胞类型颜色
         cell_type_colors = {}
-        for key in color_keys:
-            # 提取细胞类型名称 (去掉'_colors'后缀)
-            celltype_key = key.replace('_colors', '')
-            if celltype_key in self.adata.obs.columns:
-                categories = self.adata.obs[celltype_key].cat.categories
-                colors = self.adata.uns[key]
-                # 只保留在我们细胞类型列表中的颜色
-                for i, cat in enumerate(categories):
-                    if cat in self.cell_types and i < len(colors):
-                        cell_type_colors[cat] = colors[i]
-                break
         
-        # 如果没有找到完整的颜色映射，确保所有细胞类型都有颜色
-        if len(cell_type_colors) < len(self.cell_types):
+        # 优先使用用户提供的palette
+        if self.palette is not None:
+            cell_type_colors.update(self.palette)
+        
+        # 如果palette没有覆盖所有细胞类型，尝试从adata.uns中获取颜色信息
+        missing_types = set(self.cell_types) - set(cell_type_colors.keys())
+        if missing_types:
+            color_keys = [key for key in self.adata.uns.keys() if key.endswith('_colors')]
+            
+            # 寻找可能的细胞类型颜色
+            for key in color_keys:
+                # 提取细胞类型名称 (去掉'_colors'后缀)
+                celltype_key = key.replace('_colors', '')
+                if celltype_key in self.adata.obs.columns:
+                    categories = self.adata.obs[celltype_key].cat.categories
+                    colors = self.adata.uns[key]
+                    # 只保留在我们细胞类型列表中的颜色
+                    for i, cat in enumerate(categories):
+                        if cat in missing_types and i < len(colors):
+                            cell_type_colors[cat] = colors[i]
+                    break
+        
+        # 如果仍有缺失的颜色，使用默认颜色映射
+        missing_types = set(self.cell_types) - set(cell_type_colors.keys())
+        if missing_types:
             # 使用固定的颜色映射确保一致性
             import matplotlib.cm as cm
             # 使用tab20颜色映射，但确保稳定的颜色分配
             tab20_colors = cm.tab20(np.linspace(0, 1, 20))
+            from ..pl._palette import palette_56
             
             # 为缺失的细胞类型分配颜色
-            for i, ct in enumerate(self.cell_types):
-                if ct not in cell_type_colors:
-                    color_idx = i % 20  # 循环使用tab20颜色
-                    cell_type_colors[ct] = mcolors.to_hex(tab20_colors[color_idx])
+            for i, ct in enumerate(sorted(missing_types)):
+                cell_type_colors[ct] = palette_56[i]
         
         # 确保颜色映射的稳定性：按细胞类型名称排序
         sorted_colors = {}
@@ -320,7 +373,7 @@ class CellChatViz:
     def netVisual_circle(self, matrix, title="Cell-Cell Communication Network", 
                         edge_width_max=10, vertex_size_max=50, show_labels=True,
                         cmap='Blues', figsize=(10, 10), use_sender_colors=True,
-                        use_curved_arrows=True, curve_strength=0.3):
+                        use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
         圆形网络图可视化（类似CellChat的circle plot）
         使用发送者细胞类型颜色作为边的渐变颜色
@@ -347,6 +400,9 @@ class CellChatViz:
             Whether to use curved arrows like CellChat (default: True)
         curve_strength : float
             Strength of the curve (0 = straight, higher = more curved)
+        adjust_text : bool
+            Whether to use adjust_text library to prevent label overlapping (default: False)
+            If True, uses plt.text instead of nx.draw_networkx_labels
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -475,7 +531,35 @@ class CellChatViz:
             label_pos = {i: (1.15*np.cos(angle), 1.15*np.sin(angle)) 
                         for i, angle in enumerate(angles)}
             labels = {i: self.cell_types[i] for i in range(self.n_cell_types)}
-            nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
+            
+            if adjust_text:
+                # Use plt.text with adjust_text to prevent overlapping
+                try:
+                    from adjustText import adjust_text
+                    
+                    texts = []
+                    for i in range(self.n_cell_types):
+                        x, y = label_pos[i]
+                        text = ax.text(x, y, self.cell_types[i], 
+                                     fontsize=10, ha='center', va='center',
+                                     )
+                        texts.append(text)
+                    
+                    # Adjust text positions to avoid overlapping
+                    adjust_text(texts, ax=ax,
+                              expand_points=(1.2, 1.2),
+                              expand_text=(1.2, 1.2),
+                              force_points=0.5,
+                              force_text=0.5,
+                              arrowprops=dict(arrowstyle='->', color='gray', alpha=0.7, lw=0.5))
+                    
+                except ImportError:
+                    import warnings
+                    warnings.warn("adjustText library not found. Using default nx.draw_networkx_labels instead.")
+                    nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
+            else:
+                # Use traditional networkx labels
+                nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
         
         ax.set_title(title, fontsize=16, pad=20)
         ax.set_xlim(-1.5, 1.5)
@@ -1968,7 +2052,7 @@ class CellChatViz:
     def netVisual_aggregate(self, signaling, layout='circle', vertex_receiver=None, vertex_sender=None,
                            pvalue_threshold=0.05, vertex_size_max=50, edge_width_max=10,
                            show_labels=True, cmap='Blues', figsize=(10, 8), focused_view=True,
-                           use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3):
+                           use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
         绘制特定信号通路的聚合网络图（模仿CellChat的netVisual_aggregate功能）
         
@@ -2002,7 +2086,9 @@ class CellChatViz:
             Whether to use curved arrows like CellChat (default: True)
         curve_strength : float
             Strength of the curve (0 = straight, higher = more curved)
-        
+        adjust_text : bool
+            Whether to use adjust_text library to prevent label overlapping (default: False)
+            If True, uses plt.text instead of nx.draw_networkx_labels
         Returns:
         --------
         fig : matplotlib.figure.Figure
@@ -2108,7 +2194,8 @@ class CellChatViz:
                     min_interaction_threshold=0,
                     use_sender_colors=use_sender_colors,
                     use_curved_arrows=use_curved_arrows,
-                    curve_strength=curve_strength
+                    curve_strength=curve_strength,
+                    adjust_text=adjust_text 
                 )
             else:
                 fig, ax = self.netVisual_circle(
@@ -2121,7 +2208,8 @@ class CellChatViz:
                     figsize=figsize,
                     use_sender_colors=use_sender_colors,
                     use_curved_arrows=use_curved_arrows,
-                    curve_strength=curve_strength
+                    curve_strength=curve_strength,  
+                    adjust_text=adjust_text
                 )
         
         elif layout == 'hierarchy':
@@ -3823,13 +3911,9 @@ class CellChatViz:
                 # 如果添加误差后仍然相同（极端情况），使用中等大小
                 print("⚠️  Warning: All p-values are identical after jittering. Using medium size.")
                 size_matrix = np.full_like(size_matrix, (size_min + size_max) / 2)
+                size_matrix=color_matrix
         
-        # 确保没有NaN或异常值
-        size_matrix = np.nan_to_num(size_matrix, nan=size_min, posinf=size_max, neginf=size_min)
-        size_matrix = np.clip(size_matrix, size_min, size_max)
-        size_matrix = size_matrix + np.random.normal(0, jitter_strength, size_matrix.shape)
-        print(size_matrix)
-        
+
         
         # 转置功能 - 需要保存原始pivot用于后续层
         original_pivot_mean = pivot_mean.copy()
@@ -3851,7 +3935,12 @@ class CellChatViz:
             width=figsize[0] * 0.6, 
             height=figsize[1] * 0.7,
             legend=True,
-            
+            size_legend_kws=dict(
+                colors="black",
+                title="",
+                labels=["p>0.05", "p<0.01"],
+                show_at=[0.01, 1.0],
+            ),
             color_legend_kws=dict(title="Expression Level"),
         )
         
@@ -4313,10 +4402,31 @@ class CellChatViz:
                            edgecolors='black', linewidths=0.5)
         
         # 添加细胞类型标签
-        for i, cell_type in enumerate(self.cell_types):
-            ax.annotate(cell_type, (x_data[i], y_data[i]),
-                       xytext=(5, 5), textcoords='offset points',
-                       fontsize=10, alpha=0.8)
+        try:
+            from adjustText import adjust_text
+            
+            texts = []
+            for i, cell_type in enumerate(self.cell_types):
+                text = ax.text(x_data[i], y_data[i], cell_type,
+                             fontsize=10, alpha=0.8, ha='center', va='center',)
+                texts.append(text)
+            
+            # 使用adjust_text防止标签重叠
+            adjust_text(texts, ax=ax,
+                      expand_points=(1.2, 1.2),
+                      expand_text=(1.2, 1.2),
+                      force_points=0.3,
+                      force_text=0.3,
+                      arrowprops=dict(arrowstyle='->', color='gray', alpha=0.6, lw=0.8))
+            
+        except ImportError:
+            import warnings
+            warnings.warn("adjustText library not found. Using default ax.annotate instead.")
+            # 回退到原始的annotate方法
+            for i, cell_type in enumerate(self.cell_types):
+                ax.annotate(cell_type, (x_data[i], y_data[i]),
+                           xytext=(5, 5), textcoords='offset points',
+                           fontsize=10, alpha=0.8)
         
         # 设置标签和标题
         measure_labels = {
