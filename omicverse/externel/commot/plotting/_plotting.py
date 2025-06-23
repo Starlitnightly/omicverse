@@ -259,13 +259,15 @@ def plot_cluster_communication_network(
         Whether to exclude self communications in the visualization.
     filename
         Filename for saving the figure. Set the name to end with '.pdf' or 'png'
-        to specify format.
+        to specify format. If None, will use 'cluster_communication_network.png'.
     nx_node_size
         Size of node representing clusters.
     nx_node_cmap
         The discrete color map to use for clusters. Choices: 
         'Plotly', 'Alphabet', 'Light24', 'Dark24'. Recommend to use 'Plotly'
         for ten clusters or fewer and 'Alphabet' for 10-24 clusters.
+        Extended options from omicverse: 'omicverse_28', 'omicverse_56', 'omicverse_112',
+        'forbidden_city', 'vibrant', 'earth', 'pastel', 'ditto'.
     nx_pos_idx
         Coordinates to use for the 2D plot.
     nx_node_pos
@@ -297,6 +299,10 @@ def plot_cluster_communication_network(
         Node size of the spatial background.
 
     """
+    
+    # Set default filename if none provided
+    if filename is None:
+        filename = "cluster_communication_network.png"
     
     X_tmp = adata.uns[uns_names[0]]['communication_matrix'].copy()
     labels = list( X_tmp.columns.values )
@@ -352,18 +358,24 @@ def plot_cluster_communication_network(
 
     legend_elements = []
     if nx_node_cluster_cmap is None:
-        cluster_cmap = get_cmap_qualitative(nx_node_cmap)
+        cluster_cmap = get_cmap_qualitative(nx_node_cmap, n_colors=len(labels))
         for i in range(len(labels)):
-            legend_elements.append(Line2D([0],[0], marker='o',color='w', markerfacecolor=cluster_cmap[i], label=labels[i], markersize=10))
+            legend_elements.append(Line2D([0],[0], marker='o',color='w', markerfacecolor=cluster_cmap[i % len(cluster_cmap)], label=labels[i], markersize=10))
     elif not nx_node_cluster_cmap is None:
         for i in range(len(labels)):
             legend_elements.append(Line2D([0],[0], marker='o',color='w', markerfacecolor=nx_node_cluster_cmap[labels[i]], label=labels[i], markersize=10))
     
     fig, ax = plt.subplots()
-    tmp_filename,tmp_type = filename.split('.')
+    if filename and '.' in filename:
+        tmp_filename, tmp_type = filename.rsplit('.', 1)
+        legend_filename = f"{tmp_filename}_cluster_legend.{tmp_type}"
+    else:
+        legend_filename = f"{filename}_cluster_legend.png"
+    
     ax.legend(handles=legend_elements, loc='center')
     ax.axis('off')
-    fig.savefig(tmp_filename+"_cluster_legend."+tmp_type, bbox_inches='tight')
+    fig.savefig(legend_filename, bbox_inches='tight')
+    plt.close()
 
 
     
@@ -418,11 +430,11 @@ def plot_communication_dependent_genes(
     genes
         Returns the gene list being plotted if return_genes is True.
     """
-    cmap = get_cmap_qualitative(cluster_colormap)
-    wald_stats = df_deg['waldStat'].values
-    pvalue = df_deg['pvalue'].values
     labels = np.array( df_deg['cluster'].values, int)
     nlabel = np.max(labels)+1
+    cmap = get_cmap_qualitative(cluster_colormap, n_colors=nlabel)
+    wald_stats = df_deg['waldStat'].values
+    pvalue = df_deg['pvalue'].values
     yhat_mat = df_yhat.values
     peak_locs = []
     for i in range(nlabel):
@@ -550,7 +562,7 @@ def plot_communication_impact(
 
     df_plot = ( df_plot.iloc[row_idx,:] ).iloc[:,col_idx]
     mat = df_plot.values
-    cmap = get_cmap_qualitative(cluster_colormap)
+    cmap = get_cmap_qualitative(cluster_colormap, n_colors=max(mat.shape[0], mat.shape[1]))
     if mat.shape[1] > 10:
         mat_pca = PCA(n_components=np.min([10,mat.shape[1],mat.shape[0]]), svd_solver='full').fit_transform(mat)
     else:

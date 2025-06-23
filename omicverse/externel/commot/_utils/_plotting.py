@@ -8,23 +8,121 @@ import networkx as nx
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from scipy.stats import norm
-from networkx.drawing.nx_agraph import to_agraph
 
-def get_cmap_qualitative(cmap_name):
-    if cmap_name == "Plotly":
-        cmap = plotly.colors.qualitative.Plotly
-    elif cmap_name == "Alphabet":
-        cmap = plotly.colors.qualitative.Alphabet
-    elif cmap_name == "Light24":
-        cmap = plotly.colors.qualitative.Light24
-    elif cmap_name == "Dark24":
-        cmap = plotly.colors.qualitative.Dark24
-    # Safe and Vivid are strings of form "rbg(...)"
-    # Handle this later.
-    elif cmap_name == "Safe":
-        cmap = plotly.colors.qualitative.Safe
-    elif cmap_name == "Vivid":
-        cmap = plotly.colors.qualitative.Vivid
+def get_cmap_qualitative(cmap_name, n_colors=None):
+    """
+    Get qualitative colormap with support for large numbers of colors.
+    
+    Parameters
+    ----------
+    cmap_name : str
+        Name of the colormap. Options include:
+        - Standard plotly: "Plotly", "Alphabet", "Light24", "Dark24", "Safe", "Vivid"
+        - Extended omicverse: "omicverse_28", "omicverse_56", "omicverse_112"  
+        - Traditional Chinese: "forbidden_city"
+        - Themed: "vibrant", "earth", "pastel", "ditto"
+    n_colors : int, optional
+        Number of colors needed. If provided, will automatically select 
+        appropriate palette size.
+    
+    Returns
+    -------
+    cmap : list
+        List of color strings
+    """
+    # Handle omicverse extended palettes directly
+    if cmap_name in ["omicverse_28", "omicverse_56", "omicverse_112", "forbidden_city", 
+                     "vibrant", "earth", "pastel", "ditto"]:
+        try:
+            from ...pl._palette import (palette_28, palette_56, palette_112, 
+                                       vibrant_palette, earth_palette, pastel_palette, 
+                                       ditto_color, ForbiddenCity)
+            
+            if cmap_name == "omicverse_28":
+                cmap = palette_28
+            elif cmap_name == "omicverse_56":
+                cmap = palette_56  
+            elif cmap_name == "omicverse_112":
+                cmap = palette_112
+            elif cmap_name == "vibrant":
+                cmap = vibrant_palette
+            elif cmap_name == "earth":
+                cmap = earth_palette
+            elif cmap_name == "pastel":
+                cmap = pastel_palette
+            elif cmap_name == "ditto":
+                cmap = ditto_color
+            elif cmap_name == "forbidden_city":
+                fc = ForbiddenCity()
+                # Use a diverse selection of traditional Chinese colors
+                if n_colors is not None:
+                    # Select colors from different color families for diversity
+                    color_families = [
+                        fc.green[:15], fc.red[:15], fc.blue[:15], fc.yellow[:15], 
+                        fc.purple[:15], fc.brown[:15], fc.pink[:15], fc.grey[:10]
+                    ]
+                    cmap = []
+                    family_idx = 0
+                    color_idx = 0
+                    while len(cmap) < n_colors and family_idx < len(color_families):
+                        if color_idx < len(color_families[family_idx]):
+                            cmap.append(color_families[family_idx][color_idx])
+                            family_idx = (family_idx + 1) % len(color_families)
+                            if family_idx == 0:
+                                color_idx += 1
+                        else:
+                            family_idx += 1
+                else:
+                    cmap = fc.green[:10] + fc.red[:10] + fc.blue[:10] + fc.yellow[:10]
+        except ImportError:
+            # Fallback to plotly if import fails
+            cmap = plotly.colors.qualitative.Plotly
+    else:
+        # Standard plotly palettes
+        if cmap_name == "Plotly":
+            cmap = plotly.colors.qualitative.Plotly
+        elif cmap_name == "Alphabet":
+            cmap = plotly.colors.qualitative.Alphabet
+        elif cmap_name == "Light24":
+            cmap = plotly.colors.qualitative.Light24
+        elif cmap_name == "Dark24":
+            cmap = plotly.colors.qualitative.Dark24
+        elif cmap_name == "Safe":
+            cmap = plotly.colors.qualitative.Safe
+        elif cmap_name == "Vivid":
+            cmap = plotly.colors.qualitative.Vivid
+        else:
+            cmap = plotly.colors.qualitative.Plotly
+    
+    # If n_colors is specified and exceeds current palette size, 
+    # use extended palettes from omicverse
+    if n_colors is not None and n_colors > len(cmap) and cmap_name not in ["forbidden_city"]:
+        try:
+            from ...pl._palette import palette_28, palette_56, palette_112
+            
+            if n_colors <= 28:
+                cmap = palette_28[:n_colors]
+            elif n_colors <= 56:
+                cmap = palette_56[:n_colors]
+            elif n_colors <= 112:
+                cmap = palette_112[:n_colors]
+            else:
+                # For very large numbers, use palette_112 and cycle through
+                base_palette = palette_112
+                cycles_needed = (n_colors + len(base_palette) - 1) // len(base_palette)
+                extended_palette = []
+                for cycle in range(cycles_needed):
+                    for color in base_palette:
+                        if len(extended_palette) >= n_colors:
+                            break
+                        extended_palette.append(color)
+                    if len(extended_palette) >= n_colors:
+                        break
+                cmap = extended_palette[:n_colors]
+        except ImportError:
+            # Fallback to original behavior if import fails
+            pass
+    
     return cmap
 
 def linear_clamp_value(x, lower_bound, upper_bound, out_min, out_max):
@@ -38,7 +136,7 @@ def linear_clamp_value(x, lower_bound, upper_bound, out_min, out_max):
 
 
 def plot_cluster_signaling_chord(S, p_values, label_name=None, colormap='Plotly', quantile_cutoff=None, p_value_cutoff=None, cutoff=0, separate=False, filename="chord_plot.pdf", diagonal_off=False):
-    cmap = get_cmap_qualitative(colormap)
+    cmap = get_cmap_qualitative(colormap, n_colors=S.shape[0])
     data_all = np.empty([0,3], str)
     if not quantile_cutoff is None:
         cutoff = np.quantile(S.reshape(-1), quantile_cutoff)
@@ -100,51 +198,145 @@ def plot_cluster_signaling_network(S,
     background_ndsize = 1,
     filename = "network_plot.pdf",
 ):
+    """
+    Plot cluster signaling network using matplotlib and NetworkX.
+    
+    Parameters
+    ----------
+    S : array-like
+        Signaling matrix between clusters
+    labels : list, optional
+        Cluster labels
+    node_size : float
+        Size of nodes
+    node_colormap : str
+        Colormap for nodes
+    node_cluster_colormap : dict, optional
+        Custom color mapping for clusters
+    node_pos : array-like, optional
+        Positions for nodes
+    edge_width_lb_quantile : float
+        Lower bound quantile for edge width
+    edge_width_ub_quantile : float
+        Upper bound quantile for edge width
+    edge_width_min : float
+        Minimum edge width
+    edge_width_max : float
+        Maximum edge width
+    edge_color : str or array-like
+        Edge color specification
+    edge_colormap : matplotlib colormap
+        Colormap for edges when using numerical edge colors
+    background_pos : array-like, optional
+        Background positions to plot
+    background_ndcolor : str
+        Background color
+    background_ndsize : float
+        Background node size
+    filename : str
+        Output filename
+    """
+    
     if labels is None:
         labels = [str(i) for i in range(S.shape[0])]
-    node_cmap = get_cmap_qualitative(node_colormap)
-    G = nx.MultiDiGraph()
-
-    edge_width_lb = np.quantile(S.reshape(-1), edge_width_lb_quantile)
-    edge_width_ub = np.quantile(S.reshape(-1), edge_width_ub_quantile)
-
-
-    # Draw the background geometry
-    if not background_pos is None:
-        for i in range(background_pos.shape[0]):
-            G.add_node("cell_"+str(i), shape='point', color=background_ndcolor, fillcolor=background_ndcolor, width=background_ndsize)
-            G.nodes["cell_"+str(i)]["pos"] = "%f,%f!" %(background_pos[i,0],background_pos[i,1])
-
-    # Draw the nodes (cluster)
-    for i in range(len(labels)):
-        if node_cluster_colormap is None:
-            G.add_node(labels[i], shape="point", fillcolor=node_cmap[i], color=node_cmap[i])
-        elif not node_cluster_colormap is None:
-            G.add_node(labels[i], shape="point", fillcolor=node_cluster_colormap[labels[i]], color=node_cmap[i])
-        if not node_pos is None:
-            G.nodes[labels[i]]["pos"] = "%f,%f!" % (node_pos[i,0],node_pos[i,1])
-        G.nodes[labels[i]]["width"] = str(node_size)
-
-    # Draw the edges
+    node_cmap = get_cmap_qualitative(node_colormap, n_colors=len(labels))
+    
+    # Create NetworkX graph
+    G = nx.DiGraph()
+    
+    # Add nodes
+    for i, label in enumerate(labels):
+        G.add_node(label)
+    
+    # Add edges with weights
+    edge_weights = []
     for i in range(S.shape[0]):
         for j in range(S.shape[1]):
             if S[i,j] > 0:
-                G.add_edge(labels[i], labels[j], splines="curved")
-                G[labels[i]][labels[j]][0]["penwidth"] = str(linear_clamp_value(S[i,j],edge_width_lb,edge_width_ub,edge_width_min,edge_width_max))
-                if edge_color == "node":
-                    G[labels[i]][labels[j]][0]['color'] = node_cmap[i]
-                elif isinstance(edge_color, np.ndarray):
-                    G[labels[i]][labels[j]][0]['color'] = mpl.colors.to_hex( edge_colormap(edge_color[i,j]) )
-                else:
-                    G[labels[i]][labels[j]][0]['color'] = edge_color
+                G.add_edge(labels[i], labels[j], weight=S[i,j])
+                edge_weights.append(S[i,j])
     
-    # Draw the network
-    A = to_agraph(G)
-    if node_pos is None:
-        A.layout("dot")
+    # Set up the plot
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    # Calculate layout
+    if node_pos is not None:
+        pos = {labels[i]: node_pos[i,:2] for i in range(len(labels))}
     else:
-        A.layout()
-    A.draw(filename)
+        # Use spring layout as default
+        pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+    
+    # Draw background positions if provided
+    if background_pos is not None:
+        ax.scatter(background_pos[:,0], background_pos[:,1], 
+                   c=background_ndcolor, s=background_ndsize*50, alpha=0.3, zorder=1)
+    
+    # Calculate edge widths
+    if edge_weights:
+        edge_width_lb = np.quantile(edge_weights, edge_width_lb_quantile)
+        edge_width_ub = np.quantile(edge_weights, edge_width_ub_quantile)
+        normalized_weights = []
+        for edge in G.edges(data=True):
+            weight = edge[2]['weight']
+            norm_weight = linear_clamp_value(weight, edge_width_lb, edge_width_ub, edge_width_min, edge_width_max)
+            normalized_weights.append(norm_weight)
+    else:
+        normalized_weights = [1] * len(G.edges())
+    
+    # Calculate edge colors
+    if isinstance(edge_color, str) and edge_color == "node":
+        edge_colors = []
+        for edge in G.edges():
+            source_idx = labels.index(edge[0])
+            edge_colors.append(node_cmap[source_idx % len(node_cmap)])
+    elif isinstance(edge_color, np.ndarray):
+        edge_colors = []
+        for edge in G.edges():
+            i, j = labels.index(edge[0]), labels.index(edge[1])
+            color_val = edge_color[i, j] if edge_color.ndim == 2 else edge_color[i]
+            if edge_colormap is not None:
+                edge_colors.append(mpl.colors.to_hex(edge_colormap(color_val)))
+            else:
+                edge_colors.append(plt.cm.Greys(color_val))
+    else:
+        edge_colors = edge_color if edge_color else 'gray'
+    
+    # Draw edges
+    if len(G.edges()) > 0:
+        nx.draw_networkx_edges(G, pos, width=normalized_weights, 
+                              edge_color=edge_colors, alpha=0.7, arrows=True, 
+                              arrowsize=20, arrowstyle='->', 
+                              connectionstyle='arc3,rad=0.1', ax=ax)
+    
+    # Calculate node colors
+    node_colors = []
+    for i, label in enumerate(labels):
+        if node_cluster_colormap is None:
+            node_colors.append(node_cmap[i % len(node_cmap)])
+        else:
+            node_colors.append(node_cluster_colormap[label])
+    
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, 
+                          node_size=node_size*8000, alpha=0.9, ax=ax)
+    
+    # Draw labels
+    nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold', 
+                           font_color='white', ax=ax)
+    
+    ax.set_aspect('equal')
+    ax.axis('off')
+    plt.tight_layout()
+    
+    # Save the plot
+    if filename.endswith('.pdf'):
+        plt.savefig(filename, format='pdf', bbox_inches='tight', dpi=300)
+    elif filename.endswith('.png'):
+        plt.savefig(filename, format='png', bbox_inches='tight', dpi=300)
+    else:
+        plt.savefig(filename + '.png', format='png', bbox_inches='tight', dpi=300)
+    
+    plt.close()
 
 # Recommend plotting at most three LR species
 def plot_cluster_signaling_network_multipair(S_list,
@@ -165,52 +357,171 @@ def plot_cluster_signaling_network_multipair(S_list,
     background_ndsize = 1,
     filename = "network_plot.pdf"
 ):
+    """
+    Plot cluster signaling network for multiple ligand-receptor pairs using matplotlib and NetworkX.
+    
+    Parameters
+    ----------
+    S_list : list
+        List of signaling matrices
+    p_values_list : list
+        List of p-value matrices
+    labels : list, optional
+        Cluster labels
+    quantile_cutoff : float, optional
+        Quantile cutoff for significance
+    p_value_cutoff : float
+        P-value cutoff
+    node_size : float
+        Size of nodes
+    node_colormap : str
+        Colormap for nodes
+    node_pos : array-like, optional
+        Positions for nodes
+    edge_width_lb_quantile : float
+        Lower bound quantile for edge width
+    edge_width_ub_quantile : float
+        Upper bound quantile for edge width
+    edge_width_min : float
+        Minimum edge width
+    edge_width_max : float
+        Maximum edge width
+    edge_colors : list
+        Colors for different LR pairs
+    background_pos : array-like, optional
+        Background positions to plot
+    background_ndcolor : str
+        Background color
+    background_ndsize : float
+        Background node size
+    filename : str
+        Output filename
+    """
+    
     tmp_all_S = []
     for S in S_list:
         tmp_all_S.extend( list( S.reshape(-1) ) )
     tmp_all_S = np.array(tmp_all_S)
     if labels is None:
-        labels = [str(i) for i in range(S.shape[0])]
-    node_cmap = get_cmap_qualitative(node_colormap)
+        labels = [str(i) for i in range(S_list[0].shape[0])]
+    node_cmap = get_cmap_qualitative(node_colormap, n_colors=len(labels))
+    
+    # Create NetworkX graph
     G = nx.MultiDiGraph()
-    if not quantile_cutoff is None:
-        cutoff = np.quantile(tmp_all_S.reshape(-1), quantile_cutoff)
-    else:
-        cutoff = 0.0
-    edge_width_lb = np.quantile(tmp_all_S.reshape(-1), edge_width_lb_quantile)
-    edge_width_ub = np.quantile(tmp_all_S.reshape(-1), edge_width_ub_quantile)
-
-    # Draw the background geometry
-    if not background_pos is None:
-        for i in range(background_pos.shape[0]):
-            G.add_node("cell_"+str(i), shape='point', color=background_ndcolor, fillcolor=background_ndcolor, width=background_ndsize)
-            G.nodes["cell_"+str(i)]["pos"] = "%f,%f!" %(background_pos[i,0],background_pos[i,1])
-
-    # Draw the nodes (cluster)
-    for i in range(len(labels)):
-        G.add_node(labels[i], shape="point", fillcolor=node_cmap[i], color=node_cmap[i])
-        if not node_pos is None:
-            G.nodes[labels[i]]["pos"] = "%f,%f!" % (node_pos[i,0],node_pos[i,1])
-        G.nodes[labels[i]]["width"] = str(node_size)
-
-    # Draw the edges
-    for k in range(len(S_list)):
-        S = S_list[k]
-        p_values = p_values_list[k]
+    
+    # Add nodes
+    for i, label in enumerate(labels):
+        G.add_node(label)
+    
+    # Process each signaling matrix
+    all_edge_weights = []
+    all_edges_info = []  # Store edge information for each S matrix
+    
+    for s_idx, (S, p_values) in enumerate(zip(S_list, p_values_list)):
+        edges_for_this_s = []
+        
         for i in range(S.shape[0]):
             for j in range(S.shape[1]):
-                if S[i,j] >= cutoff or p_values[i,j] <= p_value_cutoff:
-                    penwidth = str(linear_clamp_value(S[i,j],edge_width_lb,edge_width_ub,edge_width_min,edge_width_max))
-                    color = edge_colors[k]
-                    G.add_edge(labels[i], labels[j], splines="curved", penwidth=penwidth, color=color)
+                include_edge = False
+                
+                if quantile_cutoff is not None:
+                    cutoff = np.quantile(tmp_all_S, quantile_cutoff)
+                    if S[i,j] >= cutoff:
+                        include_edge = True
+                
+                if p_values[i,j] <= p_value_cutoff:
+                    include_edge = True
+                
+                if include_edge:
+                    edge_key = f"{s_idx}_{i}_{j}"  # Unique key for this edge
+                    G.add_edge(labels[i], labels[j], key=edge_key, weight=S[i,j], s_idx=s_idx)
+                    all_edge_weights.append(S[i,j])
+                    edges_for_this_s.append((labels[i], labels[j], edge_key, S[i,j]))
+        
+        all_edges_info.append(edges_for_this_s)
     
-    # Draw the network
-    A = to_agraph(G)
-    if node_pos is None:
-        A.layout("dot")
+    # Set up the plot
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    # Calculate layout
+    if node_pos is not None:
+        pos = {labels[i]: node_pos[i,:2] for i in range(len(labels))}
     else:
-        A.layout()
-    A.draw(filename)
+        # Use spring layout as default
+        pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+    
+    # Draw background positions if provided
+    if background_pos is not None:
+        ax.scatter(background_pos[:,0], background_pos[:,1], 
+                   c=background_ndcolor, s=background_ndsize*50, alpha=0.3, zorder=1)
+    
+    # Calculate edge width bounds
+    if all_edge_weights:
+        edge_width_lb = np.quantile(all_edge_weights, edge_width_lb_quantile)
+        edge_width_ub = np.quantile(all_edge_weights, edge_width_ub_quantile)
+    else:
+        edge_width_lb, edge_width_ub = 0, 1
+    
+    # Draw edges for each signaling matrix with different colors
+    for s_idx, edges_info in enumerate(all_edges_info):
+        if not edges_info:
+            continue
+            
+        # Prepare edges for this signaling matrix
+        edges_to_draw = [(edge[0], edge[1]) for edge in edges_info]
+        edge_weights = [edge[3] for edge in edges_info]
+        
+        # Normalize edge weights
+        normalized_weights = [
+            linear_clamp_value(w, edge_width_lb, edge_width_ub, edge_width_min, edge_width_max)
+            for w in edge_weights
+        ]
+        
+        # Get edge color for this signaling matrix
+        edge_color = edge_colors[s_idx % len(edge_colors)]
+        
+        # Draw edges with slight offset to avoid overlap
+        offset = s_idx * 0.05  # Small offset for visual separation
+        pos_offset = {node: (x + offset, y + offset) for node, (x, y) in pos.items()}
+        
+        if edges_to_draw:
+            nx.draw_networkx_edges(G, pos_offset, edgelist=edges_to_draw,
+                                  width=normalized_weights, edge_color=edge_color, 
+                                  alpha=0.7, arrows=True, arrowsize=15, 
+                                  arrowstyle='->', connectionstyle=f'arc3,rad={0.1 + s_idx*0.05}', 
+                                  ax=ax, label=f'Signal {s_idx+1}')
+    
+    # Calculate node colors
+    node_colors = [node_cmap[i % len(node_cmap)] for i in range(len(labels))]
+    
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, 
+                          node_size=node_size*8000, alpha=0.9, ax=ax)
+    
+    # Draw labels
+    nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold', 
+                           font_color='white', ax=ax)
+    
+    ax.set_aspect('equal')
+    ax.axis('off')
+    plt.tight_layout()
+    
+    # Add legend for edge colors if multiple signaling matrices
+    if len(S_list) > 1:
+        legend_elements = [plt.Line2D([0], [0], color=edge_colors[i % len(edge_colors)], 
+                                     lw=2, label=f'Signal {i+1}') 
+                          for i in range(len(S_list))]
+        ax.legend(handles=legend_elements, loc='upper right')
+    
+    # Save the plot
+    if filename.endswith('.pdf'):
+        plt.savefig(filename, format='pdf', bbox_inches='tight', dpi=300)
+    elif filename.endswith('.png'):
+        plt.savefig(filename, format='png', bbox_inches='tight', dpi=300)
+    else:
+        plt.savefig(filename + '.png', format='png', bbox_inches='tight', dpi=300)
+    
+    plt.close()
 
 def plot_cell_signaling(X,
     V,
