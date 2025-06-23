@@ -203,6 +203,14 @@ If you use `omicverse` in your work, please cite the `omicverse` publication as 
 >
 > _Nature Communication_ 2024 Jul 16. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
 
+Here are some other related packages, feel free to reference them if you use them!
+
+> **CellOntologyMapper: Consensus mapping of cell type annotation**
+>
+> Zeng, Z., Wang, X., Du, H.
+>
+> _bioRxiv_ 2025 Jun 20. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
+
 
 ## `8` [Other](#)
 
