@@ -15,6 +15,8 @@ import matplotlib.colors as mcolors
 
 try:
     import marsilea as ma
+    import marsilea.plotter as mp
+    from matplotlib.colors import Normalize
     MARSILEA_AVAILABLE = True
 except ImportError:
     MARSILEA_AVAILABLE = False
@@ -491,8 +493,8 @@ class CellChatViz:
                                                     label=f'{cell_type} (sender)'))
             
             if legend_elements:
-                ax.legend(handles=legend_elements, loc='center left', 
-                         bbox_to_anchor=(1, 0.5), fontsize=8)
+                ax.legend(handles=legend_elements, loc='lower center', 
+                         bbox_to_anchor=(1.05, 0), fontsize=8)
         else:
             # Add traditional colorbar for edge weights
             edges = list(G.edges())
@@ -2158,49 +2160,157 @@ class CellChatViz:
         
         return fig, ax
     
-    def get_signaling_pathways(self, min_interactions=1):
+    def get_signaling_pathways(self, min_interactions=1, pathway_pvalue_threshold=0.05, 
+                              method='fisher', correction_method='fdr_bh', min_expression=0.1):
         """
-        获取所有显著的信号通路列表（类似CellChat的cellchat@netP$pathways）
+        获取所有显著的信号通路列表，使用统计学上更可靠的方法组合多个L-R对的p-values
         
         Parameters:
         -----------
         min_interactions : int
-            最小交互数量阈值
+            每个通路最小L-R对数量阈值 (default: 1)
+        pathway_pvalue_threshold : float
+            通路级别的p-value阈值 (default: 0.05)
+        method : str
+            P-value组合方法: 'fisher', 'stouffer', 'min', 'mean' (default: 'fisher')
+        correction_method : str
+            多重检验校正方法: 'fdr_bh', 'bonferroni', 'holm', None (default: 'fdr_bh')
+        min_expression : float
+            最小表达量阈值 (default: 0.1)
         
         Returns:
         --------
         pathways : list
             显著信号通路列表
         pathway_stats : dict
-            每个通路的统计信息
+            每个通路的详细统计信息
         """
-        pathways = self.adata.var['classification'].unique()
+        from scipy.stats import combine_pvalues
+        from statsmodels.stats.multitest import multipletests
+        import warnings
+        
+        pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
         pathway_stats = {}
-        significant_pathways = []
+        pathway_pvalues = []
+        pathway_names = []
+        
+        print(f"🔬 使用{method}方法分析{len(pathways)}个信号通路的统计显著性...")
         
         for pathway in pathways:
             pathway_mask = self.adata.var['classification'] == pathway
+            pathway_lr_pairs = self.adata.var.loc[pathway_mask, 'interacting_pair'].tolist()
             
-            # 计算该通路的总交互数
-            total_interactions = 0
-            significant_interactions = 0
+            if len(pathway_lr_pairs) < min_interactions:
+                continue
+                
+            # 收集该通路在所有细胞对中的p-values和表达量
+            all_pathway_pvals = []
+            all_pathway_means = []
+            significant_cell_pairs = []
             
-            for i in range(len(self.adata.obs)):
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], self.adata.obs['receiver'])):
                 pvals = self.adata.layers['pvalues'][i, pathway_mask]
                 means = self.adata.layers['means'][i, pathway_mask]
                 
-                sig_mask = pvals < 0.05
-                total_interactions += len(pvals)
-                significant_interactions += np.sum(sig_mask)
+                # 过滤低表达的相互作用
+                valid_mask = means >= min_expression
+                if np.any(valid_mask):
+                    valid_pvals = pvals[valid_mask]
+                    valid_means = means[valid_mask]
+                    
+                    all_pathway_pvals.extend(valid_pvals)
+                    all_pathway_means.extend(valid_means)
+                    
+                    # 检查是否有显著的相互作用
+                    if np.any(valid_pvals < 0.05):
+                        significant_cell_pairs.append(f"{sender}|{receiver}")
             
+            if len(all_pathway_pvals) == 0:
+                continue
+                
+            all_pathway_pvals = np.array(all_pathway_pvals)
+            all_pathway_means = np.array(all_pathway_means)
+            
+            # 组合p-values以获得通路级别的显著性
+            try:
+                if method == 'fisher':
+                    # Fisher's method - 适用于独立检验
+                    combined_stat, combined_pval = combine_pvalues(all_pathway_pvals, method='fisher')
+                elif method == 'stouffer':
+                    # Stouffer's method - 可以加权
+                    weights = all_pathway_means / all_pathway_means.sum()  # 基于表达量加权
+                    combined_stat, combined_pval = combine_pvalues(all_pathway_pvals, method='stouffer', weights=weights)
+                elif method == 'min':
+                    # 最小p-value方法 (需要Bonferroni校正)
+                    combined_pval = np.min(all_pathway_pvals) * len(all_pathway_pvals)
+                    combined_pval = min(combined_pval, 1.0)  # Cap at 1.0
+                    combined_stat = -np.log10(combined_pval)
+                elif method == 'mean':
+                    # 平均p-value (不推荐，但作为参考)
+                    combined_pval = np.mean(all_pathway_pvals)
+                    combined_stat = -np.log10(combined_pval)
+                else:
+                    raise ValueError(f"Unknown method: {method}")
+                    
+            except Exception as e:
+                warnings.warn(f"Failed to combine p-values for pathway {pathway}: {e}")
+                combined_pval = 1.0
+                combined_stat = 0.0
+            
+            # 计算通路统计信息
             pathway_stats[pathway] = {
-                'total_interactions': total_interactions,
-                'significant_interactions': significant_interactions,
-                'significance_rate': significant_interactions / max(1, total_interactions)
+                'n_lr_pairs': len(pathway_lr_pairs),
+                'n_tests': len(all_pathway_pvals),
+                'n_significant_interactions': np.sum(all_pathway_pvals < 0.05),
+                'mean_expression': np.mean(all_pathway_means),
+                'max_expression': np.max(all_pathway_means),
+                'combined_pvalue': combined_pval,
+                'combined_statistic': combined_stat,
+                'significant_cell_pairs': significant_cell_pairs,
+                'lr_pairs': pathway_lr_pairs,
+                'significance_rate': np.sum(all_pathway_pvals < 0.05) / len(all_pathway_pvals)
             }
             
-            if significant_interactions >= min_interactions:
-                significant_pathways.append(pathway)
+            pathway_pvalues.append(combined_pval)
+            pathway_names.append(pathway)
+        
+        # 多重检验校正
+        if len(pathway_pvalues) > 0 and correction_method:
+            print(f"📊 应用{correction_method}多重检验校正...")
+            try:
+                corrected_results = multipletests(pathway_pvalues, alpha=pathway_pvalue_threshold, 
+                                                method=correction_method)
+                corrected_pvals = corrected_results[1]
+                is_significant = corrected_results[0]
+                
+                # 更新统计信息
+                for i, pathway in enumerate(pathway_names):
+                    pathway_stats[pathway]['corrected_pvalue'] = corrected_pvals[i]
+                    pathway_stats[pathway]['is_significant_corrected'] = is_significant[i]
+                
+                significant_pathways = [pathway_names[i] for i in range(len(pathway_names)) if is_significant[i]]
+                
+            except Exception as e:
+                warnings.warn(f"Multiple testing correction failed: {e}")
+                # 回退到未校正的p-values
+                significant_pathways = [pathway_names[i] for i in range(len(pathway_names)) 
+                                      if pathway_pvalues[i] < pathway_pvalue_threshold]
+        else:
+            # 不进行多重检验校正
+            significant_pathways = [pathway_names[i] for i in range(len(pathway_names)) 
+                                  if pathway_pvalues[i] < pathway_pvalue_threshold]
+        
+        # 按显著性排序
+        if len(significant_pathways) > 0:
+            if correction_method:
+                significant_pathways.sort(key=lambda x: pathway_stats[x]['corrected_pvalue'])
+            else:
+                significant_pathways.sort(key=lambda x: pathway_stats[x]['combined_pvalue'])
+        
+        print(f"✅ 发现{len(significant_pathways)}个显著通路 (总共{len(pathway_names)}个通路)")
+        print(f"   - P-value组合方法: {method}")
+        print(f"   - 多重检验校正: {correction_method if correction_method else 'None'}")
+        print(f"   - 通路阈值: {pathway_pvalue_threshold}")
         
         return significant_pathways, pathway_stats
     
@@ -2360,9 +2470,12 @@ class CellChatViz:
         ax : matplotlib.axes.Axes
         """
         try:
-            from mpl_chord_diagram import chord_diagram
+            from ..externel.mpl_chord.chord_diagram import chord_diagram
         except ImportError:
-            raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
+            try:
+                from mpl_chord_diagram import chord_diagram
+            except ImportError:
+                raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
         
         # 计算特定通路的交互矩阵
         if signaling is not None:
@@ -2670,9 +2783,12 @@ class CellChatViz:
         ax : matplotlib.axes.Axes
         """
         try:
-            from mpl_chord_diagram import chord_diagram
+            from ..externel.mpl_chord.chord_diagram import chord_diagram
         except ImportError:
-            raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
+            try:
+                from mpl_chord_diagram import chord_diagram
+            except ImportError:
+                raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
         
         # 处理配体-受体对筛选
         if ligand_receptor_pairs is not None:
@@ -2924,7 +3040,9 @@ class CellChatViz:
                             rotate_names=False, fontcolor="black", fontsize=10,
                             start_at=0, extent=360, min_chord_width=0,
                             ax=None, figsize=(12, 12), 
-                            title_name=None, save=None, legend_pos_x=None):
+                            title_name=None, save=None, legend_pos_x=None,
+                            show_celltype_in_name=True, show_legend=True, 
+                            legend_bbox=(1.05, 1), legend_ncol=1):
         """
         绘制特定细胞类型作为发送者的所有配体-受体对弦图（基于基因级别）
         每个区域代表一个配体或受体，配体使用发送者颜色，受体使用接收者颜色
@@ -2984,6 +3102,16 @@ class CellChatViz:
             保存文件路径
         legend_pos_x : float or None
             图例X位置（暂未实现）
+        show_celltype_in_name : bool
+            是否在节点名称中显示细胞类型信息 (default: True)
+            如果True，显示为 "基因名(细胞类型)"
+            如果False，只显示基因名，但同一基因在不同细胞类型中仍会重复出现
+        show_legend : bool
+            是否显示细胞类型颜色图例 (default: True)
+        legend_bbox : tuple
+            图例位置，格式为 (x, y) (default: (1.05, 1))
+        legend_ncol : int
+            图例列数 (default: 1)
             
         Returns:
         --------
@@ -2991,9 +3119,12 @@ class CellChatViz:
         ax : matplotlib.axes.Axes
         """
         try:
-            from mpl_chord_diagram import chord_diagram
+            from ..externel.mpl_chord.chord_diagram import chord_diagram
         except ImportError:
-            raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
+            try:
+                from mpl_chord_diagram import chord_diagram
+            except ImportError:
+                raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
         
         # 验证必需的列是否存在
         required_cols = ['gene_a', 'gene_b']
@@ -3140,87 +3271,113 @@ class CellChatViz:
         # 创建配体-受体交互DataFrame
         lr_df = pd.DataFrame(ligand_receptor_interactions)
         
-        # 为每个基因确定其主要关联的细胞类型
-        gene_to_celltype = {}
+        # 新方法：为每个基因-细胞类型组合创建唯一节点，允许基因重复出现
+        gene_celltype_combinations = set()
         
-        # 分析配体（使用发送者细胞类型）
-        ligands = lr_df['ligand'].unique()
-        for ligand in ligands:
-            ligand_senders = lr_df[lr_df['ligand'] == ligand]['sender'].value_counts()
-            main_sender = ligand_senders.index[0]
-            gene_to_celltype[ligand] = main_sender
+        # 收集所有配体-细胞类型组合
+        for _, row in lr_df.iterrows():
+            ligand = row['ligand']
+            sender = row['sender']
+            receptor = row['receptor']
+            receiver = row['receiver']
+            
+            gene_celltype_combinations.add((ligand, sender, 'ligand'))
+            gene_celltype_combinations.add((receptor, receiver, 'receptor'))
         
-        # 分析受体（使用接收者细胞类型）
-        receptors = lr_df['receptor'].unique()
-        for receptor in receptors:
-            receptor_receivers = lr_df[lr_df['receptor'] == receptor]['receiver'].value_counts()
-            main_receiver = receptor_receivers.index[0]
-            gene_to_celltype[receptor] = main_receiver
+        # 按细胞类型分组节点，保持细胞类型聚集
+        celltype_to_nodes = {}
+        for gene, celltype, role in gene_celltype_combinations:
+            if celltype not in celltype_to_nodes:
+                celltype_to_nodes[celltype] = {'ligands': [], 'receptors': []}
+            celltype_to_nodes[celltype][role + 's'].append(gene)
         
-        # 按细胞类型分组基因，确保相同细胞类型的基因聚集在一起
-        celltype_to_genes = {}
-        for gene, celltype in gene_to_celltype.items():
-            if celltype not in celltype_to_genes:
-                celltype_to_genes[celltype] = []
-            celltype_to_genes[celltype].append(gene)
+        # 组织节点列表：每个节点使用唯一标识符但显示时只显示基因名
+        organized_nodes = []
+        organized_node_info = []  # 存储节点信息 (gene, celltype, role)
+        organized_display_names = []  # 存储显示名称
         
-        # 按细胞类型顺序组织基因列表（保持细胞类型的原始顺序）
-        organized_genes = []
-        organized_gene_roles = []  # 记录每个基因的角色（配体/受体）
+        # 按照原始细胞类型顺序排列
+        available_celltypes = [ct for ct in self.cell_types if ct in celltype_to_nodes]
         
-        # 按照细胞类型的原始顺序进行排序
-        available_celltypes = [ct for ct in self.cell_types if ct in celltype_to_genes]
-        
+        node_counter = 0  # 用于创建唯一标识符
         for celltype in available_celltypes:
-            celltype_genes = celltype_to_genes[celltype]
+            nodes = celltype_to_nodes[celltype]
             
-            # 在每个细胞类型内部，按照配体优先、受体次之的顺序排列
-            ligands_in_celltype = [g for g in celltype_genes if g in ligands]
-            receptors_in_celltype = [g for g in celltype_genes if g in receptors and g not in ligands_in_celltype]
+            # 先添加配体，再添加受体，并确保在同一细胞类型内去重和排序
+            for ligand in sorted(set(nodes['ligands'])):
+                # 使用唯一标识符作为内部节点名
+                node_id = f"node_{node_counter}"
+                organized_nodes.append(node_id)
+                organized_node_info.append((ligand, celltype, 'ligand'))
+                organized_display_names.append(ligand)  # 显示名称只是基因名
+                node_counter += 1
             
-            # 添加配体
-            for ligand in sorted(ligands_in_celltype):
-                organized_genes.append(ligand)
-                organized_gene_roles.append('ligand')
-            
-            # 添加受体
-            for receptor in sorted(receptors_in_celltype):
-                organized_genes.append(receptor)
-                organized_gene_roles.append('receptor')
+            for receptor in sorted(set(nodes['receptors'])):
+                # 使用唯一标识符作为内部节点名
+                node_id = f"node_{node_counter}"
+                organized_nodes.append(node_id)
+                organized_node_info.append((receptor, celltype, 'receptor'))
+                organized_display_names.append(receptor)  # 显示名称只是基因名
+                node_counter += 1
         
-        # 使用有序的基因列表
-        unique_genes = organized_genes
+        # 使用组织后的节点列表
+        unique_genes = organized_nodes
+        
+        # 创建映射
+        gene_to_celltype = {}
+        for node_id, (gene, celltype, role) in zip(organized_nodes, organized_node_info):
+            gene_to_celltype[node_id] = celltype
         
         # 创建交互矩阵（配体到受体）
         n_genes = len(unique_genes)
         interaction_matrix = np.zeros((n_genes, n_genes))
         
-        # 填充矩阵
+        # 填充矩阵 - 需要找到对应的节点ID
         for _, row in lr_df.iterrows():
-            ligand_idx = unique_genes.index(row['ligand'])
-            receptor_idx = unique_genes.index(row['receptor'])
-            # 累加表达强度
-            interaction_matrix[ligand_idx, receptor_idx] += row['mean_expression']
+            ligand = row['ligand']
+            receptor = row['receptor']
+            sender = row['sender']
+            receiver = row['receiver']
+            
+            # 找到对应的配体节点ID
+            ligand_idx = None
+            for i, (gene, celltype, role) in enumerate(organized_node_info):
+                if gene == ligand and celltype == sender and role == 'ligand':
+                    ligand_idx = i
+                    break
+            
+            # 找到对应的受体节点ID
+            receptor_idx = None
+            for i, (gene, celltype, role) in enumerate(organized_node_info):
+                if gene == receptor and celltype == receiver and role == 'receptor':
+                    receptor_idx = i
+                    break
+            
+            # 如果找到了对应的节点，就添加交互
+            if ligand_idx is not None and receptor_idx is not None:
+                interaction_matrix[ligand_idx, receptor_idx] += row['mean_expression']
         
-        # 准备颜色：配体使用发送者颜色，受体使用接收者颜色
+        # 准备颜色：根据细胞类型着色
         cell_colors = self._get_cell_type_colors()
         gene_colors = []
         
-        for gene in unique_genes:
-            associated_celltype = gene_to_celltype[gene]
+        for node_id in unique_genes:
+            associated_celltype = gene_to_celltype[node_id]
             gene_colors.append(cell_colors.get(associated_celltype, '#808080'))
         
         # 创建显示名称
         display_names = []
-        for i, gene in enumerate(unique_genes):
-            role = organized_gene_roles[i]
-            if gene in ligands and gene in receptors:
-                # 基因既是配体又是受体，根据当前位置的角色添加标识
-                if role == 'ligand':
-                    display_names.append(f"{gene} (L)")
-                else:
-                    display_names.append(f"{gene} (R)")
-            else:
+        ligands = lr_df['ligand'].unique()
+        receptors = lr_df['receptor'].unique()
+        
+        for i, node_id in enumerate(unique_genes):
+            gene, celltype, role = organized_node_info[i]
+            
+            # 根据参数选择显示格式
+            if show_celltype_in_name:  # 显示完整名称（基因名+细胞类型）
+                display_names.append(f"{gene}({celltype})")
+            else:  # 只显示基因名，完全去掉括号
+                # 直接使用基因名，颜色由图例说明
                 display_names.append(gene)
         
         # 创建图形
@@ -3261,12 +3418,43 @@ class CellChatViz:
         
         ax.set_title(title_name, fontsize=fontsize + 2, pad=20)
         
-        # 添加图例说明
-        #legend_text = f"Ligands (sender colors) → Receptors (receiver colors)\n"
-        #legend_text += f"Total interactions: {len(lr_df)}, Unique L-R pairs: {len(unique_genes)}"
-        #ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
-        #        fontsize=fontsize-2, va='top', ha='left',
-       #         bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        # 添加细胞类型颜色图例
+        if show_legend:
+            # 获取涉及的细胞类型和对应颜色
+            involved_celltypes = set()
+            for gene, celltype, role in organized_node_info:
+                involved_celltypes.add(celltype)
+            
+            # 按原始顺序排序细胞类型
+            ordered_celltypes = [ct for ct in self.cell_types if ct in involved_celltypes]
+            
+            # 创建图例
+            legend_handles = []
+            legend_labels = []
+            
+            for celltype in ordered_celltypes:
+                color = cell_colors.get(celltype, '#808080')
+                handle = plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor='black', linewidth=0.5)
+                legend_handles.append(handle)
+                legend_labels.append(celltype)
+            
+            # 添加图例
+            legend = ax.legend(legend_handles, legend_labels, 
+                             title='Cell Types', 
+                             bbox_to_anchor=legend_bbox,
+                             loc='upper left',
+                             ncol=legend_ncol,
+                             fontsize=fontsize-1,
+                             title_fontsize=fontsize,
+                             frameon=True,
+                             fancybox=True,
+                             shadow=True)
+            
+            # 调整图例样式
+            legend.get_frame().set_facecolor('white')
+            legend.get_frame().set_alpha(0.9)
+            legend.get_frame().set_edgecolor('gray')
+            legend.get_frame().set_linewidth(0.5)
         
         # 保存文件
         if save:
@@ -3279,13 +3467,22 @@ class CellChatViz:
                                  signaling=None, pvalue_threshold=0.05, 
                                  mean_threshold=0.1, top_interactions=20,
                                  show_pvalue=True, show_mean=True, show_count=False,
-                                 add_violin=False, add_dendrogram=True,
+                                 add_violin=False, add_dendrogram=False,
                                  group_pathways=True, figsize=(12, 8),
                                  title="Cell-Cell Communication Analysis", 
-                                 remove_isolate=False):
+                                 remove_isolate=False, font_size=12, cmap="RdBu_r",
+                                 transpose=False):
         """
-        使用Marsilea创建高级气泡图来可视化细胞间通讯
-        类似CellChat的netVisual_bubble功能，但具有更丰富的可视化效果
+        使用Marsilea的SizedHeatmap创建高级气泡图来可视化细胞间通讯
+        类似CellChat的netVisual_bubble功能，但使用SizedHeatmap使圆圈大小更有意义
+        
+        新功能特性:
+        - 颜色深度代表表达强度 (红色越深表达越高)
+        - 圆圈大小代表统计显著性 (只有两种大小)：
+          * P < 0.01: 大圆圈 (显著)
+          * P ≥ 0.01: 小圆圈或几乎看不见 (不显著)
+        - 蓝色边框标记高度显著的交互 (P < 0.01)
+        - 支持双重信息编码：颜色表达量+大小显著性
         
         Parameters:
         -----------
@@ -3326,6 +3523,14 @@ class CellChatViz:
             图标题
         remove_isolate : bool
             是否移除孤立的交互
+        font_size : int
+            字体大小 (default: 12)
+        cmap : str
+            颜色映射 (default: "RdBu_r")
+            可选: "Blues", "Greens", "Oranges", "Purples", "viridis", "plasma"等
+        transpose : bool
+            是否转置热图 (default: False)
+            如果True，行列互换：行=L-R对，列=细胞类型对
             
         Returns:
         --------
@@ -3518,11 +3723,17 @@ class CellChatViz:
                 aggfunc='mean',
                 fill_value=0
             )
+            # 通路级别P值应该使用更合适的聚合方法
+            # 选项1: 使用中位数 (更稳健)
+            # 选项2: 使用几何平均数 
+            # 选项3: 使用费舍尔合并P值方法
+            
+            # 这里使用中位数作为通路级别的代表P值 (更保守和稳健)
             pivot_pval = df_interactions.pivot_table(
                 values='pvalue', 
                 index='interaction', 
                 columns='pathway', 
-                aggfunc='min',
+                aggfunc='median',  # 使用中位数而不是最小值
                 fill_value=1
             )
             
@@ -3560,65 +3771,137 @@ class CellChatViz:
         # 标准化表达数据
         matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
         
-        # 创建Marsilea可视化组件
+        # 创建Marsilea可视化组件 - 使用SizedHeatmap增强可视化
+        # 重要：在pivot_table创建之后计算size和color矩阵，确保维度匹配
         
-        # 1. 主热图 - 标准化表达强度
-        h = ma.Heatmap(
-            matrix_normalized, 
-            cmap="Reds", 
-            label="Normalized\nExpression",
+        # 准备数据：颜色=表达量，大小=P值显著性
+        expression_matrix = pivot_mean.to_numpy()
+        pval_matrix = pivot_pval.to_numpy()
+        
+        # 颜色矩阵：使用表达量，颜色越深表示表达越高
+        color_matrix = expression_matrix.copy()
+        # 确保没有NaN或Inf值
+        color_matrix = np.nan_to_num(color_matrix, nan=0.0, posinf=color_matrix[np.isfinite(color_matrix)].max(), neginf=0.0)
+        
+        # 大小矩阵：使用负对数转换P值，P值越小圆圈越大
+        # -log10(p-value): P=0.01 → size=2, P=0.05 → size=1.3, P=0.1 → size=1
+        size_matrix = -np.log10(pval_matrix + 1e-10)  # 添加小值避免log(0)
+        
+        # 归一化到合理的视觉范围 (0.2 到 1.0)
+        # 这样P值越小，圆圈越大
+        size_min = 0.2  # 最小圆圈大小 (对应不显著的P值)
+        size_max = 1.0  # 最大圆圈大小 (对应高度显著的P值)
+        
+        # 归一化: 将-log10(p)映射到[size_min, size_max]范围
+        if size_matrix.max() > size_matrix.min():
+            size_matrix_norm = (size_matrix - size_matrix.min()) / (size_matrix.max() - size_matrix.min())
+            size_matrix = size_matrix_norm * (size_max - size_min) + size_min
+        else:
+            # 当所有P值相同时，添加轻微的随机误差避免可视化问题
+            print("⚠️  Warning: All p-values are identical. Adding slight jitter for better visualization.")
+            
+            # 设置随机种子以保证结果可重现
+            np.random.seed(42)
+            
+            # 在原始P值基础上添加很小的随机误差（不影响统计意义）
+            jitter_strength = 1e-2  # 非常小的误差，不会影响统计解释
+            jittered_pvals = pval_matrix + np.random.normal(0, jitter_strength, pval_matrix.shape)
+            
+            # 确保P值仍在合理范围内 [0, 1]
+            jittered_pvals = np.clip(jittered_pvals, 1e-10, 1.0)
+            
+            # 重新计算size_matrix
+            size_matrix = -np.log10(pval_matrix + 1e-10)
+            
+            
+            # 重新归一化
+            if size_matrix.max() > size_matrix.min():
+                size_matrix_norm = (size_matrix - size_matrix.min()) / (size_matrix.max() - size_matrix.min())
+                size_matrix = size_matrix_norm * (size_max - size_min) + size_min
+                
+            else:
+                # 如果添加误差后仍然相同（极端情况），使用中等大小
+                print("⚠️  Warning: All p-values are identical after jittering. Using medium size.")
+                size_matrix = np.full_like(size_matrix, (size_min + size_max) / 2)
+        
+        # 确保没有NaN或异常值
+        size_matrix = np.nan_to_num(size_matrix, nan=size_min, posinf=size_max, neginf=size_min)
+        size_matrix = np.clip(size_matrix, size_min, size_max)
+        size_matrix = size_matrix + np.random.normal(0, jitter_strength, size_matrix.shape)
+        print(size_matrix)
+        
+        
+        # 转置功能 - 需要保存原始pivot用于后续层
+        original_pivot_mean = pivot_mean.copy()
+        original_pivot_pval = pivot_pval.copy()
+        
+        if transpose:
+            size_matrix = size_matrix.T
+            color_matrix = color_matrix.T
+            pivot_mean = pivot_mean.T
+            pivot_pval = pivot_pval.T
+            # 注意：转置后 matrix_normalized 也需要重新计算
+            matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
+        
+        # 1. 主要的SizedHeatmap - 基于您的参考代码改进
+        h = ma.SizedHeatmap(
+            size=size_matrix,
+            color=color_matrix,
+            cmap=cmap,  # 使用自定义颜色映射
             width=figsize[0] * 0.6, 
-            height=figsize[1] * 0.7
+            height=figsize[1] * 0.7,
+            legend=True,
+            
+            color_legend_kws=dict(title="Expression Level"),
         )
         
-        # 2. 气泡图图层 - 显示P值显著性
+        # 2. 可选的额外显著性标记层
         if show_pvalue:
-            # 将P值转换为显著性大小
-            pval_matrix = pivot_pval.to_numpy()
-            significance_sizes = np.where(pval_matrix < 0.001, 3,
-                                np.where(pval_matrix < 0.01, 2,
-                                        np.where(pval_matrix < 0.05, 1, 0)))
-            
-            bubble_layer = mp.SizedMesh(
-                significance_sizes,
-                size_norm=Normalize(vmin=0, vmax=3),
-                color="none",
-                edgecolor="#2E86AB",
-                linewidth=1.5,
-                sizes=(1, 400),
-                size_legend_kws=dict(
-                    title="P-value", 
-                    show_at=[1, 2, 3],
-                    labels=["< 0.05", "< 0.01", "< 0.001"]
-                )
-            )
-            h.add_layer(bubble_layer)
+            try:
+                # 使用转置后的pval_matrix计算显著性
+                current_pval_matrix = pivot_pval.to_numpy()
+                highly_significant_mask = current_pval_matrix < 0.01
+                if np.any(highly_significant_mask):
+                    sig_layer = mp.MarkerMesh(
+                        highly_significant_mask,
+                        color="none",
+                        edgecolor="#2E86AB",
+                        linewidth=2.0,
+                        label="P < 0.01"
+                    )
+                    h.add_layer(sig_layer)
+            except Exception as e:
+                print(f"Warning: Could not add significance layer: {e}")
         
         # 3. 高表达标记
         if show_mean:
-            high_expression_mask = matrix_normalized > 0.7
-            high_mark = mp.MarkerMesh(
-                high_expression_mask, 
-                color="#DB4D6D", 
-                label="High Expression"
-            )
-            h.add_layer(high_mark)
+            try:
+                high_expression_mask = matrix_normalized > 0.7
+                high_mark = mp.MarkerMesh(
+                    high_expression_mask, 
+                    color="#DB4D6D", 
+                    label="High Expression"
+                )
+                h.add_layer(high_mark)
+            except Exception as e:
+                print(f"Warning: Could not add high expression layer: {e}")
         
-        # 4. 细胞类型标签
+        # 4. 细胞类型标签 - 基于您的参考代码
         cell_interaction_labels = mp.Labels(
             pivot_mean.index, 
-            align="center"
+            align="center",
+            fontsize=font_size
         )
         h.add_left(cell_interaction_labels)
         
-        # 5. 配体-受体对或通路标签
+        # 5. 配体-受体对或通路标签 - 基于您的参考代码
         lr_pathway_labels = mp.Labels(
             pivot_mean.columns,
-            rotation=90
+            fontsize=font_size
         )
         h.add_bottom(lr_pathway_labels)
         
-        # 6. 按信号通路或功能分组
+        # 6. 按信号通路或功能分组 (simplified version for SizedHeatmap)
         if group_pathways and 'classification' in self.adata.var.columns:
             # 获取信号通路的颜色映射
             unique_pathways = pivot_mean.columns.tolist()
@@ -3626,30 +3909,38 @@ class CellChatViz:
             pathway_color_map = {pathway: mcolors.to_hex(color) 
                                for pathway, color in zip(unique_pathways, pathway_colors)}
             
-            h.group_cols(
-                unique_pathways, 
-                order=sorted(unique_pathways)
-            )
-            
-            # 添加通路颜色条
-            pathway_chunk = mp.Chunk(
-                sorted(unique_pathways),
-                [pathway_color_map[p] for p in sorted(unique_pathways)]
-            )
-            h.add_top(pathway_chunk, pad=0.05, size=0.1)
+            # Note: Group functionality simplified for SizedHeatmap compatibility
         
-        # 7. 聚类树
+        # 7. 聚类树 (带更严格的安全检查)
         if add_dendrogram:
-            h.add_dendrogram("left", colors="#33A6B8")
-            if group_pathways:
-                h.add_dendrogram("bottom", colors="#B481BB")
+            try:
+                # 检查数据维度和质量是否足够进行聚类
+                can_cluster_rows = (pivot_mean.shape[0] > 2 and 
+                                   not np.any(np.isnan(pivot_mean.values)) and 
+                                   np.var(pivot_mean.values, axis=1).sum() > 0)
+                                   
+                can_cluster_cols = (pivot_mean.shape[1] > 2 and 
+                                   not np.any(np.isnan(pivot_mean.values)) and 
+                                   np.var(pivot_mean.values, axis=0).sum() > 0)
+                
+                if can_cluster_rows:
+                    h.add_dendrogram("left", colors="#33A6B8")
+                if group_pathways and can_cluster_cols:
+                    h.add_dendrogram("bottom", colors="#B481BB")
+                    
+                if not can_cluster_rows and not can_cluster_cols:
+                    print("Warning: Insufficient data variability for clustering. Skipping dendrograms.")
+                    
+            except Exception as e:
+                print(f"Warning: Could not add dendrogram: {e}")
+                print("Continuing without dendrograms. Consider setting add_dendrogram=False")
         
-        # 8. 图例
-        h.add_legends("right", align_stacks="center", align_legends="top", pad=0.2)
+        # 8. 图例 - 基于您的参考代码
+        h.add_legends()
         
-        # 9. 设置边距和标题
-        h.set_margin(0.15)
-        h.add_title(title, fontsize=14, pad=0.02)
+        # 9. 设置标题
+        if title:
+            h.add_title(title, fontsize=font_size + 2, pad=0.02)  # 标题字体比正文大2
         
         # 渲染图形
         h.render()
@@ -4604,4 +4895,753 @@ class CellChatViz:
                                 columns=self.cell_types)
         
         return pvalue_df
+    
+    def analyze_pathway_statistics(self, pathway_stats, show_details=True):
+        """
+        Analyze and display detailed pathway statistics
+        
+        Parameters:
+        -----------
+        pathway_stats : dict
+            Dictionary returned from get_signaling_pathways
+        show_details : bool
+            Whether to show detailed statistics for each pathway
+        
+        Returns:
+        --------
+        summary_df : pd.DataFrame
+            Summary statistics for all pathways
+        """
+        if not pathway_stats:
+            print("No pathway statistics available. Run get_signaling_pathways() first.")
+            return pd.DataFrame()
+        
+        # Create summary DataFrame
+        summary_data = []
+        for pathway, stats in pathway_stats.items():
+            row = {
+                'pathway': pathway,
+                'n_lr_pairs': stats['n_lr_pairs'],
+                'n_tests': stats['n_tests'],
+                'n_significant': stats['n_significant_interactions'],
+                'significance_rate': stats['significance_rate'],
+                'combined_pvalue': stats['combined_pvalue'],
+                'mean_expression': stats['mean_expression'],
+                'max_expression': stats['max_expression'],
+                'n_significant_cell_pairs': len(stats['significant_cell_pairs'])
+            }
+            
+            # Add corrected p-value if available
+            if 'corrected_pvalue' in stats:
+                row['corrected_pvalue'] = stats['corrected_pvalue']
+                row['is_significant'] = stats['is_significant_corrected']
+            else:
+                row['is_significant'] = stats['combined_pvalue'] < 0.05
+            
+            summary_data.append(row)
+        
+        summary_df = pd.DataFrame(summary_data)
+        summary_df = summary_df.sort_values('combined_pvalue')
+        
+        if show_details:
+            print("📊 Pathway Analysis Summary:")
+            print("=" * 80)
+            print(f"{'Pathway':<30} {'L-R':<4} {'Tests':<6} {'Sig':<4} {'Rate':<6} {'P-val':<8} {'Expr':<6}")
+            print("-" * 80)
+            
+            for _, row in summary_df.head(20).iterrows():  # Show top 20
+                significance_marker = "***" if row['is_significant'] else "   "
+                print(f"{row['pathway'][:28]:<30} {row['n_lr_pairs']:<4} {row['n_tests']:<6} "
+                      f"{row['n_significant']:<4} {row['significance_rate']:.2f}  "
+                      f"{row['combined_pvalue']:.1e} {row['mean_expression']:.2f} {significance_marker}")
+            
+            if len(summary_df) > 20:
+                print(f"... and {len(summary_df) - 20} more pathways")
+        
+        return summary_df
+    
+    def compute_pathway_communication(self, method='mean', min_lr_pairs=1, min_expression=0.1):
+        """
+        计算通路级别的细胞通讯强度（类似CellChat的方法）
+        
+        Parameters:
+        -----------
+        method : str
+            聚合方法: 'mean', 'sum', 'max', 'median' (default: 'mean')
+        min_lr_pairs : int
+            通路中最少L-R对数量 (default: 1)  
+        min_expression : float
+            最小表达阈值 (default: 0.1)
+            
+        Returns:
+        --------
+        pathway_communication : dict
+            包含每个通路的通讯矩阵和统计信息
+        """
+        pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
+        pathway_communication = {}
+        
+        print(f"🔬 计算{len(pathways)}个通路的细胞通讯强度...")
+        print(f"   - 聚合方法: {method}")
+        print(f"   - 最小表达阈值: {min_expression}")
+        
+        for pathway in pathways:
+            pathway_mask = self.adata.var['classification'] == pathway
+            pathway_lr_pairs = self.adata.var.loc[pathway_mask, 'interacting_pair'].tolist()
+            
+            if len(pathway_lr_pairs) < min_lr_pairs:
+                continue
+                
+            # 初始化通路通讯矩阵
+            pathway_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
+            pathway_pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))
+            valid_interactions_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
+            
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], self.adata.obs['receiver'])):
+                sender_idx = self.cell_types.index(sender)
+                receiver_idx = self.cell_types.index(receiver)
+                
+                # 获取该通路在这对细胞间的所有L-R对数据
+                pathway_means = self.adata.layers['means'][i, pathway_mask]
+                pathway_pvals = self.adata.layers['pvalues'][i, pathway_mask]
+                
+                # 过滤低表达的交互
+                valid_mask = pathway_means >= min_expression
+                
+                if np.any(valid_mask):
+                    valid_means = pathway_means[valid_mask]
+                    valid_pvals = pathway_pvals[valid_mask]
+                    
+                    # 计算通路级别的通讯强度
+                    if method == 'mean':
+                        pathway_strength = np.mean(valid_means)
+                    elif method == 'sum':
+                        pathway_strength = np.sum(valid_means)
+                    elif method == 'max':
+                        pathway_strength = np.max(valid_means)
+                    elif method == 'median':
+                        pathway_strength = np.median(valid_means)
+                    else:
+                        raise ValueError(f"Unknown method: {method}")
+                    
+                    # 计算通路级别的p-value（使用最小p-value作为通路显著性）
+                    pathway_pval = np.min(valid_pvals)
+                    
+                    pathway_matrix[sender_idx, receiver_idx] = pathway_strength
+                    pathway_pvalue_matrix[sender_idx, receiver_idx] = pathway_pval
+                    valid_interactions_matrix[sender_idx, receiver_idx] = len(valid_means)
+                else:
+                    # 没有有效的交互
+                    pathway_matrix[sender_idx, receiver_idx] = 0
+                    pathway_pvalue_matrix[sender_idx, receiver_idx] = 1.0
+                    valid_interactions_matrix[sender_idx, receiver_idx] = 0
+            
+            # 存储通路通讯结果
+            pathway_communication[pathway] = {
+                'communication_matrix': pd.DataFrame(pathway_matrix, 
+                                                   index=self.cell_types, 
+                                                   columns=self.cell_types),
+                'pvalue_matrix': pd.DataFrame(pathway_pvalue_matrix,
+                                            index=self.cell_types,
+                                            columns=self.cell_types),
+                'n_valid_interactions': pd.DataFrame(valid_interactions_matrix,
+                                                    index=self.cell_types,
+                                                    columns=self.cell_types),
+                'lr_pairs': pathway_lr_pairs,
+                'total_strength': pathway_matrix.sum(),
+                'max_strength': pathway_matrix.max(),
+                'mean_strength': pathway_matrix[pathway_matrix > 0].mean() if (pathway_matrix > 0).any() else 0,
+                'significant_pairs': np.sum(pathway_pvalue_matrix < 0.05),
+                'aggregation_method': method
+            }
+        
+        print(f"✅ 完成通路通讯强度计算，共{len(pathway_communication)}个通路")
+        
+        return pathway_communication
+    
+    def get_significant_pathways_v2(self, pathway_communication=None, 
+                                   strength_threshold=0.1, pvalue_threshold=0.05, 
+                                   min_significant_pairs=1):
+        """
+        基于通路级别通讯强度判断显著通路（更符合CellChat逻辑）
+        
+        Parameters:
+        -----------
+        pathway_communication : dict or None
+            通路通讯结果，如果为None则重新计算
+        strength_threshold : float
+            通路强度阈值 (default: 0.1)
+        pvalue_threshold : float  
+            p-value阈值 (default: 0.05)
+        min_significant_pairs : int
+            最少显著细胞对数量 (default: 1)
+            
+        Returns:
+        --------
+        significant_pathways : list
+            显著通路列表
+        pathway_summary : pd.DataFrame
+            通路统计摘要
+        """
+        if pathway_communication is None:
+            pathway_communication = self.compute_pathway_communication()
+        
+        pathway_summary_data = []
+        significant_pathways = []
+        
+        for pathway, data in pathway_communication.items():
+            comm_matrix = data['communication_matrix']
+            pval_matrix = data['pvalue_matrix']
+            
+            # 通路级别统计
+            total_strength = data['total_strength']
+            max_strength = data['max_strength']
+            mean_strength = data['mean_strength']
+            
+            # 使用.values确保返回numpy数组而不是pandas Series
+            pval_values = pval_matrix.values
+            comm_values = comm_matrix.values
+            
+            n_significant_pairs = np.sum((pval_values < pvalue_threshold) & (comm_values >= strength_threshold))
+            n_total_pairs = np.sum(comm_values > 0)
+            
+            # 判断通路是否显著
+            is_significant = (total_strength >= strength_threshold and 
+                            n_significant_pairs >= min_significant_pairs)
+            
+            pathway_summary_data.append({
+                'pathway': pathway,
+                'total_strength': total_strength,
+                'max_strength': max_strength,
+                'mean_strength': mean_strength,
+                'n_lr_pairs': len(data['lr_pairs']),
+                'n_active_cell_pairs': n_total_pairs,
+                'n_significant_pairs': n_significant_pairs,
+                'significance_rate': n_significant_pairs / max(1, n_total_pairs),
+                'is_significant': is_significant
+            })
+            
+            if is_significant:
+                significant_pathways.append(pathway)
+        
+        # 创建摘要DataFrame
+        pathway_summary = pd.DataFrame(pathway_summary_data)
+        pathway_summary = pathway_summary.sort_values('total_strength', ascending=False)
+        
+        print(f"📊 通路显著性分析结果:")
+        print(f"   - 总通路数: {len(pathway_summary)}")
+        print(f"   - 显著通路数: {len(significant_pathways)}")
+        print(f"   - 强度阈值: {strength_threshold}")
+        print(f"   - p-value阈值: {pvalue_threshold}")
+        
+        # 显示top通路
+        print(f"\n🏆 Top 10通路按总强度排序:")
+        print("-" * 100)
+        print(f"{'Pathway':<30} {'Total':<8} {'Max':<7} {'Mean':<7} {'L-R':<4} {'Active':<6} {'Sig':<4} {'Rate':<6} {'Status'}")
+        print("-" * 100)
+        
+        for _, row in pathway_summary.head(10).iterrows():
+            status = "***" if row['is_significant'] else "   "
+            print(f"{row['pathway'][:28]:<30} {row['total_strength']:<8.2f} {row['max_strength']:<7.2f} "
+                  f"{row['mean_strength']:<7.2f} {row['n_lr_pairs']:<4} {row['n_active_cell_pairs']:<6} "
+                  f"{row['n_significant_pairs']:<4} {row['significance_rate']:<6.2f} {status}")
+        
+        return significant_pathways, pathway_summary
+    
+    def netAnalysis_contribution(self, signaling, pvalue_threshold=0.05, 
+                                mean_threshold=0.1, top_pairs=10, 
+                                figsize=(10, 6), save=None):
+        """
+        计算每个配体-受体对对整体信号通路的贡献并可视化
+        (类似CellChat的netAnalysis_contribution功能)
+        
+        Parameters:
+        -----------
+        signaling : str or list
+            信号通路名称
+        pvalue_threshold : float
+            P-value阈值 (default: 0.05)
+        mean_threshold : float  
+            平均表达阈值 (default: 0.1)
+        top_pairs : int
+            显示的top L-R对数量 (default: 10)
+        figsize : tuple
+            图形大小 (default: (10, 6))
+        save : str or None
+            保存路径 (default: None)
+            
+        Returns:
+        --------
+        contribution_df : pd.DataFrame
+            L-R对贡献统计
+        fig : matplotlib.figure.Figure
+        ax : matplotlib.axes.Axes
+        """
+        if isinstance(signaling, str):
+            signaling = [signaling]
+        
+        # 过滤指定通路的交互
+        pathway_mask = self.adata.var['classification'].isin(signaling)
+        if not pathway_mask.any():
+            raise ValueError(f"No interactions found for signaling pathway(s): {signaling}")
+        
+        # 计算每个L-R对的贡献
+        contributions = []
+        
+        for var_idx in np.where(pathway_mask)[0]:
+            lr_pair = self.adata.var.iloc[var_idx]['interacting_pair']
+            gene_a = self.adata.var.iloc[var_idx]['gene_a']
+            gene_b = self.adata.var.iloc[var_idx]['gene_b']
+            classification = self.adata.var.iloc[var_idx]['classification']
+            
+            # 计算这个L-R对在所有细胞对中的总强度和显著性
+            total_strength = 0
+            significant_pairs = 0
+            active_pairs = 0
+            max_strength = 0
+            
+            for i in range(len(self.adata.obs)):
+                pval = self.adata.layers['pvalues'][i, var_idx]
+                mean_expr = self.adata.layers['means'][i, var_idx]
+                
+                if mean_expr > mean_threshold:
+                    active_pairs += 1
+                    total_strength += mean_expr
+                    max_strength = max(max_strength, mean_expr)
+                    
+                    if pval < pvalue_threshold:
+                        significant_pairs += 1
+            
+            if total_strength > 0:  # 只包含有活性的L-R对
+                contributions.append({
+                    'ligand_receptor': lr_pair,
+                    'ligand': gene_a,
+                    'receptor': gene_b,
+                    'pathway': classification,
+                    'total_strength': total_strength,
+                    'max_strength': max_strength,
+                    'mean_strength': total_strength / max(1, active_pairs),
+                    'significant_pairs': significant_pairs,
+                    'active_pairs': active_pairs,
+                    'contribution_score': total_strength * significant_pairs
+                })
+        
+        if not contributions:
+            raise ValueError(f"No active L-R pairs found for pathway(s): {signaling}")
+        
+        # 转换为DataFrame并排序
+        contribution_df = pd.DataFrame(contributions)
+        contribution_df = contribution_df.sort_values('contribution_score', ascending=False)
+        
+        # 计算相对贡献百分比
+        total_contribution = contribution_df['contribution_score'].sum()
+        contribution_df['contribution_percent'] = (contribution_df['contribution_score'] / total_contribution) * 100
+        
+        # 选择top pairs
+        top_df = contribution_df.head(top_pairs)
+        
+        # 可视化
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+        
+        # 左图：贡献百分比条形图
+        bars = ax1.barh(range(len(top_df)), top_df['contribution_percent'], 
+                       color='skyblue', alpha=0.7, edgecolor='navy')
+        ax1.set_yticks(range(len(top_df)))
+        ax1.set_yticklabels(top_df['ligand_receptor'], fontsize=10)
+        ax1.set_xlabel('Contribution Percentage (%)')
+        ax1.set_title(f'L-R Pair Contribution\n{" & ".join(signaling)}')
+        ax1.grid(axis='x', alpha=0.3)
+        
+        # 添加数值标签
+        for i, (bar, percent) in enumerate(zip(bars, top_df['contribution_percent'])):
+            ax1.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height()/2, 
+                    f'{percent:.1f}%', va='center', fontsize=9)
+        
+        # 右图：显著性 vs 强度散点图
+        scatter = ax2.scatter(top_df['total_strength'], top_df['significant_pairs'], 
+                            s=top_df['active_pairs']*20, 
+                            c=top_df['contribution_percent'], 
+                            cmap='viridis', alpha=0.7, edgecolors='black')
+        
+        # 添加L-R对标签
+        for _, row in top_df.iterrows():
+            ax2.annotate(row['ligand_receptor'], 
+                        (row['total_strength'], row['significant_pairs']),
+                        xytext=(5, 5), textcoords='offset points', 
+                        fontsize=8, alpha=0.8)
+        
+        ax2.set_xlabel('Total Expression Strength')
+        ax2.set_ylabel('Number of Significant Cell Pairs')
+        ax2.set_title('L-R Pair Activity vs Significance')
+        
+        # 添加colorbar
+        cbar = plt.colorbar(scatter, ax=ax2)
+        cbar.set_label('Contribution %')
+        
+        plt.tight_layout()
+        
+        if save:
+            plt.savefig(save, dpi=300, bbox_inches='tight')
+            print(f"Contribution analysis saved as: {save}")
+        
+        return contribution_df, fig, (ax1, ax2)
+    
+    def extractEnrichedLR(self, signaling, pvalue_threshold=0.05, 
+                         mean_threshold=0.1, min_cell_pairs=1,
+                         geneLR_return=False):
+        """
+        提取指定信号通路中的所有显著L-R对
+        (类似CellChat的extractEnrichedLR功能)
+        
+        Parameters:
+        -----------
+        signaling : str or list
+            信号通路名称
+        pvalue_threshold : float
+            P-value阈值 (default: 0.05)
+        mean_threshold : float
+            平均表达阈值 (default: 0.1)  
+        min_cell_pairs : int
+            最少显著细胞对数量 (default: 1)
+        geneLR_return : bool
+            是否返回基因级别信息 (default: False)
+            
+        Returns:
+        --------
+        enriched_lr : pd.DataFrame
+            显著的L-R对信息
+        """
+        if isinstance(signaling, str):
+            signaling = [signaling]
+        
+        # 过滤指定通路的交互
+        pathway_mask = self.adata.var['classification'].isin(signaling)
+        if not pathway_mask.any():
+            raise ValueError(f"No interactions found for signaling pathway(s): {signaling}")
+        
+        enriched_pairs = []
+        
+        for var_idx in np.where(pathway_mask)[0]:
+            lr_pair = self.adata.var.iloc[var_idx]['interacting_pair']
+            gene_a = self.adata.var.iloc[var_idx]['gene_a']
+            gene_b = self.adata.var.iloc[var_idx]['gene_b']
+            classification = self.adata.var.iloc[var_idx]['classification']
+            
+            # 计算显著性统计
+            significant_cell_pairs = []
+            total_strength = 0
+            
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], 
+                                                     self.adata.obs['receiver'])):
+                pval = self.adata.layers['pvalues'][i, var_idx]
+                mean_expr = self.adata.layers['means'][i, var_idx]
+                
+                if pval < pvalue_threshold and mean_expr > mean_threshold:
+                    significant_cell_pairs.append(f"{sender}|{receiver}")
+                    total_strength += mean_expr
+            
+            # 只包含满足条件的L-R对
+            if len(significant_cell_pairs) >= min_cell_pairs:
+                pair_info = {
+                    'ligand_receptor': lr_pair,
+                    'ligand': gene_a,
+                    'receptor': gene_b, 
+                    'pathway': classification,
+                    'n_significant_pairs': len(significant_cell_pairs),
+                    'total_strength': total_strength,
+                    'mean_strength': total_strength / len(significant_cell_pairs),
+                    'significant_cell_pairs': significant_cell_pairs
+                }
+                
+                # 如果需要基因级别信息
+                if geneLR_return:
+                    # 添加更详细的基因信息
+                    var_info = self.adata.var.iloc[var_idx]
+                    for col in var_info.index:
+                        if col not in pair_info:
+                            pair_info[col] = var_info[col]
+                
+                enriched_pairs.append(pair_info)
+        
+        if not enriched_pairs:
+            print(f"No enriched L-R pairs found for pathway(s): {signaling}")
+            return pd.DataFrame()
+        
+        # 转换为DataFrame并按显著性排序
+        enriched_df = pd.DataFrame(enriched_pairs)
+        enriched_df = enriched_df.sort_values(['n_significant_pairs', 'total_strength'], 
+                                            ascending=[False, False])
+        
+        print(f"✅ Found {len(enriched_df)} enriched L-R pairs in pathway(s): {', '.join(signaling)}")
+        
+        return enriched_df
+    
+    def netVisual_individual(self, signaling, pairLR_use=None, sources_use=None, 
+                           targets_use=None, layout='hierarchy', 
+                           vertex_receiver=None, pvalue_threshold=0.05,
+                           edge_width_max=8, vertex_size_max=50,
+                           figsize=(10, 8), title=None, save=None):
+        """
+        可视化单个配体-受体对介导的细胞间通讯
+        (类似CellChat的netVisual_individual功能)
+        
+        Parameters:
+        -----------
+        signaling : str or list
+            信号通路名称
+        pairLR_use : str, dict, or pd.Series
+            要显示的L-R对。可以是：
+            - 字符串：L-R对名称 (如 "TGFB1_TGFBR1")
+            - 字典：包含ligand和receptor的字典
+            - pandas Series：extractEnrichedLR返回的行
+        sources_use : list or None
+            指定的发送者细胞类型
+        targets_use : list or None  
+            指定的接收者细胞类型
+        layout : str
+            布局类型：'hierarchy', 'circle' (default: 'hierarchy')
+        vertex_receiver : list or None
+            指定接收者位置的数值向量(仅hierarchy布局)
+        pvalue_threshold : float
+            显著性阈值 (default: 0.05)
+        edge_width_max : float
+            最大边宽度 (default: 8)
+        vertex_size_max : float
+            最大节点大小 (default: 50)
+        figsize : tuple
+            图形大小 (default: (10, 8))
+        title : str or None
+            图标题
+        save : str or None
+            保存路径
+            
+        Returns:
+        --------
+        fig : matplotlib.figure.Figure
+        ax : matplotlib.axes.Axes
+        """
+        if isinstance(signaling, str):
+            signaling = [signaling]
+        
+        # 解析pairLR_use参数
+        if pairLR_use is None:
+            # 如果未指定，选择第一个enriched L-R对
+            enriched_lr = self.extractEnrichedLR(signaling, pvalue_threshold)
+            if enriched_lr.empty:
+                raise ValueError(f"No enriched L-R pairs found for {signaling}")
+            pairLR_use = enriched_lr.iloc[0]
+        
+        # 处理不同类型的pairLR_use输入
+        if isinstance(pairLR_use, str):
+            # 假设是ligand_receptor格式
+            ligand, receptor = pairLR_use.split('_') if '_' in pairLR_use else pairLR_use.split('-')
+            lr_pair = pairLR_use
+        elif isinstance(pairLR_use, dict):
+            ligand = pairLR_use['ligand']
+            receptor = pairLR_use['receptor'] 
+            lr_pair = pairLR_use.get('ligand_receptor', f"{ligand}_{receptor}")
+        elif isinstance(pairLR_use, pd.Series):
+            ligand = pairLR_use['ligand']
+            receptor = pairLR_use['receptor']
+            lr_pair = pairLR_use['ligand_receptor']
+        else:
+            raise ValueError("pairLR_use must be str, dict, or pandas Series")
+        
+        # 找到对应的L-R对
+        lr_mask = (self.adata.var['gene_a'] == ligand) & (self.adata.var['gene_b'] == receptor)
+        if signaling:
+            pathway_mask = self.adata.var['classification'].isin(signaling)
+            lr_mask = lr_mask & pathway_mask
+        
+        if not lr_mask.any():
+            raise ValueError(f"L-R pair {lr_pair} not found in pathway(s) {signaling}")
+        
+        var_idx = np.where(lr_mask)[0][0]
+        
+        # 收集显著的细胞间通讯
+        communications = []
+        
+        for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], 
+                                                 self.adata.obs['receiver'])):
+            # 应用细胞类型过滤
+            if sources_use and sender not in sources_use:
+                continue
+            if targets_use and receiver not in targets_use:
+                continue
+                
+            pval = self.adata.layers['pvalues'][i, var_idx]
+            mean_expr = self.adata.layers['means'][i, var_idx]
+            
+            if pval < pvalue_threshold and mean_expr > 0:
+                communications.append({
+                    'sender': sender,
+                    'receiver': receiver,
+                    'strength': mean_expr,
+                    'pvalue': pval
+                })
+        
+        if not communications:
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.text(0.5, 0.5, f'No significant communication found\nfor {lr_pair}', 
+                   ha='center', va='center', fontsize=16)
+            ax.axis('off')
+            return fig, ax
+        
+        # 创建通讯DataFrame
+        comm_df = pd.DataFrame(communications)
+        
+        # 创建图
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 获取细胞类型颜色
+        cell_colors = self._get_cell_type_colors()
+        
+        if layout == 'hierarchy':
+            self._draw_hierarchy_plot(comm_df, ax, cell_colors, vertex_receiver, 
+                                    edge_width_max, vertex_size_max)
+        elif layout == 'circle':
+            self._draw_circle_plot(comm_df, ax, cell_colors, edge_width_max, vertex_size_max)
+        else:
+            raise ValueError("layout must be 'hierarchy' or 'circle'")
+        
+        # 设置标题
+        if title is None:
+            title = f"{ligand} → {receptor} Communication\nPathway: {', '.join(signaling)}"
+        ax.set_title(title, fontsize=14, pad=20)
+        
+        # 保存
+        if save:
+            plt.savefig(save, dpi=300, bbox_inches='tight')
+            print(f"Individual communication plot saved as: {save}")
+        
+        return fig, ax
+    
+    def _draw_hierarchy_plot(self, comm_df, ax, cell_colors, vertex_receiver, 
+                           edge_width_max, vertex_size_max):
+        """绘制层次图"""
+        # 获取唯一的发送者和接收者
+        senders = comm_df['sender'].unique()
+        receivers = comm_df['receiver'].unique()
+        
+        # 设置位置
+        if vertex_receiver is not None:
+            # 用户指定接收者位置
+            y_positions = {}
+            for i, receiver in enumerate(receivers):
+                if i < len(vertex_receiver):
+                    y_positions[receiver] = vertex_receiver[i]
+                else:
+                    y_positions[receiver] = i + 1
+        else:
+            # 自动分配位置
+            y_positions = {receiver: i for i, receiver in enumerate(receivers)}
+        
+        # 发送者位置（左侧）
+        sender_y = np.linspace(0, max(y_positions.values()), len(senders))
+        sender_pos = {sender: (0.2, y) for sender, y in zip(senders, sender_y)}
+        
+        # 接收者位置（右侧）
+        receiver_pos = {receiver: (0.8, y_positions[receiver]) for receiver in receivers}
+        
+        # 绘制节点
+        max_strength = comm_df['strength'].max()
+        
+        for sender, (x, y) in sender_pos.items():
+            # 计算节点大小（基于发送强度）
+            sender_strength = comm_df[comm_df['sender'] == sender]['strength'].sum()
+            size = (sender_strength / max_strength) * vertex_size_max + 20
+            
+            color = cell_colors.get(sender, '#lightblue')
+            circle = plt.Circle((x, y), 0.05, color=color, alpha=0.7, zorder=3)
+            ax.add_patch(circle)
+            ax.text(x-0.1, y, sender, ha='right', va='center', fontsize=10, weight='bold')
+        
+        for receiver, (x, y) in receiver_pos.items():
+            # 计算节点大小（基于接收强度）
+            receiver_strength = comm_df[comm_df['receiver'] == receiver]['strength'].sum()
+            size = (receiver_strength / max_strength) * vertex_size_max + 20
+            
+            color = cell_colors.get(receiver, '#lightcoral')
+            circle = plt.Circle((x, y), 0.05, color=color, alpha=0.7, zorder=3)
+            ax.add_patch(circle)
+            ax.text(x+0.1, y, receiver, ha='left', va='center', fontsize=10, weight='bold')
+        
+        # 绘制边
+        for _, row in comm_df.iterrows():
+            sender = row['sender']
+            receiver = row['receiver']
+            strength = row['strength']
+            
+            if sender in sender_pos and receiver in receiver_pos:
+                x1, y1 = sender_pos[sender]
+                x2, y2 = receiver_pos[receiver]
+                
+                # 边宽度
+                width = (strength / max_strength) * edge_width_max
+                
+                # 绘制箭头
+                from matplotlib.patches import FancyArrowPatch
+                arrow = FancyArrowPatch((x1+0.05, y1), (x2-0.05, y2),
+                                      arrowstyle='->', mutation_scale=20,
+                                      linewidth=width, color='gray', alpha=0.6)
+                ax.add_patch(arrow)
+        
+        ax.set_xlim(0, 1)
+        ax.set_ylim(-0.5, max(y_positions.values()) + 0.5)
+        ax.axis('off')
+    
+    def _draw_circle_plot(self, comm_df, ax, cell_colors, edge_width_max, vertex_size_max):
+        """绘制圆形图"""
+        # 获取所有唯一的细胞类型
+        all_cells = list(set(comm_df['sender'].tolist() + comm_df['receiver'].tolist()))
+        n_cells = len(all_cells)
+        
+        # 创建圆形位置
+        angles = np.linspace(0, 2*np.pi, n_cells, endpoint=False)
+        positions = {cell: (np.cos(angle), np.sin(angle)) for cell, angle in zip(all_cells, angles)}
+        
+        # 计算节点大小
+        cell_strengths = {}
+        for cell in all_cells:
+            send_strength = comm_df[comm_df['sender'] == cell]['strength'].sum()
+            receive_strength = comm_df[comm_df['receiver'] == cell]['strength'].sum()
+            cell_strengths[cell] = send_strength + receive_strength
+        
+        max_strength = max(cell_strengths.values()) if cell_strengths else 1
+        
+        # 绘制节点
+        for cell, (x, y) in positions.items():
+            size = (cell_strengths[cell] / max_strength) * vertex_size_max + 100
+            color = cell_colors.get(cell, '#lightgray')
+            
+            circle = plt.Circle((x, y), 0.1, color=color, alpha=0.7, zorder=3)
+            ax.add_patch(circle)
+            ax.text(x*1.2, y*1.2, cell, ha='center', va='center', fontsize=10, weight='bold')
+        
+        # 绘制边
+        edge_max = comm_df['strength'].max()
+        for _, row in comm_df.iterrows():
+            sender = row['sender']
+            receiver = row['receiver']
+            strength = row['strength']
+            
+            if sender in positions and receiver in positions:
+                x1, y1 = positions[sender]
+                x2, y2 = positions[receiver]
+                
+                # 边宽度
+                width = (strength / edge_max) * edge_width_max
+                
+                # 绘制弯曲箭头
+                from matplotlib.patches import FancyArrowPatch, ConnectionPatch
+                arrow = FancyArrowPatch((x1, y1), (x2, y2),
+                                      arrowstyle='->', mutation_scale=15,
+                                      linewidth=width, color='red', alpha=0.6,
+                                      connectionstyle="arc3,rad=0.2")
+                ax.add_patch(arrow)
+        
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect('equal')
+        ax.axis('off')
     

@@ -16,6 +16,7 @@ from ._enum import ModeEnum
 from scipy.sparse import diags, issparse, spmatrix, csr_matrix, isspmatrix_csr
 import warnings
 from scipy.stats import norm
+from .._settings import Colors  # Import Colors from settings
 
 
 def read(path,**kwargs):
@@ -650,16 +651,51 @@ class easter_egg(object):
     def O(self):
         print('尊嘟假嘟')
 
-def save(file,path):
-    import pickle
-    with open(path, 'wb') as f:
-        pickle.dump(file, f)
+
+def save(file, path):
+    """Save object to file using pickle or cloudpickle."""
+    print(f"{Colors.HEADER}{Colors.BOLD}💾 Save Operation:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Target path: {Colors.BOLD}{path}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Object type: {Colors.BOLD}{type(file).__name__}{Colors.ENDC}")
+    
+    try:
+        import pickle
+        print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
+        with open(path, 'wb') as f:
+            pickle.dump(file, f)
+        print(f"   {Colors.GREEN}✅ Successfully saved!{Colors.ENDC}")
+    except:
+        import cloudpickle
+        print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
+        with open(path, 'wb') as f:
+            cloudpickle.dump(file, f)
+        print(f"   {Colors.GREEN}✅ Successfully saved using cloudpickle!{Colors.ENDC}")
+    print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
 def load(path):
-    import pickle
-    with open(path, 'rb') as f:
-        return pickle.load(f)
+    """Load object from file using pickle or cloudpickle."""
+    print(f"{Colors.HEADER}{Colors.BOLD}📂 Load Operation:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Source path: {Colors.BOLD}{path}{Colors.ENDC}")
     
+    try:
+        import pickle
+        print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+        print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+        return data
+    except:
+        import cloudpickle
+        print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
+        with open(path, 'rb') as f:
+            data = cloudpickle.load(f)
+        print(f"   {Colors.GREEN}✅ Successfully loaded using cloudpickle!{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+        return data
+
 
 import os
 import requests
