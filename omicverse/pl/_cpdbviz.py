@@ -3974,14 +3974,71 @@ class CellChatViz:
                 h.add_layer(high_mark)
             except Exception as e:
                 print(f"Warning: Could not add high expression layer: {e}")
+
         
-        # 4. 细胞类型标签 - 基于您的参考代码
+        
+        # 4. 细胞类型颜色条和标签 - 添加mp.Colors显示发送者细胞类型颜色
+        # 解析细胞交互标签中的细胞类型信息（格式：sender→receiver）
+        cell_colors = self._get_cell_type_colors()
+        
+        # 为每个交互对创建发送者颜色映射
+        sender_colors = []
+        sender_names_list=[]
+        
+        
+        #h.add_left(sender_color_bar, size=0.3, pad=0.05)
+
+        if transpose:
+            for interaction in pivot_mean.columns:
+                if '→' in str(interaction):
+                    # 解析发送者和接收者
+                    sender, receiver = str(interaction).split('→', 1)
+                    sender = sender.strip()
+                    
+                    # 获取发送者对应的颜色
+                    sender_color = cell_colors.get(sender, '#CCCCCC')
+                    sender_colors.append(sender_color)
+                    sender_names_list.append(sender)
+
+                else:
+                    # 如果不是标准格式，使用默认颜色
+                    sender_colors.append('#CCCCCC')
+                    sender_names_list.append(interaction)
+            
+            # 添加发送者颜色条
+            show_palette=dict(zip(sender_names_list,sender_colors))
+            sender_color_bar = mp.Colors(sender_names_list,palette=show_palette)
+
+
+            h.add_bottom(sender_color_bar, pad=0.05,size=0.15)
+        else:
+            for interaction in pivot_mean.index:
+                if '→' in str(interaction):
+                    # 解析发送者和接收者
+                    sender, receiver = str(interaction).split('→', 1)
+                    sender = sender.strip()
+                    
+                    # 获取发送者对应的颜色
+                    sender_color = cell_colors.get(sender, '#CCCCCC')
+                    sender_colors.append(sender_color)
+                    sender_names_list.append(sender)
+                else:
+                    # 如果不是标准格式，使用默认颜色
+                    sender_colors.append('#CCCCCC')
+                    sender_names_list.append(interaction)
+            
+            # 添加发送者颜色条
+            show_palette=dict(zip(sender_names_list,sender_colors))
+            sender_color_bar = mp.Colors(sender_names_list,palette=show_palette)
+            h.add_left(sender_color_bar, size=0.15, pad=0.05)
+        # 添加细胞交互标签
         cell_interaction_labels = mp.Labels(
             pivot_mean.index, 
             align="center",
             fontsize=font_size
         )
-        h.add_left(cell_interaction_labels)
+        
+        h.add_left(cell_interaction_labels, pad=0.05)
         
         # 5. 配体-受体对或通路标签 - 基于您的参考代码
         lr_pathway_labels = mp.Labels(
@@ -4402,6 +4459,7 @@ class CellChatViz:
                            edgecolors='black', linewidths=0.5)
         
         # 添加细胞类型标签
+        
         try:
             from adjustText import adjust_text
             
@@ -4453,6 +4511,561 @@ class CellChatViz:
             print(f"2D signaling role plot saved as: {save}")
         
         return fig, ax
+    
+    def netAnalysis_signalingRole_heatmap(self, pattern="outgoing", signaling=None, 
+                                        row_scale=True, figsize=(12, 8), 
+                                        cmap='RdYlBu_r', show_totals=True,
+                                        title=None, save=None):
+        """
+        创建热图分析细胞群的信号传导角色（传出或传入信号贡献）
+        使用marsilea实现现代化的热图可视化
+        
+        Parameters:
+        -----------
+        pattern : str
+            'outgoing' for outgoing signaling or 'incoming' for incoming signaling
+        signaling : str, list or None
+            特定信号通路名称，如果为None则分析所有通路
+        row_scale : bool
+            是否对行进行标准化（显示相对信号强度）
+        figsize : tuple
+            图形大小
+        cmap : str
+            热图颜色映射
+        show_totals : bool
+            是否显示总信号强度的条形图
+        title : str or None
+            图形标题
+        save : str or None
+            保存路径
+            
+        Returns:
+        --------
+        h : marsilea plot object
+        axes : list containing marsilea object (for compatibility)
+        signaling_matrix : pandas.DataFrame
+            信号强度矩阵
+        """
+        # 使用新的marsilea实现替换旧的matplotlib实现
+        h, df = self.netVisual_signaling_heatmap(
+            pattern=pattern,
+            signaling=signaling,
+            min_threshold=0.0,
+            cmap=cmap,
+            figsize=figsize,
+            show_bars=show_totals,
+            show_colors=True,
+            fontsize=10,
+            title=title,
+            save=save
+        )
+        
+        # 如果需要行标准化，重新处理数据
+        if row_scale:
+            from scipy.stats import zscore
+            import pandas as pd
+            import marsilea as ma
+            import marsilea.plotter as mp
+            
+            # 获取原始信号矩阵并进行z-score标准化
+            cell_matrix = self.get_signaling_matrix(
+                level="cell_type", 
+                pattern=pattern, 
+                signaling=signaling
+            )
+            
+            df_raw = cell_matrix.T  # 转置：通路 x 细胞类型
+            df_scaled = df_raw.apply(zscore, axis=1).fillna(0)
+            
+            # 重新创建标准化的热图
+            cell_colors = self._get_cell_type_colors()
+            colors = [cell_colors.get(ct, '#1f77b4') for ct in df_scaled.columns]
+            
+            h = ma.Heatmap(df_scaled, linewidth=1, width=figsize[0], height=figsize[1], cmap=cmap)
+            h.add_left(mp.Labels(df_scaled.index, fontsize=10), pad=0.1)
+            h.add_bottom(mp.Colors(df_scaled.columns, palette=cell_colors), size=0.15, pad=0.02)
+            h.add_bottom(mp.Labels(df_scaled.columns, fontsize=10), pad=0.1)
+            
+            if show_totals:
+                h.add_right(mp.Bar(df_raw.mean(axis=1), color='#c2c2c2'), pad=0.1)
+                h.add_top(mp.Bar(df_raw.mean(axis=0), palette=colors), pad=0.1)
+            
+            if title:
+                h.add_title(title, fontsize=12, pad=0.02)
+            elif title is None:
+                direction = "Outgoing" if pattern == "outgoing" else "Incoming"
+                h.add_title(f"{direction} Signaling Role Analysis", fontsize=12, pad=0.02)
+            
+            h.render()
+            
+            if save:
+                h.fig.savefig(save, dpi=300, bbox_inches='tight')
+                print(f"Signaling role heatmap saved as: {save}")
+            
+            df = df_scaled
+        
+        # 为了保持兼容性，返回类似原函数的结构
+        return h, [h], df
+    
+    def get_signaling_matrix(self, pattern="outgoing", signaling=None,
+                signaling = [signaling]
+            pathways = [p for p in signaling if p in all_pathways]
+            if not pathways:
+                raise ValueError(f"No valid signaling pathways found: {signaling}")
+        else:
+            pathways = all_pathways
+        
+        # 计算每个通路的信号强度矩阵
+        signaling_data = []
+        
+        for pathway in pathways:
+            # 筛选该通路的交互
+            pathway_mask = self.adata.var['classification'] == pathway
+            pathway_indices = np.where(pathway_mask)[0]
+            
+            if len(pathway_indices) == 0:
+                continue
+                
+            # 获取该通路的平均值矩阵
+            if 'means' in self.adata.layers:
+                means = self.adata.layers['means'][:, pathway_indices]
+            else:
+                means = self.adata.X[:, pathway_indices]
+            
+            # 计算每个细胞类型的信号强度
+            pathway_strength = {}
+            
+            for i, cell_type in enumerate(self.cell_types):
+                if pattern == "outgoing":
+                    # 传出信号：该细胞类型作为发送者的信号强度
+                    sender_mask = self.adata.obs['sender'] == cell_type
+                    if np.any(sender_mask):
+                        strength = np.mean(means[sender_mask, :])
+                    else:
+                        strength = 0
+                elif pattern == "incoming":
+                    # 传入信号：该细胞类型作为接收者的信号强度
+                    receiver_mask = self.adata.obs['receiver'] == cell_type
+                    if np.any(receiver_mask):
+                        strength = np.mean(means[receiver_mask, :])
+                    else:
+                        strength = 0
+                else:
+                    raise ValueError("pattern must be 'outgoing' or 'incoming'")
+                
+                pathway_strength[cell_type] = strength
+            
+            signaling_data.append({
+                'pathway': pathway,
+                **pathway_strength
+            })
+        
+        # 创建DataFrame
+        df = pd.DataFrame(signaling_data)
+        df = df.set_index('pathway')
+        # 行标准化（显示相对信号强度）
+        if row_scale:
+            df_scaled = df.apply(zscore, axis=1)
+            df_scaled = df_scaled.fillna(0)  # 处理标准差为0的情况
+        else:
+            df_scaled = df
+        
+        # 计算总信号强度
+        cell_totals = df.sum(axis=0)  # 每个细胞类型的总信号强度
+        pathway_totals = df.sum(axis=1)  # 每个通路的总信号强度
+        
+        # 创建图形
+        if show_totals:
+            fig = plt.figure(figsize=figsize)
+            
+            # 创建网格布局
+            gs = fig.add_gridspec(3, 3, height_ratios=[1, 0.05, 4], 
+                                width_ratios=[4, 0.05, 1], 
+                                hspace=0.05, wspace=0.05)
+            
+            # 顶部条形图（细胞类型总信号强度）
+            ax_top = fig.add_subplot(gs[0, 0])
+            cell_colors = self._get_cell_type_colors()
+            colors = [cell_colors.get(ct, '#1f77b4') for ct in cell_totals.index]
+            
+            bars = ax_top.bar(range(len(cell_totals)), cell_totals.values, color=colors)
+            ax_top.set_xlim(-0.5, len(cell_totals) - 0.5)
+            ax_top.set_xticks([])
+            ax_top.set_ylabel('Total\nStrength', fontsize=10)
+            ax_top.tick_params(axis='y', labelsize=8)
+            
+            # 主热图
+            ax_main = fig.add_subplot(gs[2, 0])
+            
+            # 右侧条形图（通路总信号强度）
+            ax_right = fig.add_subplot(gs[2, 2])
+            ax_right.barh(range(len(pathway_totals)), pathway_totals.values, 
+                         color='grey', alpha=0.7)
+            ax_right.set_ylim(-0.5, len(pathway_totals) - 0.5)
+            ax_right.set_yticks([])
+            ax_right.set_xlabel('Total\nStrength', fontsize=10)
+            ax_right.tick_params(axis='x', labelsize=8)
+            
+            axes = [ax_main, ax_top, ax_right]
+        else:
+            fig, ax_main = plt.subplots(figsize=figsize)
+            axes = [ax_main]
+        
+        # 绘制热图
+        im = ax_main.imshow(df_scaled.values, cmap=cmap, aspect='auto')
+        
+        # 设置坐标轴
+        ax_main.set_xticks(range(len(df_scaled.columns)))
+        ax_main.set_xticklabels(df_scaled.columns, rotation=45, ha='right')
+        ax_main.set_yticks(range(len(df_scaled.index)))
+        ax_main.set_yticklabels(df_scaled.index)
+        
+        # 添加颜色条
+        if show_totals:
+            cbar = plt.colorbar(im, ax=ax_main, fraction=0.046, pad=0.04)
+        else:
+            cbar = plt.colorbar(im, ax=ax_main)
+        
+        if row_scale:
+            cbar.set_label('Relative Signaling Strength\n(z-score)', rotation=270, labelpad=20)
+        else:
+            cbar.set_label('Signaling Strength', rotation=270, labelpad=20)
+        
+        # 设置标题
+        if title is None:
+            direction = "Outgoing" if pattern == "outgoing" else "Incoming"
+            title = f"{direction} Signaling Role Analysis"
+        
+        if show_totals:
+            fig.suptitle(title, fontsize=16, y=0.95)
+        else:
+            ax_main.set_title(title, fontsize=16, pad=20)
+        
+        # 调整布局
+        plt.tight_layout()
+        
+        # 保存图形
+        if save:
+            fig.savefig(save, dpi=300, bbox_inches='tight')
+            print(f"Signaling role heatmap saved as: {save}")
+        
+        return fig, axes, df
+    
+    def get_signaling_matrix(self, pattern="outgoing", signaling=None, 
+                           aggregation="mean", normalize=False, level="cell_type"):
+        """
+        获取信号强度矩阵
+        
+        Parameters:
+        -----------
+        pattern : str
+            'outgoing', 'incoming', or 'overall'
+        signaling : str, list or None
+            特定信号通路名称，如果为None则分析所有通路
+        aggregation : str
+            聚合方法: 'mean', 'sum', 'max'
+        normalize : bool
+            是否对每行进行归一化
+        level : str
+            'cell_type' for cell type level or 'cell' for individual cell level
+            
+        Returns:
+        --------
+        matrix_df : pandas.DataFrame
+            信号强度矩阵 (cell_type/cell x pathway)
+        """
+        import pandas as pd
+        
+        # 获取所有信号通路
+        if 'classification' not in self.adata.var.columns:
+            raise ValueError("'classification' column not found in adata.var")
+        
+        all_pathways = self.adata.var['classification'].unique()
+        
+        if signaling is not None:
+            if isinstance(signaling, str):
+                signaling = [signaling]
+            pathways = [p for p in signaling if p in all_pathways]
+            if not pathways:
+                raise ValueError(f"No valid signaling pathways found: {signaling}")
+        else:
+            pathways = all_pathways
+        
+        if level == "cell_type":
+            return self._get_celltype_signaling_matrix(pattern, pathways, aggregation, normalize)
+        elif level == "cell":
+            return self._get_cell_signaling_matrix(pattern, pathways, aggregation, normalize)
+        else:
+            raise ValueError("level must be 'cell_type' or 'cell'")
+    
+    def _get_celltype_signaling_matrix(self, pattern, pathways, aggregation, normalize):
+        """获取细胞类型级别的信号矩阵"""
+        import pandas as pd
+        
+        result_data = []
+        
+        for cell_type in self.cell_types:
+            cell_data = {'cell_type': cell_type}
+            
+            for pathway in pathways:
+                # 筛选该通路的交互
+                pathway_mask = self.adata.var['classification'] == pathway
+                pathway_indices = np.where(pathway_mask)[0]
+                
+                if len(pathway_indices) == 0:
+                    cell_data[pathway] = 0
+                    continue
+                
+                # 获取该通路的平均值矩阵
+                if 'means' in self.adata.layers:
+                    means = self.adata.layers['means'][:, pathway_indices]
+                else:
+                    means = self.adata.X[:, pathway_indices]
+                
+                # 根据模式计算信号强度
+                if pattern == "outgoing":
+                    mask = self.adata.obs['sender'] == cell_type
+                elif pattern == "incoming":
+                    mask = self.adata.obs['receiver'] == cell_type
+                elif pattern == "overall":
+                    mask = (self.adata.obs['sender'] == cell_type) | \
+                           (self.adata.obs['receiver'] == cell_type)
+                else:
+                    raise ValueError("pattern must be 'outgoing', 'incoming', or 'overall'")
+                
+                if np.any(mask):
+                    pathway_data = means[mask, :]
+                    
+                    if aggregation == "mean":
+                        strength = np.mean(pathway_data)
+                    elif aggregation == "sum":
+                        strength = np.sum(pathway_data)
+                    elif aggregation == "max":
+                        strength = np.max(pathway_data)
+                    else:
+                        raise ValueError("aggregation must be 'mean', 'sum', or 'max'")
+                else:
+                    strength = 0
+                
+                cell_data[pathway] = strength
+            
+            result_data.append(cell_data)
+        
+        # 创建DataFrame
+        matrix_df = pd.DataFrame(result_data)
+        matrix_df = matrix_df.set_index('cell_type')
+        
+        # 归一化
+        if normalize:
+            matrix_df = matrix_df.div(matrix_df.max(axis=1), axis=0).fillna(0)
+        
+        return matrix_df
+    
+    def _get_cell_signaling_matrix(self, pattern, pathways, aggregation, normalize):
+        """获取单个细胞级别的信号矩阵"""
+        import pandas as pd
+        
+        # 检查是否有细胞标识符
+        if 'cell_id' not in self.adata.obs.columns:
+            # 如果没有cell_id列，使用索引作为细胞标识符
+            if hasattr(self.adata.obs.index, 'name') and self.adata.obs.index.name:
+                cell_ids = self.adata.obs.index.tolist()
+            else:
+                cell_ids = [f"Cell_{i}" for i in range(len(self.adata.obs))]
+        else:
+            cell_ids = self.adata.obs['cell_id'].tolist()
+        
+        # 获取每个细胞的信号强度
+        result_data = []
+        
+        for i, cell_id in enumerate(cell_ids):
+            cell_data = {'cell_id': cell_id}
+            
+            # 获取该细胞的细胞类型
+            if pattern == "outgoing":
+                cell_type = self.adata.obs['sender'].iloc[i]
+            elif pattern == "incoming":
+                cell_type = self.adata.obs['receiver'].iloc[i]
+            else:
+                # 对于overall模式，我们需要考虑该细胞既可能是sender也可能是receiver
+                sender_type = self.adata.obs['sender'].iloc[i]
+                receiver_type = self.adata.obs['receiver'].iloc[i]
+                cell_type = f"{sender_type}-{receiver_type}"  # 组合标识
+            
+            cell_data['cell_type'] = cell_type
+            
+            for pathway in pathways:
+                # 筛选该通路的交互
+                pathway_mask = self.adata.var['classification'] == pathway
+                pathway_indices = np.where(pathway_mask)[0]
+                
+                if len(pathway_indices) == 0:
+                    cell_data[pathway] = 0
+                    continue
+                
+                # 获取该通路的信号强度
+                if 'means' in self.adata.layers:
+                    means = self.adata.layers['means'][i, pathway_indices]
+                else:
+                    means = self.adata.X[i, pathway_indices]
+                
+                # 根据聚合方法计算信号强度
+                if aggregation == "mean":
+                    strength = np.mean(means)
+                elif aggregation == "sum":
+                    strength = np.sum(means)
+                elif aggregation == "max":
+                    strength = np.max(means)
+                else:
+                    raise ValueError("aggregation must be 'mean', 'sum', or 'max'")
+                
+                cell_data[pathway] = strength
+            
+            result_data.append(cell_data)
+        
+        # 创建DataFrame
+        matrix_df = pd.DataFrame(result_data)
+        matrix_df = matrix_df.set_index('cell_id')
+        
+        # 归一化
+        if normalize:
+            # 只对信号通路列进行归一化
+            pathway_cols = [col for col in matrix_df.columns if col != 'cell_type']
+            matrix_df[pathway_cols] = matrix_df[pathway_cols].div(
+                matrix_df[pathway_cols].max(axis=1), axis=0
+            ).fillna(0)
+        
+        return matrix_df
+    
+    def netVisual_signaling_heatmap(self, pattern="incoming", signaling=None, 
+                                  min_threshold=0.1, cmap='Greens',
+                                  figsize=(4, 4), show_bars=True,
+                                  show_colors=True, fontsize=10, 
+                                  title=None, save=None):
+        """
+        使用marsilea创建信号通路热图，显示细胞类型的信号强度
+        
+        Parameters:
+        -----------
+        pattern : str
+            'outgoing', 'incoming', or 'overall'
+        signaling : str, list or None
+            特定信号通路名称，如果为None则分析所有通路
+        min_threshold : float
+            信号强度最小阈值，低于此值的通路将被过滤
+        cmap : str
+            热图颜色映射
+        figsize : tuple
+            图形大小 (width, height)
+        show_bars : bool
+            是否显示边缘条形图
+        show_colors : bool
+            是否显示细胞类型颜色条
+        fontsize : int
+            字体大小
+        title : str or None
+            图形标题
+        save : str or None
+            保存路径
+            
+        Returns:
+        --------
+        h : marsilea plot object
+        df : pandas.DataFrame
+            过滤后的信号强度矩阵
+        """
+        try:
+            import marsilea as ma
+            import marsilea.plotter as mp
+            import scanpy as sc
+        except ImportError:
+            raise ImportError("marsilea and scanpy packages are required. Please install them: pip install marsilea scanpy")
+        
+        # 获取信号矩阵 (细胞类型 x 信号通路)
+        cell_matrix = self.get_signaling_matrix(
+            level="cell_type", 
+            pattern=pattern, 
+            signaling=signaling
+        )
+        
+        # 创建AnnData对象用于筛选
+        ad_signal = sc.AnnData(cell_matrix)
+        ad_signal.var['mean'] = ad_signal.X.mean(axis=0)
+        ad_signal.var['min'] = ad_signal.X.min(axis=0)
+        
+        # 过滤低信号强度的通路
+        valid_pathways = ad_signal.var['min'][ad_signal.var['min'] > min_threshold].index
+        
+        if len(valid_pathways) == 0:
+            raise ValueError(f"No pathways found with minimum signal strength > {min_threshold}")
+        
+        # 获取过滤后的数据矩阵 (转置：通路 x 细胞类型)
+        df = ad_signal[:, valid_pathways].to_df().T
+        
+        # 获取细胞类型颜色
+        cell_colors = self._get_cell_type_colors()
+        colors = [cell_colors.get(ct, '#1f77b4') for ct in df.columns]
+        
+        # 创建主热图
+        h = ma.Heatmap(
+            df, 
+            linewidth=1,
+            width=figsize[0],
+            height=figsize[1],
+            cmap=cmap,
+        )
+        
+        # 添加通路标签（左侧）
+        h.add_left(mp.Labels(df.index, fontsize=fontsize), pad=0.1)
+        
+        # 添加细胞类型颜色条（底部）
+        if show_colors:
+            h.add_bottom(
+                mp.Colors(df.columns, palette=cell_colors), 
+                size=0.15, 
+                pad=0.02
+            )
+        
+        # 添加细胞类型标签（底部）
+        h.add_bottom(mp.Labels(df.columns, fontsize=fontsize), pad=0.1)
+        
+        # 添加边缘条形图
+        if show_bars:
+            # 右侧：每个通路的平均信号强度
+            h.add_right(
+                mp.Bar(df.mean(axis=1), color='#c2c2c2'), 
+                pad=0.1
+            )
+            
+            # 顶部：每个细胞类型的平均信号强度（使用细胞类型颜色）
+            h.add_top(
+                mp.Bar(df.mean(axis=0), palette=colors), 
+                pad=0.1
+            )
+        
+        # 添加标题
+        if title:
+            h.add_title(title, fontsize=fontsize + 2, pad=0.02)
+        elif title is None:
+            direction = {"outgoing": "Outgoing", "incoming": "Incoming", "overall": "Overall"}
+            auto_title = f"{direction.get(pattern, pattern.title())} Signaling Heatmap"
+            h.add_title(auto_title, fontsize=fontsize + 2, pad=0.02)
+        
+        # 渲染图形
+        h.render()
+        
+        # 保存图形
+        if save:
+            h.fig.savefig(save, dpi=300, bbox_inches='tight')
+            print(f"Signaling heatmap saved as: {save}")
+        
+        # 打印统计信息
+        print(f"📊 热图统计:")
+        print(f"   - 通路数量: {len(df.index)}")
+        print(f"   - 细胞类型数量: {len(df.columns)}")
+        print(f"   - 信号强度范围: {df.values.min():.3f} - {df.values.max():.3f}")
+        
+        return h, df
     
     def netAnalysis_contribution(self, signaling, group_celltype=None, 
                                sources=None, targets=None,
