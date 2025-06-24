@@ -371,3 +371,689 @@ def cpdb2cellchat(df):
     
     # 显示新的 DataFrame
     return new_df
+
+
+def cellphonedb_v5(adata, 
+                           celltype_key='celltype',
+                           min_cell_fraction=0.005,
+                           min_genes=200,
+                           min_cells=3,
+                           cpdb_file_path=None,
+                           iterations=1000,
+                           threshold=0.1,
+                           pvalue=0.05,
+                           threads=10,
+                           output_dir=None,
+                           temp_dir=None,
+                           cleanup_temp=True,
+                           debug=False,
+                           separator='|',
+                           **kwargs):
+    """
+    Run CellPhoneDB statistical analysis with proper file handling
+    
+    Parameters:
+    -----------
+    adata : AnnData
+        Annotated data matrix
+    celltype_key : str
+        Column name in adata.obs containing cell type annotations
+    min_cell_fraction : float
+        Minimum fraction of total cells required for a cell type to be included
+    min_genes : int
+        Minimum number of genes required per cell
+    min_cells : int
+        Minimum number of cells required per gene
+    cpdb_file_path : str or None
+        Path to CellPhoneDB database zip file. If None, will try to find automatically
+    iterations : int
+        Number of shufflings performed in the analysis
+    threshold : float
+        Min % of cells expressing a gene for this to be employed in the analysis
+    pvalue : float
+        P-value threshold to employ for significance
+    threads : int
+        Number of threads to use in the analysis
+    output_dir : str or None
+        Directory to save results. If None, creates temporary directory
+    temp_dir : str or None
+        Directory for temporary files. If None, uses system temp
+    cleanup_temp : bool
+        Whether to clean up temporary files after analysis
+    debug : bool
+        Saves all intermediate tables employed during the analysis
+    separator : str
+        String to employ to separate cells in the results dataframes
+    **kwargs : dict
+        Additional parameters for cpdb_statistical_analysis_method.call
+        
+    Returns:
+    --------
+    dict : CellPhoneDB results
+    adata_cpdb : AnnData
+        Formatted AnnData object for visualization with CellChatViz
+    """
+    import os
+    import tempfile
+    import shutil
+    from pathlib import Path
+    import pandas as pd
+    import scanpy as sc
+    
+    # Validate inputs
+    if celltype_key not in adata.obs.columns:
+        raise ValueError(f"celltype_key '{celltype_key}' not found in adata.obs")
+    
+    print("🔬 Starting CellPhoneDB analysis...")
+    print(f"   - Original data: {adata.shape[0]} cells, {adata.shape[1]} genes")
+    
+    # Step 1: Filter cell types by minimum cell fraction
+    ct_counts = adata.obs[celltype_key].value_counts()
+    min_cells_required = int(adata.shape[0] * min_cell_fraction)
+    valid_celltypes = ct_counts[ct_counts > min_cells_required].index
+    
+    print(f"   - Cell types passing {min_cell_fraction*100}% threshold: {len(valid_celltypes)}")
+    print(f"   - Minimum cells required: {min_cells_required}")
+    
+    if len(valid_celltypes) == 0:
+        raise ValueError("No cell types pass the minimum cell fraction threshold")
+    
+    # Step 2: Subset and preprocess data
+    adata_filtered = adata[adata.obs[celltype_key].isin(valid_celltypes)].copy()
+    
+    # Use raw data if available, otherwise use X
+    if adata_filtered.raw is not None:
+        adata_pp = adata_filtered.raw.to_adata()
+        adata_pp.obs = adata_filtered.obs.copy()
+    else:
+        adata_pp = adata_filtered.copy()
+    
+    print(f"   - After filtering: {adata_pp.shape[0]} cells, {adata_pp.shape[1]} genes")
+    
+    # Apply standard preprocessing
+    sc.pp.filter_cells(adata_pp, min_genes=min_genes)
+    sc.pp.filter_genes(adata_pp, min_cells=min_cells)
+    
+    print(f"   - After preprocessing: {adata_pp.shape[0]} cells, {adata_pp.shape[1]} genes")
+    
+    # Step 3: Setup directories
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp(prefix='cpdb_temp_')
+        temp_created = True
+    else:
+        temp_created = False
+        os.makedirs(temp_dir, exist_ok=True)
+    
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp(prefix='cpdb_results_')
+        output_created = True
+    else:
+        output_created = False
+        os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"   - Temporary directory: {temp_dir}")
+    print(f"   - Output directory: {output_dir}")
+    
+    try:
+        # Step 4: Create temporary files for CellPhoneDB
+        # Create counts file (AnnData format)
+        counts_file = os.path.join(temp_dir, 'counts_matrix.h5ad')
+        adata_counts = sc.AnnData(
+            X=adata_pp.X,
+            obs=pd.DataFrame(index=adata_pp.obs.index),
+            var=pd.DataFrame(index=adata_pp.var.index)
+        )
+        adata_counts.write_h5ad(counts_file, compression='gzip')
+        
+        # Create metadata file
+        meta_file = os.path.join(temp_dir, 'metadata.tsv')
+        df_meta = pd.DataFrame({
+            'Cell': list(adata_pp.obs.index),
+            'cell_type': list(adata_pp.obs[celltype_key])
+        })
+        df_meta.set_index('Cell', inplace=True)
+        df_meta.to_csv(meta_file, sep='\t')
+        
+        print("   - Created temporary input files")
+        
+        # Step 5: Find CellPhoneDB database if not provided
+        if cpdb_file_path is None:
+            # Try common locations
+            possible_paths = [
+                '/oak/stanford/groups/xiaojie/steorra/software/cellphonedb.zip',
+                './cellphonedb.zip',
+                '~/cellphonedb.zip'
+            ]
+            
+            for path in possible_paths:
+                expanded_path = os.path.expanduser(path)
+                if os.path.exists(expanded_path):
+                    cpdb_file_path = expanded_path
+                    break
+            
+            if cpdb_file_path is None:
+                raise FileNotFoundError(
+                    "CellPhoneDB database not found. Please provide cpdb_file_path or "
+                    "place cellphonedb.zip in current directory"
+                )
+        
+        print(f"   - Using CellPhoneDB database: {cpdb_file_path}")
+        
+        # Step 6: Run CellPhoneDB analysis
+        try:
+            from cellphonedb.src.core.methods import cpdb_statistical_analysis_method
+        except ImportError:
+            raise ImportError(
+                "CellPhoneDB not installed. Please install with: "
+                "pip install cellphonedb"
+            )
+        
+        print("   - Running CellPhoneDB statistical analysis...")
+        
+        # Prepare parameters
+        analysis_params = {
+            'cpdb_file_path': cpdb_file_path,
+            'meta_file_path': meta_file,
+            'counts_file_path': counts_file,
+            'counts_data': 'hgnc_symbol',
+            'active_tfs_file_path': None,
+            'microenvs_file_path': None,
+            'score_interactions': True,
+            'iterations': iterations,
+            'threshold': threshold,
+            'threads': threads,
+            'debug_seed': 42,
+            'result_precision': 3,
+            'pvalue': pvalue,
+            'subsampling': False,
+            'subsampling_log': False,
+            'subsampling_num_pc': 100,
+            'subsampling_num_cells': 1000,
+            'separator': separator,
+            'debug': debug,
+            'output_path': output_dir,
+            'output_suffix': None
+        }
+        
+        # Update with any additional kwargs
+        analysis_params.update(kwargs)
+        
+        # Run analysis
+        cpdb_results = cpdb_statistical_analysis_method.call(**analysis_params)
+        
+        print("   - CellPhoneDB analysis completed successfully!")
+        
+        # Step 7: Format results for visualization
+        print("   - Formatting results for visualization...")
+        
+        adata_cpdb = format_cpdb_results_for_viz(cpdb_results, separator=separator)
+        
+        print(f"   - Created visualization AnnData: {adata_cpdb.shape}")
+        print(f"   - Cell interactions: {adata_cpdb.n_obs}")
+        print(f"   - L-R pairs: {adata_cpdb.n_vars}")
+        
+        return cpdb_results, adata_cpdb
+        
+    finally:
+        # Step 8: Cleanup temporary files if requested
+        if cleanup_temp:
+            if temp_created and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                print(f"   - Cleaned up temporary directory: {temp_dir}")
+            
+            if output_created and os.path.exists(output_dir):
+                # Only clean output if we created it and user didn't specify it
+                pass  # Keep results by default
+        
+        print("✅ CellPhoneDB analysis pipeline completed!")
+
+
+def format_cpdb_results_for_viz(cpdb_results, separator='|'):
+    """
+    Format CellPhoneDB results into AnnData object for CellChatViz
+    
+    Parameters:
+    -----------
+    cpdb_results : dict
+        Results from CellPhoneDB analysis
+    separator : str
+        Separator used in cell type pairs
+        
+    Returns:
+    --------
+    adata_cpdb : AnnData
+        Formatted AnnData object for visualization
+    """
+    import pandas as pd
+    import scanpy as sc
+    
+    # Extract results
+    means_df = cpdb_results['means']
+    pvalues_df = cpdb_results['pvalues']
+    
+    # Identify cell type pair columns (usually start after column 12 or 13)
+    info_cols = []
+    pair_cols = []
+    
+    for col in means_df.columns:
+        if separator in str(col):
+            pair_cols.append(col)
+        else:
+            info_cols.append(col)
+    
+    print(f"   - Found {len(info_cols)} info columns and {len(pair_cols)} cell type pairs")
+    
+    if len(pair_cols) == 0:
+        raise ValueError(f"No cell type pair columns found with separator '{separator}'")
+    
+    # Create AnnData object
+    # X matrix: cell pairs (obs) x L-R interactions (vars)
+    X_data = means_df[pair_cols].T  # Transpose so pairs are observations
+    
+    adata_cpdb = sc.AnnData(X=X_data)
+    
+    # Add layers
+    adata_cpdb.layers['means'] = means_df[pair_cols].T
+    adata_cpdb.layers['pvalues'] = pvalues_df[pair_cols].T
+    
+    # Add variable (L-R pair) information
+    adata_cpdb.var = means_df[info_cols].copy()
+    adata_cpdb.var['interaction_name'] = adata_cpdb.var['interacting_pair']
+    
+    # Add observation (cell pair) information
+    adata_cpdb.obs['sender'] = [pair.split(separator)[0] for pair in adata_cpdb.obs.index]
+    adata_cpdb.obs['receiver'] = [pair.split(separator)[1] for pair in adata_cpdb.obs.index]
+    
+    # Add interaction classification if available
+    if 'classification' in adata_cpdb.var.columns:
+        print(f"   - Found {adata_cpdb.var['classification'].nunique()} pathway classifications")
+    
+    return adata_cpdb
+
+
+def create_cellchatviz_from_cpdb(cpdb_results, separator='|', palette=None):
+    """
+    Create CellChatViz object directly from CellPhoneDB results
+    
+    Parameters:
+    -----------
+    cpdb_results : dict
+        Results from CellPhoneDB analysis
+    separator : str
+        Separator used in cell type pairs
+    palette : dict or list, optional
+        Color palette for cell types
+        
+    Returns:
+    --------
+    viz : CellChatViz
+        Initialized CellChatViz object ready for visualization
+    """
+    # Format results
+    adata_cpdb = format_cpdb_results_for_viz(cpdb_results, separator=separator)
+    
+    # Create and return CellChatViz object
+    from ..pl._cpdbviz import CellChatViz
+    viz = CellChatViz(adata_cpdb, palette=palette)
+    
+    print(f"✅ Created CellChatViz with {viz.n_cell_types} cell types")
+    
+    return viz
+
+
+def download_cellphonedb_database(download_path=None, force_download=False):
+    """
+    Download CellPhoneDB database with fallback URLs
+    
+    Parameters:
+    -----------
+    download_path : str or None
+        Path to save the database. If None, saves to current directory as 'cellphonedb.zip'
+    force_download : bool
+        Whether to force download even if file exists
+        
+    Returns:
+    --------
+    str : Path to downloaded database file
+    """
+    import os
+    import urllib.request
+    import urllib.error
+    from pathlib import Path
+    
+    if download_path is None:
+        download_path = './cellphonedb.zip'
+    
+    download_path = Path(download_path)
+    
+    # Check if file already exists
+    if download_path.exists() and not force_download:
+        print(f"✅ CellPhoneDB database already exists: {download_path}")
+        return str(download_path)
+    
+    # URLs to try in order
+    download_urls = [
+        "https://github.com/ventolab/cellphonedb-data/raw/refs/heads/master/cellphonedb.zip",
+        "https://starlit.oss-cn-beijing.aliyuncs.com/single/cellphonedb.zip"
+    ]
+    
+    print("📥 Downloading CellPhoneDB database...")
+    
+    for i, url in enumerate(download_urls, 1):
+        try:
+            print(f"   - Trying URL {i}/{len(download_urls)}: {url}")
+            
+            # Create directory if it doesn't exist
+            download_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Download with progress
+            def show_progress(block_num, block_size, total_size):
+                if total_size > 0:
+                    percent = min(100, block_num * block_size * 100 / total_size)
+                    print(f"\r     Progress: {percent:.1f}%", end='', flush=True)
+            
+            urllib.request.urlretrieve(url, download_path, reporthook=show_progress)
+            print(f"\n✅ Successfully downloaded CellPhoneDB database to: {download_path}")
+            
+            # Verify file is not empty
+            if download_path.stat().st_size > 0:
+                return str(download_path)
+            else:
+                print(f"❌ Downloaded file is empty, trying next URL...")
+                download_path.unlink(missing_ok=True)
+                
+        except urllib.error.URLError as e:
+            print(f"\n❌ Failed to download from {url}: {e}")
+            download_path.unlink(missing_ok=True)
+            continue
+        except Exception as e:
+            print(f"\n❌ Unexpected error downloading from {url}: {e}")
+            download_path.unlink(missing_ok=True)
+            continue
+    
+    raise RuntimeError(
+        "Failed to download CellPhoneDB database from all available URLs. "
+        "Please check your internet connection or manually download the database."
+    )
+
+
+def validate_cpdb_database(cpdb_file_path):
+    """
+    Validate CellPhoneDB database file
+    
+    Parameters:
+    -----------
+    cpdb_file_path : str
+        Path to CellPhoneDB database file
+        
+    Returns:
+    --------
+    str : Validated database path
+    """
+    import os
+    from pathlib import Path
+    
+    if cpdb_file_path is None:
+        raise ValueError("cpdb_file_path is required. Use download_cellphonedb_database() to get the database.")
+    
+    cpdb_path = Path(cpdb_file_path)
+    
+    # If path doesn't exist, try to download
+    if not cpdb_path.exists():
+        print(f"❌ Database not found at: {cpdb_file_path}")
+        print("🔄 Attempting to download database...")
+        
+        # If the provided path looks like a filename, use it for download
+        if cpdb_path.name.endswith('.zip'):
+            return download_cellphonedb_database(cpdb_file_path)
+        else:
+            # Download to default location and return that path
+            downloaded_path = download_cellphonedb_database()
+            print(f"💡 Database downloaded to: {downloaded_path}")
+            print(f"   You can use this path in future calls: cpdb_file_path='{downloaded_path}'")
+            return downloaded_path
+    
+    # Validate file size
+    file_size = cpdb_path.stat().st_size
+    if file_size == 0:
+        print(f"❌ Database file is empty: {cpdb_file_path}")
+        print("🔄 Re-downloading database...")
+        return download_cellphonedb_database(cpdb_file_path, force_download=True)
+    
+    print(f"✅ Valid CellPhoneDB database found: {cpdb_file_path} ({file_size/1024/1024:.1f} MB)")
+    return str(cpdb_path)
+
+
+def run_cellphonedb_analysis(adata, 
+                           cpdb_file_path,  # Now mandatory
+                           celltype_key='celltype',
+                           min_cell_fraction=0.005,
+                           min_genes=200,
+                           min_cells=3,
+                           iterations=1000,
+                           threshold=0.1,
+                           pvalue=0.05,
+                           threads=10,
+                           output_dir=None,
+                           temp_dir=None,
+                           cleanup_temp=True,
+                           debug=False,
+                           separator='|',
+                           **kwargs):
+    """
+    Run CellPhoneDB statistical analysis with automatic database download
+    
+    Parameters:
+    -----------
+    adata : AnnData
+        Annotated data matrix
+    cpdb_file_path : str
+        Path to CellPhoneDB database zip file (REQUIRED)
+        If file doesn't exist, will attempt automatic download
+    celltype_key : str
+        Column name in adata.obs containing cell type annotations
+    min_cell_fraction : float
+        Minimum fraction of total cells required for a cell type to be included
+    min_genes : int
+        Minimum number of genes required per cell
+    min_cells : int
+        Minimum number of cells required per gene
+    iterations : int
+        Number of shufflings performed in the analysis
+    threshold : float
+        Min % of cells expressing a gene for this to be employed in the analysis
+    pvalue : float
+        P-value threshold to employ for significance
+    threads : int
+        Number of threads to use in the analysis
+    output_dir : str or None
+        Directory to save results. If None, creates temporary directory
+    temp_dir : str or None
+        Directory for temporary files. If None, uses system temp
+    cleanup_temp : bool
+        Whether to clean up temporary files after analysis
+    debug : bool
+        Saves all intermediate tables employed during the analysis
+    separator : str
+        String to employ to separate cells in the results dataframes
+    **kwargs : dict
+        Additional parameters for cpdb_statistical_analysis_method.call
+        
+    Returns:
+    --------
+    dict : CellPhoneDB results
+    adata_cpdb : AnnData
+        Formatted AnnData object for visualization with CellChatViz
+        
+    Examples:
+    --------
+    # Basic usage - will download database automatically if needed
+    cpdb_results, adata_cpdb = run_cellphonedb_analysis(
+        adata, 
+        cpdb_file_path='./cellphonedb.zip',
+        celltype_key='celltype_minor'
+    )
+    
+    # Advanced usage
+    cpdb_results, adata_cpdb = run_cellphonedb_analysis(
+        adata,
+        cpdb_file_path='/path/to/cellphonedb.zip',
+        celltype_key='celltype_minor',
+        min_cell_fraction=0.01,
+        iterations=2000,
+        threads=20
+    )
+    """
+    import os
+    import tempfile
+    import shutil
+    from pathlib import Path
+    import pandas as pd
+    import scanpy as sc
+    
+    # Step 1: Validate and download database if necessary
+    print("🔬 Starting CellPhoneDB analysis...")
+    cpdb_file_path = validate_cpdb_database(cpdb_file_path)
+    
+    # Validate inputs
+    if celltype_key not in adata.obs.columns:
+        raise ValueError(f"celltype_key '{celltype_key}' not found in adata.obs")
+    
+    print(f"   - Original data: {adata.shape[0]} cells, {adata.shape[1]} genes")
+    
+    # Step 2: Filter cell types by minimum cell fraction
+    ct_counts = adata.obs[celltype_key].value_counts()
+    min_cells_required = int(adata.shape[0] * min_cell_fraction)
+    valid_celltypes = ct_counts[ct_counts > min_cells_required].index
+    
+    print(f"   - Cell types passing {min_cell_fraction*100}% threshold: {len(valid_celltypes)}")
+    print(f"   - Minimum cells required: {min_cells_required}")
+    
+    if len(valid_celltypes) == 0:
+        raise ValueError("No cell types pass the minimum cell fraction threshold")
+    
+    # Step 3: Subset and preprocess data
+    adata_filtered = adata[adata.obs[celltype_key].isin(valid_celltypes)].copy()
+    
+    # Use raw data if available, otherwise use X
+    if adata_filtered.raw is not None:
+        adata_pp = adata_filtered.raw.to_adata()
+        adata_pp.obs = adata_filtered.obs.copy()
+    else:
+        adata_pp = adata_filtered.copy()
+    
+    print(f"   - After filtering: {adata_pp.shape[0]} cells, {adata_pp.shape[1]} genes")
+    
+    # Apply standard preprocessing
+    sc.pp.filter_cells(adata_pp, min_genes=min_genes)
+    sc.pp.filter_genes(adata_pp, min_cells=min_cells)
+    
+    print(f"   - After preprocessing: {adata_pp.shape[0]} cells, {adata_pp.shape[1]} genes")
+    
+    # Step 4: Setup directories
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp(prefix='cpdb_temp_')
+        temp_created = True
+    else:
+        temp_created = False
+        os.makedirs(temp_dir, exist_ok=True)
+    
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp(prefix='cpdb_results_')
+        output_created = True
+    else:
+        output_created = False
+        os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"   - Temporary directory: {temp_dir}")
+    print(f"   - Output directory: {output_dir}")
+    
+    try:
+        # Step 5: Create temporary files for CellPhoneDB
+        # Create counts file (AnnData format)
+        counts_file = os.path.join(temp_dir, 'counts_matrix.h5ad')
+        adata_counts = sc.AnnData(
+            X=adata_pp.X,
+            obs=pd.DataFrame(index=adata_pp.obs.index),
+            var=pd.DataFrame(index=adata_pp.var.index)
+        )
+        adata_counts.write_h5ad(counts_file, compression='gzip')
+        
+        # Create metadata file
+        meta_file = os.path.join(temp_dir, 'metadata.tsv')
+        df_meta = pd.DataFrame({
+            'Cell': list(adata_pp.obs.index),
+            'cell_type': list(adata_pp.obs[celltype_key])
+        })
+        df_meta.set_index('Cell', inplace=True)
+        df_meta.to_csv(meta_file, sep='\t')
+        
+        print("   - Created temporary input files")
+        
+        # Step 6: Run CellPhoneDB analysis
+        try:
+            from cellphonedb.src.core.methods import cpdb_statistical_analysis_method
+        except ImportError:
+            raise ImportError(
+                "CellPhoneDB not installed. Please install with: "
+                "pip install cellphonedb"
+            )
+        
+        print("   - Running CellPhoneDB statistical analysis...")
+        
+        # Prepare parameters
+        analysis_params = {
+            'cpdb_file_path': cpdb_file_path,
+            'meta_file_path': meta_file,
+            'counts_file_path': counts_file,
+            'counts_data': 'hgnc_symbol',
+            'active_tfs_file_path': None,
+            'microenvs_file_path': None,
+            'score_interactions': True,
+            'iterations': iterations,
+            'threshold': threshold,
+            'threads': threads,
+            'debug_seed': 42,
+            'result_precision': 3,
+            'pvalue': pvalue,
+            'subsampling': False,
+            'subsampling_log': False,
+            'subsampling_num_pc': 100,
+            'subsampling_num_cells': 1000,
+            'separator': separator,
+            'debug': debug,
+            'output_path': output_dir,
+            'output_suffix': None
+        }
+        
+        # Update with any additional kwargs
+        analysis_params.update(kwargs)
+        
+        # Run analysis
+        cpdb_results = cpdb_statistical_analysis_method.call(**analysis_params)
+        
+        print("   - CellPhoneDB analysis completed successfully!")
+        
+        # Step 7: Format results for visualization
+        print("   - Formatting results for visualization...")
+        
+        adata_cpdb = format_cpdb_results_for_viz(cpdb_results, separator=separator)
+        
+        print(f"   - Created visualization AnnData: {adata_cpdb.shape}")
+        print(f"   - Cell interactions: {adata_cpdb.n_obs}")
+        print(f"   - L-R pairs: {adata_cpdb.n_vars}")
+        
+        return cpdb_results, adata_cpdb
+        
+    finally:
+        # Step 8: Cleanup temporary files if requested
+        if cleanup_temp:
+            if temp_created and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                print(f"   - Cleaned up temporary directory: {temp_dir}")
+            
+            if output_created and os.path.exists(output_dir):
+                # Only clean output if we created it and user didn't specify it
+                pass  # Keep results by default
+        
+        print("✅ CellPhoneDB analysis pipeline completed!")
