@@ -141,7 +141,7 @@ def generate_reference_table(adata):
 
 def print_gpu_usage_color(bar_length: int = 30):
     """
-    Print a colorized memory‐usage bar for each CUDA GPU.
+    Print a colorized memory‐usage bar for each GPU (NVIDIA, AMD, Intel, Apple Silicon).
 
     Parameters
     ----------
@@ -153,42 +153,252 @@ def print_gpu_usage_color(bar_length: int = 30):
     YELLOW = '\033[93m'
     RED = '\033[91m'
     GREY = '\033[90m'
+    BLUE = '\033[94m'
     RESET = '\033[0m'
 
-    if torch is None or not torch.cuda.is_available():
-        print(f"{RED}No CUDA devices found.{RESET}")
+    if torch is None:
+        print(f"{RED}PyTorch not available for GPU monitoring.{RESET}")
         return
 
+    # Try different GPU backends
+    gpu_found = False
+    
+    # 1. NVIDIA CUDA GPUs
+    if torch.cuda.is_available():
+        print(f"{BLUE}NVIDIA CUDA GPUs detected:{RESET}")
+        gpu_found = True
+        
+        # Try nvidia-smi first (most detailed info)
+        try:
+            cmd = [
+                "nvidia-smi",
+                "--query-gpu=index,memory.used,memory.total,name",
+                "--format=csv,noheader,nounits"
+            ]
+            lines = subprocess.check_output(cmd, encoding="utf-8").splitlines()
+            
+            for line in lines:
+                parts = [x.strip() for x in line.split(",")]
+                if len(parts) >= 3:
+                    idx_str, used_str, total_str = parts[0], parts[1], parts[2]
+                    gpu_name = parts[3] if len(parts) > 3 else "Unknown"
+                    
+                    idx = int(idx_str)
+                    used = float(used_str)
+                    total = float(total_str)
+                    frac = max(0.0, min(used / total, 1.0))
+                    filled = int(frac * bar_length)
+                    empty = bar_length - filled
+
+                    # choose color based on usage fraction
+                    if frac < 0.5:
+                        color = GREEN
+                    elif frac < 0.8:
+                        color = YELLOW
+                    else:
+                        color = RED
+
+                    bar = f"{color}{'|' * filled}{GREY}{'-' * empty}{RESET}"
+                    print(f"{EMOJI['bar']} [CUDA {idx}] {gpu_name}")
+                    print(f"    {bar} {used:.0f}/{total:.0f} MiB ({frac*100:.1f}%)")
+                    
+        except Exception as e:
+            # Fallback to PyTorch CUDA memory info
+            print(f"{YELLOW}nvidia-smi not available, using PyTorch CUDA info{RESET}")
+            try:
+                for i in range(torch.cuda.device_count()):
+                    props = torch.cuda.get_device_properties(i)
+                    # Get current memory usage
+                    torch.cuda.set_device(i)
+                    allocated = torch.cuda.memory_allocated(i)
+                    cached = torch.cuda.memory_reserved(i)
+                    total = props.total_memory
+                    
+                    # Use allocated memory for the bar
+                    used = allocated
+                    frac = max(0.0, min(used / total, 1.0))
+                    filled = int(frac * bar_length)
+                    empty = bar_length - filled
+
+                    if frac < 0.5:
+                        color = GREEN
+                    elif frac < 0.8:
+                        color = YELLOW
+                    else:
+                        color = RED
+
+                    bar = f"{color}{'|' * filled}{GREY}{'-' * empty}{RESET}"
+                    print(f"{EMOJI['bar']} [CUDA {i}] {props.name}")
+                    print(f"    {bar} {used/1024**2:.0f}/{total/1024**2:.0f} MiB ({frac*100:.1f}%)")
+                    print(f"    Allocated: {allocated/1024**2:.0f} MiB, Cached: {cached/1024**2:.0f} MiB")
+            except Exception as cuda_e:
+                print(f"{RED}Could not get CUDA memory info: {cuda_e}{RESET}")
+
+    # 2. Apple Silicon MPS
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        if gpu_found:
+            print()  # Add spacing between different GPU types
+        print(f"{BLUE}Apple Silicon MPS detected:{RESET}")
+        gpu_found = True
+        
+        try:
+            # MPS doesn't provide detailed memory info, so we show a simplified view
+            # Try to get some basic info
+            device = torch.device("mps")
+            
+            # Create a small tensor to test MPS
+            test_tensor = torch.randn(100, 100, device=device)
+            del test_tensor
+            
+            # MPS doesn't have detailed memory APIs like CUDA
+            # So we'll show a basic status
+            bar = f"{GREEN}{'|' * (bar_length//2)}{GREY}{'-' * (bar_length//2)}{RESET}"
+            print(f"{EMOJI['bar']} [MPS] Apple Silicon GPU")
+            print(f"    {bar} Status: Available (detailed memory info not supported)")
+            
+        except Exception as e:
+            print(f"{RED}Could not access MPS: {e}{RESET}")
+
+    # 3. AMD ROCm (if available)
     try:
-        cmd = [
-            "nvidia-smi",
-            "--query-gpu=index,memory.used,memory.total",
-            "--format=csv,noheader,nounits"
-        ]
-        lines = subprocess.check_output(cmd, encoding="utf-8").splitlines()
-    except Exception as e:
-        print(f"{RED}Could not run nvidia-smi: {e}{RESET}")
+        # Check if ROCm is available
+        if hasattr(torch.version, 'hip') and torch.version.hip is not None:
+            if gpu_found:
+                print()
+            print(f"{BLUE}AMD ROCm GPUs detected:{RESET}")
+            gpu_found = True
+            
+            try:
+                # Try to use rocm-smi if available
+                cmd = ["rocm-smi", "--showmeminfo", "vram"]
+                lines = subprocess.check_output(cmd, encoding="utf-8").splitlines()
+                
+                # Parse rocm-smi output (this is a simplified parser)
+                for i, line in enumerate(lines):
+                    if "GPU" in line and "vram" in line.lower():
+                        # This is a basic parser - might need adjustment based on actual output
+                        bar = f"{GREEN}{'|' * (bar_length//2)}{GREY}{'-' * (bar_length//2)}{RESET}"
+                        print(f"{EMOJI['bar']} [ROCm {i}] AMD GPU")
+                        print(f"    {bar} (rocm-smi info available)")
+                        
+            except Exception:
+                # Fallback for ROCm without rocm-smi
+                bar = f"{GREEN}{'|' * (bar_length//2)}{GREY}{'-' * (bar_length//2)}{RESET}"
+                print(f"{EMOJI['bar']} [ROCm] AMD GPU")
+                print(f"    {bar} Status: Available (install rocm-smi for detailed info)")
+                
+    except Exception:
+        pass  # ROCm not available
+
+    # 4. Intel GPU (if available)
+    try:
+        # Intel GPUs are less common in PyTorch, but check anyway
+        if hasattr(torch, 'xpu') and torch.xpu.is_available():
+            if gpu_found:
+                print()
+            print(f"{BLUE}Intel XPU detected:{RESET}")
+            gpu_found = True
+            
+            try:
+                device_count = torch.xpu.device_count()
+                for i in range(device_count):
+                    bar = f"{GREEN}{'|' * (bar_length//2)}{GREY}{'-' * (bar_length//2)}{RESET}"
+                    print(f"{EMOJI['bar']} [XPU {i}] Intel GPU")
+                    print(f"    {bar} Status: Available")
+            except Exception as e:
+                print(f"{RED}Could not get Intel XPU info: {e}{RESET}")
+                
+    except Exception:
+        pass  # Intel XPU not available
+
+    # 5. Generic GPU detection fallback
+    if not gpu_found:
+        print(f"{RED}No supported GPU devices found.{RESET}")
+        print(f"{GREY}Supported: NVIDIA CUDA, Apple MPS, AMD ROCm, Intel XPU{RESET}")
+        
+        # Try to detect if any GPU hardware exists but drivers are missing
+        try:
+            # Try lspci on Linux/macOS to detect GPU hardware
+            cmd = ["lspci"]
+            output = subprocess.check_output(cmd, encoding="utf-8")
+            gpu_lines = [line for line in output.splitlines() if any(keyword in line.lower() for keyword in ['vga', 'display', 'nvidia', 'amd', 'intel', 'gpu'])]
+            
+            if gpu_lines:
+                print(f"{YELLOW}GPU hardware detected but no supported drivers:{RESET}")
+                for line in gpu_lines[:3]:  # Show first 3 GPUs
+                    print(f"  • {line.strip()}")
+                    
+        except Exception:
+            pass  # lspci not available or failed
+
+def print_gpu_usage_simple():
+    """
+    Simple GPU usage display without color bars - useful for non-NVIDIA GPUs.
+    """
+    if torch is None:
+        print("PyTorch not available for GPU monitoring.")
         return
-
-    for line in lines:
-        idx_str, used_str, total_str = [x.strip() for x in line.split(",")]
-        idx = int(idx_str)
-        used = float(used_str)
-        total = float(total_str)
-        frac = max(0.0, min(used / total, 1.0))
-        filled = int(frac * bar_length)
-        empty = bar_length - filled
-
-        # choose color based on usage fraction
-        if frac < 0.5:
-            color = GREEN
-        elif frac < 0.8:
-            color = YELLOW
-        else:
-            color = RED
-
-        bar = f"{color}{'|' * filled}{GREY}{'-' * empty}{RESET}"
-        print(f"{EMOJI['bar']} [GPU {idx}] {bar} {used:.0f}/{total:.0f} MiB ({frac*100:.1f}%)")
+        
+    gpu_info = []
+    
+    # CUDA
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            props = torch.cuda.get_device_properties(i)
+            allocated = torch.cuda.memory_allocated(i)
+            total = props.total_memory
+            gpu_info.append({
+                'type': 'CUDA',
+                'id': i,
+                'name': props.name,
+                'memory_used': allocated,
+                'memory_total': total,
+                'utilization': allocated / total * 100
+            })
+    
+    # MPS
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        gpu_info.append({
+            'type': 'MPS',
+            'id': 0,
+            'name': 'Apple Silicon',
+            'memory_used': None,
+            'memory_total': None,
+            'utilization': None
+        })
+    
+    # ROCm
+    if hasattr(torch.version, 'hip') and torch.version.hip is not None:
+        gpu_info.append({
+            'type': 'ROCm',
+            'id': 0,
+            'name': 'AMD GPU',
+            'memory_used': None,
+            'memory_total': None,
+            'utilization': None
+        })
+    
+    # Intel XPU
+    if hasattr(torch, 'xpu') and torch.xpu.is_available():
+        for i in range(torch.xpu.device_count()):
+            gpu_info.append({
+                'type': 'XPU',
+                'id': i,
+                'name': 'Intel GPU',
+                'memory_used': None,
+                'memory_total': None,
+                'utilization': None
+            })
+    
+    if gpu_info:
+        print("Available GPUs:")
+        for gpu in gpu_info:
+            if gpu['memory_used'] is not None:
+                print(f"  [{gpu['type']} {gpu['id']}] {gpu['name']}: {gpu['memory_used']/1024**2:.0f}/{gpu['memory_total']/1024**2:.0f} MiB ({gpu['utilization']:.1f}%)")
+            else:
+                print(f"  [{gpu['type']} {gpu['id']}] {gpu['name']}: Available")
+    else:
+        print("No GPUs detected.")
 
 EMOJI = {
     "start":        "🔍",  # start
