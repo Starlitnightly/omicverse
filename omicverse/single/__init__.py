@@ -55,7 +55,7 @@ from ._scdrug import autoResolution,writeGEP,Drug_Response
 from ._cpdb import (cpdb_network_cal,cpdb_plot_network,
                     cpdb_plot_interaction,
                     cpdb_interaction_filtered,
-                    cpdb_submeans_exacted,cpdb_exact_target,cpdb_exact_source)
+                    cpdb_submeans_exacted,cpdb_exact_target,cpdb_exact_source,cellphonedb_v5,run_cellphonedb_v5)
 from ._scgsea import (geneset_aucell,pathway_aucell,pathway_aucell_enrichment,
                       geneset_aucell_tmp,pathway_aucell_tmp,pathway_aucell_enrichment_tmp,
                       pathway_enrichment,pathway_enrichment_plot,)
@@ -85,6 +85,7 @@ from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
 from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
+
 
 __all__ = [
     # Core analysis functions
@@ -151,7 +152,8 @@ __all__ = [
     'cpdb_submeans_exacted',
     'cpdb_exact_target',
     'cpdb_exact_source',
-    
+    'cellphonedb_v5',
+    'run_cellphonedb_v5',
     # Pathway and functional analysis
     'geneset_aucell',
     'pathway_aucell',

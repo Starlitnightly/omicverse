@@ -596,7 +596,8 @@ class CellChatViz:
     def netVisual_circle_focused(self, matrix, title="Cell-Cell Communication Network", 
                                 edge_width_max=10, vertex_size_max=50, show_labels=True,
                                 cmap='Blues', figsize=(10, 10), min_interaction_threshold=0,
-                                use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3):
+                                use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3,
+                                adjust_text=False):
         """
         绘制聚焦的圆形网络图，只显示有实际交互的细胞类型
         
@@ -624,6 +625,9 @@ class CellChatViz:
             Whether to use curved arrows like CellChat (default: True)
         curve_strength : float
             Strength of the curve (0 = straight, higher = more curved)
+        adjust_text : bool
+            Whether to use adjust_text library to prevent label overlapping (default: False)
+            If True, uses plt.text instead of nx.draw_networkx_labels
             
         Returns:
         --------
@@ -772,7 +776,36 @@ class CellChatViz:
             label_pos = {i: (1.15*np.cos(angle), 1.15*np.sin(angle)) 
                         for i, angle in enumerate(angles)}
             labels = {i: active_cell_types[i] for i in range(n_active_cells)}
-            nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
+            
+            if adjust_text:
+                # Use plt.text with adjust_text to prevent overlapping
+                try:
+                    from adjustText import adjust_text
+                    
+                    texts = []
+                    for i in range(n_active_cells):
+                        x, y = label_pos[i]
+                        text = ax.text(x, y, active_cell_types[i], 
+                                     fontsize=10, ha='center', va='center',
+                                     bbox=dict(boxstyle="round,pad=0.3", 
+                                             facecolor='white', alpha=0.8, edgecolor='none'))
+                        texts.append(text)
+                    
+                    # Adjust text positions to avoid overlapping
+                    adjust_text(texts, ax=ax,
+                              expand_points=(1.2, 1.2),
+                              expand_text=(1.2, 1.2),
+                              force_points=0.5,
+                              force_text=0.5,
+                              arrowprops=dict(arrowstyle='->', color='gray', alpha=0.7, lw=0.5))
+                    
+                except ImportError:
+                    import warnings
+                    warnings.warn("adjustText library not found. Using default nx.draw_networkx_labels instead.")
+                    nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
+            else:
+                # Use traditional networkx labels
+                nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
         
         ax.set_title(title, fontsize=16, pad=20)
         ax.set_xlim(-1.5, 1.5)
@@ -4515,7 +4548,7 @@ class CellChatViz:
     def netAnalysis_signalingRole_heatmap(self, pattern="outgoing", signaling=None, 
                                         row_scale=True, figsize=(12, 8), 
                                         cmap='RdYlBu_r', show_totals=True,
-                                        title=None, save=None):
+                                        title=None, save=None,min_threshold=0.1):
         """
         创建热图分析细胞群的信号传导角色（传出或传入信号贡献）
         使用marsilea实现现代化的热图可视化
@@ -4550,7 +4583,7 @@ class CellChatViz:
         h, df = self.netVisual_signaling_heatmap(
             pattern=pattern,
             signaling=signaling,
-            min_threshold=0.0,
+            min_threshold=min_threshold,
             cmap=cmap,
             figsize=figsize,
             show_bars=show_totals,
@@ -4607,149 +4640,7 @@ class CellChatViz:
         # 为了保持兼容性，返回类似原函数的结构
         return h, [h], df
     
-    def get_signaling_matrix(self, pattern="outgoing", signaling=None,
-                signaling = [signaling]
-            pathways = [p for p in signaling if p in all_pathways]
-            if not pathways:
-                raise ValueError(f"No valid signaling pathways found: {signaling}")
-        else:
-            pathways = all_pathways
-        
-        # 计算每个通路的信号强度矩阵
-        signaling_data = []
-        
-        for pathway in pathways:
-            # 筛选该通路的交互
-            pathway_mask = self.adata.var['classification'] == pathway
-            pathway_indices = np.where(pathway_mask)[0]
-            
-            if len(pathway_indices) == 0:
-                continue
-                
-            # 获取该通路的平均值矩阵
-            if 'means' in self.adata.layers:
-                means = self.adata.layers['means'][:, pathway_indices]
-            else:
-                means = self.adata.X[:, pathway_indices]
-            
-            # 计算每个细胞类型的信号强度
-            pathway_strength = {}
-            
-            for i, cell_type in enumerate(self.cell_types):
-                if pattern == "outgoing":
-                    # 传出信号：该细胞类型作为发送者的信号强度
-                    sender_mask = self.adata.obs['sender'] == cell_type
-                    if np.any(sender_mask):
-                        strength = np.mean(means[sender_mask, :])
-                    else:
-                        strength = 0
-                elif pattern == "incoming":
-                    # 传入信号：该细胞类型作为接收者的信号强度
-                    receiver_mask = self.adata.obs['receiver'] == cell_type
-                    if np.any(receiver_mask):
-                        strength = np.mean(means[receiver_mask, :])
-                    else:
-                        strength = 0
-                else:
-                    raise ValueError("pattern must be 'outgoing' or 'incoming'")
-                
-                pathway_strength[cell_type] = strength
-            
-            signaling_data.append({
-                'pathway': pathway,
-                **pathway_strength
-            })
-        
-        # 创建DataFrame
-        df = pd.DataFrame(signaling_data)
-        df = df.set_index('pathway')
-        # 行标准化（显示相对信号强度）
-        if row_scale:
-            df_scaled = df.apply(zscore, axis=1)
-            df_scaled = df_scaled.fillna(0)  # 处理标准差为0的情况
-        else:
-            df_scaled = df
-        
-        # 计算总信号强度
-        cell_totals = df.sum(axis=0)  # 每个细胞类型的总信号强度
-        pathway_totals = df.sum(axis=1)  # 每个通路的总信号强度
-        
-        # 创建图形
-        if show_totals:
-            fig = plt.figure(figsize=figsize)
-            
-            # 创建网格布局
-            gs = fig.add_gridspec(3, 3, height_ratios=[1, 0.05, 4], 
-                                width_ratios=[4, 0.05, 1], 
-                                hspace=0.05, wspace=0.05)
-            
-            # 顶部条形图（细胞类型总信号强度）
-            ax_top = fig.add_subplot(gs[0, 0])
-            cell_colors = self._get_cell_type_colors()
-            colors = [cell_colors.get(ct, '#1f77b4') for ct in cell_totals.index]
-            
-            bars = ax_top.bar(range(len(cell_totals)), cell_totals.values, color=colors)
-            ax_top.set_xlim(-0.5, len(cell_totals) - 0.5)
-            ax_top.set_xticks([])
-            ax_top.set_ylabel('Total\nStrength', fontsize=10)
-            ax_top.tick_params(axis='y', labelsize=8)
-            
-            # 主热图
-            ax_main = fig.add_subplot(gs[2, 0])
-            
-            # 右侧条形图（通路总信号强度）
-            ax_right = fig.add_subplot(gs[2, 2])
-            ax_right.barh(range(len(pathway_totals)), pathway_totals.values, 
-                         color='grey', alpha=0.7)
-            ax_right.set_ylim(-0.5, len(pathway_totals) - 0.5)
-            ax_right.set_yticks([])
-            ax_right.set_xlabel('Total\nStrength', fontsize=10)
-            ax_right.tick_params(axis='x', labelsize=8)
-            
-            axes = [ax_main, ax_top, ax_right]
-        else:
-            fig, ax_main = plt.subplots(figsize=figsize)
-            axes = [ax_main]
-        
-        # 绘制热图
-        im = ax_main.imshow(df_scaled.values, cmap=cmap, aspect='auto')
-        
-        # 设置坐标轴
-        ax_main.set_xticks(range(len(df_scaled.columns)))
-        ax_main.set_xticklabels(df_scaled.columns, rotation=45, ha='right')
-        ax_main.set_yticks(range(len(df_scaled.index)))
-        ax_main.set_yticklabels(df_scaled.index)
-        
-        # 添加颜色条
-        if show_totals:
-            cbar = plt.colorbar(im, ax=ax_main, fraction=0.046, pad=0.04)
-        else:
-            cbar = plt.colorbar(im, ax=ax_main)
-        
-        if row_scale:
-            cbar.set_label('Relative Signaling Strength\n(z-score)', rotation=270, labelpad=20)
-        else:
-            cbar.set_label('Signaling Strength', rotation=270, labelpad=20)
-        
-        # 设置标题
-        if title is None:
-            direction = "Outgoing" if pattern == "outgoing" else "Incoming"
-            title = f"{direction} Signaling Role Analysis"
-        
-        if show_totals:
-            fig.suptitle(title, fontsize=16, y=0.95)
-        else:
-            ax_main.set_title(title, fontsize=16, pad=20)
-        
-        # 调整布局
-        plt.tight_layout()
-        
-        # 保存图形
-        if save:
-            fig.savefig(save, dpi=300, bbox_inches='tight')
-            print(f"Signaling role heatmap saved as: {save}")
-        
-        return fig, axes, df
+    
     
     def get_signaling_matrix(self, pattern="outgoing", signaling=None, 
                            aggregation="mean", normalize=False, level="cell_type"):
