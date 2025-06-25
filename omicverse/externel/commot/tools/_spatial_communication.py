@@ -342,7 +342,54 @@ def summarize_cluster_optimized(X, clusterid, clusternames, n_permutations=500):
     
     return df_cluster, df_p_value
 
-def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gpu=True):
+def _apply_scaling(X_cluster, cluster_indices, clusternames, scale_factor):
+    """
+    Apply scaling to cluster communication matrix for better visualization.
+    
+    Parameters
+    ----------
+    X_cluster : np.ndarray
+        Original cluster communication matrix
+    cluster_indices : dict
+        Mapping of cluster names to cell indices
+    clusternames : list
+        List of cluster names
+    scale_factor : str or float
+        Scaling method or factor
+        
+    Returns
+    -------
+    np.ndarray
+        Scaled cluster communication matrix
+    """
+    if scale_factor is None or scale_factor == 1:
+        return X_cluster
+    
+    if scale_factor == 'auto':
+        # Auto-scale based on median cluster size to improve visualization
+        cluster_sizes = np.array([len(cluster_indices[name]) for name in clusternames])
+        median_size = np.median(cluster_sizes[cluster_sizes > 0])
+        # Scale factor to bring values to a more reasonable range for visualization
+        scale_factor = max(10.0, median_size)  # At least 10x scaling
+    elif scale_factor == 'sum':
+        # Convert from mean to sum by multiplying by cluster sizes
+        X_scaled = X_cluster.copy()
+        for i, name_i in enumerate(clusternames):
+            for j, name_j in enumerate(clusternames):
+                size_i = len(cluster_indices[name_i])
+                size_j = len(cluster_indices[name_j])
+                if size_i > 0 and size_j > 0:
+                    X_scaled[i, j] *= size_i * size_j
+        return X_scaled
+    
+    # Apply numeric scaling factor
+    if isinstance(scale_factor, (int, float)) and scale_factor > 0:
+        return X_cluster * scale_factor
+    else:
+        print(f"Warning: Invalid scale_factor '{scale_factor}', using original values")
+        return X_cluster
+
+def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gpu=True, scale_factor='auto'):
     """
     GPU-accelerated version of summarize_cluster using CuPy for CUDA computation.
     
@@ -360,11 +407,17 @@ def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gp
         Number of permutations for p-value calculation
     use_gpu : bool, default True
         Whether to attempt GPU computation
+    scale_factor : str or float, default 'auto'
+        Scaling factor for visualization compatibility:
+        - 'auto': automatically scale based on cluster sizes
+        - 'sum': use sum instead of mean (multiply by cluster sizes)
+        - float: multiply results by this factor
+        - None or 1: no scaling (original behavior)
     
     Returns
     -------
     df_cluster : pd.DataFrame
-        Cluster-cluster signaling values
+        Cluster-cluster signaling values (potentially scaled)
     df_p_value : pd.DataFrame
         P-values from permutation test
     """
@@ -382,10 +435,16 @@ def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gp
     
     n = len(clusternames)
     
-    # Pre-compute cluster indices
-    cluster_indices = {}
+    # Pre-compute cluster indices and transfer to GPU
+    cluster_indices_cpu = {}
+    cluster_indices_gpu = {}
     for i, name in enumerate(clusternames):
-        cluster_indices[name] = np.where(clusterid == name)[0]
+        indices = np.where(clusterid == name)[0]
+        cluster_indices_cpu[name] = indices
+        if len(indices) > 0:
+            cluster_indices_gpu[name] = cp.asarray(indices)
+        else:
+            cluster_indices_gpu[name] = cp.array([], dtype=cp.int32)
     
     # Convert data to GPU arrays
     if sparse.issparse(X):
@@ -398,56 +457,51 @@ def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gp
     X_cluster = cp.zeros((n, n), dtype=cp.float32)
     
     for i, name_i in enumerate(clusternames):
-        idx_i = cluster_indices[name_i]
-        if len(idx_i) == 0:
+        idx_i_gpu = cluster_indices_gpu[name_i]
+        if len(idx_i_gpu) == 0:
+            # Leave zeros for empty clusters - this is mathematically correct
             continue
         
-        # Transfer indices to GPU
-        idx_i_gpu = cp.asarray(idx_i)
         X_i = X_gpu[idx_i_gpu, :]
         
         for j, name_j in enumerate(clusternames):
-            idx_j = cluster_indices[name_j]
-            if len(idx_j) == 0:
+            idx_j_gpu = cluster_indices_gpu[name_j]
+            if len(idx_j_gpu) == 0:
+                # Leave zeros for empty clusters - this is mathematically correct
                 continue
             
-            idx_j_gpu = cp.asarray(idx_j)
             # GPU-accelerated mean computation
             X_cluster[i, j] = cp.mean(X_i[:, idx_j_gpu])
     
     # GPU-accelerated permutation test
     p_cluster = cp.zeros((n, n), dtype=cp.float32)
-    cluster_sizes = cp.asarray([len(cluster_indices[name]) for name in clusternames])
     total_cells = len(clusterid)
     
     for perm in range(n_permutations):
-        # Generate permutation on CPU, then transfer to GPU
-        perm_indices_cpu = np.random.permutation(total_cells)
-        perm_indices_gpu = cp.asarray(perm_indices_cpu)
+        # Generate permuted cluster labels (correct approach matching original implementation)
+        clusterid_perm = np.random.permutation(clusterid)
         
-        # Create permuted cluster indices on GPU
-        start_idx = 0
-        perm_cluster_indices_gpu = {}
-        for i, name in enumerate(clusternames):
-            size = int(cluster_sizes[i])
-            if size > 0:
-                perm_cluster_indices_gpu[name] = perm_indices_gpu[start_idx:start_idx + size]
-                start_idx += size
+        # Pre-compute permuted cluster indices on CPU, then transfer to GPU
+        perm_cluster_indices = {}
+        for name in clusternames:
+            perm_indices = np.where(clusterid_perm == name)[0]
+            if len(perm_indices) > 0:
+                perm_cluster_indices[name] = cp.asarray(perm_indices)
             else:
-                perm_cluster_indices_gpu[name] = cp.array([], dtype=cp.int32)
+                perm_cluster_indices[name] = cp.array([], dtype=cp.int32)
         
         # Compute permuted cluster-cluster matrix on GPU
         X_cluster_perm = cp.zeros((n, n), dtype=cp.float32)
         
         for i, name_i in enumerate(clusternames):
-            perm_idx_i = perm_cluster_indices_gpu[name_i]
+            perm_idx_i = perm_cluster_indices[name_i]
             if len(perm_idx_i) == 0:
                 continue
             
             X_perm_i = X_gpu[perm_idx_i, :]
             
             for j, name_j in enumerate(clusternames):
-                perm_idx_j = perm_cluster_indices_gpu[name_j]
+                perm_idx_j = perm_cluster_indices[name_j]
                 if len(perm_idx_j) == 0:
                     continue
                 
@@ -463,12 +517,17 @@ def summarize_cluster_gpu(X, clusterid, clusternames, n_permutations=500, use_gp
     X_cluster_cpu = cp.asnumpy(X_cluster)
     p_cluster_cpu = cp.asnumpy(p_cluster)
     
+    # Apply scaling for visualization compatibility
+    X_cluster_scaled = _apply_scaling(X_cluster_cpu, cluster_indices_cpu, clusternames, scale_factor)
+    
     # Create output DataFrames
-    df_cluster = pd.DataFrame(data=X_cluster_cpu, index=clusternames, columns=clusternames)
+    df_cluster = pd.DataFrame(data=X_cluster_scaled, index=clusternames, columns=clusternames)
     df_p_value = pd.DataFrame(data=p_cluster_cpu, index=clusternames, columns=clusternames)
     
     # Clear GPU memory
     del X_gpu, X_cluster, p_cluster
+    for name in clusternames:
+        del cluster_indices_gpu[name]
     cp.get_default_memory_pool().free_all_blocks()
     
     return df_cluster, df_p_value
@@ -1133,6 +1192,7 @@ def cluster_communication(
     clustering: str = None,
     n_permutations: int = 100,
     random_seed: int = 1,
+    scale_factor: str = 'auto',
     copy: bool = False
 ):
     """
@@ -1158,6 +1218,12 @@ def cluster_communication(
         Number of label permutations for computing the p-value.
     random_seed
         The numpy random_seed for reproducible random permutations.
+    scale_factor : str or float, default 'auto'
+        Scaling factor for better visualization:
+        - 'auto': automatically scale based on cluster sizes
+        - 'sum': use sum instead of mean (multiply by cluster sizes)  
+        - float: multiply results by this factor
+        - None or 1: no scaling (original behavior)
     copy
         Whether to return a copy of the :class:`anndata.AnnData`.
     
@@ -1191,10 +1257,11 @@ def cluster_communication(
         obsp_names.append(database_name+'-total-total')
     # name_mat = adata.uns['commot-'+pathway_name+'-info']['df_ligrec'].values
     # name_mat = np.concatenate((name_mat, np.array([['total','total']],str)), axis=0)
+    
     for i in range(len(obsp_names)):
         S = adata.obsp['commot-'+obsp_names[i]]
         tmp_df, tmp_p_value = summarize_cluster_gpu(S,
-            clusterid, celltypes, n_permutations=n_permutations)
+            clusterid, celltypes, n_permutations=n_permutations, scale_factor=scale_factor)
         adata.uns['commot_cluster-'+clustering+'-'+obsp_names[i]] = {'communication_matrix': tmp_df, 'communication_pvalue': tmp_p_value}
     
     return adata if copy else None
