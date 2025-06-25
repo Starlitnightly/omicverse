@@ -1,5 +1,6 @@
 #聚类
 from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -89,6 +90,19 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     elif method=='louvain':
         sc.tl.louvain(adata,**kwargs)
         add_reference(adata,'louvain','clustering with Louvain')
+    elif method=='kmeans':
+        if n_components is None:
+            print('You need to input the `n_components` when method is `kmeans`')
+            return
+        print(f"""running KMeans clustering""")
+        kmeans = KMeans(n_clusters=n_components, random_state=random_state, **kwargs)
+        kmeans_res = kmeans.fit_predict(adata.obsm[use_rep])
+        adata.obs['kmeans'] = kmeans_res
+        adata.obs['kmeans'] = adata.obs['kmeans'].astype('int')
+        adata.obs['kmeans'] = adata.obs['kmeans'].astype('category')
+        print(f"""finished: found {n_components} clusters and added
+    'kmeans', the cluster labels (adata.obs, categorical)""")
+        add_reference(adata,'kmeans','clustering with K-means')
     elif method=='GMM':
         mclust_py(adata, n_components=n_components,use_rep=use_rep,random_seed=random_state,**kwargs)
         print(f"""finished: found {n_components} clusters and added
