@@ -74,6 +74,7 @@ dependencies = [
     'tqdm',
     'requests>=2.0',
     'transformers>=0.30',
+    'marsilea',
     #'cvxpy>=1.3',
 
 ]
