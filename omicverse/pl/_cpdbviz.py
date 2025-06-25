@@ -12,7 +12,6 @@ import warnings
 warnings.filterwarnings('ignore')
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.colors as mcolors
-
 try:
     import marsilea as ma
     import marsilea.plotter as mp
@@ -96,54 +95,54 @@ class CellChatViz:
             raise ValueError("Palette must be a dictionary, list, or None")
     
     def _get_cell_type_colors(self):
-        """获取细胞类型颜色映射，确保所有方法使用相同的颜色"""
-        # 如果已经有缓存的颜色，直接返回
+        """Get cell type color mapping, ensuring all methods use consistent colors"""
+        # If already cached colors, return directly
         if self._color_cache is not None:
             return self._color_cache
         
         cell_type_colors = {}
         
-        # 优先使用用户提供的palette
+        # Prioritize user-provided palette
         if self.palette is not None:
             cell_type_colors.update(self.palette)
         
-        # 如果palette没有覆盖所有细胞类型，尝试从adata.uns中获取颜色信息
+        # If palette doesn't cover all cell types, try to get color info from adata.uns
         missing_types = set(self.cell_types) - set(cell_type_colors.keys())
         if missing_types:
             color_keys = [key for key in self.adata.uns.keys() if key.endswith('_colors')]
             
-            # 寻找可能的细胞类型颜色
+            # Look for possible cell type colors
             for key in color_keys:
-                # 提取细胞类型名称 (去掉'_colors'后缀)
+                # Extract cell type name (remove '_colors' suffix)
                 celltype_key = key.replace('_colors', '')
                 if celltype_key in self.adata.obs.columns:
                     categories = self.adata.obs[celltype_key].cat.categories
                     colors = self.adata.uns[key]
-                    # 只保留在我们细胞类型列表中的颜色
+                    # Only keep colors for cell types in our list
                     for i, cat in enumerate(categories):
                         if cat in missing_types and i < len(colors):
                             cell_type_colors[cat] = colors[i]
                     break
         
-        # 如果仍有缺失的颜色，使用默认颜色映射
+        # If still missing colors, use default color mapping
         missing_types = set(self.cell_types) - set(cell_type_colors.keys())
         if missing_types:
-            # 使用固定的颜色映射确保一致性
+            # Use fixed color mapping to ensure consistency
             import matplotlib.cm as cm
-            # 使用tab20颜色映射，但确保稳定的颜色分配
+            # Use tab20 colormap, but ensure stable color assignment
             tab20_colors = cm.tab20(np.linspace(0, 1, 20))
             from ..pl._palette import palette_56
             
-            # 为缺失的细胞类型分配颜色
+            # Assign colors to missing cell types
             for i, ct in enumerate(sorted(missing_types)):
                 cell_type_colors[ct] = palette_56[i]
         
-        # 确保颜色映射的稳定性：按细胞类型名称排序
+        # Ensure color mapping stability: sort by cell type name
         sorted_colors = {}
         for ct in sorted(self.cell_types):
             sorted_colors[ct] = cell_type_colors[ct]
         
-        # 缓存颜色映射
+        # Cache color mapping
         self._color_cache = sorted_colors
         
         return sorted_colors
@@ -180,7 +179,7 @@ class CellChatViz:
     def _draw_curved_arrow(self, ax, start_pos, end_pos, weight, max_weight, color, 
                           edge_width_max=10, curve_strength=0.3, arrowsize=10):
         """
-        绘制弯曲的箭头，模仿CellChat的旋转开花效果
+        Draw curved arrows, mimicking CellChat's rotated blooming effect
         
         Parameters:
         -----------
@@ -207,78 +206,78 @@ class CellChatViz:
         from matplotlib.patches import ConnectionPatch
         import matplotlib.patches as patches
         
-        # 计算箭头宽度
+        # Calculate arrow width
         width = (weight / max_weight) * edge_width_max
         
-        # 计算中点和法向量来创建弯曲效果
+        # Calculate midpoint and normal vector to create curved effect
         start_x, start_y = start_pos
         end_x, end_y = end_pos
         
-        # 计算向量
+        # Calculate vector
         dx = end_x - start_x
         dy = end_y - start_y
         
-        # 计算中点
+        # Calculate midpoint
         mid_x = (start_x + end_x) / 2
         mid_y = (start_y + end_y) / 2
         
-        # 计算垂直向量（用于弯曲）
+        # Calculate perpendicular vector (for curvature)
         length = np.sqrt(dx**2 + dy**2)
         if length > 0:
-            # 标准化垂直向量
+            # Normalize perpendicular vector
             perp_x = -dy / length
             perp_y = dx / length
             
-            # 添加弯曲偏移
+            # Add curvature offset
             curve_offset = curve_strength * length
             control_x = mid_x + perp_x * curve_offset
             control_y = mid_y + perp_y * curve_offset
             
-            # 创建弯曲路径
+            # Create curved path
             from matplotlib.path import Path
             import matplotlib.patches as patches
             
-            # 定义贝塞尔曲线路径
+            # Define Bezier curve path
             verts = [
-                (start_x, start_y),  # 起点
-                (control_x, control_y),  # 控制点
-                (end_x, end_y),  # 终点
+                (start_x, start_y),  # Start point
+                (control_x, control_y),  # Control point
+                (end_x, end_y),  # End point
             ]
             
             codes = [
-                Path.MOVETO,  # 移动到起点
-                Path.CURVE3,  # 二次贝塞尔曲线
-                Path.CURVE3,  # 二次贝塞尔曲线
+                Path.MOVETO,  # Move to start point
+                Path.CURVE3,  # Quadratic Bezier curve
+                Path.CURVE3,  # Quadratic Bezier curve
             ]
             
             path = Path(verts, codes)
             
-            # 绘制弯曲的线条
+            # Draw curved line
             patch = patches.PathPatch(path, facecolor='none', edgecolor=color, 
                                     linewidth=width, alpha=0.7)
             ax.add_patch(patch)
             
-            # 添加箭头头部
-            # 计算箭头方向
+            # Add arrow head
+            # Calculate arrow direction
             arrow_dx = end_x - control_x
             arrow_dy = end_y - control_y
             arrow_length = np.sqrt(arrow_dx**2 + arrow_dy**2)
             
             if arrow_length > 0:
-                # 标准化方向向量
+                # Normalize direction vector
                 arrow_dx /= arrow_length
                 arrow_dy /= arrow_length
                 
-                # 箭头头部大小
+                # Arrow head size
                 head_length = arrowsize * 0.01
                 head_width = arrowsize * 0.008
                 
-                # 计算箭头头部的三个点
-                # 箭头尖端
+                # Calculate three points of arrow head
+                # Arrow tip
                 tip_x = end_x
                 tip_y = end_y
                 
-                # 箭头底部的两个点
+                # Two base points of arrow
                 base_x = tip_x - arrow_dx * head_length
                 base_y = tip_y - arrow_dy * head_length
                 
@@ -287,14 +286,14 @@ class CellChatViz:
                 right_x = base_x + arrow_dy * head_width
                 right_y = base_y - arrow_dx * head_width
                 
-                # 绘制箭头头部
+                # Draw arrow head
                 triangle = plt.Polygon([(tip_x, tip_y), (left_x, left_y), (right_x, right_y)], 
                                      color=color, alpha=0.8)
                 ax.add_patch(triangle)
     
     def _draw_self_loop(self, ax, pos, weight, max_weight, color, edge_width_max):
         """
-        绘制自环（自己到自己的连接）
+        Draw self-loops (connections from cell type to itself)
         
         Parameters:
         -----------
@@ -316,13 +315,13 @@ class CellChatViz:
         x, y = pos
         width = (weight / max_weight) * edge_width_max
         
-        # 创建一个小圆圈作为自环
+        # Create a small circle as self-loop
         radius = 0.15
         circle = patches.Circle((x + radius, y), radius, fill=False, 
                               edgecolor=color, linewidth=width, alpha=0.7)
         ax.add_patch(circle)
         
-        # 添加小箭头
+        # Add small arrow
         arrow_x = x + radius + radius * 0.7
         arrow_y = y
         arrow = patches.FancyArrowPatch((arrow_x - 0.05, arrow_y), (arrow_x, arrow_y),
@@ -332,7 +331,7 @@ class CellChatViz:
     
     def compute_aggregated_network(self, pvalue_threshold=0.05, use_means=True):
         """
-        计算聚合的细胞通讯网络
+        Compute aggregated cell communication network
         
         Parameters:
         -----------
@@ -375,8 +374,8 @@ class CellChatViz:
                         cmap='Blues', figsize=(10, 10), use_sender_colors=True,
                         use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
-        圆形网络图可视化（类似CellChat的circle plot）
-        使用发送者细胞类型颜色作为边的渐变颜色
+        Circular network visualization (similar to CellChat's circle plot)
+        Uses sender cell type colors as edge gradient colors
         
         Parameters:
         -----------
@@ -459,13 +458,13 @@ class CellChatViz:
                         start_pos = pos[u]
                         end_pos = pos[v]
                         
-                        # 自环处理
+                        # Handle self-loops
                         if u == v:
-                            # 绘制自环
+                            # Draw self-loop
                             self._draw_self_loop(ax, start_pos, weight, max_weight, 
                                                sender_color, edge_width_max)
                         else:
-                            # 绘制弯曲箭头
+                            # Draw curved arrow
                             self._draw_curved_arrow(ax, start_pos, end_pos, weight, max_weight, 
                                                   sender_color, edge_width_max, curve_strength)
             else:
@@ -593,13 +592,465 @@ class CellChatViz:
         plt.tight_layout()
         return fig, ax
     
+    def get_ligand_receptor_pairs(self, min_interactions=1, pvalue_threshold=0.05):
+        """
+        Get all significant ligand-receptor pair lists
+        
+        Parameters:
+        -----------
+        min_interactions : int
+            Minimum interaction count threshold
+        pvalue_threshold : float
+            P-value threshold for significance
+        
+        Returns:
+        --------
+        lr_pairs : list
+            Significant ligand-receptor pair list
+        lr_stats : dict
+            Statistics for each ligand-receptor pair
+        """
+        # Determine ligand-receptor pair column name
+        if 'gene_name' in self.adata.var.columns:
+            lr_column = 'gene_name'
+        elif 'interaction_name' in self.adata.var.columns:
+            lr_column = 'interaction_name'
+        else:
+            lr_column = None
+            print("Warning: No specific L-R pair column found, using variable names")
+        
+        if lr_column:
+            lr_pairs = self.adata.var[lr_column].unique()
+        else:
+            lr_pairs = self.adata.var.index.unique()
+        
+        lr_stats = {}
+        significant_pairs = []
+        
+        for lr_pair in lr_pairs:
+            if lr_column:
+                lr_mask = self.adata.var[lr_column] == lr_pair
+            else:
+                lr_mask = self.adata.var.index == lr_pair
+            
+            # Calculate total interactions for this ligand-receptor pair
+            total_interactions = 0
+            significant_interactions = 0
+            
+            for i in range(len(self.adata.obs)):
+                pvals = self.adata.layers['pvalues'][i, lr_mask]
+                means = self.adata.layers['means'][i, lr_mask]
+                
+                sig_mask = pvals < pvalue_threshold
+                total_interactions += len(pvals)
+                significant_interactions += np.sum(sig_mask)
+            
+            lr_stats[lr_pair] = {
+                'total_interactions': total_interactions,
+                'significant_interactions': significant_interactions,
+                'significance_rate': significant_interactions / max(1, total_interactions)
+            }
+            
+            if significant_interactions >= min_interactions:
+                significant_pairs.append(lr_pair)
+        
+        return significant_pairs, lr_stats
+    
+    def mean(self, count_min=1):
+        """
+        Compute mean expression matrix for cell-cell interactions (like CellChat)
+        
+        Parameters:
+        -----------
+        count_min : int
+            Minimum count threshold to filter interactions (default: 1)
+            
+        Returns:
+        --------
+        mean_matrix : pd.DataFrame
+            Mean expression matrix with senders as index and receivers as columns
+        """
+        # Initialize matrix
+        mean_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
+        
+        # Get means data
+        means = self.adata.layers['means']
+        
+        for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], self.adata.obs['receiver'])):
+            sender_idx = self.cell_types.index(sender)
+            receiver_idx = self.cell_types.index(receiver)
+            
+            # Sum mean expression for this sender-receiver pair, applying count_min filter
+            interaction_means = means[i, :]
+            # Apply count_min threshold (interactions below threshold are set to 0)
+            filtered_means = np.where(interaction_means >= count_min, interaction_means, 0)
+            mean_matrix[sender_idx, receiver_idx] = np.sum(filtered_means)
+        
+        # Convert to DataFrame for easier handling
+        mean_df = pd.DataFrame(mean_matrix, 
+                              index=self.cell_types, 
+                              columns=self.cell_types)
+        
+        return mean_df
+    
+    def pvalue(self, count_min=1):
+        """
+        Compute p-value matrix for cell-cell interactions (like CellChat)
+        
+        Parameters:
+        -----------
+        count_min : int
+            Minimum count threshold to filter interactions (default: 1)
+            
+        Returns:
+        --------
+        pvalue_matrix : pd.DataFrame
+            Average p-value matrix with senders as index and receivers as columns
+        """
+        # Initialize matrix
+        pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))  # Default p=1
+        
+        # Get data
+        pvalues = self.adata.layers['pvalues']
+        means = self.adata.layers['means']
+        
+        for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], self.adata.obs['receiver'])):
+            sender_idx = self.cell_types.index(sender)
+            receiver_idx = self.cell_types.index(receiver)
+            
+            # Get interaction data for this sender-receiver pair
+            interaction_pvals = pvalues[i, :]
+            interaction_means = means[i, :]
+            
+            # Apply count_min filter - only consider interactions above threshold
+            valid_mask = interaction_means >= count_min
+            
+            if np.any(valid_mask):
+                # Compute average p-value for valid interactions
+                pvalue_matrix[sender_idx, receiver_idx] = np.mean(interaction_pvals[valid_mask])
+            else:
+                # No valid interactions, keep default p=1
+                pvalue_matrix[sender_idx, receiver_idx] = 1.0
+        
+        # Convert to DataFrame for easier handling
+        pvalue_df = pd.DataFrame(pvalue_matrix, 
+                                index=self.cell_types, 
+                                columns=self.cell_types)
+        
+        return pvalue_df
+    
+    def analyze_pathway_statistics(self, pathway_stats, show_details=True):
+        """
+        Analyze and display detailed pathway statistics
+        
+        Parameters:
+        -----------
+        pathway_stats : dict
+            Dictionary returned from get_signaling_pathways
+        show_details : bool
+            Whether to show detailed statistics for each pathway
+        
+        Returns:
+        --------
+        summary_df : pd.DataFrame
+            Summary statistics for all pathways
+        """
+        if not pathway_stats:
+            print("No pathway statistics available. Run get_signaling_pathways() first.")
+            return pd.DataFrame()
+        
+        # Create summary DataFrame
+        summary_data = []
+        for pathway, stats in pathway_stats.items():
+            row = {
+                'pathway': pathway,
+                'n_lr_pairs': stats['n_lr_pairs'],
+                'n_tests': stats['n_tests'],
+                'n_significant': stats['n_significant_interactions'],
+                'significance_rate': stats['significance_rate'],
+                'combined_pvalue': stats['combined_pvalue'],
+                'mean_expression': stats['mean_expression'],
+                'max_expression': stats['max_expression'],
+                'n_significant_cell_pairs': len(stats['significant_cell_pairs'])
+            }
+            
+            # Add corrected p-value if available
+            if 'corrected_pvalue' in stats:
+                row['corrected_pvalue'] = stats['corrected_pvalue']
+                row['is_significant'] = stats['is_significant_corrected']
+            else:
+                row['is_significant'] = stats['combined_pvalue'] < 0.05
+            
+            summary_data.append(row)
+        
+        summary_df = pd.DataFrame(summary_data)
+        summary_df = summary_df.sort_values('combined_pvalue')
+        
+        if show_details:
+            print("📊 Pathway Analysis Summary:")
+            print("=" * 80)
+            print(f"{'Pathway':<30} {'L-R':<4} {'Tests':<6} {'Sig':<4} {'Rate':<6} {'P-val':<8} {'Expr':<6}")
+            print("-" * 80)
+            
+            for _, row in summary_df.head(20).iterrows():  # Show top 20
+                significance_marker = "***" if row['is_significant'] else "   "
+                print(f"{row['pathway'][:28]:<30} {row['n_lr_pairs']:<4} {row['n_tests']:<6} "
+                      f"{row['n_significant']:<4} {row['significance_rate']:.2f}  "
+                      f"{row['combined_pvalue']:.1e} {row['mean_expression']:.2f} {significance_marker}")
+            
+            if len(summary_df) > 20:
+                print(f"... and {len(summary_df) - 20} more pathways")
+        
+        return summary_df
+    
+    def compute_pathway_communication(self, method='mean', min_lr_pairs=1, min_expression=0.1):
+        """
+        Calculate pathway-level cell communication strength (similar to CellChat methods)
+        
+        Parameters:
+        -----------
+        method : str
+            Aggregation method: 'mean', 'sum', 'max', 'median' (default: 'mean')
+        min_lr_pairs : int
+            Minimum L-R pair count in pathway (default: 1)  
+        min_expression : float
+            Minimum expression threshold (default: 0.1)
+            
+        Returns:
+        --------
+        pathway_communication : dict
+            Contains communication matrix and statistics for each pathway
+        """
+        pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
+        pathway_communication = {}
+        
+        print(f"🔬 Calculating cell communication strength for {len(pathways)} pathways...")
+        print(f"   - Aggregation method: {method}")
+        print(f"   - Minimum expression threshold: {min_expression}")
+        
+        for pathway in pathways:
+            pathway_mask = self.adata.var['classification'] == pathway
+            pathway_lr_pairs = self.adata.var.loc[pathway_mask, 'interacting_pair'].tolist()
+            
+            if len(pathway_lr_pairs) < min_lr_pairs:
+                continue
+                
+            # Initialize pathway communication matrix
+            pathway_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
+            pathway_pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))
+            valid_interactions_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
+            
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], self.adata.obs['receiver'])):
+                sender_idx = self.cell_types.index(sender)
+                receiver_idx = self.cell_types.index(receiver)
+                
+                # Get all L-R pair data for this pathway between this cell pair
+                pathway_means = self.adata.layers['means'][i, pathway_mask]
+                pathway_pvals = self.adata.layers['pvalues'][i, pathway_mask]
+                
+                # Filter low expression interactions
+                valid_mask = pathway_means >= min_expression
+                
+                if np.any(valid_mask):
+                    valid_means = pathway_means[valid_mask]
+                    valid_pvals = pathway_pvals[valid_mask]
+                    
+                    # Calculate pathway-level communication strength
+                    if method == 'mean':
+                        pathway_strength = np.mean(valid_means)
+                    elif method == 'sum':
+                        pathway_strength = np.sum(valid_means)
+                    elif method == 'max':
+                        pathway_strength = np.max(valid_means)
+                    elif method == 'median':
+                        pathway_strength = np.median(valid_means)
+                    else:
+                        raise ValueError(f"Unknown method: {method}")
+                    
+                    # Calculate pathway-level p-value (use minimum p-value as pathway significance)
+                    pathway_pval = np.min(valid_pvals)
+                    
+                    pathway_matrix[sender_idx, receiver_idx] = pathway_strength
+                    pathway_pvalue_matrix[sender_idx, receiver_idx] = pathway_pval
+                    valid_interactions_matrix[sender_idx, receiver_idx] = len(valid_means)
+                else:
+                    # No valid interactions
+                    pathway_matrix[sender_idx, receiver_idx] = 0
+                    pathway_pvalue_matrix[sender_idx, receiver_idx] = 1.0
+                    valid_interactions_matrix[sender_idx, receiver_idx] = 0
+            
+            # Store pathway communication results
+            pathway_communication[pathway] = {
+                'communication_matrix': pd.DataFrame(pathway_matrix, 
+                                                   index=self.cell_types, 
+                                                   columns=self.cell_types),
+                'pvalue_matrix': pd.DataFrame(pathway_pvalue_matrix,
+                                            index=self.cell_types,
+                                            columns=self.cell_types),
+                'n_valid_interactions': pd.DataFrame(valid_interactions_matrix,
+                                                    index=self.cell_types,
+                                                    columns=self.cell_types),
+                'lr_pairs': pathway_lr_pairs,
+                'total_strength': pathway_matrix.sum(),
+                'max_strength': pathway_matrix.max(),
+                'mean_strength': pathway_matrix[pathway_matrix > 0].mean() if (pathway_matrix > 0).any() else 0,
+                'significant_pairs': np.sum(pathway_pvalue_matrix < 0.05),
+                'aggregation_method': method
+            }
+        
+        print(f"✅ Completed pathway communication strength calculation for {len(pathway_communication)} pathways")
+        
+        return pathway_communication
+    
+    def get_significant_pathways_v2(self, pathway_communication=None, 
+                                   strength_threshold=0.1, pvalue_threshold=0.05, 
+                                   min_significant_pairs=1):
+        """
+        Determine significant pathways based on pathway-level communication strength (more aligned with CellChat logic)
+        
+        Parameters:
+        -----------
+        pathway_communication : dict or None
+            Pathway communication results, if None then recalculate
+        strength_threshold : float
+            Pathway strength threshold (default: 0.1)
+        pvalue_threshold : float  
+            p-value threshold (default: 0.05)
+        min_significant_pairs : int
+            Minimum significant cell pair count (default: 1)
+            
+        Returns:
+        --------
+        significant_pathways : list
+            Significant pathway list
+        pathway_summary : pd.DataFrame
+            Pathway statistics summary
+        """
+        if pathway_communication is None:
+            pathway_communication = self.compute_pathway_communication()
+        
+        pathway_summary_data = []
+        significant_pathways = []
+        
+        for pathway, data in pathway_communication.items():
+            comm_matrix = data['communication_matrix']
+            pval_matrix = data['pvalue_matrix']
+            
+            # Pathway-level statistics
+            total_strength = data['total_strength']
+            max_strength = data['max_strength']
+            mean_strength = data['mean_strength']
+            
+            # Use .values to ensure returning numpy arrays instead of pandas Series
+            pval_values = pval_matrix.values
+            comm_values = comm_matrix.values
+            
+            n_significant_pairs = np.sum((pval_values < pvalue_threshold) & (comm_values >= strength_threshold))
+            n_total_pairs = np.sum(comm_values > 0)
+            
+            # Determine if pathway is significant
+            is_significant = (total_strength >= strength_threshold and 
+                            n_significant_pairs >= min_significant_pairs)
+            
+            pathway_summary_data.append({
+                'pathway': pathway,
+                'total_strength': total_strength,
+                'max_strength': max_strength,
+                'mean_strength': mean_strength,
+                'n_lr_pairs': len(data['lr_pairs']),
+                'n_active_cell_pairs': n_total_pairs,
+                'n_significant_pairs': n_significant_pairs,
+                'significance_rate': n_significant_pairs / max(1, n_total_pairs),
+                'is_significant': is_significant
+            })
+            
+            if is_significant:
+                significant_pathways.append(pathway)
+        
+        # Create summary DataFrame
+        pathway_summary = pd.DataFrame(pathway_summary_data)
+        pathway_summary = pathway_summary.sort_values('total_strength', ascending=False)
+        
+        print(f"📊 Pathway significance analysis results:")
+        print(f"   - Total pathways: {len(pathway_summary)}")
+        print(f"   - Significant pathways: {len(significant_pathways)}")
+        print(f"   - Strength threshold: {strength_threshold}")
+        print(f"   - p-value threshold: {pvalue_threshold}")
+        
+        # Show top pathways
+        print(f"\n🏆 Top 10 pathways by total strength:")
+        print("-" * 100)
+        print(f"{'Pathway':<30} {'Total':<8} {'Max':<7} {'Mean':<7} {'L-R':<4} {'Active':<6} {'Sig':<4} {'Rate':<6} {'Status'}")
+        print("-" * 100)
+        
+        for _, row in pathway_summary.head(10).iterrows():
+            status = "***" if row['is_significant'] else "   "
+            print(f"{row['pathway'][:28]:<30} {row['total_strength']:<8.2f} {row['max_strength']:<7.2f} "
+                  f"{row['mean_strength']:<7.2f} {row['n_lr_pairs']:<4} {row['n_active_cell_pairs']:<6} "
+                  f"{row['n_significant_pairs']:<4} {row['significance_rate']:<6.2f} {status}")
+        
+        return significant_pathways, pathway_summary
+    
+    def demo_curved_arrows(self, signaling_pathway=None, curve_strength=0.4, figsize=(12, 10)):
+        """
+        Demo function to show curved arrow effects
+        
+        Parameters:
+        -----------
+        signaling_pathway : str or None
+            Signaling pathway to visualize, if None use aggregated network
+        curve_strength : float
+            Arrow curvature strength (0-1), 0 for straight lines, higher values for more curvature
+        figsize : tuple
+            Figure size
+        
+        Returns:
+        --------
+        fig : matplotlib.figure.Figure
+        ax : matplotlib.axes.Axes
+        """
+        print("🌸 Demonstrating CellChat-style curved arrow effects...")
+        print(f"📏 Curvature strength: {curve_strength} (recommended range: 0.2-0.6)")
+        
+        if signaling_pathway is not None:
+            # Visualize specific signaling pathway
+            fig, ax = self.netVisual_aggregate(
+                signaling=signaling_pathway,
+                layout='circle',
+                focused_view=True,
+                use_curved_arrows=True,
+                curve_strength=curve_strength,
+                figsize=figsize,
+                use_sender_colors=True
+            )
+            print(f"✨ Generated curved arrow network plot for signaling pathway '{signaling_pathway}'")
+        else:
+            # Visualize aggregated network
+            _, weight_matrix = self.compute_aggregated_network()
+            fig, ax = self.netVisual_circle_focused(
+                matrix=weight_matrix,
+                title="Cell-Cell Communication Network (Curved Arrows)",
+                use_curved_arrows=True,
+                curve_strength=curve_strength,
+                figsize=figsize,
+                use_sender_colors=True
+            )
+            print("✨ Generated curved arrow plot for aggregated network")
+        
+        print("💡 Tips:")
+        print("  - curve_strength=0.2: Slight curvature")
+        print("  - curve_strength=0.4: Medium curvature (recommended)") 
+        print("  - curve_strength=0.6: Strong curvature")
+        print("  - use_curved_arrows=False: Switch back to straight arrows")
+        
+        return fig, ax
+    
     def netVisual_circle_focused(self, matrix, title="Cell-Cell Communication Network", 
                                 edge_width_max=10, vertex_size_max=50, show_labels=True,
                                 cmap='Blues', figsize=(10, 10), min_interaction_threshold=0,
-                                use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3,
-                                adjust_text=False):
+                                use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3):
         """
-        绘制聚焦的圆形网络图，只显示有实际交互的细胞类型
+        Draw focused circular network diagram, showing only cell types with actual interactions
         
         Parameters:
         -----------
@@ -625,16 +1076,13 @@ class CellChatViz:
             Whether to use curved arrows like CellChat (default: True)
         curve_strength : float
             Strength of the curve (0 = straight, higher = more curved)
-        adjust_text : bool
-            Whether to use adjust_text library to prevent label overlapping (default: False)
-            If True, uses plt.text instead of nx.draw_networkx_labels
             
         Returns:
         --------
         fig : matplotlib.figure.Figure
         ax : matplotlib.axes.Axes
         """
-        # 找到有实际交互的细胞类型
+        # Find cell types with actual interactions
         interaction_mask = (matrix.sum(axis=0) + matrix.sum(axis=1)) > min_interaction_threshold
         active_cell_indices = np.where(interaction_mask)[0]
         
@@ -645,7 +1093,7 @@ class CellChatViz:
             ax.axis('off')
             return fig, ax
         
-        # 创建筛选后的矩阵和细胞类型列表
+        # Create filtered matrix and cell type list
         filtered_matrix = matrix[np.ix_(active_cell_indices, active_cell_indices)]
         active_cell_types = [self.cell_types[i] for i in active_cell_indices]
         n_active_cells = len(active_cell_types)
@@ -708,13 +1156,13 @@ class CellChatViz:
                         start_pos = pos[u]
                         end_pos = pos[v]
                         
-                        # 自环处理
+                        # Handle self-loops
                         if u == v:
-                            # 绘制自环
+                            # Draw self-loop
                             self._draw_self_loop(ax, start_pos, weight, max_weight, 
                                                sender_color, edge_width_max)
                         else:
-                            # 绘制弯曲箭头
+                            # Draw curved arrow
                             self._draw_curved_arrow(ax, start_pos, end_pos, weight, max_weight, 
                                                   sender_color, edge_width_max, curve_strength)
             else:
@@ -776,36 +1224,7 @@ class CellChatViz:
             label_pos = {i: (1.15*np.cos(angle), 1.15*np.sin(angle)) 
                         for i, angle in enumerate(angles)}
             labels = {i: active_cell_types[i] for i in range(n_active_cells)}
-            
-            if adjust_text:
-                # Use plt.text with adjust_text to prevent overlapping
-                try:
-                    from adjustText import adjust_text
-                    
-                    texts = []
-                    for i in range(n_active_cells):
-                        x, y = label_pos[i]
-                        text = ax.text(x, y, active_cell_types[i], 
-                                     fontsize=10, ha='center', va='center',
-                                     bbox=dict(boxstyle="round,pad=0.3", 
-                                             facecolor='white', alpha=0.8, edgecolor='none'))
-                        texts.append(text)
-                    
-                    # Adjust text positions to avoid overlapping
-                    adjust_text(texts, ax=ax,
-                              expand_points=(1.2, 1.2),
-                              expand_text=(1.2, 1.2),
-                              force_points=0.5,
-                              force_text=0.5,
-                              arrowprops=dict(arrowstyle='->', color='gray', alpha=0.7, lw=0.5))
-                    
-                except ImportError:
-                    import warnings
-                    warnings.warn("adjustText library not found. Using default nx.draw_networkx_labels instead.")
-                    nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
-            else:
-                # Use traditional networkx labels
-                nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
+            nx.draw_networkx_labels(G, label_pos, labels, font_size=10, ax=ax)
         
         ax.set_title(title, fontsize=16, pad=20)
         ax.set_xlim(-1.5, 1.5)
@@ -846,8 +1265,8 @@ class CellChatViz:
                                    edge_width_max=10, show_labels=True, cmap='Blues', 
                                    figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        为每个细胞类型绘制单独的圆形网络图，显示其向外发送的信号
-        模仿CellChat的功能，使用发送者细胞类型颜色作为边的渐变
+        Draw individual circular network diagrams for each cell type, showing its outgoing signals
+        Mimics CellChat functionality, using sender cell type colors as edge gradients
         
         Parameters:
         -----------
@@ -1012,8 +1431,8 @@ class CellChatViz:
                                            edge_width_max=10, show_labels=True, cmap='Reds', 
                                            figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        为每个细胞类型绘制单独的圆形网络图，显示其接收的信号
-        使用发送者细胞类型颜色作为边的渐变
+        Draw individual circular network diagrams for each cell type, showing its incoming signals
+        Uses sender cell type colors as edge gradients
         
         Parameters:
         -----------
@@ -1187,7 +1606,7 @@ class CellChatViz:
     def netVisual_heatmap(self, matrix, title="Communication Heatmap", 
                          cmap='Reds', figsize=(10, 8), show_values=True):
         """
-        热图可视化细胞间通讯
+        Heatmap visualization of cell-cell communication
         
         Parameters:
         -----------
@@ -1221,28 +1640,28 @@ class CellChatViz:
                                 add_row_sum=True, add_col_sum=True, 
                                 linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        使用marsilea包绘制细胞间通讯热图（模仿CellChat的netVisual_heatmap功能）
+        Use marsilea package to draw cell-cell communication heatmap (mimicking CellChat's netVisual_heatmap function)
         
         Parameters:
         -----------
         signaling : str, list or None
-            特定信号通路名称。如果为None，显示所有通路的聚合结果
+            Specific signaling pathway names. If None, show aggregated results of all pathways
         pvalue_threshold : float
             P-value threshold for significant interactions
         color_heatmap : str
-            热图颜色映射
+            Heatmap colormap
         add_dendrogram : bool
-            是否添加树状图
+            Whether to add dendrogram
         add_row_sum : bool
-            是否在左侧显示行总和
+            Whether to show row sums on the left
         add_col_sum : bool
-            是否在顶部显示列总和  
+            Whether to show column sums on top  
         linewidth : float
-            网格线宽度
+            Grid line width
         figsize : tuple
-            图形大小
+            Figure size
         title : str
-            热图标题
+            Heatmap title
             
         Returns:
         --------
@@ -1251,19 +1670,19 @@ class CellChatViz:
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
         
-        # 计算通讯矩阵
+        # Calculate communication matrix
         if signaling is not None:
-            # 计算特定通路的通讯矩阵
+            # Calculate communication matrix for specific pathway
             if isinstance(signaling, str):
                 signaling = [signaling]
             
-            # 检查信号通路是否存在
+            # Check if signaling pathways exist
             available_pathways = self.adata.var['classification'].unique()
             for pathway in signaling:
                 if pathway not in available_pathways:
                     raise ValueError(f"Pathway '{pathway}' not found. Available pathways: {list(available_pathways)}")
             
-            # 计算特定通路的通讯矩阵
+            # Calculate communication matrix for specific pathway
             pathway_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
             pathway_mask = self.adata.var['classification'].isin(signaling)
             pathway_indices = np.where(pathway_mask)[0]
@@ -1276,7 +1695,7 @@ class CellChatViz:
                 sender_idx = self.cell_types.index(sender)
                 receiver_idx = self.cell_types.index(receiver)
                 
-                # 获取该通路的显著交互
+                # Get significant interactions for this pathway
                 pvals = self.adata.layers['pvalues'][i, pathway_indices]
                 means = self.adata.layers['means'][i, pathway_indices]
                 
@@ -1287,56 +1706,53 @@ class CellChatViz:
             matrix = pathway_matrix
             heatmap_title = f"{title} - {', '.join(signaling)}"
         else:
-            # 使用聚合的通讯矩阵
+            # Use aggregated communication matrix
             _, matrix = self.compute_aggregated_network(pvalue_threshold)
             heatmap_title = title
         
-        # 创建DataFrame以便更好地标记
+        # Create DataFrame for better labeling
         df_matrix = pd.DataFrame(matrix, 
                                 index=self.cell_types, 
                                 columns=self.cell_types)
-
         #return df_matrix
         
-        # 创建marsilea热图
+        # Create marsilea heatmap
         h = ma.Heatmap(df_matrix, linewidth=linewidth, 
                     cmap=color_heatmap, label="Interaction Strength")
         
-        # 添加行列分组 - 这是关键步骤！
+        # Add row and column grouping - this is a key step!
         #h.group_rows(df_matrix.index, order=df_matrix.index.tolist())
         #h.group_cols(df_matrix.columns, order=df_matrix.columns.tolist())
         
         
         
-        # 添加行总和（左侧）
-        # 添加行总和（左侧）
+        # Add row sums (left side)
         if add_row_sum:
             row_sums = matrix.sum(axis=1)
             h.add_left(ma.plotter.Numbers(row_sums, color="#F05454", 
                                         label="Outgoing",show_value=False))
         
-        # 添加列总和（顶部）
+        # Add column sums (top)
         if add_col_sum:
             col_sums = matrix.sum(axis=0)
             h.add_top(ma.plotter.Numbers(col_sums, color="#4A90E2",
                                     label="Incoming",show_value=False))
         
-        # 添加细胞类型颜色注释
+        # Add cell type color annotations
         cell_colors = self._get_cell_type_colors()
         row_colors = [cell_colors.get(ct, '#808080') for ct in self.cell_types]
         col_colors = [cell_colors.get(ct, '#808080') for ct in self.cell_types]
         
-        # 添加细胞类型颜色条
+        # Add cell type color bars
         h.add_left(ma.plotter.Colors(self.cell_types,palette=row_colors),size=0.2,legend=False)
         h.add_top(ma.plotter.Colors(self.cell_types,palette=col_colors),size=0.2)
         
-        # 添加图例
+        # Add legends
         h.add_legends()
         
-        # 添加标题
+        # Add title
         h.add_title(heatmap_title)
-
-        # 添加树状图
+        # Add dendrograms
         if add_dendrogram:
             h.add_dendrogram("left", colors="#2E8B57")
             h.add_dendrogram("top", colors="#2E8B57")
@@ -1349,30 +1765,30 @@ class CellChatViz:
                                           add_dendrogram=True, add_row_sum=True, add_col_sum=True,
                                           linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        使用marsilea包绘制聚焦的细胞间通讯热图，只显示有实际交互的细胞类型
+        Use marsilea package to draw focused cell-cell communication heatmap, showing only cell types with actual interactions
         
         Parameters:
         -----------
         signaling : str, list or None
-            特定信号通路名称
+            Specific signaling pathway names
         pvalue_threshold : float
             P-value threshold for significant interactions
         min_interaction_threshold : float
-            最小交互强度阈值，用于筛选细胞类型
+            Minimum interaction strength threshold for filtering cell types
         color_heatmap : str
-            热图颜色映射
+            Heatmap colormap
         add_dendrogram : bool
-            是否添加树状图
+            Whether to add dendrogram
         add_row_sum : bool
-            是否在左侧显示行总和
+            Whether to show row sums on the left
         add_col_sum : bool
-            是否在顶部显示列总和
+            Whether to show column sums on top
         linewidth : float
-            网格线宽度
+            Grid line width
         figsize : tuple
-            图形大小
+            Figure size
         title : str
-            热图标题
+            Heatmap title
             
         Returns:
         --------
@@ -1381,9 +1797,9 @@ class CellChatViz:
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
         
-        # 首先获取完整矩阵
+        # First get complete matrix
         if signaling is not None:
-            # 计算特定通路的通讯矩阵 
+            # Calculate communication matrix for specific pathway 
             if isinstance(signaling, str):
                 signaling = [signaling]
                 
@@ -1417,64 +1833,63 @@ class CellChatViz:
             _, matrix = self.compute_aggregated_network(pvalue_threshold)
             heatmap_title = f"{title} (Focused)"
         
-        # 筛选有实际交互的细胞类型
+        # Filter cell types with actual interactions
         interaction_mask = (matrix.sum(axis=0) + matrix.sum(axis=1)) > min_interaction_threshold
         active_cell_indices = np.where(interaction_mask)[0]
         
         if len(active_cell_indices) == 0:
             raise ValueError("No cell types have interactions above the threshold")
         
-        # 创建筛选后的矩阵和细胞类型列表
+        # Create filtered matrix and cell type list
         filtered_matrix = matrix[np.ix_(active_cell_indices, active_cell_indices)]
         active_cell_types = [self.cell_types[i] for i in active_cell_indices]
         
-        # 创建DataFrame
+        # Create DataFrame
         df_matrix = pd.DataFrame(filtered_matrix,
                                 index=active_cell_types,
                                 columns=active_cell_types)
         
-        # 创建marsilea热图
+        # Create marsilea heatmap
         h = ma.Heatmap(df_matrix, linewidth=linewidth,
                       cmap=color_heatmap, label="Interaction Strength")
         
-        # 添加行列分组 - 这是关键步骤！
+        # Add row and column grouping - this is a key step!
         h.group_rows(df_matrix.index, order=df_matrix.index.tolist())
         h.group_cols(df_matrix.columns, order=df_matrix.columns.tolist())
         
         
         
-        # 添加行总和（左侧）
+        # Add row sums (left side)
         if add_row_sum:
             row_sums = filtered_matrix.sum(axis=1)
             h.add_left(ma.plotter.Numbers(row_sums, color="#F05454",
                                         label="Outgoing"))
         
-        # 添加列总和（顶部）
+        # Add column sums (top)
         if add_col_sum:
             col_sums = filtered_matrix.sum(axis=0)
             h.add_top(ma.plotter.Numbers(col_sums, color="#4A90E2",
                                        label="Incoming"))
         
-        # 添加细胞类型颜色注释
-            cell_colors = self._get_cell_type_colors()
+        # Add cell type color annotations
+        cell_colors = self._get_cell_type_colors()
         row_colors = [cell_colors.get(ct, '#808080') for ct in active_cell_types]
         col_colors = [cell_colors.get(ct, '#808080') for ct in active_cell_types]
             
-        # 添加细胞类型颜色条
+        # Add cell type color bars
         h.add_left(ma.plotter.Chunk(active_cell_types, fill_colors=row_colors, 
                                        rotation=90, label="Cell Types (Senders)"))
         h.add_top(ma.plotter.Chunk(active_cell_types, fill_colors=col_colors, 
                                       rotation=90, label="Cell Types (Receivers)"))
         
-        # 添加图例
+        # Add legends
         h.add_legends()
-
-        # 添加树状图
+        # Add dendrograms
         if add_dendrogram:
             h.add_dendrogram("right", colors="#2E8B57")
             h.add_dendrogram("top", colors="#2E8B57")
         
-        # 添加标题
+        # Add title
         h.add_title(heatmap_title)
         
         
@@ -1483,7 +1898,7 @@ class CellChatViz:
     def netVisual_chord(self, matrix, title="Chord Diagram", threshold=0, 
                        cmap='tab20', figsize=(12, 12)):
         """
-        弦图可视化（Chord diagram）
+        Chord diagram visualization
         
         Parameters:
         -----------
@@ -1565,7 +1980,7 @@ class CellChatViz:
     def netVisual_hierarchy(self, pathway_name=None, sources=None, targets=None,
                            pvalue_threshold=0.05, figsize=(14, 10)):
         """
-        层次图可视化（Hierarchy plot）
+        Hierarchy plot visualization
         
         Parameters:
         -----------
@@ -1682,7 +2097,7 @@ class CellChatViz:
     def netVisual_bubble(self, sources=None, targets=None, pathways=None,
                         pvalue_threshold=0.05, figsize=(12, 10)):
         """
-        气泡图可视化
+        Bubble plot visualization
         
         Parameters:
         -----------
@@ -1804,7 +2219,7 @@ class CellChatViz:
     
     def compute_pathway_network(self, pvalue_threshold=0.05):
         """
-        计算通路级别的通讯网络
+        Compute pathway-level communication networks
         
         Returns:
         --------
@@ -1843,7 +2258,7 @@ class CellChatViz:
     
     def identify_signaling_role(self, pattern="all", pvalue_threshold=0.05):
         """
-        识别细胞的信号角色（sender, receiver, mediator, influencer）
+        Identify cellular signaling roles (sender, receiver, mediator, influencer)
         
         Parameters:
         -----------
@@ -1903,7 +2318,7 @@ class CellChatViz:
     
     def compute_network_similarity(self, method='functional'):
         """
-        计算通路间的相似性（功能或结构相似性）
+        Compute pathway similarity (functional or structural similarity)
         
         Parameters:
         -----------
@@ -1942,7 +2357,7 @@ class CellChatViz:
     
     def netEmbedding(self, method='functional', n_components=2, figsize=(10, 8)):
         """
-        通路嵌入和聚类可视化（UMAP）
+        Pathway embedding and clustering visualization (UMAP)
         
         Parameters:
         -----------
@@ -2015,15 +2430,15 @@ class CellChatViz:
                                vertex_size_max=50, edge_width_max=10, show_labels=True, 
                                cmap='Blues', figsize=(8, 8), use_sender_colors=True):
         """
-        为指定的单个细胞类型绘制圆形网络图
-        使用发送者细胞类型颜色作为边的渐变
+        Draw circular network diagram for a single specified cell type
+        Uses sender cell type colors as edge gradients
         
         Parameters:
         -----------
         cell_type : str
-            要绘制的细胞类型名称
+            Cell type name to draw
         direction : str
-            'outgoing' 显示该细胞类型发送的信号, 'incoming' 显示接收的信号
+            'outgoing' shows signals sent by this cell type, 'incoming' shows signals received
         pvalue_threshold : float
             P-value threshold for significant interactions
         vertex_size_max : float
@@ -2087,18 +2502,18 @@ class CellChatViz:
                            show_labels=True, cmap='Blues', figsize=(10, 8), focused_view=True,
                            use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
-        绘制特定信号通路的聚合网络图（模仿CellChat的netVisual_aggregate功能）
+        Draw aggregated network diagram for specific signaling pathways (mimicking CellChat's netVisual_aggregate function)
         
         Parameters:
         -----------
         signaling : str or list
-            信号通路名称（来自adata.var['classification']）
+            Signaling pathway names (from adata.var['classification'])
         layout : str
-            布局类型：'circle' 或 'hierarchy'
+            Layout type: 'circle' or 'hierarchy'
         vertex_receiver : list or None
-            接收者细胞类型名称列表（用于hierarchy布局）
+            Receiver cell type names list (for hierarchy layout)
         vertex_sender : list or None
-            发送者细胞类型名称列表（用于hierarchy布局）
+            Sender cell type names list (for hierarchy layout)
         pvalue_threshold : float
             P-value threshold for significant interactions
         vertex_size_max : float
@@ -2127,17 +2542,17 @@ class CellChatViz:
         fig : matplotlib.figure.Figure
         ax : matplotlib.axes.Axes
         """
-        # 确保signaling是列表格式
+        # Ensure signaling is in list format
         if isinstance(signaling, str):
             signaling = [signaling]
         
-        # 检查信号通路是否存在
+        # Check if signaling pathways exist
         available_pathways = self.adata.var['classification'].unique()
         for pathway in signaling:
             if pathway not in available_pathways:
                 raise ValueError(f"Pathway '{pathway}' not found. Available pathways: {list(available_pathways)}")
         
-        # 验证细胞类型名称
+        # Validate cell type names
         if vertex_receiver is not None:
             invalid_receivers = [ct for ct in vertex_receiver if ct not in self.cell_types]
             if invalid_receivers:
@@ -2148,15 +2563,15 @@ class CellChatViz:
             if invalid_senders:
                 raise ValueError(f"Invalid sender cell types: {invalid_senders}. Available cell types: {self.cell_types}")
         
-        # 计算特定通路的通讯矩阵
+        # Calculate communication matrix for specific pathway
         pathway_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
         
-        # 筛选特定通路的交互
+        # Filter specific pathway interactions
         pathway_mask = self.adata.var['classification'].isin(signaling)
         pathway_indices = np.where(pathway_mask)[0]
         
         if len(pathway_indices) == 0:
-            # 如果没有找到该通路的交互，返回空图
+            # If no interactions found for the pathway, return empty plot
             fig, ax = plt.subplots(figsize=figsize)
             ax.text(0.5, 0.5, f'No interactions found for pathway(s): {", ".join(signaling)}', 
                    ha='center', va='center', fontsize=16)
@@ -2168,7 +2583,7 @@ class CellChatViz:
             sender_idx = self.cell_types.index(sender)
             receiver_idx = self.cell_types.index(receiver)
             
-            # 获取该通路的显著交互
+            # Get significant interactions for this pathway
             pvals = self.adata.layers['pvalues'][i, pathway_indices]
             means = self.adata.layers['means'][i, pathway_indices]
             
@@ -2176,9 +2591,9 @@ class CellChatViz:
             if np.any(sig_mask):
                 pathway_matrix[sender_idx, receiver_idx] += np.sum(means[sig_mask])
         
-        # 根据布局类型选择可视化方法
+        # Choose visualization method based on layout type
         if layout == 'circle':
-            # 检查是否有实际的交互
+            # Check if there are actual interactions
             if pathway_matrix.sum() == 0:
                 fig, ax = plt.subplots(figsize=figsize)
                 ax.text(0.5, 0.5, f'No significant interactions found for pathway(s): {", ".join(signaling)}', 
@@ -2188,14 +2603,14 @@ class CellChatViz:
             
             title = f"Signaling Pathway: {', '.join(signaling)} (Circle)"
             
-            # 如果指定了vertex_sender或vertex_receiver，需要筛选矩阵
+            # If vertex_sender or vertex_receiver specified, need to filter matrix
             if vertex_sender is not None or vertex_receiver is not None:
-                # 创建筛选后的矩阵
+                # Create filtered matrix
                 filtered_matrix = np.zeros_like(pathway_matrix)
                 
                 for i, sender_type in enumerate(self.cell_types):
                     for j, receiver_type in enumerate(self.cell_types):
-                        # 检查是否符合sender/receiver条件
+                        # Check if meets sender/receiver conditions
                         sender_ok = (vertex_sender is None) or (sender_type in vertex_sender)
                         receiver_ok = (vertex_receiver is None) or (receiver_type in vertex_receiver)
                         
@@ -2204,7 +2619,7 @@ class CellChatViz:
                 
                 pathway_matrix = filtered_matrix
                 
-                # 再次检查是否还有交互
+                # Check again if there are still interactions
                 if pathway_matrix.sum() == 0:
                     fig, ax = plt.subplots(figsize=figsize)
                     sender_str = f"senders: {vertex_sender}" if vertex_sender else "any senders"
@@ -2214,7 +2629,7 @@ class CellChatViz:
                     ax.axis('off')
                     return fig, ax
             
-            # 选择合适的圆形可视化方法
+            # Choose appropriate circular visualization method
             if focused_view:
                 fig, ax = self.netVisual_circle_focused(
                     matrix=pathway_matrix,
@@ -2227,8 +2642,7 @@ class CellChatViz:
                     min_interaction_threshold=0,
                     use_sender_colors=use_sender_colors,
                     use_curved_arrows=use_curved_arrows,
-                    curve_strength=curve_strength,
-                    adjust_text=adjust_text 
+                    curve_strength=curve_strength
                 )
             else:
                 fig, ax = self.netVisual_circle(
@@ -2246,34 +2660,34 @@ class CellChatViz:
                 )
         
         elif layout == 'hierarchy':
-            # 确定源细胞和目标细胞
+            # Determine source and target cells
             if vertex_receiver is not None and vertex_sender is not None:
-                # 如果同时指定了发送者和接收者
+                # If both sender and receiver specified
                 source_cells = vertex_sender
                 target_cells = vertex_receiver
             elif vertex_receiver is not None:
-                # 只指定了接收者，其余为发送者
+                # Only receiver specified, others are senders
                 target_cells = vertex_receiver
                 source_cells = [ct for ct in self.cell_types if ct not in target_cells]
             elif vertex_sender is not None:
-                # 只指定了发送者，其余为接收者
+                # Only sender specified, others are receivers
                 source_cells = vertex_sender
                 target_cells = [ct for ct in self.cell_types if ct not in source_cells]
             else:
-                # 如果都没有指定，使用所有有交互的细胞类型
+                # If neither specified, use all cell types with interactions
                 source_cells = None
                 target_cells = None
             
             title = f"Signaling Pathway: {', '.join(signaling)} (Hierarchy)"
             fig, ax = self.netVisual_hierarchy(
-                pathway_name=signaling[0],  # 使用第一个通路名称
+                pathway_name=signaling[0],  # Use first pathway name
                 sources=source_cells,
                 targets=target_cells,
                 pvalue_threshold=pvalue_threshold,
                 figsize=figsize
             )
             
-            # 更新标题
+            # Update title
             ax.set_title(title, fontsize=16)
         
         else:
@@ -2284,27 +2698,27 @@ class CellChatViz:
     def get_signaling_pathways(self, min_interactions=1, pathway_pvalue_threshold=0.05, 
                               method='fisher', correction_method='fdr_bh', min_expression=0.1):
         """
-        获取所有显著的信号通路列表，使用统计学上更可靠的方法组合多个L-R对的p-values
+        Get all significant signaling pathway lists using statistically more reliable methods to combine p-values from multiple L-R pairs
         
         Parameters:
         -----------
         min_interactions : int
-            每个通路最小L-R对数量阈值 (default: 1)
+            Minimum L-R pair count threshold per pathway (default: 1)
         pathway_pvalue_threshold : float
-            通路级别的p-value阈值 (default: 0.05)
+            Pathway-level p-value threshold (default: 0.05)
         method : str
-            P-value组合方法: 'fisher', 'stouffer', 'min', 'mean' (default: 'fisher')
+            P-value combination method: 'fisher', 'stouffer', 'min', 'mean' (default: 'fisher')
         correction_method : str
-            多重检验校正方法: 'fdr_bh', 'bonferroni', 'holm', None (default: 'fdr_bh')
+            Multiple testing correction method: 'fdr_bh', 'bonferroni', 'holm', None (default: 'fdr_bh')
         min_expression : float
-            最小表达量阈值 (default: 0.1)
+            Minimum expression threshold (default: 0.1)
         
         Returns:
         --------
         pathways : list
-            显著信号通路列表
+            Significant signaling pathway list
         pathway_stats : dict
-            每个通路的详细统计信息
+            Detailed statistics for each pathway
         """
         from scipy.stats import combine_pvalues
         from statsmodels.stats.multitest import multipletests
@@ -2315,7 +2729,7 @@ class CellChatViz:
         pathway_pvalues = []
         pathway_names = []
         
-        print(f"🔬 使用{method}方法分析{len(pathways)}个信号通路的统计显著性...")
+        print(f"🔬 Analyzing statistical significance of {len(pathways)} signaling pathways using {method} method...")
         
         for pathway in pathways:
             pathway_mask = self.adata.var['classification'] == pathway
@@ -2324,7 +2738,7 @@ class CellChatViz:
             if len(pathway_lr_pairs) < min_interactions:
                 continue
                 
-            # 收集该通路在所有细胞对中的p-values和表达量
+            # Collect p-values and expression levels for this pathway across all cell pairs
             all_pathway_pvals = []
             all_pathway_means = []
             significant_cell_pairs = []
@@ -2333,7 +2747,7 @@ class CellChatViz:
                 pvals = self.adata.layers['pvalues'][i, pathway_mask]
                 means = self.adata.layers['means'][i, pathway_mask]
                 
-                # 过滤低表达的相互作用
+                # Filter low expression interactions
                 valid_mask = means >= min_expression
                 if np.any(valid_mask):
                     valid_pvals = pvals[valid_mask]
@@ -2342,7 +2756,7 @@ class CellChatViz:
                     all_pathway_pvals.extend(valid_pvals)
                     all_pathway_means.extend(valid_means)
                     
-                    # 检查是否有显著的相互作用
+                    # Check if there are significant interactions
                     if np.any(valid_pvals < 0.05):
                         significant_cell_pairs.append(f"{sender}|{receiver}")
             
@@ -2352,22 +2766,22 @@ class CellChatViz:
             all_pathway_pvals = np.array(all_pathway_pvals)
             all_pathway_means = np.array(all_pathway_means)
             
-            # 组合p-values以获得通路级别的显著性
+            # Combine p-values to get pathway-level significance
             try:
                 if method == 'fisher':
-                    # Fisher's method - 适用于独立检验
+                    # Fisher's method - suitable for independent tests
                     combined_stat, combined_pval = combine_pvalues(all_pathway_pvals, method='fisher')
                 elif method == 'stouffer':
-                    # Stouffer's method - 可以加权
-                    weights = all_pathway_means / all_pathway_means.sum()  # 基于表达量加权
+                    # Stouffer's method - can be weighted
+                    weights = all_pathway_means / all_pathway_means.sum()  # Weight based on expression
                     combined_stat, combined_pval = combine_pvalues(all_pathway_pvals, method='stouffer', weights=weights)
                 elif method == 'min':
-                    # 最小p-value方法 (需要Bonferroni校正)
+                    # Minimum p-value method (needs Bonferroni correction)
                     combined_pval = np.min(all_pathway_pvals) * len(all_pathway_pvals)
                     combined_pval = min(combined_pval, 1.0)  # Cap at 1.0
                     combined_stat = -np.log10(combined_pval)
                 elif method == 'mean':
-                    # 平均p-value (不推荐，但作为参考)
+                    # Average p-value (not recommended, but as reference)
                     combined_pval = np.mean(all_pathway_pvals)
                     combined_stat = -np.log10(combined_pval)
                 else:
@@ -2378,7 +2792,7 @@ class CellChatViz:
                 combined_pval = 1.0
                 combined_stat = 0.0
             
-            # 计算通路统计信息
+            # Calculate pathway statistics
             pathway_stats[pathway] = {
                 'n_lr_pairs': len(pathway_lr_pairs),
                 'n_tests': len(all_pathway_pvals),
@@ -2395,16 +2809,16 @@ class CellChatViz:
             pathway_pvalues.append(combined_pval)
             pathway_names.append(pathway)
         
-        # 多重检验校正
+        # Multiple testing correction
         if len(pathway_pvalues) > 0 and correction_method:
-            print(f"📊 应用{correction_method}多重检验校正...")
+            print(f"📊 Applying {correction_method} multiple testing correction...")
             try:
                 corrected_results = multipletests(pathway_pvalues, alpha=pathway_pvalue_threshold, 
                                                 method=correction_method)
                 corrected_pvals = corrected_results[1]
                 is_significant = corrected_results[0]
                 
-                # 更新统计信息
+                # Update statistics
                 for i, pathway in enumerate(pathway_names):
                     pathway_stats[pathway]['corrected_pvalue'] = corrected_pvals[i]
                     pathway_stats[pathway]['is_significant_corrected'] = is_significant[i]
@@ -2413,31 +2827,31 @@ class CellChatViz:
                 
             except Exception as e:
                 warnings.warn(f"Multiple testing correction failed: {e}")
-                # 回退到未校正的p-values
+                # Fall back to uncorrected p-values
                 significant_pathways = [pathway_names[i] for i in range(len(pathway_names)) 
                                       if pathway_pvalues[i] < pathway_pvalue_threshold]
         else:
-            # 不进行多重检验校正
+            # No multiple testing correction
             significant_pathways = [pathway_names[i] for i in range(len(pathway_names)) 
                                   if pathway_pvalues[i] < pathway_pvalue_threshold]
         
-        # 按显著性排序
+        # Sort by significance
         if len(significant_pathways) > 0:
             if correction_method:
                 significant_pathways.sort(key=lambda x: pathway_stats[x]['corrected_pvalue'])
             else:
                 significant_pathways.sort(key=lambda x: pathway_stats[x]['combined_pvalue'])
         
-        print(f"✅ 发现{len(significant_pathways)}个显著通路 (总共{len(pathway_names)}个通路)")
-        print(f"   - P-value组合方法: {method}")
-        print(f"   - 多重检验校正: {correction_method if correction_method else 'None'}")
-        print(f"   - 通路阈值: {pathway_pvalue_threshold}")
+        print(f"✅ Found {len(significant_pathways)} significant pathways (out of {len(pathway_names)} pathways)")
+        print(f"   - P-value combination method: {method}")
+        print(f"   - Multiple testing correction: {correction_method if correction_method else 'None'}")
+        print(f"   - Pathway threshold: {pathway_pvalue_threshold}")
         
         return significant_pathways, pathway_stats
     
     def plot_all_visualizations(self, pvalue_threshold=0.05, save_prefix=None):
         """
-        生成所有主要的可视化图
+        Generate all major visualization plots
         
         Parameters:
         -----------
@@ -2458,7 +2872,7 @@ class CellChatViz:
         fig2, _ = self.netVisual_circle(weight_matrix, title="Interaction Strength")
         figures['circle_weight'] = fig2
         
-        # Individual cell type networks (类似CellChat)
+        # Individual cell type networks (similar to CellChat)
         fig2_1 = self.netVisual_individual_circle(pvalue_threshold=pvalue_threshold)
         figures['individual_outgoing'] = fig2_1
         
@@ -2531,59 +2945,59 @@ class CellChatViz:
                             colors=None, ax=None, figsize=(8, 8), 
                             title_name=None, save=None, normalize_to_sender=True):
         """
-        使用mpl-chord-diagram创建弦图可视化（模仿CellChat的netVisual_chord_cell功能）
+        Create chord diagram visualization using mpl-chord-diagram (mimicking CellChat's netVisual_chord_cell function)
         
         Parameters:
         -----------
         signaling : str, list or None
-            特定信号通路名称。如果为None，显示所有通路的聚合结果
+            Specific signaling pathway names. If None, show aggregated results of all pathways
         group_celltype : dict or None
-            细胞类型分组映射，例如 {'CellA': 'GroupX', 'CellB': 'GroupX', 'CellC': 'GroupY'}
-            如果为None，每个细胞类型单独显示
+            Cell type grouping mapping, e.g., {'CellA': 'GroupX', 'CellB': 'GroupX', 'CellC': 'GroupY'}
+            If None, each cell type is shown individually
         sources : list or None
-            指定的发送者细胞类型列表。如果为None，包含所有细胞类型
+            Specified sender cell type list. If None, include all cell types
         targets : list or None
-            指定的接收者细胞类型列表。如果为None，包含所有细胞类型
+            Specified receiver cell type list. If None, include all cell types
         pvalue_threshold : float
             P-value threshold for significant interactions
         count_min : int
-            最小交互计数阈值
+            Minimum interaction count threshold
         gap : float
-            弦图各段之间的间隙 (0.03)
+            Gap between chord diagram segments (0.03)
         use_gradient : bool
-            是否使用渐变效果 (True)
+            Whether to use gradient effects (True)
         sort : str or None
-            排序方式: "size", "distance", None ("size")
+            Sorting method: "size", "distance", None ("size")
         directed : bool
-            是否显示方向性 (True)
+            Whether to show directionality (True)
         cmap : str or None
-            颜色映射名称 (None，使用细胞类型颜色)
+            Colormap name (None, use cell type colors)
         chord_colors : str or None
-            弦的颜色 (None)
+            Chord colors (None)
         rotate_names : bool
-            是否旋转名称 (False)
+            Whether to rotate names (False)
         fontcolor : str
-            字体颜色 ("black")
+            Font color ("black")
         fontsize : int
-            字体大小 (12)
+            Font size (12)
         start_at : int
-            起始角度 (0)
+            Starting angle (0)
         extent : int
-            弦图覆盖的角度范围 (360)
+            Angle range covered by chord diagram (360)
         min_chord_width : int
-            最小弦宽度 (0)
+            Minimum chord width (0)
         colors : list or None
-            自定义颜色列表 (None，使用细胞类型颜色)
+            Custom color list (None, use cell type colors)
         ax : matplotlib.axes.Axes or None
-            matplotlib轴对象 (None，创建新图)
+            Matplotlib axes object (None, create new plot)
         figsize : tuple
-            图形大小 (8, 8)
+            Figure size (8, 8)
         title_name : str or None
-            图标题 (None)
+            Plot title (None)
         save : str or None
-            保存文件路径 (None)
+            Save file path (None)
         normalize_to_sender : bool
-            是否对发送者进行归一化以获得相等的弧宽度 (True)
+            Whether to normalize to sender for equal arc widths (True)
             
         Returns:
         --------
@@ -2598,18 +3012,18 @@ class CellChatViz:
             except ImportError:
                 raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
         
-        # 计算特定通路的交互矩阵
+        # Calculate interaction matrix for specific pathways
         if signaling is not None:
             if isinstance(signaling, str):
                 signaling = [signaling]
             
-            # 检查信号通路是否存在
+            # Check if signaling pathways exist
             available_pathways = self.adata.var['classification'].unique()
             for pathway in signaling:
                 if pathway not in available_pathways:
                     raise ValueError(f"Pathway '{pathway}' not found. Available pathways: {list(available_pathways)}")
             
-            # 计算特定通路的通讯矩阵
+            # Calculate communication matrix for specific pathways
             pathway_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
             pathway_mask = self.adata.var['classification'].isin(signaling)
             pathway_indices = np.where(pathway_mask)[0]
@@ -2622,25 +3036,25 @@ class CellChatViz:
                 sender_idx = self.cell_types.index(sender)
                 receiver_idx = self.cell_types.index(receiver)
                 
-                # 获取该通路的显著交互
+                # Get significant interactions for this pathway
                 pvals = self.adata.layers['pvalues'][i, pathway_indices]
                 means = self.adata.layers['means'][i, pathway_indices]
                 
                 sig_mask = pvals < pvalue_threshold
                 if np.any(sig_mask):
-                    # 使用交互数量，更适合弦图
+                    # Use interaction count, more suitable for chord diagrams
                     pathway_matrix[sender_idx, receiver_idx] += np.sum(means[sig_mask])
             
             matrix = pathway_matrix
             self.test_pathway_matrix = pathway_matrix
         else:
-            # 使用聚合的交互计数矩阵
+            # Use aggregated interaction count matrix
             count_matrix, _ = self.compute_aggregated_network(pvalue_threshold)
             matrix = count_matrix
         
-        # 过滤指定的发送者和接收者
+        # Filter specified senders and receivers
         if sources is not None or targets is not None:
-            # 验证指定的细胞类型
+            # Validate specified cell types
             if sources is not None:
                 invalid_sources = [ct for ct in sources if ct not in self.cell_types]
                 if invalid_sources:
@@ -2651,11 +3065,11 @@ class CellChatViz:
                 if invalid_targets:
                     raise ValueError(f"Invalid target cell types: {invalid_targets}. Available: {self.cell_types}")
             
-            # 创建过滤后的矩阵
+            # Create filtered matrix
             filtered_matrix = np.zeros_like(matrix)
             for i, sender_type in enumerate(self.cell_types):
                 for j, receiver_type in enumerate(self.cell_types):
-                    # 检查是否符合sources/targets条件
+                    # Check if meets sources/targets conditions
                     sender_ok = (sources is None) or (sender_type in sources)
                     receiver_ok = (targets is None) or (receiver_type in targets)
                     
@@ -2664,18 +3078,18 @@ class CellChatViz:
             
             matrix = filtered_matrix
         
-        # 应用group_celltype分组（如果提供）
+        # Apply group_celltype grouping (if provided)
         if group_celltype is not None:
-            # 验证分组映射
+            # Validate grouping mapping
             for cell_type in self.cell_types:
                 if cell_type not in group_celltype:
                     raise ValueError(f"Cell type '{cell_type}' not found in group_celltype mapping")
             
-            # 获取唯一的组名
+            # Get unique group names
             unique_groups = list(set(group_celltype.values()))
             group_matrix = np.zeros((len(unique_groups), len(unique_groups)))
             
-            # 聚合到组级别
+            # Aggregate to group level
             for i, sender_type in enumerate(self.cell_types):
                 for j, receiver_type in enumerate(self.cell_types):
                     if matrix[i, j] > 0:
@@ -2685,18 +3099,18 @@ class CellChatViz:
                         receiver_group_idx = unique_groups.index(receiver_group)
                         group_matrix[sender_group_idx, receiver_group_idx] += matrix[i, j]
             
-            # 使用分组后的矩阵和名称
+            # Use grouped matrix and names
             final_matrix = group_matrix
             final_names = unique_groups
         else:
-            # 使用原始细胞类型
+            # Use original cell types
             final_matrix = matrix
             final_names = self.cell_types
         
-        # 过滤低于阈值的交互
+        # Filter interactions below threshold
         final_matrix[final_matrix < count_min] = 0
         
-        # 检查是否还有交互
+        # Check if there are still interactions
         if final_matrix.sum() == 0:
             if ax is None:
                 fig, ax = plt.subplots(figsize=figsize)
@@ -2716,14 +3130,14 @@ class CellChatViz:
                 ax.set_title(title_name, fontsize=16, pad=20)
             return fig, ax
         
-        # CellChat风格的归一化：确保每个细胞类型的弧宽度相等
+        # CellChat-style normalization: ensure equal arc width for each cell type
         if normalize_to_sender:
-            # 使用迭代方法确保行和列总和都相等
-            # 这是解决矩阵双向归一化的经典方法
+            # Use iterative method to ensure both row and column sums are equal
+            # This is a classic method for solving bidirectional matrix normalization
             
             normalized_matrix = final_matrix.copy().astype(float)
             
-            # 找到有交互的行和列
+            # Find rows and columns with interactions
             row_sums = normalized_matrix.sum(axis=1)
             col_sums = normalized_matrix.sum(axis=0)
             nonzero_rows = row_sums > 0
@@ -2732,28 +3146,28 @@ class CellChatViz:
             if np.any(nonzero_rows) and np.any(nonzero_cols):
                 standard_sum = 100.0
                 max_iterations = 15
-                tolerance = 1e-4  # 放宽容差，实际应用中这个精度已足够
+                tolerance = 1e-4  # Relaxed tolerance, sufficient precision for practical applications
                 
                 for iteration in range(max_iterations):
-                    # 归一化行
+                    # Normalize rows
                     row_sums = normalized_matrix.sum(axis=1)
                     for i in range(len(final_names)):
-                        if row_sums[i] > tolerance:  # 避免除零
+                        if row_sums[i] > tolerance:  # Avoid division by zero
                             scale_factor = standard_sum / row_sums[i]
                             normalized_matrix[i, :] *= scale_factor
                     
-                    # 归一化列
+                    # Normalize columns
                     col_sums = normalized_matrix.sum(axis=0)
                     for j in range(len(final_names)):
-                        if col_sums[j] > tolerance:  # 避免除零
+                        if col_sums[j] > tolerance:  # Avoid division by zero
                             scale_factor = standard_sum / col_sums[j]
                             normalized_matrix[:, j] *= scale_factor
                     
-                    # 检查收敛性
+                    # Check convergence
                     final_row_sums = normalized_matrix.sum(axis=1)
                     final_col_sums = normalized_matrix.sum(axis=0)
                     
-                    # 计算非零行列的标准差，判断是否收敛
+                    # Calculate standard deviation of non-zero rows and columns to judge convergence
                     nonzero_final_rows = final_row_sums[final_row_sums > tolerance]
                     nonzero_final_cols = final_col_sums[final_col_sums > tolerance]
                     
@@ -2767,44 +3181,43 @@ class CellChatViz:
                 
                 final_matrix = normalized_matrix
         
-        # 准备颜色
+        # Prepare colors
         if colors is None:
             if group_celltype is not None:
-                # 对于分组，为每个组分配颜色
+                # For grouping, assign colors to each group
                 cell_colors = self._get_cell_type_colors()
                 group_colors = {}
                 for group in unique_groups:
-                    # 使用该组中第一个细胞类型的颜色
+                    # Use color of first cell type in this group
                     for cell_type, group_name in group_celltype.items():
                         if group_name == group:
                             group_colors[group] = cell_colors.get(cell_type, '#1f77b4')
                             break
                 colors = [group_colors.get(node, '#1f77b4') for node in final_names]
             else:
-                # 使用细胞类型颜色
+                # Use cell type colors
                 cell_colors = self._get_cell_type_colors()
                 colors = [cell_colors.get(node, '#1f77b4') for node in final_names]
         
-        # 创建图形
+        # Create figure
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
         else:
             fig = ax.figure
-
         self.test_final_matrix = final_matrix
         
-        # 修改名称：只隐藏既不发送也不接收信号的细胞类型名字
+        # Modify names: only hide names of cell types that neither send nor receive signals
         display_names = final_names.copy()
         if normalize_to_sender:
-            # 计算行总和（发送的信号）和列总和（接收的信号）
+            # Calculate row sums (sent signals) and column sums (received signals)
             row_sums = final_matrix.sum(axis=1)
             col_sums = final_matrix.sum(axis=0)
             for i in range(len(final_names)):
-                # 只有既不发送也不接收信号的细胞类型才隐藏名字
+                # Only hide names of cell types that neither send nor receive signals
                 if row_sums[i] == 0 and col_sums[i] == 0:
-                    display_names[i] = ""  # 隐藏名字
+                    display_names[i] = ""  # Hide name
         
-        # 绘制弦图
+        # Draw chord diagram
         chord_diagram(
             final_matrix, 
             display_names,
@@ -2824,17 +3237,17 @@ class CellChatViz:
             colors=colors
         )
         
-        # 添加标题
+        # Add title
         if title_name:
             ax.set_title(title_name, fontsize=fontsize + 4, pad=20)
         
-        # 保存文件
+        # Save file
         if save:
             fig.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.02)
             print(f"Chord diagram saved as: {save}")
         
         return fig, ax
-
+    
     def netVisual_chord_LR(self, ligand_receptor_pairs=None, sources=None, targets=None,
                           pvalue_threshold=0.05, count_min=1, 
                           gap=0.03, use_gradient=True, sort="size", 
@@ -2844,59 +3257,59 @@ class CellChatViz:
                           colors=None, ax=None, figsize=(8, 8), 
                           title_name=None, save=None, normalize_to_sender=True):
         """
-        为特定配体-受体对创建弦图可视化（模仿CellChat的配体-受体级别分析）
+        Create chord diagram visualization for specific ligand-receptor pairs (mimicking CellChat's ligand-receptor level analysis)
         
         Parameters:
         -----------
         ligand_receptor_pairs : str, list or None
-            特定配体-受体对名称。支持以下格式：
-            - 单个字符串: "LIGAND_RECEPTOR" (例如: "TGFB1_TGFBR1")  
-            - 字符串列表: ["LIGAND1_RECEPTOR1", "LIGAND2_RECEPTOR2"]
-            - 如果为None，显示所有配体-受体对的聚合结果
+            Specific ligand-receptor pair names. Supports following formats:
+            - Single string: "LIGAND_RECEPTOR" (e.g.: "TGFB1_TGFBR1")  
+            - String list: ["LIGAND1_RECEPTOR1", "LIGAND2_RECEPTOR2"]
+            - If None, show aggregated results of all ligand-receptor pairs
         sources : list or None
-            指定的发送者细胞类型列表。如果为None，包含所有细胞类型
+            Specified sender cell type list. If None, include all cell types
         targets : list or None
-            指定的接收者细胞类型列表。如果为None，包含所有细胞类型
+            Specified receiver cell type list. If None, include all cell types
         pvalue_threshold : float
             P-value threshold for significant interactions
         count_min : int
-            最小交互计数阈值
+            Minimum interaction count threshold
         gap : float
-            弦图各段之间的间隙
+            Gap between chord diagram segments
         use_gradient : bool
-            是否使用渐变效果
+            Whether to use gradient effects
         sort : str or None
-            排序方式: "size", "distance", None
+            Sorting method: "size", "distance", None
         directed : bool
-            是否显示方向性
+            Whether to show directionality
         cmap : str or None
-            颜色映射名称
+            Colormap name
         chord_colors : str or None
-            弦的颜色
+            Chord colors
         rotate_names : bool
-            是否旋转名称
+            Whether to rotate names
         fontcolor : str
-            字体颜色
+            Font color
         fontsize : int
-            字体大小
+            Font size
         start_at : int
-            起始角度
+            Starting angle
         extent : int
-            弦图覆盖的角度范围
+            Angle range covered by chord diagram
         min_chord_width : int
-            最小弦宽度
+            Minimum chord width
         colors : list or None
-            自定义颜色列表
+            Custom color list
         ax : matplotlib.axes.Axes or None
-            matplotlib轴对象
+            Matplotlib axes object
         figsize : tuple
-            图形大小
+            Figure size
         title_name : str or None
-            图标题
+            Plot title
         save : str or None
-            保存文件路径
+            Save file path
         normalize_to_sender : bool
-            是否隐藏没有接收信号的细胞类型名字 (True)
+            Whether to hide names of cell types without received signals (True)
             
         Returns:
         --------
@@ -2911,22 +3324,22 @@ class CellChatViz:
             except ImportError:
                 raise ImportError("mpl-chord-diagram package is required. Please install it: pip install mpl-chord-diagram")
         
-        # 处理配体-受体对筛选
+        # Handle ligand-receptor pair filtering
         if ligand_receptor_pairs is not None:
             if isinstance(ligand_receptor_pairs, str):
                 ligand_receptor_pairs = [ligand_receptor_pairs]
             
-            # 检查配体-受体对是否存在
-            # 假设adata.var中包含配体-受体对信息，可能在'gene_name'或其他列中
+            # Check if ligand-receptor pairs exist
+            # Assume adata.var contains ligand-receptor pair information, possibly in 'gene_name' or other columns
             if 'gene_name' in self.adata.var.columns:
                 available_pairs = self.adata.var['gene_name'].unique()
             elif 'interacting_pair' in self.adata.var.columns:
                 available_pairs = self.adata.var['interacting_pair'].unique()
             else:
-                # 如果没有明确的配体-受体对列，使用索引
+                # If no explicit ligand-receptor pair column, use index
                 available_pairs = self.adata.var.index.tolist()
             
-            # 验证请求的配体-受体对
+            # Validate requested ligand-receptor pairs
             missing_pairs = []
             valid_pairs = []
             for pair in ligand_receptor_pairs:
@@ -2937,15 +3350,15 @@ class CellChatViz:
             
             if missing_pairs:
                 print(f"Warning: The following L-R pairs were not found: {missing_pairs}")
-                print(f"Available pairs: {list(available_pairs)[:10]}...")  # 显示前10个
+                print(f"Available pairs: {list(available_pairs)[:10]}...")  # Show first 10
             
             if not valid_pairs:
                 raise ValueError(f"None of the specified L-R pairs were found in the data")
             
-            # 计算特定配体-受体对的通讯矩阵
+            # Calculate communication matrix for specific ligand-receptor pairs
             lr_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
             
-            # 筛选特定配体-受体对的交互
+            # Filter specific ligand-receptor pair interactions
             if 'gene_name' in self.adata.var.columns:
                 lr_mask = self.adata.var['gene_name'].isin(valid_pairs)
             elif 'interacting_pair' in self.adata.var.columns:
@@ -2963,26 +3376,26 @@ class CellChatViz:
                 sender_idx = self.cell_types.index(sender)
                 receiver_idx = self.cell_types.index(receiver)
                 
-                # 获取该配体-受体对的显著交互
+                # Get significant interactions for this ligand-receptor pair
                 pvals = self.adata.layers['pvalues'][i, lr_indices]
                 means = self.adata.layers['means'][i, lr_indices]
                 
                 sig_mask = pvals < pvalue_threshold
                 if np.any(sig_mask):
-                    # 使用交互强度的平均值作为权重
+                    # Use average of interaction strengths as weight
                     lr_matrix[sender_idx, receiver_idx] += np.mean(means[sig_mask])
             
             matrix = lr_matrix
             title_suffix = f" - L-R: {', '.join(valid_pairs[:3])}{'...' if len(valid_pairs) > 3 else ''}"
         else:
-            # 使用聚合的交互计数矩阵
+            # Use aggregated interaction count matrix
             count_matrix, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
-            matrix = weight_matrix  # 使用权重矩阵以更好地反映交互强度
+            matrix = weight_matrix  # Use weight matrix to better reflect interaction strength
             title_suffix = " - All L-R pairs"
         
-        # 过滤指定的发送者和接收者
+        # Filter specified senders and receivers
         if sources is not None or targets is not None:
-            # 验证指定的细胞类型
+            # Validate specified cell types
             if sources is not None:
                 invalid_sources = [ct for ct in sources if ct not in self.cell_types]
                 if invalid_sources:
@@ -2993,11 +3406,11 @@ class CellChatViz:
                 if invalid_targets:
                     raise ValueError(f"Invalid target cell types: {invalid_targets}. Available: {self.cell_types}")
             
-            # 创建过滤后的矩阵
+            # Create filtered matrix
             filtered_matrix = np.zeros_like(matrix)
             for i, sender_type in enumerate(self.cell_types):
                 for j, receiver_type in enumerate(self.cell_types):
-                    # 检查是否符合sources/targets条件
+                    # Check if meets sources/targets conditions
                     sender_ok = (sources is None) or (sender_type in sources)
                     receiver_ok = (targets is None) or (receiver_type in targets)
                     
@@ -3006,14 +3419,14 @@ class CellChatViz:
             
             matrix = filtered_matrix
         
-        # 使用细胞类型名称
+        # Use cell type names
         final_matrix = matrix
         final_names = self.cell_types
         
-        # 过滤低于阈值的交互
+        # Filter interactions below threshold
         final_matrix[final_matrix < count_min] = 0
         
-        # 检查是否还有交互
+        # Check if there are still interactions
         if final_matrix.sum() == 0:
             if ax is None:
                 fig, ax = plt.subplots(figsize=figsize)
@@ -3033,32 +3446,31 @@ class CellChatViz:
                 ax.set_title(title_name, fontsize=16, pad=20)
             return fig, ax
         
-        # 准备颜色
+        # Prepare colors
         if colors is None:
-            # 使用细胞类型颜色
+            # Use cell type colors
             cell_colors = self._get_cell_type_colors()
             colors = [cell_colors.get(node, '#1f77b4') for node in final_names]
         
-        # 创建图形
+        # Create figure
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
         else:
             fig = ax.figure
-
         self.test_final_matrix = final_matrix
         
-        # 修改名称：只隐藏既不发送也不接收信号的细胞类型名字
+        # Modify names: only hide names of cell types that neither send nor receive signals
         display_names = final_names.copy()
         if normalize_to_sender:
-            # 计算行总和（发送的信号）和列总和（接收的信号）
+            # Calculate row sums (sent signals) and column sums (received signals)
             row_sums = final_matrix.sum(axis=1)
             col_sums = final_matrix.sum(axis=0)
             for i in range(len(final_names)):
-                # 只有既不发送也不接收信号的细胞类型才隐藏名字
+                # Only hide names of cell types that neither send nor receive signals
                 if row_sums[i] == 0 and col_sums[i] == 0:
-                    display_names[i] = ""  # 隐藏名字
+                    display_names[i] = ""  # Hide name
         
-        # 绘制弦图
+        # Draw chord diagram
         chord_diagram(
             final_matrix, 
             display_names,
@@ -3078,17 +3490,22 @@ class CellChatViz:
             colors=colors
         )
         
-        # 添加标题
+        # Add title
         if title_name is None:
             title_name = f"Ligand-Receptor Communication{title_suffix}"
         ax.set_title(title_name, fontsize=fontsize + 4, pad=20)
         
-        # 保存文件
+        # Save file
         if save:
             fig.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.02)
             print(f"L-R Chord diagram saved as: {save}")
         
         return fig, ax
+    
+
+
+
+    ##########################################################
 
     def get_ligand_receptor_pairs(self, min_interactions=1, pvalue_threshold=0.05):
         """
@@ -6258,4 +6675,883 @@ class CellChatViz:
         ax.set_ylim(-1.5, 1.5)
         ax.set_aspect('equal')
         ax.axis('off')
+
+    def compute_communication_prob(self, pvalue_threshold=0.05, normalize=True):
+        """
+        计算细胞间通信概率矩阵（类似CellChat的prob矩阵）
+        
+        Parameters:
+        -----------
+        pvalue_threshold : float
+            P-value threshold for significant interactions
+        normalize : bool
+            是否对概率进行归一化
+            
+        Returns:
+        --------
+        prob_tensor : np.ndarray
+            概率张量，形状为 (n_cell_types, n_cell_types, n_pathways)
+        pathway_names : list
+            信号通路名称列表
+        """
+        if 'classification' not in self.adata.var.columns:
+            raise ValueError("'classification' column not found in adata.var")
+        
+        # 获取所有信号通路
+        pathway_names = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
+        n_pathways = len(pathway_names)
+        
+        # 初始化概率张量 (sender, receiver, pathway)
+        prob_tensor = np.zeros((self.n_cell_types, self.n_cell_types, n_pathways))
+        
+        for p_idx, pathway in enumerate(pathway_names):
+            # 获取该通路的交互
+            pathway_mask = self.adata.var['classification'] == pathway
+            pathway_indices = np.where(pathway_mask)[0]
+            
+            if len(pathway_indices) == 0:
+                continue
+            
+            # 计算该通路的概率矩阵
+            pathway_prob = np.zeros((self.n_cell_types, self.n_cell_types))
+            
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], 
+                                                      self.adata.obs['receiver'])):
+                sender_idx = self.cell_types.index(sender)
+                receiver_idx = self.cell_types.index(receiver)
+                
+                # 获取显著交互
+                pvals = self.adata.layers['pvalues'][i, pathway_indices]
+                means = self.adata.layers['means'][i, pathway_indices]
+                
+                # 计算概率：显著交互的平均表达强度
+                sig_mask = pvals < pvalue_threshold
+                if np.any(sig_mask):
+                    pathway_prob[sender_idx, receiver_idx] = np.mean(means[sig_mask])
+            
+            # 存储到张量中
+            prob_tensor[:, :, p_idx] = pathway_prob
+        
+        # 归一化概率（可选）
+        if normalize:
+            # 对每个通路进行归一化，使概率和为1
+            for p_idx in range(n_pathways):
+                prob_sum = prob_tensor[:, :, p_idx].sum()
+                if prob_sum > 0:
+                    prob_tensor[:, :, p_idx] /= prob_sum
+        
+        # 存储结果
+        self.prob_tensor = prob_tensor
+        self.pathway_names = pathway_names
+        
+        return prob_tensor, pathway_names
     
+    def selectK(self, pattern="outgoing", k_range=range(2, 11), nrun=5, 
+               plot_results=True, figsize=(8, 6)):
+        """
+        选择NMF分解的最优K值（类似CellChat的selectK功能）
+        
+        Parameters:
+        -----------
+        pattern : str
+            'outgoing' or 'incoming'
+        k_range : range or list
+            要测试的K值范围
+        nrun : int
+            每个K值运行的次数
+        plot_results : bool
+            是否绘制评估结果
+        figsize : tuple
+            图形大小
+            
+        Returns:
+        --------
+        results : dict
+            包含不同K值的评估指标
+        optimal_k : int
+            推荐的最优K值
+        """
+        try:
+            from sklearn.decomposition import NMF
+            from sklearn.metrics import silhouette_score
+        except ImportError:
+            raise ImportError("scikit-learn is required for NMF analysis. Please install: pip install scikit-learn")
+        
+        # 获取概率矩阵
+        if not hasattr(self, 'prob_tensor'):
+            self.compute_communication_prob()
+        
+        prob_tensor = self.prob_tensor
+        
+        # 准备数据矩阵
+        if pattern == "outgoing":
+            # 聚合为 (sender, pathway)
+            data_matrix = np.sum(prob_tensor, axis=1)  # Sum over receivers
+        elif pattern == "incoming":
+            # 聚合为 (receiver, pathway)
+            data_matrix = np.sum(prob_tensor, axis=0)  # Sum over senders
+        else:
+            raise ValueError("pattern must be 'outgoing' or 'incoming'")
+        
+        # 归一化：每列除以最大值
+        data_matrix = data_matrix / (np.max(data_matrix, axis=0, keepdims=True) + 1e-10)
+        
+        # 过滤掉全零行
+        row_sums = np.sum(data_matrix, axis=1)
+        data_matrix = data_matrix[row_sums > 0, :]
+        
+        if data_matrix.shape[0] < 2:
+            raise ValueError("Insufficient data for NMF analysis")
+        
+        # 评估不同K值
+        results = {
+            'k_values': [],
+            'reconstruction_error': [],
+            'silhouette_score': [],
+            'explained_variance': []
+        }
+        
+        print(f"🔍 评估K值范围: {list(k_range)}...")
+        
+        for k in k_range:
+            if k >= min(data_matrix.shape):
+                continue
+                
+            k_errors = []
+            k_silhouettes = []
+            k_variances = []
+            
+            for run in range(nrun):
+                # 运行NMF
+                nmf_model = NMF(n_components=k, init='nndsvd', random_state=42+run, 
+                               max_iter=1000, alpha_W=0.1, alpha_H=0.1)
+                
+                try:
+                    W = nmf_model.fit_transform(data_matrix)
+                    H = nmf_model.components_
+                    
+                    # 重构误差
+                    reconstruction = np.dot(W, H)
+                    error = np.linalg.norm(data_matrix - reconstruction, 'fro')
+                    k_errors.append(error)
+                    
+                    # 轮廓系数（基于W矩阵的聚类质量）
+                    if k > 1:
+                        labels = np.argmax(W, axis=1)
+                        if len(np.unique(labels)) > 1:
+                            silhouette = silhouette_score(W, labels)
+                            k_silhouettes.append(silhouette)
+                    
+                    # 解释方差
+                    total_var = np.var(data_matrix)
+                    explained_var = 1 - np.var(data_matrix - reconstruction) / total_var
+                    k_variances.append(explained_var)
+                    
+                except Exception as e:
+                    print(f"Warning: NMF failed for k={k}, run={run}: {e}")
+                    continue
+            
+            if k_errors:
+                results['k_values'].append(k)
+                results['reconstruction_error'].append(np.mean(k_errors))
+                results['silhouette_score'].append(np.mean(k_silhouettes) if k_silhouettes else 0)
+                results['explained_variance'].append(np.mean(k_variances))
+        
+        if not results['k_values']:
+            raise ValueError("No valid K values found")
+        
+        # 选择最优K：综合考虑重构误差和轮廓系数
+        scores = []
+        for i, k in enumerate(results['k_values']):
+            # 标准化指标
+            error_norm = 1 - (results['reconstruction_error'][i] / max(results['reconstruction_error']))
+            silhouette_norm = results['silhouette_score'][i] if results['silhouette_score'][i] > 0 else 0
+            variance_norm = results['explained_variance'][i]
+            
+            # 综合评分
+            combined_score = 0.4 * error_norm + 0.3 * silhouette_norm + 0.3 * variance_norm
+            scores.append(combined_score)
+        
+        optimal_idx = np.argmax(scores)
+        optimal_k = results['k_values'][optimal_idx]
+        
+        # 可视化结果
+        if plot_results:
+            fig, axes = plt.subplots(2, 2, figsize=figsize)
+            
+            # 重构误差
+            axes[0, 0].plot(results['k_values'], results['reconstruction_error'], 'bo-')
+            axes[0, 0].set_xlabel('Number of patterns (K)')
+            axes[0, 0].set_ylabel('Reconstruction Error')
+            axes[0, 0].set_title('NMF Reconstruction Error')
+            axes[0, 0].grid(True, alpha=0.3)
+            
+            # 轮廓系数
+            axes[0, 1].plot(results['k_values'], results['silhouette_score'], 'ro-')
+            axes[0, 1].set_xlabel('Number of patterns (K)')
+            axes[0, 1].set_ylabel('Silhouette Score')
+            axes[0, 1].set_title('Clustering Quality')
+            axes[0, 1].grid(True, alpha=0.3)
+            
+            # 解释方差
+            axes[1, 0].plot(results['k_values'], results['explained_variance'], 'go-')
+            axes[1, 0].set_xlabel('Number of patterns (K)')
+            axes[1, 0].set_ylabel('Explained Variance')
+            axes[1, 0].set_title('Variance Explained')
+            axes[1, 0].grid(True, alpha=0.3)
+            
+            # 综合评分
+            axes[1, 1].plot(results['k_values'], scores, 'mo-')
+            axes[1, 1].axvline(optimal_k, color='red', linestyle='--', alpha=0.7)
+            axes[1, 1].set_xlabel('Number of patterns (K)')
+            axes[1, 1].set_ylabel('Combined Score')
+            axes[1, 1].set_title(f'Overall Score (Optimal K={optimal_k})')
+            axes[1, 1].grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.show()
+        
+        print(f"📊 K值选择结果:")
+        print(f"   - 推荐最优K值: {optimal_k}")
+        print(f"   - 重构误差: {results['reconstruction_error'][optimal_idx]:.4f}")
+        print(f"   - 轮廓系数: {results['silhouette_score'][optimal_idx]:.4f}")
+        print(f"   - 解释方差: {results['explained_variance'][optimal_idx]:.4f}")
+        
+        return results, optimal_k
+    
+    def identifyCommunicationPatterns(self, pattern="outgoing", k=None, 
+                                    heatmap_show=True, figsize=(15, 6), 
+                                    font_size=10, save=None, 
+                                    color_heatmap="RdYlBu_r", title=None):
+        """
+        识别细胞通信模式使用NMF分解（类似CellChat的identifyCommunicationPatterns功能）
+        
+        Parameters:
+        -----------
+        pattern : str
+            'outgoing' or 'incoming'
+        k : int or None
+            NMF分解的模式数量，如果为None则需要先运行selectK
+        heatmap_show : bool
+            是否显示热图
+        figsize : tuple
+            图形大小
+        font_size : int
+            字体大小
+        save : str or None
+            保存路径
+        color_heatmap : str
+            热图颜色方案
+        title : str or None
+            图形标题
+            
+        Returns:
+        --------
+        patterns : dict
+            包含细胞模式和信号模式的结果
+        fig : matplotlib.figure.Figure or None
+            可视化图形
+        """
+        try:
+            from sklearn.decomposition import NMF
+            from sklearn.preprocessing import normalize
+        except ImportError:
+            raise ImportError("scikit-learn is required for NMF analysis. Please install: pip install scikit-learn")
+        
+        if k is None:
+            raise ValueError("Please provide k value or run selectK() first to determine optimal k")
+        
+        # 获取概率矩阵
+        if not hasattr(self, 'prob_tensor'):
+            self.compute_communication_prob()
+        
+        prob_tensor = self.prob_tensor
+        
+        # 准备数据矩阵
+        if pattern == "outgoing":
+            # 聚合为 (sender, pathway)
+            data_matrix = np.sum(prob_tensor, axis=1)  # Sum over receivers
+            cell_labels = self.cell_types
+        elif pattern == "incoming":
+            # 聚合为 (receiver, pathway)  
+            data_matrix = np.sum(prob_tensor, axis=0)  # Sum over senders
+            cell_labels = self.cell_types
+        else:
+            raise ValueError("pattern must be 'outgoing' or 'incoming'")
+        
+        print(f"🔍 原始数据矩阵形状: {data_matrix.shape}")
+        print(f"   - 数据范围: {data_matrix.min():.4f} - {data_matrix.max():.4f}")
+        print(f"   - 非零元素比例: {(data_matrix > 0).sum() / data_matrix.size:.2%}")
+        
+        # 改进的数据预处理
+        # 1. 过滤掉全零行和列
+        row_sums = np.sum(data_matrix, axis=1)
+        col_sums = np.sum(data_matrix, axis=0)
+        
+        valid_rows = row_sums > 0
+        valid_cols = col_sums > 0
+        
+        data_filtered = data_matrix[valid_rows, :][:, valid_cols]
+        valid_cell_labels = [cell_labels[i] for i in range(len(cell_labels)) if valid_rows[i]]
+        valid_pathway_names = [self.pathway_names[i] for i in range(len(self.pathway_names)) if valid_cols[i]]
+        
+        print(f"🔧 过滤后数据形状: {data_filtered.shape}")
+        
+        if data_filtered.shape[0] < k:
+            raise ValueError(f"Not enough valid cell types ({data_filtered.shape[0]}) for k={k} patterns")
+        
+        if data_filtered.shape[1] < k:
+            raise ValueError(f"Not enough valid pathways ({data_filtered.shape[1]}) for k={k} patterns")
+        
+        # 2. 改进的归一化策略：使用CellChat风格的按行归一化
+        # 每行除以该行的最大值，类似CellChat的sweep操作
+        row_max = np.max(data_filtered, axis=1, keepdims=True)
+        row_max[row_max == 0] = 1  # 避免除零
+        data_normalized = data_filtered / row_max
+        
+        print(f"📊 归一化后数据范围: {data_normalized.min():.4f} - {data_normalized.max():.4f}")
+        
+        # 3. 添加小量随机噪声避免完全相同的行（这在真实数据中很少见）
+        np.random.seed(42)
+        noise_level = data_normalized.std() * 0.01  # 1%的噪声
+        data_normalized += np.random.normal(0, noise_level, data_normalized.shape)
+        data_normalized = np.clip(data_normalized, 0, None)  # 确保非负
+        
+        # 执行NMF分解
+        print(f"🔬 执行NMF分解 (k={k}, pattern={pattern})...")
+        
+        # 改进的NMF参数：降低正则化，增加迭代次数
+        nmf_model = NMF(
+            n_components=k, 
+            init='nndsvd',  # 更好的初始化
+            random_state=42, 
+            max_iter=2000,  # 增加迭代次数
+            alpha_W=0.01,   # 降低W的正则化
+            alpha_H=0.01,   # 降低H的正则化
+            beta_loss='frobenius',
+            tol=1e-6
+        )
+        
+        W = nmf_model.fit_transform(data_normalized)  # (cells, patterns)
+        H = nmf_model.components_  # (patterns, pathways)
+        
+        print(f"   - 收敛状态: {'已收敛' if nmf_model.n_iter_ < nmf_model.max_iter else '未完全收敛'}")
+        print(f"   - 迭代次数: {nmf_model.n_iter_}")
+        
+        # 检查分解质量
+        reconstruction = np.dot(W, H)
+        reconstruction_error = np.linalg.norm(data_normalized - reconstruction, 'fro')
+        relative_error = reconstruction_error / np.linalg.norm(data_normalized, 'fro')
+        
+        print(f"   - 重构误差: {reconstruction_error:.4f}")
+        print(f"   - 相对误差: {relative_error:.4f}")
+        
+        # 4. 改进的归一化：采用CellChat的标准化方法
+        # W矩阵：每行归一化（每个细胞在所有模式中的贡献和为1）
+        W_norm = W / (W.sum(axis=1, keepdims=True) + 1e-10)
+        
+        # H矩阵：每列归一化（每个通路在所有模式中的贡献和为1）
+        H_norm = H / (H.sum(axis=0, keepdims=True) + 1e-10)
+        
+        # 检查结果的多样性
+        pattern_diversity = []
+        for i in range(k):
+            # 计算每个模式的熵（多样性指标）
+            w_entropy = -np.sum(W_norm[:, i] * np.log(W_norm[:, i] + 1e-10))
+            h_entropy = -np.sum(H_norm[i, :] * np.log(H_norm[i, :] + 1e-10))
+            pattern_diversity.append((w_entropy, h_entropy))
+        
+        print(f"📈 模式多样性分析:")
+        for i, (w_ent, h_ent) in enumerate(pattern_diversity):
+            print(f"   - Pattern {i+1}: 细胞多样性={w_ent:.2f}, 通路多样性={h_ent:.2f}")
+        
+        # 创建模式标签
+        pattern_labels = [f"Pattern {i+1}" for i in range(k)]
+        
+        # 创建结果DataFrame
+        cell_patterns_df = pd.DataFrame(
+            W_norm, 
+            index=valid_cell_labels, 
+            columns=pattern_labels
+        )
+        
+        signaling_patterns_df = pd.DataFrame(
+            H_norm.T,  # 转置: (pathways, patterns)
+            index=valid_pathway_names,
+            columns=pattern_labels
+        )
+        
+        # 存储结果
+        patterns = {
+            'cell': cell_patterns_df,
+            'signaling': signaling_patterns_df,
+            'W_matrix': W_norm,
+            'H_matrix': H_norm,
+            'pattern': pattern,
+            'k': k,
+            'reconstruction_error': reconstruction_error,
+            'relative_error': relative_error,
+            'pattern_diversity': pattern_diversity,
+            'valid_cells': valid_cell_labels,
+            'valid_pathways': valid_pathway_names
+        }
+        
+        self.communication_patterns = patterns
+        
+        # 可视化
+        fig = None
+        if heatmap_show:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+            
+            # 细胞模式热图
+            im1 = ax1.imshow(W_norm, cmap=color_heatmap, aspect='auto', vmin=0, vmax=1)
+            ax1.set_xticks(range(k))
+            ax1.set_xticklabels(pattern_labels, fontsize=font_size)
+            ax1.set_yticks(range(len(valid_cell_labels)))
+            ax1.set_yticklabels(valid_cell_labels, fontsize=font_size-1)
+            ax1.set_title('Cell Patterns', fontsize=font_size + 2)
+            ax1.set_xlabel('Communication Patterns', fontsize=font_size)
+            
+            # 添加细胞类型颜色条
+            cell_colors = self._get_cell_type_colors()
+            colors = [cell_colors.get(ct, '#808080') for ct in valid_cell_labels]
+            
+            # 在左侧添加颜色条
+            for i, color in enumerate(colors):
+                rect = plt.Rectangle((-0.8, i-0.4), 0.6, 0.8, 
+                                   facecolor=color, edgecolor='black', linewidth=0.5)
+                ax1.add_patch(rect)
+            
+            # 信号模式热图
+            im2 = ax2.imshow(H_norm.T, cmap=color_heatmap, aspect='auto', vmin=0, vmax=1)
+            ax2.set_xticks(range(k))
+            ax2.set_xticklabels(pattern_labels, fontsize=font_size)
+            ax2.set_yticks(range(len(valid_pathway_names)))
+            ax2.set_yticklabels(valid_pathway_names, fontsize=font_size-1, rotation=0)
+            ax2.set_title('Signaling Patterns', fontsize=font_size + 2)
+            ax2.set_xlabel('Communication Patterns', fontsize=font_size)
+            
+            # 添加colorbar
+            plt.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04, label='Contribution')
+            plt.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04, label='Contribution')
+            
+            # 总标题
+            if title is None:
+                title = f"Communication Pattern Analysis ({pattern.title()}) - RE={relative_error:.3f}"
+            fig.suptitle(title, fontsize=font_size + 4, y=0.95)
+            
+            plt.tight_layout()
+            
+            if save:
+                plt.savefig(save, dpi=300, bbox_inches='tight')
+                print(f"Communication patterns saved as: {save}")
+        
+        # 输出分析结果
+        print(f"✅ 通信模式识别完成:")
+        print(f"   - 模式数量: {k}")
+        print(f"   - 分析方向: {pattern}")
+        print(f"   - 重构误差: {reconstruction_error:.4f}")
+        print(f"   - 相对误差: {relative_error:.4f}")
+        print(f"   - 有效细胞类型: {len(valid_cell_labels)}")
+        print(f"   - 有效信号通路: {len(valid_pathway_names)}")
+        
+        # 显示主要模式特征 - 改进版本
+        print(f"\n🔍 模式特征分析:")
+        for i in range(k):
+            pattern_name = pattern_labels[i]
+            
+            # 主要细胞类型 - 显示更有意义的差异
+            cell_scores = cell_patterns_df[pattern_name]
+            if cell_scores.max() > 0.1:  # 只显示有意义的贡献
+                top_cells = cell_scores.nlargest(3)
+                cell_str = ", ".join([f"{ct}({score:.3f})" for ct, score in top_cells.items() if score > 0.05])
+            else:
+                cell_str = "低贡献模式"
+            
+            # 主要信号通路
+            pathway_scores = signaling_patterns_df[pattern_name]
+            if pathway_scores.max() > 0.1:
+                top_pathways = pathway_scores.nlargest(3)
+                pathway_str = ", ".join([f"{pw}({score:.3f})" for pw, score in top_pathways.items() if score > 0.05])
+            else:
+                pathway_str = "低贡献模式"
+            
+            w_ent, h_ent = pattern_diversity[i]
+            print(f"   - {pattern_name} (多样性: 细胞={w_ent:.2f}, 通路={h_ent:.2f}):")
+            print(f"     * 主要细胞: {cell_str}")
+            print(f"     * 主要通路: {pathway_str}")
+        
+        return patterns, fig
+    
+    def computeNetSimilarity(self, similarity_type="functional", k=None, thresh=None):
+        """
+        计算信号网络之间的相似性（类似CellChat的computeNetSimilarity功能）
+        
+        Parameters:
+        -----------
+        similarity_type : str
+            相似性类型: "functional" or "structural"
+        k : int or None
+            SNN平滑的邻居数量，如果为None则自动计算
+        thresh : float or None
+            过滤阈值，去除低于该分位数的交互
+            
+        Returns:
+        --------
+        similarity_matrix : pd.DataFrame
+            信号网络相似性矩阵
+        """
+        # 获取概率矩阵
+        if not hasattr(self, 'prob_tensor'):
+            self.compute_communication_prob()
+        
+        prob_tensor = self.prob_tensor
+        n_pathways = prob_tensor.shape[2]
+        
+        # 自动设置k值
+        if k is None:
+            if n_pathways <= 25:
+                k = int(np.ceil(np.sqrt(n_pathways)))
+            else:
+                k = int(np.ceil(np.sqrt(n_pathways))) + 1
+        
+        # 应用阈值过滤
+        if thresh is not None:
+            non_zero_values = prob_tensor[prob_tensor != 0]
+            if len(non_zero_values) > 0:
+                threshold_value = np.quantile(non_zero_values, thresh)
+                prob_tensor = prob_tensor.copy()
+                prob_tensor[prob_tensor < threshold_value] = 0
+        
+        print(f"🔍 计算{similarity_type}相似性 (k={k}, n_pathways={n_pathways})...")
+        
+        # 初始化相似性矩阵
+        similarity_matrix = np.zeros((n_pathways, n_pathways))
+        
+        if similarity_type == "functional":
+            # 计算功能相似性（基于Jaccard指数）
+            for i in range(n_pathways - 1):
+                for j in range(i + 1, n_pathways):
+                    # 获取二进制矩阵（是否有交互）
+                    Gi = (prob_tensor[:, :, i] > 0).astype(int)
+                    Gj = (prob_tensor[:, :, j] > 0).astype(int)
+                    
+                    # 计算Jaccard相似性
+                    intersection = np.sum(Gi * Gj)
+                    union = np.sum(Gi + Gj - Gi * Gj)
+                    
+                    if union > 0:
+                        jaccard_sim = intersection / union
+                    else:
+                        jaccard_sim = 0
+                    
+                    similarity_matrix[i, j] = jaccard_sim
+            
+            # 对称化矩阵
+            similarity_matrix = similarity_matrix + similarity_matrix.T
+            np.fill_diagonal(similarity_matrix, 1.0)
+            
+        elif similarity_type == "structural":
+            # 计算结构相似性
+            for i in range(n_pathways - 1):
+                for j in range(i + 1, n_pathways):
+                    Gi = (prob_tensor[:, :, i] > 0).astype(int)
+                    Gj = (prob_tensor[:, :, j] > 0).astype(int)
+                    
+                    # 计算结构距离（简化版本）
+                    # 使用Hamming距离的归一化版本
+                    diff_matrix = np.abs(Gi - Gj)
+                    total_positions = Gi.size
+                    hamming_distance = np.sum(diff_matrix) / total_positions
+                    
+                    # 转换为相似性（距离越小，相似性越高）
+                    structural_sim = 1 - hamming_distance
+                    similarity_matrix[i, j] = structural_sim
+            
+            # 对称化矩阵
+            similarity_matrix = similarity_matrix + similarity_matrix.T
+            np.fill_diagonal(similarity_matrix, 1.0)
+            
+        else:
+            raise ValueError("similarity_type must be 'functional' or 'structural'")
+        
+        # SNN平滑（简化版本）
+        similarity_smoothed = self._apply_snn_smoothing(similarity_matrix, k)
+        
+        # 创建DataFrame
+        similarity_df = pd.DataFrame(
+            similarity_smoothed,
+            index=self.pathway_names,
+            columns=self.pathway_names
+        )
+        
+        # 存储结果
+        if not hasattr(self, 'net_similarity'):
+            self.net_similarity = {}
+        self.net_similarity[similarity_type] = similarity_df
+        
+        print(f"✅ 网络相似性计算完成:")
+        print(f"   - 相似性类型: {similarity_type}")
+        print(f"   - 相似性范围: {similarity_df.values.min():.3f} - {similarity_df.values.max():.3f}")
+        print(f"   - 平均相似性: {similarity_df.values.mean():.3f}")
+        
+        return similarity_df
+    
+    def _apply_snn_smoothing(self, similarity_matrix, k):
+        """
+        应用共享最近邻（SNN）平滑
+        
+        Parameters:
+        -----------
+        similarity_matrix : np.ndarray
+            原始相似性矩阵
+        k : int
+            邻居数量
+            
+        Returns:
+        --------
+        smoothed_matrix : np.ndarray
+            平滑后的相似性矩阵
+        """
+        n = similarity_matrix.shape[0]
+        snn_matrix = np.zeros_like(similarity_matrix)
+        
+        # 对每个节点找k个最近邻
+        for i in range(n):
+            # 获取相似性分数并排序
+            similarities = similarity_matrix[i, :]
+            # 不包括自己，找到k个最近邻
+            neighbor_indices = np.argsort(similarities)[::-1][1:k+1]
+            
+            for j in range(n):
+                if i != j:
+                    # 计算共享邻居数量
+                    j_neighbors = np.argsort(similarity_matrix[j, :])[::-1][1:k+1]
+                    shared_neighbors = len(set(neighbor_indices) & set(j_neighbors))
+                    
+                    # SNN相似性
+                    snn_matrix[i, j] = shared_neighbors / k
+        
+        # 应用SNN权重
+        prune_threshold = 1/15  # 类似CellChat的prune.SNN参数
+        snn_matrix[snn_matrix < prune_threshold] = 0
+        
+        # 与原始相似性矩阵相乘
+        smoothed_matrix = similarity_matrix * snn_matrix
+        
+        return smoothed_matrix
+    
+    def netVisual_diffusion(self, similarity_type="functional", layout='spring',
+                           node_size_factor=500, edge_width_factor=5,
+                           figsize=(12, 10), title=None, save=None,
+                           show_labels=True, font_size=12):
+        """
+        可视化信号网络相似性和扩散模式
+        
+        Parameters:
+        -----------
+        similarity_type : str
+            使用的相似性类型
+        layout : str
+            网络布局: 'spring', 'circular', 'kamada_kawai'
+        node_size_factor : float
+            节点大小因子
+        edge_width_factor : float
+            边宽度因子
+        figsize : tuple
+            图形大小
+        title : str or None
+            图标题
+        save : str or None
+            保存路径
+        show_labels : bool
+            是否显示标签
+        font_size : int
+            字体大小
+            
+        Returns:
+        --------
+        fig : matplotlib.figure.Figure
+        ax : matplotlib.axes.Axes
+        """
+        try:
+            import networkx as nx
+        except ImportError:
+            raise ImportError("NetworkX is required for network visualization. Please install: pip install networkx")
+        
+        if not hasattr(self, 'net_similarity') or similarity_type not in self.net_similarity:
+            print(f"Computing {similarity_type} similarity first...")
+            self.computeNetSimilarity(similarity_type=similarity_type)
+        
+        similarity_df = self.net_similarity[similarity_type]
+        
+        # 创建网络图
+        G = nx.Graph()
+        
+        # 添加节点
+        pathways = similarity_df.index.tolist()
+        G.add_nodes_from(pathways)
+        
+        # 添加边（只保留高相似性的边）
+        threshold = similarity_df.values.mean() + similarity_df.values.std()
+        
+        for i, pathway1 in enumerate(pathways):
+            for j, pathway2 in enumerate(pathways):
+                if i < j:  # 避免重复边
+                    weight = similarity_df.loc[pathway1, pathway2]
+                    if weight > threshold:
+                        G.add_edge(pathway1, pathway2, weight=weight)
+        
+        # 计算布局
+        if layout == 'spring':
+            pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+        elif layout == 'circular':
+            pos = nx.circular_layout(G)
+        elif layout == 'kamada_kawai':
+            pos = nx.kamada_kawai_layout(G)
+        else:
+            pos = nx.spring_layout(G)
+        
+        # 可视化
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 计算节点大小（基于平均相似性）
+        node_similarities = similarity_df.mean(axis=1)
+        node_sizes = [node_similarities[pathway] * node_size_factor for pathway in pathways]
+        
+        # 绘制节点
+        nx.draw_networkx_nodes(G, pos, node_size=node_sizes, 
+                              node_color='lightblue', alpha=0.7, 
+                              edgecolors='black', linewidths=1, ax=ax)
+        
+        # 绘制边
+        edges = G.edges()
+        if edges:
+            weights = [G[u][v]['weight'] for u, v in edges]
+            edge_widths = [w * edge_width_factor for w in weights]
+            
+            nx.draw_networkx_edges(G, pos, width=edge_widths, 
+                                  alpha=0.6, edge_color='gray', ax=ax)
+        
+        # 添加标签
+        if show_labels:
+            nx.draw_networkx_labels(G, pos, font_size=font_size, 
+                                   font_weight='bold', ax=ax)
+        
+        # 设置标题
+        if title is None:
+            title = f"Signaling Network Similarity ({similarity_type.title()})"
+        ax.set_title(title, fontsize=font_size + 4, pad=20)
+        ax.axis('off')
+        
+        # 添加图例
+        legend_elements = [
+            plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue',
+                      markersize=10, label='Signaling Pathway'),
+            plt.Line2D([0], [0], color='gray', linewidth=3, label='High Similarity')
+        ]
+        ax.legend(handles=legend_elements, loc='upper right')
+        
+        plt.tight_layout()
+        
+        if save:
+            plt.savefig(save, dpi=300, bbox_inches='tight')
+            print(f"Network similarity plot saved as: {save}")
+        
+        return fig, ax
+    
+    def identifyOverExpressedGenes(self, signaling, patterns=None,
+                                  min_expression=0.1, pvalue_threshold=0.05):
+        """
+        识别在特定模式中过表达的基因
+        
+        Parameters:
+        -----------
+        signaling : str or list
+            信号通路名称
+        patterns : list or None
+            要分析的模式编号，如果为None则分析所有模式
+        min_expression : float
+            最小表达阈值
+        pvalue_threshold : float
+            显著性阈值
+            
+        Returns:
+        --------
+        overexpressed_genes : dict
+            每个模式中过表达的基因
+        """
+        if not hasattr(self, 'communication_patterns'):
+            raise ValueError("Please run identifyCommunicationPatterns() first")
+        
+        if isinstance(signaling, str):
+            signaling = [signaling]
+        
+        # 获取模式信息
+        cell_patterns = self.communication_patterns['cell']
+        signaling_patterns = self.communication_patterns['signaling']
+        
+        if patterns is None:
+            patterns = list(range(len(cell_patterns.columns)))
+        
+        overexpressed_genes = {}
+        
+        # 分析每个模式
+        for pattern_idx in patterns:
+            pattern_name = f"Pattern {pattern_idx + 1}"
+            
+            if pattern_name not in cell_patterns.columns:
+                continue
+            
+            # 获取该模式中贡献最大的细胞类型
+            top_cells = cell_patterns[pattern_name].nlargest(3).index.tolist()
+            
+            # 获取该模式中贡献最大的信号通路
+            pattern_pathways = signaling_patterns[pattern_name].nlargest(5).index.tolist()
+            
+            # 找到交集通路
+            relevant_pathways = list(set(pattern_pathways) & set(signaling))
+            
+            if not relevant_pathways:
+                continue
+            
+            # 收集过表达基因
+            pattern_genes = {'ligands': set(), 'receptors': set()}
+            
+            # 筛选相关通路的基因
+            pathway_mask = self.adata.var['classification'].isin(relevant_pathways)
+            
+            for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], 
+                                                     self.adata.obs['receiver'])):
+                # 只考虑top细胞类型
+                if sender not in top_cells and receiver not in top_cells:
+                    continue
+                
+                # 获取显著交互
+                pvals = self.adata.layers['pvalues'][i, pathway_mask]
+                means = self.adata.layers['means'][i, pathway_mask]
+                
+                sig_mask = (pvals < pvalue_threshold) & (means > min_expression)
+                
+                if np.any(sig_mask):
+                    # 获取基因信息
+                    pathway_indices = np.where(pathway_mask)[0]
+                    sig_indices = pathway_indices[sig_mask]
+                    
+                    for idx in sig_indices:
+                        gene_a = self.adata.var['gene_a'].iloc[idx]
+                        gene_b = self.adata.var['gene_b'].iloc[idx]
+                        
+                        if pd.notna(gene_a):
+                            pattern_genes['ligands'].add(gene_a)
+                        if pd.notna(gene_b):
+                            pattern_genes['receptors'].add(gene_b)
+            
+            overexpressed_genes[pattern_name] = {
+                'ligands': list(pattern_genes['ligands']),
+                'receptors': list(pattern_genes['receptors']),
+                'top_cells': top_cells,
+                'relevant_pathways': relevant_pathways
+            }
+        
+        return overexpressed_genes
