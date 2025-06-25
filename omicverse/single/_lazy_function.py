@@ -124,21 +124,40 @@ def lazy(adata,
     #step 3: PCA:
     if  ('pca' not in adata.uns['status'].keys()) or ('pca' in adata.uns['status'].keys() and adata.uns['status']['pca'] == False)  or ('pca' in reforce_steps):
         print('❌ PCA step didn\'t start, we will start it now')
-        if pca_kwargs is None:
-            pca_kwargs = {
-                'layer':'scaled',
-                'n_pcs':50,
-                'use_highly_variable': True,
-            }
-        if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
-            adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
-        print(f'🔧 The argument of PCA we set\n'
-              f'   layer: {pca_kwargs["layer"]}\n'
-              f'   n_pcs: {pca_kwargs["n_pcs"]}\n'
-              f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
-              )
-        pca(adata,**pca_kwargs)
-        adata.obsm['X_pca']=adata.obsm["scaled|original|X_pca"]
+        if sc.__version__>='1.11.0':
+            if pca_kwargs is None:
+                pca_kwargs = {
+                    'layer':'scaled',
+                    'n_pcs':50,
+                    'use_highly_variable': True,
+                }
+            if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
+                adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
+            print(f'🔧 The argument of PCA we set\n'
+                    f'   layer: {pca_kwargs["layer"]}\n'
+                    f'   n_pcs: {pca_kwargs["n_pcs"]}\n'
+                    f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
+                    )
+            pca(adata,**pca_kwargs)
+            adata.obsm['X_pca']=adata.obsm["scaled|original|X_pca"]
+        else:
+            print('❌ The version of scanpy is lower than 1.11.0, we will use the old version of PCA function (sc.pp.pca)')
+            if pca_kwargs is None:
+                pca_kwargs = {
+                    'layer':'scaled',
+                    'n_comps':50,
+                    'use_highly_variable': True,
+                }
+            if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
+                adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
+            print(f'🔧 The argument of PCA we set\n'
+                    f'   layer: {pca_kwargs["layer"]}\n'
+                    f'   n_comps: {pca_kwargs["n_comps"]}\n'
+                    f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
+                    )
+            sc.pp.pca(adata,**pca_kwargs)
+        print('❌ The version of scanpy is lower than 1.11.0, GPU mode will not work, we will use CPU mode')
+        print('    If you want to use GPU mode, please update scanpy to 1.11.0 or higher')
     else:
         print('✅ PCA step already finished, skipping it')
 
