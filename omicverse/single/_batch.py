@@ -41,9 +41,15 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             use_direct_harmony = False
             
         adata3=adata.copy()
-        if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
-            scale(adata3)
-            pca(adata3,layer='scaled',n_pcs=n_pcs)
+        if sc.__version__>='1.11.0':
+            if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
+                scale(adata3)
+                pca(adata3,layer='scaled',n_pcs=n_pcs)
+        else:
+            if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
+                scale(adata3)
+                sc.pp.pca(adata3,layer='scaled',n_comps=n_pcs)
+                adata3.obsm['scaled|original|X_pca'] = adata3.obsm['X_pca'].copy()
         
         if settings.mode == 'cpu':
             # Use scanpy's external harmony integration for CPU mode
