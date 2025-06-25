@@ -64,6 +64,7 @@ from ._svg import svg
 from ._cast import CAST
 from ._tools import *
 from ._gaston import GASTON
+from ._commot import create_communication_anndata,update_classification_from_database
 
 
 __all__ = [
@@ -91,4 +92,6 @@ __all__ = [
     'GASTON',
     
     # Utility functions (imported from _tools)
+    'create_communication_anndata',
+    'update_classification_from_database',
 ]
