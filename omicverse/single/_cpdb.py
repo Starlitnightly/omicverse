@@ -824,7 +824,7 @@ def validate_cpdb_database(cpdb_file_path):
     return str(cpdb_path)
 
 
-def run_cellphonedb_analysis(adata, 
+def run_cellphonedb_v5(adata, 
                            cpdb_file_path,  # Now mandatory
                            celltype_key='celltype',
                            min_cell_fraction=0.005,
