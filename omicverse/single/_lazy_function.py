@@ -294,7 +294,7 @@ def lazy(adata,
         adata.obs['L1_result_smooth']=adata.obs['leiden_r1.5']
         #自动聚类
         for idx in range(10):
-            if (np.unique(len(adata.obs['L1_result_smooth'].tolist()))>3) and idx>0:
+            if (len(np.unique(adata.obs['L1_result_smooth'].tolist()))>3) and idx>0:
                 break
             else:
                 adata.obs['L1_Round0']=adata.obs['L1_result_smooth']
