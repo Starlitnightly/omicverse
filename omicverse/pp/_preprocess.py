@@ -515,14 +515,14 @@ def normalize_pearson_residuals(adata,**kwargs):
     normalize
     '''
 
-    sc.experimental.pp.normalize_pearson_residuals(adata,kwargs)
+    sc.experimental.pp.normalize_pearson_residuals(adata,**kwargs)
 
 def highly_variable_genes(adata,**kwargs):
     '''
     highly_variable_genes calculation
     '''
     sc.experimental.pp.highly_variable_genes(
-        adata, kwargs,
+        adata, **kwargs,
     )
 
 def scale(adata,max_value=10,layers_add='scaled'):
