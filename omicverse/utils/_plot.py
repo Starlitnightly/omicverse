@@ -1,6 +1,8 @@
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
 import random
 import scanpy as sc
@@ -15,6 +17,7 @@ import pkg_resources
 from pkg_resources import DistributionNotFound, VersionConflict
 import tomli
 import os
+
 
 from datetime import datetime, timedelta
 import warnings
@@ -213,7 +216,8 @@ EMOJI = {
 }
 
 
-def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
+def plot_set(verbosity: int = 3, dpi: int = 80, 
+             facecolor: str = 'white', font_path: str = None):
     r"""Configure plotting settings for OmicVerse.
     
     Sets up scanpy verbosity, matplotlib parameters, suppresses warnings,
@@ -223,6 +227,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
         verbosity: Scanpy verbosity level (3)
         dpi: Resolution for matplotlib figures (80) 
         facecolor: Background color for figures ('white')
+        font_path: Path to font for custom fonts (None)
         
     Returns:
         None
@@ -242,14 +247,71 @@ def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
     sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
     #print(f"{EMOJI['done']} Settings applied")
 
-    # 3) suppress user/future/deprecation warnings
+    # 3) Custom font setup
+    if font_path is not None:
+        # Check if user wants Arial font (auto-download)
+        if font_path.lower() in ['arial', 'arial.ttf'] and not font_path.endswith('.ttf'):
+            try:
+                # Create a persistent cache location for the Arial font
+                import tempfile
+                import requests
+
+                cache_dir = tempfile.gettempdir()
+                cached_arial_path = os.path.join(cache_dir, 'omicverse_arial.ttf')
+                
+                # Check if Arial font is already cached
+                if os.path.exists(cached_arial_path):
+                    print(f"Using already downloaded Arial font from: {cached_arial_path}")
+                    font_path = cached_arial_path
+                else:
+                    print("Downloading Arial font from GitHub...")
+                    arial_url = "https://github.com/kavin808/arial.ttf/raw/refs/heads/master/arial.ttf"
+                    
+                    # Download the font
+                    response = requests.get(arial_url, timeout=30)
+                    response.raise_for_status()
+                    
+                    # Save the font to cache location
+                    with open(cached_arial_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Use the cached font file
+                    font_path = cached_arial_path
+                    print(f"Arial font downloaded successfully to: {cached_arial_path}")
+                
+            except Exception as e:
+                print(f"Failed to download Arial font: {e}")
+                print("Continuing with default font settings...")
+                font_path = None
+        
+        if font_path is not None:
+            try:
+                # 1) Create a brand-new manager
+                fm.fontManager = fm.FontManager()
+                
+                # 2) Add your file
+                fm.fontManager.addfont(font_path)
+                
+                # 3) Now find out what name it uses
+                name = fm.FontProperties(fname=font_path).get_name()
+                print("Registered as:", name)
+                
+                # 4) Point rcParams at that name
+                mpl.rcParams['font.family'] = 'sans-serif'
+                mpl.rcParams['font.sans-serif'] = [name, 'DejaVu Sans']
+                
+            except Exception as e:
+                print(f"Failed to set custom font: {e}")
+                print("Continuing with default font settings...")
+
+    # 4) suppress user/future/deprecation warnings
     #print(f"{EMOJI['warnings']} Suppressing common warnings")
     warnings.simplefilter("ignore", category=UserWarning)
     warnings.simplefilter("ignore", category=FutureWarning)
     warnings.simplefilter("ignore", category=DeprecationWarning)
     #print(f"{EMOJI['done']} Warnings suppressed")
 
-    # 4) GPU detection
+    # 5) GPU detection
     print(f"{EMOJI['gpu']} Detecting CUDA devices…")
     if torch is None or not torch.cuda.is_available():
         print(f"{EMOJI['warnings']} No CUDA devices found")
@@ -263,7 +325,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80, facecolor: str = 'white'):
         except Exception as e:
             print(f"{EMOJI['warnings']} GPU detection failed: {e}")
 
-    # 5) print logo & version only once
+    # 6) print logo & version only once
     if not _has_printed_logo:
         #print(f"{EMOJI['logo']} OmicVerse Logo:")
         today = datetime.now()
