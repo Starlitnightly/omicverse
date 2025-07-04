@@ -30,7 +30,7 @@ from matplotlib.colors import (
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Circle, Polygon, Rectangle
-from matplotlib_scalebar.scalebar import ScaleBar
+
 from pandas import CategoricalDtype
 from scanpy import logging as logg
 from scanpy._settings import settings as sc_settings
@@ -665,6 +665,7 @@ def _decorate_axs(
     scalebar_units: Sequence[str] | None = None,
     scalebar_kwargs: Mapping[str, Any] = MappingProxyType({}),
 ) -> Axes:
+   
     ax.set_yticks([])
     ax.set_xticks([])
     ax.set_xlabel(fig_params.ax_labels[0])
@@ -714,6 +715,7 @@ def _decorate_axs(
         ax.invert_yaxis()
 
     if isinstance(scalebar_dx, list) and isinstance(scalebar_units, list):
+        from matplotlib_scalebar.scalebar import ScaleBar
         scalebar = ScaleBar(scalebar_dx[lib_count], units=scalebar_units[lib_count], **scalebar_kwargs)
         ax.add_artist(scalebar)
 
@@ -1930,7 +1932,9 @@ def spatial_segment_overlay(
     """
     from matplotlib.colors import LinearSegmentedColormap, to_rgb
     from matplotlib.gridspec import GridSpec
+    from squidpy.pl._utils import sanitize_anndata, save_fig
     import matplotlib as mpl
+    from squidpy.gr._utils import _assert_spatial_basis
     
     sanitize_anndata(adata)
     _assert_spatial_basis(adata, spatial_key)
@@ -2018,8 +2022,10 @@ def spatial_segment_overlay(
         else:
             fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
             ax.grid(False)
+            gs = None  # No GridSpec when no colorbars
     else:
         fig = ax.figure if ax.figure is not None else fig
+        gs = None  # No GridSpec when external ax is provided
     
     # Get spatial parameters once
     spatial_params = _image_spatial_attrs(

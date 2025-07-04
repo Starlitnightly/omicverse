@@ -291,15 +291,6 @@ def dotplot(
         height = h / 3
         width = w / 3
     
-    # Handle color normalization
-    if norm is None and (vmin is not None or vmax is not None or vcenter is not None):
-        if vcenter is not None:
-            vmin = vmin if vmin is not None else means.min()
-            vmax = vmax if vmax is not None else means.max()
-            norm = mp.DivergingNorm(vcenter=vcenter, vmin=vmin, vmax=vmax)
-        else:
-            norm = mp.Normalize(vmin=vmin if vmin is not None else means.min(),
-                              vmax=vmax if vmax is not None else means.max())
     
     # Create SizedHeatmap
     m = ma.SizedHeatmap(
@@ -310,7 +301,9 @@ def dotplot(
         width=width,
         edgecolor="lightgray",
         cmap=cmap,
-        norm=norm,
+        vmin=vmin,
+        vmax=vmax,
+        #norm=norm,
         size_legend_kws=dict(
             colors="#c2c2c2",
             title=size_title,
