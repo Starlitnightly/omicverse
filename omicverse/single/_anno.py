@@ -293,7 +293,8 @@ def get_celltype_marker(adata:anndata.AnnData,
                             log2fc_min:int=2,scores_type='scores',
                             pval_cutoff:float=0.05,rank:bool=False,
                             key='rank_genes_groups',method='wilcoxon',
-                            foldchange=None,topgenenumber=10)->dict:
+                            foldchange=None,topgenenumber=10,unique=True,
+                            global_unique=False)->dict:
         r"""Get marker genes for each clusters.
         
         Arguments:
@@ -303,6 +304,8 @@ def get_celltype_marker(adata:anndata.AnnData,
             pval_cutoff: Maximum p value of marker genes. (0.05)
             rank: Whether to rank genes by wilcoxon test. (True)
             scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
+            unique: Whether to remove duplicates within each cell type. (True)
+            global_unique: Whether to remove duplicates across all cell types. (False)
 
         Returns:
             cellmarker: A dictionary of marker genes for each clusters.
@@ -310,21 +313,36 @@ def get_celltype_marker(adata:anndata.AnnData,
         print('...get cell type marker')
         celltypes = sorted(adata.obs[clustertype].unique())
         cell_marker_dict={}
-        if rank==False:
+        if rank==True and 'rank_genes_groups' not in adata.uns.keys():
             sc.tl.rank_genes_groups(adata, clustertype, method=method)
+        elif rank==True and 'rank_genes_groups' in adata.uns.keys():
+            pass
         for celltype in celltypes:
             degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
                                             pval_cutoff=pval_cutoff)
             foldp=np.histogram(degs[scores_type])
             if foldchange is None:
-                foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+                try:
+                    foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+                except:
+                    foldchange=degs[scores_type].mean()
+                    
             cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
             cell_marker_dict[celltype]=cellmarker
+        if unique==True:
+            for key in cell_marker_dict.keys():
+                cell_marker_dict[key]=list(set(cell_marker_dict[key]))
         
-        for key in cell_marker_dict.keys():
-            cell_marker_dict[key]=list(cell_marker_dict[key])
-
-
+        # Global uniqueness across all cell types
+        if global_unique:
+            used_genes = set()
+            for celltype in celltypes:
+                if celltype in cell_marker_dict:
+                    # Filter out genes that have been used in previous cell types
+                    unique_genes = [gene for gene in cell_marker_dict[celltype] if gene not in used_genes]
+                    cell_marker_dict[celltype] = unique_genes
+                    used_genes.update(unique_genes)
+        
         return cell_marker_dict
 
 
@@ -517,7 +535,8 @@ class pySCSA(object):
     def get_celltype_marker(self,adata:anndata.AnnData,
                             clustertype:str='leiden',
                             log2fc_min:int=2,scores_type='scores',
-                            pval_cutoff:float=0.05,rank:bool=True)->dict:
+                            pval_cutoff:float=0.05,rank:bool=True,
+                            unique:bool=True,global_unique:bool=False)->dict:
         r"""Get marker genes for each clusters.
         
         Arguments:
@@ -527,6 +546,8 @@ class pySCSA(object):
             pval_cutoff: Maximum p value of marker genes. (0.05)
             rank: Whether to rank genes by wilcoxon test. (True)
             scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
+            unique: Whether to remove duplicates within each cell type. (True)
+            global_unique: Whether to remove duplicates across all cell types. (False)
 
         Returns:
             cellmarker: A dictionary of marker genes for each clusters.
@@ -535,7 +556,8 @@ class pySCSA(object):
         cell_marker_dict=get_celltype_marker(adata=adata,
                             clustertype=clustertype,
                             log2fc_min=log2fc_min,scores_type=scores_type,
-                            pval_cutoff=pval_cutoff,rank=rank)
+                            pval_cutoff=pval_cutoff,rank=rank,
+                            unique=unique,global_unique=global_unique)
 
         return cell_marker_dict
     
