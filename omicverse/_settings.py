@@ -409,6 +409,7 @@ EMOJI = {
     "error":        "❌",  # error
     "bar":          "📊",  # usage bar
     "check_mark":   "✅",  # check mark
+    "warning":      "⚠️",  # warning
 }
 
 class Colors:
