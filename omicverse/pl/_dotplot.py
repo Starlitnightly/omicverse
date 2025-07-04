@@ -50,6 +50,7 @@ def dotplot(
     dot_min: Optional[float] = None,
     smallest_dot: float = 0.0,
     fontsize: int = 12,
+    preserve_dict_order: bool = False,
     **kwds,
 ) -> Optional[Union[Dict, 'DotPlot']]:
     """
@@ -70,10 +71,72 @@ def dotplot(
         The key of the observation grouping to consider.
     use_raw : bool, optional
         Use `raw` attribute of `adata` if present.
+    log : bool, optional (default: False)
+        Whether to log-transform the data.
+    num_categories : int, optional (default: 7)
+        Number of categories to show.
+    categories_order : list of str, optional
+        Order of categories to display.
+    expression_cutoff : float, optional (default: 0.0)
+        Expression cutoff for calculating fraction of expressing cells.
+    mean_only_expressed : bool, optional (default: False)
+        Whether to calculate mean only for expressing cells.
     standard_scale : {'var', 'group'} or None
         Whether to standardize data.
+    title : str, optional
+        Title for the plot.
+    colorbar_title : str, optional (default: 'Mean expression\nin group')
+        Title for the color bar.
+    size_title : str, optional (default: 'Fraction of cells\nin group (%)')
+        Title for the size legend.
+    figsize : tuple, optional
+        Figure size (width, height) in inches. If provided, the plot dimensions will be scaled accordingly.
+    dendrogram : bool or str, optional (default: False)
+        Whether to add dendrogram to the plot.
+    gene_symbols : str, optional
+        Key for gene symbols in `adata.var`.
+    var_group_positions : list of tuples, optional
+        Positions for variable groups.
+    var_group_labels : list of str, optional
+        Labels for variable groups.
+    var_group_rotation : float, optional
+        Rotation angle for variable group labels.
+    layer : str, optional
+        Layer to use for expression data.
+    swap_axes : bool, optional (default: False)
+        Whether to swap x and y axes.
+    dot_color_df : pandas.DataFrame, optional
+        DataFrame for dot colors.
+    show : bool, optional
+        Whether to show the plot.
+    save : str or bool, optional
+        Whether to save the plot.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to plot on.
+    return_fig : bool, optional (default: False)
+        Whether to return the figure object.
+    vmin : float, optional
+        Minimum value for color scaling.
+    vmax : float, optional
+        Maximum value for color scaling.
+    vcenter : float, optional
+        Center value for diverging colormap.
+    norm : matplotlib.colors.Normalize, optional
+        Normalization object for colors.
+    cmap : str or matplotlib.colors.Colormap, optional (default: 'Reds')
+        Colormap for the plot.
+    dot_max : float, optional
+        Maximum dot size.
+    dot_min : float, optional
+        Minimum dot size.
+    smallest_dot : float, optional (default: 0.0)
+        Size of the smallest dot.
     fontsize : int, optional (default: 12)
         Font size for labels and legends. Titles will be one point larger.
+    preserve_dict_order : bool, optional (default: False)
+        When var_names is a dictionary, whether to preserve the original dictionary order.
+        If True, genes will be ordered according to the dictionary's insertion order.
+        If False (default), genes will be ordered according to cell type categories.
     
     Returns
     -------
@@ -81,37 +144,50 @@ def dotplot(
     If `show` is False, returns axes dictionary.
     """
     # Convert var_names to list if string
+    original_var_names_dict = None
     if isinstance(var_names, str):
         var_names = [var_names]
     elif isinstance(var_names, Mapping):
+        # Save original dictionary reference for color bar ordering
+        if preserve_dict_order:
+            original_var_names_dict = var_names
+        
         # Get gene groups
         gene_groups = []
         var_names_list = []
         
-        # Get cell type order
-        if categories_order is not None:
-            group_order = categories_order
-        elif pd.api.types.is_categorical_dtype(adata.obs[groupby]):
-            group_order = list(adata.obs[groupby].cat.categories)
+        if preserve_dict_order:
+            # Preserve the original dictionary order
+            for group, genes in var_names.items():
+                if isinstance(genes, str):
+                    genes = [genes]
+                var_names_list.extend(genes)
+                gene_groups.extend([group] * len(genes))
         else:
-            group_order = list(adata.obs[groupby].unique())
-        
-        # Order gene groups according to cell types
-        for group in group_order:
-            if group in var_names:
-                genes = var_names[group]
-                if isinstance(genes, str):
-                    genes = [genes]
-                var_names_list.extend(genes)
-                gene_groups.extend([group] * len(genes))
-        
-        # Add any remaining groups that weren't in the cell types
-        for group, genes in var_names.items():
-            if group not in group_order:
-                if isinstance(genes, str):
-                    genes = [genes]
-                var_names_list.extend(genes)
-                gene_groups.extend([group] * len(genes))
+            # Get cell type order (original behavior)
+            if categories_order is not None:
+                group_order = categories_order
+            elif pd.api.types.is_categorical_dtype(adata.obs[groupby]):
+                group_order = list(adata.obs[groupby].cat.categories)
+            else:
+                group_order = list(adata.obs[groupby].unique())
+            
+            # Order gene groups according to cell types
+            for group in group_order:
+                if group in var_names:
+                    genes = var_names[group]
+                    if isinstance(genes, str):
+                        genes = [genes]
+                    var_names_list.extend(genes)
+                    gene_groups.extend([group] * len(genes))
+            
+            # Add any remaining groups that weren't in the cell types
+            for group, genes in var_names.items():
+                if group not in group_order:
+                    if isinstance(genes, str):
+                        genes = [genes]
+                    var_names_list.extend(genes)
+                    gene_groups.extend([group] * len(genes))
         
         var_names = var_names_list
     
@@ -137,6 +213,28 @@ def dotplot(
     # Get aggregated data with specified order
     agg = adata.obs[groupby].value_counts().reindex(cats)
     cell_counts = agg.to_numpy()
+    
+    # Get colors for cell types if available
+    cell_colors = None
+    color_dict = None
+    try:
+        color_key = f"{groupby}_colors"
+        if color_key in adata.uns:
+            colors = adata.uns[color_key]
+            # Create color dictionary mapping cell types to colors
+            if pd.api.types.is_categorical_dtype(adata.obs[groupby]):
+                # Use categorical order for colors
+                color_dict = dict(zip(adata.obs[groupby].cat.categories, colors))
+            else:
+                # Use unique order for colors
+                unique_cats = adata.obs[groupby].unique()
+                color_dict = dict(zip(unique_cats, colors[:len(unique_cats)]))
+            
+            # Get colors for the actual categories in the plot
+            cell_colors = [color_dict.get(cat, '#CCCCCC') for cat in agg.index]
+    except (KeyError, IndexError):
+        cell_colors = None
+        color_dict = None
     
     # Calculate mean expression and fraction of expressing cells
     means = np.zeros((len(agg), len(var_names)))
@@ -178,14 +276,20 @@ def dotplot(
     # Create the plot
     h, w = means.shape
     
-    # Get colors if available
-    try:
-        color_key = f"{groupby}_colors"
-        colors = adata.uns[color_key]
-        color_dict = dict(zip(agg.index, colors))
-        cell_colors = [color_dict[i] for i in agg.index]
-    except KeyError:
-        cell_colors = None
+    # Calculate dimensions based on figsize if provided
+    if figsize is not None:
+        # Use figsize to determine height and width
+        # Adjust for the number of rows and columns to maintain aspect ratio
+        base_height = figsize[1] * 0.7  # Use 70% of figsize height for main plot
+        base_width = figsize[0] * 0.7   # Use 70% of figsize width for main plot
+        
+        # Scale based on data dimensions
+        height = base_height * (h / max(h, w))
+        width = base_width * (w / max(h, w))
+    else:
+        # Default behavior
+        height = h / 3
+        width = w / 3
     
     # Handle color normalization
     if norm is None and (vmin is not None or vmax is not None or vcenter is not None):
@@ -202,8 +306,8 @@ def dotplot(
         size=fractions,
         color=means,
         cluster_data=fractions if dendrogram else None,
-        height=h / 3,
-        width=w / 3,
+        height=height,
+        width=width,
         edgecolor="lightgray",
         cmap=cmap,
         norm=norm,
@@ -231,23 +335,27 @@ def dotplot(
     if 'gene_groups' in locals():
         # Get colors for gene groups
         try:
-            # Try to get colors from adata.uns
-            group_colors = adata.uns[f"{groupby}_colors"]
-            color_dict = dict(zip(
-                adata.obs[groupby].cat.categories,
-                group_colors
-            ))
-            # Get unique groups and check which ones are not in color_dict
-            unique_groups = list(dict.fromkeys(gene_groups))
-            missing_groups = [g for g in unique_groups if g not in color_dict]
-            
-            # If there are missing groups, add colors from palette
-            if missing_groups:
-                if len(palette_28) >= len(color_dict) + len(missing_groups):
-                    extra_colors = palette_28[len(color_dict):len(color_dict) + len(missing_groups)]
+            # Use the same color_dict that was created for cell types
+            if color_dict is not None:
+                # Get unique groups and check which ones are not in color_dict
+                unique_groups = list(dict.fromkeys(gene_groups))
+                missing_groups = [g for g in unique_groups if g not in color_dict]
+                
+                # If there are missing groups, add colors from palette
+                if missing_groups:
+                    if len(palette_28) >= len(color_dict) + len(missing_groups):
+                        extra_colors = palette_28[len(color_dict):len(color_dict) + len(missing_groups)]
+                    else:
+                        extra_colors = palette_56[len(color_dict):len(color_dict) + len(missing_groups)]
+                    color_dict.update(dict(zip(missing_groups, extra_colors)))
+            else:
+                # If no colors found in uns, use default palette
+                unique_groups = list(dict.fromkeys(gene_groups))
+                if len(unique_groups) <= 28:
+                    palette = palette_28
                 else:
-                    extra_colors = palette_56[len(color_dict):len(color_dict) + len(missing_groups)]
-                color_dict.update(dict(zip(missing_groups, extra_colors)))
+                    palette = palette_56
+                color_dict = dict(zip(unique_groups, palette[:len(unique_groups)]))
         except (KeyError, AttributeError):
             # If colors not found in uns, use default palette
             unique_groups = list(dict.fromkeys(gene_groups))
@@ -260,7 +368,13 @@ def dotplot(
         # Add color bars with matching order
         # Add group labels
         # Only show used colors in legend and increase group spacing
-        used_groups = list(dict.fromkeys(gene_groups))
+        if preserve_dict_order and original_var_names_dict is not None:
+            # When preserving dict order, use the original dictionary key order
+            used_groups = list(original_var_names_dict.keys())
+        else:
+            # Use the order as they appear in gene_groups
+            used_groups = list(dict.fromkeys(gene_groups))
+        
         used_color_dict = {k: color_dict[k] for k in used_groups}
         m.add_top(
             mp.Colors(gene_groups, palette=used_color_dict),
@@ -268,23 +382,17 @@ def dotplot(
             size=0.15,
         )
         # Add group labels with increased spacing
-        m.group_cols(gene_groups)
+        m.group_cols(gene_groups,order=used_groups)
     
     # Add cell type colors if available
-    try:
-        color_key = f"{groupby}_colors"
-        if color_key in adata.uns:
-            # Create color dictionary
-            color_dict = dict(zip(cats, adata.uns[color_key]))
-            # Add color bar
-            m.add_left(
-                mp.Colors(agg.index, palette=color_dict),
-                size=0.15,
-                pad=0.1,
-                legend=False,
-            )
-    except KeyError:
-        pass
+    if color_dict is not None:
+        # Add color bar using the properly created color_dict
+        m.add_left(
+            mp.Colors(agg.index, palette=color_dict),
+            size=0.15,
+            pad=0.1,
+            legend=False,
+        )
     
     # Add cell type labels
     m.add_left(mp.Labels(agg.index, align="right", fontsize=fontsize), pad=0.1)
@@ -515,6 +623,7 @@ def rank_genes_groups_dotplot(
         dot_color_df=values_df,
         return_fig=True,
         gene_symbols=gene_symbols,
+        preserve_dict_order=True,
         **kwds,
     )
     
