@@ -209,6 +209,7 @@ class DEG:
         if self.adata_test.shape[0] == 0:
             raise ValueError(f"No cells found for DEG analysis")
         elif self.adata_test.shape[0] > max_cells:
+            EMOJI['warning']="⚠️"
             print(f"{EMOJI['warning']} Total cells: {self.adata_test.shape[0]} is too large, will be downsampled to {max_cells}")
             print(f"If you want to keep all cells, please set max_cells to None")
             try:
@@ -314,10 +315,13 @@ class DEG:
             res.loc[res['padj']<0.05,'sig']='sig'
             res['-log(pvalue)'] = -np.log10(res['pvalue'])
             res['-log(qvalue)'] = -np.log10(res['qvalue'])
+            #calculate the Mean of the self.adata_test's genes(var)
+            res['baseMean']=np.mean(self.adata_test.to_df(),axis=0).loc[res.index]
             self.result=res
             return res
         elif self.method == 'memento-de':
             self.result=self.result_1d
+            self.result['baseMean']=np.mean(self.adata_test.to_df(),axis=0).loc[self.result.index]
             return self.result_1d
         else:
             raise ValueError(f"Method {self.method} not supported")

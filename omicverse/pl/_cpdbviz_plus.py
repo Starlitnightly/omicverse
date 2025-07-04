@@ -98,7 +98,7 @@ class CellChatVizPlus:
                             ax=None, figsize=(12, 12), 
                             title_name=None, save=None, legend_pos_x=None,
                             show_celltype_in_name=True, show_legend=True, 
-                            legend_bbox=(1.05, 1), legend_ncol=1):
+                            legend_bbox=(1.05, 1), legend_ncol=1,return_df=False):
         """
         Draw a chord diagram of all ligand-receptor pairs for specific cell types as senders (gene-level)
         Each sector represents a ligand or receptor, ligands use sender color, receptors use receiver color
@@ -517,7 +517,10 @@ class CellChatVizPlus:
             fig.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.02)
             print(f"Gene-level chord diagram saved as: {save}")
         
-        return fig, ax
+        if return_df:
+            return fig, ax, lr_df
+        else:
+            return fig, ax
     
     def netVisual_bubble_marsilea(self, sources_use=None, targets_use=None, 
                                  signaling=None, pvalue_threshold=0.05, 
@@ -2197,7 +2200,7 @@ class CellChatVizPlus:
                                                   title="Signaling Role Analysis",
                                                   add_dendrogram=True, add_cell_colors=True,
                                                   add_importance_bars=True, show_values=True,
-                                                  save=None):
+                                                  save=None,return_df=False,label_rotation=45):
         """
         使用Marsilea创建高级信号角色热图（CellChat风格的netAnalysis_signalingRole_network）
         
@@ -2381,7 +2384,7 @@ class CellChatVizPlus:
             h.add_bottom(
                 ma.plotter.Labels(
                     col_labels,
-                    rotation=45,
+                    rotation=label_rotation,
                     fontsize=font_size
                 ),
                 size=0.3,
@@ -2436,7 +2439,10 @@ class CellChatVizPlus:
                 }
                 print(f"   - {role_description.get(measure, measure)}: {top_cell} (Importance: {top_score:.3f})")
         
-        return h
+        if return_df:
+            return h, df_centrality
+        else:
+            return h
     
     def demo_curved_arrows(self, signaling_pathway=None, curve_strength=0.4, figsize=(12, 10)):
         """
