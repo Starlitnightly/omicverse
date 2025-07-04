@@ -12,7 +12,7 @@ from numbers import Number
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeAlias, Union
 
-import dask.array as da
+
 import numpy as np
 import pandas as pd
 from anndata import AnnData
@@ -35,10 +35,10 @@ from pandas import CategoricalDtype
 from scanpy import logging as logg
 from scanpy._settings import settings as sc_settings
 from scanpy.plotting._tools.scatterplots import _add_categorical_legend
-from skimage.color import label2rgb
-from skimage.morphology import erosion, square
-from skimage.segmentation import find_boundaries
-from skimage.util import map_array
+
+
+
+
 
 import itertools
 from collections.abc import Callable, Mapping, Sequence
@@ -173,6 +173,7 @@ def _get_image(
 ) -> Sequence[np.ndarray] | tuple[None, ...]:
     from squidpy._constants._pkg_constants import Key
     from squidpy.pl._utils import _to_grayscale
+    import dask.array as da
 
     if isinstance(img, list | np.ndarray | da.Array):
         img = _get_list(img, _type=(np.ndarray, da.Array), ref_len=len(library_id), name="img")
@@ -209,6 +210,7 @@ def _get_segment(
     seg_key: str | None = None,
 ) -> tuple[Sequence[np.ndarray], Sequence[np.ndarray]] | tuple[tuple[None, ...], tuple[None, ...]]:
     from squidpy._constants._pkg_constants import Key
+    import dask.array as da
     
     if seg_cell_id not in adata.obs:
         raise ValueError(f"Cell id `{seg_cell_id!r}` not found in `adata.obs`.")
@@ -729,6 +731,10 @@ def _map_color_seg(
     na_color: str | tuple[float, ...] = (0, 0, 0, 0),
 ) -> np.ndarray:
     cell_id = np.array(cell_id)
+    from skimage.morphology import erosion, square
+    from skimage.color import label2rgb
+    from skimage.segmentation import find_boundaries
+    from skimage.util import map_array
 
     if isinstance(color_vector, pd.Categorical):
         if isinstance(na_color, tuple) and len(na_color) == 4 and np.any(color_source_vector.isna()):
@@ -1107,6 +1113,9 @@ def _plot_segment(
     # Check if the colormap has alpha variation (transparency gradients)
     has_alpha_variation = False
     is_custom_transparent_cmap = False
+    from skimage.morphology import erosion, square
+    from skimage.segmentation import find_boundaries
+    from skimage.util import map_array
     
     if not categorical:
         try:
