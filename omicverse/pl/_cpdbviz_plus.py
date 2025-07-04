@@ -527,7 +527,9 @@ class CellChatVizPlus:
                                  group_pathways=True, figsize=(12, 8),
                                  title="Cell-Cell Communication Analysis", 
                                  remove_isolate=False, font_size=12, cmap="RdBu_r",
-                                 transpose=False):
+                                 transpose=False, scale=None,
+                                 vmin=None, vmax=None, dot_size_min=None, dot_size_max=None,
+                                 show_sender_colors=True, show_receiver_colors=False):
         """
         Create advanced bubble plot using Marsilea's SizedHeatmap to visualize cell-cell communication
         Similar to CellChat's netVisual_bubble function, but uses SizedHeatmap to make circle size more meaningful
@@ -539,6 +541,8 @@ class CellChatVizPlus:
           * P ≥ 0.01: small circle or nearly invisible (not significant)
         - Blue border marks highly significant interactions (P < 0.01)
         - Supports dual information encoding: color expression + size significance
+        - Supports data scaling: 'row', 'column', or None
+        - Supports sender and receiver color bars
         
         Parameters:
         -----------
@@ -587,6 +591,21 @@ class CellChatVizPlus:
         transpose : bool
             Whether to transpose the heatmap (default: False)
             If True, swap rows and columns: rows=L-R pairs, columns=cell type pairs
+        scale : str or None
+            Scaling method for the expression data (default: None)
+            - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
+            - 'column': Scale each column (pathway/LR pair) to have mean=0, std=1 (Z-score)
+            - 'row_minmax': Min-max scaling for each row (cell type pair) to [0,1] range
+            - 'column_minmax': Min-max scaling for each column (pathway/LR pair) to [0,1] range
+            - None: No scaling (use raw expression values)
+        vmin : float or None
+            Minimum value for color scaling (default: None)
+        vmax : float or None
+            Maximum value for color scaling (default: None)
+        show_sender_colors : bool
+            Whether to show sender cell type color bar (default: True)
+        show_receiver_colors : bool
+            Whether to show receiver cell type color bar (default: False)
             
         Returns:
         --------
@@ -827,6 +846,50 @@ class CellChatVizPlus:
         # Normalize expression data
         matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
         
+        # Apply scaling if specified
+        if scale is not None:
+            if scale not in ['row', 'column', 'row_minmax', 'column_minmax']:
+                print(f"⚠️  Warning: Invalid scale parameter '{scale}'. Must be 'row', 'column', 'row_minmax', 'column_minmax', or None. Using no scaling.")
+                scale = None
+            
+            if scale == 'row':
+                # Scale each row (cell type pair) to have mean=0, std=1
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                pivot_mean_scaled = pd.DataFrame(
+                    scaler.fit_transform(pivot_mean),
+                    index=pivot_mean.index,
+                    columns=pivot_mean.columns
+                )
+                print(f"📊 Applied row-wise scaling (Z-score normalization)")
+                pivot_mean = pivot_mean_scaled
+                
+            elif scale == 'column':
+                # Scale each column (pathway/LR pair) to have mean=0, std=1
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                pivot_mean_scaled = pd.DataFrame(
+                    scaler.fit_transform(pivot_mean.T).T,  # Transpose, scale, then transpose back
+                    index=pivot_mean.index,
+                    columns=pivot_mean.columns
+                )
+                print(f"📊 Applied column-wise scaling (Z-score normalization)")
+                pivot_mean = pivot_mean_scaled
+                
+            elif scale == 'row_minmax':
+                # Min-max scaling for each row (cell type pair)
+                means = pivot_mean.to_numpy()
+                means = (means - means.min(axis=1, keepdims=True)) / (means.max(axis=1, keepdims=True) - means.min(axis=1, keepdims=True))
+                pivot_mean = pd.DataFrame(means, index=pivot_mean.index, columns=pivot_mean.columns)
+                print(f"📊 Applied row-wise min-max scaling")
+                
+            elif scale == 'column_minmax':
+                # Min-max scaling for each column (pathway/LR pair)
+                means = pivot_mean.to_numpy()
+                means = (means - means.min(axis=0)) / (means.max(axis=0) - means.min(axis=0))
+                pivot_mean = pd.DataFrame(means, index=pivot_mean.index, columns=pivot_mean.columns)
+                print(f"📊 Applied column-wise min-max scaling")
+        
         # Create Marsilea visualization component - using SizedHeatmap for enhanced visualization
         # Important: Calculate size and color matrices after pivot_table creation to ensure dimension matching
         
@@ -896,6 +959,24 @@ class CellChatVizPlus:
             matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
         
         # 1. Main SizedHeatmap - based on your reference code
+        # Set color legend title based on scaling
+        if scale == 'row':
+            color_legend_title = "Expression Level (Row-scaled)"
+        elif scale == 'column':
+            color_legend_title = "Expression Level (Column-scaled)"
+        elif scale == 'row_minmax':
+            color_legend_title = "Expression Level (Row-scaled Min-max)"
+        elif scale == 'column_minmax':
+            color_legend_title = "Expression Level (Column-scaled Min-max)"
+        else:
+            color_legend_title = "Expression Level"
+        
+        if dot_size_min is not None and dot_size_max is not None:
+            from matplotlib.colors import Normalize
+            size_norm = Normalize(vmin=dot_size_min, vmax=dot_size_max)
+        else:
+            size_norm = None
+        
         h = ma.SizedHeatmap(
             size=size_matrix,
             color=color_matrix,
@@ -909,7 +990,10 @@ class CellChatVizPlus:
                 labels=["p>0.05", "p<0.01"],
                 show_at=[0.01, 1.0],
             ),
-            color_legend_kws=dict(title="Expression Level"),
+            vmin=vmin,
+            vmax=vmax,
+            size_norm=size_norm,
+            color_legend_kws=dict(title=color_legend_title),
         )
         
         # 2. Optional additional significance layer
@@ -945,16 +1029,15 @@ class CellChatVizPlus:
 
         
         
-        # 4. Cell type color bar and labels - adding mp.Colors to show sender cell type colors
+        # 4. Cell type color bar and labels - adding mp.Colors to show sender and receiver cell type colors
         # Parse cell interaction labels for cell type information (format: sender→receiver)
         cell_colors = self._get_cell_type_colors()
         
-        # Create sender color mapping for each interaction pair
+        # Create sender and receiver color mappings for each interaction pair
         sender_colors = []
-        sender_names_list=[]
-        
-        
-        #h.add_left(sender_color_bar, size=0.3, pad=0.05)
+        sender_names_list = []
+        receiver_colors = []
+        receiver_names_list = []
 
         if transpose:
             for interaction in pivot_mean.columns:
@@ -962,43 +1045,72 @@ class CellChatVizPlus:
                     # Parse sender and receiver
                     sender, receiver = str(interaction).split('→', 1)
                     sender = sender.strip()
+                    receiver = receiver.strip()
                     
-                    # Get corresponding color for sender
+                    # Get corresponding colors
                     sender_color = cell_colors.get(sender, '#CCCCCC')
+                    receiver_color = cell_colors.get(receiver, '#CCCCCC')
+                    
                     sender_colors.append(sender_color)
                     sender_names_list.append(sender)
-
+                    receiver_colors.append(receiver_color)
+                    receiver_names_list.append(receiver)
                 else:
                     # If not standard format, use default color
                     sender_colors.append('#CCCCCC')
                     sender_names_list.append(interaction)
+                    receiver_colors.append('#CCCCCC')
+                    receiver_names_list.append(interaction)
+
+            # Add receiver color bar if requested
+            if show_receiver_colors:
+                receiver_palette = dict(zip(receiver_names_list, receiver_colors))
+                receiver_color_bar = mp.Colors(receiver_names_list, palette=receiver_palette)
+                h.add_bottom(receiver_color_bar, pad=0.05, size=0.15)
             
-            # Add sender color bar
-            show_palette=dict(zip(sender_names_list,sender_colors))
-            sender_color_bar = mp.Colors(sender_names_list,palette=show_palette)
-
-
-            h.add_bottom(sender_color_bar, pad=0.05,size=0.15)
+            # Add sender color bar if requested
+            if show_sender_colors:
+                sender_palette = dict(zip(sender_names_list, sender_colors))
+                sender_color_bar = mp.Colors(sender_names_list, palette=sender_palette)
+                h.add_bottom(sender_color_bar, pad=0.05, size=0.15)
+            
+            
+                
         else:
             for interaction in pivot_mean.index:
                 if '→' in str(interaction):
                     # Parse sender and receiver
                     sender, receiver = str(interaction).split('→', 1)
                     sender = sender.strip()
+                    receiver = receiver.strip()
                     
-                    # Get corresponding color for sender
+                    # Get corresponding colors
                     sender_color = cell_colors.get(sender, '#CCCCCC')
+                    receiver_color = cell_colors.get(receiver, '#CCCCCC')
+                    
                     sender_colors.append(sender_color)
                     sender_names_list.append(sender)
+                    receiver_colors.append(receiver_color)
+                    receiver_names_list.append(receiver)
                 else:
                     # If not standard format, use default color
                     sender_colors.append('#CCCCCC')
                     sender_names_list.append(interaction)
+                    receiver_colors.append('#CCCCCC')
+                    receiver_names_list.append(interaction)
             
-            # Add sender color bar
-            show_palette=dict(zip(sender_names_list,sender_colors))
-            sender_color_bar = mp.Colors(sender_names_list,palette=show_palette)
-            h.add_left(sender_color_bar, size=0.15, pad=0.05)
+            # Add sender color bar if requested
+            if show_sender_colors:
+                sender_palette = dict(zip(sender_names_list, sender_colors))
+                sender_color_bar = mp.Colors(sender_names_list, palette=sender_palette)
+                h.add_left(sender_color_bar, size=0.15, pad=0.05)
+            
+            # Add receiver color bar if requested
+            if show_receiver_colors:
+                receiver_palette = dict(zip(receiver_names_list, receiver_colors))
+                receiver_color_bar = mp.Colors(receiver_names_list, palette=receiver_palette)
+                h.add_left(receiver_color_bar, size=0.15, pad=0.05)
+        
         # Add cell interaction labels
         cell_interaction_labels = mp.Labels(
             pivot_mean.index, 
@@ -1063,6 +1175,24 @@ class CellChatVizPlus:
         print(f"   - Number of significant interactions: {len(df_interactions)}")
         print(f"   - Number of cell type pairs: {len(pivot_mean.index)}")
         print(f"   - {'Signaling pathways' if group_pathways else 'Ligand-receptor pairs'}: {len(pivot_mean.columns)}")
+        if scale:
+            if scale in ['row', 'column']:
+                print(f"   - Data scaling: {scale} (Z-score normalization)")
+            elif scale in ['row_minmax', 'column_minmax']:
+                print(f"   - Data scaling: {scale} (Min-max normalization to [0,1])")
+        else:
+            print(f"   - Data scaling: None (raw expression values)")
+        
+        # Color bar information
+        color_bar_info = []
+        if show_sender_colors:
+            color_bar_info.append("sender")
+        if show_receiver_colors:
+            color_bar_info.append("receiver")
+        if color_bar_info:
+            print(f"   - Color bars: {', '.join(color_bar_info)}")
+        else:
+            print(f"   - Color bars: None")
         
         return h
     
