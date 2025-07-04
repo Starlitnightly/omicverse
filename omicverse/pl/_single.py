@@ -173,7 +173,7 @@ def embedding(
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False,legend_awargs={'ncol':1}):
+                       legend:bool=False,legend_awargs={'ncol':1},transpose:bool=False):
     r"""Plot cell proportion of each cell type in each visual cluster.
 
     Arguments:
@@ -187,6 +187,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
         ax: Matplotlib axes object. (None)
         legend: Whether to show legend. (False)
         legend_awargs: Legend arguments. ({'ncol':1})
+        transpose: Whether to transpose the plot (horizontal bars). (False)
     
     Returns:
         None
@@ -226,11 +227,17 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     for i in all_celltype:
         if n==0:
             test1=b[b['cell_type']==i]
-            ax.bar(x=test1['Week'],height=test1['value'],width=0.8,color=list(set(test1['cell_type_color']))[0], label=i)
+            if transpose:
+                ax.barh(y=test1['Week'],width=test1['value'],height=0.8,color=list(set(test1['cell_type_color']))[0], label=i)
+            else:
+                ax.bar(x=test1['Week'],height=test1['value'],width=0.8,color=list(set(test1['cell_type_color']))[0], label=i)
             bottoms=test1['value'].values
         else:
             test2=b[b['cell_type']==i]
-            ax.bar(x=test2['Week'],height=test2['value'],bottom=bottoms,width=0.8,color=list(set(test2['cell_type_color']))[0], label=i)
+            if transpose:
+                ax.barh(y=test2['Week'],width=test2['value'],left=bottoms,height=0.8,color=list(set(test2['cell_type_color']))[0], label=i)
+            else:
+                ax.bar(x=test2['Week'],height=test2['value'],bottom=bottoms,width=0.8,color=list(set(test2['cell_type_color']))[0], label=i)
             test1=test2
             bottoms+=test1['value'].values
         n+=1
@@ -255,10 +262,16 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     ax.spines['left'].set_position(('outward', 10))
     ax.spines['bottom'].set_position(('outward', 10))
 
-    plt.xticks(fontsize=ticks_fontsize,rotation=90)
-    plt.yticks(fontsize=ticks_fontsize)
-    plt.xlabel(groupby,fontsize=labels_fontsize)
-    plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
+    if transpose:
+        plt.yticks(fontsize=ticks_fontsize,rotation=0)
+        plt.xticks(fontsize=ticks_fontsize)
+        plt.ylabel(groupby,fontsize=labels_fontsize)
+        plt.xlabel('Cells per Stage',fontsize=labels_fontsize)
+    else:
+        plt.xticks(fontsize=ticks_fontsize,rotation=90)
+        plt.yticks(fontsize=ticks_fontsize)
+        plt.xlabel(groupby,fontsize=labels_fontsize)
+        plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
     #fig.tight_layout()
     if ax==None:
         return fig,ax
