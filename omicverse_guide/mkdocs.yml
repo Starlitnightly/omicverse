@@ -42,6 +42,7 @@ nav:
             - Inference of MetaCell from Single-Cell RNA-seq: Tutorials-single/t_metacells.ipynb
             - Differential expression and celltype analysis [All Cell]: Tutorials-single/t_deg_single.ipynb
             - Differential expression analysis [Meta Cell]: Tutorials-single/t_scdeg.ipynb
+            - Gene Regulatory Network Analysis with SCENIC: Tutorials-single/t_scenic.ipynb
             - Pathway analysis with AUCell: Tutorials-single/t_aucell.ipynb
             - Cell interaction with CellPhoneDB: Tutorials-single/t_cellphonedb.ipynb
             - Drug response predict with scDrug: Tutorials-single/t_scdrug.ipynb

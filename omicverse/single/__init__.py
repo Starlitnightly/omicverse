@@ -85,6 +85,7 @@ from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
 from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
+from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulation,plot_grn
 
 
 __all__ = [
@@ -197,5 +198,9 @@ __all__ = [
     # Additional analysis tools  
     'cnmf',
     'generate_scRNA_report',
+    'SCENIC',
+    'build_correlation_network_umap_layout',
+    'add_tf_regulation',
+    'plot_grn',
 ]
 

@@ -571,9 +571,19 @@ Changed the logo presentation of Omicverse to `ov.plot_set`
 ### Pl Module
 - Optimated the plot effect of `ov.pl.box_plot`
 - Optimated the plot effect of `ov.pl.volcano`
+Optimated the plot effect of `ov.pl.violin`
+- Added beautiful dotplot than scanpy (#318)
+- Added the similar visualization function of CellChat. (#313)
 
 ### Space Module
-- Added 3D cell-cell interaction analysis in `COMMOT`
+- Added 3D cell-cell interaction analysis in `COMMOT` (#315)
 
 ### Single Module
 - Fixed the error of pathway_enrichment. (#184)
+- Added SCENIC module with GPU-accerlate. (#331) 
+
+### utils Module
+- Added scICE to calculate the best cluster (#329)
+
+
+
