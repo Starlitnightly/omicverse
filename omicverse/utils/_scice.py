@@ -3,7 +3,7 @@ import pandas as pd
 import scanpy as sc
 import anndata as ad
 from joblib import Parallel, delayed
-import igraph as ig
+
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.stats import mode
 from collections import Counter
@@ -237,6 +237,7 @@ class scICE:
         --------
         igraph.Graph
         """
+        import igraph as ig
         if not isinstance(adj_matrix, coo_matrix):
             adj_matrix = coo_matrix(adj_matrix)
         
@@ -249,7 +250,7 @@ class scICE:
             
         return g
     
-    def _cluster_graph(self, g: ig.Graph, gamma: float = 0.8, 
+    def _cluster_graph(self, g, gamma: float = 0.8, 
                       objective_function: str = "CPM", n_iter: int = 5, 
                       beta: float = 0.1, init_membership: Optional[List] = None):
         """
