@@ -62,6 +62,7 @@ from ._density import *
 from ._cpdbviz import *
 from ._dotplot import dotplot, rank_genes_groups_dotplot
 from ._spatial import spatial_segment,spatial_segment_overlay
+from ._violin import violin
 
 # Note: Specific function names are imported through wildcard imports
 # from individual modules. Key functions include:
