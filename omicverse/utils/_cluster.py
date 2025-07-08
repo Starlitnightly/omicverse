@@ -143,6 +143,20 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         print(f"""finished: found {n_components} clusters and added
     'mclust', the cluster labels (adata.obs, categorical)""")
         add_reference(adata,'mclust','clustering with Gaussian Mixture Model')
+    elif method=='scICE':
+        from ._scice import scICE
+        scice = scICE(n_jobs=-1,use_gpu=False)
+        # Run clustering ensemble
+        results = scice.fit(
+            adata, 
+            use_rep=use_rep,
+            **kwargs
+        )
+        scice.add_to_adata(adata)
+        print('scICE_cluster has been added to adata.obs')
+        add_reference(adata,'scICE','clustering with scICE')
+        return scice
+
 
       
 def refine_label(adata, use_rep='spatial',radius=50, key='label'):
