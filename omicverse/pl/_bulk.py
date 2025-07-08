@@ -14,66 +14,64 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
                      plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
                      ticks_fontsize:int=12,pval_threshold:float=0.05,fc_max:float=1.5,fc_min:float=-1.5,
                      ax = None,):
-    """
+    r"""
     Create a volcano plot for differential expression analysis.
     
-    Parameters
-    ----------
-    result : pandas.DataFrame
-        Dataframe containing differential expression results with 'sig' column
-    pval_name : str, default 'qvalue'
-        Column name for p-values/q-values
-    fc_name : str, default 'log2FC'
-        Column name for fold change values  
-    pval_max : float, optional
-        Maximum p-value for y-axis scaling
-    FC_max : float, optional
-        Maximum fold change for x-axis scaling
-    figsize : tuple, default (4,4)
-        Figure size (width, height)
-    title : str, default ''
-        Plot title
-    titlefont : dict, default {'weight':'normal','size':14}
-        Font settings for title and axis labels
-    up_color : str, default '#e25d5d'
-        Color for upregulated genes
-    down_color : str, default '#7388c1'
-        Color for downregulated genes
-    normal_color : str, default '#d7d7d7'
-        Color for non-significant genes
-    up_fontcolor : str, default '#e25d5d'
-        Font color for upregulated gene labels
-    down_fontcolor : str, default '#7388c1'
-        Font color for downregulated gene labels
-    normal_fontcolor : str, default '#d7d7d7'
-        Font color for normal gene labels
-    legend_bbox : tuple, default (0.8, -0.2)
-        Legend bounding box position
-    legend_ncol : int, default 2
-        Number of legend columns
-    legend_fontsize : int, default 12
-        Legend font size
-    plot_genes : list, optional
-        Specific genes to label on plot
-    plot_genes_num : int, default 10
-        Number of top genes to label automatically
-    plot_genes_fontsize : int, default 10
-        Font size for gene labels
-    ticks_fontsize : int, default 12
-        Font size for axis ticks
-    pval_threshold : float, default 0.05
-        P-value threshold for significance
-    fc_max : float, default 1.5
-        Upper fold change threshold
-    fc_min : float, default -1.5
-        Lower fold change threshold
-    ax : matplotlib.axes, optional
-        Existing axes to plot on
+    Arguments:
+        result: pandas.DataFrame
+            Dataframe containing differential expression results with 'sig' column
+        pval_name: str, optional (default='qvalue')
+            Column name for p-values/q-values
+        fc_name: str, optional (default='log2FC')
+            Column name for fold change values  
+        pval_max: float, optional (default=None)
+            Maximum p-value for y-axis scaling
+        FC_max: float, optional (default=None)
+            Maximum fold change for x-axis scaling
+        figsize: tuple, optional (default=(4,4))
+            Figure size (width, height)
+        title: str, optional (default='')
+            Plot title
+        titlefont: dict, optional (default={'weight':'normal','size':14})
+            Font settings for title and axis labels
+        up_color: str, optional (default='#e25d5d')
+            Color for upregulated genes
+        down_color: str, optional (default='#7388c1')
+            Color for downregulated genes
+        normal_color: str, optional (default='#d7d7d7')
+            Color for non-significant genes
+        up_fontcolor: str, optional (default='#e25d5d')
+            Font color for upregulated gene labels
+        down_fontcolor: str, optional (default='#7388c1')
+            Font color for downregulated gene labels
+        normal_fontcolor: str, optional (default='#d7d7d7')
+            Font color for normal gene labels
+        legend_bbox: tuple, optional (default=(0.8, -0.2))
+            Legend bounding box position
+        legend_ncol: int, optional (default=2)
+            Number of legend columns
+        legend_fontsize: int, optional (default=12)
+            Legend font size
+        plot_genes: list, optional (default=None)
+            Specific genes to label on plot
+        plot_genes_num: int, optional (default=10)
+            Number of top genes to label automatically
+        plot_genes_fontsize: int, optional (default=10)
+            Font size for gene labels
+        ticks_fontsize: int, optional (default=12)
+            Font size for axis ticks
+        pval_threshold: float, optional (default=0.05)
+            P-value threshold for significance
+        fc_max: float, optional (default=1.5)
+            Upper fold change threshold
+        fc_min: float, optional (default=-1.5)
+            Lower fold change threshold
+        ax: matplotlib.axes, optional (default=None)
+            Existing axes to plot on
         
-    Returns
-    -------
-    ax : matplotlib.axes
-        The plot axes object
+    Returns:
+        ax: matplotlib.axes
+            The plot axes object
     """
     
     # Color codes for terminal output

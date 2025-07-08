@@ -133,6 +133,23 @@ def _get_library_id(
     library_id: Sequence[str] | None = None,
     library_key: str | None = None,
 ) -> Sequence[str]:
+    r"""
+    Get library IDs for spatial data processing.
+    
+    Arguments:
+        adata: AnnData object
+        shape: str, optional (default=None)
+            Shape parameter for spatial data
+        spatial_key: str, optional (default="spatial")
+            Key for spatial information in adata.uns
+        library_id: Sequence[str], optional (default=None)
+            Specific library IDs to use
+        library_key: str, optional (default=None)
+            Key in adata.obs for library information
+    
+    Returns:
+        Sequence[str]: List of library IDs
+    """
     from squidpy._constants._pkg_constants import Key
     from squidpy.pl._utils import _assert_value_in_obs
     

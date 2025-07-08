@@ -283,23 +283,29 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
                             celltype_range:tuple=(2,9),
                             embedding_range:tuple=(3,10),
                             xlim:int=-1000)->tuple:
-    """
-    Plot embedding with celltype color by omicverse
+    r"""
+    Plot embedding with celltype color by omicverse.
 
     Arguments:
         adata: AnnData object  
-        figsize: figure size
-        basis: embedding method
-        celltype_key: celltype key in adata.obs
-        title: figure title
-        celltype_range: celltype range to plot
-        embedding_range: embedding range to plot
-        xlim: x axis limit
+        figsize: tuple, optional (default=(6,4))
+            Figure size
+        basis: str, optional (default='umap')
+            Embedding method
+        celltype_key: str, optional (default='major_celltype')
+            Celltype key in adata.obs
+        title: str, optional (default=None)
+            Figure title
+        celltype_range: tuple, optional (default=(2,9))
+            Celltype range to plot
+        embedding_range: tuple, optional (default=(3,10))
+            Embedding range to plot
+        xlim: int, optional (default=-1000)
+            X axis limit
 
     Returns:
-        fig : figure and axis
+        fig: figure and axis
         ax: axis
-    
     """
 
     adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
@@ -379,21 +385,27 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
 
 def ConvexHull(adata:AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
-    """
-    Plot the ConvexHull for a cluster in embedding
+    r"""
+    Plot the ConvexHull for a cluster in embedding.
 
     Arguments:
         adata: AnnData object
-        basis: embedding method in adata.obsm
-        cluster_key: cluster key in adata.obs
-        hull_cluster: cluster to plot for ConvexHull
-        ax: axes
-        color: color for ConvexHull
-        alpha: alpha for ConvexHull
+        basis: str
+            Embedding method in adata.obsm
+        cluster_key: str
+            Cluster key in adata.obs
+        hull_cluster: str
+            Cluster to plot for ConvexHull
+        ax: matplotlib.axes.Axes
+            Axes object
+        color: str, optional (default=None)
+            Color for ConvexHull
+        alpha: float, optional (default=0.2)
+            Alpha for ConvexHull
 
     Returns:
-        ax: axes
-    
+        ax: matplotlib.axes.Axes
+            Modified axes object
     """
     from scipy.spatial import ConvexHull
     adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
@@ -423,8 +435,29 @@ def embedding_adjust(
     adata, groupby, exclude=(), 
     basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
 ):
-    """ 
-    Get locations of cluster median . Borrowed from scanpy github forum.
+    r"""
+    Get locations of cluster median and adjust text labels accordingly.
+    
+    Borrowed from scanpy github forum.
+
+    Arguments:
+        adata: AnnData object
+        groupby: str
+            Key in adata.obs for grouping
+        exclude: tuple, optional (default=())
+            Groups to exclude from labeling
+        basis: str, optional (default='X_umap')
+            Embedding basis key in adata.obsm
+        ax: matplotlib.axes.Axes, optional (default=None)
+            Axes object to plot on
+        adjust_kwargs: dict, optional (default=None)
+            Arguments for adjust_text function
+        text_kwargs: dict, optional (default=None)
+            Arguments for text annotation
+
+    Returns:
+        medians: dict
+            Dictionary of median positions for each group
     """
     if adjust_kwargs is None:
         adjust_kwargs = {"text_from_points": False}

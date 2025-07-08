@@ -617,6 +617,19 @@ def optim_palette(adata,basis,colors,palette=None,**kwargs):
     return palette_spaco
 
 def Forbidden_Cmap(color_range,return_cmap=False):
+    r"""
+    Create a colormap or color list from the Forbidden City color palette.
+    
+    Arguments:
+        color_range: list or sequence
+            Range of color indices to select from the Forbidden City palette
+        return_cmap: bool, optional (default=False)
+            Whether to return a matplotlib colormap object or HTML color codes
+    
+    Returns:
+        If return_cmap is True, returns matplotlib.colors.ListedColormap
+        If return_cmap is False, returns list of HTML color codes
+    """
     from matplotlib.colors import ListedColormap
     import numpy as np
     colors = [Forbiddencity[str(color)]['color_rgb'] for color in color_range]
@@ -629,7 +642,13 @@ def Forbidden_Cmap(color_range,return_cmap=False):
     
 
 def get_forbidden():
-
+    r"""
+    Get the complete Forbidden City color palette dictionary.
+    
+    Returns:
+        dict: Dictionary containing traditional Chinese color names and their RGB/HTML values
+        Each color entry contains: num, name, name_en, color_rgb, color_html
+    """
     Forbiddencity={'1': {'num': '1',
     'name': '人籁',
     'name_en': 'Anthropophony',

@@ -49,4 +49,4 @@ import omicverse as ov
 | ---- | ---- |
 |[pp](utils/api_pp)|preprocessing the scRNA-seq|
 |[qc](utils/api_qc)|quantity control the scRNA-seq|
-|[plot](utils/api_plot)|plot function|
+|[plot](pl/api_pl)|plot function|
