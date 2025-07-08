@@ -666,7 +666,6 @@ class scICE:
             start_g, end_g = np.log(val_tolerance), 0
         
         print(f"Exploring {len(t_range)} cluster numbers: {t_range}")
-        print(f"🚀 Using parallel processing: each thread handles one cluster number")
         
         def process_single_cluster_number(target_k):
             """Process a single cluster number (target_k) completely"""
@@ -696,33 +695,64 @@ class scICE:
                 print(f"Error processing k={target_k}: {e}")
                 return None
         
-        # Parallel processing of all cluster numbers
-        print(f"🔧 Processing {len(t_range)} cluster numbers in parallel...")
+        # Choose processing strategy based on n_jobs
+        if self.n_jobs == 1:
+            print(f"🔧 Using sequential processing with real-time progress updates")
+            # Sequential processing with real-time progress updates (like old version)
+            successful_results = []
+            
+            try:
+                with progress_bar(t_range, desc="Processing cluster numbers", 
+                         bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]',
+                         leave=True) as pbar:
+                    
+                    for target_k in pbar:
+                        pbar.set_description(f"Processing k={target_k}")
+                        
+                        result = process_single_cluster_number(target_k)
+                        if result is not None:
+                            successful_results.append(result)
+                            # Update progress bar with current results
+                            pbar.set_postfix({
+                                'IC': f"{result['ic']:.4f}",
+                                'γ': f"{result['gamma']:.4f}",
+                                'Found': len(successful_results)
+                            })
+                            
+            except KeyboardInterrupt:
+                print("\nClustering interrupted by user")
+            except Exception as e:
+                print(f"\nError during sequential clustering: {e}")
+        else:
+            print(f"🚀 Using parallel processing: each thread handles one cluster number")
+            # Parallel processing of all cluster numbers
+            print(f"🔧 Processing {len(t_range)} cluster numbers in parallel...")
+            
+            try:
+                with progress_bar(total=len(t_range), desc="Processing cluster numbers in parallel", 
+                         bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]',
+                         leave=True) as pbar:
+                    
+                    # Use joblib to process cluster numbers in parallel
+                    results = Parallel(n_jobs=self.n_jobs, verbose=0)(
+                        delayed(process_single_cluster_number)(target_k) 
+                        for target_k in t_range
+                    )
+                    
+                    # Update progress bar
+                    pbar.update(len(t_range))
+                    
+            except KeyboardInterrupt:
+                print("\nClustering interrupted by user")
+                results = []
+            except Exception as e:
+                print(f"\nError during parallel clustering: {e}")
+                results = []
+            
+            # Filter out None results
+            successful_results = [r for r in results if r is not None]
         
-        try:
-            with progress_bar(total=len(t_range), desc="Processing cluster numbers in parallel", 
-                     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]',
-                     leave=True) as pbar:
-                
-                # Use joblib to process cluster numbers in parallel
-                results = Parallel(n_jobs=self.n_jobs, verbose=0)(
-                    delayed(process_single_cluster_number)(target_k) 
-                    for target_k in t_range
-                )
-                
-                # Update progress bar
-                pbar.update(len(t_range))
-                
-        except KeyboardInterrupt:
-            print("\nClustering interrupted by user")
-            results = []
-        except Exception as e:
-            print(f"\nError during parallel clustering: {e}")
-            results = []
-        
-        # Filter out None results and organize output
-        successful_results = [r for r in results if r is not None]
-        
+        # Organize output (common for both strategies)
         if successful_results:
             # Sort by target_k to maintain order
             successful_results.sort(key=lambda x: x['target_k'])
@@ -769,7 +799,7 @@ class scICE:
             }
         
         n_found = len(successful_results)
-        print(f"\n✅ Completed parallel scICE clustering. Found {n_found}/{len(t_range)} stable solutions.")
+        print(f"\n✅ Completed scICE clustering. Found {n_found}/{len(t_range)} stable solutions.")
         
         if self.use_gpu:
             if self.gpu_device == 'cuda':
