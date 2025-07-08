@@ -168,3 +168,5 @@ def embedding_atlas(adata,basis,color,
     ax.set_title(title,fontsize=fontsize+1)
 
     return ax
+
+
