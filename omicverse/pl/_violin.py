@@ -70,85 +70,50 @@ def violin(
     ticks_fontsize=None,
     **kwds
 ) -> Union[Axes, None]:
-    """
+    r"""
     Enhanced violin plot compatible with scanpy's interface.
     
     This function provides all the functionality of scanpy's violin plot
     with additional customization options for enhanced visualization,
     implemented using pure matplotlib.
     
-    Parameters
-    ----------
-    adata : AnnData
-        Annotated data matrix.
-    keys : str | Sequence[str]
-        Keys for accessing variables of `.var_names` or fields of `.obs`.
-    groupby : str | None
-        The key of the observation grouping to consider.
-    log : bool
-        Plot on logarithmic axis.
-    use_raw : bool | None
-        Whether to use `raw` attribute of `adata`. Defaults to `True` if `.raw` is present.
-    stripplot : bool
-        Add a stripplot on top of the violin plot.
-    jitter : float | bool
-        Add jitter to the stripplot (only when stripplot is True).
-    size : int
-        Size of the jitter points.
-    layer : str | None
-        Name of the AnnData object layer that wants to be plotted.
-    density_norm : DensityNorm
-        The method used to scale the width of each violin.
-        If 'width' (the default), each violin will have the same width.
-        If 'area', each violin will have the same area.
-        If 'count', a violin's width corresponds to the number of observations.
-    order : Sequence[str] | None
-        Order in which to show the categories.
-    multi_panel : bool | None
-        Display keys in multiple panels also when `groupby is not None`.
-    xlabel : str
-        Label of the x axis.
-    ylabel : str | Sequence[str] | None
-        Label of the y axis.
-    rotation : float | None
-        Rotation of xtick labels.
-    show : bool | None
-        Whether to show the plot.
-    save : bool | str | None
-        Path to save the figure.
-    ax : Axes | None
-        A matplotlib axes object.
-    enhanced_style : bool
-        Whether to apply enhanced styling.
-    show_means : bool
-        Whether to show mean values with annotations.
-    show_boxplot : bool
-        Whether to overlay box plots on violins.
-    jitter_method : str
-        Method for jittering: 'uniform' or 't_dist'.
-    jitter_alpha : float
-        Transparency of jittered points.
-    violin_alpha : float
-        Transparency of violin plots.
-    background_color : str
-        Background color of the plot.
-    spine_color : str
-        Color of plot spines.
-    grid_lines : bool
-        Whether to show horizontal grid lines.
-    statistical_tests : bool
-        Whether to perform and display statistical tests.
-    custom_colors : Sequence[str] | None
-        Custom colors for groups.
-    figsize : tuple | None
-        Figure size (width, height).
-    **kwds
-        Additional keyword arguments passed to violinplot.
+    Arguments:
+        adata: AnnData. Annotated data matrix.
+        keys: str | Sequence[str]. Keys for accessing variables of `.var_names` or fields of `.obs`.
+        groupby: str | None. The key of the observation grouping to consider. (None)
+        log: bool. Plot on logarithmic axis. (False)
+        use_raw: bool | None. Whether to use `raw` attribute of `adata`. Defaults to `True` if `.raw` is present. (None)
+        stripplot: bool. Add a stripplot on top of the violin plot. (True)
+        jitter: float | bool. Add jitter to the stripplot (only when stripplot is True). (True)
+        size: int. Size of the jitter points. (1)
+        layer: str | None. Name of the AnnData object layer that wants to be plotted. (None)
+        density_norm: str. The method used to scale the width of each violin. If 'width' (the default), each violin will have the same width. If 'area', each violin will have the same area. If 'count', a violin's width corresponds to the number of observations. ('width')
+        order: Sequence[str] | None. Order in which to show the categories. (None)
+        multi_panel: bool | None. Display keys in multiple panels also when `groupby is not None`. (None)
+        xlabel: str. Label of the x axis. ('')
+        ylabel: str | Sequence[str] | None. Label of the y axis. (None)
+        rotation: float | None. Rotation of xtick labels. (None)
+        show: bool | None. Whether to show the plot. (None)
+        save: bool | str | None. Path to save the figure. (None)
+        ax: Axes | None. A matplotlib axes object. (None)
+        enhanced_style: bool. Whether to apply enhanced styling. (True)
+        show_means: bool. Whether to show mean values with annotations. (False)
+        show_boxplot: bool. Whether to overlay box plots on violins. (False)
+        jitter_method: str. Method for jittering: 'uniform' or 't_dist'. ('uniform')
+        jitter_alpha: float. Transparency of jittered points. (0.4)
+        violin_alpha: float. Transparency of violin plots. (0.8)
+        background_color: str. Background color of the plot. ('white')
+        spine_color: str. Color of plot spines. ('#b4aea9')
+        grid_lines: bool. Whether to show horizontal grid lines. (True)
+        statistical_tests: bool. Whether to perform and display statistical tests. (False)
+        custom_colors: Sequence[str] | None. Custom colors for groups. (None)
+        figsize: tuple | None. Figure size (width, height). (None)
+        fontsize: int. Font size for labels and ticks. (13)
+        ticks_fontsize: int | None. Font size for axis ticks. If None, uses fontsize-1. (None)
+        **kwds: Additional keyword arguments passed to violinplot.
     
-    Returns
-    -------
-    Axes | None
-        A matplotlib axes object if `ax` is `None` else `None`.
+    Returns:
+        ax: matplotlib.axes.Axes | None. A matplotlib axes object if `ax` is `None` else `None`.
     """
     
     # Handle AnnData availability
@@ -455,7 +420,23 @@ def violin(
     return ax
 
 def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
-    """Extract data from AnnData object."""
+    r"""
+    Extract data from AnnData object for violin plotting.
+    
+    Arguments:
+        adata: AnnData object
+        keys: list of str
+            Variables to extract
+        groupby: str
+            Grouping variable
+        layer: str, optional
+            Layer to use for gene expression data
+        use_raw: bool
+            Whether to use raw data
+    
+    Returns:
+        dict: Dictionary containing extracted data
+    """
     # This is a simplified version - in real scanpy, this would handle
     # raw data, layers, etc. more comprehensively
     

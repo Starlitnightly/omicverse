@@ -53,7 +53,7 @@ def dotplot(
     preserve_dict_order: bool = False,
     **kwds,
 ) -> Optional[Union[Dict, 'DotPlot']]:
-    """
+    r"""
     Make a dot plot of the expression values of `var_names`.
     
     For each var_name and each `groupby` category a dot is plotted.
@@ -61,87 +61,85 @@ def dotplot(
     (visualized by color) and fraction of cells expressing the `var_name` in the
     category (visualized by the size of the dot).
     
-    Parameters
-    ----------
-    adata : AnnData
-        Annotated data matrix.
-    var_names : str or list of str or dict
-        Variables to plot.
-    groupby : str or list of str
-        The key of the observation grouping to consider.
-    use_raw : bool, optional
-        Use `raw` attribute of `adata` if present.
-    log : bool, optional (default: False)
-        Whether to log-transform the data.
-    num_categories : int, optional (default: 7)
-        Number of categories to show.
-    categories_order : list of str, optional
-        Order of categories to display.
-    expression_cutoff : float, optional (default: 0.0)
-        Expression cutoff for calculating fraction of expressing cells.
-    mean_only_expressed : bool, optional (default: False)
-        Whether to calculate mean only for expressing cells.
-    standard_scale : {'var', 'group'} or None
-        Whether to standardize data.
-    title : str, optional
-        Title for the plot.
-    colorbar_title : str, optional (default: 'Mean expression\nin group')
-        Title for the color bar.
-    size_title : str, optional (default: 'Fraction of cells\nin group (%)')
-        Title for the size legend.
-    figsize : tuple, optional
-        Figure size (width, height) in inches. If provided, the plot dimensions will be scaled accordingly.
-    dendrogram : bool or str, optional (default: False)
-        Whether to add dendrogram to the plot.
-    gene_symbols : str, optional
-        Key for gene symbols in `adata.var`.
-    var_group_positions : list of tuples, optional
-        Positions for variable groups.
-    var_group_labels : list of str, optional
-        Labels for variable groups.
-    var_group_rotation : float, optional
-        Rotation angle for variable group labels.
-    layer : str, optional
-        Layer to use for expression data.
-    swap_axes : bool, optional (default: False)
-        Whether to swap x and y axes.
-    dot_color_df : pandas.DataFrame, optional
-        DataFrame for dot colors.
-    show : bool, optional
-        Whether to show the plot.
-    save : str or bool, optional
-        Whether to save the plot.
-    ax : matplotlib.axes.Axes, optional
-        Axes object to plot on.
-    return_fig : bool, optional (default: False)
-        Whether to return the figure object.
-    vmin : float, optional
-        Minimum value for color scaling.
-    vmax : float, optional
-        Maximum value for color scaling.
-    vcenter : float, optional
-        Center value for diverging colormap.
-    norm : matplotlib.colors.Normalize, optional
-        Normalization object for colors.
-    cmap : str or matplotlib.colors.Colormap, optional (default: 'Reds')
-        Colormap for the plot.
-    dot_max : float, optional
-        Maximum dot size.
-    dot_min : float, optional
-        Minimum dot size.
-    smallest_dot : float, optional (default: 0.0)
-        Size of the smallest dot.
-    fontsize : int, optional (default: 12)
-        Font size for labels and legends. Titles will be one point larger.
-    preserve_dict_order : bool, optional (default: False)
-        When var_names is a dictionary, whether to preserve the original dictionary order.
-        If True, genes will be ordered according to the dictionary's insertion order.
-        If False (default), genes will be ordered according to cell type categories.
+    Arguments:
+        adata: AnnData
+            Annotated data matrix.
+        var_names: str or list of str or dict
+            Variables to plot.
+        groupby: str or list of str
+            The key of the observation grouping to consider.
+        use_raw: bool, optional (default=None)
+            Use `raw` attribute of `adata` if present.
+        log: bool, optional (default=False)
+            Whether to log-transform the data.
+        num_categories: int, optional (default=7)
+            Number of categories to show.
+        categories_order: list of str, optional (default=None)
+            Order of categories to display.
+        expression_cutoff: float, optional (default=0.0)
+            Expression cutoff for calculating fraction of expressing cells.
+        mean_only_expressed: bool, optional (default=False)
+            Whether to calculate mean only for expressing cells.
+        standard_scale: {'var', 'group'} or None, optional (default=None)
+            Whether to standardize data.
+        title: str, optional (default=None)
+            Title for the plot.
+        colorbar_title: str, optional (default='Mean expression\nin group')
+            Title for the color bar.
+        size_title: str, optional (default='Fraction of cells\nin group (%)')
+            Title for the size legend.
+        figsize: tuple, optional (default=None)
+            Figure size (width, height) in inches. If provided, the plot dimensions will be scaled accordingly.
+        dendrogram: bool or str, optional (default=False)
+            Whether to add dendrogram to the plot.
+        gene_symbols: str, optional (default=None)
+            Key for gene symbols in `adata.var`.
+        var_group_positions: list of tuples, optional (default=None)
+            Positions for variable groups.
+        var_group_labels: list of str, optional (default=None)
+            Labels for variable groups.
+        var_group_rotation: float, optional (default=None)
+            Rotation angle for variable group labels.
+        layer: str, optional (default=None)
+            Layer to use for expression data.
+        swap_axes: bool, optional (default=False)
+            Whether to swap x and y axes.
+        dot_color_df: pandas.DataFrame, optional (default=None)
+            DataFrame for dot colors.
+        show: bool, optional (default=None)
+            Whether to show the plot.
+        save: str or bool, optional (default=None)
+            Whether to save the plot.
+        ax: matplotlib.axes.Axes, optional (default=None)
+            Axes object to plot on.
+        return_fig: bool, optional (default=False)
+            Whether to return the figure object.
+        vmin: float, optional (default=None)
+            Minimum value for color scaling.
+        vmax: float, optional (default=None)
+            Maximum value for color scaling.
+        vcenter: float, optional (default=None)
+            Center value for diverging colormap.
+        norm: matplotlib.colors.Normalize, optional (default=None)
+            Normalization object for colors.
+        cmap: str or matplotlib.colors.Colormap, optional (default='Reds')
+            Colormap for the plot.
+        dot_max: float, optional (default=None)
+            Maximum dot size.
+        dot_min: float, optional (default=None)
+            Minimum dot size.
+        smallest_dot: float, optional (default=0.0)
+            Size of the smallest dot.
+        fontsize: int, optional (default=12)
+            Font size for labels and legends. Titles will be one point larger.
+        preserve_dict_order: bool, optional (default=False)
+            When var_names is a dictionary, whether to preserve the original dictionary order.
+            If True, genes will be ordered according to the dictionary's insertion order.
+            If False (default), genes will be ordered according to cell type categories.
     
-    Returns
-    -------
-    If `return_fig` is True, returns the figure object.
-    If `show` is False, returns axes dictionary.
+    Returns:
+        If `return_fig` is True, returns the figure object.
+        If `show` is False, returns axes dictionary.
     """
     # Convert var_names to list if string
     original_var_names_dict = None

@@ -52,18 +52,16 @@ def create_transparent_gradient_colormap(color1, color2,N=100):
     return cmap
 
 def create_custom_colormap(cell_color):
-    """
-    Create a custom colormap based on cell type color
+    r"""
+    Create a custom colormap based on cell type color.
     
-    Parameters:
-    -----------
-    cell_color : str
-        Base color for the cell type
+    Arguments:
+        cell_color: str
+            Base color for the cell type
     
     Returns:
-    --------
-    cmap : matplotlib.colors.LinearSegmentedColormap
-        Custom colormap
+        cmap: matplotlib.colors.LinearSegmentedColormap
+            Custom colormap
     """
     from matplotlib.colors import LinearSegmentedColormap
     import matplotlib.colors as mcolors
