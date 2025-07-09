@@ -160,7 +160,7 @@ def _distributed_calc(
     aggregate_func: Callable[[Sequence[T]], T],
     motif_similarity_fdr: float = 0.001,
     orthologuous_identity_threshold: float = 0.0,
-    client_or_address="dask_multiprocessing",
+    client_or_address="custom_multiprocessing",
     num_workers=None,
     module_chunksize=100,
 ) -> T:
@@ -186,8 +186,8 @@ def _distributed_calc(
         multiprocessing scheduler.
     :return: A pandas dataframe or a sequence of regulons (depends on aggregate function supplied).
     """
-    from dask.distributed import Client
-
+    
+    '''
     def is_valid(client_or_address):
         if isinstance(client_or_address, str) and (
             (
@@ -204,6 +204,7 @@ def _distributed_calc(
     assert is_valid(
         client_or_address
     ), '"{}"is not valid for parameter client_or_address.'.format(client_or_address)
+    '''
 
     if client_or_address not in {"custom_multiprocessing", "dask_multiprocessing"}:
         module_chunksize = 1
@@ -257,6 +258,8 @@ def _distributed_calc(
                 os.remove(fname)
     else:  # DASK framework.
         from dask import delayed
+        from dask.distributed import Client
+
         
         # Load motif annotations.
         motif_annotations = load_motif_annotations(
