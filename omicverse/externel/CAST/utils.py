@@ -124,9 +124,9 @@ def Harmony_integration(
     sc.tl.umap(sdata_inte,min_dist=min_dist, spread = spread_t)
     sdata_inte.obsm['har_X_umap'] = sdata_inte.obsm['X_umap'].copy()
     if ifplot == True:
-        plt.rcParams.update({'pdf.fonttype':42})
+        #plt.rcParams.update({'pdf.fonttype':42})
         sc.settings.figdir = output_path
-        sc.set_figure_params(figsize=(10, 10),facecolor='white',vector_friendly=True, dpi_save=300,fontsize = 25)
+        #sc.set_figure_params(figsize=(10, 10),facecolor='white',vector_friendly=True, dpi_save=300,fontsize = 25)
         sc.pl.umap(sdata_inte,color=[batch_key],size=10,save=f'_har_{umap_n_pcs}pcs_batch.pdf')
         sc.pl.umap(sdata_inte,color=[source_sample_ctype_col],size=10,save=f'_har_{umap_n_pcs}pcs_ctype.pdf') if source_sample_ctype_col is not None else None
     return sdata_inte

@@ -585,5 +585,8 @@ Optimated the plot effect of `ov.pl.violin`
 ### utils Module
 - Added scICE to calculate the best cluster (#329)
 
+### v 1.7.5
+
+
 
 
