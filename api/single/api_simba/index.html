@@ -353,13 +353,18 @@
       </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scenic/">
+        Gene Regulatory Network Analysis with SCENIC
+      </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../../Tutorials-single/t_aucell/">
         Pathway analysis with AUCell
       </a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../../Tutorials-single/t_cellphonedb/">
-        Cell interaction with CellPhoneDB
+        Cell-cell communication using CellPhoneDBViz
       </a>
 </li>
 <li class="md-nav__item">
@@ -625,53 +630,53 @@
 <p class="doc doc-class-bases">
         Bases: <code>object</code></p>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
 <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos=" 23 "></span><span class="k">class</span> <span class="nc">pySIMBA</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="linenos" data-linenos=" 24 "></span>
 <span class="linenos" data-linenos=" 25 "></span>    <span class="k">def</span> <span class="nf">check_simba</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="linenos" data-linenos=" 26 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos=" 27 "></span><span class="sd">        Check if simba have been installed.</span>
-<span class="linenos" data-linenos=" 28 "></span><span class="sd">        """</span>
-<span class="linenos" data-linenos=" 29 "></span>        <span class="k">global</span> <span class="n">simba_install</span>
-<span class="linenos" data-linenos=" 30 "></span>        <span class="k">try</span><span class="p">:</span>
-<span class="linenos" data-linenos=" 31 "></span>            <span class="kn">import</span> <span class="nn">simba</span> <span class="k">as</span> <span class="nn">si</span>
-<span class="linenos" data-linenos=" 32 "></span>            <span class="n">simba_install</span><span class="o">=</span><span class="kc">True</span>
-<span class="linenos" data-linenos=" 33 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s1">'simba have been install version:'</span><span class="p">,</span><span class="n">si</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
-<span class="linenos" data-linenos=" 34 "></span>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-<span class="linenos" data-linenos=" 35 "></span>            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
-<span class="linenos" data-linenos=" 36 "></span><span class="w">                </span><span class="sd">"""Please install the simba and simba_pdg: `conda install -c bioconda simba` or </span>
-<span class="linenos" data-linenos=" 37 "></span><span class="sd">                `pip install git+https://github.com/huidongchen/simba and pip install git+https://github.com/pinellolab/simba_pbg`.'"""</span>
-<span class="linenos" data-linenos=" 38 "></span>            <span class="p">)</span>
-<span class="linenos" data-linenos=" 39 "></span>
-<span class="linenos" data-linenos=" 40 "></span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">,</span><span class="n">workdir</span><span class="o">=</span><span class="s2">"simba_result"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos=" 41 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos=" 42 "></span><span class="sd">        SIMBA method for batch correction.</span>
-<span class="linenos" data-linenos=" 43 "></span>
-<span class="linenos" data-linenos=" 44 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos=" 45 "></span><span class="sd">            adata: AnnData object.</span>
-<span class="linenos" data-linenos=" 46 "></span><span class="sd">            workdir: The working directory for saving the results.</span>
-<span class="linenos" data-linenos=" 47 "></span>
-<span class="linenos" data-linenos=" 48 "></span><span class="sd">        """</span>
-<span class="linenos" data-linenos=" 49 "></span>
-<span class="linenos" data-linenos=" 50 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">check_simba</span><span class="p">()</span>
-<span class="linenos" data-linenos=" 51 "></span>        <span class="k">global</span> <span class="n">simba_install</span>
-<span class="linenos" data-linenos=" 52 "></span>        <span class="k">if</span> <span class="n">simba_install</span><span class="o">==</span><span class="kc">True</span><span class="p">:</span>
-<span class="linenos" data-linenos=" 53 "></span>            <span class="n">global_imports</span><span class="p">(</span><span class="s2">"simba"</span><span class="p">,</span><span class="s2">"si"</span><span class="p">)</span>
-<span class="linenos" data-linenos=" 54 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
-<span class="linenos" data-linenos=" 55 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="o">=</span><span class="n">workdir</span>
-<span class="linenos" data-linenos=" 56 "></span>        <span class="k">pass</span>
-<span class="linenos" data-linenos=" 57 "></span>
-<span class="linenos" data-linenos=" 58 "></span>    <span class="k">def</span> <span class="nf">preprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">batch_key</span><span class="o">=</span><span class="s1">'batch'</span><span class="p">,</span><span class="n">min_n_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-<span class="linenos" data-linenos=" 59 "></span>                    <span class="n">method</span><span class="o">=</span><span class="s1">'lib_size'</span><span class="p">,</span><span class="n">n_top_genes</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span><span class="n">n_bins</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
-<span class="linenos" data-linenos=" 60 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos=" 61 "></span><span class="sd">        The preprocess of the adata by simba</span>
+<span class="linenos" data-linenos=" 26 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Check if SIMBA package has been installed.</span>
+<span class="linenos" data-linenos=" 27 "></span>
+<span class="linenos" data-linenos=" 28 "></span><span class="sd">        Raises:</span>
+<span class="linenos" data-linenos=" 29 "></span><span class="sd">            ImportError: If SIMBA package is not installed</span>
+<span class="linenos" data-linenos=" 30 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos=" 31 "></span>        <span class="k">global</span> <span class="n">simba_install</span>
+<span class="linenos" data-linenos=" 32 "></span>        <span class="k">try</span><span class="p">:</span>
+<span class="linenos" data-linenos=" 33 "></span>            <span class="kn">import</span> <span class="nn">simba</span> <span class="k">as</span> <span class="nn">si</span>
+<span class="linenos" data-linenos=" 34 "></span>            <span class="n">simba_install</span><span class="o">=</span><span class="kc">True</span>
+<span class="linenos" data-linenos=" 35 "></span>            <span class="nb">print</span><span class="p">(</span><span class="s1">'simba have been install version:'</span><span class="p">,</span><span class="n">si</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="linenos" data-linenos=" 36 "></span>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<span class="linenos" data-linenos=" 37 "></span>            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+<span class="linenos" data-linenos=" 38 "></span><span class="w">                </span><span class="sd">"""Please install the simba and simba_pdg: `conda install -c bioconda simba` or </span>
+<span class="linenos" data-linenos=" 39 "></span><span class="sd">                `pip install git+https://github.com/huidongchen/simba and pip install git+https://github.com/pinellolab/simba_pbg`.'"""</span>
+<span class="linenos" data-linenos=" 40 "></span>            <span class="p">)</span>
+<span class="linenos" data-linenos=" 41 "></span>
+<span class="linenos" data-linenos=" 42 "></span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">,</span><span class="n">workdir</span><span class="o">=</span><span class="s2">"simba_result"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos=" 43 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Initialize SIMBA object for batch correction and multimodal analysis.</span>
+<span class="linenos" data-linenos=" 44 "></span>
+<span class="linenos" data-linenos=" 45 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos=" 46 "></span><span class="sd">            adata: AnnData object containing single-cell data</span>
+<span class="linenos" data-linenos=" 47 "></span><span class="sd">            workdir (str): Working directory for saving results (default: "simba_result")</span>
+<span class="linenos" data-linenos=" 48 "></span>
+<span class="linenos" data-linenos=" 49 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos=" 50 "></span>
+<span class="linenos" data-linenos=" 51 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">check_simba</span><span class="p">()</span>
+<span class="linenos" data-linenos=" 52 "></span>        <span class="k">global</span> <span class="n">simba_install</span>
+<span class="linenos" data-linenos=" 53 "></span>        <span class="k">if</span> <span class="n">simba_install</span><span class="o">==</span><span class="kc">True</span><span class="p">:</span>
+<span class="linenos" data-linenos=" 54 "></span>            <span class="n">global_imports</span><span class="p">(</span><span class="s2">"simba"</span><span class="p">,</span><span class="s2">"si"</span><span class="p">)</span>
+<span class="linenos" data-linenos=" 55 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
+<span class="linenos" data-linenos=" 56 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="o">=</span><span class="n">workdir</span>
+<span class="linenos" data-linenos=" 57 "></span>        <span class="k">pass</span>
+<span class="linenos" data-linenos=" 58 "></span>
+<span class="linenos" data-linenos=" 59 "></span>    <span class="k">def</span> <span class="nf">preprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">batch_key</span><span class="o">=</span><span class="s1">'batch'</span><span class="p">,</span><span class="n">min_n_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<span class="linenos" data-linenos=" 60 "></span>                    <span class="n">method</span><span class="o">=</span><span class="s1">'lib_size'</span><span class="p">,</span><span class="n">n_top_genes</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span><span class="n">n_bins</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<span class="linenos" data-linenos=" 61 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Preprocess the AnnData object for SIMBA analysis.</span>
 <span class="linenos" data-linenos=" 62 "></span>
 <span class="linenos" data-linenos=" 63 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos=" 64 "></span><span class="sd">            batch_key: The key of batch in adata.obs.</span>
-<span class="linenos" data-linenos=" 65 "></span><span class="sd">            min_n_cells: The minimum number of cells for a gene to be considered.</span>
-<span class="linenos" data-linenos=" 66 "></span><span class="sd">            method: The method for normalization.</span>
-<span class="linenos" data-linenos=" 67 "></span><span class="sd">            n_top_genes: The number of top genes to keep.</span>
-<span class="linenos" data-linenos=" 68 "></span><span class="sd">            n_bins: The number of bins for discretization.</span>
+<span class="linenos" data-linenos=" 64 "></span><span class="sd">            batch_key (str): Key of batch information in adata.obs (default: 'batch')</span>
+<span class="linenos" data-linenos=" 65 "></span><span class="sd">            min_n_cells (int): Minimum number of cells for a gene to be considered (default: 3)</span>
+<span class="linenos" data-linenos=" 66 "></span><span class="sd">            method (str): Method for normalization (default: 'lib_size')</span>
+<span class="linenos" data-linenos=" 67 "></span><span class="sd">            n_top_genes (int): Number of top variable genes to keep (default: 3000)</span>
+<span class="linenos" data-linenos=" 68 "></span><span class="sd">            n_bins (int): Number of bins for discretization (default: 5)</span>
 <span class="linenos" data-linenos=" 69 "></span>
 <span class="linenos" data-linenos=" 70 "></span>
 <span class="linenos" data-linenos=" 71 "></span><span class="sd">        """</span>
@@ -690,109 +695,108 @@
 <span class="linenos" data-linenos=" 84 "></span>
 <span class="linenos" data-linenos=" 85 "></span>    <span class="k">def</span> <span class="nf">gen_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_components</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
 <span class="linenos" data-linenos=" 86 "></span>                    <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">dirname</span><span class="o">=</span><span class="s1">'graph0'</span><span class="p">):</span>
-<span class="linenos" data-linenos=" 87 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos=" 88 "></span><span class="sd">        Generate the graph for batch correction.</span>
-<span class="linenos" data-linenos=" 89 "></span>
-<span class="linenos" data-linenos=" 90 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos=" 91 "></span><span class="sd">            n_components: The number of components for the graph.</span>
-<span class="linenos" data-linenos=" 92 "></span><span class="sd">            k: The number of neighbors for the graph.</span>
-<span class="linenos" data-linenos=" 93 "></span><span class="sd">            copy: Whether to copy the adata.</span>
-<span class="linenos" data-linenos=" 94 "></span><span class="sd">            dirname: The name of the graph.</span>
-<span class="linenos" data-linenos=" 95 "></span>
-<span class="linenos" data-linenos=" 96 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos=" 87 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Generate the graph structure for batch correction.</span>
+<span class="linenos" data-linenos=" 88 "></span>
+<span class="linenos" data-linenos=" 89 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos=" 90 "></span><span class="sd">            n_components (int): Number of components for dimensionality reduction (default: 15)</span>
+<span class="linenos" data-linenos=" 91 "></span><span class="sd">            k (int): Number of neighbors for graph construction (default: 15)</span>
+<span class="linenos" data-linenos=" 92 "></span><span class="sd">            copy (bool): Whether to copy the adata object (default: False)</span>
+<span class="linenos" data-linenos=" 93 "></span><span class="sd">            dirname (str): Directory name for saving graph results (default: 'graph0')</span>
+<span class="linenos" data-linenos=" 94 "></span>
+<span class="linenos" data-linenos=" 95 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos=" 96 "></span>
 <span class="linenos" data-linenos=" 97 "></span>
-<span class="linenos" data-linenos=" 98 "></span>
-<span class="linenos" data-linenos=" 99 "></span>        <span class="n">batch_size</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
-<span class="linenos" data-linenos="100 "></span>                            <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
-<span class="linenos" data-linenos="101 "></span>        <span class="n">result_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">batch_size</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
-<span class="linenos" data-linenos="102 "></span>        <span class="n">adata_edge_dict</span><span class="o">=</span><span class="p">{}</span>
-<span class="linenos" data-linenos="103 "></span>        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
-<span class="linenos" data-linenos="104 "></span>            <span class="k">if</span> <span class="n">batch</span><span class="o">==</span><span class="n">result_max</span><span class="p">:</span>
-<span class="linenos" data-linenos="105 "></span>                <span class="k">continue</span>
-<span class="linenos" data-linenos="106 "></span>            <span class="k">else</span><span class="p">:</span>
-<span class="linenos" data-linenos="107 "></span>                <span class="n">adata_edge_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">infer_edges</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">result_max</span><span class="p">],</span> 
-<span class="linenos" data-linenos="108 "></span>                                                        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">batch</span><span class="p">],</span> <span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
-<span class="linenos" data-linenos="109 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_edge_dict</span>
-<span class="linenos" data-linenos="110 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">gen_graph</span><span class="p">(</span><span class="n">list_CG</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
-<span class="linenos" data-linenos="111 "></span>                    <span class="n">list_CC</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
-<span class="linenos" data-linenos="112 "></span>                    <span class="n">copy</span><span class="o">=</span><span class="n">copy</span><span class="p">,</span>
-<span class="linenos" data-linenos="113 "></span>                    <span class="n">dirname</span><span class="o">=</span><span class="n">dirname</span><span class="p">)</span>
-<span class="linenos" data-linenos="114 "></span>
-<span class="linenos" data-linenos="115 "></span>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">num_workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span><span class="n">auto_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'model'</span><span class="p">):</span>
-<span class="linenos" data-linenos="116 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="117 "></span>
-<span class="linenos" data-linenos="118 "></span><span class="sd">        Train the model for batch correction.</span>
-<span class="linenos" data-linenos="119 "></span>
-<span class="linenos" data-linenos="120 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos="121 "></span><span class="sd">            num_workers: The number of workers for training.</span>
-<span class="linenos" data-linenos="122 "></span><span class="sd">            auto_wd: Whether to use the automatic weight decay.</span>
-<span class="linenos" data-linenos="123 "></span><span class="sd">            save_wd: Whether to save the weight decay.</span>
-<span class="linenos" data-linenos="124 "></span><span class="sd">            output: The output directory for saving the model.</span>
-<span class="linenos" data-linenos="125 "></span>
-<span class="linenos" data-linenos="126 "></span><span class="sd">        """</span>
-<span class="linenos" data-linenos="127 "></span>
-<span class="linenos" data-linenos="128 "></span>        <span class="c1"># modify parameters</span>
-<span class="linenos" data-linenos="129 "></span>        <span class="n">dict_config</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">pbg_params</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="linenos" data-linenos="130 "></span>        <span class="c1"># dict_config['wd'] = 0.00477</span>
-<span class="linenos" data-linenos="131 "></span>        <span class="n">dict_config</span><span class="p">[</span><span class="s1">'workers'</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_workers</span>
-<span class="linenos" data-linenos="132 "></span>        <span class="c1">## start training</span>
-<span class="linenos" data-linenos="133 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pbg_train</span><span class="p">(</span><span class="n">pbg_params</span> <span class="o">=</span> <span class="n">dict_config</span><span class="p">,</span> <span class="n">auto_wd</span><span class="o">=</span><span class="n">auto_wd</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="n">save_wd</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
-<span class="linenos" data-linenos="134 "></span>
-<span class="linenos" data-linenos="135 "></span>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="linenos" data-linenos="136 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="137 "></span><span class="sd">        Load the model for batch correction.</span>
-<span class="linenos" data-linenos="138 "></span>
-<span class="linenos" data-linenos="139 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos="140 "></span><span class="sd">            model_path: The path of the model.</span>
-<span class="linenos" data-linenos="141 "></span>
-<span class="linenos" data-linenos="142 "></span>
-<span class="linenos" data-linenos="143 "></span><span class="sd">        """</span>
-<span class="linenos" data-linenos="144 "></span>        <span class="c1"># load in graph ('graph0') info</span>
-<span class="linenos" data-linenos="145 "></span>        <span class="k">if</span> <span class="n">model_path</span><span class="o">==</span><span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos="146 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">()</span>
-<span class="linenos" data-linenos="147 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">()</span>
-<span class="linenos" data-linenos="148 "></span>        <span class="k">else</span><span class="p">:</span>
-<span class="linenos" data-linenos="149 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="p">)</span>
-<span class="linenos" data-linenos="150 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="o">+</span><span class="s1">'/model/'</span><span class="p">)</span>
-<span class="linenos" data-linenos="151 "></span>
-<span class="linenos" data-linenos="152 "></span>
-<span class="linenos" data-linenos="153 "></span>    <span class="k">def</span> <span class="nf">batch_correction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="linenos" data-linenos="154 "></span><span class="w">        </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="155 "></span><span class="sd">        Batch correction by SIMBA</span>
+<span class="linenos" data-linenos=" 98 "></span>        <span class="n">batch_size</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+<span class="linenos" data-linenos=" 99 "></span>                            <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
+<span class="linenos" data-linenos="100 "></span>        <span class="n">result_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">batch_size</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
+<span class="linenos" data-linenos="101 "></span>        <span class="n">adata_edge_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="linenos" data-linenos="102 "></span>        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
+<span class="linenos" data-linenos="103 "></span>            <span class="k">if</span> <span class="n">batch</span><span class="o">==</span><span class="n">result_max</span><span class="p">:</span>
+<span class="linenos" data-linenos="104 "></span>                <span class="k">continue</span>
+<span class="linenos" data-linenos="105 "></span>            <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="106 "></span>                <span class="n">adata_edge_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">infer_edges</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">result_max</span><span class="p">],</span> 
+<span class="linenos" data-linenos="107 "></span>                                                        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">batch</span><span class="p">],</span> <span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
+<span class="linenos" data-linenos="108 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_edge_dict</span>
+<span class="linenos" data-linenos="109 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">gen_graph</span><span class="p">(</span><span class="n">list_CG</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
+<span class="linenos" data-linenos="110 "></span>                    <span class="n">list_CC</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
+<span class="linenos" data-linenos="111 "></span>                    <span class="n">copy</span><span class="o">=</span><span class="n">copy</span><span class="p">,</span>
+<span class="linenos" data-linenos="112 "></span>                    <span class="n">dirname</span><span class="o">=</span><span class="n">dirname</span><span class="p">)</span>
+<span class="linenos" data-linenos="113 "></span>
+<span class="linenos" data-linenos="114 "></span>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">num_workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span><span class="n">auto_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'model'</span><span class="p">):</span>
+<span class="linenos" data-linenos="115 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Train the SIMBA model for batch correction.</span>
+<span class="linenos" data-linenos="116 "></span>
+<span class="linenos" data-linenos="117 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="118 "></span><span class="sd">            num_workers (int): Number of workers for parallel training (default: 12)</span>
+<span class="linenos" data-linenos="119 "></span><span class="sd">            auto_wd (bool): Whether to use automatic weight decay (default: True)</span>
+<span class="linenos" data-linenos="120 "></span><span class="sd">            save_wd (bool): Whether to save weight decay parameters (default: True)</span>
+<span class="linenos" data-linenos="121 "></span><span class="sd">            output (str): Output directory for saving the trained model (default: 'model')</span>
+<span class="linenos" data-linenos="122 "></span>
+<span class="linenos" data-linenos="123 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="124 "></span>
+<span class="linenos" data-linenos="125 "></span>        <span class="c1"># modify parameters</span>
+<span class="linenos" data-linenos="126 "></span>        <span class="n">dict_config</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">pbg_params</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="linenos" data-linenos="127 "></span>        <span class="c1"># dict_config['wd'] = 0.00477</span>
+<span class="linenos" data-linenos="128 "></span>        <span class="n">dict_config</span><span class="p">[</span><span class="s1">'workers'</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_workers</span>
+<span class="linenos" data-linenos="129 "></span>        <span class="c1">## start training</span>
+<span class="linenos" data-linenos="130 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pbg_train</span><span class="p">(</span><span class="n">pbg_params</span> <span class="o">=</span> <span class="n">dict_config</span><span class="p">,</span> <span class="n">auto_wd</span><span class="o">=</span><span class="n">auto_wd</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="n">save_wd</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
+<span class="linenos" data-linenos="131 "></span>        <span class="n">add_reference</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span><span class="s1">'SIMBA'</span><span class="p">,</span><span class="s1">'batch correction with SIMBA'</span><span class="p">)</span>
+<span class="linenos" data-linenos="132 "></span>
+<span class="linenos" data-linenos="133 "></span>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="linenos" data-linenos="134 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Load a pre-trained SIMBA model for batch correction.</span>
+<span class="linenos" data-linenos="135 "></span>
+<span class="linenos" data-linenos="136 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="137 "></span><span class="sd">            model_path (str): Path to the model directory (default: None)</span>
+<span class="linenos" data-linenos="138 "></span><span class="sd">                            If None, loads from default location</span>
+<span class="linenos" data-linenos="139 "></span>
+<span class="linenos" data-linenos="140 "></span>
+<span class="linenos" data-linenos="141 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="142 "></span>        <span class="c1"># load in graph ('graph0') info</span>
+<span class="linenos" data-linenos="143 "></span>        <span class="k">if</span> <span class="n">model_path</span><span class="o">==</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="144 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">()</span>
+<span class="linenos" data-linenos="145 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">()</span>
+<span class="linenos" data-linenos="146 "></span>        <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="147 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="p">)</span>
+<span class="linenos" data-linenos="148 "></span>            <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="o">+</span><span class="s1">'/model/'</span><span class="p">)</span>
+<span class="linenos" data-linenos="149 "></span>
+<span class="linenos" data-linenos="150 "></span>
+<span class="linenos" data-linenos="151 "></span>    <span class="k">def</span> <span class="nf">batch_correction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="linenos" data-linenos="152 "></span><span class="w">        </span><span class="sa">r</span><span class="sd">"""Perform batch correction using the trained SIMBA model.</span>
+<span class="linenos" data-linenos="153 "></span>
+<span class="linenos" data-linenos="154 "></span><span class="sd">        Arguments:</span>
+<span class="linenos" data-linenos="155 "></span><span class="sd">            use_precomputed (bool): Whether to use precomputed embeddings (default: False)</span>
 <span class="linenos" data-linenos="156 "></span>
-<span class="linenos" data-linenos="157 "></span><span class="sd">        Arguments:</span>
-<span class="linenos" data-linenos="158 "></span><span class="sd">            use_precomputed: Whether to use the precomputed model.</span>
-<span class="linenos" data-linenos="159 "></span>
-<span class="linenos" data-linenos="160 "></span><span class="sd">        """</span>
-<span class="linenos" data-linenos="161 "></span>        <span class="n">dict_adata</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">read_embedding</span><span class="p">()</span>
-<span class="linenos" data-linenos="162 "></span>        <span class="n">adata_dict</span><span class="o">=</span><span class="p">{}</span>
-<span class="linenos" data-linenos="163 "></span>        <span class="k">for</span> <span class="n">batch</span><span class="p">,</span><span class="n">key</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">dict_adata</span><span class="o">.</span><span class="n">keys</span><span class="p">()))):</span>
-<span class="linenos" data-linenos="164 "></span>            <span class="k">if</span> <span class="n">key</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
-<span class="linenos" data-linenos="165 "></span>                <span class="n">key</span><span class="o">=</span><span class="s1">''</span>
-<span class="linenos" data-linenos="166 "></span>            <span class="c1">#adata.uns['simba_batch_dict'][batch].obsm['X_simba']=dict_adata['C{}'.format(key)][adata.uns['simba_batch_dict'][batch].obs.index].to_df().values</span>
-<span class="linenos" data-linenos="167 "></span>            <span class="n">adata_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">dict_adata</span><span class="p">[</span><span class="s1">'C</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
-<span class="linenos" data-linenos="168 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_dict</span>
-<span class="linenos" data-linenos="169 "></span>        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
-<span class="linenos" data-linenos="170 "></span>            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
-<span class="linenos" data-linenos="171 "></span>
-<span class="linenos" data-linenos="172 "></span>        <span class="c1"># we choose the largest dataset as a reference</span>
-<span class="linenos" data-linenos="173 "></span>        <span class="n">dict_adata2</span> <span class="o">=</span> <span class="n">dict_adata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="linenos" data-linenos="174 "></span>        <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"G"</span><span class="p">)</span> <span class="c1"># remove genes</span>
-<span class="linenos" data-linenos="175 "></span>        <span class="n">batch_size_si</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
-<span class="linenos" data-linenos="176 "></span>                <span class="p">[</span><span class="n">dict_adata2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
-<span class="linenos" data-linenos="177 "></span>        <span class="n">max_dict_label</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size_si</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">batch_size_si</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
-<span class="linenos" data-linenos="178 "></span>        <span class="n">adata_ref_si</span> <span class="o">=</span> <span class="n">dict_adata2</span><span class="p">[</span><span class="n">max_dict_label</span><span class="p">]</span> <span class="c1"># select largest dataset</span>
-<span class="linenos" data-linenos="179 "></span>        <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">max_dict_label</span><span class="p">)</span> <span class="c1"># remove largest dataset</span>
-<span class="linenos" data-linenos="180 "></span>        <span class="n">list_adata_query</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-<span class="linenos" data-linenos="181 "></span>        <span class="n">adata_all</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">embed</span><span class="p">(</span><span class="n">adata_ref</span> <span class="o">=</span> <span class="n">adata_ref_si</span><span class="p">,</span>
-<span class="linenos" data-linenos="182 "></span>                            <span class="n">list_adata_query</span> <span class="o">=</span> <span class="n">list_adata_query</span><span class="p">,</span>
-<span class="linenos" data-linenos="183 "></span>                            <span class="n">use_precomputed</span> <span class="o">=</span> <span class="n">use_precomputed</span><span class="p">)</span>
-<span class="linenos" data-linenos="184 "></span>
-<span class="linenos" data-linenos="185 "></span>        <span class="c1">#all_adata=anndata.concat([adata.uns['simba_Gen'][batch] for batch in adata.uns['simba_Gen'].keys()],merge='same')</span>
-<span class="linenos" data-linenos="186 "></span>        <span class="n">cell_idx</span><span class="o">=</span><span class="n">adata_all</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span>
-<span class="linenos" data-linenos="187 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span>
-<span class="linenos" data-linenos="188 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_all</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
-<span class="linenos" data-linenos="189 "></span>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span>
+<span class="linenos" data-linenos="157 "></span><span class="sd">        Returns:</span>
+<span class="linenos" data-linenos="158 "></span><span class="sd">            AnnData: Batch-corrected AnnData object with X_simba embedding</span>
+<span class="linenos" data-linenos="159 "></span><span class="sd">        """</span>
+<span class="linenos" data-linenos="160 "></span>        <span class="n">dict_adata</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">read_embedding</span><span class="p">()</span>
+<span class="linenos" data-linenos="161 "></span>        <span class="n">adata_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="linenos" data-linenos="162 "></span>        <span class="k">for</span> <span class="n">batch</span><span class="p">,</span><span class="n">key</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">dict_adata</span><span class="o">.</span><span class="n">keys</span><span class="p">()))):</span>
+<span class="linenos" data-linenos="163 "></span>            <span class="k">if</span> <span class="n">key</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+<span class="linenos" data-linenos="164 "></span>                <span class="n">key</span><span class="o">=</span><span class="s1">''</span>
+<span class="linenos" data-linenos="165 "></span>            <span class="c1">#adata.uns['simba_batch_dict'][batch].obsm['X_simba']=dict_adata['C{}'.format(key)][adata.uns['simba_batch_dict'][batch].obs.index].to_df().values</span>
+<span class="linenos" data-linenos="166 "></span>            <span class="n">adata_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">dict_adata</span><span class="p">[</span><span class="s1">'C</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
+<span class="linenos" data-linenos="167 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_dict</span>
+<span class="linenos" data-linenos="168 "></span>        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
+<span class="linenos" data-linenos="169 "></span>            <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
+<span class="linenos" data-linenos="170 "></span>
+<span class="linenos" data-linenos="171 "></span>        <span class="c1"># we choose the largest dataset as a reference</span>
+<span class="linenos" data-linenos="172 "></span>        <span class="n">dict_adata2</span> <span class="o">=</span> <span class="n">dict_adata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="linenos" data-linenos="173 "></span>        <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"G"</span><span class="p">)</span> <span class="c1"># remove genes</span>
+<span class="linenos" data-linenos="174 "></span>        <span class="n">batch_size_si</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+<span class="linenos" data-linenos="175 "></span>                <span class="p">[</span><span class="n">dict_adata2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
+<span class="linenos" data-linenos="176 "></span>        <span class="n">max_dict_label</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size_si</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">batch_size_si</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
+<span class="linenos" data-linenos="177 "></span>        <span class="n">adata_ref_si</span> <span class="o">=</span> <span class="n">dict_adata2</span><span class="p">[</span><span class="n">max_dict_label</span><span class="p">]</span> <span class="c1"># select largest dataset</span>
+<span class="linenos" data-linenos="178 "></span>        <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">max_dict_label</span><span class="p">)</span> <span class="c1"># remove largest dataset</span>
+<span class="linenos" data-linenos="179 "></span>        <span class="n">list_adata_query</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+<span class="linenos" data-linenos="180 "></span>        <span class="n">adata_all</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">embed</span><span class="p">(</span><span class="n">adata_ref</span> <span class="o">=</span> <span class="n">adata_ref_si</span><span class="p">,</span>
+<span class="linenos" data-linenos="181 "></span>                            <span class="n">list_adata_query</span> <span class="o">=</span> <span class="n">list_adata_query</span><span class="p">,</span>
+<span class="linenos" data-linenos="182 "></span>                            <span class="n">use_precomputed</span> <span class="o">=</span> <span class="n">use_precomputed</span><span class="p">)</span>
+<span class="linenos" data-linenos="183 "></span>
+<span class="linenos" data-linenos="184 "></span>        <span class="c1">#all_adata=anndata.concat([adata.uns['simba_Gen'][batch] for batch in adata.uns['simba_Gen'].keys()],merge='same')</span>
+<span class="linenos" data-linenos="185 "></span>        <span class="n">cell_idx</span><span class="o">=</span><span class="n">adata_all</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span>
+<span class="linenos" data-linenos="186 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span>
+<span class="linenos" data-linenos="187 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_all</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
+<span class="linenos" data-linenos="188 "></span>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span>
 </code></pre></div>
 </details>
 <div class="doc doc-children">
@@ -801,7 +805,7 @@
 <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">workdir</span><span class="o">=</span><span class="s1">'simba_result'</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.__init__" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>SIMBA method for batch correction.</p>
+<p>Initialize SIMBA object for batch correction and multimodal analysis.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -817,7 +821,7 @@
 <td><code>adata</code></td>
 <td>
 </td>
-<td><p>AnnData object.</p></td>
+<td><p>AnnData object containing single-cell data</p></td>
 <td>
 <em>required</em>
 </td>
@@ -825,8 +829,9 @@
 <tr>
 <td><code>workdir</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The working directory for saving the results.</p></td>
+<td><p>Working directory for saving results (default: "simba_result")</p></td>
 <td>
 <code>'simba_result'</code>
 </td>
@@ -834,24 +839,23 @@
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="40 "></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">,</span><span class="n">workdir</span><span class="o">=</span><span class="s2">"simba_result"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos="41 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="42 "></span><span class="sd">    SIMBA method for batch correction.</span>
-<span class="linenos" data-linenos="43 "></span>
-<span class="linenos" data-linenos="44 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos="45 "></span><span class="sd">        adata: AnnData object.</span>
-<span class="linenos" data-linenos="46 "></span><span class="sd">        workdir: The working directory for saving the results.</span>
-<span class="linenos" data-linenos="47 "></span>
-<span class="linenos" data-linenos="48 "></span><span class="sd">    """</span>
-<span class="linenos" data-linenos="49 "></span>
-<span class="linenos" data-linenos="50 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">check_simba</span><span class="p">()</span>
-<span class="linenos" data-linenos="51 "></span>    <span class="k">global</span> <span class="n">simba_install</span>
-<span class="linenos" data-linenos="52 "></span>    <span class="k">if</span> <span class="n">simba_install</span><span class="o">==</span><span class="kc">True</span><span class="p">:</span>
-<span class="linenos" data-linenos="53 "></span>        <span class="n">global_imports</span><span class="p">(</span><span class="s2">"simba"</span><span class="p">,</span><span class="s2">"si"</span><span class="p">)</span>
-<span class="linenos" data-linenos="54 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
-<span class="linenos" data-linenos="55 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="o">=</span><span class="n">workdir</span>
-<span class="linenos" data-linenos="56 "></span>    <span class="k">pass</span>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="42 "></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">adata</span><span class="p">,</span><span class="n">workdir</span><span class="o">=</span><span class="s2">"simba_result"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="43 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Initialize SIMBA object for batch correction and multimodal analysis.</span>
+<span class="linenos" data-linenos="44 "></span>
+<span class="linenos" data-linenos="45 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="46 "></span><span class="sd">        adata: AnnData object containing single-cell data</span>
+<span class="linenos" data-linenos="47 "></span><span class="sd">        workdir (str): Working directory for saving results (default: "simba_result")</span>
+<span class="linenos" data-linenos="48 "></span>
+<span class="linenos" data-linenos="49 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="50 "></span>
+<span class="linenos" data-linenos="51 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">check_simba</span><span class="p">()</span>
+<span class="linenos" data-linenos="52 "></span>    <span class="k">global</span> <span class="n">simba_install</span>
+<span class="linenos" data-linenos="53 "></span>    <span class="k">if</span> <span class="n">simba_install</span><span class="o">==</span><span class="kc">True</span><span class="p">:</span>
+<span class="linenos" data-linenos="54 "></span>        <span class="n">global_imports</span><span class="p">(</span><span class="s2">"simba"</span><span class="p">,</span><span class="s2">"si"</span><span class="p">)</span>
+<span class="linenos" data-linenos="55 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span>
+<span class="linenos" data-linenos="56 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="o">=</span><span class="n">workdir</span>
+<span class="linenos" data-linenos="57 "></span>    <span class="k">pass</span>
 </code></pre></div>
 </details>
 </div>
@@ -861,23 +865,42 @@
 <code class="highlight language-python"><span class="n">check_simba</span><span class="p">()</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.check_simba" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>Check if simba have been installed.</p>
+<p>Check if SIMBA package has been installed.</p>
+<p><strong>Raises:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ImportError</code>
+</td>
+<td><p>If SIMBA package is not installed</p></td>
+</tr>
+</tbody>
+</table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
 <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="25 "></span><span class="k">def</span> <span class="nf">check_simba</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="linenos" data-linenos="26 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="27 "></span><span class="sd">    Check if simba have been installed.</span>
-<span class="linenos" data-linenos="28 "></span><span class="sd">    """</span>
-<span class="linenos" data-linenos="29 "></span>    <span class="k">global</span> <span class="n">simba_install</span>
-<span class="linenos" data-linenos="30 "></span>    <span class="k">try</span><span class="p">:</span>
-<span class="linenos" data-linenos="31 "></span>        <span class="kn">import</span> <span class="nn">simba</span> <span class="k">as</span> <span class="nn">si</span>
-<span class="linenos" data-linenos="32 "></span>        <span class="n">simba_install</span><span class="o">=</span><span class="kc">True</span>
-<span class="linenos" data-linenos="33 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'simba have been install version:'</span><span class="p">,</span><span class="n">si</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
-<span class="linenos" data-linenos="34 "></span>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-<span class="linenos" data-linenos="35 "></span>        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
-<span class="linenos" data-linenos="36 "></span><span class="w">            </span><span class="sd">"""Please install the simba and simba_pdg: `conda install -c bioconda simba` or </span>
-<span class="linenos" data-linenos="37 "></span><span class="sd">            `pip install git+https://github.com/huidongchen/simba and pip install git+https://github.com/pinellolab/simba_pbg`.'"""</span>
-<span class="linenos" data-linenos="38 "></span>        <span class="p">)</span>
+<span class="linenos" data-linenos="26 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Check if SIMBA package has been installed.</span>
+<span class="linenos" data-linenos="27 "></span>
+<span class="linenos" data-linenos="28 "></span><span class="sd">    Raises:</span>
+<span class="linenos" data-linenos="29 "></span><span class="sd">        ImportError: If SIMBA package is not installed</span>
+<span class="linenos" data-linenos="30 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="31 "></span>    <span class="k">global</span> <span class="n">simba_install</span>
+<span class="linenos" data-linenos="32 "></span>    <span class="k">try</span><span class="p">:</span>
+<span class="linenos" data-linenos="33 "></span>        <span class="kn">import</span> <span class="nn">simba</span> <span class="k">as</span> <span class="nn">si</span>
+<span class="linenos" data-linenos="34 "></span>        <span class="n">simba_install</span><span class="o">=</span><span class="kc">True</span>
+<span class="linenos" data-linenos="35 "></span>        <span class="nb">print</span><span class="p">(</span><span class="s1">'simba have been install version:'</span><span class="p">,</span><span class="n">si</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="linenos" data-linenos="36 "></span>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<span class="linenos" data-linenos="37 "></span>        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+<span class="linenos" data-linenos="38 "></span><span class="w">            </span><span class="sd">"""Please install the simba and simba_pdg: `conda install -c bioconda simba` or </span>
+<span class="linenos" data-linenos="39 "></span><span class="sd">            `pip install git+https://github.com/huidongchen/simba and pip install git+https://github.com/pinellolab/simba_pbg`.'"""</span>
+<span class="linenos" data-linenos="40 "></span>        <span class="p">)</span>
 </code></pre></div>
 </details>
 </div>
@@ -887,7 +910,7 @@
 <code class="highlight language-python"><span class="n">preprocess</span><span class="p">(</span><span class="n">batch_key</span><span class="o">=</span><span class="s1">'batch'</span><span class="p">,</span> <span class="n">min_n_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'lib_size'</span><span class="p">,</span> <span class="n">n_top_genes</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span> <span class="n">n_bins</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.preprocess" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>The preprocess of the adata by simba</p>
+<p>Preprocess the AnnData object for SIMBA analysis.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -902,8 +925,9 @@
 <tr>
 <td><code>batch_key</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The key of batch in adata.obs.</p></td>
+<td><p>Key of batch information in adata.obs (default: 'batch')</p></td>
 <td>
 <code>'batch'</code>
 </td>
@@ -911,8 +935,9 @@
 <tr>
 <td><code>min_n_cells</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The minimum number of cells for a gene to be considered.</p></td>
+<td><p>Minimum number of cells for a gene to be considered (default: 3)</p></td>
 <td>
 <code>3</code>
 </td>
@@ -920,8 +945,9 @@
 <tr>
 <td><code>method</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The method for normalization.</p></td>
+<td><p>Method for normalization (default: 'lib_size')</p></td>
 <td>
 <code>'lib_size'</code>
 </td>
@@ -929,8 +955,9 @@
 <tr>
 <td><code>n_top_genes</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The number of top genes to keep.</p></td>
+<td><p>Number of top variable genes to keep (default: 3000)</p></td>
 <td>
 <code>3000</code>
 </td>
@@ -938,8 +965,9 @@
 <tr>
 <td><code>n_bins</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The number of bins for discretization.</p></td>
+<td><p>Number of bins for discretization (default: 5)</p></td>
 <td>
 <code>5</code>
 </td>
@@ -947,18 +975,17 @@
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="58 "></span><span class="k">def</span> <span class="nf">preprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">batch_key</span><span class="o">=</span><span class="s1">'batch'</span><span class="p">,</span><span class="n">min_n_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-<span class="linenos" data-linenos="59 "></span>                <span class="n">method</span><span class="o">=</span><span class="s1">'lib_size'</span><span class="p">,</span><span class="n">n_top_genes</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span><span class="n">n_bins</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
-<span class="linenos" data-linenos="60 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="61 "></span><span class="sd">    The preprocess of the adata by simba</span>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="59 "></span><span class="k">def</span> <span class="nf">preprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">batch_key</span><span class="o">=</span><span class="s1">'batch'</span><span class="p">,</span><span class="n">min_n_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<span class="linenos" data-linenos="60 "></span>                <span class="n">method</span><span class="o">=</span><span class="s1">'lib_size'</span><span class="p">,</span><span class="n">n_top_genes</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span><span class="n">n_bins</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<span class="linenos" data-linenos="61 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Preprocess the AnnData object for SIMBA analysis.</span>
 <span class="linenos" data-linenos="62 "></span>
 <span class="linenos" data-linenos="63 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos="64 "></span><span class="sd">        batch_key: The key of batch in adata.obs.</span>
-<span class="linenos" data-linenos="65 "></span><span class="sd">        min_n_cells: The minimum number of cells for a gene to be considered.</span>
-<span class="linenos" data-linenos="66 "></span><span class="sd">        method: The method for normalization.</span>
-<span class="linenos" data-linenos="67 "></span><span class="sd">        n_top_genes: The number of top genes to keep.</span>
-<span class="linenos" data-linenos="68 "></span><span class="sd">        n_bins: The number of bins for discretization.</span>
+<span class="linenos" data-linenos="64 "></span><span class="sd">        batch_key (str): Key of batch information in adata.obs (default: 'batch')</span>
+<span class="linenos" data-linenos="65 "></span><span class="sd">        min_n_cells (int): Minimum number of cells for a gene to be considered (default: 3)</span>
+<span class="linenos" data-linenos="66 "></span><span class="sd">        method (str): Method for normalization (default: 'lib_size')</span>
+<span class="linenos" data-linenos="67 "></span><span class="sd">        n_top_genes (int): Number of top variable genes to keep (default: 3000)</span>
+<span class="linenos" data-linenos="68 "></span><span class="sd">        n_bins (int): Number of bins for discretization (default: 5)</span>
 <span class="linenos" data-linenos="69 "></span>
 <span class="linenos" data-linenos="70 "></span>
 <span class="linenos" data-linenos="71 "></span><span class="sd">    """</span>
@@ -983,7 +1010,7 @@
 <code class="highlight language-python"><span class="n">gen_graph</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dirname</span><span class="o">=</span><span class="s1">'graph0'</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.gen_graph" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>Generate the graph for batch correction.</p>
+<p>Generate the graph structure for batch correction.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -998,8 +1025,9 @@
 <tr>
 <td><code>n_components</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The number of components for the graph.</p></td>
+<td><p>Number of components for dimensionality reduction (default: 15)</p></td>
 <td>
 <code>15</code>
 </td>
@@ -1007,8 +1035,9 @@
 <tr>
 <td><code>k</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The number of neighbors for the graph.</p></td>
+<td><p>Number of neighbors for graph construction (default: 15)</p></td>
 <td>
 <code>15</code>
 </td>
@@ -1016,8 +1045,9 @@
 <tr>
 <td><code>copy</code></td>
 <td>
+<code>bool</code>
 </td>
-<td><p>Whether to copy the adata.</p></td>
+<td><p>Whether to copy the adata object (default: False)</p></td>
 <td>
 <code>False</code>
 </td>
@@ -1025,8 +1055,9 @@
 <tr>
 <td><code>dirname</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The name of the graph.</p></td>
+<td><p>Directory name for saving graph results (default: 'graph0')</p></td>
 <td>
 <code>'graph0'</code>
 </td>
@@ -1034,36 +1065,35 @@
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
 <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos=" 85 "></span><span class="k">def</span> <span class="nf">gen_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_components</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
 <span class="linenos" data-linenos=" 86 "></span>                <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">dirname</span><span class="o">=</span><span class="s1">'graph0'</span><span class="p">):</span>
-<span class="linenos" data-linenos=" 87 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos=" 88 "></span><span class="sd">    Generate the graph for batch correction.</span>
-<span class="linenos" data-linenos=" 89 "></span>
-<span class="linenos" data-linenos=" 90 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos=" 91 "></span><span class="sd">        n_components: The number of components for the graph.</span>
-<span class="linenos" data-linenos=" 92 "></span><span class="sd">        k: The number of neighbors for the graph.</span>
-<span class="linenos" data-linenos=" 93 "></span><span class="sd">        copy: Whether to copy the adata.</span>
-<span class="linenos" data-linenos=" 94 "></span><span class="sd">        dirname: The name of the graph.</span>
-<span class="linenos" data-linenos=" 95 "></span>
-<span class="linenos" data-linenos=" 96 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos=" 87 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Generate the graph structure for batch correction.</span>
+<span class="linenos" data-linenos=" 88 "></span>
+<span class="linenos" data-linenos=" 89 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos=" 90 "></span><span class="sd">        n_components (int): Number of components for dimensionality reduction (default: 15)</span>
+<span class="linenos" data-linenos=" 91 "></span><span class="sd">        k (int): Number of neighbors for graph construction (default: 15)</span>
+<span class="linenos" data-linenos=" 92 "></span><span class="sd">        copy (bool): Whether to copy the adata object (default: False)</span>
+<span class="linenos" data-linenos=" 93 "></span><span class="sd">        dirname (str): Directory name for saving graph results (default: 'graph0')</span>
+<span class="linenos" data-linenos=" 94 "></span>
+<span class="linenos" data-linenos=" 95 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos=" 96 "></span>
 <span class="linenos" data-linenos=" 97 "></span>
-<span class="linenos" data-linenos=" 98 "></span>
-<span class="linenos" data-linenos=" 99 "></span>    <span class="n">batch_size</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
-<span class="linenos" data-linenos="100 "></span>                        <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
-<span class="linenos" data-linenos="101 "></span>    <span class="n">result_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">batch_size</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
-<span class="linenos" data-linenos="102 "></span>    <span class="n">adata_edge_dict</span><span class="o">=</span><span class="p">{}</span>
-<span class="linenos" data-linenos="103 "></span>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
-<span class="linenos" data-linenos="104 "></span>        <span class="k">if</span> <span class="n">batch</span><span class="o">==</span><span class="n">result_max</span><span class="p">:</span>
-<span class="linenos" data-linenos="105 "></span>            <span class="k">continue</span>
-<span class="linenos" data-linenos="106 "></span>        <span class="k">else</span><span class="p">:</span>
-<span class="linenos" data-linenos="107 "></span>            <span class="n">adata_edge_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">infer_edges</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">result_max</span><span class="p">],</span> 
-<span class="linenos" data-linenos="108 "></span>                                                    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">batch</span><span class="p">],</span> <span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
-<span class="linenos" data-linenos="109 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_edge_dict</span>
-<span class="linenos" data-linenos="110 "></span>    <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">gen_graph</span><span class="p">(</span><span class="n">list_CG</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
-<span class="linenos" data-linenos="111 "></span>                <span class="n">list_CC</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
-<span class="linenos" data-linenos="112 "></span>                <span class="n">copy</span><span class="o">=</span><span class="n">copy</span><span class="p">,</span>
-<span class="linenos" data-linenos="113 "></span>                <span class="n">dirname</span><span class="o">=</span><span class="n">dirname</span><span class="p">)</span>
+<span class="linenos" data-linenos=" 98 "></span>    <span class="n">batch_size</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+<span class="linenos" data-linenos=" 99 "></span>                        <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
+<span class="linenos" data-linenos="100 "></span>    <span class="n">result_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">batch_size</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
+<span class="linenos" data-linenos="101 "></span>    <span class="n">adata_edge_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="linenos" data-linenos="102 "></span>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
+<span class="linenos" data-linenos="103 "></span>        <span class="k">if</span> <span class="n">batch</span><span class="o">==</span><span class="n">result_max</span><span class="p">:</span>
+<span class="linenos" data-linenos="104 "></span>            <span class="k">continue</span>
+<span class="linenos" data-linenos="105 "></span>        <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="106 "></span>            <span class="n">adata_edge_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">infer_edges</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">result_max</span><span class="p">],</span> 
+<span class="linenos" data-linenos="107 "></span>                                                    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">batch</span><span class="p">],</span> <span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
+<span class="linenos" data-linenos="108 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_edge_dict</span>
+<span class="linenos" data-linenos="109 "></span>    <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">gen_graph</span><span class="p">(</span><span class="n">list_CG</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
+<span class="linenos" data-linenos="110 "></span>                <span class="n">list_CC</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_batch_edge_dict'</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()],</span>
+<span class="linenos" data-linenos="111 "></span>                <span class="n">copy</span><span class="o">=</span><span class="n">copy</span><span class="p">,</span>
+<span class="linenos" data-linenos="112 "></span>                <span class="n">dirname</span><span class="o">=</span><span class="n">dirname</span><span class="p">)</span>
 </code></pre></div>
 </details>
 </div>
@@ -1073,7 +1103,7 @@
 <code class="highlight language-python"><span class="n">train</span><span class="p">(</span><span class="n">num_workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">auto_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'model'</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.train" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>Train the model for batch correction.</p>
+<p>Train the SIMBA model for batch correction.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -1088,8 +1118,9 @@
 <tr>
 <td><code>num_workers</code></td>
 <td>
+<code>int</code>
 </td>
-<td><p>The number of workers for training.</p></td>
+<td><p>Number of workers for parallel training (default: 12)</p></td>
 <td>
 <code>12</code>
 </td>
@@ -1097,8 +1128,9 @@
 <tr>
 <td><code>auto_wd</code></td>
 <td>
+<code>bool</code>
 </td>
-<td><p>Whether to use the automatic weight decay.</p></td>
+<td><p>Whether to use automatic weight decay (default: True)</p></td>
 <td>
 <code>True</code>
 </td>
@@ -1106,8 +1138,9 @@
 <tr>
 <td><code>save_wd</code></td>
 <td>
+<code>bool</code>
 </td>
-<td><p>Whether to save the weight decay.</p></td>
+<td><p>Whether to save weight decay parameters (default: True)</p></td>
 <td>
 <code>True</code>
 </td>
@@ -1115,8 +1148,9 @@
 <tr>
 <td><code>output</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The output directory for saving the model.</p></td>
+<td><p>Output directory for saving the trained model (default: 'model')</p></td>
 <td>
 <code>'model'</code>
 </td>
@@ -1124,26 +1158,25 @@
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="115 "></span><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">num_workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span><span class="n">auto_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'model'</span><span class="p">):</span>
-<span class="linenos" data-linenos="116 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="117 "></span>
-<span class="linenos" data-linenos="118 "></span><span class="sd">    Train the model for batch correction.</span>
-<span class="linenos" data-linenos="119 "></span>
-<span class="linenos" data-linenos="120 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos="121 "></span><span class="sd">        num_workers: The number of workers for training.</span>
-<span class="linenos" data-linenos="122 "></span><span class="sd">        auto_wd: Whether to use the automatic weight decay.</span>
-<span class="linenos" data-linenos="123 "></span><span class="sd">        save_wd: Whether to save the weight decay.</span>
-<span class="linenos" data-linenos="124 "></span><span class="sd">        output: The output directory for saving the model.</span>
-<span class="linenos" data-linenos="125 "></span>
-<span class="linenos" data-linenos="126 "></span><span class="sd">    """</span>
-<span class="linenos" data-linenos="127 "></span>
-<span class="linenos" data-linenos="128 "></span>    <span class="c1"># modify parameters</span>
-<span class="linenos" data-linenos="129 "></span>    <span class="n">dict_config</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">pbg_params</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="linenos" data-linenos="130 "></span>    <span class="c1"># dict_config['wd'] = 0.00477</span>
-<span class="linenos" data-linenos="131 "></span>    <span class="n">dict_config</span><span class="p">[</span><span class="s1">'workers'</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_workers</span>
-<span class="linenos" data-linenos="132 "></span>    <span class="c1">## start training</span>
-<span class="linenos" data-linenos="133 "></span>    <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pbg_train</span><span class="p">(</span><span class="n">pbg_params</span> <span class="o">=</span> <span class="n">dict_config</span><span class="p">,</span> <span class="n">auto_wd</span><span class="o">=</span><span class="n">auto_wd</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="n">save_wd</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="114 "></span><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">num_workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span><span class="n">auto_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'model'</span><span class="p">):</span>
+<span class="linenos" data-linenos="115 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Train the SIMBA model for batch correction.</span>
+<span class="linenos" data-linenos="116 "></span>
+<span class="linenos" data-linenos="117 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="118 "></span><span class="sd">        num_workers (int): Number of workers for parallel training (default: 12)</span>
+<span class="linenos" data-linenos="119 "></span><span class="sd">        auto_wd (bool): Whether to use automatic weight decay (default: True)</span>
+<span class="linenos" data-linenos="120 "></span><span class="sd">        save_wd (bool): Whether to save weight decay parameters (default: True)</span>
+<span class="linenos" data-linenos="121 "></span><span class="sd">        output (str): Output directory for saving the trained model (default: 'model')</span>
+<span class="linenos" data-linenos="122 "></span>
+<span class="linenos" data-linenos="123 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="124 "></span>
+<span class="linenos" data-linenos="125 "></span>    <span class="c1"># modify parameters</span>
+<span class="linenos" data-linenos="126 "></span>    <span class="n">dict_config</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">pbg_params</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="linenos" data-linenos="127 "></span>    <span class="c1"># dict_config['wd'] = 0.00477</span>
+<span class="linenos" data-linenos="128 "></span>    <span class="n">dict_config</span><span class="p">[</span><span class="s1">'workers'</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_workers</span>
+<span class="linenos" data-linenos="129 "></span>    <span class="c1">## start training</span>
+<span class="linenos" data-linenos="130 "></span>    <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">pbg_train</span><span class="p">(</span><span class="n">pbg_params</span> <span class="o">=</span> <span class="n">dict_config</span><span class="p">,</span> <span class="n">auto_wd</span><span class="o">=</span><span class="n">auto_wd</span><span class="p">,</span> <span class="n">save_wd</span><span class="o">=</span><span class="n">save_wd</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
+<span class="linenos" data-linenos="131 "></span>    <span class="n">add_reference</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span><span class="s1">'SIMBA'</span><span class="p">,</span><span class="s1">'batch correction with SIMBA'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 </div>
@@ -1153,7 +1186,7 @@
 <code class="highlight language-python"><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.load" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>Load the model for batch correction.</p>
+<p>Load a pre-trained SIMBA model for batch correction.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -1168,8 +1201,10 @@
 <tr>
 <td><code>model_path</code></td>
 <td>
+<code>str</code>
 </td>
-<td><p>The path of the model.</p></td>
+<td><p>Path to the model directory (default: None)
+            If None, loads from default location</p></td>
 <td>
 <code>None</code>
 </td>
@@ -1177,23 +1212,23 @@
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="135 "></span><span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="linenos" data-linenos="136 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="137 "></span><span class="sd">    Load the model for batch correction.</span>
-<span class="linenos" data-linenos="138 "></span>
-<span class="linenos" data-linenos="139 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos="140 "></span><span class="sd">        model_path: The path of the model.</span>
-<span class="linenos" data-linenos="141 "></span>
-<span class="linenos" data-linenos="142 "></span>
-<span class="linenos" data-linenos="143 "></span><span class="sd">    """</span>
-<span class="linenos" data-linenos="144 "></span>    <span class="c1"># load in graph ('graph0') info</span>
-<span class="linenos" data-linenos="145 "></span>    <span class="k">if</span> <span class="n">model_path</span><span class="o">==</span><span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos="146 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">()</span>
-<span class="linenos" data-linenos="147 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">()</span>
-<span class="linenos" data-linenos="148 "></span>    <span class="k">else</span><span class="p">:</span>
-<span class="linenos" data-linenos="149 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="p">)</span>
-<span class="linenos" data-linenos="150 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="o">+</span><span class="s1">'/model/'</span><span class="p">)</span>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="133 "></span><span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="linenos" data-linenos="134 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Load a pre-trained SIMBA model for batch correction.</span>
+<span class="linenos" data-linenos="135 "></span>
+<span class="linenos" data-linenos="136 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="137 "></span><span class="sd">        model_path (str): Path to the model directory (default: None)</span>
+<span class="linenos" data-linenos="138 "></span><span class="sd">                        If None, loads from default location</span>
+<span class="linenos" data-linenos="139 "></span>
+<span class="linenos" data-linenos="140 "></span>
+<span class="linenos" data-linenos="141 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="142 "></span>    <span class="c1"># load in graph ('graph0') info</span>
+<span class="linenos" data-linenos="143 "></span>    <span class="k">if</span> <span class="n">model_path</span><span class="o">==</span><span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="144 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">()</span>
+<span class="linenos" data-linenos="145 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">()</span>
+<span class="linenos" data-linenos="146 "></span>    <span class="k">else</span><span class="p">:</span>
+<span class="linenos" data-linenos="147 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_graph_stats</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="p">)</span>
+<span class="linenos" data-linenos="148 "></span>        <span class="n">si</span><span class="o">.</span><span class="n">load_pbg_config</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">model_path</span><span class="o">+</span><span class="s1">'/model/'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 </div>
@@ -1203,7 +1238,7 @@
 <code class="highlight language-python"><span class="n">batch_correction</span><span class="p">(</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 <a class="headerlink" href="#omicverse.single._simba.pySIMBA.batch_correction" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents">
-<p>Batch correction by SIMBA</p>
+<p>Perform batch correction using the trained SIMBA model.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -1218,53 +1253,71 @@
 <tr>
 <td><code>use_precomputed</code></td>
 <td>
+<code>bool</code>
 </td>
-<td><p>Whether to use the precomputed model.</p></td>
+<td><p>Whether to use precomputed embeddings (default: False)</p></td>
 <td>
 <code>False</code>
 </td>
 </tr>
 </tbody>
 </table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th> <th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AnnData</code></td> <td>
+</td>
+<td><p>Batch-corrected AnnData object with X_simba embedding</p></td>
+</tr>
+</tbody>
+</table>
 <details class="quote">
-<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/scbasset/lib/python3.8/site-packages/omicverse/single/_simba.py</code></summary>
-<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="153 "></span><span class="k">def</span> <span class="nf">batch_correction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="linenos" data-linenos="154 "></span><span class="w">    </span><span class="sd">"""</span>
-<span class="linenos" data-linenos="155 "></span><span class="sd">    Batch correction by SIMBA</span>
+<summary>Source code in <code>/Users/fernandozeng/miniforge3/envs/space/lib/python3.10/site-packages/omicverse/single/_simba.py</code></summary>
+<div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="151 "></span><span class="k">def</span> <span class="nf">batch_correction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="linenos" data-linenos="152 "></span><span class="w">    </span><span class="sa">r</span><span class="sd">"""Perform batch correction using the trained SIMBA model.</span>
+<span class="linenos" data-linenos="153 "></span>
+<span class="linenos" data-linenos="154 "></span><span class="sd">    Arguments:</span>
+<span class="linenos" data-linenos="155 "></span><span class="sd">        use_precomputed (bool): Whether to use precomputed embeddings (default: False)</span>
 <span class="linenos" data-linenos="156 "></span>
-<span class="linenos" data-linenos="157 "></span><span class="sd">    Arguments:</span>
-<span class="linenos" data-linenos="158 "></span><span class="sd">        use_precomputed: Whether to use the precomputed model.</span>
-<span class="linenos" data-linenos="159 "></span>
-<span class="linenos" data-linenos="160 "></span><span class="sd">    """</span>
-<span class="linenos" data-linenos="161 "></span>    <span class="n">dict_adata</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">read_embedding</span><span class="p">()</span>
-<span class="linenos" data-linenos="162 "></span>    <span class="n">adata_dict</span><span class="o">=</span><span class="p">{}</span>
-<span class="linenos" data-linenos="163 "></span>    <span class="k">for</span> <span class="n">batch</span><span class="p">,</span><span class="n">key</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">dict_adata</span><span class="o">.</span><span class="n">keys</span><span class="p">()))):</span>
-<span class="linenos" data-linenos="164 "></span>        <span class="k">if</span> <span class="n">key</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
-<span class="linenos" data-linenos="165 "></span>            <span class="n">key</span><span class="o">=</span><span class="s1">''</span>
-<span class="linenos" data-linenos="166 "></span>        <span class="c1">#adata.uns['simba_batch_dict'][batch].obsm['X_simba']=dict_adata['C{}'.format(key)][adata.uns['simba_batch_dict'][batch].obs.index].to_df().values</span>
-<span class="linenos" data-linenos="167 "></span>        <span class="n">adata_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">dict_adata</span><span class="p">[</span><span class="s1">'C</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
-<span class="linenos" data-linenos="168 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_dict</span>
-<span class="linenos" data-linenos="169 "></span>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
-<span class="linenos" data-linenos="170 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
-<span class="linenos" data-linenos="171 "></span>
-<span class="linenos" data-linenos="172 "></span>    <span class="c1"># we choose the largest dataset as a reference</span>
-<span class="linenos" data-linenos="173 "></span>    <span class="n">dict_adata2</span> <span class="o">=</span> <span class="n">dict_adata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="linenos" data-linenos="174 "></span>    <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"G"</span><span class="p">)</span> <span class="c1"># remove genes</span>
-<span class="linenos" data-linenos="175 "></span>    <span class="n">batch_size_si</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
-<span class="linenos" data-linenos="176 "></span>            <span class="p">[</span><span class="n">dict_adata2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
-<span class="linenos" data-linenos="177 "></span>    <span class="n">max_dict_label</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size_si</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">batch_size_si</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
-<span class="linenos" data-linenos="178 "></span>    <span class="n">adata_ref_si</span> <span class="o">=</span> <span class="n">dict_adata2</span><span class="p">[</span><span class="n">max_dict_label</span><span class="p">]</span> <span class="c1"># select largest dataset</span>
-<span class="linenos" data-linenos="179 "></span>    <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">max_dict_label</span><span class="p">)</span> <span class="c1"># remove largest dataset</span>
-<span class="linenos" data-linenos="180 "></span>    <span class="n">list_adata_query</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-<span class="linenos" data-linenos="181 "></span>    <span class="n">adata_all</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">embed</span><span class="p">(</span><span class="n">adata_ref</span> <span class="o">=</span> <span class="n">adata_ref_si</span><span class="p">,</span>
-<span class="linenos" data-linenos="182 "></span>                        <span class="n">list_adata_query</span> <span class="o">=</span> <span class="n">list_adata_query</span><span class="p">,</span>
-<span class="linenos" data-linenos="183 "></span>                        <span class="n">use_precomputed</span> <span class="o">=</span> <span class="n">use_precomputed</span><span class="p">)</span>
-<span class="linenos" data-linenos="184 "></span>
-<span class="linenos" data-linenos="185 "></span>    <span class="c1">#all_adata=anndata.concat([adata.uns['simba_Gen'][batch] for batch in adata.uns['simba_Gen'].keys()],merge='same')</span>
-<span class="linenos" data-linenos="186 "></span>    <span class="n">cell_idx</span><span class="o">=</span><span class="n">adata_all</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span>
-<span class="linenos" data-linenos="187 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span>
-<span class="linenos" data-linenos="188 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_all</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
-<span class="linenos" data-linenos="189 "></span>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span>
+<span class="linenos" data-linenos="157 "></span><span class="sd">    Returns:</span>
+<span class="linenos" data-linenos="158 "></span><span class="sd">        AnnData: Batch-corrected AnnData object with X_simba embedding</span>
+<span class="linenos" data-linenos="159 "></span><span class="sd">    """</span>
+<span class="linenos" data-linenos="160 "></span>    <span class="n">dict_adata</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">read_embedding</span><span class="p">()</span>
+<span class="linenos" data-linenos="161 "></span>    <span class="n">adata_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="linenos" data-linenos="162 "></span>    <span class="k">for</span> <span class="n">batch</span><span class="p">,</span><span class="n">key</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">dict_adata</span><span class="o">.</span><span class="n">keys</span><span class="p">()))):</span>
+<span class="linenos" data-linenos="163 "></span>        <span class="k">if</span> <span class="n">key</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+<span class="linenos" data-linenos="164 "></span>            <span class="n">key</span><span class="o">=</span><span class="s1">''</span>
+<span class="linenos" data-linenos="165 "></span>        <span class="c1">#adata.uns['simba_batch_dict'][batch].obsm['X_simba']=dict_adata['C{}'.format(key)][adata.uns['simba_batch_dict'][batch].obs.index].to_df().values</span>
+<span class="linenos" data-linenos="166 "></span>        <span class="n">adata_dict</span><span class="p">[</span><span class="n">batch</span><span class="p">]</span><span class="o">=</span><span class="n">dict_adata</span><span class="p">[</span><span class="s1">'C</span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
+<span class="linenos" data-linenos="167 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_dict</span>
+<span class="linenos" data-linenos="168 "></span>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">'batch'</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">:</span>
+<span class="linenos" data-linenos="169 "></span>        <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">'simba_Gen'</span><span class="p">][</span><span class="n">batch</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
+<span class="linenos" data-linenos="170 "></span>
+<span class="linenos" data-linenos="171 "></span>    <span class="c1"># we choose the largest dataset as a reference</span>
+<span class="linenos" data-linenos="172 "></span>    <span class="n">dict_adata2</span> <span class="o">=</span> <span class="n">dict_adata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="linenos" data-linenos="173 "></span>    <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"G"</span><span class="p">)</span> <span class="c1"># remove genes</span>
+<span class="linenos" data-linenos="174 "></span>    <span class="n">batch_size_si</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+<span class="linenos" data-linenos="175 "></span>            <span class="p">[</span><span class="n">dict_adata2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dict_adata2</span><span class="o">.</span><span class="n">keys</span><span class="p">()]))</span>
+<span class="linenos" data-linenos="176 "></span>    <span class="n">max_dict_label</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">batch_size_si</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">batch_size_si</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
+<span class="linenos" data-linenos="177 "></span>    <span class="n">adata_ref_si</span> <span class="o">=</span> <span class="n">dict_adata2</span><span class="p">[</span><span class="n">max_dict_label</span><span class="p">]</span> <span class="c1"># select largest dataset</span>
+<span class="linenos" data-linenos="178 "></span>    <span class="n">dict_adata2</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">max_dict_label</span><span class="p">)</span> <span class="c1"># remove largest dataset</span>
+<span class="linenos" data-linenos="179 "></span>    <span class="n">list_adata_query</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dict_adata2</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+<span class="linenos" data-linenos="180 "></span>    <span class="n">adata_all</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">embed</span><span class="p">(</span><span class="n">adata_ref</span> <span class="o">=</span> <span class="n">adata_ref_si</span><span class="p">,</span>
+<span class="linenos" data-linenos="181 "></span>                        <span class="n">list_adata_query</span> <span class="o">=</span> <span class="n">list_adata_query</span><span class="p">,</span>
+<span class="linenos" data-linenos="182 "></span>                        <span class="n">use_precomputed</span> <span class="o">=</span> <span class="n">use_precomputed</span><span class="p">)</span>
+<span class="linenos" data-linenos="183 "></span>
+<span class="linenos" data-linenos="184 "></span>    <span class="c1">#all_adata=anndata.concat([adata.uns['simba_Gen'][batch] for batch in adata.uns['simba_Gen'].keys()],merge='same')</span>
+<span class="linenos" data-linenos="185 "></span>    <span class="n">cell_idx</span><span class="o">=</span><span class="n">adata_all</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span>
+<span class="linenos" data-linenos="186 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span>
+<span class="linenos" data-linenos="187 "></span>    <span class="bp">self</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">'X_simba'</span><span class="p">]</span><span class="o">=</span><span class="n">adata_all</span><span class="p">[</span><span class="n">cell_idx</span><span class="p">]</span><span class="o">.</span><span class="n">to_df</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
+<span class="linenos" data-linenos="188 "></span>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">adata</span>
 </code></pre></div>
 </details>
 </div>
@@ -1281,7 +1334,7 @@
 <div class="md-footer-meta__inner md-grid">
 <div class="md-copyright">
 <div class="md-copyright__highlight">
-      Copyright © 2019-2024, 112 Lab, USTB
+      Copyright © 2019-2025, 112 Lab, USTB
     </div>
   
   
