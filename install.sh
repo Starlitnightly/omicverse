@@ -136,7 +136,6 @@ pip_install_pkg \
   tangram-sc \
   fa2-modified \
   pot \
-  cvxpy \
   libpysal \
   openai \
   patsy \
