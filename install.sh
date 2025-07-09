@@ -138,7 +138,6 @@ pip_install_pkg \
   pot \
   cvxpy \
   libpysal \
-  gudhi \
   openai \
   patsy \
   combat \
