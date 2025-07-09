@@ -59,7 +59,7 @@ from ._cpdb import (cpdb_network_cal,cpdb_plot_network,
 from ._scgsea import (geneset_aucell,pathway_aucell,pathway_aucell_enrichment,
                       geneset_aucell_tmp,pathway_aucell_tmp,pathway_aucell_enrichment_tmp,
                       pathway_enrichment,pathway_enrichment_plot,)
-from ._via import pyVIA,scRNA_hematopoiesis
+#from ._via import pyVIA,scRNA_hematopoiesis
 from ._simba import pySIMBA
 from ._tosica import pyTOSICA
 from ._atac import atac_concat_get_index,atac_concat_inner,atac_concat_outer
@@ -125,8 +125,8 @@ __all__ = [
     'Batch',
     
     # Trajectory and pseudotime analysis
-    'pyVIA',
-    'scRNA_hematopoiesis',
+    #'pyVIA',
+    #'scRNA_hematopoiesis',
     'TrajInfer',
     'fle',
     'diffmap',
