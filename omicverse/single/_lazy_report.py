@@ -215,7 +215,7 @@ def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html",
     generator = HTMLReportGenerator(template_dir)
     
     # Set scanpy settings for clean plots
-    sc.settings.set_figure_params(dpi=100, facecolor='white', figsize=(8, 6))
+    #sc.settings.set_figure_params(dpi=100, facecolor='white', figsize=(8, 6))
     plt.style.use('default')
 
     if sample_key is None:
@@ -266,10 +266,10 @@ def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html",
     for mode in ["day", "night"]:
         # 设置绘图主题
         if mode == "night":
-            sc.settings.set_figure_params(dpi=100)
+            #sc.settings.set_figure_params(dpi=100)
             plt.style.use('dark_background')
         else:
-            sc.settings.set_figure_params(dpi=100)
+            #sc.settings.set_figure_params(dpi=100)
             plt.style.use('default')
         
         # 1. QC metrics violin plot

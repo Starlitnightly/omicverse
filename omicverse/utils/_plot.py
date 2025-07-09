@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
+from matplotlib import rcParams
 import random
 import scanpy as sc
 import networkx as nx
@@ -217,7 +218,15 @@ EMOJI = {
 
 
 def plot_set(verbosity: int = 3, dpi: int = 80, 
-             facecolor: str = 'white', font_path: str = None):
+             facecolor: str = 'white', font_path: str = None,
+             ipython_format: str  = "retina",
+             dpi_save: int = 300,
+             transparent: bool = None,
+             scanpy: bool = True,
+             fontsize: int = 14,
+             color_map: str | None = None,
+             figsize: int | None = None,
+             ):
     r"""Configure plotting settings for OmicVerse.
     
     Sets up scanpy verbosity, matplotlib parameters, suppresses warnings,
@@ -244,7 +253,27 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
     # 2) scanpy verbosity & figure params
     #print(f"{EMOJI['settings']} Applying plotting settings (verbosity={verbosity}, dpi={dpi})")
     sc.settings.verbosity = verbosity
-    sc.settings.set_figure_params(dpi=dpi, facecolor=facecolor)
+    import builtins
+    is_ipython = getattr(builtins, "__IPYTHON__", False)
+    if is_ipython:
+        from matplotlib_inline.backend_inline import set_matplotlib_formats
+        ipython_format = [ipython_format]
+        set_matplotlib_formats(*ipython_format)
+    
+    from matplotlib import rcParams
+    if dpi is not None:
+        rcParams["figure.dpi"] = dpi
+    if dpi_save is not None:
+        rcParams["savefig.dpi"] = dpi_save
+    if transparent is not None:
+        rcParams["savefig.transparent"] = transparent
+    if facecolor is not None:
+        rcParams["figure.facecolor"] = facecolor
+        rcParams["axes.facecolor"] = facecolor
+    if scanpy:
+        set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
+    if figsize is not None:
+        rcParams["figure.figsize"] = figsize
     #print(f"{EMOJI['done']} Settings applied")
 
     # 3) Custom font setup
@@ -1305,3 +1334,70 @@ def check_dependencies(dependencies=None, check_full=False):
         print("All dependencies are satisfied.")
     except (DistributionNotFound, VersionConflict) as e:
         print(f"Dependency error: {e}")
+
+
+
+
+def set_rcParams_scanpy(fontsize=14, color_map=None):
+    """Set matplotlib.rcParams to Scanpy defaults.
+
+    Call this through :func:`scanpy.set_figure_params`.
+    """
+    # figure
+    import matplotlib as mpl
+    from cycler import cycler
+    
+    rcParams["figure.figsize"] = (4, 4)
+    rcParams["figure.subplot.left"] = 0.18
+    rcParams["figure.subplot.right"] = 0.96
+    rcParams["figure.subplot.bottom"] = 0.15
+    rcParams["figure.subplot.top"] = 0.91
+
+    rcParams["lines.linewidth"] = 1.5  # the line width of the frame
+    rcParams["lines.markersize"] = 6
+    rcParams["lines.markeredgewidth"] = 1
+
+    # font
+    rcParams["font.sans-serif"] = [
+        "Arial",
+        "Helvetica",
+        "DejaVu Sans",
+        "Bitstream Vera Sans",
+        "sans-serif",
+    ]
+    rcParams["font.size"] = fontsize
+    rcParams["legend.fontsize"] = 0.92 * fontsize
+    rcParams["axes.titlesize"] = fontsize
+    rcParams["axes.labelsize"] = fontsize
+
+    # legend
+    rcParams["legend.numpoints"] = 1
+    rcParams["legend.scatterpoints"] = 1
+    rcParams["legend.handlelength"] = 0.5
+    rcParams["legend.handletextpad"] = 0.4
+
+    # color cycles
+    rcParams["axes.prop_cycle"] = cycler(color=sc_color)
+
+    # lines
+    rcParams["axes.linewidth"] = 0.8
+    rcParams["axes.edgecolor"] = "black"
+    rcParams["axes.facecolor"] = "white"
+
+    # ticks
+    rcParams["xtick.color"] = "k"
+    rcParams["ytick.color"] = "k"
+    rcParams["xtick.labelsize"] = fontsize
+    rcParams["ytick.labelsize"] = fontsize
+
+    # axes grid
+    rcParams["axes.grid"] = True
+    rcParams["grid.color"] = ".8"
+
+    # color map
+    rcParams["image.cmap"] = rcParams["image.cmap"] if color_map is None else color_map
+
+
+def set_rcParams_defaults():
+    """Reset `matplotlib.rcParams` to defaults."""
+    rcParams.update(mpl.rcParamsDefault)

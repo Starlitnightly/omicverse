@@ -1,43 +1,108 @@
 # Summary
 
-Date : 2023-07-03 21:12:57
+Date : 2025-07-08 18:02:10
 
 Directory : ./omicverse
 
-Total : 112 files,  23809 codes, 9165 comments, 5811 blanks, all 38785 lines, 27.79% comment rate
+Total : 492 files,  119692 codes, 44426 comments, 25399 blanks, all 189517 lines, 27.07% comment rate
 
 [details](details.md)
 
 ## Languages
 | language | files | code | comment | blank | total | comment rate |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Python | 108 | 23,635 | 9,165 | 5,797 | 38,597 | 27.94% |
-| Markdown | 2 | 161 | 0 | 13 | 174 | 0.00% |
-| XML | 1 | 12 | 0 | 0 | 12 | 0.00% |
+| Python | 482 | 117,545 | 44,382 | 25,142 | 187,069 | 27.41% |
+| HTML | 2 | 849 | 19 | 123 | 991 | 2.19% |
+| XML | 1 | 534 | 0 | 2 | 536 | 0.00% |
+| CSS | 1 | 473 | 16 | 76 | 565 | 3.27% |
+| Markdown | 4 | 227 | 0 | 44 | 271 | 0.00% |
+| JavaScript | 1 | 63 | 9 | 11 | 83 | 12.50% |
 | reStructuredText | 1 | 1 | 0 | 1 | 2 | 0.00% |
 
 ## Directories
 | path | files | code | comment | blank | total | comment rate |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| . | 112 | 23,809 | 9,165 | 5,811 | 38,785 | 27.79% |
-| bulk | 9 | 2,114 | 818 | 445 | 3,377 | 27.90% |
-| bulk2single | 8 | 1,869 | 425 | 434 | 2,728 | 18.53% |
-| cylib | 3 | 97 | 0 | 30 | 127 | 0.00% |
-| data_files | 1 | 10 | 0 | 1 | 11 | 0.00% |
-| mofapy2 | 47 | 5,247 | 3,438 | 1,782 | 10,467 | 39.59% |
-| mofapy2/build_model | 6 | 925 | 496 | 367 | 1,788 | 34.90% |
-| mofapy2/core | 34 | 3,356 | 2,578 | 1,149 | 7,083 | 43.44% |
-| mofapy2/core/distributions | 11 | 486 | 1,042 | 144 | 1,672 | 68.19% |
-| mofapy2/core/nodes | 18 | 2,350 | 1,260 | 831 | 4,441 | 34.90% |
-| mofapy2/run | 2 | 838 | 322 | 236 | 1,396 | 27.76% |
-| mofapy2/simulate | 2 | 113 | 36 | 24 | 173 | 24.16% |
-| nocd | 13 | 586 | 312 | 148 | 1,046 | 34.74% |
-| nocd/metrics | 3 | 123 | 84 | 29 | 236 | 40.58% |
+| . | 492 | 119,692 | 44,426 | 25,399 | 189,517 | 27.07% |
+| bulk | 10 | 2,400 | 852 | 496 | 3,748 | 26.20% |
+| bulk2single | 9 | 2,111 | 1,265 | 473 | 3,849 | 37.47% |
+| cylib | 4 | 395 | 222 | 116 | 733 | 35.98% |
+| data_files | 2 | 66 | 10 | 19 | 95 | 13.16% |
+| externel | 324 | 63,274 | 21,658 | 14,422 | 99,354 | 25.50% |
+| externel/BINARY | 4 | 398 | 306 | 143 | 847 | 43.47% |
+| externel/CAST | 10 | 2,006 | 134 | 222 | 2,362 | 6.26% |
+| externel/CAST/model | 3 | 153 | 16 | 43 | 212 | 9.47% |
+| externel/CEFCON | 10 | 1,955 | 432 | 432 | 2,819 | 18.10% |
+| externel/CEFCON/resources | 1 | 12 | 8 | 5 | 25 | 40.00% |
+| externel/GNTD | 4 | 419 | 52 | 147 | 618 | 11.04% |
+| externel/GraphST | 5 | 718 | 85 | 212 | 1,015 | 10.59% |
+| externel/PROST | 7 | 1,362 | 402 | 307 | 2,071 | 22.79% |
+| externel/PyWGCNA | 5 | 3,352 | 1,178 | 535 | 5,065 | 26.00% |
+| externel/SEACells | 15 | 2,287 | 1,015 | 707 | 4,009 | 30.74% |
+| externel/STAGATE_pyG | 5 | 349 | 168 | 79 | 596 | 32.50% |
+| externel/STAligner | 5 | 749 | 291 | 198 | 1,238 | 27.98% |
+| externel/STT | 9 | 932 | 816 | 228 | 1,976 | 46.68% |
+| externel/STT/pl | 4 | 593 | 646 | 124 | 1,363 | 52.14% |
+| externel/STT/tl | 4 | 335 | 170 | 103 | 608 | 33.66% |
+| externel/VIA | 7 | 10,959 | 1,601 | 2,181 | 14,741 | 12.75% |
+| externel/cellanova | 3 | 318 | 19 | 89 | 426 | 5.64% |
+| externel/cnmf | 2 | 845 | 479 | 260 | 1,584 | 36.18% |
+| externel/commot | 20 | 4,828 | 2,038 | 714 | 7,580 | 29.68% |
+| externel/commot/_optimal_transport | 5 | 1,166 | 439 | 188 | 1,793 | 27.35% |
+| externel/commot/_utils | 5 | 992 | 195 | 125 | 1,312 | 16.43% |
+| externel/commot/plotting | 3 | 1,130 | 406 | 185 | 1,721 | 26.43% |
+| externel/commot/preprocessing | 3 | 179 | 119 | 22 | 320 | 39.93% |
+| externel/commot/tools | 3 | 1,356 | 878 | 192 | 2,426 | 39.30% |
+| externel/cytotrace2 | 3 | 324 | 34 | 116 | 474 | 9.50% |
+| externel/flowsig | 15 | 1,700 | 371 | 779 | 2,850 | 17.91% |
+| externel/flowsig/plotting | 2 | 262 | 0 | 98 | 360 | 0.00% |
+| externel/flowsig/preprocessing | 6 | 879 | 128 | 372 | 1,379 | 12.71% |
+| externel/flowsig/tools | 4 | 389 | 232 | 226 | 847 | 37.36% |
+| externel/flowsig/utilities | 2 | 164 | 8 | 81 | 253 | 4.65% |
+| externel/forcedirect2 | 7 | 970 | 259 | 250 | 1,479 | 21.07% |
+| externel/gaston | 16 | 1,340 | 310 | 441 | 2,091 | 18.79% |
+| externel/gseapy | 10 | 2,375 | 1,244 | 445 | 4,064 | 34.37% |
+| externel/mofapy2 | 47 | 5,247 | 3,438 | 1,782 | 10,467 | 39.59% |
+| externel/mofapy2/build_model | 6 | 925 | 496 | 367 | 1,788 | 34.90% |
+| externel/mofapy2/core | 34 | 3,356 | 2,578 | 1,149 | 7,083 | 43.44% |
+| externel/mofapy2/core/distributions | 11 | 486 | 1,042 | 144 | 1,672 | 68.19% |
+| externel/mofapy2/core/nodes | 18 | 2,350 | 1,260 | 831 | 4,441 | 34.90% |
+| externel/mofapy2/run | 2 | 838 | 322 | 236 | 1,396 | 27.76% |
+| externel/mofapy2/simulate | 2 | 113 | 36 | 24 | 173 | 24.16% |
+| externel/mpl_chord | 3 | 593 | 141 | 175 | 909 | 19.21% |
+| externel/palantir | 11 | 2,895 | 2,169 | 606 | 5,670 | 42.83% |
+| externel/pyscenic | 12 | 2,086 | 745 | 427 | 3,258 | 26.32% |
+| externel/scMulan | 9 | 1,605 | 155 | 327 | 2,087 | 8.81% |
+| externel/scMulan/model | 2 | 384 | 4 | 89 | 477 | 1.03% |
+| externel/scMulan/reference | 1 | 150 | 106 | 55 | 311 | 41.41% |
+| externel/scMulan/reference/GeneSymbolUniform | 1 | 150 | 106 | 55 | 311 | 41.41% |
+| externel/scMulan/utils | 3 | 625 | 7 | 24 | 656 | 1.11% |
+| externel/scSLAT | 19 | 1,893 | 1,019 | 280 | 3,192 | 34.99% |
+| externel/scSLAT/model | 13 | 930 | 521 | 153 | 1,604 | 35.91% |
+| externel/scSLAT/model/graphconv | 2 | 45 | 15 | 11 | 71 | 25.00% |
+| externel/scSLAT/model/prematch | 3 | 190 | 91 | 26 | 307 | 32.38% |
+| externel/scSLAT/viz | 3 | 715 | 313 | 81 | 1,109 | 30.45% |
+| externel/scanorama | 3 | 809 | 210 | 158 | 1,177 | 20.61% |
+| externel/scdiffusion | 25 | 3,454 | 794 | 711 | 4,959 | 18.69% |
+| externel/scdiffusion/VAE | 3 | 301 | 109 | 66 | 476 | 26.59% |
+| externel/scdiffusion/guided_diffusion | 18 | 2,531 | 646 | 534 | 3,711 | 20.33% |
+| externel/scrublet | 3 | 893 | 35 | 234 | 1,162 | 3.77% |
+| externel/spaceflow | 3 | 278 | 188 | 41 | 507 | 40.34% |
+| externel/spatrio | 6 | 757 | 322 | 144 | 1,223 | 29.84% |
+| externel/starfysh | 9 | 3,142 | 913 | 850 | 4,905 | 22.52% |
+| externel/tape | 6 | 662 | 69 | 130 | 861 | 9.44% |
+| externel/tosica | 5 | 739 | 166 | 71 | 976 | 18.34% |
+| nocd | 13 | 588 | 393 | 150 | 1,131 | 40.06% |
+| nocd/metrics | 3 | 124 | 110 | 30 | 264 | 47.01% |
 | nocd/nn | 4 | 206 | 83 | 47 | 336 | 28.72% |
-| pp | 3 | 491 | 327 | 125 | 943 | 39.98% |
-| single | 13 | 4,298 | 1,683 | 743 | 6,724 | 28.14% |
-| utils | 6 | 1,110 | 667 | 226 | 2,003 | 37.54% |
-| via | 8 | 7,978 | 1,493 | 1,871 | 11,342 | 15.76% |
-| via/.idea | 1 | 12 | 0 | 0 | 12 | 0.00% |
+| pl | 18 | 14,680 | 4,321 | 2,235 | 21,236 | 22.74% |
+| popv | 23 | 2,453 | 1,055 | 430 | 3,938 | 30.07% |
+| popv/algorithms | 12 | 1,046 | 349 | 196 | 1,591 | 25.02% |
+| popv/hub | 5 | 427 | 260 | 75 | 762 | 37.85% |
+| pp | 11 | 3,456 | 1,437 | 625 | 5,518 | 29.37% |
+| single | 46 | 23,096 | 7,617 | 5,078 | 35,791 | 24.80% |
+| single/templates | 7 | 1,520 | 134 | 258 | 1,912 | 8.10% |
+| single/templates/img | 1 | 32 | 0 | 15 | 47 | 0.00% |
+| space | 13 | 2,021 | 2,579 | 399 | 4,999 | 56.07% |
+| utils | 17 | 4,804 | 2,935 | 884 | 8,623 | 37.92% |
 
 [details](details.md)
