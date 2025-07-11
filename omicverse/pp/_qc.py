@@ -19,7 +19,7 @@ from matplotlib import rcParams
 import seaborn as sns
 from scipy.sparse import issparse
 
-from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference
+from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Colors
 
 
 
@@ -86,13 +86,18 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
     # For each adata, produce a figure
     # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     removed_cells = []
+    
+    print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Multi-Sample Quality Control Analysis:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Total samples to process: {Colors.BOLD}{len(adatas)}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}QC mode: {Colors.BOLD}{mode}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Thresholds: mito≤{Colors.BOLD}{tresh['mito_perc']}{Colors.ENDC}{Colors.BLUE}, nUMIs≥{Colors.BOLD}{tresh['nUMIs']}{Colors.ENDC}{Colors.BLUE}, genes≥{Colors.BOLD}{tresh['detected_genes']}{Colors.ENDC}")
+    
     for s, adata in adatas.items():
 
-
-        print(f'Sample {s} QC...')
+        print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Processing Sample: {Colors.BOLD}{s}{Colors.ENDC}")
 
         # QC metrics
-        print('Calculate QC metrics')
+        print(f"   {Colors.GREEN}{EMOJI['start']} Calculating QC metrics...{Colors.ENDC}")
         adata.var_names_make_unique()
         adata.var["mt"] = adata.var_names.str.startswith("MT-")
         if issparse(adata.X):
@@ -106,26 +111,27 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
             adata.obs['nUMIs'].values
             adata.obs['detected_genes'] = (adata.X > 0).sum(axis=1)
         adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-        print('End calculation of QC metrics.')
+        print(f"   {Colors.GREEN}✓ QC metrics calculation completed{Colors.ENDC}")
 
         # Original QC plot
         n0 = adata.shape[0]
-        print(f'Original cell number: {n0}')
+        print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
 
         # Post doublets removal QC plot
-        print('Begin of post doublets removal and QC plot')
+        print(f"   {Colors.GREEN}{EMOJI['start']} Doublet detection with scrublet...{Colors.ENDC}")
         sc.pp.scrublet(adata, random_state=1234)
         adata_remove = adata[adata.obs['predicted_doublet'], :]
         removed_cells.extend(list(adata_remove.obs_names))
         adata = adata[~adata.obs['predicted_doublet'], :]
         n1 = adata.shape[0]
-        print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-        print('End of post doublets removal and QC plots.')
+        doublet_removed = n0 - n1
+        print(f"   {Colors.GREEN}✓ Doublets removed: {Colors.BOLD}{doublet_removed:,}{Colors.ENDC}{Colors.GREEN} ({doublet_removed/n0*100:.1f}%){Colors.ENDC}")
+        print(f"   {Colors.BLUE}📊 Cells retained: {Colors.BOLD}{n1:,}{Colors.ENDC}")
 
         # Post seurat or mads filtering QC plot
 
         # Filters
-        print('Filters application (seurat or mads)')
+        print(f"   {Colors.GREEN}{EMOJI['start']} Applying {mode} filters...{Colors.ENDC}")
         if mode == 'seurat':
             adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
             adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
@@ -137,50 +143,64 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
             nmads=nmads, lt=tresh)
 
         # Report
+        mt_filtered = n1-np.sum(adata.obs["passing_mt"])
+        umis_filtered = n1-np.sum(adata.obs["passing_nUMIs"])
+        genes_filtered = n1-np.sum(adata.obs["passing_ngenes"])
+        
         if mode == 'seurat':
-            print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
-            {n1-np.sum(adata.obs["passing_nUMIs"])}')
-            print(f'Lower treshold, n genes: {tresh["detected_genes"]}; \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+            print(f"   {Colors.BLUE}📊 Filter Results (Seurat):{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• nUMIs threshold ≥{tresh['nUMIs']}: {Colors.BOLD}{umis_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Genes threshold ≥{tresh['detected_genes']}: {Colors.BOLD}{genes_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Mitochondrial % ≤{tresh['mito_perc']}: {Colors.BOLD}{mt_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
         elif mode == 'mads':
             nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
             n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-            print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_nUMIs"])}')
-            print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); \
-                filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-            print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
-        print('Filters applicated.')
+            print(f"   {Colors.BLUE}📊 Filter Results (MADs):{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Mitochondrial % ≤{tresh['mito_perc']}: {Colors.BOLD}{mt_filtered:,}{Colors.ENDC}{Colors.CYAN} cells filtered{Colors.ENDC}")
+        print(f"   {Colors.GREEN}✓ Filters applied successfully{Colors.ENDC}")
 
         # QC plot
         QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & \
         (adata.obs['passing_ngenes'])
         removed = QC_test.loc[lambda x : x is False]
         removed_cells.extend(list(removed.index.values))
-        print(f'Total cell filtered out with this last --mode {mode} QC (and its \
-        chosen options): {n1-np.sum(QC_test)}')
+        total_qc_filtered = n1-np.sum(QC_test)
         adata = adata[QC_test, :]
         n2 = adata.shape[0]
+        
+        print(f"   {Colors.HEADER}{Colors.BOLD}📈 Sample {s} Summary:{Colors.ENDC}")
+        print(f"     {Colors.GREEN}✓ Total QC filtered: {Colors.BOLD}{total_qc_filtered:,}{Colors.ENDC}{Colors.GREEN} cells ({total_qc_filtered/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.GREEN}✓ Final retained: {Colors.BOLD}{n2:,}{Colors.ENDC}{Colors.GREEN} cells ({n2/n0*100:.1f}% of original){Colors.ENDC}")
+        
         # Store cleaned adata
-        print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
         adatas[s] = adata
-        print(adatas[s])
 
-
-    # Concenate
+    # Concatenate
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔗 Merging all samples...{Colors.ENDC}")
     universe = sorted(
         list(reduce(lambda x,y: x&y, [ set(adatas[k].var_names) for k in adatas ]))
     )
     seed(1234)
     universe = sample(universe, len(universe))
     adata = anndata.concat([ adatas[k][:, universe] for k in adatas ], axis=0)
+    
+    print(f"   {Colors.CYAN}📊 Common genes: {Colors.BOLD}{len(universe):,}{Colors.ENDC}")
 
     # Last gene and cell filter
+    print(f"   {Colors.GREEN}{EMOJI['start']} Final filtering (min_genes={min_genes}, min_cells={min_cells})...{Colors.ENDC}")
+    cells_before = adata.shape[0]
+    genes_before = adata.shape[1]
+    
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
+    
+    print(f"   {Colors.GREEN}✓ Final dataset: {Colors.BOLD}{adata.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{adata.shape[1]:,}{Colors.ENDC}{Colors.GREEN} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}📊 Filtered: {Colors.BOLD}{cells_before-adata.shape[0]:,}{Colors.ENDC}{Colors.BLUE} cells, {Colors.BOLD}{genes_before-adata.shape[1]:,}{Colors.ENDC}{Colors.BLUE} genes{Colors.ENDC}")
+    
+    print(f"\n{Colors.GREEN}{EMOJI['done']} Quality control completed successfully!{Colors.ENDC}")
+    print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
     return adata, removed_cells
 
@@ -190,16 +210,15 @@ def qc(adata,**kwargs):
     qc
     '''
 
-
     if settings.mode == 'gpu':
-        print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate QC...")
+        print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['gpu']} Using RAPIDS GPU to calculate QC...{Colors.ENDC}")
         return qc_gpu(adata,**kwargs)
     elif settings.mode == 'cpu-gpu-mixed':
-        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode...")
+        print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['mixed']} Using CPU/GPU mixed mode for QC...{Colors.ENDC}")
         print_gpu_usage_color()
         return qc_cpu_gpu_mixed(adata,**kwargs)
     else:
-        print(f"{EMOJI['cpu']} Using torch CPU mode...")
+        print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['cpu']} Using CPU mode for QC...{Colors.ENDC}")
         return qc_cpu(adata,**kwargs)
     
 
@@ -241,19 +260,28 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     # Logging
     if tresh is None:
         tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}
-    # For each adata, produce a figure
-    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     
     removed_cells = []
 
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Quality Control Analysis (CPU-GPU Mixed):{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Dataset shape: {Colors.BOLD}{adata.shape[0]:,} cells × {adata.shape[1]:,} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}QC mode: {Colors.BOLD}{mode}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Doublet detection: {Colors.BOLD}{doublets_method if doublets else 'disabled'}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Mitochondrial genes: {Colors.BOLD}{mt_startswith if mt_genes is None else 'custom list'}{Colors.ENDC}")
+
     # QC metrics
-    print('Calculate QC metrics')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Step 1: Calculating QC Metrics{Colors.ENDC}")
     adata.var_names_make_unique()
     if mt_genes is not None:
         adata.var['mt']=False
         adata.var.loc[list(set(adata.var_names) & set(mt_genes)),'mt']=True
+        mt_genes_found = sum(adata.var['mt'])
+        print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
         adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+        mt_genes_found = sum(adata.var["mt"])
+        print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
@@ -265,21 +293,24 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    print('End calculation of QC metrics.')
+    
+    # Display QC statistics
+    print(f"   {Colors.GREEN}✓ QC metrics calculated:{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
-    print(f'Original cell number: {n0}')
     n1 = n0
 
     if doublets is True:
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
-            print('!!!It should be noted that the `scrublet` detection is too old and \
-            may not work properly.!!!')
-            print('!!!if you want to use novel doublet detection, \
-            please set `doublets_method=sccomposite`!!!')
-            print('Begin of post doublets removal and QC plot using`scrublet`')
+            print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is legacy and may not work optimally{Colors.ENDC}")
+            print(f"   {Colors.CYAN}💡 Consider using 'doublets_method=sccomposite' for better results{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
             from ._scrublet import scrublet
             scrublet(adata, random_state=1234,batch_key=batch_key,use_gpu=use_gpu)
 
@@ -287,12 +318,12 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
-            print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-            print('End of post doublets removal and QC plots.')
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+            
         elif doublets_method=='sccomposite':
-            print('!!!It should be noted that the `sccomposite` will remove more cells than \
-            `scrublet`!!!')
-            print('Begin of post doublets removal and QC plot using `sccomposite`')
+            print(f"   {Colors.WARNING}⚠️  Note: 'sccomposite' typically removes more cells than 'scrublet'{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
             if batch_key is None:
@@ -301,6 +332,7 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
                 adata.obs['sccomposite_doublet']=multiplet_classification
                 adata.obs['sccomposite_consistency']=consistency
             else:
+                print(f"   {Colors.CYAN}Processing {len(adata.obs[batch_key].unique())} batches separately...{Colors.ENDC}")
                 for batch in adata.obs[batch_key].unique():
                     from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
@@ -312,15 +344,18 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[adata.obs['sccomposite_doublet']==0, :]
             n1 = adata.shape[0]
-            print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
-            print('End of post sccomposite removal and QC plots.')
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
     else:
+        print(f"\n{Colors.BLUE}📊 Step 2: Doublet detection disabled{Colors.ENDC}")
         n1 = adata.shape[0]
 
     # Post seurat or mads filtering QC plot
 
     # Filters
-    print('Filters application (seurat or mads)')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
+    
     if mode == 'seurat':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
@@ -331,41 +366,52 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
 
     # Report
+    mt_failed = n1-np.sum(adata.obs["passing_mt"])
+    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
+    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    
     if mode == 'seurat':
-        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs filter (≥{tresh['nUMIs']}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({umis_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes filter (≥{tresh['detected_genes']}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({genes_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({mt_failed/n1*100:.1f}%){Colors.ENDC}")
     elif mode == 'mads':
         nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_mt"])}')
-    print('Filters applicated.')
+        print(f"   {Colors.BLUE}📊 MADs Filter Results (±{nmads} MADs):{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
     removed = QC_test.loc[lambda x : x == False]
     removed_cells.extend(list(removed.index.values))
-    print(f'Total cell filtered out with this last --mode {mode} QC (and its \
-    chosen options): {n1-np.sum(QC_test)}')
+    total_qc_failed = n1-np.sum(QC_test)
     adata = adata[QC_test, :]
     n2 = adata.shape[0]
-    # Store cleaned adata
-    print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
+    
+    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
 
     # Last gene and cell filter
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Parameters: min_genes={min_genes}, min_cells={min_cells}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Ratios: max_genes_ratio={max_genes_ratio}, max_cells_ratio={max_cells_ratio}{Colors.ENDC}")
+    
+    cells_before_final = adata.shape[0]
+    genes_before_final = adata.shape[1]
+    
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
     sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
     sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+    
+    cells_final_filtered = cells_before_final - adata.shape[0]
+    genes_final_filtered = genes_before_final - adata.shape[1]
+    
+    print(f"   {Colors.GREEN}✓ Final filtering: {Colors.BOLD}{cells_final_filtered:,}{Colors.ENDC}{Colors.GREEN} cells, {Colors.BOLD}{genes_final_filtered:,}{Colors.ENDC}{Colors.GREEN} genes removed{Colors.ENDC}")
 
+    # Store status
     if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
     if 'status_args' not in adata.uns.keys():
@@ -387,6 +433,29 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         'nUMIs': tresh['nUMIs'],
         'detected_genes': tresh['detected_genes'],
     }
+
+    # Final summary
+    print(f"\n{Colors.GREEN}{EMOJI['done']} Quality Control Analysis Completed!{Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}📈 Final Summary:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}📊 Original: {Colors.BOLD}{n0:,}{Colors.ENDC}{Colors.CYAN} cells × {Colors.BOLD}{genes_before_final:,}{Colors.ENDC}{Colors.CYAN} genes{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Final: {Colors.BOLD}{adata.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{adata.shape[1]:,}{Colors.ENDC}{Colors.GREEN} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}📉 Total removed: {Colors.BOLD}{n0-adata.shape[0]:,}{Colors.ENDC}{Colors.BLUE} cells ({(n0-adata.shape[0])/n0*100:.1f}%){Colors.ENDC}")
+    print(f"   {Colors.BLUE}📉 Total removed: {Colors.BOLD}{genes_before_final-adata.shape[1]:,}{Colors.ENDC}{Colors.BLUE} genes ({(genes_before_final-adata.shape[1])/genes_before_final*100:.1f}%){Colors.ENDC}")
+    
+    # Quality assessment
+    final_retention_rate = adata.shape[0] / n0
+    if final_retention_rate >= 0.8:
+        quality_color = Colors.GREEN
+        quality_msg = "Excellent retention rate"
+    elif final_retention_rate >= 0.6:
+        quality_color = Colors.CYAN
+        quality_msg = "Good retention rate"
+    else:
+        quality_color = Colors.WARNING
+        quality_msg = "Low retention rate - consider relaxing thresholds"
+    
+    print(f"   {quality_color}💯 Quality: {Colors.BOLD}{final_retention_rate*100:.1f}%{Colors.ENDC}{quality_color} retention ({quality_msg}){Colors.ENDC}")
+    print(f"\n{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
     return adata
 
@@ -434,13 +503,18 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     removed_cells = []
 
     # QC metrics
-    print('Calculate QC metrics')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Step 1: Calculating QC Metrics{Colors.ENDC}")
     adata.var_names_make_unique()
     if mt_genes is not None:
         adata.var['mt']=False
         adata.var.loc[list(set(adata.var_names) & set(mt_genes)),'mt']=True
+        mt_genes_found = sum(adata.var['mt'])
+        print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
         adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+        mt_genes_found = sum(adata.var["mt"])
+        print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
@@ -452,32 +526,36 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    print('End calculation of QC metrics.')
+    
+    # Display QC statistics
+    print(f"   {Colors.GREEN}✓ QC metrics calculated:{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
-    print(f'Original cell number: {n0}')
+    print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
 
     if doublets is True:
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
-            print('!!!It should be noted that the `scrublet` detection is too old and \
-            may not work properly.!!!')
-            print('!!!if you want to use novel doublet detection, \
-            please set `doublets_method=sccomposite`!!!')
-            print('Begin of post doublets removal and QC plot using`scrublet`')
+            print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is too old and may not work properly{Colors.ENDC}")
+            print(f"   {Colors.CYAN}💡 Consider using 'doublets_method=sccomposite' for better results{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
             sc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
 
             adata_remove = adata[adata.obs['predicted_doublet'], :]
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
-            print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-            print('End of post doublets removal and QC plots.')
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+            
         elif doublets_method=='sccomposite':
-            print('!!!It should be noted that the `sccomposite` will remove more cells than \
-            `scrublet`!!!')
-            print('Begin of post doublets removal and QC plot using `sccomposite`')
+            print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
             if batch_key is None:
@@ -497,9 +575,10 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[adata.obs['sccomposite_doublet']==0, :]
             n1 = adata.shape[0]
-            print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
-            print('End of post sccomposite removal and QC plots.')
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
     else:
+        print(f"\n{Colors.BLUE}📊 Step 2: Doublet detection disabled{Colors.ENDC}")
         n1 = adata.shape[0]
     # Fix bug where n1 is not defined when doublets=False
     if not doublets:
@@ -509,7 +588,9 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     # Post seurat or mads filtering QC plot
 
     # Filters
-    print('Filters application (seurat or mads)')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
+    
     if mode == 'seurat':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
@@ -520,36 +601,43 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
 
     # Report
+    mt_failed = n1-np.sum(adata.obs["passing_mt"])
+    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
+    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    
     if mode == 'seurat':
-        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs filter (≥{tresh['nUMIs']}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({umis_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes filter (≥{tresh['detected_genes']}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({genes_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({mt_failed/n1*100:.1f}%){Colors.ENDC}")
     elif mode == 'mads':
         nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_mt"])}')
-    print('Filters applicated.')
+        print(f"   {Colors.BLUE}📊 MADs Filter Results (±{nmads} MADs):{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Filters applied successfully{Colors.ENDC}")
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
     removed = QC_test.loc[lambda x : x == False]
     removed_cells.extend(list(removed.index.values))
-    print(f'Total cell filtered out with this last --mode {mode} QC (and its \
-    chosen options): {n1-np.sum(QC_test)}')
+    total_qc_failed = n1-np.sum(QC_test)
     adata = adata[QC_test, :]
     n2 = adata.shape[0]
     # Store cleaned adata
-    print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
+    print(f"   {Colors.GREEN}✓ Final dataset: {Colors.BOLD}{adata.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{adata.shape[1]:,}{Colors.ENDC}{Colors.GREEN} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}📊 Filtered: {Colors.BOLD}{cells_before_final-adata.shape[0]:,}{Colors.ENDC}{Colors.BLUE} cells, {Colors.BOLD}{genes_before_final-adata.shape[1]:,}{Colors.ENDC}{Colors.BLUE} genes{Colors.ENDC}")
 
     # Last gene and cell filter
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Parameters: min_genes={min_genes}, min_cells={min_cells}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Ratios: max_genes_ratio={max_genes_ratio}, max_cells_ratio={max_cells_ratio}{Colors.ENDC}")
+    
+    cells_before_final = adata.shape[0]
+    genes_before_final = adata.shape[1]
+    
     sc.pp.filter_cells(adata, min_genes=min_genes)
     sc.pp.filter_genes(adata, min_cells=min_cells)
     sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
@@ -586,49 +674,69 @@ def qc_gpu(adata, mode='seurat',
        batch_key=None,doublets=True,doublets_method='scrublet',
        path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
     '''
-    qc
-    
+    GPU-accelerated quality control using RAPIDS
     '''
     import rapids_singlecell as rsc
-     # Logging
+    
+    # Logging
     if tresh is None:
         tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}
-    # For each adata, produce a figure
-    # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
+    
     removed_cells = []
+    
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Quality Control Analysis (GPU-Accelerated):{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Dataset shape: {Colors.BOLD}{adata.shape[0]:,} cells × {adata.shape[1]:,} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}QC mode: {Colors.BOLD}{mode}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Doublet detection: {Colors.BOLD}{doublets_method if doublets else 'disabled'}{Colors.ENDC}")
+    print(f"   {Colors.BLUE}Mitochondrial genes: {Colors.BOLD}{mt_startswith if mt_genes is None else 'custom list'}{Colors.ENDC}")
+    
+    print(f"   {Colors.GREEN}{EMOJI['gpu']} Loading data to GPU...{Colors.ENDC}")
     rsc.get.anndata_to_GPU(adata)
+    
     # QC metrics
-    print('Calculate QC metrics')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Step 1: Calculating QC Metrics{Colors.ENDC}")
     adata.var_names_make_unique()
     if mt_genes is not None:
         adata.var['mt']=False
         adata.var.loc[list(set(adata.var_names) & set(mt_genes)),'mt']=True
+        mt_genes_found = sum(adata.var['mt'])
+        print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
         rsc.pp.flag_gene_family(adata, gene_family_name="mt", gene_family_prefix=mt_startswith)
+        mt_genes_found = sum(adata.var["mt"])
+        print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    
     rsc.pp.calculate_qc_metrics(adata, qc_vars=["mt"])
     adata.obs['nUMIs'] = adata.obs['total_counts']
     adata.obs['mito_perc'] = adata.obs['pct_counts_mt']/100
     adata.obs['detected_genes'] = adata.obs['n_genes_by_counts']
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    print('End calculation of QC metrics.')
+    
+    # Display QC statistics
+    print(f"   {Colors.GREEN}✓ QC metrics calculated:{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
-    print(f'Original cell number: {n0}')
+    print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
+    n1 = n0
 
     if doublets is True:
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
         if doublets_method=='scrublet':
-            # Post doublets removal QC plot
-            print('Begin of post doublets removal and QC plot')
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running GPU-accelerated scrublet...{Colors.ENDC}")
             rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
             adata_remove = adata[adata.obs['predicted_doublet'], :]
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
-            print(f'Cells retained after scrublet: {n1}, {n0-n1} removed.')
-            print('End of post doublets removal and QC plots.')
-
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+            
         elif doublets_method=='sccomposite':
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
             adata.obs['sccomposite_doublet']=0
             adata.obs['sccomposite_consistency']=0
             if batch_key is None:
@@ -637,6 +745,7 @@ def qc_gpu(adata, mode='seurat',
                 adata.obs['sccomposite_doublet']=multiplet_classification
                 adata.obs['sccomposite_consistency']=consistency
             else:
+                print(f"   {Colors.CYAN}Processing {len(adata.obs[batch_key].unique())} batches separately...{Colors.ENDC}")
                 for batch in adata.obs[batch_key].unique():
                     from ._sccomposite import composite_rna
                     adata_batch=adata[adata.obs[batch_key]==batch]
@@ -648,11 +757,13 @@ def qc_gpu(adata, mode='seurat',
             removed_cells.extend(list(adata_remove.obs_names))
             adata = adata[adata.obs['sccomposite_doublet']==0, :]
             n1 = adata.shape[0]
-            print(f'Cells retained after sccomposite: {n1}, {n0-n1} removed.')
-            print('End of post sccomposite removal and QC plots.')
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
 
     # Filters
-    print('Filters application (seurat or mads)')
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
+    
     if mode == 'seurat':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
@@ -661,45 +772,81 @@ def qc_gpu(adata, mode='seurat',
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
         adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-     # Report
+    
+    # Report
+    mt_failed = n1-np.sum(adata.obs["passing_mt"])
+    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
+    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    
     if mode == 'seurat':
-        print(f'Lower treshold, nUMIs: {tresh["nUMIs"]}; filtered-out-cells: \
-            {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Lower treshold, n genes: {tresh["detected_genes"]}; \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; \
-            filtered-out-cells: {n1-np.sum(adata.obs["passing_mt"])}')
+        print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs filter (≥{tresh['nUMIs']}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({umis_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes filter (≥{tresh['detected_genes']}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({genes_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({mt_failed/n1*100:.1f}%){Colors.ENDC}")
     elif mode == 'mads':
         nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
         n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f'Tresholds used, nUMIs: ({nUMIs_t[0]}, {nUMIs_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_nUMIs"])}')
-        print(f'Tresholds used, n genes: ({n_genes_t[0]}, {n_genes_t[1]}); filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_ngenes"])}')
-        print(f'Lower treshold, mito %: {tresh["mito_perc"]}; filtered-out-cells: \
-        {n1-np.sum(adata.obs["passing_mt"])}')
-    print(f'Filters applicated.')
+        print(f"   {Colors.BLUE}📊 MADs Filter Results (±{nmads} MADs):{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
     removed = QC_test.loc[~QC_test.values]
     removed_cells.extend(list(removed.index.values))
-    print(f'Total cell filtered out with this last --mode {mode} QC (and its chosen options): \
-    {n1-np.sum(QC_test)}')
+    total_qc_failed = n1-np.sum(QC_test)
     adata = adata[QC_test, :]
     n2 = adata.shape[0]
-    # Store cleaned adata
-    print(f'Cells retained after scrublet and {mode} filtering: {n2}, {n0-n2} removed.')
+    
+    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
 
     # Last gene and cell filter
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Parameters: min_genes={min_genes}, min_cells={min_cells}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Ratios: max_genes_ratio={max_genes_ratio}, max_cells_ratio={max_cells_ratio}{Colors.ENDC}")
+    
+    cells_before_final = adata.shape[0]
+    genes_before_final = adata.shape[1]
+    
     rsc.pp.filter_cells(adata, min_counts=min_genes)
     rsc.pp.filter_cells(adata, max_counts=max_genes_ratio*adata.shape[1])
     rsc.pp.filter_genes(adata, min_counts=min_cells)
     rsc.pp.filter_genes(adata, max_counts=max_cells_ratio*adata.shape[0])
+    
+    cells_final_filtered = cells_before_final - adata.shape[0]
+    genes_final_filtered = genes_before_final - adata.shape[1]
+    
+    print(f"   {Colors.GREEN}✓ Final filtering: {Colors.BOLD}{cells_final_filtered:,}{Colors.ENDC}{Colors.GREEN} cells, {Colors.BOLD}{genes_final_filtered:,}{Colors.ENDC}{Colors.GREEN} genes removed{Colors.ENDC}")
 
+    # Store status
     if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
     adata.uns['status']['qc']=True
+    
+    # Final summary
+    print(f"\n{Colors.GREEN}{EMOJI['done']} GPU Quality Control Analysis Completed!{Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}📈 Final Summary:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}📊 Original: {Colors.BOLD}{n0:,}{Colors.ENDC}{Colors.CYAN} cells × {Colors.BOLD}{genes_before_final:,}{Colors.ENDC}{Colors.CYAN} genes{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Final: {Colors.BOLD}{adata.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{adata.shape[1]:,}{Colors.ENDC}{Colors.GREEN} genes{Colors.ENDC}")
+    print(f"   {Colors.BLUE}📉 Total removed: {Colors.BOLD}{n0-adata.shape[0]:,}{Colors.ENDC}{Colors.BLUE} cells ({(n0-adata.shape[0])/n0*100:.1f}%){Colors.ENDC}")
+    print(f"   {Colors.BLUE}📉 Total removed: {Colors.BOLD}{genes_before_final-adata.shape[1]:,}{Colors.ENDC}{Colors.BLUE} genes ({(genes_before_final-adata.shape[1])/genes_before_final*100:.1f}%){Colors.ENDC}")
+    
+    # Quality assessment
+    final_retention_rate = adata.shape[0] / n0
+    if final_retention_rate >= 0.8:
+        quality_color = Colors.GREEN
+        quality_msg = "Excellent retention rate"
+    elif final_retention_rate >= 0.6:
+        quality_color = Colors.CYAN
+        quality_msg = "Good retention rate"
+    else:
+        quality_color = Colors.WARNING
+        quality_msg = "Low retention rate - consider relaxing thresholds"
+    
+    print(f"   {quality_color}💯 Quality: {Colors.BOLD}{final_retention_rate*100:.1f}%{Colors.ENDC}{quality_color} retention ({quality_msg}){Colors.ENDC}")
+    print(f"\n{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+    
     return adata
 
 
@@ -714,7 +861,7 @@ def filter_cells(adata: anndata.AnnData,
     
     For instance, only keep cells with at least `min_counts` counts or
     `min_genes` genes expressed. This is to filter measurement outliers,
-    i.e. “unreliable” observations.
+    i.e. "unreliable" observations.
     
     Only provide one of the optional parameters `min_counts`, `min_genes`,
     `max_counts`, `max_genes` per call.
@@ -748,9 +895,26 @@ def filter_cells(adata: anndata.AnnData,
         the array stores `n_counts` or `n_cells` per gene.
     
     """
-
+    print(f"{Colors.GREEN}{EMOJI['start']} Filtering cells...{Colors.ENDC}")
+    filter_params = []
+    if min_counts is not None:
+        filter_params.append(f"min_counts≥{min_counts}")
+    if min_genes is not None:
+        filter_params.append(f"min_genes≥{min_genes}")
+    if max_counts is not None:
+        filter_params.append(f"max_counts≤{max_counts}")
+    if max_genes is not None:
+        filter_params.append(f"max_genes≤{max_genes}")
+    
+    if filter_params:
+        print(f"   {Colors.CYAN}Parameters: {', '.join(filter_params)}{Colors.ENDC}")
+    
+    cells_before = adata.shape[0]
     sc.pp.filter_cells(adata, min_genes=min_genes,min_counts=min_counts, max_counts=max_counts,
                        max_genes=max_genes, inplace=inplace)
+    cells_filtered = cells_before - adata.shape[0]
+    print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{cells_filtered:,}{Colors.ENDC}{Colors.GREEN} cells removed{Colors.ENDC}")
+
 def filter_genes(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_cells: Optional[int] = None,
@@ -796,7 +960,23 @@ def filter_genes(adata: anndata.AnnData,
         `n_counts` or `n_cells` per gene.
     
     """
-
+    print(f"{Colors.GREEN}{EMOJI['start']} Filtering genes...{Colors.ENDC}")
+    filter_params = []
+    if min_counts is not None:
+        filter_params.append(f"min_counts≥{min_counts}")
+    if min_cells is not None:
+        filter_params.append(f"min_cells≥{min_cells}")
+    if max_counts is not None:
+        filter_params.append(f"max_counts≤{max_counts}")
+    if max_cells is not None:
+        filter_params.append(f"max_cells≤{max_cells}")
+    
+    if filter_params:
+        print(f"   {Colors.CYAN}Parameters: {', '.join(filter_params)}{Colors.ENDC}")
+    
+    genes_before = adata.shape[1]
     sc.pp.filter_genes(adata, min_counts=min_counts, min_cells=min_cells, max_counts=max_counts,
                           max_cells=max_cells, inplace=inplace)
+    genes_filtered = genes_before - adata.shape[1]
+    print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{genes_filtered:,}{Colors.ENDC}{Colors.GREEN} genes removed{Colors.ENDC}")
     
