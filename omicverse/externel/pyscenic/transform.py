@@ -34,22 +34,34 @@ COLUMN_NAME_TYPE = "Type"
 # TODO: Should actually be a function depending on return_recovery_curves and rank_threshold
 def _get_df_meta_data():
     """Get the dataframe metadata for pyscenic operations."""
-    from dask.dataframe.utils import make_meta
-    return make_meta(
-        {
-            ("Enrichment", COLUMN_NAME_AUC): np.float64,
-            ("Enrichment", COLUMN_NAME_NES): np.float64,
-            ("Enrichment", COLUMN_NAME_MOTIF_SIMILARITY_QVALUE): np.float64,
-            ("Enrichment", COLUMN_NAME_ORTHOLOGOUS_IDENTITY): np.float64,
-            ("Enrichment", COLUMN_NAME_ANNOTATION): object,
-            ("Enrichment", COLUMN_NAME_CONTEXT): object,
-            ("Enrichment", COLUMN_NAME_TARGET_GENES): object,
-            ("Enrichment", COLUMN_NAME_RANK_AT_MAX): np.int64,
-        },
-        index=pd.MultiIndex.from_arrays(
-            [[], []], names=(COLUMN_NAME_TF, COLUMN_NAME_MOTIF_ID)
-        ),
+    # Pure pandas implementation - no need for dask
+    columns = pd.MultiIndex.from_tuples([
+        ("Enrichment", COLUMN_NAME_AUC),
+        ("Enrichment", COLUMN_NAME_NES),
+        ("Enrichment", COLUMN_NAME_MOTIF_SIMILARITY_QVALUE),
+        ("Enrichment", COLUMN_NAME_ORTHOLOGOUS_IDENTITY),
+        ("Enrichment", COLUMN_NAME_ANNOTATION),
+        ("Enrichment", COLUMN_NAME_CONTEXT),
+        ("Enrichment", COLUMN_NAME_TARGET_GENES),
+        ("Enrichment", COLUMN_NAME_RANK_AT_MAX),
+    ])
+    
+    index = pd.MultiIndex.from_arrays(
+        [[], []], names=(COLUMN_NAME_TF, COLUMN_NAME_MOTIF_ID)
     )
+    
+    # Create empty DataFrame with correct dtypes
+    df = pd.DataFrame(columns=columns, index=index)
+    df[("Enrichment", COLUMN_NAME_AUC)] = df[("Enrichment", COLUMN_NAME_AUC)].astype(np.float64)
+    df[("Enrichment", COLUMN_NAME_NES)] = df[("Enrichment", COLUMN_NAME_NES)].astype(np.float64)
+    df[("Enrichment", COLUMN_NAME_MOTIF_SIMILARITY_QVALUE)] = df[("Enrichment", COLUMN_NAME_MOTIF_SIMILARITY_QVALUE)].astype(np.float64)
+    df[("Enrichment", COLUMN_NAME_ORTHOLOGOUS_IDENTITY)] = df[("Enrichment", COLUMN_NAME_ORTHOLOGOUS_IDENTITY)].astype(np.float64)
+    df[("Enrichment", COLUMN_NAME_ANNOTATION)] = df[("Enrichment", COLUMN_NAME_ANNOTATION)].astype(object)
+    df[("Enrichment", COLUMN_NAME_CONTEXT)] = df[("Enrichment", COLUMN_NAME_CONTEXT)].astype(object)
+    df[("Enrichment", COLUMN_NAME_TARGET_GENES)] = df[("Enrichment", COLUMN_NAME_TARGET_GENES)].astype(object)
+    df[("Enrichment", COLUMN_NAME_RANK_AT_MAX)] = df[("Enrichment", COLUMN_NAME_RANK_AT_MAX)].astype(np.int64)
+    
+    return df
 
 # Create a lazy property for DF_META_DATA
 DF_META_DATA = None

@@ -12,6 +12,8 @@ class SCENIC:
             motif_path,
             n_jobs=8):
         
+        from .._settings import Colors, EMOJI, print_gpu_usage_color
+        
         from ctxcore.rnkdb import FeatherRankingDatabase as RankingDatabase
         self.adata = adata
         self.db_glob = db_glob
@@ -21,39 +23,219 @@ class SCENIC:
         import glob
         import os
 
+        # Print SCENIC initialization information with colors
+        print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} SCENIC Analysis Initialization:{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Input data shape: {Colors.BOLD}{adata.shape[0]} cells × {adata.shape[1]} genes{Colors.ENDC}")
+        
+        # Check data type and quality
+        total_counts = adata.X.sum()
+        mean_genes_per_cell = (adata.X > 0).sum(axis=1).mean()
+        print(f"   {Colors.BLUE}Total UMI counts: {Colors.BOLD}{total_counts:,.0f}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Mean genes per cell: {Colors.BOLD}{mean_genes_per_cell:.1f}{Colors.ENDC}")
+        
+        # Database information
         db_fnames = glob.glob(db_glob)  # e.g. your feather files
+        print(f"   {Colors.GREEN}Ranking databases found: {Colors.BOLD}{len(db_fnames)}{Colors.ENDC}")
+        
+        if len(db_fnames) == 0:
+            print(f"   {Colors.FAIL}{EMOJI['error']} No ranking databases found at: {Colors.BOLD}{db_glob}{Colors.ENDC}")
+            raise ValueError(f"No ranking databases found at: {db_glob}")
+        
+        # Show database files
+        for i, fname in enumerate(db_fnames[:5]):  # Show first 5
+            basename = os.path.basename(fname)
+            print(f"   {Colors.BLUE}  └─ [{i+1}] {Colors.BOLD}{basename}{Colors.ENDC}")
+        if len(db_fnames) > 5:
+            print(f"   {Colors.BLUE}  └─ ... and {Colors.BOLD}{len(db_fnames)-5}{Colors.ENDC}{Colors.BLUE} more{Colors.ENDC}")
+        
+        # Motif annotations
+        print(f"   {Colors.GREEN}Motif annotations: {Colors.BOLD}{motif_path}{Colors.ENDC}")
+        if not os.path.exists(motif_path):
+            print(f"   {Colors.FAIL}{EMOJI['error']} Motif annotation file not found!{Colors.ENDC}")
+            raise FileNotFoundError(f"Motif annotation file not found: {motif_path}")
+        
+        # Computational settings
+        print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Computational Settings:{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Number of workers: {Colors.BOLD}{n_jobs}{Colors.ENDC}")
+        
+        # GPU usage information
+        print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['gpu']} GPU Usage Information:{Colors.ENDC}")
+        try:
+            print_gpu_usage_color(bar_length=25)
+        except Exception as e:
+            print(f"   {Colors.WARNING}Could not get GPU info: {e}{Colors.ENDC}")
+        
+        # Performance recommendations
+        print(f"\n{Colors.HEADER}{Colors.BOLD}💡 Performance Recommendations:{Colors.ENDC}")
+        if adata.shape[0] > 50000:
+            print(f"   {Colors.WARNING}▶ Large dataset detected ({adata.shape[0]} cells):{Colors.ENDC}")
+            print(f"     {Colors.CYAN}Consider increasing n_jobs to {Colors.BOLD}{min(n_jobs*2, 16)}{Colors.ENDC}{Colors.CYAN} for faster processing{Colors.ENDC}")
+        
+        if adata.shape[1] > 30000:
+            print(f"   {Colors.WARNING}▶ Many genes detected ({adata.shape[1]} genes):{Colors.ENDC}")
+            print(f"     {Colors.CYAN}Consider filtering low-expression genes before SCENIC analysis{Colors.ENDC}")
+        
+        if len(db_fnames) > 10:
+            print(f"   {Colors.BLUE}▶ Multiple databases available ({len(db_fnames)}):{Colors.ENDC}")
+            print(f"     {Colors.GREEN}Great! More databases can improve regulon discovery{Colors.ENDC}")
+        
         dbs = [ RankingDatabase(fname, name=os.path.splitext(os.path.basename(fname))[0])
         for fname in db_fnames ]
 
         self.dbs = dbs
+        
+        print(f"\n{Colors.GREEN}{EMOJI['done']} SCENIC initialization completed successfully!{Colors.ENDC}")
+        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
 
-    def cal_grn(self,layer='counts'):
+    def cal_grn(self,layer='counts',**kwargs):
+        r"""
+        Initialize and Train a RegDiffusion model.
+
+        For architecture and training details, please refer to our paper.
+
+        > From noise to knowledge: probabilistic diffusion-based neural inference
+
+        You can access the model through `RegDiffusionTrainer.model`. 
+        
+        Arguments:
+            exp_array (np.ndarray): 2D numpy array. If used on single-cell RNAseq, 
+                the rows are cells and the columns are genes. Data should be log 
+                transformed. You may also want to remove all non expressed genes.
+            cell_types (np.ndarray): (Optional) 1D integer array for cell type. If 
+                you have labels in your cell type, you need to convert them to 
+                interge. Default is None. 
+            T (int): Total number of diffusion steps. Default: 5,000
+            start_noise (float): Minimal noise level (beta) to be added. Default: 
+                0.0001
+            end_noise (float): Maximal noise level (beta) to be added. Default: 
+                0.02
+            time_dim (int): Dimension size for the time embedding. Default: 64.
+            celltype_dim (int): Dimension size for the cell type embedding. 
+                Default: 4.
+            hidden_dim (list): Dimension sizes for the feature learning layers. We 
+                use the size of the first layer as the dimension for gene embeddings
+                as well. Default: [16, 16, 16].
+            init_coef (int): A coefficent to control the value to initialize the 
+                adjacency matrix. Here we define regulatory norm as 1 over (number 
+                of genes - 1). The value which we use to initialize the model is 
+                `init_coef` times of the regulatory norm. Default: 5. 
+            lr_nn (float): Learning rate for the rest of the neural networks except
+                the adjacency matrix. Default: 0.001
+            lr_adj (float): Learning rate for the adjacency matrix. By default, it 
+                equals to 0.02 * gene regulatory norm, which equals 1/(n_gene-1). 
+            weight_decay_nn (float): L2 regularization coef on the rest of the 
+                neural networks. Default: 0.1.
+            weight_decay_adj (float): L2 regularization coef on the adj matrix.
+                Default: 0.01.
+            sparse_loss_coef (float): L1 regularization coef on the adj matrix. 
+                Default: 0.25.
+            adj_dropout (float): Probability of an edge to be zeroed. Default: 0.3.
+            batch_size (int): Batch size for training. Default: 128.
+            n_steps (int): Total number of training iterations. Default: 1000.
+            train_split (float): Train partition. Default: 1.0.
+            train_split_seed (int): Random seed for train/val partition. 
+                Default: 123
+            device (str or torch.device): Device where the model is running. For 
+                example, "cpu", "cuda", "cuda:1", and etc. You are not recommended 
+                to run this model on Apple's MPS chips. Default is "cuda" but if 
+                you only has CPU, it will switch back to CPU.
+            compile (boolean): Whether to compile the model before training. 
+                Compile the model is a good idea on large dataset and ofter improves
+                inference speed when it works. For smaller dataset, eager execution 
+                if often good enough. 
+            evaluator (GRNEvaluator): (Optional) A defined GRNEvaluator if ground 
+                truth data is available. Evaluation will be done every 100 steps by 
+                default but you can change this setting through the eval_on_n_steps 
+                option. Default is None
+            eval_on_n_steps (int): If an evaluator is provided, the trainer will 
+                run evaluation every `eval_on_n_steps` steps. Default: 100.
+            logger (LightLogger): (Optional) A LightLogger to log training process. 
+                The only situation when you need to provide this is when you want 
+                to save logs from different trainers into the same logger. Default 
+                is None. 
+        """
+        from .._settings import Colors, EMOJI, print_gpu_usage_color
         import regdiffusion as rd
+        
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🧬 Gene Regulatory Network (GRN) Inference:{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Method: {Colors.BOLD}RegDiffusion{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Data layer: {Colors.BOLD}'{layer}'{Colors.ENDC}")
+        
+        # Data preparation
         if layer in self.adata.layers:
             x = self.adata.layers[layer].toarray()
             x = np.log(x+1.0)
+            print(f"   {Colors.GREEN}✓ Using existing '{layer}' layer{Colors.ENDC}")
         else:
+            print(f"   {Colors.WARNING}⚠️  Layer '{layer}' not found, recovering counts...{Colors.ENDC}")
             from ..pp import recover_counts
             
             if self.adata.X.max()<np.log1p(1e4):
                 X_counts_recovered, size_factors_sub=recover_counts(self.adata.X, 1e4, 1e5, log_base=None, 
                                                           chunk_size=10000)
                 self.adata.layers['counts']=X_counts_recovered
+                print(f"   {Colors.GREEN}✓ Counts recovered (target: 1e4){Colors.ENDC}")
             elif self.adata.X.max()<np.log1p(50*1e4):
                 X_counts_recovered, size_factors_sub=recover_counts(self.adata.X, 50*1e4, 50*1e5, log_base=None, 
                                                           chunk_size=10000)
                 self.adata.layers['counts']=X_counts_recovered
+                print(f"   {Colors.GREEN}✓ Counts recovered (target: 50*1e4){Colors.ENDC}")
             else:
-                print('Please provide a layer with raw counts data')
+                print(f'   {Colors.FAIL}{EMOJI["error"]} Please provide a layer with raw counts data{Colors.ENDC}')
                 return None
-        
 
             x = self.adata.layers['counts'].toarray()
             x = np.log(x+1.0)
 
+        # Display data statistics
+        print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Data Statistics:{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Expression matrix shape: {Colors.BOLD}{x.shape}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Mean expression: {Colors.BOLD}{x.mean():.3f}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Sparsity: {Colors.BOLD}{(x == 0).sum() / x.size * 100:.1f}%{Colors.ENDC}")
+        
+        # Display training parameters
+        print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Training Parameters:{Colors.ENDC}")
+        default_params = {
+            'T': 5000, 'start_noise': 0.0001, 'end_noise': 0.02,
+            'time_dim': 64, 'celltype_dim': 4, 'hidden_dim': [16, 16, 16],
+            'init_coef': 5, 'lr_nn': 0.001, 'lr_adj': None,
+            'weight_decay_nn': 0.1, 'weight_decay_adj': 0.01,
+            'sparse_loss_coef': 0.25, 'adj_dropout': 0.3,
+            'batch_size': 128, 'n_steps': 1000, 'train_split': 1.0,
+            'device': 'cuda'
+        }
+        
+        # Show key parameters
+        key_params = ['n_steps', 'batch_size', 'device', 'lr_nn', 'sparse_loss_coef']
+        for param in key_params:
+            value = kwargs.get(param, default_params.get(param, 'Default'))
+            if param == 'device':
+                color = Colors.GREEN if 'cuda' in str(value) else Colors.BLUE
+            else:
+                color = Colors.BLUE
+            print(f"   {color}{param}: {Colors.BOLD}{value}{Colors.ENDC}")
+        
+        # GPU status check
+        if kwargs.get('device', 'cuda') != 'cpu':
+            print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['gpu']} GPU Training Status:{Colors.ENDC}")
+            try:
+                print_gpu_usage_color(bar_length=20)
+            except:
+                print(f"   {Colors.WARNING}GPU status check failed{Colors.ENDC}")
+        
+        # Training time estimation
+        estimated_time = x.shape[0] * kwargs.get('n_steps', 1000) / 10000  # rough estimate
+        if estimated_time > 60:
+            print(f"\n{Colors.HEADER}{Colors.BOLD}⏱️  Estimated Training Time:{Colors.ENDC}")
+            print(f"   {Colors.CYAN}Approximate: {Colors.BOLD}{estimated_time/60:.1f} minutes{Colors.ENDC}")
+            if estimated_time > 300:  # 5 minutes
+                print(f"   {Colors.WARNING}💡 This may take a while. Consider reducing n_steps or using GPU{Colors.ENDC}")
 
-        rd_trainer = rd.RegDiffusionTrainer(x)
+        print(f"\n{Colors.GREEN}{EMOJI['start']} Starting RegDiffusion training...{Colors.ENDC}")
+        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+
+        rd_trainer = rd.RegDiffusionTrainer(x,**kwargs)
         rd_trainer.train()
         grn = rd_trainer.get_grn(self.adata.var_names, top_gene_percentile=50)
 
@@ -65,6 +247,13 @@ class SCENIC:
         self.edgelist['importance']=self.edgelist['importance'].astype(np.float32)
         self.adjacencies = self.edgelist
         
+        # Display results
+        print(f"\n{Colors.GREEN}{EMOJI['done']} GRN inference completed!{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Total edges detected: {Colors.BOLD}{len(self.edgelist):,}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Unique TFs: {Colors.BOLD}{self.edgelist['TF'].nunique()}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Unique targets: {Colors.BOLD}{self.edgelist['target'].nunique()}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Mean importance: {Colors.BOLD}{self.edgelist['importance'].mean():.4f}{Colors.ENDC}")
+        
         return edgelist
     
     def cal_regulons(
@@ -72,12 +261,35 @@ class SCENIC:
             rho_mask_dropouts=True,
             seed=42,**kwargs
         ):
+        from .._settings import Colors, EMOJI, print_gpu_usage_color
         
         from ..externel.pyscenic.utils import modules_from_adjacencies
         from ..externel.pyscenic.prune import prune2df, df2regulons
 
-        expr_mtx=self.adata.to_df()
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Regulon Calculation and Activity Scoring:{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Input edges: {Colors.BOLD}{len(self.edgelist):,}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Databases: {Colors.BOLD}{len(self.dbs)}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Workers: {Colors.BOLD}{self.n_jobs}{Colors.ENDC}")
 
+        expr_mtx=self.adata.to_df()
+        
+        print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Expression Matrix Info:{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Shape: {Colors.BOLD}{expr_mtx.shape}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Missing values: {Colors.BOLD}{expr_mtx.isnull().sum().sum()}{Colors.ENDC}")
+        
+        # Parameters display
+        print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Regulon Parameters:{Colors.ENDC}")
+        print(f"   {Colors.BLUE}rho_mask_dropouts: {Colors.BOLD}{rho_mask_dropouts}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}random_seed: {Colors.BOLD}{seed}{Colors.ENDC}")
+        
+        # Show additional kwargs if provided
+        if kwargs:
+            print(f"   {Colors.BLUE}Additional parameters:{Colors.ENDC}")
+            for key, value in kwargs.items():
+                print(f"   {Colors.BLUE}  {key}: {Colors.BOLD}{value}{Colors.ENDC}")
+
+        print(f"\n{Colors.GREEN}{EMOJI['start']} Step 1: Building co-expression modules...{Colors.ENDC}")
+        
         modules = list(
             modules_from_adjacencies(
                 self.edgelist, 
@@ -87,13 +299,29 @@ class SCENIC:
             )
         )
         self.modules = modules
+        
+        print(f"   {Colors.GREEN}✓ Modules created: {Colors.BOLD}{len(modules)}{Colors.ENDC}")
+        if len(modules) > 0:
+            module_sizes = [len(module) for module in modules]
+            print(f"   {Colors.BLUE}  Mean module size: {Colors.BOLD}{np.mean(module_sizes):.1f} genes{Colors.ENDC}")
+            print(f"   {Colors.BLUE}  Module size range: {Colors.BOLD}{min(module_sizes)} - {max(module_sizes)} genes{Colors.ENDC}")
 
+        print(f"\n{Colors.GREEN}{EMOJI['start']} Step 2: Pruning modules with cisTarget databases...{Colors.ENDC}")
+        
         # Calculate enriched motifs and build regulons
         df = prune2df(self.dbs, modules, self.motif_path,num_workers=self.n_jobs,
                         client_or_address='custom_multiprocessing')
         regulons = df2regulons(df)
         self.regulons = regulons
+        
+        print(f"   {Colors.GREEN}✓ Regulons created: {Colors.BOLD}{len(regulons)}{Colors.ENDC}")
+        if len(regulons) > 0:
+            regulon_sizes = [len(regulon.gene2weight) for regulon in regulons]
+            print(f"   {Colors.BLUE}  Mean regulon size: {Colors.BOLD}{np.mean(regulon_sizes):.1f} genes{Colors.ENDC}")
+            print(f"   {Colors.BLUE}  Regulon size range: {Colors.BOLD}{min(regulon_sizes)} - {max(regulon_sizes)} genes{Colors.ENDC}")
 
+        print(f"\n{Colors.GREEN}{EMOJI['start']} Step 3: Calculating AUCell scores...{Colors.ENDC}")
+        
         from ..single._aucell import aucell
 
         auc_mtx = aucell(
@@ -109,6 +337,40 @@ class SCENIC:
         ad_auc_mtx = ad.AnnData(auc_mtx)
         ad_auc_mtx.obs=self.adata.obs.loc[ad_auc_mtx.obs.index]
         self.ad_auc_mtx=ad_auc_mtx
+        
+        # Final results summary
+        print(f"\n{Colors.GREEN}{EMOJI['done']} Regulon analysis completed successfully!{Colors.ENDC}")
+        print(f"\n{Colors.HEADER}{Colors.BOLD}📈 Final Results Summary:{Colors.ENDC}")
+        print(f"   {Colors.GREEN}✓ Input modules: {Colors.BOLD}{len(modules)}{Colors.ENDC}")
+        print(f"   {Colors.GREEN}✓ Final regulons: {Colors.BOLD}{len(regulons)}{Colors.ENDC}")
+        print(f"   {Colors.GREEN}✓ AUC matrix shape: {Colors.BOLD}{auc_mtx.shape}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Mean AUC value: {Colors.BOLD}{auc_mtx.values.mean():.4f}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}AUC range: {Colors.BOLD}{auc_mtx.values.min():.4f} - {auc_mtx.values.max():.4f}{Colors.ENDC}")
+        
+        # Success rate
+        success_rate = len(regulons) / len(modules) * 100 if len(modules) > 0 else 0
+        if success_rate >= 50:
+            color = Colors.GREEN
+        elif success_rate >= 25:
+            color = Colors.WARNING
+        else:
+            color = Colors.FAIL
+        print(f"   {color}Module→Regulon success rate: {Colors.BOLD}{success_rate:.1f}%{Colors.ENDC}")
+        
+        # Recommendations
+        print(f"\n{Colors.HEADER}{Colors.BOLD}💡 Next Steps Recommendations:{Colors.ENDC}")
+        if len(regulons) > 0:
+            print(f"   {Colors.GREEN}✓ Analysis successful! You can now:{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Use scenic.ad_auc_mtx for downstream analysis{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Visualize regulon activity with: sc.pl.heatmap(scenic.ad_auc_mtx, ...){Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Calculate regulon specificity scores{Colors.ENDC}")
+        else:
+            print(f"   {Colors.WARNING}⚠️  No regulons detected. Consider:{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Relaxing thresholds in modules_from_adjacencies{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Checking motif annotation compatibility{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Using different ranking databases{Colors.ENDC}")
+        
+        print(f"\n{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
         return ad_auc_mtx
 

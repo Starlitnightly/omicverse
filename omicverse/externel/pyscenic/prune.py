@@ -64,8 +64,8 @@ def _prepare_client(client_or_address, num_workers):
         client = Client(local_cluster)
 
         def close_client_and_local_cluster(verbose=False):
-            if verbose:
-                LOGGER.info("shutting down client and local cluster")
+            #if verbose:
+                #LOGGER.info("shutting down client and local cluster")
 
             client.close()
             local_cluster.close()
@@ -76,8 +76,8 @@ def _prepare_client(client_or_address, num_workers):
         client = Client(client_or_address)
 
         def close_client(verbose=False):
-            if verbose:
-                LOGGER.info("shutting down client")
+            #if verbose:
+            #    LOGGER.info("shutting down client")
 
             client.close()
 
@@ -86,8 +86,8 @@ def _prepare_client(client_or_address, num_workers):
     elif isinstance(client_or_address, Client):
 
         def close_dummy(verbose=False):
-            if verbose:
-                LOGGER.info("not shutting down client, client was created externally")
+            #if verbose:
+             #   LOGGER.info("not shutting down client, client was created externally")
 
             return None
 
@@ -122,7 +122,7 @@ class Worker(Process):
         # Load ranking database in memory.
         from ctxcore.rnkdb import MemoryDecorator, RankingDatabase
         rnkdb = MemoryDecorator(self.database)
-        LOGGER.info("Worker {}: database loaded in memory.".format(self.name))
+        #LOGGER.info("Worker {}: database loaded in memory.".format(self.name))
 
         # Load motif annotations in memory.
         motif_annotations = load_motif_annotations(
@@ -130,13 +130,13 @@ class Worker(Process):
             motif_similarity_fdr=self.motif_similarity_fdr,
             orthologous_identity_threshold=self.orthologuous_identity_threshold,
         )
-        LOGGER.info("Worker {}: motif annotations loaded in memory.".format(self.name))
+        #LOGGER.info("Worker {}: motif annotations loaded in memory.".format(self.name))
 
         # Apply transformation on all modules.
         output = self.transform_fnc(
             rnkdb, self.modules, motif_annotations=motif_annotations
         )
-        LOGGER.info("Worker {}: All regulons derived.".format(self.name))
+        #LOGGER.info("Worker {}: All regulons derived.".format(self.name))
 
         # Sending information back to parent process: to avoid overhead of pickling the data, the output is first written
         # to disk in binary pickle format to a temporary file. The name of that file is shared with the parent process.
@@ -146,7 +146,7 @@ class Worker(Process):
         del output
         self.sender.send(output_fname)
         self.sender.close()
-        LOGGER.info("Worker {}: Done.".format(self.name))
+        #LOGGER.info("Worker {}: Done.".format(self.name))
 
 
 T = TypeVar("T")
@@ -225,7 +225,7 @@ def _distributed_calc(
             len(rnkdbs) <= num_workers if num_workers else cpu_count()
         ), "The number of databases is larger than the number of cores."
         amplifier = int((num_workers if num_workers else cpu_count()) / len(rnkdbs))
-        LOGGER.info("Using {} workers.".format(len(rnkdbs) * amplifier))
+        #("Using {} workers.".format(len(rnkdbs) * amplifier))
         receivers = []
         for db in rnkdbs:
             for idx, chunk in enumerate(
