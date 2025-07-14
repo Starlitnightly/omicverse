@@ -827,6 +827,7 @@ class pyMOFAART(object):
                      sharex: bool = True,
                      sharey: bool = False,
                      feature_label: str = None,
+                     figsize: tuple = (10, 6),
                      **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
         r"""
         Plot weights for MOFA factors.
@@ -901,16 +902,8 @@ class pyMOFAART(object):
             sorted(wm['factor'].cat.categories, key=lambda x: int(x.split('Factor')[1]))
         )
         
-        # Get features to label
-        features_to_label = []
-        for factor in wm['factor'].unique():
-            factor_data = wm[wm['factor'] == factor].sort_values('abs_value', ascending=False)
-            features_to_label.extend(factor_data['feature'].head(n_features))
-        
-        wm['to_label'] = wm['feature'].isin(features_to_label)
-        
         # Create plot
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=figsize)
         
         # Create stripplot
         g = sns.stripplot(
@@ -919,20 +912,24 @@ class pyMOFAART(object):
             y='factor',
             jitter=jitter,
             size=size,
-            hue='to_label',
-            palette=['lightgrey', color],
+            color='lightgrey',
             ax=ax
         )
         
-        # Remove legend
-        g.legend().remove()
-        
-        # Add feature labels
+        # Add feature labels for each factor separately
         for fi, factor in enumerate(wm['factor'].unique()):
+            factor_data = wm[wm['factor'] == factor].sort_values('abs_value', ascending=False)
+            
+            # Get top features for this factor only
+            top_features = factor_data.head(n_features)
+            
+            # Overlay colored dots for top features
+            for _, point in top_features.iterrows():
+                ax.scatter(point['value'], fi, color=color, s=size*10, alpha=0.8, zorder=5)
+            
+            # Add labels for positive and negative weights separately
             for sign_i in [1, -1]:
-                to_label = wm[(wm['factor'] == factor) & 
-                             (wm['to_label']) & 
-                             (wm['value'] * sign_i > 0)].sort_values('abs_value', ascending=False)
+                to_label = top_features[top_features['value'] * sign_i > 0].sort_values('abs_value', ascending=False)
                 
                 if len(to_label) == 0:
                     continue
@@ -1721,6 +1718,7 @@ def plot_weights(mdata,
     
     # Set index name for weights DataFrame
     weights.index = feature_names
+    weights.index.name = 'feature'  # Explicitly set index name
     
     # Filter factors if specified
     if factors is not None:
@@ -1737,7 +1735,7 @@ def plot_weights(mdata,
     
     # Melt the DataFrame for plotting
     wm = weights.reset_index().melt(
-        id_vars=weights.index.name or 'feature',
+        id_vars='feature',
         var_name='factor',
         value_name='value'
     )
@@ -1749,14 +1747,6 @@ def plot_weights(mdata,
         sorted(wm['factor'].cat.categories, key=lambda x: int(x.split('Factor')[1]))
     )
     
-    # Get features to label
-    features_to_label = []
-    for factor in wm['factor'].unique():
-        factor_data = wm[wm['factor'] == factor].sort_values('abs_value', ascending=False)
-        features_to_label.extend(factor_data[weights.index.name or 'feature'].head(n_features))
-    
-    wm['to_label'] = wm[weights.index.name or 'feature'].isin(features_to_label)
-    
     # Create plot
     fig, ax = plt.subplots(figsize=figsize)
     
@@ -1767,20 +1757,24 @@ def plot_weights(mdata,
         y='factor',
         jitter=jitter,
         size=size,
-        hue='to_label',
-        palette=['lightgrey', color],
+        color='lightgrey',
         ax=ax
     )
     
-    # Remove legend
-    g.legend().remove()
-    
-    # Add feature labels
+    # Add feature labels for each factor separately
     for fi, factor in enumerate(wm['factor'].unique()):
+        factor_data = wm[wm['factor'] == factor].sort_values('abs_value', ascending=False)
+        
+        # Get top features for this factor only
+        top_features = factor_data.head(n_features)
+        
+        # Overlay colored dots for top features
+        for _, point in top_features.iterrows():
+            ax.scatter(point['value'], fi, color=color, s=size*10, alpha=0.8, zorder=5)
+        
+        # Add labels for positive and negative weights separately
         for sign_i in [1, -1]:
-            to_label = wm[(wm['factor'] == factor) & 
-                         (wm['to_label']) & 
-                         (wm['value'] * sign_i > 0)].sort_values('abs_value', ascending=False)
+            to_label = top_features[top_features['value'] * sign_i > 0].sort_values('abs_value', ascending=False)
             
             if len(to_label) == 0:
                 continue
@@ -1793,7 +1787,7 @@ def plot_weights(mdata,
                 y_loc = y_prev + y_offset if i != 0 else y_start_pos
                 
                 g.annotate(
-                    point[weights.index.name or 'feature'],
+                    point['feature'],
                     xy=(point['value'], fi),
                     xytext=(x_start_pos, y_loc),
                     arrowprops=dict(
@@ -4805,299 +4799,6 @@ def nmf_coexpression_modules_kendall(mdata,
     
     return results
 
-def compute_kendall_tau_torch_fast(mdata, 
-                                  view1: str, 
-                                  view2: str,
-                                  min_corr: float = 0.3,
-                                  p_threshold: float = 0.05,
-                                  max_features: int = 1000,
-                                  device: str = 'auto',
-                                  batch_size: int = 100,
-                                  dtype: str = 'float32',
-                                  handle_zeros: bool = True,
-                                  min_nonzero_pairs: int = 10) -> pd.DataFrame:
-    r"""
-    Fast and accurate Kendall's Tau correlation computation using PyTorch.
-    Implements the true Kendall's Tau algorithm optimized for sparse datasets.
-    
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider (recommended: 1000-2000).
-        device: Device to use ('auto', 'cpu', 'cuda', 'mps').
-        batch_size: Batch size for processing (smaller for large datasets).
-        dtype: Data type ('float32' or 'float64').
-        handle_zeros: Whether to use zero-aware Kendall computation.
-        min_nonzero_pairs: Minimum number of non-zero pairs required.
-        
-    Returns:
-        corr_df: DataFrame with correlation results.
-    """
-    try:
-        import torch
-    except ImportError:
-        raise ImportError("PyTorch is required. Install with: pip install torch")
-    
-    # Determine device
-    if device == 'auto':
-        if torch.cuda.is_available():
-            device = 'cuda'
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            device = 'mps'
-        else:
-            device = 'cpu'
-    
-    print(f"Using device: {device} for fast Kendall's Tau computation")
-    
-    # Get paired samples
-    common_samples = list(set(mdata.mod[view1].obs_names) & set(mdata.mod[view2].obs_names))
-    if len(common_samples) == 0:
-        raise ValueError("No common samples found between the two modalities")
-    
-    print(f"Found {len(common_samples)} paired samples")
-    
-    # Get data for paired samples
-    data1 = mdata.mod[view1][common_samples].X
-    data2 = mdata.mod[view2][common_samples].X
-    
-    # Convert to dense if sparse
-    if hasattr(data1, 'toarray'):
-        data1 = data1.toarray()
-    if hasattr(data2, 'toarray'):
-        data2 = data2.toarray()
-    
-    # Aggressive feature selection for speed
-    print(f"Selecting top {max_features} features from each modality...")
-    
-    # For view1: select features with highest information content
-    non_zero_counts1 = np.count_nonzero(data1, axis=0)
-    var1 = np.var(data1, axis=0)
-    feature_scores1 = non_zero_counts1 * var1
-    
-    if data1.shape[1] > max_features:
-        top_indices1 = np.argsort(feature_scores1)[-max_features:]
-        data1 = data1[:, top_indices1]
-        features1 = mdata.mod[view1].var_names[top_indices1]
-    else:
-        features1 = mdata.mod[view1].var_names
-    
-    # For view2: select features with highest information content
-    non_zero_counts2 = np.count_nonzero(data2, axis=0)
-    var2 = np.var(data2, axis=0)
-    feature_scores2 = non_zero_counts2 * var2
-    
-    if data2.shape[1] > max_features:
-        top_indices2 = np.argsort(feature_scores2)[-max_features:]
-        data2 = data2[:, top_indices2]
-        features2 = mdata.mod[view2].var_names[top_indices2]
-    else:
-        features2 = mdata.mod[view2].var_names
-    
-    n_samples, n_features1 = data1.shape
-    _, n_features2 = data2.shape
-    
-    print(f"Computing true Kendall's Tau between {n_features1} and {n_features2} features...")
-    print(f"Using batch size: {batch_size}")
-    
-    torch_dtype = torch.float32 if dtype == 'float32' else torch.float64
-    
-    def kendall_tau_true_single(x, y):
-        """
-        True Kendall's Tau computation for a single pair using PyTorch.
-        Implements the exact concordant/discordant pairs algorithm.
-        """
-        if handle_zeros:
-            # Remove pairs where both values are zero
-            non_zero_mask = (x != 0) | (y != 0)
-            if torch.sum(non_zero_mask) < min_nonzero_pairs:
-                return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-            x_filtered = x[non_zero_mask]
-            y_filtered = y[non_zero_mask]
-        else:
-            x_filtered = x
-            y_filtered = y
-        
-        n = len(x_filtered)
-        if n < min_nonzero_pairs:
-            return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        # True Kendall's Tau: count concordant and discordant pairs
-        concordant = torch.tensor(0.0, device=device, dtype=torch_dtype)
-        discordant = torch.tensor(0.0, device=device, dtype=torch_dtype)
-        
-        # For efficiency, we'll use vectorized operations
-        # Create all pairs (i, j) where i < j
-        for i in range(n):
-            for j in range(i + 1, n):
-                x_diff = x_filtered[i] - x_filtered[j]
-                y_diff = y_filtered[i] - y_filtered[j]
-                
-                # Check if concordant or discordant
-                if (x_diff > 0 and y_diff > 0) or (x_diff < 0 and y_diff < 0):
-                    concordant += 1
-                elif (x_diff > 0 and y_diff < 0) or (x_diff < 0 and y_diff > 0):
-                    discordant += 1
-                # Ties are ignored in basic Kendall's Tau
-        
-        total_pairs = n * (n - 1) / 2
-        
-        if total_pairs == 0:
-            return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        # Kendall's Tau = (concordant - discordant) / total_pairs
-        tau = (concordant - discordant) / total_pairs
-        
-        # Approximate p-value using normal approximation
-        n_tensor = torch.tensor(n, device=device, dtype=torch_dtype)
-        var_tau = (2 * (2*n_tensor + 5)) / (9 * n_tensor * (n_tensor - 1))
-        
-        if var_tau <= 0:
-            return tau, torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        z_score = tau / torch.sqrt(var_tau)
-        
-        # Two-tailed p-value
-        p_val = 2 * (1 - torch.erf(torch.abs(z_score) / torch.sqrt(torch.tensor(2.0, device=device, dtype=torch_dtype))))
-        
-        return tau, p_val
-    
-    def kendall_tau_vectorized_single(x, y):
-        """
-        Improved vectorized Kendall's Tau computation with proper ties handling.
-        """
-        if handle_zeros:
-            # Remove pairs where both values are zero
-            non_zero_mask = (x != 0) | (y != 0)
-            if torch.sum(non_zero_mask) < min_nonzero_pairs:
-                return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-            x_filtered = x[non_zero_mask]
-            y_filtered = y[non_zero_mask]
-        else:
-            x_filtered = x
-            y_filtered = y
-        
-        n = len(x_filtered)
-        if n < min_nonzero_pairs:
-            return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        # Vectorized computation of all pairs
-        x_expanded = x_filtered.unsqueeze(1)  # (n, 1)
-        y_expanded = y_filtered.unsqueeze(1)  # (n, 1)
-        
-        x_diff = x_expanded - x_filtered.unsqueeze(0)  # (n, n)
-        y_diff = y_expanded - y_filtered.unsqueeze(0)  # (n, n)
-        
-        # Only consider upper triangle (i < j)
-        mask = torch.triu(torch.ones(n, n, device=device, dtype=torch.bool), diagonal=1)
-        
-        x_diff_masked = x_diff[mask]
-        y_diff_masked = y_diff[mask]
-        
-        # Count concordant, discordant, and tied pairs
-        concordant = torch.sum((x_diff_masked * y_diff_masked) > 0).float()
-        discordant = torch.sum((x_diff_masked * y_diff_masked) < 0).float()
-        
-        # Count ties for proper Kendall's Tau calculation
-        x_ties = torch.sum(x_diff_masked == 0).float()
-        y_ties = torch.sum(y_diff_masked == 0).float()
-        
-        total_pairs = torch.sum(mask).float()
-        
-        if total_pairs == 0:
-            return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        # Kendall's Tau with ties correction
-        # tau = (concordant - discordant) / sqrt((total_pairs - x_ties) * (total_pairs - y_ties))
-        denominator = torch.sqrt((total_pairs - x_ties) * (total_pairs - y_ties))
-        
-        if denominator == 0:
-            return torch.tensor(0.0, device=device, dtype=torch_dtype), torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        tau = (concordant - discordant) / denominator
-        
-        # Improved p-value calculation
-        if n <= 10:
-            # For small samples, use simpler approximation
-            var_tau = torch.tensor((2 * (2*n + 5)) / (9 * n * (n - 1)), device=device, dtype=torch_dtype)
-        else:
-            # For larger samples, use ties-corrected variance
-            n_tensor = torch.tensor(n, device=device, dtype=torch_dtype)
-            v0 = n_tensor * (n_tensor - 1) * (2*n_tensor + 5)
-            
-            # Ties correction terms
-            if x_ties > 0:
-                x_unique, x_counts = torch.unique(x_filtered, return_counts=True)
-                t1 = torch.sum(x_counts * (x_counts - 1) * (2*x_counts + 5))
-            else:
-                t1 = torch.tensor(0.0, device=device, dtype=torch_dtype)
-                
-            if y_ties > 0:
-                y_unique, y_counts = torch.unique(y_filtered, return_counts=True)
-                t2 = torch.sum(y_counts * (y_counts - 1) * (2*y_counts + 5))
-            else:
-                t2 = torch.tensor(0.0, device=device, dtype=torch_dtype)
-            
-            var_tau = (v0 - t1 - t2) / 18 + (2 * t1 * t2) / (9 * n_tensor * (n_tensor - 1) * (n_tensor - 2))
-        
-        if var_tau <= 0:
-            return tau, torch.tensor(1.0, device=device, dtype=torch_dtype)
-        
-        z_score = tau / torch.sqrt(var_tau)
-        
-        # More accurate p-value using complementary error function
-        p_val = torch.erfc(torch.abs(z_score) / torch.sqrt(torch.tensor(2.0, device=device, dtype=torch_dtype)))
-        
-        return tau, p_val
-    
-    # Compute correlations in batches
-    correlations = []
-    n_batches1 = (n_features1 + batch_size - 1) // batch_size
-    total_batches = n_batches1
-    
-    with torch.no_grad():
-        with tqdm(total=total_batches, desc="Processing true Kendall's Tau batches") as pbar:
-            for batch_idx1 in range(n_batches1):
-                start_idx1 = batch_idx1 * batch_size
-                end_idx1 = min(start_idx1 + batch_size, n_features1)
-                
-                # Get batch of features from view1
-                X1_batch = torch.tensor(data1[:, start_idx1:end_idx1].T, 
-                                      dtype=torch_dtype, device=device)  # (batch_size, n_samples)
-                
-                # Process all features from view2 against this batch
-                X2_all = torch.tensor(data2.T, dtype=torch_dtype, device=device)  # (n_features2, n_samples)
-                
-                for i in range(X1_batch.shape[0]):
-                    x = X1_batch[i]
-                    
-                    for j in range(X2_all.shape[0]):
-                        y = X2_all[j]
-                        
-                        # Compute true Kendall's Tau using vectorized version for speed
-                        tau, p_val = kendall_tau_vectorized_single(x, y)
-                        
-                        tau_val = tau.item()
-                        p_val_val = p_val.item()
-                        
-                        if abs(tau_val) >= min_corr and p_val_val <= p_threshold:
-                            correlations.append({
-                                f'{view1}_feature': features1[start_idx1 + i],
-                                f'{view2}_feature': features2[j],
-                                'correlation': tau_val,
-                                'p_value': p_val_val,
-                                'abs_correlation': abs(tau_val)
-                            })
-                
-                pbar.update(1)
-    
-    corr_df = pd.DataFrame(correlations)
-    print(f"Found {len(corr_df)} significant true Kendall's Tau correlations")
-    
-    return corr_df
-
 def validate_kendall_tau_implementation(mdata, 
                                       view1: str, 
                                       view2: str,
@@ -6396,6 +6097,4 @@ def compute_coexpression_modules(mdata,
             method, random_state, corr_df)
 
 
-# Convenience aliases for backward compatibility
-compute_correlation_unified = compute_correlation
-compute_modules_unified = compute_coexpression_modules
+
