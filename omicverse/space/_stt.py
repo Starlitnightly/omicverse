@@ -180,7 +180,7 @@ class STT(object):
         self.adata_aggr=adata_aggr
         add_reference(self.adata,'STT','spatial transition tensor with STT')
 
-    def compute_pathway(self,pathway_dict):
+    def compute_pathway(self,pathway_dict,n_components=10):
         r"""Compute spatial pathways for cell transitions.
         
         This method identifies and computes transition pathways between cell states
@@ -206,7 +206,7 @@ class STT(object):
             - Results can be visualized using plot_pathway()
             - Considers both spatial and transcriptional information
         """
-        return tl.compute_pathway(self.adata,self.adata_aggr,pathway_dict)
+        return tl.compute_pathway(self.adata,self.adata_aggr,pathway_dict,n_components=n_components)
 
     def plot_pathway(self,label_fontsize=20,**kwargs):
         r"""Plot spatial transition pathways.
