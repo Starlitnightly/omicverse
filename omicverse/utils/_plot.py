@@ -14,8 +14,6 @@ from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
 import seaborn as sns
 from datetime import datetime,timedelta
-import pkg_resources
-from pkg_resources import DistributionNotFound, VersionConflict
 import tomli
 import os
 
@@ -1277,11 +1275,23 @@ def check_dependencies(dependencies=None, check_full=False):
             print(f"Warning: Could not read dependencies from pyproject.toml: {e}")
             return
 
-    try:
-        pkg_resources.require(dependencies)
+    # try:
+    #     pkg_resources.require(dependencies)
+    #     print("All dependencies are satisfied.")
+    # except (DistributionNotFound, VersionConflict) as e:
+    #     print(f"Dependency error: {e}")
+    
+    import importlib.metadata as importlib_metadata
+    for req in dependencies:
+        try:
+            importlib_metadata.requires(req)   # 会自动解析版本约束
+        except importlib_metadata.PackageNotFoundError as e:
+            print(f"Missing dependency: {req!r}: {e}")
+        except Exception as e:
+            # 版本不兼容等
+            print(f"Dependency error for {req!r}: {e}")
+    else:
         print("All dependencies are satisfied.")
-    except (DistributionNotFound, VersionConflict) as e:
-        print(f"Dependency error: {e}")
 
 
 
