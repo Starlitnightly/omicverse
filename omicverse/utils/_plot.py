@@ -1284,11 +1284,11 @@ def check_dependencies(dependencies=None, check_full=False):
     import importlib.metadata as importlib_metadata
     for req in dependencies:
         try:
-            importlib_metadata.requires(req)   # 会自动解析版本约束
+            importlib_metadata.distribution(req)  # Validate package installation and version constraints
         except importlib_metadata.PackageNotFoundError as e:
             print(f"Missing dependency: {req!r}: {e}")
         except Exception as e:
-            # 版本不兼容等
+            # Handle version conflicts or other issues
             print(f"Dependency error for {req!r}: {e}")
     else:
         print("All dependencies are satisfied.")
