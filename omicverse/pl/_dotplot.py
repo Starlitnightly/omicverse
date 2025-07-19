@@ -239,7 +239,7 @@ def dotplot(
     fractions = np.zeros_like(means)
     
     for i, group in enumerate(agg.index):
-        mask = adata.obs[groupby] == group
+        mask = (adata.obs[groupby] == group).values  # Convert to numpy array
         group_matrix = matrix[mask][:, var_names_idx]
         
         # Calculate mean expression
