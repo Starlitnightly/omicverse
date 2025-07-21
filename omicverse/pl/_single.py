@@ -1412,7 +1412,7 @@ def dotplot_doublegroup(adata, gene, group1, group2, cmap='Reds',
 
 
 def add_arrow(ax,adata,basis,fontsize=12,
-              x_label=None,y_label=None):
+              x_label=None,y_label=None,arrow_scale=5):
     r"""
     Add arrow and label to the axis
     Parameters
@@ -1431,13 +1431,13 @@ def add_arrow(ax,adata,basis,fontsize=12,
     y_range=(adata.obsm[basis][:,1].max()-adata.obsm[basis][:,1].min())/6
     x_min=adata.obsm[basis][:,0].min()
     y_min=adata.obsm[basis][:,1].min()
-    ax.arrow(x=x_min-x_range/5,y=y_min,dx=x_range+x_range/5,dy=0, 
+    ax.arrow(x=x_min-x_range/5,y=y_min,dx=x_range+x_range/arrow_scale,dy=0, 
             width=0.01, color="k", 
-                head_width=y_range*2/5, head_length=x_range*2/5, overhang=0.5)
+                head_width=y_range*2/arrow_scale, head_length=x_range*2/arrow_scale, overhang=0.5)
 
-    ax.arrow(x=x_min,y=y_min-y_range/5,dx=0,dy=y_range+y_range/5, 
+    ax.arrow(x=x_min,y=y_min-y_range/5,dx=0,dy=y_range+y_range/arrow_scale, 
             width=0.01, color="k", 
-                head_width=x_range*2/5, head_length=y_range*2/5, overhang=0.5)
+                head_width=x_range*2/arrow_scale, head_length=y_range*2/arrow_scale, overhang=0.5)
     ax.text(x=x_min,y=y_min-y_range/2,s=x_label,fontsize=fontsize,multialignment='center',
             verticalalignment='center')
     ax.text(x=x_min-x_range/2,y=y_min,s=y_label,fontsize=fontsize,rotation='vertical',multialignment='center',

@@ -106,6 +106,7 @@ def embedding(
     ax: Optional[Axes] = None,
     return_fig: Optional[bool] = None,
     marker: Union[str, Sequence[str]] = '.',
+    arrow_scale: float = 5,
     **kwargs,
 ) -> Union[Figure, Axes, None]:
     r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
@@ -358,7 +359,7 @@ def embedding(
         elif frameon == 'small':
             ax.axis('off')
             from ..pl._single import add_arrow
-            add_arrow(ax,adata,basis,fontsize=legend_fontsize)
+            add_arrow(ax,adata,basis,fontsize=legend_fontsize,arrow_scale=arrow_scale)
             '''
             #ax.axis('off')
             xmin=coords[:, 0].min()
