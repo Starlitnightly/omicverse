@@ -356,6 +356,10 @@ def embedding(
         if frameon ==False:
             ax.axis('off')
         elif frameon == 'small':
+            ax.axis('off')
+            from ..pl._single import add_arrow
+            add_arrow(ax,adata,basis,fontsize=legend_fontsize)
+            '''
             #ax.axis('off')
             xmin=coords[:, 0].min()
             xmax=coords[:, 0].max()
@@ -369,8 +373,9 @@ def embedding(
 
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_bounds(xmin,xmin+(xmax-xmin)/6)
-            ax.spines['left'].set_bounds(ymin,ymin+(ymax-ymin)/6)
+            #ax.spines['bottom'].set_bounds(xmin,xmin+(xmax-xmin)/6)
+            #ax.spines['left'].set_bounds(ymin,ymin+(ymax-ymin)/6)
+            '''
 
 
         
