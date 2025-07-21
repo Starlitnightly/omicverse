@@ -117,17 +117,6 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
         n0 = adata.shape[0]
         print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
 
-        # Post doublets removal QC plot
-        print(f"   {Colors.GREEN}{EMOJI['start']} Doublet detection with scrublet...{Colors.ENDC}")
-        sc.pp.scrublet(adata, random_state=1234)
-        adata_remove = adata[adata.obs['predicted_doublet'], :]
-        removed_cells.extend(list(adata_remove.obs_names))
-        adata = adata[~adata.obs['predicted_doublet'], :]
-        n1 = adata.shape[0]
-        doublet_removed = n0 - n1
-        print(f"   {Colors.GREEN}✓ Doublets removed: {Colors.BOLD}{doublet_removed:,}{Colors.ENDC}{Colors.GREEN} ({doublet_removed/n0*100:.1f}%){Colors.ENDC}")
-        print(f"   {Colors.BLUE}📊 Cells retained: {Colors.BOLD}{n1:,}{Colors.ENDC}")
-
         # Post seurat or mads filtering QC plot
 
         # Filters
@@ -173,6 +162,17 @@ def quantity_control(adatas, mode='seurat', min_cells=3, min_genes=200,\
         print(f"   {Colors.HEADER}{Colors.BOLD}📈 Sample {s} Summary:{Colors.ENDC}")
         print(f"     {Colors.GREEN}✓ Total QC filtered: {Colors.BOLD}{total_qc_filtered:,}{Colors.ENDC}{Colors.GREEN} cells ({total_qc_filtered/n1*100:.1f}%){Colors.ENDC}")
         print(f"     {Colors.GREEN}✓ Final retained: {Colors.BOLD}{n2:,}{Colors.ENDC}{Colors.GREEN} cells ({n2/n0*100:.1f}% of original){Colors.ENDC}")
+        
+        # Post doublets removal QC plot
+        print(f"   {Colors.GREEN}{EMOJI['start']} Doublet detection with scrublet...{Colors.ENDC}")
+        sc.pp.scrublet(adata, random_state=1234)
+        adata_remove = adata[adata.obs['predicted_doublet'], :]
+        removed_cells.extend(list(adata_remove.obs_names))
+        adata = adata[~adata.obs['predicted_doublet'], :]
+        n1 = adata.shape[0]
+        doublet_removed = n0 - n1
+        print(f"   {Colors.GREEN}✓ Doublets removed: {Colors.BOLD}{doublet_removed:,}{Colors.ENDC}{Colors.GREEN} ({doublet_removed/n0*100:.1f}%){Colors.ENDC}")
+        print(f"   {Colors.BLUE}📊 Cells retained: {Colors.BOLD}{n1:,}{Colors.ENDC}")
         
         # Store cleaned adata
         adatas[s] = adata
@@ -304,8 +304,51 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     n0 = adata.shape[0]
     n1 = n0
 
+    # Post seurat or mads filtering QC plot
+
+    # Filters
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 2: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
+    
+    if mode == 'seurat':
+        adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
+        adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
+        adata.obs['passing_ngenes'] = adata.obs['detected_genes'] > tresh['detected_genes']
+    elif mode == 'mads':
+        adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
+        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+
+    # Report
+    mt_failed = n1-np.sum(adata.obs["passing_mt"])
+    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
+    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    
+    if mode == 'seurat':
+        print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs filter (≥{tresh['nUMIs']}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({umis_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes filter (≥{tresh['detected_genes']}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({genes_failed/n1*100:.1f}%){Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({mt_failed/n1*100:.1f}%){Colors.ENDC}")
+    elif mode == 'mads':
+        nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
+        n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+        print(f"   {Colors.BLUE}📊 MADs Filter Results (±{nmads} MADs):{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
+
+    # QC plot
+    QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
+    removed = QC_test.loc[lambda x : x == False]
+    removed_cells.extend(list(removed.index.values))
+    total_qc_failed = n1-np.sum(QC_test)
+    adata = adata[QC_test, :]
+    n2 = adata.shape[0]
+    
+    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
+
     if doublets is True:
-        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 3: Doublet Detection{Colors.ENDC}")
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
             print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is legacy and may not work optimally{Colors.ENDC}")
@@ -347,51 +390,9 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             doublets_removed = n0-n1
             print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
     else:
-        print(f"\n{Colors.BLUE}📊 Step 2: Doublet detection disabled{Colors.ENDC}")
+        print(f"\n{Colors.BLUE}📊 Step 3: Doublet detection disabled{Colors.ENDC}")
         n1 = adata.shape[0]
 
-    # Post seurat or mads filtering QC plot
-
-    # Filters
-    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
-    print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
-    
-    if mode == 'seurat':
-        adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
-        adata.obs['passing_nUMIs'] = adata.obs['nUMIs'] > tresh['nUMIs']
-        adata.obs['passing_ngenes'] = adata.obs['detected_genes'] > tresh['detected_genes']
-    elif mode == 'mads':
-        adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
-        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-
-    # Report
-    mt_failed = n1-np.sum(adata.obs["passing_mt"])
-    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
-    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
-    
-    if mode == 'seurat':
-        print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
-        print(f"     {Colors.CYAN}• nUMIs filter (≥{tresh['nUMIs']}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({umis_failed/n1*100:.1f}%){Colors.ENDC}")
-        print(f"     {Colors.CYAN}• Genes filter (≥{tresh['detected_genes']}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({genes_failed/n1*100:.1f}%){Colors.ENDC}")
-        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed ({mt_failed/n1*100:.1f}%){Colors.ENDC}")
-    elif mode == 'mads':
-        nUMIs_t = mads(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        n_genes_t = mads(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
-        print(f"   {Colors.BLUE}📊 MADs Filter Results (±{nmads} MADs):{Colors.ENDC}")
-        print(f"     {Colors.CYAN}• nUMIs range ({nUMIs_t[0]:.0f}, {nUMIs_t[1]:.0f}): {Colors.BOLD}{umis_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
-        print(f"     {Colors.CYAN}• Genes range ({n_genes_t[0]:.0f}, {n_genes_t[1]:.0f}): {Colors.BOLD}{genes_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
-        print(f"     {Colors.CYAN}• Mitochondrial filter (≤{tresh['mito_perc']}): {Colors.BOLD}{mt_failed:,}{Colors.ENDC}{Colors.CYAN} cells failed{Colors.ENDC}")
-
-    # QC plot
-    QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-    removed = QC_test.loc[lambda x : x == False]
-    removed_cells.extend(list(removed.index.values))
-    total_qc_failed = n1-np.sum(QC_test)
-    adata = adata[QC_test, :]
-    n2 = adata.shape[0]
-    
-    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
 
     # Last gene and cell filter
     print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
@@ -537,58 +538,10 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     n0 = adata.shape[0]
     print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
 
-    if doublets is True:
-        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
-        if doublets_method=='scrublet':
-            # Post doublets removal QC plot
-            print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is too old and may not work properly{Colors.ENDC}")
-            print(f"   {Colors.CYAN}💡 Consider using 'doublets_method=sccomposite' for better results{Colors.ENDC}")
-            print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
-            sc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
-
-            adata_remove = adata[adata.obs['predicted_doublet'], :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[~adata.obs['predicted_doublet'], :]
-            n1 = adata.shape[0]
-            doublets_removed = n0-n1
-            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
-            
-        elif doublets_method=='sccomposite':
-            print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")
-            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
-            adata.obs['sccomposite_doublet']=0
-            adata.obs['sccomposite_consistency']=0
-            if batch_key is None:
-                from ._sccomposite import composite_rna
-                multiplet_classification, consistency = composite_rna(adata)
-                adata.obs['sccomposite_doublet']=multiplet_classification
-                adata.obs['sccomposite_consistency']=consistency
-            else:
-                for batch in adata.obs[batch_key].unique():
-                    from ._sccomposite import composite_rna
-                    adata_batch=adata[adata.obs[batch_key]==batch]
-                    multiplet_classification, consistency = composite_rna(adata_batch)
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
-                    multiplet_classification
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
-            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[adata.obs['sccomposite_doublet']==0, :]
-            n1 = adata.shape[0]
-            doublets_removed = n0-n1
-            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
-    else:
-        print(f"\n{Colors.BLUE}📊 Step 2: Doublet detection disabled{Colors.ENDC}")
-        n1 = adata.shape[0]
-    # Fix bug where n1 is not defined when doublets=False
-    if not doublets:
-        n1 = n0
-
-
     # Post seurat or mads filtering QC plot
 
     # Filters
-    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 2: Quality Filtering ({mode.upper()}){Colors.ENDC}")
     print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
     
     if mode == 'seurat':
@@ -629,6 +582,54 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     # Store cleaned adata
     print(f"   {Colors.GREEN}✓ Final dataset: {Colors.BOLD}{adata.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{adata.shape[1]:,}{Colors.ENDC}{Colors.GREEN} genes{Colors.ENDC}")
     print(f"   {Colors.BLUE}📊 Filtered: {Colors.BOLD}{cells_before_final-adata.shape[0]:,}{Colors.ENDC}{Colors.BLUE} cells, {Colors.BOLD}{genes_before_final-adata.shape[1]:,}{Colors.ENDC}{Colors.BLUE} genes{Colors.ENDC}")
+
+
+    if doublets is True:
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 3: Doublet Detection{Colors.ENDC}")
+        if doublets_method=='scrublet':
+            # Post doublets removal QC plot
+            print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is too old and may not work properly{Colors.ENDC}")
+            print(f"   {Colors.CYAN}💡 Consider using 'doublets_method=sccomposite' for better results{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
+            sc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+
+            adata_remove = adata[adata.obs['predicted_doublet'], :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[~adata.obs['predicted_doublet'], :]
+            n1 = adata.shape[0]
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+            
+        elif doublets_method=='sccomposite':
+            print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
+            adata.obs['sccomposite_doublet']=0
+            adata.obs['sccomposite_consistency']=0
+            if batch_key is None:
+                from ._sccomposite import composite_rna
+                multiplet_classification, consistency = composite_rna(adata)
+                adata.obs['sccomposite_doublet']=multiplet_classification
+                adata.obs['sccomposite_consistency']=consistency
+            else:
+                for batch in adata.obs[batch_key].unique():
+                    from ._sccomposite import composite_rna
+                    adata_batch=adata[adata.obs[batch_key]==batch]
+                    multiplet_classification, consistency = composite_rna(adata_batch)
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
+                    multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[adata.obs['sccomposite_doublet']==0, :]
+            n1 = adata.shape[0]
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+    else:
+        print(f"\n{Colors.BLUE}📊 Step 3: Doublet detection disabled{Colors.ENDC}")
+        n1 = adata.shape[0]
+    # Fix bug where n1 is not defined when doublets=False
+    if not doublets:
+        n1 = n0
 
     # Last gene and cell filter
     print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
@@ -723,45 +724,8 @@ def qc_gpu(adata, mode='seurat',
     print(f"   {Colors.CYAN}📈 Original cell count: {Colors.BOLD}{n0:,}{Colors.ENDC}")
     n1 = n0
 
-    if doublets is True:
-        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 2: Doublet Detection{Colors.ENDC}")
-        if doublets_method=='scrublet':
-            print(f"   {Colors.GREEN}{EMOJI['start']} Running GPU-accelerated scrublet...{Colors.ENDC}")
-            rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
-            adata_remove = adata[adata.obs['predicted_doublet'], :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[~adata.obs['predicted_doublet'], :]
-            n1 = adata.shape[0]
-            doublets_removed = n0-n1
-            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
-            
-        elif doublets_method=='sccomposite':
-            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
-            adata.obs['sccomposite_doublet']=0
-            adata.obs['sccomposite_consistency']=0
-            if batch_key is None:
-                from ._sccomposite import composite_rna
-                multiplet_classification, consistency = composite_rna(adata)
-                adata.obs['sccomposite_doublet']=multiplet_classification
-                adata.obs['sccomposite_consistency']=consistency
-            else:
-                print(f"   {Colors.CYAN}Processing {len(adata.obs[batch_key].unique())} batches separately...{Colors.ENDC}")
-                for batch in adata.obs[batch_key].unique():
-                    from ._sccomposite import composite_rna
-                    adata_batch=adata[adata.obs[batch_key]==batch]
-                    multiplet_classification, consistency = composite_rna(adata_batch)
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
-                    multiplet_classification
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
-            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[adata.obs['sccomposite_doublet']==0, :]
-            n1 = adata.shape[0]
-            doublets_removed = n0-n1
-            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
-
     # Filters
-    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 3: Quality Filtering ({mode.upper()}){Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}🔧 Step 2: Quality Filtering ({mode.upper()}){Colors.ENDC}")
     print(f"   {Colors.CYAN}Thresholds: mito≤{tresh['mito_perc']}, nUMIs≥{tresh['nUMIs']}, genes≥{tresh['detected_genes']}{Colors.ENDC}")
     
     if mode == 'seurat':
@@ -800,6 +764,45 @@ def qc_gpu(adata, mode='seurat',
     n2 = adata.shape[0]
     
     print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
+
+    if doublets is True:
+        print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 3: Doublet Detection{Colors.ENDC}")
+        if doublets_method=='scrublet':
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running GPU-accelerated scrublet...{Colors.ENDC}")
+            rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+            adata_remove = adata[adata.obs['predicted_doublet'], :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[~adata.obs['predicted_doublet'], :]
+            n1 = adata.shape[0]
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+            
+        elif doublets_method=='sccomposite':
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
+            adata.obs['sccomposite_doublet']=0
+            adata.obs['sccomposite_consistency']=0
+            if batch_key is None:
+                from ._sccomposite import composite_rna
+                multiplet_classification, consistency = composite_rna(adata)
+                adata.obs['sccomposite_doublet']=multiplet_classification
+                adata.obs['sccomposite_consistency']=consistency
+            else:
+                print(f"   {Colors.CYAN}Processing {len(adata.obs[batch_key].unique())} batches separately...{Colors.ENDC}")
+                for batch in adata.obs[batch_key].unique():
+                    from ._sccomposite import composite_rna
+                    adata_batch=adata[adata.obs[batch_key]==batch]
+                    multiplet_classification, consistency = composite_rna(adata_batch)
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
+                    multiplet_classification
+                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+            adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
+            removed_cells.extend(list(adata_remove.obs_names))
+            adata = adata[adata.obs['sccomposite_doublet']==0, :]
+            n1 = adata.shape[0]
+            doublets_removed = n0-n1
+            print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n0*100:.1f}%){Colors.ENDC}")
+
+
 
     # Last gene and cell filter
     print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 4: Final Filtering{Colors.ENDC}")
