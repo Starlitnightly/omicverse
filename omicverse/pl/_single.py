@@ -1412,7 +1412,8 @@ def dotplot_doublegroup(adata, gene, group1, group2, cmap='Reds',
 
 
 def add_arrow(ax,adata,basis,fontsize=12,
-              x_label=None,y_label=None,arrow_scale=5):
+              x_label=None,y_label=None,
+              arrow_scale=5,arrow_width=0.01):
     r"""
     Add arrow and label to the axis
     Parameters
@@ -1421,6 +1422,18 @@ def add_arrow(ax,adata,basis,fontsize=12,
         The axis to add the arrow and label to.
     adata : AnnData
         The AnnData object to add the arrow and label to.
+    basis : str
+        The basis to add the arrow and label to.
+    fontsize : int
+        The fontsize of the label.
+    arrow_scale : float
+        The scale of the arrow.
+    arrow_width : float
+        The width of the arrow.
+    x_label : str
+        The label of the x-axis.
+    y_label : str
+        The label of the y-axis.
     """
     if x_label is None:
         x_label=basis+'1'
@@ -1432,11 +1445,11 @@ def add_arrow(ax,adata,basis,fontsize=12,
     x_min=adata.obsm[basis][:,0].min()
     y_min=adata.obsm[basis][:,1].min()
     ax.arrow(x=x_min-x_range/5,y=y_min,dx=x_range+x_range/arrow_scale,dy=0, 
-            width=0.01, color="k", 
+            width=arrow_width, color="k", 
                 head_width=y_range*2/arrow_scale, head_length=x_range*2/arrow_scale, overhang=0.5)
 
     ax.arrow(x=x_min,y=y_min-y_range/5,dx=0,dy=y_range+y_range/arrow_scale, 
-            width=0.01, color="k", 
+            width=arrow_width, color="k", 
                 head_width=x_range*2/arrow_scale, head_length=y_range*2/arrow_scale, overhang=0.5)
     ax.text(x=x_min,y=y_min-y_range/2,s=x_label,fontsize=fontsize,multialignment='center',
             verticalalignment='center')
