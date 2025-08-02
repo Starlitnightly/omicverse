@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+
 try:
     import cupy as cp
 except ImportError:
@@ -10,6 +11,7 @@ except ImportError:
 # --------------------------------------------------------
 gpu_mode = False
 
+
 # --------------------------------------------------------
 # operations on single matrices
 # --------------------------------------------------------
@@ -19,11 +21,13 @@ def log(mat):
     else:
         return np.log(mat)
 
+
 def square(mat):
     if gpu_mode:
         return cp.square(mat)
     else:
         return np.square(mat)
+
 
 def exp(mat):
     if gpu_mode:
@@ -31,11 +35,34 @@ def exp(mat):
     else:
         return np.exp(mat)
 
+
 def sum(mat):
     if gpu_mode:
         return cp.sum(mat)
     else:
         return np.sum(mat)
+
+
+def sigmoid(mat):
+    if gpu_mode:
+        return cp.divide(1.0, 1.0 + cp.exp(-mat))
+    else:
+        return np.divide(1.0, 1.0 + np.exp(-mat))
+
+
+def sqrt(mat):
+    if gpu_mode:
+        return cp.sqrt(mat)
+    else:
+        return np.sqrt(mat)
+
+
+def tanh(mat):
+    if gpu_mode:
+        return cp.tanh(mat)
+    else:
+        return np.tanh(mat)
+
 
 # --------------------------------------------------------
 # operations on matrices pairs
@@ -63,6 +90,7 @@ def zeros(dim):
     else:
         return np.zeros(dim)
 
+
 # --------------------------------------------------------
 # loading on and from the GPU
 # --------------------------------------------------------
@@ -71,6 +99,7 @@ def array(mat):
         return cp.array(mat)
     else:
         return mat
+
 
 def asnumpy(mat):
     if gpu_mode:
