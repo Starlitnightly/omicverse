@@ -66,7 +66,7 @@ from ._preprocess import (identify_robust_genes,
                           pca,score_genes_cell_cycle,
                           leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,mde,tsne)
 
-from ._qc import quantity_control,qc,filter_cells,filter_genes
+from ._qc import qc,filter_cells,filter_genes
 from ._recover import recover_counts,binary_search
 
 __all__ = [
