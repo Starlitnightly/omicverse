@@ -1,9 +1,9 @@
 import numpy as np
-import scipy as s
-import scipy.stats as stats
+import math
 from .basic_distributions import Distribution
 
 from ..utils import *
+
 
 class Poisson(Distribution):
     """
@@ -21,33 +21,33 @@ class Poisson(Distribution):
 
         # Initialise parameters
         theta = np.ones(dim) * theta
-        self.params = { 'theta':theta }
+        self.params = {"theta": theta}
 
         # Initialise expectations
         if E is None:
             self.updateExpectations()
         else:
-            self.expectations = { 'E':np.ones(dim)*E }
+            self.expectations = {"E": np.ones(dim) * E}
 
         # Check that dimensionalities match
         self.CheckDimensionalities()
 
     def updateExpectations(self):
-        E = self.params['theta']
-        self.expectations = { 'E':E }
+        E = self.params["theta"]
+        self.expectations = {"E": E}
 
     def density(self, x):
         assert x.shape == self.dim, "Problem with the dimensionalities"
         assert x.dtype == int, "x has to be an integer array"
-        theta = self.params['theta'].flatten()
+        theta = self.params["theta"].flatten()
         x = x.flatten()
         # return np.prod (stats.poisson.pmf(x,theta) )
-        return np.prod( np.divide(theta**x * np.exp(-theta),s.misc.factorial(x)) )
+        return np.prod(np.divide(theta**x * np.exp(-theta), math.factorial(x)))
 
     def loglik(self, x):
         assert x.shape == self.dim, "Problem with the dimensionalities"
         assert x.dtype == int, "x has to be an integer array"
-        theta = self.params['theta'].flatten()
+        theta = self.params["theta"].flatten()
         x = x.flatten()
         # return np.log( np.prod (stats.poisson.pmf(x,theta) ))
-        return np.sum( x*np.log(theta) - theta - np.log(s.misc.factorial(x)) )
+        return np.sum(x * np.log(theta) - theta - np.log(math.factorial(x)))

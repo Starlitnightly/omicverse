@@ -12,7 +12,7 @@ from tqdm import tqdm,trange
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scanpy as sc
-from typing import Union,Tuple
+from typing import Union,Tuple,Optional
 import matplotlib
 from .._settings import add_reference
 
@@ -373,7 +373,7 @@ class pyMOFA(object):
 
     def mofa_run(self,outfile:str='res.hdf5',factors:int=20,iter:int = 1000,convergence_mode:str = "fast",
                 spikeslab_weights:bool = True,startELBO:int = 1, freqELBO:int = 1, dropR2:float = 0.001, gpu_mode:bool = True, 
-                verbose:bool = False, seed:int = 112,scale_groups:bool = False, 
+                gpu_device: Optional[int] = None, verbose:bool = False, seed:int = 112,scale_groups:bool = False, 
                 scale_views:bool = False,center_groups:bool=True,)->None:
         r"""
         Train the MOFA model.
@@ -419,6 +419,7 @@ class pyMOFA(object):
             freqELBO = freqELBO, 
             dropR2 = dropR2, 
             gpu_mode = gpu_mode, 
+            gpu_device = gpu_device,
             verbose = verbose, 
             seed = seed
         )
@@ -426,7 +427,8 @@ class pyMOFA(object):
         ent1.build()
         ent1.run()
         ent1.save(outfile=outfile)
-        add_reference(self.adata,'MOFA','Multi-omics factor analysis with MOFA')
+        for ix in range(len(self.omics)):
+            add_reference(self.omics[ix],'MOFA','Multi-omics factor analysis with MOFA')
 
     
 
@@ -809,170 +811,77 @@ class pyMOFAART(object):
             fig.savefig("factor_gene_{}.png".format(title),dpi=300,bbox_inches = 'tight')
         return fig,ax
 
-    def plot_weights(self,view:str,factors=None,n_features: int = 5,
-                     w_scaled: bool = False,
-                     w_abs: bool = False,
-                     size: float = 2,
-                     color: str = "black",
-                     label_size: float = 5,
-                     x_offset: float = 0.01,
-                     y_offset: float = 0.15,
-                     jitter: float = 0.01,
-                     line_width: float = 0.5,
-                     line_color: str = "black",
-                     line_alpha: float = 0.2,
-                     zero_line: bool = True,
-                     zero_line_width: float = 1,
-                     ncols: int = 4,
-                     sharex: bool = True,
-                     sharey: bool = False,
-                     feature_label: str = None,
-                     figsize: tuple = (10, 6),
-                     **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
-        r"""
-        Plot weights for MOFA factors.
+    def plot_weights_gene_factor(self,view:str,factor:int,color:str='#a51616',figsize:tuple=(3,4),
+                     plot_gene_num:int=10,ascending:bool=False,
+                    labels_fontsize:int=12,ticks_fontsize:int=12,title_fontsize:int=12,
+                     title=None,save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
+        """
+        Plot the weights of each gene in the factor
 
         Arguments:
-            view: Name of the modality/view.
-            factors: List of factors to plot (all by default).
-            n_features: Number of features with largest weights to label.
-            w_scaled: Whether to scale weights to unit variance.
-            w_abs: Whether to plot absolute weight values.
-            size: Dot size.
-            color: Color for labeled dots.
-            label_size: Font size of feature labels.
-            x_offset: Offset for feature labels from left/right side.
-            y_offset: Parameter to repel feature labels along y axis.
-            jitter: Whether to jitter dots per factors.
-            line_width: Width of lines connecting labels with dots.
-            line_color: Color of lines connecting labels with dots.
-            line_alpha: Alpha level for lines connecting labels with dots.
-            zero_line: Whether to plot dotted line at zero.
-            zero_line_width: Width of zero line.
-            ncols: Number of columns in grid of multiple plots.
-            sharex: Whether to use same X axis across panels.
-            sharey: Whether to use same Y axis across panels.
-            feature_label: Column name in var containing feature labels.
-            **kwargs: Additional arguments passed to seaborn plotting functions.
+            view: str, the view of the factor
+            factor: int, the factor number
+            color: str, the color of the plot
+            figsize: tuple, the size of the figure
+            plot_gene_num: int, the number of genes to plot
+            ascending: bool, whether to sort the genes by weights
+            labels_fontsize: int, the fontsize of the labels
+            ticks_fontsize: int, the fontsize of the ticks
+            title_fontsize: int, the fontsize of the title
+            title: str, the title of the plot
+            save: bool, whether to save the plot.
 
         Returns:
             fig: The figure object.
             ax: The axis object.
         """
-        if view not in self.model_path:
-            raise ValueError(f"View {view} not found in MOFA model")
-        
-        if 'mofa_weights' not in self.model_path:
-            raise ValueError(f"Weights not found in MOFA model")
-        
-        # Get weights
-        weights = get_weights(hdf5_path=self.model_path,view=view,factor=factors)
-        
-        # Get feature labels
-        if feature_label is not None and feature_label in self.model_path:
-            feature_names = get_weights(hdf5_path=self.model_path,view=view,factor=factors)['feature']
-        else:
-            feature_names = get_weights(hdf5_path=self.model_path,view=view,factor=factors)['feature']
-        
-        # Filter factors if specified
-        if factors is not None:
-            factor_names = [f'Factor{i}' if isinstance(i, int) else i for i in factors]
-            weights = weights[factor_names]
-        
-        # Scale weights if requested
-        if w_scaled:
-            weights = weights / weights.abs().max()
-        
-        # Convert to absolute values if requested
-        if w_abs:
-            weights = weights.abs()
-        
-        # Melt the DataFrame for plotting
-        wm = weights.reset_index().melt(
-            id_vars='index',
-            var_name='factor',
-            value_name='value'
-        )
-        wm['feature'] = wm['index'].map(lambda x: feature_names[x])
-        wm['abs_value'] = abs(wm['value'])
-        
-        # Sort factors
-        wm['factor'] = wm['factor'].astype('category')
-        wm['factor'] = wm['factor'].cat.reorder_categories(
-            sorted(wm['factor'].cat.categories, key=lambda x: int(x.split('Factor')[1]))
-        )
-        
-        # Create plot
-        fig, ax = plt.subplots(figsize=figsize)
-        
-        # Create stripplot
-        g = sns.stripplot(
-            data=wm,
-            x='value',
-            y='factor',
-            jitter=jitter,
-            size=size,
-            color='lightgrey',
-            ax=ax
-        )
-        
-        # Add feature labels for each factor separately
-        for fi, factor in enumerate(wm['factor'].unique()):
-            factor_data = wm[wm['factor'] == factor].sort_values('abs_value', ascending=False)
-            
-            # Get top features for this factor only
-            top_features = factor_data.head(n_features)
-            
-            # Overlay colored dots for top features
-            for _, point in top_features.iterrows():
-                ax.scatter(point['value'], fi, color=color, s=size*10, alpha=0.8, zorder=5)
-            
-            # Add labels for positive and negative weights separately
-            for sign_i in [1, -1]:
-                to_label = top_features[top_features['value'] * sign_i > 0].sort_values('abs_value', ascending=False)
-                
-                if len(to_label) == 0:
-                    continue
-                    
-                x_start_pos = sign_i * (to_label['abs_value'].max() + x_offset)
-                y_start_pos = fi - ((len(to_label) - 1) // 2) * y_offset
-                y_prev = y_start_pos
-                
-                for i, (_, point) in enumerate(to_label.iterrows()):
-                    y_loc = y_prev + y_offset if i != 0 else y_start_pos
-                    
-                    g.annotate(
-                        point['feature'],
-                        xy=(point['value'], fi),
-                        xytext=(x_start_pos, y_loc),
-                        arrowprops=dict(
-                            arrowstyle='-',
-                            connectionstyle='arc3',
-                            color=line_color,
-                            alpha=line_alpha,
-                            linewidth=line_width
-                        ),
-                        horizontalalignment='left' if sign_i > 0 else 'right',
-                        size=label_size,
-                        color='black',
-                        weight='regular',
-                        alpha=0.9
-                    )
-                    y_prev = y_loc
-        
-        # Add zero line
-        if zero_line:
-            ax.axvline(0, ls='--', color='lightgrey', linewidth=zero_line_width, zorder=0)
-        
-        # Customize plot
-        sns.despine(offset=10, trim=True)
-        ax.set_xlabel('Feature weight')
-        ax.set_ylabel('')
-        ax.set_title(view)
-        
-        return fig, ax
+        factor_w=pd.DataFrame()
+        for i in range(self.factors.shape[1]):
+            f1_w=get_weights(hdf5_path=self.model_path,view=view,factor=i+1)
+            f1_w.index=[str(i,"utf8").replace('{}_'.format(view),'') for i in f1_w['feature']]
+            factor_w['factor_{}'.format(i+1)]=f1_w['weights']
+        factor_w.index=[str(i,"utf8").replace('{}_'.format(view),'') for i in f1_w['feature']]
 
-    def plot_top_feature_dotplot(self,view:str,cmap:str='bwr',n_genes:int=3)->list:
+        fig, ax = plt.subplots(figsize=figsize)
+        plot_data4=pd.DataFrame()
+        plot_data4['weight']=factor_w['factor_{}'.format(factor)].sort_values(ascending=ascending)
+        plot_data4['rank']=range(len(plot_data4['weight']))
+        plt.plot(plot_data4['rank'],plot_data4['weight'],color=color)
+
+        hub_gene=plot_data4.index[:plot_gene_num]
+        plt.scatter(plot_data4.loc[hub_gene,'rank'],
+                plot_data4.loc[hub_gene,'weight'],color=color,
+                    alpha=0.5)
+
+        from adjustText import adjust_text
+        texts=[ax.text(plot_data4.loc[i,'rank'],
+                        plot_data4.loc[i,'weight'],
+                        i,
+                        fontdict={'size':10,'weight':'normal','color':'black'}
+                        ) for i in hub_gene]
+
+        adjust_text(texts,only_move={'text': 'xy'},
+                    arrowprops=dict(arrowstyle='->', color='grey'),)
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(True)
+        ax.spines['left'].set_visible(True)
+        if title is None:
+            plt.title('factor_{}'.format(factor),fontsize=title_fontsize,)
+        else:
+            plt.title(title,fontsize=title_fontsize,)
+        plt.xticks(fontsize=ticks_fontsize)
+        plt.yticks(fontsize=ticks_fontsize)
+        plt.xlabel('Feature rank',fontsize=labels_fontsize)
+        plt.ylabel('Weight',fontsize=labels_fontsize)
+
+        plt.grid(False)
+        if save:
+            fig.savefig("factor{}_gene.png".format(factor),dpi=300,bbox_inches = 'tight')
+        return fig,ax
+
+    def plot_top_feature_dotplot(self,view:str,cmap:str='bwr',n_genes:int=3,n_pcs:int=50)->list:
         """
         Plot the top features of each factor in dotplot
         
@@ -996,12 +905,13 @@ class pyMOFAART(object):
         adata1=anndata.AnnData(pd.concat([factor_w,factor_w],axis=1).T)
         adata1.obs['Factor']=adata1.obs.index
         adata1.obs['Factor']=adata1.obs['Factor'].astype('category')
+        sc.tl.dendrogram(adata1, groupby='Factor', n_pcs=n_pcs)
         sc.tl.rank_genes_groups(adata1, groupby='Factor', method='wilcoxon')
         ax=sc.pl.rank_genes_groups_dotplot(adata1, n_genes=n_genes, 
                                         cmap=cmap,show=False)
         return ax
     
-    def plot_top_feature_heatmap(self,view:str,cmap:str='bwr',n_genes:int=3)->list:
+    def plot_top_feature_heatmap(self,view:str,cmap:str='bwr',n_genes:int=3,n_pcs:int=50)->list:
         """
         Plot the top features of each factor in dotplot
         
@@ -1025,6 +935,7 @@ class pyMOFAART(object):
         adata1=anndata.AnnData(pd.concat([factor_w,factor_w],axis=1).T)
         adata1.obs['Factor']=adata1.obs.index
         adata1.obs['Factor']=adata1.obs['Factor'].astype('category')
+        sc.tl.dendrogram(adata1, groupby='Factor', n_pcs=n_pcs)
         sc.tl.rank_genes_groups(adata1, groupby='Factor', method='wilcoxon')
         ax=sc.pl.rank_genes_groups_matrixplot(adata1, n_genes=n_genes, 
                                         cmap=cmap,show=False)
@@ -1634,13 +1545,15 @@ def store_weights(mdata, hdf5_path: str):
         if view_name in mdata.mod:
             # Get weights for this view
             weights = f['expectations']['W'][view_name][:]  # shape: (n_factors, n_features)
+            feature_lst=[x.decode('utf-8') for x in f['features'][view_name][:]]
             
             # Create DataFrame with proper index and columns
             weights_df = pd.DataFrame(
-                weights.T,  # Transpose to make features as rows
+                np.full((mdata.mod[view_name].shape[1], nfactors), np.nan),  # Transpose to make features as rows
                 index=mdata.mod[view_name].var_names,
                 columns=[f'Factor{i+1}' for i in range(nfactors)]
             )
+            weights_df.loc[feature_lst,:] = weights.T
             
             # Store in varm
             mdata.mod[view_name].varm['mofa_weights'] = weights_df

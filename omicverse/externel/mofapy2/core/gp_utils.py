@@ -1,36 +1,34 @@
-"""
-Utility funcions for the Gaussian process calculations of the Sigma Node
-"""
-
-import scipy as s
 import scipy.spatial as SS
 import numpy as np
+
 # import gpytorch
 
-def SE(X, l, zeta = 1e-3):
+
+def SE(X, l, zeta=1e-3):
     """
     squared exponential covariance function on input X with lengthscale l
     """
-    tmp = SS.distance.pdist(X, 'euclidean') ** 2.
+    tmp = SS.distance.pdist(X, "euclidean") ** 2.0
     tmp = SS.distance.squareform(tmp)
     if l == 0:
-        cov = (1-zeta) * (tmp ==0).astype(float)
+        cov = (1 - zeta) * (tmp == 0).astype(float)
     else:
-        cov = (1-zeta) * np.exp(-tmp/ (2 * l ** 2.))
+        cov = (1 - zeta) * np.exp(-tmp / (2 * l**2.0))
     cov += zeta * np.eye(X.shape[0])
 
     return cov
 
-def Cauchy(X, l, zeta =  1e-3):
+
+def Cauchy(X, l, zeta=1e-3):
     """
     Cauchy covariance function on input X with lengthscale l
     """
-    tmp = SS.distance.pdist(X,'euclidean') ** 2.
+    tmp = SS.distance.pdist(X, "euclidean") ** 2.0
     tmp = SS.distance.squareform(tmp)
     if l == 0:
-        cov = (1-zeta) * (tmp ==0).astype(float)
+        cov = (1 - zeta) * (tmp == 0).astype(float)
     else:
-        cov = (1-zeta) * 1/(1 + tmp/ (l ** 2.))
+        cov = (1 - zeta) * 1 / (1 + tmp / (l**2.0))
     cov += zeta * np.eye(X.shape[0])
 
     return cov
@@ -54,25 +52,25 @@ def Cauchy(X, l, zeta =  1e-3):
 #     return cov
 
 
-def get_l_limits(X, idx = None):
+def get_l_limits(X, idx=None):
     """
-    Get boundaries for the grid of lengthscales to optimize over (as implemented in spatialDE) 
+    Get boundaries for the grid of lengthscales to optimize over (as implemented in spatialDE)
     Boundaries of the grid are the shortest observed distance, divided by 2, and the longest observed distance multiplied by 2
     """
-    if not idx is None: # calculate based on distances in the reference group
+    if not idx is None:  # calculate based on distances in the reference group
         X = X[idx, :]
-    tmp = SS.distance.pdist(X,'euclidean')**2.
+    tmp = SS.distance.pdist(X, "euclidean") ** 2.0
     tmp = SS.distance.squareform(tmp)
     tmp_vals = np.unique(tmp.flatten())
     tmp_vals = tmp_vals[tmp_vals > 1e-8]
 
-    l_min = np.sqrt(tmp_vals.min()) / 2.
-    l_max = np.sqrt(tmp_vals.max()) * 2.
+    l_min = np.sqrt(tmp_vals.min()) / 2.0
+    l_max = np.sqrt(tmp_vals.max()) * 2.0
 
     return l_min, l_max
 
 
-def get_l_grid(X, n_grid = 5, idx = None):
+def get_l_grid(X, n_grid=5, idx=None):
     """
     Function to get points in a logarithmic grid for lengthscales (as implemented in spatialDE)
     """
@@ -118,32 +116,38 @@ def covar_to_corr(C):
     Transforms the covariance matrix into a correlation matrix
     """
     Cdiag = np.diag(C)
-    Ccor = np.diag(1/np.sqrt(Cdiag)) @ C @ np.diag(1/np.sqrt(Cdiag))
+    Ccor = np.diag(1 / np.sqrt(Cdiag)) @ C @ np.diag(1 / np.sqrt(Cdiag))
     return Ccor
 
 
-def set_inducing_points(data, sample_cov, groups, dims, n_inducing, random = False, seed_inducing = 0):
+def set_inducing_points(
+    data, sample_cov, groups, dims, n_inducing, random=False, seed_inducing=0
+):
     """
     Method to select samples to use as inducing points for the GP
     """
 
     missing_sample_per_view = np.ones((dims["N"], dims["M"]))
     for m in range(len(data)):
-        missing_sample_per_view[:,m] = np.isnan(data[m]).all(axis = 1)
-    nonmissing_samples = np.where(missing_sample_per_view.sum(axis = 1) != dims["M"])[0]
+        missing_sample_per_view[:, m] = np.isnan(data[m]).all(axis=1)
+    nonmissing_samples = np.where(missing_sample_per_view.sum(axis=1) != dims["M"])[0]
     N_nonmissing = len(nonmissing_samples)
     n_inducing = min(n_inducing, N_nonmissing)
     if random:
         if not seed_inducing is None:
             np.random.seed(int(seed_inducing))
-        idx_inducing = np.random.choice(dims["N"], n_inducing, replace = False)
+        idx_inducing = np.random.choice(dims["N"], n_inducing, replace=False)
         idx_inducing.sort()
     else:
         N = dims["N"]
-        loc = sample_cov.sum(axis = 1)
-        nonmissing_samples_tiesshuffled = nonmissing_samples[np.lexsort((np.random.random(N_nonmissing), loc[nonmissing_samples]))] # shuffle tienp.randomly (e.g. between groups)
-        grid_ix = np.floor(np.arange(0, N_nonmissing, step=N_nonmissing / n_inducing)).astype('int')
-        if grid_ix[-1] == N_nonmissing: # avoid out of bound
+        loc = sample_cov.sum(axis=1)
+        nonmissing_samples_tiesshuffled = nonmissing_samples[
+            np.lexsort((np.random.random(N_nonmissing), loc[nonmissing_samples]))
+        ]  # shuffle tienp.randomly (e.g. between groups)
+        grid_ix = np.floor(
+            np.arange(0, N_nonmissing, step=N_nonmissing / n_inducing)
+        ).astype("int")
+        if grid_ix[-1] == N_nonmissing:  # avoid out of bound
             grid_ix = grid_ix[:-1]
         idx_inducing = nonmissing_samples_tiesshuffled[grid_ix]
 
