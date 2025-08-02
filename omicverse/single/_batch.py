@@ -1,4 +1,4 @@
-from ..pp import *
+from ..pp import scale,pca
 import scanpy as sc
 import numpy as np
 import anndata
