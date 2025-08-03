@@ -4,15 +4,15 @@
 @author: Ping Qiu  qiuping1@genomics.cn
 @last modified by: Ping Qiu
 @file: anno_cellplm_train.py
-@time: 2024/3/3 15:02
+@time: 2025/4/18 17:28
 """
-import pandas as pd
-import scanpy as sc
-import json
-import os
+
+import torch
+import numpy as np
 from ..repo.CellPLM.pipeline.cell_type_annotation import (CellTypeAnnotationDefaultModelConfig,
                                                                CellTypeAnnotationPipeline,
                                                                CellTypeAnnotationDefaultPipelineConfig)
+import json
 
 
 def train(data, args):

@@ -16,7 +16,7 @@ import os
 import scanpy as sc
 import torch
 from torch import nn
-from scgpt.loss import masked_mse_loss
+from ...repo.scgpt.loss import masked_mse_loss
 from biollm.dataset.scgpt_dataset import make_train_data
 from biollm.trainer.integration_scgpt_trainer import train, predict
 from biollm.repo.scgpt.utils import eval_scib_metrics

@@ -10,22 +10,12 @@
 change log:
     2024/04/03  create file.
 """
-import pickle
 import torch
-import wandb
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import torch.nn.functional as F
-import os
-import scipy
-import pandas as pd
-from scipy.stats import pearsonr, spearmanr
-
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 from ..evaluate.bm_metrices_anno import compute_metrics
+import os
 
 
 class Trainer:
