@@ -312,6 +312,9 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         print(f"🔖 Version: {__version__}   📚 Tutorials: https://omicverse.readthedocs.io/")
         _has_printed_logo = True
 
+    import matplotlib.pyplot as plt
+    plt.rcParams['axes.grid'] = False
+
     print(f"{EMOJI['done']} plot_set complete.\n")
 
 

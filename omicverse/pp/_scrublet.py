@@ -184,6 +184,7 @@ def scrublet(
             threshold=threshold,
             random_state=random_state,
             verbose=verbose,
+            use_gpu=use_gpu,
         )
 
         return {"obs": ad_obs.obs, "uns": ad_obs.uns["scrublet"]}
@@ -255,7 +256,8 @@ def _scrublet_call_doublets(
     threshold: float | None = None,
     random_state: _LegacyRandom = 0,
     verbose: bool = True,
-) -> AnnData:
+    use_gpu: bool = False,
+    ) -> AnnData:
     """Core function for predicting doublets using Scrublet :cite:p:`Wolock2019`.
 
     Predict cell doublets using a nearest-neighbor classifier of observed
@@ -376,7 +378,7 @@ def _scrublet_call_doublets(
 
     if mean_center:
         logg.info("Embedding transcriptomes using PCA...")
-        pca_torch(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state)
+        pca_torch(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state,use_gpu=use_gpu)
         #pipeline.pca(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state)
     else:
         logg.info("Embedding transcriptomes using Truncated SVD...")
