@@ -1,5 +1,5 @@
-from ..externel import mofapy2
-from ..externel.mofapy2.run.entry_point import entry_point
+from ..external import mofapy2
+from ..external.mofapy2.run.entry_point import entry_point
 from ..utils import pyomic_palette
 from ..single import get_celltype_marker
 import numpy as np

@@ -1,5 +1,5 @@
-from ..externel.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
-from ..externel.SEACells import compute_celltype_purity,separation,compactness
+from ..external.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
+from ..external.SEACells import compute_celltype_purity,separation,compactness
 from .._settings import add_reference
 import pandas as pd
 

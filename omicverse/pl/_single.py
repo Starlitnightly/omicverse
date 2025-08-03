@@ -479,6 +479,7 @@ def embedding_adjust(
         texts = [ax.text(x=x, y=y, s=k, **text_kwargs) for k, (x, y) in medians.items()]
     from adjustText import adjust_text
     adjust_text(texts, **adjust_kwargs)
+    return texts
 
 
 def embedding_density(adata,basis,groupby,target_clusters,**kwargs):

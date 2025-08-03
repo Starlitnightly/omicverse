@@ -46,3 +46,4 @@ mkdocs-plotly-plugin
 bioservices
 tomli
 requests
+wandb

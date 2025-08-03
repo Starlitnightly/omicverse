@@ -1,0 +1,18 @@
+# the param for the llm model, to init the foundation model.
+model_used = "cellplm"
+pretrain_version = "20230926_85M"
+pretrain_directory = "/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/cellplm/"
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/cellplm/20230926_85M.best.ckpt'
+model_param_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/cellplm/20230926_85M.config.json'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/cellplm/vocab.json'
+# param of task
+#input_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/annotation/human/organs/ms/filtered_ms_adata.h5ad'  # h5ad for the sc express matrix
+input_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/annotation/human/organs/ms/c_data.h5ad'  # h5ad for the sc express matrix
+test_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/annotation/human/organs/ms/filtered_ms_adata.h5ad'  # h5ad for the sc express matrix
+output_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/result/anno/cellplm/ms/'
+obs_key = 'celltype'
+var_key = 'index_column'
+device = 'cuda:3'
+head_type='annotation'
+distributed=false
+finetune=true

@@ -1,0 +1,35 @@
+
+# the param for the llm model, to init the foundation model.
+
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer/gene_vocab.json'
+gene_median_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer/gene_median_dict.json'
+# encoder
+encoder_dims = 768
+encoder_heads = 12
+encoder_depth = 12
+
+# task params
+distributed = false
+
+device = 'cuda'
+batch_size = 8
+do_preprocess = true
+
+## cell embedding
+emb_type = 'gene-expression'
+model_used = "geneformer"
+model_type = "Pretrained"
+obs_key = "cell_type"
+var_key='feature_name'
+n_hvg=0
+
+## other
+h5ad_file='/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/zero-shot/Immune_ALL_human.h5ad'
+tf_genes_file='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/resources/hs_hgnc_tfs.txt'
+database_folder='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/databases/'
+resources_folder='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/resources'
+
+output_folder='/home/share/huadjyin/home/s_huluni/project/BioLLM2/case/grn/output/'
+gene_sets = 'GO_Biological_Process_2025'  
+#'GO_Molecular_Function_2025' 'GO_Cellular_Component_2025' 'GO_Biological_Process_2025'

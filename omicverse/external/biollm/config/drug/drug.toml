@@ -1,0 +1,35 @@
+# path related
+drug_smiles_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/223drugs_pubchem_smiles.txt'
+drug_feature_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/GDSC/drug_graph_feat'
+drug_info_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/GDSC/1.Drug_listMon Jun 24 09_00_55 2019.csv'
+cell_line_info_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/CCLE/Cell_lines_annotations_20181226.txt'
+cancer_response_exp_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/CCLE/GDSC_IC50.csv'
+# expression / mutation / methylation
+use_gexp = true
+use_mut = false
+use_methy = false
+gene_expression_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/CCLE/genomic_expression_561celllines_697genes_demap_features.csv'
+genomic_mutation_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/CCLE/genomic_mutation_34673_demap_features.csv'
+methylation_file = '/home/share/huadjyin/home/s_jiangwenjian/proj/scLLM/deepcdr/torchData/CCLE/genomic_methylation_561celllines_808genes_demap_features.csv'
+# save
+save_path = '/home/share/huadjyin/home/s_qiuping1/hanyuxuan/save'
+
+# deepCDR params
+# mode
+mode = 'train'
+leave_drug_test = false
+leave_drug = 0
+# params
+israndom = false  # randomlize X and A
+# hyparameters for GCN
+unit_list = [256,256,256]
+use_bn = true   # use batchnormalization for GCN
+use_relu = true
+use_GMP =true    # use GlobalMaxPooling for GCN
+max_atoms = 100
+
+# global
+model_used = 'no'
+device = 'cuda'
+lr = 1e-3
+seed = 0

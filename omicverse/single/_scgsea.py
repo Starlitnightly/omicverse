@@ -345,7 +345,7 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     """
 
     #import gseapy as gp
-    from ..externel.gseapy import enrichr
+    from ..external.gseapy import enrichr
     df_list = []
     cluster_list = []
     celltypes = sorted(adata.obs[group_by].unique())

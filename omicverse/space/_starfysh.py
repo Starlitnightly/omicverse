@@ -1,5 +1,5 @@
-from ..externel.starfysh import (AA, utils, plot_utils, post_analysis)
-from ..externel.starfysh import _starfysh as sf_model
+from ..external.starfysh import (AA, utils, plot_utils, post_analysis)
+from ..external.starfysh import _starfysh as sf_model
 
 class STARFYSH:
     """

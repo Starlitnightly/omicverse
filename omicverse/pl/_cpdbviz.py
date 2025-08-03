@@ -3007,7 +3007,7 @@ class CellChatViz(CellChatVizPlus):
         ax : matplotlib.axes.Axes
         """
         try:
-            from ..externel.mpl_chord.chord_diagram import chord_diagram
+            from ..external.mpl_chord.chord_diagram import chord_diagram
         except ImportError:
             try:
                 from mpl_chord_diagram import chord_diagram
@@ -3319,7 +3319,7 @@ class CellChatViz(CellChatVizPlus):
         ax : matplotlib.axes.Axes
         """
         try:
-            from ..externel.mpl_chord.chord_diagram import chord_diagram
+            from ..external.mpl_chord.chord_diagram import chord_diagram
         except ImportError:
             try:
                 from mpl_chord_diagram import chord_diagram

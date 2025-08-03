@@ -129,7 +129,7 @@ class CellVote(object):
     def scMulan_anno(self):
         """Annotate cells with the scMulan large language model.
 
-        This is a thin wrapper around :mod:`omicverse.externel.scMulan` that
+        This is a thin wrapper around :mod:`omicverse.external.scMulan` that
         performs gene symbol unification, runs the pretrained model and stores
         predictions back into ``self.adata``.
 
@@ -139,7 +139,7 @@ class CellVote(object):
             The annotated AnnData object.
         """
         from scipy.sparse import csc_matrix
-        from ..externel import scMulan
+        from ..external import scMulan
         import scanpy as sc
 
         # ensure CSC format for scMulan

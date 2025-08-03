@@ -76,7 +76,7 @@ def CAST(adata, sample_key=None, basis='spatial', layer='norm_1e4',
 
     os.makedirs(output_path, exist_ok=True)
     
-    from ..externel.CAST import CAST_MARK
+    from ..external.CAST import CAST_MARK
     embed_dict = CAST_MARK(coords_raw, exp_dict, output_path, gpu_t=gpu_t, device=device, **kwargs)
 
     adata.obsm['X_cast'] = np.zeros((adata.shape[0], 512))

@@ -11,8 +11,8 @@ from tqdm import tqdm
 from itertools import combinations_with_replacement
 
 # Get the optimized function
-#from omicverse.externel.commot.tools._spatial_communication import summarize_cluster_gpu
-from ..externel.commot.tools._spatial_communication import summarize_cluster_gpu
+#from omicverse.external.commot.tools._spatial_communication import summarize_cluster_gpu
+from ..external.commot.tools._spatial_communication import summarize_cluster_gpu
 
 def create_communication_anndata(adata, clustering_column, n_permutations=100):
     """

@@ -1,2 +1,2 @@
 
-from ..externel.cnmf.cnmf import *
+from ..external.cnmf.cnmf import *

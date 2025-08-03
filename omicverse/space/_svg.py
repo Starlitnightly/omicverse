@@ -1,5 +1,5 @@
 import scanpy as sc
-from ..externel.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
+from ..external.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
 from ..pp import preprocess
 from .._settings import add_reference
 

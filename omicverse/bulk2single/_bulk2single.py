@@ -108,7 +108,7 @@ class Bulk2Single:
         Returns:
             pd.DataFrame: Predicted cell-type fractions for each bulk sample
         """
-        from ..externel.tape import Deconvolution,ScadenDeconvolution
+        from ..external.tape import Deconvolution,ScadenDeconvolution
         sc_ref=self.sc_ref.copy()
         if method=='scaden':
             CellFractionPrediction=ScadenDeconvolution(sc_ref, 

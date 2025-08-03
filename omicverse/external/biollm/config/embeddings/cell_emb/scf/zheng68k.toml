@@ -1,0 +1,28 @@
+# the param for the llm model, to init the foundation model.
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scfoundation/models.ckpt'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scfoundation/gene_vocab.json'
+encoder_dims = 128
+encoder_heads = 12
+encoder_depth = 12
+max_seq_len = 19264
+max_none_zero_num = 5000 # for encoder if GPU is OMM
+
+# task params
+distributed = false
+input_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/CFM/data/case/dataset/emb/Zheng68K.h5ad'
+output_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/BioLLM2/demo/cell_emb/zheng68k/scfoundation'
+device = 'cuda:1'
+batch_size = 16
+do_preprocess = true
+# n_hvg = 2000
+
+## cell embedding
+model_used = "scfoundation"
+key = "cell"
+emb_type = "cell"  # gene/gene-expression/cell
+input_type = "singlecell" # "singlecell", "bulk"
+tgthighres = "t4" #  the targeted high resolution (start with t) or the fold change of the high resolution (start with f), or the addtion (start with a) of the high resoultion. only valid for input_type=singlecell
+pool_type = "all" # pooling type of cell embedding all/max
+quantile_cutoff = 0
+label_key = "celltype"
+gene_symbol_key=''

@@ -371,7 +371,7 @@ class Fate(object):
             import mellon
         except:
             print("Please install mellon package first using ``pip install mellon``")
-        from ..externel.palantir.utils import run_diffusion_maps
+        from ..external.palantir.utils import run_diffusion_maps
         run_diffusion_maps(self.adata,n_components=n_components,knn=knn,alpha=alpha,seed=seed,
                            pca_key=pca_key,kernel_key=kernel_key,sim_key=sim_key,
                            eigval_key=eigval_key,eigvec_key=eigvec_key)
@@ -389,7 +389,7 @@ class Fate(object):
                     expression_key: str = "MAGIC_imputed_data",
                     distances_key: str = "distances",
                     ):
-        from ..externel.palantir.utils import run_low_density_variability,run_local_variability
+        from ..external.palantir.utils import run_low_density_variability,run_local_variability
 
         if localvar_key not in self.adata.layers.keys():
             print("Run low_density first")
@@ -1036,7 +1036,7 @@ def mellon_density(adata,
             import mellon
         except:
             print("Please install mellon package first using ``pip install mellon``")
-        from ..externel.palantir.utils import run_diffusion_maps
+        from ..external.palantir.utils import run_diffusion_maps
         run_diffusion_maps(adata,n_components=n_components,knn=knn,alpha=alpha,seed=seed,
                            pca_key=pca_key,kernel_key=kernel_key,sim_key=sim_key,
                            eigval_key=eigval_key,eigvec_key=eigvec_key)

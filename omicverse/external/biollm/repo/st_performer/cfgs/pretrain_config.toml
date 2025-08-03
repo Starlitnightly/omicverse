@@ -1,0 +1,46 @@
+# data
+lmdb_path = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/data/train_data/panglao/all.db'  # lmdb file for pretrain
+ckpt_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/model/st_performer/performer/pretrain'
+gene2vec_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/data/train_data/gene2vec/gene2vec_16906.npy'
+vocab_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/data/train_data/panglao/vocab'
+use_genes_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/data/train_data/panglao/vocab/human_marker_ids.pk'
+max_seq_len = 13793   # gene2vec: 16907
+batch_tokens_num = 300
+n_workers = 0
+
+# test file when do_eval is True
+do_eval = false
+test_lmdb_path = ''
+
+# model
+dim = 200  # the embedding dim
+depth = 6  # the performer layers
+heads = 10  # the attention heads number
+lr = 1.5e-4  # initial learning rate
+model_name = 'performer_l6_10h'
+
+# train
+epochs = 50
+batch_size = 4
+local_rank = -1
+no_cuda = false
+distributed = true
+is_st = false  # the input data is spatial transcriptome
+is_exp_emb = true
+is_organ_emb = true
+is_sequence_emb = false
+g2v_position_emb = false
+mask_non_zero_prob = 0.15  # the mask proportion
+mask_zero_prob = 0.01
+keep_replace_prob = 0.9 # keep mask proportion
+random_replace_prob = 0  # random replace proportion
+bin_num = 7
+pretrain = true
+finetune = false
+pretrained_model = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/model/st_performer/performer/pretrain/st_performer_5.pth'
+
+# finetune param
+celltype_label = ''
+
+
+

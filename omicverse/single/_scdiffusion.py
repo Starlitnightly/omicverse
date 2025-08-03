@@ -30,8 +30,8 @@ class scDiffusion(object):
             loss_ae="mse",
             decoder_activation='ReLU',
     ):
-        from ..externel.scdiffusion.VAE.VAE_model import VAE
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
+        from ..external.scdiffusion.VAE.VAE_model import VAE
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
         print('device: ',self.device)
 
         datasets = prepare_data(
@@ -170,17 +170,17 @@ class scDiffusion(object):
             model_name="muris_diffusion",
             save_dir='output/diffusion_checkpoint'
     ):
-        from ..externel.scdiffusion.guided_diffusion import dist_util, logger
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
-        from ..externel.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
-        from ..externel.scdiffusion.guided_diffusion.script_util import (
+        from ..external.scdiffusion.guided_diffusion import dist_util, logger
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
+        from ..external.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
+        from ..external.scdiffusion.guided_diffusion.script_util import (
             model_and_diffusion_defaults,
             create_model_and_diffusion,
             args_to_dict,
             add_dict_to_argparser,
         )
-        from ..externel.scdiffusion.guided_diffusion.train_util import TrainLoop
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
+        from ..external.scdiffusion.guided_diffusion.train_util import TrainLoop
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -264,23 +264,23 @@ class scDiffusion(object):
             schedule_sampler="uniform",
             
     ):
-        from ..externel.scdiffusion.guided_diffusion import dist_util, logger
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
-        from ..externel.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
-        from ..externel.scdiffusion.guided_diffusion.script_util import (
+        from ..external.scdiffusion.guided_diffusion import dist_util, logger
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
+        from ..external.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
+        from ..external.scdiffusion.guided_diffusion.script_util import (
             model_and_diffusion_defaults,
             create_model_and_diffusion,
             args_to_dict,
             add_dict_to_argparser,
             create_classifier_and_diffusion
         )
-        from ..externel.scdiffusion.guided_diffusion.train_util import log_loss_dict,parse_resume_step_from_filename
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
+        from ..external.scdiffusion.guided_diffusion.train_util import log_loss_dict,parse_resume_step_from_filename
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
         from torch.nn.parallel.distributed import DistributedDataParallel as DDP
         from torch.optim import AdamW
         import torch.nn.functional as F
 
-        from ..externel.scdiffusion.guided_diffusion.fp16_util import MixedPrecisionTrainer
+        from ..external.scdiffusion.guided_diffusion.fp16_util import MixedPrecisionTrainer
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -442,7 +442,7 @@ class scDiffusion(object):
             loss_ae="mse",
             decoder_activation='ReLU',
     ):
-        from ..externel.scdiffusion.VAE.VAE_model import VAE
+        from ..external.scdiffusion.VAE.VAE_model import VAE
         autoencoder = VAE(
             num_genes=self.num_genes,
             device=self.device,
@@ -467,17 +467,17 @@ class scDiffusion(object):
             loss_ae="mse",
             decoder_activation='ReLU',
     ):
-        from ..externel.scdiffusion.guided_diffusion import dist_util, logger
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
-        from ..externel.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
-        from ..externel.scdiffusion.guided_diffusion.script_util import (
+        from ..external.scdiffusion.guided_diffusion import dist_util, logger
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
+        from ..external.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
+        from ..external.scdiffusion.guided_diffusion.script_util import (
             model_and_diffusion_defaults,
             create_model_and_diffusion,
             args_to_dict,
             add_dict_to_argparser,
         )
-        from ..externel.scdiffusion.guided_diffusion.train_util import TrainLoop
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
+        from ..external.scdiffusion.guided_diffusion.train_util import TrainLoop
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
 
         dist_util.setup_dist()
         logger.configure(dir='checkpoint/sample_logs')
@@ -585,10 +585,10 @@ class scDiffusion(object):
         classifier_scale1=weight[0]*2/10,
         classifier_scale2=weight[1]*2/10,
         import torch.nn.functional as F
-        from ..externel.scdiffusion.guided_diffusion import dist_util, logger
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
-        from ..externel.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
-        from ..externel.scdiffusion.guided_diffusion.script_util import (
+        from ..external.scdiffusion.guided_diffusion import dist_util, logger
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data
+        from ..external.scdiffusion.guided_diffusion.resample import create_named_schedule_sampler
+        from ..external.scdiffusion.guided_diffusion.script_util import (
             NUM_CLASSES,
             model_and_diffusion_defaults,
             classifier_and_diffusion_defaults,
@@ -597,8 +597,8 @@ class scDiffusion(object):
             add_dict_to_argparser,
             args_to_dict,
         )
-        from ..externel.scdiffusion.guided_diffusion.train_util import TrainLoop
-        from ..externel.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
+        from ..external.scdiffusion.guided_diffusion.train_util import TrainLoop
+        from ..external.scdiffusion.guided_diffusion.cell_datasets_loader import load_data,prepare_data
 
         dist_util.setup_dist()
         logger.configure(dir='checkpoint/sample_logs')

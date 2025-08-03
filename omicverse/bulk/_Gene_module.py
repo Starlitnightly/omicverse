@@ -22,8 +22,8 @@ from ..utils import pyomic_palette,plot_network
 import os
 
 try:
-    from ..externel.PyWGCNA.wgcna import pyWGCNA
-    from ..externel.PyWGCNA.utils import readWGCNA
+    from ..external.PyWGCNA.wgcna import pyWGCNA
+    from ..external.PyWGCNA.utils import readWGCNA
 except Exception:  # pragma: no cover - optional dependency
     pyWGCNA = None
     readWGCNA = None
