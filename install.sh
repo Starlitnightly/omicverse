@@ -139,7 +139,9 @@ pip_install_pkg \
   libpysal \
   openai \
   patsy \
-  combat \
+  combat
+
+pip_install_pkg \
   pymde \
   opencv-python \
   scikit-image \
@@ -155,19 +157,23 @@ pip_install_pkg \
   scvi-tools \
   mofax \
   metatime \
-  s-gd2 \
+  s-gd2
+
+pip_install_pkg \
   mellon \
   scvelo \
   cellrank \
   einops \
   dynamo-release \
   squidpy \
-  pertpy \
+  pertpy
+
+pip_install_pkg \
   toytree \
   arviz \
   ete3 \
   pymde \
-  torchdr \
+  torchdr
 
 
 

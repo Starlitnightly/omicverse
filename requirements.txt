@@ -47,3 +47,4 @@ bioservices
 tomli
 requests
 wandb
+munch
