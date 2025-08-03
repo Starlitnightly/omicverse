@@ -8,13 +8,99 @@ from typing_extensions import Self
 import numpy as np
 import pandas as pd
 import torch
-import torchtext.vocab as torch_vocab
-from torchtext.vocab import Vocab
 
 # from transformers.tokenization_utils import PreTrainedTokenizer
 # from transformers import AutoTokenizer, BertTokenizer
 
 from .. import logger
+
+
+class Vocab:
+    """
+    Custom Vocab class to replace torchtext.vocab.Vocab.
+    Provides the same interface without torchtext dependency.
+    """
+
+    def __init__(self, vocab_dict: Dict[str, int]):
+        """Initialize vocab from a dictionary mapping tokens to indices."""
+        self._stoi = dict(vocab_dict)  # string to index mapping
+        self._itos = [''] * len(vocab_dict)  # index to string mapping
+        for token, idx in vocab_dict.items():
+            if idx >= len(self._itos):
+                self._itos.extend([''] * (idx - len(self._itos) + 1))
+            self._itos[idx] = token
+        self._default_index = None
+        
+    def __getitem__(self, token: str) -> int:
+        """Get index for a token."""
+        if token in self._stoi:
+            return self._stoi[token]
+        elif self._default_index is not None:
+            return self._default_index
+        else:
+            raise KeyError(f"Token '{token}' not found in vocabulary")
+    
+    def __contains__(self, token: str) -> bool:
+        """Check if token exists in vocabulary."""
+        return token in self._stoi
+    
+    def __len__(self) -> int:
+        """Return vocabulary size."""
+        return len(self._stoi)
+    
+    def get_stoi(self) -> Dict[str, int]:
+        """Get string to index mapping."""
+        return self._stoi.copy()
+    
+    def get_itos(self) -> List[str]:
+        """Get index to string mapping."""
+        return self._itos.copy()
+    
+    def set_default_index(self, index: int) -> None:
+        """Set default index for unknown tokens."""
+        self._default_index = index
+    
+    def insert_token(self, token: str, index: int) -> None:
+        """Insert a token at a specific index."""
+        if index < 0:
+            raise ValueError("Index must be non-negative")
+        
+        # Check if token already exists
+        if token in self._stoi:
+            old_index = self._stoi[token]
+            if old_index == index:
+                return  # Token already at correct position
+            else:
+                raise ValueError(f"Token '{token}' already exists at index {old_index}")
+        
+        # Check if index is already occupied
+        if index < len(self._itos) and self._itos[index] != '':
+            existing_token = self._itos[index]
+            raise ValueError(f"Index {index} is already occupied by token '{existing_token}'")
+        
+        # Extend _itos if necessary
+        if index >= len(self._itos):
+            self._itos.extend([''] * (index - len(self._itos) + 1))
+        
+        # Insert the token
+        self._stoi[token] = index
+        self._itos[index] = token
+    
+    @property
+    def vocab(self) -> 'Vocab':
+        """Return self for compatibility with torchtext interface."""
+        return self
+
+
+def vocab(ordered_dict: OrderedDict, min_freq: int = 1) -> Vocab:
+    """Create a Vocab object from an OrderedDict."""
+    vocab_dict = {}
+    idx = 0
+    for token, freq in ordered_dict.items():
+        if freq >= min_freq:
+            vocab_dict[token] = idx
+            idx += 1
+    return Vocab(vocab_dict)
 
 
 class GeneVocab(Vocab):
@@ -58,7 +144,7 @@ class GeneVocab(Vocab):
             raise ValueError(
                 "gene_list_or_vocab must be a list of gene names or a Vocab object."
             )
-        super().__init__(_vocab.vocab)
+        super().__init__(_vocab.get_stoi())
         if default_token is not None and default_token in self:
             self.set_default_token(default_token)
 
@@ -96,13 +182,13 @@ class GeneVocab(Vocab):
         Args:
             token2idx (Dict[str, int]): Dictionary mapping tokens to indices.
         """
-        # initiate an empty vocabulary first
-        _vocab = cls([])
-
-        # add the tokens to the vocabulary, GeneVocab requires consecutive indices
-        for t, i in sorted(token2idx.items(), key=lambda x: x[1]):
-            _vocab.insert_token(t, i)
-
+        # Create a Vocab directly from the token2idx mapping to avoid recursion
+        base_vocab = Vocab(token2idx)
+        
+        # Create GeneVocab from the base Vocab
+        _vocab = cls.__new__(cls)  # Create instance without calling __init__
+        Vocab.__init__(_vocab, token2idx)  # Initialize as Vocab directly
+        
         if default_token is not None and default_token in _vocab:
             _vocab.set_default_token(default_token)
 
@@ -151,7 +237,7 @@ class GeneVocab(Vocab):
                 ordered_dict.update({symbol: min_freq})
                 ordered_dict.move_to_end(symbol, last=not special_first)
 
-        word_vocab = torch_vocab.vocab(ordered_dict, min_freq=min_freq)
+        word_vocab = vocab(ordered_dict, min_freq=min_freq)
         return word_vocab
 
     @property
