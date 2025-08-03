@@ -3,7 +3,7 @@ from typing import Any
 import pandas as pd
 import numpy as np
 import scanpy as sc
-from ..externel.spatrio.spatrio import ot_alignment,assign_coord
+from ..external.spatrio.spatrio import ot_alignment,assign_coord
 
 class CellMap(object):
     """

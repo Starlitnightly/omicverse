@@ -1,0 +1,26 @@
+
+# the param for the llm model, to init the foundation model.
+
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer/gene_vocab.json'
+gene_median_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/geneformer/gene_median_dict.json'
+# encoder
+encoder_dims = 768
+encoder_heads = 12
+encoder_depth = 12
+
+# task params
+distributed = false
+input_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/zero-shot/Immune_ALL_human.h5ad'
+output_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/BioLLM2/demo/grn/immune/geneformer'
+device = 'cuda'
+batch_size = 32
+do_preprocess = true
+
+## cell embedding
+emb_type = 'gene-expression'
+model_used = "geneformer"
+model_type = "Pretrained"
+var_key='' # feature_name
+obs_key='final_annotation'
+n_hvg=0

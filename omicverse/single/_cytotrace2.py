@@ -13,7 +13,7 @@ import scanpy as sc
 
 from .._settings import add_reference
 
-from ..externel.cytotrace2.gen_utils import *
+from ..external.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *
 
 #pylint: disable=too-many-arguments
@@ -75,7 +75,7 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
         #out = subprocess.run(['Rscript', run_script, '--output-dir', output_dir,
                #'--suffix', suffix, '--max-pcs', str(max_pcs), '--seed', str(seed)], check=True)
         #smooth_by_knn_df = pd.read_csv(knn_path, index_col = 0, sep='\t')
-        from ..externel.cytotrace2.smoothDatakNN import smooth_data_kNN
+        from ..external.cytotrace2.smoothDatakNN import smooth_data_kNN
         smooth_data_kNN(output_dir=output_dir, suffix=suffix, max_pcs=max_pcs, seed=seed)
         # 读取平滑处理后的结果
         knn_path = os.path.join(output_dir, f'smoothbykNNresult{suffix}.txt')

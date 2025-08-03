@@ -32,7 +32,7 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
         enrich_res: A pandas DataFrame containing the enrichment results.
 
     """
-    from ..externel.gseapy import enrichr
+    from ..external.gseapy import enrichr
     #import gseapy as gp
     if background is None:
         if (organism == 'Mouse') or (organism == 'mouse') or (organism == 'mm'):
@@ -117,7 +117,7 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
         pre_res: A prerank object containing the enrichment results.
     
     """
-    from ..externel.gseapy import prerank
+    from ..external.gseapy import prerank
     pre_res = prerank(rnk=gene_rnk, gene_sets=pathways_dict,
                      processes=processes,
                      permutation_num=permutation_num, # reduce number to speed up testing
@@ -418,7 +418,7 @@ class pyGSEA(object):
         Returns:
             fig: A matplotlib.figure.Figure object.
         """
-        from ..externel.gseapy.plot import GSEAPlot
+        from ..external.gseapy.plot import GSEAPlot
         #from gseapy.plot import GSEAPlot
         terms = self.enrich_res.index
         g = GSEAPlot(

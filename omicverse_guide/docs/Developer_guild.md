@@ -17,21 +17,21 @@ A omicverse framework is primarily composed of 5 components.
 - `single`: to analysis the single cell omic-seq like scRNA-seq or scATAC-seq
 - `space`: to analysis the spatial RNA-seq
 - `bulk2single`: to integrate the bulk RNA-seq and single cell RNA-seq
-- `externel`: more related module included RNA-seq avoided installation and confliction
+- `external`: more related module included RNA-seq avoided installation and confliction
 
 The `__init__.py` file is responsible for importing function entries within each folder, and all function functions use a file starting with `_*.py` for function writing.
 
 
 ## For Developer
 
-### Externel module
+### external module
 
 In most cases, we realize that writing a module function is difficult. Therefore, we introduced the `external` module. We can directly clone the entire package from GitHub and then move the entire folder to the `external` folder. During this process, we need to pay attention to whether the License allows it and whether there is a conflict with OmicVerse's GPL license. Subsequently, we need to modify the `import` content. We need to change the packages that are not dependencies of OmicVerse from top-level imports to function-level imports.
 
 ````shell
 .
 ├── omicverse               
-├───── externel
+├───── external
 ├──────── STT
 ├─────────── __init__.py 
 ├─────────── pl

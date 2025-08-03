@@ -1,0 +1,32 @@
+# the param for the llm model, to init the foundation model.
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scgpt/best_model.pt'
+model_param_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scgpt/args.json'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scgpt/vocab.json'
+pad_value = -2
+mask_ratio = 0
+append_cls = true
+input_style = "binned"  # "normed_raw", "log1p", or "binned"
+output_style = "binned"  # "normed_raw", "log1p", or "binned"
+do_mvc = false
+do_dab = false
+input_emb_style = "continuous"  # "category" or "continuous" or "scaling"
+cell_emb_style = "cls"  # "avg-pool" or "w-pool" or "cls"
+do_sample_in_train = false  # sample the bernoulli in training
+per_seq_batch_sample = false
+
+# task params
+distributed = false
+input_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/zero-shot/blood/blood.h5ad'
+output_dir = '/home/share/huadjyin/home/s_qiuping1/workspace/BioLLM1/demo/cell_emb/blood/scgpt_1200'
+device = 'cuda'
+batch_size = 32
+max_seq_len = 1200
+include_zero_gene = false
+
+## cell embedding
+model_used = "scgpt"
+emb_type = 'cell'
+var_key='feature_name' # feature_name
+obs_key='cell_type'
+n_hvg=0
+

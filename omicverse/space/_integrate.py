@@ -20,8 +20,8 @@ __author__ = "Xiang Zhou"
 __email__ = "xzhou@amss.ac.cn"
 __citation__ = "Zhou, X., Dong, K. & Zhang, S. Integrating spatial transcriptomics data across different conditions, technologies and developmental stages. Nat Comput Sci 3, 894–906 (2023)"
 
-from ..externel.STAligner.mnn_utils import create_dictionary_mnn
-from ..externel.STAligner.STALIGNER import STAligner
+from ..external.STAligner.mnn_utils import create_dictionary_mnn
+from ..external.STAligner.STALIGNER import STAligner
 
 import numpy as np
 import pandas as pd

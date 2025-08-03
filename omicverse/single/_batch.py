@@ -85,7 +85,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             raise ImportError(
                 'Please install the intervaltree: `pip install intervaltree fbpca`.'
             )
-        from ..externel.scanorama import integrate_scanpy
+        from ..external.scanorama import integrate_scanpy
         batches = adata.obs[batch_key].cat.categories.tolist()
         alldata = {}
         for batch in batches:
@@ -127,7 +127,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         add_reference(adata,'scVI','batch correction with scVI')
         return model
     elif methods=='CellANOVA':
-        from ..externel.cellanova.model import calc_ME,calc_BE,calc_TE
+        from ..external.cellanova.model import calc_ME,calc_BE,calc_TE
         if ('highly_variable_features' in adata.var.columns) and ('highly_variable' not in adata.var.columns):
             adata.var['highly_variable']=adata.var['highly_variable_features']
         adata= calc_ME(adata, integrate_key=batch_key)

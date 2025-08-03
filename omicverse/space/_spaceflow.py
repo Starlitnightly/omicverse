@@ -73,13 +73,13 @@ class pySpaceFlow(object):
         """
         global sf_install
         try:
-            from ..externel.spaceflow import SpaceFlow
+            from ..external.spaceflow import SpaceFlow
             sf_install=True
         except ImportError as e:
             raise ImportError(
                 'Please install the SpaceFlow: `pip install SpaceFlow`.'
             ) from e
-        from ..externel.spaceflow import SpaceFlow
+        from ..external.spaceflow import SpaceFlow
         sf = SpaceFlow(adata=adata, 
                          spatial_locs=adata.obsm['spatial'])
 
@@ -135,7 +135,7 @@ class pySpaceFlow(object):
             - Results are stored in adata.obsm['spaceflow']
             - Progress is shown with a progress bar
         """
-        from ..externel.spaceflow import sparse_mx_to_torch_edge_list, corruption
+        from ..external.spaceflow import sparse_mx_to_torch_edge_list, corruption
 
         adata_preprocessed, spatial_graph = self.sf.adata_preprocessed, self.sf.spatial_graph
         if not adata_preprocessed:

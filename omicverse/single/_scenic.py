@@ -263,8 +263,8 @@ class SCENIC:
         ):
         from .._settings import Colors, EMOJI, print_gpu_usage_color
         
-        from ..externel.pyscenic.utils import modules_from_adjacencies
-        from ..externel.pyscenic.prune import prune2df, df2regulons
+        from ..external.pyscenic.utils import modules_from_adjacencies
+        from ..external.pyscenic.prune import prune2df, df2regulons
 
         print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Regulon Calculation and Activity Scoring:{Colors.ENDC}")
         print(f"   {Colors.CYAN}Input edges: {Colors.BOLD}{len(self.edgelist):,}{Colors.ENDC}")

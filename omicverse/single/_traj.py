@@ -13,10 +13,10 @@ from ..utils._neighboors import update_rep, eff_n_jobs,neighbors,W_from_rep
 from .._settings import add_reference
 
 from ._cosg import cosg
-from ..externel.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
-from ..externel.palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
-from ..externel.palantir.core import run_palantir
-from ..externel.palantir.presults import select_branch_cells,compute_gene_trends
+from ..external.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
+from ..external.palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
+from ..external.palantir.core import run_palantir
+from ..external.palantir.presults import select_branch_cells,compute_gene_trends
 
 
 class TrajInfer(object):
@@ -277,7 +277,7 @@ def calc_force_directed_layout(
     """
     G = construct_graph(W)
     try:
-        from ..externel.forcedirect2.forceatlas2 import ForceAtlas2
+        from ..external.forcedirect2.forceatlas2 import ForceAtlas2
         
         # 如果请求编译并且fa2util模块需要编译
         if compile_cython:
@@ -287,7 +287,7 @@ def calc_force_directed_layout(
                 import importlib.util
                 
                 # 检查是否已经编译
-                force_dir = os.path.dirname(os.path.abspath(importlib.util.find_spec("omicverse.externel.forcedirect2.forceatlas2").origin))
+                force_dir = os.path.dirname(os.path.abspath(importlib.util.find_spec("omicverse.external.forcedirect2.forceatlas2").origin))
                 compiled_module_exists = any(f.startswith('fa2util.') and (f.endswith('.so') or f.endswith('.pyd')) 
                                            for f in os.listdir(force_dir))
                 

@@ -1,5 +1,5 @@
 r"""Module providing encapsulation of STT for spatial transition tensor analysis."""
-from ..externel.STT import tl,pl
+from ..external.STT import tl,pl
 from typing import Any
 import scanpy as sc
 import numpy as np

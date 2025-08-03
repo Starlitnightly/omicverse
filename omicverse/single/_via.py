@@ -1,7 +1,7 @@
 
 
-from ..externel.VIA.core import VIA
-from ..externel.VIA.datasets_via import scRNA_hematopoiesis
+from ..external.VIA.core import VIA
+from ..external.VIA.datasets_via import scRNA_hematopoiesis
 
 import anndata
 import numpy as np
@@ -13,8 +13,8 @@ import pygam as pg
 from datetime import datetime
 from typing import Union,Tuple
 
-from ..externel.VIA.utils_via import *
-from ..externel.VIA.plotting_via import *
+from ..external.VIA.utils_via import *
+from ..external.VIA.plotting_via import *
 from .._settings import add_reference
 #from ..via.utils_via import sc_loc_ofsuperCluster_PCAspace,compute_velocity_on_grid
 

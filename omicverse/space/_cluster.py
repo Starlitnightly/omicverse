@@ -3,7 +3,7 @@ import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
-from ..externel.STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
+from ..external.STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
 import scanpy as sc
 from anndata import AnnData
 import numpy as np
@@ -295,7 +295,7 @@ def clusters(adata,
         >>> adata = ov.space.clusters(adata, methods, methods_kwargs)
     """
     from scipy.sparse import issparse
-    from ..externel.GraphST import GraphST
+    from ..external.GraphST import GraphST
 
     for method in methods:
         if method=='STAGATE':
@@ -381,7 +381,7 @@ def clusters(adata,
             output_path = methods_kwargs['CAST']['output_path_t']
             os.makedirs(output_path, exist_ok=True)
 
-            from ..externel.CAST import CAST_MARK
+            from ..external.CAST import CAST_MARK
             embed_dict = CAST_MARK(coords_raw,exp_dict,**methods_kwargs['CAST'])
 
             from tqdm import tqdm
@@ -395,7 +395,7 @@ def clusters(adata,
             add_reference(adata,'CAST','embedding with CAST')
         elif method=='BINARY':
             print('The BINARY method is used to embed the spatial data.')
-            from ..externel import BINARY
+            from ..external import BINARY
             if batch_key is None:
                 adata.obs['BINARY_sample']='sample1'
             else:

@@ -1,0 +1,33 @@
+# the param for the llm model, to init the foundation model.
+model_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scbert/panglao_pretrain.pth'
+vocab_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scbert/gene_vocab.json'
+g2v_file = '/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/models/scbert//gene2vec_16906.npy'
+bin_num = 7
+max_seq_len = 16907
+use_g2v = true
+embsize = 200
+
+# task params
+distributed = false
+
+device = 'cuda'
+batch_size = 8
+do_preprocess = true
+
+## cell embedding
+model_used = "scbert"
+emb_type = 'gene-expression'
+cell_emb_type='cls' # cls/ mean/ sum
+obs_key = "cell_type"
+var_key='feature_name'
+n_hvg=0
+
+## other
+h5ad_file='/home/share/huadjyin/home/s_qiuping1/workspace/omics_model/bio_model/biollm/case/data/zero-shot/Immune_ALL_human.h5ad'
+tf_genes_file='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/resources/hs_hgnc_tfs.txt'
+database_folder='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/databases/'
+resources_folder='/home/share/huadjyin/home/s_huluni/chenqianqian/files_for_pyscenic/resources'
+
+output_folder='/home/share/huadjyin/home/s_huluni/project/BioLLM2/case/grn/output/'
+gene_sets = 'GO_Biological_Process_2025'  
+#'GO_Molecular_Function_2025' 'GO_Cellular_Component_2025' 'GO_Biological_Process_2025'

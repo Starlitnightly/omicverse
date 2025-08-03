@@ -348,13 +348,13 @@ Add `pl` as a unified drawing prefix for the next release, to replace the drawin
 
 ## v 1.6.0
 
-Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from root to externel module.
+Move `CEFCON`,`GNTD`,`mofapy2`,`spaceflow`,`spatrio`,`STAligner`,`tosica` from root to external module.
 
 ### space Module
 
 - Added `STT` in `omicverse.space` to calculate the spatial transition tensor.
-- Added `scSLAT` in `omicverse.externel` to align of different spatial slices.
-- Added `PROST` in `omicverse.externel` and `svg` in `omicverse.space` to identify the spatially variable genes and domain.
+- Added `scSLAT` in `omicverse.external` to align of different spatial slices.
+- Added `PROST` in `omicverse.external` and `svg` in `omicverse.space` to identify the spatially variable genes and domain.
 
 ### single Module
 
@@ -375,7 +375,7 @@ Support Raw Windows platform
 ## v 1.6.3
 
 - Added  `ov.setting.cpu_init` to change the environment to CPU.
-- Move module `tape`,`SEACells` and `palantir` to `externel`
+- Move module `tape`,`SEACells` and `palantir` to `external`
 
 ### Single Module
 - Added `CytoTrace2` to predict cellular potency categories and absolute developmental potential from single-cell RNA-sequencing data.

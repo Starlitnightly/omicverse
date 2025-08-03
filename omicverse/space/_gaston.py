@@ -2,7 +2,7 @@ import scanpy as sc
 import os
 import torch
 import numpy as np
-from ..externel.gaston import neural_net,process_NN_output,dp_related,cluster_plotting
+from ..external.gaston import neural_net,process_NN_output,dp_related,cluster_plotting
 from scipy.sparse import issparse, csr_matrix
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -191,7 +191,7 @@ class GASTON(object):
             - Required before calling train()
         """
         S=self.adata.obsm['spatial']
-        from ..externel.gaston.neural_net import load_rescale_input_data
+        from ..external.gaston.neural_net import load_rescale_input_data
         S_torch, A_torch = load_rescale_input_data(S,A)
         self.S_torch=S_torch
         self.A_torch=A_torch
@@ -275,7 +275,7 @@ class GASTON(object):
         self.model=gaston_model
         self.A=A
         self.S=S
-        from ..externel.gaston import model_selection
+        from ..external.gaston import model_selection
         model_selection.plot_ll_curve(gaston_model, A, S, max_domain_num=max_domain_num, start_from=start_from)
         return gaston_model, A, S
     
@@ -343,7 +343,7 @@ class GASTON(object):
             - Colors represent depth values
             - Useful for understanding tissue organization
         """
-        from ..externel.gaston.cluster_plotting import plot_isodepth
+        from ..external.gaston.cluster_plotting import plot_isodepth
         rotate=np.radians(rotate_angle)
         plot_isodepth(self.gaston_isodepth,self.S, 
                       self.model, figsize=figsize, streamlines=show_streamlines, 
@@ -485,7 +485,7 @@ class GASTON(object):
         """
         rotate = np.radians(rotate_angle)
 
-        from ..externel.gaston.restrict_spots import restrict_spots
+        from ..external.gaston.restrict_spots import restrict_spots
         counts_mat_restrict, coords_mat_restrict, gaston_isodepth_restrict, gaston_labels_restrict, S_restrict=restrict_spots(
                                                                     self.adata.X, 
                                                                     self.adata.obsm['spatial'], 
@@ -531,7 +531,7 @@ class GASTON(object):
             - Results can be used for downstream analysis
         """
         self.umi_thresh=umi_thresh
-        from ..externel.gaston.filter_genes import filter_genes
+        from ..external.gaston.filter_genes import filter_genes
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
@@ -567,7 +567,7 @@ class GASTON(object):
             - Identifies expression breakpoints
             - Useful for finding spatial transition points
         """
-        from ..externel.gaston.segmented_fit import pw_linear_fit
+        from ..external.gaston.segmented_fit import pw_linear_fit
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
@@ -611,8 +611,8 @@ class GASTON(object):
             - Can incorporate cell type information
             - Useful for trajectory analysis
         """
-        from ..externel.gaston.binning_and_plotting import bin_data
-        from ..externel.gaston.spatial_gene_classification import get_discont_genes, get_cont_genes
+        from ..external.gaston.binning_and_plotting import bin_data
+        from ..external.gaston.spatial_gene_classification import get_discont_genes, get_cont_genes
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
@@ -728,7 +728,7 @@ class GASTON(object):
 
         # display log CPM (if you want to do CP500, set offset=500)
         #offset=10**6
-        from ..externel.gaston.binning_and_plotting import plot_gene_pwlinear
+        from ..external.gaston.binning_and_plotting import plot_gene_pwlinear
         plot_gene_pwlinear(gene_name, self.pw_fit_dict, self.gaston_labels_restrict, self.gaston_isodepth_restrict, 
                            self.binning_output, cell_type_list=cell_type_list, pt_size=pt_size, colors=domain_colors, 
                            linear_fit=linear_fit, ticksize=ticksize, figsize=figsize, offset=offset, lw=lw,
@@ -766,7 +766,7 @@ class GASTON(object):
             - Useful for examining expression patterns
         """
         rotate=np.radians(rotate_angle)
-        from ..externel.gaston.binning_and_plotting import plot_gene_raw
+        from ..external.gaston.binning_and_plotting import plot_gene_raw
         if issparse(self.counts_mat_restrict):
             counts_mat_restrict=self.counts_mat_restrict.toarray()
         else:
@@ -805,7 +805,7 @@ class GASTON(object):
             - Useful for detailed pattern analysis
         """
         rotate=np.radians(rotate_angle)
-        from ..externel.gaston.binning_and_plotting import plot_gene_function
+        from ..external.gaston.binning_and_plotting import plot_gene_function
 
         plot_gene_function(gene_name, self.S_restrict, self.pw_fit_dict, 
                            self.gaston_labels_restrict, self.gaston_isodepth_restrict, 
