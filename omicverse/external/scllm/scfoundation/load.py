@@ -7,6 +7,7 @@ import numpy as np
 import random
 from .pretrainmodels import select_model
 import math
+import pandas as pd
 
 def next_16x(x):
     return int(math.ceil(x / 16) * 16)
@@ -76,26 +77,64 @@ def gatherData(data, labels, pad_token_id):
 def convertconfig(ckpt):
     newconfig = {}
     newconfig['configs']={}
-    model_type = ckpt['configs']['model']
     
-    for key, val in ckpt['configs']['model_config'][model_type].items():
-        newconfig['configs'][key]=val
+    # Handle both 'config' and 'configs' keys
+    config_key = 'configs' if 'configs' in ckpt else 'config'
+    state_dict_key = 'state_dict' if 'state_dict' in ckpt else 'model_state_dict'
+    
+    if config_key not in ckpt:
+        raise KeyError(f"Neither 'configs' nor 'config' found in checkpoint. Available keys: {list(ckpt.keys())}")
+    
+    if state_dict_key not in ckpt:
+        raise KeyError(f"Neither 'state_dict' nor 'model_state_dict' found in checkpoint. Available keys: {list(ckpt.keys())}")
+    
+    config_data = ckpt[config_key]
+    
+    # Extract model type - handle different config structures
+    if isinstance(config_data, dict) and 'model' in config_data:
+        model_type = config_data['model']
         
-    for key, val in ckpt['configs']['dataset_config']['rnaseq'].items():
-        newconfig['configs'][key]=val
+        # Extract model config
+        if 'model_config' in config_data and model_type in config_data['model_config']:
+            for key, val in config_data['model_config'][model_type].items():
+                newconfig['configs'][key] = val
+        
+        # Extract dataset config
+        if 'dataset_config' in config_data and 'rnaseq' in config_data['dataset_config']:
+            for key, val in config_data['dataset_config']['rnaseq'].items():
+                newconfig['configs'][key] = val
+                
+    else:
+        # If config_data is already flattened, use it directly
+        if isinstance(config_data, dict):
+            for key, val in config_data.items():
+                newconfig['configs'][key] = val
+            # Try to extract model_type
+            model_type = config_data.get('model_type', config_data.get('model', 'flash_all'))
+        else:
+            # Fallback to default
+            model_type = 'flash_all'
         
     if model_type == 'performergau_resolution':
         model_type = 'performer_gau'
     
     import collections
     d = collections.OrderedDict()
-    for key, val in ckpt['state_dict'].items():
-        d[str(key).split('model.')[1]]=val
+    state_dict_data = ckpt[state_dict_key]
+    
+    # Handle different state dict structures
+    for key, val in state_dict_data.items():
+        if 'model.' in key:
+            # Remove 'model.' prefix if present
+            new_key = str(key).split('model.')[1]
+        else:
+            new_key = key
+        d[new_key] = val
         
-    newconfig['configs']['model_type']=model_type
-    newconfig['model_state_dict']=d
-    newconfig['configs']['pos_embed']=False
-    newconfig['configs']['device']='cuda'
+    newconfig['configs']['model_type'] = model_type
+    newconfig['model_state_dict'] = d
+    newconfig['configs']['pos_embed'] = False
+    newconfig['configs']['device'] = 'cuda'
     return newconfig
 
 def load_model(best_ckpt_path, device):
@@ -122,8 +161,21 @@ def load_model(best_ckpt_path, device):
     return model.cuda(),config
 
 def load_model_frommmf(best_ckpt_path, key='gene'):
-    model_data = torch.load(best_ckpt_path,map_location='cpu')
-    model_data = model_data[key]
+    checkpoint = torch.load(best_ckpt_path,map_location='cpu')
+    
+    # Check if the requested key exists
+    if key not in checkpoint:
+        available_keys = list(checkpoint.keys()) if isinstance(checkpoint, dict) else []
+        mmf_keys = [k for k in available_keys if k in ['gene', 'cell', 'rde']]
+        
+        if mmf_keys:
+            raise KeyError(f"Key '{key}' not found in checkpoint. Available MMF keys: {mmf_keys}. "
+                          f"Try using one of these keys instead.")
+        else:
+            raise KeyError(f"Key '{key}' not found in checkpoint. Available keys: {available_keys}. "
+                          f"This may not be a valid MMF format checkpoint.")
+    
+    model_data = checkpoint[key]
     model_data = convertconfig(model_data)
     if not model_data.__contains__('configs'):
         print('***** No configs *****')
