@@ -2,11 +2,10 @@ from transformers import PreTrainedTokenizer
 
 class scMulanTokenizer(PreTrainedTokenizer):
     def __init__(self, chars):
-        super().__init__()
-
         self.chars = chars
         self.stoi = { ch:i for i,ch in enumerate(self.chars) }
         self.itos = { i:ch for i,ch in enumerate(self.chars) }
+        super().__init__()
 
     def _tokenize(self, text):
         # Implement your tokenization method here
@@ -26,7 +25,10 @@ class scMulanTokenizer(PreTrainedTokenizer):
         if transformers.__version__ <= "4.40":
             return self.stoi
         else:
-            return self.get_stoi()
+            try:
+                return self.get_stoi()
+            except:
+                return self.stoi
     
     @property
     def vocab_size(self) -> int:
