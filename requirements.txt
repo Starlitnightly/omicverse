@@ -48,3 +48,4 @@ tomli
 requests
 wandb
 munch
+datasets
