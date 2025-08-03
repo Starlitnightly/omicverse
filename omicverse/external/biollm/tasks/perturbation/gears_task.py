@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-@author: Ping Qiu  qiuping1@genomics.cn
-@last modified by: Ping Qiu
 @file: gears_task.py
-@time: 2024/3/3 15:02
+@description: 
+@author: Ping Qiu
+@email: qiuping1@genomics.cn
+@last modified by: Ping Qiu
+
+change log:
+    2024/03/18  create file.
 """
-import os
-import gc
-import json
+from ...tasks.bio_task import BioTask
 import numpy as np
-import pandas as pd
-from ..bio_task import BioTask
-import torch
+from os.path import join as pjoin
 from ...repo.gears import PertData, GEARS
+import torch
 import scanpy as sc
 from ...utils.utils import gene2vec_embedding
 from ...repo.scfoundation.GEARS.gears import GEARS as scFoundationGEARS
@@ -40,7 +41,7 @@ class GearsTask(BioTask):
         if self.args.data_name in ['norman', 'adamson', 'dixit']:
             pert_data.load(data_name=self.args.data_name, gene_subset=gene_subset)
         else:
-            adata = self.read_h5ad(os.path.join(self.args.data_dir, self.args.data_name + '.h5ad'), filter_gene=True)
+            adata = self.read_h5ad(pjoin(self.args.data_dir, self.args.data_name + '.h5ad'), filter_gene=True)
             sc.pp.calculate_qc_metrics(adata, inplace=True)
             pert_data.new_data_process(dataset_name=self.args.data_name, adata=adata)
         # specify data split

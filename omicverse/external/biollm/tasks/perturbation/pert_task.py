@@ -1,30 +1,27 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-@author: Ping Qiu  qiuping1@genomics.cn
-@last modified by: Ping Qiu
 @file: pert_task.py
-@time: 2024/3/3 15:02
-"""
-import os
-import gc
-import json
-import numpy as np
-import pandas as pd
-import scanpy as sc
-import torch
-from torch.utils.data import DataLoader
+@description: 
+@author: Ping Qiu
+@email: qiuping1@genomics.cn
+@last modified by: Ping Qiu
 
-from ..bio_task import BioTask
+change log:
+    2024/04/02  create file.
+"""
+import pickle
+
+from ...tasks.bio_task import BioTask
 from ...repo.gears import PertData
 from ...repo.scgpt.loss import masked_mse_loss
-import matplotlib.pyplot as plt
-import seaborn as sns
-from tqdm import tqdm
+import os
+import numpy as np
+import torch
 from ...trainer.pert_scgpt_trainer import PertScgptTrainer
 from ...trainer.pert_scmamba_trainer import PertScmambaTrainer
-import warnings
-import pickle
+import time
+import copy
 from ...evaluate.perturbation import plot_perturbation
 
 

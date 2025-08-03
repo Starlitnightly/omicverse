@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-@author: Ping Qiu  qiuping1@genomics.cn
+@file: trainer.py
+@description:
+@author: Ping Qiu
+@email: qiuping1@genomics.cn
 @last modified by: Ping Qiu
-@file: anno_scbert_train.py
-@time: 2024/3/3 15:02
+
+change log:
+    2024/04/03  create file.
 """
-import warnings
-warnings.filterwarnings("ignore")
-
-import time
-import numpy as np
-import torch
-import wandb
-from torch import nn
-
-from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
-
+from sklearn.metrics import accuracy_score, f1_score
+from torch.optim import Adam
+import torch.distributed as dist
 from ..repo.scbert.utils import *
 from datetime import datetime
 import copy

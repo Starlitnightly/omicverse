@@ -1,36 +1,30 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-@author: Ping Qiu  qiuping1@genomics.cn
+@file: pert_scmamba_trainer.py
+@description:
+@author: Ping Qiu
+@email: qiuping1@genomics.cn
 @last modified by: Ping Qiu
-@file: pert_scgpt_trainer.py
-@time: 2024/3/3 15:02
+
+change log:
+    2024/04/11  create file.
 """
-import copy
-import gc
-import json
+
 import time
 import warnings
-
-import torch
-from torch import nn
-from tqdm import tqdm
-import pandas as pd
 import numpy as np
-from ..repo.gears.utils import create_cell_graph_dataset_for_prediction
-import torch.distributed as dist
-from sklearn.metrics import f1_score
-
 from ..repo.scgpt.utils import map_raw_id_to_vocab_id
 from ..repo.scgpt.loss import masked_relative_error
-
+from ..repo.gears.utils import create_cell_graph_dataset_for_prediction
+from torch_geometric.loader import DataLoader
 import torch
 from .trainer import Trainer
 
 
-class PertScgptTrainer(Trainer):
+class PertScmambaTrainer(Trainer):
     def __init__(self, args, model, train_loader, val_loader, optimizer, scheduler, scaler, criterion):
-        super(PertScgptTrainer, self).__init__(args, model, train_loader)
+        super(PertScmambaTrainer, self).__init__(args, model, train_loader)
         self.val_loader = val_loader
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -44,49 +38,51 @@ class PertScgptTrainer(Trainer):
         self.model.train()
         total_loss, total_mse = 0.0, 0.0
         start_time = time.time()
-        n_genes = len(gene_ids)
+        # n_genes = len(gene_ids)
         num_batches = len(self.train_loader)
         for batch, batch_data in enumerate(self.train_loader):
             batch_size = len(batch_data.y)
             batch_data.to(self.device)
-            x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 2)
-            ori_gene_values = x[:, 0].view(batch_size, n_genes)
+            x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 1)
+            ori_gene_values = x[:, 0].view(batch_size, -1)
+            n_genes = ori_gene_values.shape[-1]
             pert_flags = torch.Tensor(np.stack(batch_data.pert_flag)).long().to(self.device)
+            sorted_layer_idx = batch_data.sorted_layer_idx
             target_gene_values = batch_data.y  # (batch_size, n_genes)
-            if self.args.include_zero_gene in ["all", "batch-wise"]:
-                if self.args.include_zero_gene == "all":
-                    input_gene_ids = torch.arange(n_genes, device=self.device, dtype=torch.long)
-                else:
-                    input_gene_ids = (
-                        ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
-                    )
-                # sample input_gene_id
-                if len(input_gene_ids) > self.args.max_seq_len:
-                    input_gene_ids = torch.randperm(len(input_gene_ids), device=self.device)[
-                                     :self.args.max_seq_len
-                                     ]
-                input_values = ori_gene_values[:, input_gene_ids]
-                input_pert_flags = pert_flags[:, input_gene_ids]
-                target_values = target_gene_values[:, input_gene_ids]
+            input_gene_ids = torch.arange(n_genes, device=self.device, dtype=torch.long)
+            # if self.args.include_zero_gene == "all":
+            #     input_gene_ids = torch.arange(n_genes, device=self.device, dtype=torch.long)
+            # else:
+            #     input_gene_ids = (
+            #         ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
+            #     )
+            # # sample input_gene_id
+            # if len(input_gene_ids) > self.args.max_seq_len:
+            #     input_gene_ids = torch.randperm(len(input_gene_ids), device=self.device)[
+            #                      :self.args.max_seq_len
+            #                      ]
+            input_values = ori_gene_values[:, input_gene_ids]
+            input_pert_flags = pert_flags[:, input_gene_ids]
+            target_values = target_gene_values[:, input_gene_ids]
+            sorted_layer_idx = sorted_layer_idx[:, input_gene_ids]
+            mapped_input_gene_ids = map_raw_id_to_vocab_id(input_gene_ids, gene_ids)
+            mapped_input_gene_ids = mapped_input_gene_ids.repeat(batch_size, 1)
 
-                mapped_input_gene_ids = map_raw_id_to_vocab_id(input_gene_ids, gene_ids)
-                mapped_input_gene_ids = mapped_input_gene_ids.repeat(batch_size, 1)
-
-                # src_key_padding_mask = mapped_input_gene_ids.eq(vocab[pad_token])
-                src_key_padding_mask = torch.zeros_like(
-                    input_values, dtype=torch.bool, device=self.device
-                )
-
+            # src_key_padding_mask = mapped_input_gene_ids.eq(vocab[pad_token])
+            src_key_padding_mask = torch.zeros_like(
+                input_values, dtype=torch.bool, device=self.device
+            )
             with torch.cuda.amp.autocast(enabled=True):
                 output_dict = self.model(
                     mapped_input_gene_ids,
                     input_values,
-                    input_pert_flags,
                     src_key_padding_mask=src_key_padding_mask,
                     CLS=False,
                     CCE=False,
                     MVC=False,
                     ECS=False,
+                    sorted_layer_idx=sorted_layer_idx,
+                    input_pert_flags=input_pert_flags,
                 )
                 output_values = output_dict["mlm_output"]
 
@@ -140,61 +136,65 @@ class PertScgptTrainer(Trainer):
         self.model.eval()
         total_loss = 0.0
         total_error = 0.0
-        n_genes = len(gene_ids)
+        # n_genes = len(gene_ids)
         with torch.no_grad():
             for batch, batch_data in enumerate(self.val_loader):
                 batch_size = len(batch_data.y)
                 batch_data.to(self.device)
                 x: torch.Tensor = batch_data.x  # (batch_size * n_genes, 2)
-                ori_gene_values = x[:, 0].view(batch_size, n_genes)
+                ori_gene_values = x[:, 0].view(batch_size, -1)
+                n_genes = ori_gene_values.shape[-1]
                 pert_flags = torch.Tensor(np.stack(batch_data.pert_flag)).long().to(self.device)
                 target_gene_values = batch_data.y  # (batch_size, n_genes)
+                sorted_layer_idx = batch_data.sorted_layer_idx
+                input_gene_ids = torch.arange(n_genes, device=self.device, dtype=torch.long)
+                # if self.args.include_zero_gene in ["all", "batch-wise"]:
+                #     if self.args.include_zero_gene == "all":
+                #         input_gene_ids = torch.arange(n_genes, device=self.device)
+                #     else:  # when batch-wise
+                #         input_gene_ids = (
+                #             ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
+                #         )
+                #     # sample input_gene_id
+                #     if len(input_gene_ids) > self.args.max_seq_len:
+                #         input_gene_ids = torch.randperm(len(input_gene_ids), device=self.device)[
+                #                          :self.args.max_seq_len
+                #                          ]
+                input_values = ori_gene_values[:, input_gene_ids]
+                input_pert_flags = pert_flags[:, input_gene_ids]
+                target_values = target_gene_values[:, input_gene_ids]
+                sorted_layer_idx = sorted_layer_idx[:, input_gene_ids]
 
-                if self.args.include_zero_gene in ["all", "batch-wise"]:
-                    if self.args.include_zero_gene == "all":
-                        input_gene_ids = torch.arange(n_genes, device=self.device)
-                    else:  # when batch-wise
-                        input_gene_ids = (
-                            ori_gene_values.nonzero()[:, 1].flatten().unique().sort()[0]
-                        )
-                    # sample input_gene_id
-                    if len(input_gene_ids) > self.args.max_seq_len:
-                        input_gene_ids = torch.randperm(len(input_gene_ids), device=self.device)[
-                                         :self.args.max_seq_len
-                                         ]
-                    input_values = ori_gene_values[:, input_gene_ids]
-                    input_pert_flags = pert_flags[:, input_gene_ids]
-                    target_values = target_gene_values[:, input_gene_ids]
+                print(input_pert_flags.sum())
+                mapped_input_gene_ids = map_raw_id_to_vocab_id(input_gene_ids, gene_ids)
+                mapped_input_gene_ids = mapped_input_gene_ids.repeat(batch_size, 1)
 
-                    mapped_input_gene_ids = map_raw_id_to_vocab_id(input_gene_ids, gene_ids)
-                    mapped_input_gene_ids = mapped_input_gene_ids.repeat(batch_size, 1)
+                # src_key_padding_mask = mapped_input_gene_ids.eq(vocab[pad_token])
+                src_key_padding_mask = torch.zeros_like(
+                    input_values, dtype=torch.bool, device=input_values.device
+                )
+            with torch.cuda.amp.autocast(enabled=True):
+                output_dict = self.model(
+                    mapped_input_gene_ids,
+                    input_values,
+                    src_key_padding_mask=src_key_padding_mask,
+                    CLS=False,
+                    CCE=False,
+                    MVC=False,
+                    ECS=False,
+                    sorted_layer_idx=sorted_layer_idx,
+                    input_pert_flags=input_pert_flags,
+                )
+                output_values = output_dict["mlm_output"]
 
-                    # src_key_padding_mask = mapped_input_gene_ids.eq(vocab[pad_token])
-                    src_key_padding_mask = torch.zeros_like(
-                        input_values, dtype=torch.bool, device=input_values.device
-                    )
-                with torch.cuda.amp.autocast(enabled=True):
-                    output_dict = self.model(
-                        mapped_input_gene_ids,
-                        input_values,
-                        input_pert_flags,
-                        src_key_padding_mask=src_key_padding_mask,
-                        CLS=False,
-                        CCE=False,
-                        MVC=False,
-                        ECS=False,
-                        do_sample=True,
-                    )
-                    output_values = output_dict["mlm_output"]
-
-                    masked_positions = torch.ones_like(
-                        input_values, dtype=torch.bool, device=input_values.device
-                    )
-                    loss = self.criterion(output_values, target_values, masked_positions)
-                total_loss += loss.item()
-                total_error += masked_relative_error(
-                    output_values, target_values, masked_positions
-                ).item()
+                masked_positions = torch.ones_like(
+                    input_values, dtype=torch.bool, device=input_values.device
+                )
+                loss = self.criterion(output_values, target_values, masked_positions)
+            total_loss += loss.item()
+            total_error += masked_relative_error(
+                output_values, target_values, masked_positions
+            ).item()
         return total_loss / len(self.val_loader), total_error / len(self.val_loader)
 
     def predict(self, pert_data, pert_list, gene_ids, pool_size=None):

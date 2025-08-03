@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 # coding: utf-8
-"""
-@author: Ping Qiu  qiuping1@genomics.cn
-@last modified by: Ping Qiu
-@file: integration_scgpt_trainer.py
-@time: 2024/3/3 15:02
-"""
+
+import warnings
 import torch
-from torch import nn
-from tqdm import tqdm
 import numpy as np
 import copy
 from ..repo.scgpt.loss import (
-    masked_mse_loss,
     masked_relative_error,
     criterion_neg_log_bernoulli,
 )
