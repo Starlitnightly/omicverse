@@ -2,11 +2,13 @@
 Model factory for creating and managing different scLLM models.
 """
 
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
+import numpy as np
 
 from .base import SCLLMBase
 from .scgpt_model import ScGPTModel
+from .scfoundation_model import ScFoundationModel
 
 
 class ModelFactory:
@@ -20,6 +22,7 @@ class ModelFactory:
     # Registry of available models
     _models = {
         "scgpt": ScGPTModel,
+        "scfoundation": ScFoundationModel,
         # Future models can be added here:
         # "scbert": ScBERTModel,
         # "celllm": CellLMModel,
@@ -621,3 +624,431 @@ def integrate_with_scgpt(query_adata,
             print("✓ Original embeddings added to query_adata.obsm['X_scgpt_original']")
     
     return results
+
+
+# Convenience functions for scFoundation
+def load_scfoundation(model_path: Union[str, Path], device: Optional[str] = None, **kwargs) -> ScFoundationModel:
+    """
+    Quick function to load a scFoundation model.
+    
+    Args:
+        model_path: Path to the scFoundation model file (.ckpt)
+        device: Device to run the model on
+        **kwargs: Additional parameters (key, version, etc.)
+        
+    Returns:
+        Loaded scFoundation model
+    """
+    return ModelFactory.create_model("scfoundation", model_path, device, **kwargs)
+
+
+def get_embeddings_with_scfoundation(adata, model_path: Union[str, Path], 
+                                    device: Optional[str] = None, 
+                                    output_type: str = "cell",
+                                    **kwargs):
+    """
+    Quick function to get embeddings with scFoundation.
+    
+    Args:
+        adata: AnnData object
+        model_path: Path to the scFoundation model
+        device: Device to run the model on
+        output_type: Type of embeddings ('cell', 'gene', 'gene_batch')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Embeddings
+    """
+    model = load_scfoundation(model_path, device, **kwargs)
+    return model.get_embeddings(adata, output_type=output_type, **kwargs)
+
+
+def end_to_end_scfoundation_embedding(adata,
+                                     model_path: Union[str, Path],
+                                     save_embeddings_path: Optional[Union[str, Path]] = None,
+                                     device: Optional[str] = None,
+                                     output_type: str = "cell",
+                                     pool_type: str = "all",
+                                     **kwargs):
+    """
+    Complete workflow for extracting embeddings with scFoundation.
+    
+    Args:
+        adata: Input AnnData object
+        model_path: Path to scFoundation model
+        save_embeddings_path: Path to save embeddings (optional)
+        device: Device for computation
+        output_type: Type of embeddings ('cell', 'gene', 'gene_batch') 
+        pool_type: Pooling type for cell embeddings ('all', 'max')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Dictionary with embeddings and metadata
+    """
+    print("🚀 Starting scFoundation embedding extraction workflow...")
+    
+    # Load model
+    manager = SCLLMManager(
+        model_type="scfoundation",
+        model_path=model_path,
+        device=device
+    )
+    
+    # Extract embeddings
+    results = manager.get_embeddings(
+        adata, 
+        output_type=output_type,
+        pool_type=pool_type,
+        **kwargs
+    )
+    
+    # Add embeddings to adata
+    if output_type == "cell":
+        adata.obsm['X_scfoundation'] = results
+        print("✓ Cell embeddings added to adata.obsm['X_scfoundation']")
+    elif output_type in ["gene", "gene_batch"]:
+        adata.varm[f'X_scfoundation_{output_type}'] = results
+        print(f"✓ Gene embeddings added to adata.varm['X_scfoundation_{output_type}']")
+    
+    # Save embeddings if requested
+    if save_embeddings_path is not None:
+        np.save(save_embeddings_path, results)
+        print(f"💾 Embeddings saved to: {save_embeddings_path}")
+    
+    print("🎉 scFoundation embedding extraction completed!")
+    
+    return {
+        "embeddings": results,
+        "output_type": output_type,
+        "pool_type": pool_type if output_type == "cell" else None,
+        "model_path": str(model_path)
+    }
+
+
+def fine_tune_scfoundation(train_adata,
+                          model_path: Union[str, Path],
+                          valid_adata=None,
+                          save_path: Optional[Union[str, Path]] = None,
+                          device: Optional[str] = None,
+                          **kwargs):
+    """
+    Complete workflow for fine-tuning scFoundation on reference data.
+    
+    Args:
+        train_adata: Training data with 'celltype' in .obs
+        model_path: Path to pretrained scFoundation model (.ckpt)
+        valid_adata: Validation data (optional)
+        save_path: Path to save fine-tuned model (optional)
+        device: Device for training
+        **kwargs: Training parameters (epochs, lr, batch_size, frozen_more, etc.)
+        
+    Returns:
+        Dictionary with fine-tuning results and trained model
+    """
+    print("🚀 Starting scFoundation fine-tuning workflow...")
+    
+    # Load pretrained model
+    model = load_scfoundation(model_path, device, **kwargs)
+    
+    # Fine-tune the model
+    results = model.fine_tune(
+        train_adata=train_adata,
+        valid_adata=valid_adata,
+        task="annotation",
+        **kwargs
+    )
+    
+    # Save fine-tuned model if requested
+    if save_path is not None:
+        model.save_model(save_path)
+        print(f"💾 Fine-tuned model saved to: {save_path}")
+    
+    return {
+        "model": model,
+        "results": results
+    }
+
+
+def predict_celltypes_with_scfoundation(query_adata,
+                                       finetuned_model_path: Union[str, Path],
+                                       device: Optional[str] = None,
+                                       save_predictions: bool = True,
+                                       **kwargs):
+    """
+    Complete workflow for predicting cell types with fine-tuned scFoundation.
+    
+    Args:
+        query_adata: Query data to predict
+        finetuned_model_path: Path to fine-tuned scFoundation model
+        device: Device for prediction
+        save_predictions: Whether to save predictions to query_adata.obs
+        **kwargs: Prediction parameters
+        
+    Returns:
+        Dictionary with predictions and metadata
+    """
+    print("🔍 Starting scFoundation cell type prediction workflow...")
+    
+    # Load fine-tuned model
+    manager = SCLLMManager(
+        model_type="scfoundation",
+        model_path=finetuned_model_path,
+        device=device
+    )
+    
+    # Predict cell types
+    results = manager.model.predict_with_finetune(query_adata, **kwargs)
+    
+    # Add predictions to adata if requested
+    if save_predictions and 'predicted_celltypes' in results:
+        query_adata.obs['predicted_celltype'] = results['predicted_celltypes']
+        query_adata.obs['predicted_celltype_id'] = results['predictions']
+        query_adata.obsm['prediction_probabilities'] = results['probabilities']
+        print("✓ Predictions added to query_adata.obs")
+    
+    return results
+
+
+def end_to_end_scfoundation_annotation(reference_adata,
+                                      query_adata,
+                                      pretrained_model_path: Union[str, Path],
+                                      save_finetuned_path: Optional[Union[str, Path]] = None,
+                                      device: Optional[str] = None,
+                                      validation_split: float = 0.2,
+                                      **kwargs):
+    """
+    Complete end-to-end workflow: fine-tune scFoundation and predict on query data.
+    
+    Args:
+        reference_adata: Reference data with known cell types
+        query_adata: Query data to predict
+        pretrained_model_path: Path to pretrained scFoundation model
+        save_finetuned_path: Path to save fine-tuned model
+        device: Device for computation
+        validation_split: Fraction of reference data for validation
+        **kwargs: Training and prediction parameters
+        
+    Returns:
+        Dictionary with fine-tuning results and predictions
+    """
+    from sklearn.model_selection import train_test_split
+    
+    print("🎯 Starting end-to-end scFoundation annotation workflow...")
+    
+    # Validate data
+    if 'celltype' not in reference_adata.obs:
+        raise ValueError("Reference data must have 'celltype' column in .obs")
+    
+    # Split reference data into train/validation
+    if validation_split > 0:
+        train_idx, val_idx = train_test_split(
+            range(reference_adata.n_obs),
+            test_size=validation_split,
+            stratify=reference_adata.obs['celltype'],
+            random_state=kwargs.get('random_state', 42)
+        )
+        train_adata = reference_adata[train_idx].copy()  
+        valid_adata = reference_adata[val_idx].copy()
+        print(f"📊 Split data: {len(train_idx)} train, {len(val_idx)} validation")
+    else:
+        train_adata = reference_adata.copy()
+        valid_adata = None
+        print(f"📊 Using all {reference_adata.n_obs} cells for training")
+    
+    # Fine-tune model
+    fine_tune_result = fine_tune_scfoundation(
+        train_adata=train_adata,
+        model_path=pretrained_model_path, 
+        valid_adata=valid_adata,
+        save_path=save_finetuned_path,
+        device=device,
+        **kwargs
+    )
+    
+    # Predict on query data using fine-tuned model
+    if save_finetuned_path is not None:
+        prediction_results = predict_celltypes_with_scfoundation(
+            query_adata=query_adata,
+            finetuned_model_path=save_finetuned_path,
+            device=device,
+            **kwargs
+        )
+    else:
+        # Use the fine-tuned model directly
+        prediction_results = fine_tune_result["model"].predict_with_finetune(query_adata, **kwargs)
+        query_adata.obs['predicted_celltype'] = prediction_results['predicted_celltypes']
+        query_adata.obs['predicted_celltype_id'] = prediction_results['predictions']
+        query_adata.obsm['prediction_probabilities'] = prediction_results['probabilities']
+    
+    print("🎉 End-to-end scFoundation annotation completed!")
+    
+    return {
+        "fine_tune_results": fine_tune_result["results"],
+        "prediction_results": prediction_results,
+        "model": fine_tune_result["model"]
+    }
+
+
+# Integration functions for scFoundation
+def integrate_with_scfoundation(query_adata,
+                               model_path: Union[str, Path],
+                               batch_key: str = "batch",
+                               correction_method: str = "harmony",
+                               device: Optional[str] = None,
+                               save_embeddings: bool = True,
+                               **kwargs):
+    """
+    Complete workflow for batch integration using scFoundation.
+    
+    Args:
+        query_adata: Query data with batch information
+        model_path: Path to scFoundation model
+        batch_key: Column name for batch labels
+        correction_method: Integration method ('harmony', 'combat', 'scanorama', 'mnn')
+        device: Device for computation
+        save_embeddings: Whether to save embeddings to query_adata.obsm
+        **kwargs: Integration parameters
+        
+    Returns:
+        Dictionary with integration results
+    """
+    print("🔍 Starting scFoundation batch integration workflow...")
+    
+    # Load scFoundation model
+    manager = SCLLMManager(
+        model_type="scfoundation",
+        model_path=model_path,
+        device=device
+    )
+    
+    # Perform integration
+    results = manager.model.predict(
+        query_adata, 
+        task="integration", 
+        batch_key=batch_key,
+        correction_method=correction_method,
+        **kwargs
+    )
+    
+    # Add integrated embeddings to adata if requested
+    if save_embeddings and 'embeddings' in results:
+        query_adata.obsm['X_scfoundation_integrated'] = results['embeddings']
+        print("✓ Integrated embeddings added to query_adata.obsm['X_scfoundation_integrated']")
+        
+        # Also save original embeddings for comparison
+        if 'original_embeddings' in results:
+            query_adata.obsm['X_scfoundation_original'] = results['original_embeddings']
+            print("✓ Original embeddings added to query_adata.obsm['X_scfoundation_original']")
+    
+    return results
+
+
+def integrate_batches_with_scfoundation(query_adata,
+                                       model_path: Union[str, Path],
+                                       batch_key: str = "batch",
+                                       correction_method: str = "harmony",
+                                       device: Optional[str] = None,
+                                       save_embeddings: bool = True,
+                                       **kwargs):
+    """
+    Alias for integrate_with_scfoundation for consistency with scGPT naming.
+    """
+    return integrate_with_scfoundation(
+        query_adata=query_adata,
+        model_path=model_path,
+        batch_key=batch_key,
+        correction_method=correction_method,
+        device=device,
+        save_embeddings=save_embeddings,
+        **kwargs
+    )
+
+
+def end_to_end_scfoundation_integration(query_adata,
+                                       model_path: Union[str, Path],
+                                       batch_key: str = "batch",
+                                       correction_methods: List[str] = ["harmony"],
+                                       device: Optional[str] = None,
+                                       save_all_methods: bool = False,
+                                       **kwargs):
+    """
+    Complete end-to-end integration workflow with multiple correction methods.
+    
+    Args:
+        query_adata: Query data with batch information
+        model_path: Path to scFoundation model
+        batch_key: Column name for batch labels
+        correction_methods: List of correction methods to try
+        device: Device for computation
+        save_all_methods: Whether to save results from all methods
+        **kwargs: Integration parameters
+        
+    Returns:
+        Dictionary with results from all methods
+    """
+    print("🎯 Starting end-to-end scFoundation integration workflow...")
+    
+    # Load model once
+    manager = SCLLMManager(
+        model_type="scfoundation",
+        model_path=model_path,
+        device=device
+    )
+    
+    all_results = {}
+    
+    for method in correction_methods:
+        print(f"\n📊 Testing integration method: {method}")
+        
+        try:
+            # Perform integration with this method
+            results = manager.model.predict(
+                query_adata,
+                task="integration",
+                batch_key=batch_key,
+                correction_method=method,
+                **kwargs
+            )
+            
+            all_results[method] = results
+            
+            # Save embeddings if requested
+            if save_all_methods or method == correction_methods[0]:
+                if method == correction_methods[0]:
+                    # Save the first method as the default
+                    query_adata.obsm['X_scfoundation_integrated'] = results['embeddings']
+                    print(f"✓ {method} embeddings saved as default integration")
+                
+                if save_all_methods:
+                    query_adata.obsm[f'X_scfoundation_{method}'] = results['embeddings']
+                    print(f"✓ {method} embeddings saved to query_adata.obsm")
+            
+        except Exception as e:
+            print(f"❌ Integration with {method} failed: {e}")
+            all_results[method] = {"error": str(e)}
+    
+    # Save original embeddings for comparison
+    if len(all_results) > 0:
+        first_successful = next((r for r in all_results.values() if 'embeddings' in r), None)
+        if first_successful and 'original_embeddings' in first_successful:
+            query_adata.obsm['X_scfoundation_original'] = first_successful['original_embeddings']
+            print("✓ Original embeddings saved for comparison")
+    
+    print("🎉 End-to-end scFoundation integration completed!")
+    
+    # Summary
+    successful_methods = [m for m, r in all_results.items() if 'embeddings' in r]
+    failed_methods = [m for m, r in all_results.items() if 'error' in r]
+    
+    print(f"\n📈 Integration Summary:")
+    print(f"  Successful methods: {successful_methods}")
+    if failed_methods:
+        print(f"  Failed methods: {failed_methods}")
+    
+    return {
+        "results": all_results,
+        "successful_methods": successful_methods,
+        "failed_methods": failed_methods,
+        "batch_key": batch_key,
+        "model_path": str(model_path)
+    }
