@@ -6,9 +6,16 @@ from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
 import numpy as np
 
-from .base import SCLLMBase
-from .scgpt_model import ScGPTModel
-from .scfoundation_model import ScFoundationModel
+try:
+    from .base import SCLLMBase
+    from .scgpt_model import ScGPTModel
+    from .scfoundation_model import ScFoundationModel
+    from .geneformer_model import GeneformerModel
+except ImportError:
+    from base import SCLLMBase
+    from scgpt_model import ScGPTModel
+    from scfoundation_model import ScFoundationModel
+    from geneformer_model import GeneformerModel
 
 
 class ModelFactory:
@@ -23,6 +30,7 @@ class ModelFactory:
     _models = {
         "scgpt": ScGPTModel,
         "scfoundation": ScFoundationModel,
+        "geneformer": GeneformerModel,
         # Future models can be added here:
         # "scbert": ScBERTModel,
         # "celllm": CellLMModel,
@@ -46,6 +54,25 @@ class ModelFactory:
         Returns:
             Model instance
         """
+        if model_type.lower() == "geneformer":
+            try:
+                from tdigest import TDigest
+                
+            except ImportError:
+                import warnings
+                warnings.warn("tdigest is recommended for full Geneformer functionality. Install with `pip install tdigest`.")
+            try:
+                from peft import LoraConfig, get_peft_model
+            except ImportError:
+                import warnings
+                warnings.warn("peft is recommended for full Geneformer functionality. Install with `pip install peft`.")
+            
+        elif model_type.lower() == "scfoundation":
+            try:
+                from datasets import Dataset
+            except ImportError:
+                raise ImportError("datasets is required for scFoundation model. Please install it using `pip install datasets`.")
+            
         if model_type.lower() not in cls._models:
             available_models = list(cls._models.keys())
             raise ValueError(f"Unknown model type: {model_type}. "
@@ -187,6 +214,43 @@ class SCLLMManager:
             Dictionary with integration results
         """
         return self.model.integrate(adata, batch_key=batch_key, **kwargs)
+    
+    def predict_celltypes(self, query_adata, **kwargs):
+        """
+        Predict cell types for query data.
+        
+        Args:
+            query_adata: Query data to predict
+            **kwargs: Additional parameters
+            
+        Returns:
+            Prediction results with cell type names and statistics
+        """
+        if hasattr(self.model, 'predict_celltypes'):
+            return self.model.predict_celltypes(query_adata, **kwargs)
+        else:
+            # Fallback to general prediction
+            return self.model.predict(query_adata, task="annotation", **kwargs)
+    
+    def perturb_genes(self, adata, target_genes, perturb_type="overexpress", **kwargs):
+        """
+        Perform in silico gene perturbation experiments.
+        
+        This method is particularly useful for Geneformer models.
+        
+        Args:
+            adata: Input data
+            target_genes: List of genes to perturb
+            perturb_type: Type of perturbation ('overexpress', 'inhibit', 'delete')
+            **kwargs: Additional parameters
+            
+        Returns:
+            Perturbation results
+        """
+        if hasattr(self.model, 'perturb_genes'):
+            return self.model.perturb_genes(adata, target_genes, perturb_type, **kwargs)
+        else:
+            raise NotImplementedError(f"Gene perturbation not supported for {self.model.__class__.__name__}")
     
     def save_model(self, save_path, **kwargs):
         """Save the current model."""
@@ -1052,3 +1116,171 @@ def end_to_end_scfoundation_integration(query_adata,
         "batch_key": batch_key,
         "model_path": str(model_path)
     }
+
+
+# Geneformer convenience functions
+def load_geneformer(model_path: Union[str, Path],
+                   gene_median_file: Union[str, Path],
+                   token_dictionary_file: Union[str, Path], 
+                   gene_mapping_file: Union[str, Path],
+                   device: Optional[str] = None, 
+                   model_version: str = "V1",
+                   **kwargs) -> 'GeneformerModel':
+    """
+    Quick function to load a Geneformer model with external dictionary files.
+    
+    Args:
+        model_path: Path to the Geneformer model directory
+        gene_median_file: Path to gene median dictionary file
+        token_dictionary_file: Path to token dictionary file
+        gene_mapping_file: Path to gene mapping file
+        device: Device to run the model on
+        model_version: Model version ('V1' or 'V2')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Loaded Geneformer model
+        
+    Example:
+        model = load_geneformer(
+            '/path/to/geneformer/model',
+            gene_median_file='/path/to/gene_median_dictionary_gc104M.pkl',
+            token_dictionary_file='/path/to/token_dictionary_gc104M.pkl',
+            gene_mapping_file='/path/to/ensembl_mapping_dict_gc104M.pkl'
+        )
+        
+    Note:
+        Dictionary files are not included in the package. Download them from:
+        https://huggingface.co/ctheodoris/Geneformer
+    """
+    model = ModelFactory.create_model(
+        "geneformer", 
+        device=device, 
+        model_version=model_version,
+        **kwargs
+    )
+    model.load_model(
+        model_path,
+        gene_median_file=gene_median_file,
+        token_dictionary_file=token_dictionary_file,
+        gene_mapping_file=gene_mapping_file,
+        **kwargs
+    )
+    return model
+
+
+def annotate_with_geneformer(adata, 
+                           model_path: Union[str, Path], 
+                           device: Optional[str] = None,
+                           model_version: str = "V1",
+                           **kwargs):
+    """
+    Quick function to annotate cells with Geneformer.
+    
+    Args:
+        adata: AnnData object
+        model_path: Path to the Geneformer model
+        device: Device to run the model on
+        model_version: Model version ('V1' or 'V2')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Annotation results
+    """
+    model = load_geneformer(model_path, device, model_version, **kwargs)
+    return model.predict(adata, task="annotation", **kwargs)
+
+
+def extract_geneformer_embeddings(adata,
+                                 model_path: Union[str, Path],
+                                 device: Optional[str] = None,
+                                 model_version: str = "V1",
+                                 emb_layer: int = 0,
+                                 **kwargs):
+    """
+    Extract cell embeddings using Geneformer.
+    
+    Args:
+        adata: AnnData object
+        model_path: Path to the Geneformer model
+        device: Device to run the model on
+        model_version: Model version ('V1' or 'V2')
+        emb_layer: Which layer to extract embeddings from
+        **kwargs: Additional parameters
+        
+    Returns:
+        Cell embeddings
+    """
+    model = load_geneformer(model_path, device, model_version, **kwargs)
+    return model.get_embeddings(adata, emb_layer=emb_layer, **kwargs)
+
+
+def perturb_genes_with_geneformer(adata,
+                                 target_genes: List[str],
+                                 model_path: Union[str, Path],
+                                 perturb_type: str = "overexpress",
+                                 device: Optional[str] = None,
+                                 model_version: str = "V1",
+                                 **kwargs):
+    """
+    Perform in silico gene perturbation using Geneformer.
+    
+    Args:
+        adata: AnnData object
+        target_genes: List of genes to perturb
+        model_path: Path to the Geneformer model
+        perturb_type: Type of perturbation ('overexpress', 'inhibit', 'delete')
+        device: Device to run the model on
+        model_version: Model version ('V1' or 'V2')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Perturbation results
+    """
+    model = load_geneformer(model_path, device, model_version, **kwargs)
+    return model.perturb_genes(adata, target_genes, perturb_type, **kwargs)
+
+
+def fine_tune_geneformer(train_adata,
+                        model_path: Union[str, Path],
+                        valid_adata=None,
+                        save_path: Optional[Union[str, Path]] = None,
+                        device: Optional[str] = None,
+                        model_version: str = "V1",
+                        task: str = "annotation",
+                        **kwargs):
+    """
+    Fine-tune a Geneformer model for cell classification.
+    
+    Args:
+        train_adata: Training data with cell type labels
+        model_path: Path to pre-trained Geneformer model
+        valid_adata: Validation data (optional)
+        save_path: Where to save the fine-tuned model
+        device: Device for computation
+        model_version: Model version ('V1' or 'V2')
+        task: Task type ('annotation', 'gene_classification')
+        **kwargs: Training parameters
+        
+    Returns:
+        Training results and metrics
+    """
+    print("🔧 Starting Geneformer fine-tuning...")
+    
+    # Load model
+    model = load_geneformer(model_path, device, model_version, **kwargs)
+    
+    # Fine-tune
+    results = model.fine_tune(
+        train_adata=train_adata,
+        valid_adata=valid_adata,
+        task=task,
+        **kwargs
+    )
+    
+    # Save if requested
+    if save_path is not None:
+        model.save_model(save_path)
+        print(f"✓ Fine-tuned model saved to {save_path}")
+    
+    return results
