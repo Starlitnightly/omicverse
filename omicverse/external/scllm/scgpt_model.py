@@ -19,7 +19,10 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from anndata import AnnData
 from scipy.sparse import issparse
 
-from .base import SCLLMBase, ModelConfig, TaskConfig
+try:
+    from .base import SCLLMBase, ModelConfig, TaskConfig
+except ImportError:
+    from base import SCLLMBase, ModelConfig, TaskConfig
 # Import scGPT components with error handling
 try:
     from .scgpt.model import TransformerModel

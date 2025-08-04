@@ -22,7 +22,10 @@ from anndata import AnnData
 from scipy.sparse import issparse
 import scanpy as sc
 
-from .base import SCLLMBase, ModelConfig, TaskConfig
+try:
+    from .base import SCLLMBase, ModelConfig, TaskConfig
+except ImportError:
+    from base import SCLLMBase, ModelConfig, TaskConfig
 
 # Import scFoundation components with error handling
 try:
