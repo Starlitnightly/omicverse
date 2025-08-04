@@ -1212,8 +1212,8 @@ class ScFoundationModel(SCLLMBase):
         # Preprocess data
         adata_processed = self.preprocess(adata, **kwargs)
         
-        # Create dataset
-        dataset = FineTuneDataset(adata_processed)
+        # Create dataset for prediction (no labels needed)
+        dataset = PredictionDataset(adata_processed)
         dataloader = DataLoader(dataset, batch_size=kwargs.get('batch_size', 32), shuffle=False)
         
         # Make predictions
@@ -1256,6 +1256,93 @@ class ScFoundationModel(SCLLMBase):
             'probabilities': probabilities,
             'celltype_mapping': self.celltype_mapping
         }
+    
+    def predict_celltypes(self, query_adata: AnnData, **kwargs) -> Dict[str, Any]:
+        """
+        Predict cell types for query data using fine-tuned scFoundation model.
+        
+        This function provides a convenient interface for cell type prediction,
+        similar to scGPT's predict_celltypes function.
+        
+        Args:
+            query_adata: Query data to predict cell types for
+            **kwargs: Additional parameters including:
+                - batch_size: Batch size for prediction (default: 32)
+                - pre_normalized: Whether data is pre-normalized ('T', 'F', or 'A')
+                - Other preprocessing parameters
+            
+        Returns:
+            Dictionary containing:
+                - predictions: Numeric predictions (class IDs)
+                - predicted_celltypes: Cell type names
+                - probabilities: Prediction probabilities
+                - celltype_mapping: Mapping between IDs and cell type names
+                - prediction_summary: Summary statistics
+        """
+        if not hasattr(self, 'celltype_mapping') or self.celltype_mapping is None:
+            raise ValueError("Model has not been fine-tuned for cell type annotation. "
+                           "Call fine_tune() first or load a fine-tuned model.")
+        
+        print("🔍 Predicting cell types for query data using scFoundation...")
+        print(f"   Query data: {query_adata.n_obs} cells × {query_adata.n_vars} genes")
+        
+        # Use the existing predict_with_finetune method
+        results = self.predict_with_finetune(query_adata, **kwargs)
+        
+        if 'predictions' in results and 'probabilities' in results:
+            # Convert IDs to cell type names using the mapping
+            id_to_celltype = self.celltype_mapping['id_to_celltype']
+            predicted_celltypes = [
+                id_to_celltype.get(int(pred), f"Unknown_{int(pred)}") 
+                for pred in results['predictions']
+            ]
+            
+            # Add cell type names to results
+            results['predicted_celltypes'] = predicted_celltypes
+            
+            print(f"✓ Predicted cell types for {len(predicted_celltypes)} cells")
+            
+            # Generate prediction summary
+            from collections import Counter
+            type_counts = Counter(predicted_celltypes)
+            
+            print("📊 Prediction summary:")
+            prediction_summary = {}
+            for celltype, count in type_counts.most_common():
+                percentage = count / len(predicted_celltypes) * 100
+                print(f"   {celltype}: {count} cells ({percentage:.1f}%)")
+                prediction_summary[celltype] = {
+                    'count': count,
+                    'percentage': percentage
+                }
+            
+            results['prediction_summary'] = prediction_summary
+            
+            # Add confidence statistics
+            if 'probabilities' in results:
+                import numpy as np
+                probs = results['probabilities']
+                max_probs = np.max(probs, axis=1)
+                
+                confidence_stats = {
+                    'mean_confidence': float(np.mean(max_probs)),
+                    'median_confidence': float(np.median(max_probs)),
+                    'min_confidence': float(np.min(max_probs)),
+                    'max_confidence': float(np.max(max_probs)),
+                    'high_confidence_cells': int(np.sum(max_probs > 0.8)),  # cells with >80% confidence
+                    'low_confidence_cells': int(np.sum(max_probs < 0.5))   # cells with <50% confidence
+                }
+                
+                results['confidence_stats'] = confidence_stats
+                
+                print(f"📈 Confidence statistics:")
+                print(f"   Mean confidence: {confidence_stats['mean_confidence']:.3f}")
+                print(f"   High confidence cells (>80%): {confidence_stats['high_confidence_cells']}")
+                print(f"   Low confidence cells (<50%): {confidence_stats['low_confidence_cells']}")
+        else:
+            print("⚠️  No predictions found in results")
+        
+        return results
 
 
 class LinearProbingClassifier(nn.Module):
@@ -1599,6 +1686,34 @@ class FineTuneDataset(Dataset):
         return {
             'x': self.expressions[idx],
             'targets': self.labels[idx]
+        }
+
+
+class PredictionDataset(Dataset):
+    """Dataset class for prediction (no labels required)."""
+    
+    def __init__(self, adata: AnnData):
+        """
+        Initialize dataset from AnnData for prediction.
+        
+        Args:
+            adata: Preprocessed AnnData object (no celltype_id required)
+        """
+        # Get expression data
+        if issparse(adata.X):
+            self.expressions = torch.from_numpy(adata.X.toarray()).float()
+        else:
+            self.expressions = torch.from_numpy(adata.X).float()
+        
+        print(f"PredictionDataset created with {len(self.expressions)} samples")
+        print(f"Expression shape: {self.expressions.shape}")
+    
+    def __len__(self):
+        return len(self.expressions)
+    
+    def __getitem__(self, idx):
+        return {
+            'x': self.expressions[idx]
         }
 
 
