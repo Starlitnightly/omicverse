@@ -156,8 +156,8 @@ def lazy(adata,
                     f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
                     )
             sc.pp.pca(adata,**pca_kwargs)
-        print('❌ The version of scanpy is lower than 1.11.0, GPU mode will not work, we will use CPU mode')
-        print('    If you want to use GPU mode, please update scanpy to 1.11.0 or higher')
+            print('❌ The version of scanpy is lower than 1.11.0, GPU mode will not work, we will use CPU mode')
+            print('    If you want to use GPU mode, please update scanpy to 1.11.0 or higher')
     else:
         print('✅ PCA step already finished, skipping it')
 
