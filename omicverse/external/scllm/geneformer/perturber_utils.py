@@ -11,7 +11,7 @@ import pandas as pd
 import torch
 import datasets
 from datasets import Dataset, load_from_disk
-from peft import LoraConfig, get_peft_model
+#from peft import LoraConfig, get_peft_model
 from transformers import (
     BertForMaskedLM,
     BertForSequenceClassification,
@@ -110,6 +110,7 @@ def slice_by_inds_to_perturb(filtered_input_data, cell_inds_to_perturb):
 
 # load model to GPU
 def load_model(model_type, num_classes, model_directory, mode, quantize=False):
+    from peft import LoraConfig, get_peft_model
     if model_type == "Pretrained-Quantized":
         inference_only = True
         model_type = "Pretrained"
@@ -210,12 +211,25 @@ def load_model(model_type, num_classes, model_directory, mode, quantize=False):
 
 
 def move_to_cuda(model):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # get what device model is currently on
-    model_device = next(model.parameters()).device
-    # Check if the model is on the CPU and move to cuda if necessary
-    if (model_device.type == "cpu") and (device.type == "cuda"):
-        model.to(device)
+    # Check if CPU-only mode is requested via environment variable
+    import os
+    force_cpu = os.environ.get("OMICVERSE_FORCE_CPU", "false").lower() == "true"
+    
+    if force_cpu:
+        # Force CPU usage
+        device = torch.device("cpu")
+        model_device = next(model.parameters()).device
+        if model_device.type != "cpu":
+            print(f"   🔄 Moving model from {model_device} to CPU (forced)")
+            model.to(device)
+    else:
+        # Original logic: prefer CUDA if available
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # get what device model is currently on
+        model_device = next(model.parameters()).device
+        # Check if the model is on the CPU and move to cuda if necessary
+        if (model_device.type == "cpu") and (device.type == "cuda"):
+            model.to(device)
 
 
 def quant_layers(model):
@@ -245,15 +259,22 @@ def measure_length(example):
 
 def downsample_and_sort(data, max_ncells):
     num_cells = len(data)
+    # Add original indices to preserve cell order
+    data_with_indices = data.add_column("original_index", list(range(len(data))))
+    
     # if max number of cells is defined, then shuffle and subsample to this max number
     if max_ncells is not None:
         if num_cells > max_ncells:
-            data = data.shuffle(seed=42)
+            data_with_indices = data_with_indices.shuffle(seed=42)
             num_cells = max_ncells
-    data_subset = data.select([i for i in range(num_cells)])
+    data_subset = data_with_indices.select([i for i in range(num_cells)])
     # sort dataset with largest cell first to encounter any memory errors earlier
-    data_sorted = data_subset.sort("length", reverse=True)
-    return data_sorted
+    # DISABLED: This sorting changes cell order - we want to preserve original order
+    # data_sorted = data_subset.sort("length", reverse=True)
+    # return data_sorted
+    
+    # Return data in original order instead of sorted by length
+    return data_subset
 
 
 def get_possible_states(cell_states_to_model):
@@ -743,7 +764,13 @@ def gen_attention_mask(minibatch_encoding, max_len=None):
         else [1] * max_len
         for original_len in original_lens
     ]
-    return torch.tensor(attention_mask, device="cuda")
+    
+    # Check if CPU-only mode is requested via environment variable
+    import os
+    force_cpu = os.environ.get("OMICVERSE_FORCE_CPU", "false").lower() == "true"
+    device = "cpu" if force_cpu else ("cuda" if torch.cuda.is_available() else "cpu")
+    
+    return torch.tensor(attention_mask, device=device)
 
 
 # get cell embeddings excluding padding

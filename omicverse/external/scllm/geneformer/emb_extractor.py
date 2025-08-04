@@ -21,7 +21,7 @@ import pandas as pd
 import scanpy as sc
 import seaborn as sns
 import torch
-from tdigest import TDigest
+
 from tqdm.auto import trange
 
 from . import TOKEN_DICTIONARY_FILE
@@ -43,6 +43,7 @@ def get_embs(
     summary_stat=None,
     silent=False,
 ):
+    from tdigest import TDigest
     model_input_size = pu.get_model_input_size(model)
     total_batch_length = len(filtered_input_data)
 
@@ -96,7 +97,10 @@ def get_embs(
         minibatch = filtered_input_data.select([i for i in range(i, max_range)])
 
         max_len = int(max(minibatch["length"]))
-        original_lens = torch.tensor(minibatch["length"], device="cuda")
+        
+        # Determine device based on model location
+        model_device = next(model.parameters()).device
+        original_lens = torch.tensor(minibatch["length"], device=model_device)
         minibatch.set_format(type="torch")
 
         input_data_minibatch = minibatch["input_ids"]
@@ -106,7 +110,7 @@ def get_embs(
 
         with torch.no_grad():
             outputs = model(
-                input_ids=input_data_minibatch.to("cuda"),
+                input_ids=input_data_minibatch.to(model_device),
                 attention_mask=pu.gen_attention_mask(minibatch),
             )
 

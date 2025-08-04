@@ -1,8 +1,8 @@
 # imports
 import torch
 import pickle
-from geneformer.collator_for_classification import DataCollatorForGeneClassification
-from geneformer import TOKEN_DICTIONARY_FILE
+from ..collator_for_classification import DataCollatorForGeneClassification
+from .. import TOKEN_DICTIONARY_FILE
 
 """Geneformer collator for multi-task cell classification."""
 
