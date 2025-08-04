@@ -46,6 +46,7 @@ embeddings = manager.get_embeddings(adata)
 from .base import SCLLMBase, ModelConfig, TaskConfig
 from .scgpt_model import ScGPTModel
 from .scfoundation_model import ScFoundationModel
+from .geneformer_model import GeneformerModel
 from .model_factory import (
     ModelFactory, SCLLMManager, load_scgpt, annotate_with_scgpt,
     fine_tune_scgpt, predict_celltypes_workflow, end_to_end_scgpt_annotation,
@@ -73,6 +74,7 @@ __all__ = [
     "TaskConfig",
     "ScGPTModel",
     "ScFoundationModel",
+    "GeneformerModel",
     "ModelFactory",
     "SCLLMManager",
     "load_scgpt",
