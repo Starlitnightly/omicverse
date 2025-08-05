@@ -78,7 +78,7 @@ def gptcelltype(input, tissuename=None, speciename='human',
                     flag = True
             for idx, cell_type in zip(id_list, res):
                 key = list(input.keys())[idx]
-                allres[key] = 'unknown' if input[key] == 'unknown' else cell_type.strip(',')
+                allres[key] = 'unknown' if input[key] == 'unknown' else cell_type.strip(',').strip()
         
         
         print('Note: It is always recommended to check the results returned by GPT-4 in case of AI hallucination, before going to downstream analysis.')

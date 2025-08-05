@@ -129,7 +129,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         robjects.r.library("mclust")
 
         import rpy2.robjects.numpy2ri
-        rpy2.robjects.numpy2ri.activate()
+        # rpy2.robjects.numpy2ri.activate()
         r_random_seed = robjects.r['set.seed']
         r_random_seed(random_state)
         rmclust = robjects.r['Mclust']
@@ -234,7 +234,7 @@ class LDA_topic(object):
         if self.ondisk!=True:
         
             self.model.get_learning_rate_bounds(adata)
-            self.model.set_learning_rates(learning_rate, 0.25) # for larger datasets, the default of 1e-3, 0.1 usually works well.
+            self.model.set_learning_rates(learning_rate, 0.1) # for larger datasets, the default of 1e-3, 0.1 usually works well.
         else:
             train, test = self.model.train_test_split(adata)
             import os 
@@ -243,7 +243,7 @@ class LDA_topic(object):
             self.model.write_ondisk_dataset(train, dirname='topic_train')
             self.model.write_ondisk_dataset(test, dirname='topic_test')
             self.model.get_learning_rate_bounds('topic_train')
-            self.model.set_learning_rates(learning_rate, 0.25) # for larger datasets, the default of 1e-3, 0.1 usually works well.
+            self.model.set_learning_rates(learning_rate, 0.1) # for larger datasets, the default of 1e-3, 0.1 usually works well.
 
         self.model.plot_learning_rate_bounds(figsize=(6,3))
         
