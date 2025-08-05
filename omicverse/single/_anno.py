@@ -313,9 +313,10 @@ def get_celltype_marker(adata:anndata.AnnData,
         print('...get cell type marker')
         celltypes = sorted(adata.obs[clustertype].unique())
         cell_marker_dict={}
-        if rank==True and 'rank_genes_groups' not in adata.uns.keys():
-            sc.tl.rank_genes_groups(adata, clustertype, method=method)
-        elif rank==True and 'rank_genes_groups' in adata.uns.keys():
+        if rank==True and key not in adata.uns.keys():
+            sc.tl.rank_genes_groups(adata, clustertype, method=method, key_added=key)
+        elif rank==True and key in adata.uns.keys():
+            print(r"key already in adata.uns!")
             pass
         for celltype in celltypes:
             degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 

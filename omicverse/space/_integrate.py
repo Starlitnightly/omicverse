@@ -260,12 +260,13 @@ class pySTAligner(object):
         comm_gene = adata.var_names
         data_list = []
         for adata_tmp in Batch_list:
-            adata_tmp = adata_tmp[:, comm_gene]
+            adata_tmp = adata_tmp[:, comm_gene].copy()   # line 268 avoid 'ArrayView'
+            adata_tmp_X = adata.X.toarray() if hasattr(adata_tmp.X, 'toarray') else adata_tmp.X
             edge_index = np.nonzero(adata_tmp.uns['adj'])
             data_list.append(
                 Data(edge_index=torch.LongTensor(np.array([edge_index[0], edge_index[1]])),
                               prune_edge_index=torch.LongTensor(np.array([])),
-                              x=torch.FloatTensor(adata_tmp.X.todense())))
+                              x=torch.FloatTensor(adata_tmp_X)))
 
         loader = DataLoader(data_list, batch_size=1, shuffle=True)
 
@@ -421,7 +422,10 @@ class pySTAligner(object):
             for batch in pair_loader:
                 self.model.train()
                 self.optimizer.zero_grad()
-                batch.x = torch.FloatTensor(batch.x[0].todense())
+                torch_data = batch.x[0].copy()
+                if hasattr(torch_data, 'toarray'):
+                    torch_data = torch_data.toarray()
+                batch.x = torch.FloatTensor(torch_data)
                 batch = batch.to(self.device)
                 z, out = self.model(batch.x, batch.edge_index)
                 mse_loss = F.mse_loss(batch.x, out)

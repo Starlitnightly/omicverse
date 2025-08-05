@@ -537,7 +537,7 @@ class GASTON(object):
         else:
             counts_mat_restrict=self.counts_mat_restrict
         idx_kept, gene_labels_idx = filter_genes(counts_mat_restrict, self.adata.var.index.to_numpy(), 
-                                                umi_thresh = umi_thresh,exclude_prefix=exclude_prefix)
+                                                umi_threshold = umi_thresh,exclude_prefix=exclude_prefix)
         self.gene_labels_idx=gene_labels_idx
         self.idx_kept=idx_kept
         return idx_kept, gene_labels_idx
