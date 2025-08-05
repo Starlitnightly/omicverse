@@ -24,8 +24,10 @@ import scanpy as sc
 
 try:
     from .base import SCLLMBase, ModelConfig, TaskConfig
+    from .utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 except ImportError:
     from base import SCLLMBase, ModelConfig, TaskConfig
+    from utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 
 # Import CellPLM components with error handling
 try:
@@ -121,7 +123,7 @@ class CellPLMModel(SCLLMBase):
         if not _cellplm_imports_available:
             raise ImportError("CellPLM dependencies not available")
         
-        print(f"📥 Loading CellPLM model from {model_path}...")
+        SCLLMOutput.status(f"📥 Loading CellPLM model from {model_path}...")
         
         self.pretrain_directory = str(model_path)
         self.pretrain_version = kwargs.get('pretrain_version', self.pretrain_version)
@@ -155,9 +157,9 @@ class CellPLMModel(SCLLMBase):
                     pbar.update(1)
                 
             self.is_loaded = True
-            print(f"✓ CellPLM model loaded from {model_path}")
-            print(f"  - Loaded pipelines: {', '.join(tasks_to_load)}")
-            print(f"  - Pretrain version: {self.pretrain_version}")
+            SCLLMOutput.status(f" CellPLM model loaded from {model_path}", "loaded")
+            SCLLMOutput.status(f"- Loaded pipelines: {', '.join(tasks_to_load)}", indent=1)
+            SCLLMOutput.status(f"- Pretrain version: {self.pretrain_version}", indent=1)
             
         except Exception as e:
             raise RuntimeError(f"Failed to load CellPLM model: {e}")
@@ -267,11 +269,11 @@ class CellPLMModel(SCLLMBase):
             raise ValueError("Model not fine-tuned for annotation. Call fine_tune() first.")
         
         try:
-            print(f"🔮 Predicting cell types for {adata.n_obs} cells...")
+            SCLLMOutput.status(f"Predicting cell types for {adata.n_obs:,} cells...", 'predicting', indent=1)
             
             # Use CellPLM annotation pipeline for prediction with progress tracking
-            with tqdm(total=2, desc="Cell type prediction", ncols=100) as pbar:
-                pbar.set_description("Running prediction...")
+            with SCLLMOutput.progress_bar(total=2, desc="Cell type prediction", model_name="CellPLM") as pbar:
+                pbar.set_description("[CellPLM] Running prediction...")
                 predictions = self.annotation_pipeline.predict(
                     adata,
                     inference_config=kwargs.get('inference_config', {}),
@@ -279,7 +281,7 @@ class CellPLMModel(SCLLMBase):
                     **{k: v for k, v in kwargs.items() if k not in ['inference_config', 'ensembl_auto_conversion']}
                 )
                 pbar.update(1)
-                pbar.set_description("Processing results...")
+                pbar.set_description("[CellPLM] Processing results...")
                 pbar.update(1)
             
             # Convert predictions to expected format
@@ -303,7 +305,7 @@ class CellPLMModel(SCLLMBase):
                                          for pred_id in predicted_ids]
                     predicted_celltypes = np.array(predicted_celltypes)
                 except Exception as e:
-                    print(f"Warning: Could not use stored celltype mapping: {e}")
+                    SCLLMOutput.status(f"Could not use stored celltype mapping: {e}", "warning")
             
             # Fallback to label encoders if available
             if predicted_celltypes is None:
@@ -312,7 +314,7 @@ class CellPLMModel(SCLLMBase):
                         label_encoder = list(self.annotation_pipeline.label_encoders.values())[0]
                         predicted_celltypes = label_encoder.inverse_transform(predicted_ids)
                     except Exception as e:
-                        print(f"Warning: Could not use label encoder: {e}")
+                        SCLLMOutput.status(f"Could not use label encoder: {e}", "warning")
             
             if predicted_celltypes is not None:
                 results['predicted_celltypes'] = predicted_celltypes
@@ -336,18 +338,18 @@ class CellPLMModel(SCLLMBase):
             raise ValueError("Embedding pipeline not loaded")
         
         try:
-            print(f"🧬 Extracting embeddings for {adata.n_obs} cells...")
+            SCLLMOutput.status(f"Extracting embeddings for {adata.n_obs:,} cells...", 'embedding', indent=1)
             
             # Use CellPLM embedding pipeline with progress tracking
-            with tqdm(total=2, desc="Embedding extraction", ncols=100) as pbar:
-                pbar.set_description("Computing embeddings...")
+            with SCLLMOutput.progress_bar(total=2, desc="Embedding extraction", model_name="CellPLM") as pbar:
+                pbar.set_description("[CellPLM] Computing embeddings...")
                 embeddings = self.embedding_pipeline.predict(
                     adata,
                     device=self.device,
                     **kwargs
                 )
                 pbar.update(1)
-                pbar.set_description("Processing embeddings...")
+                pbar.set_description("[CellPLM] Processing embeddings...")
                 pbar.update(1)
             
             # Convert to numpy if tensor
@@ -371,7 +373,7 @@ class CellPLMModel(SCLLMBase):
             raise ValueError("Model not fine-tuned for imputation. Call fine_tune() first.")
         
         try:
-            print(f"🔬 Performing imputation for {adata.n_obs} cells...")
+            SCLLMOutput.status(f" Performing imputation for {adata.n_obs} cells...", "predicting")
             
             # Use CellPLM imputation pipeline with progress tracking
             with tqdm(total=2, desc="Gene imputation", ncols=100) as pbar:
@@ -400,7 +402,7 @@ class CellPLMModel(SCLLMBase):
     
     def _predict_integration(self, adata: AnnData, **kwargs) -> Dict[str, Any]:
         """Perform batch integration using embeddings."""
-        print(f"🔗 Performing batch integration for {adata.n_obs} cells...")
+        SCLLMOutput.status(f"🔗 Performing batch integration for {adata.n_obs} cells...")
         
         # Extract integration-specific parameters and pass only embedding-related ones
         batch_key = kwargs.get('batch_key', 'batch')
@@ -443,7 +445,7 @@ class CellPLMModel(SCLLMBase):
         if method == 'harmony':
             try:
                 import harmonypy as hm
-                print("   Applying Harmony correction...")
+                SCLLMOutput.status(f" Applying Harmony correction...", indent=1)
                 harmony_out = hm.run_harmony(embeddings.T, batch_labels, max_iter_harmony=20)  
                 return harmony_out.Z_corr.T
             except ImportError:
@@ -465,7 +467,7 @@ class CellPLMModel(SCLLMBase):
     
     def _apply_mnn_correction(self, embeddings: np.ndarray, batch_labels: pd.Series) -> np.ndarray:
         """Apply MNN (Mutual Nearest Neighbors) correction - same as scFoundation implementation."""
-        print("   Applying MNN correction...")
+        SCLLMOutput.status(f" Applying MNN correction...", indent=1)
         
         try:
             from sklearn.neighbors import NearestNeighbors
@@ -475,7 +477,7 @@ class CellPLMModel(SCLLMBase):
             batch_codes = batch_labels.astype('category').cat.codes.values
             
             if len(unique_batches) < 2:
-                print("     Only one batch found, no correction needed")
+                SCLLMOutput.status(f"   Only one batch found, no correction needed", indent=1)
                 return embeddings
             
             # Simple MNN-style correction between consecutive batches (same as scFoundation)
@@ -508,16 +510,16 @@ class CellPLMModel(SCLLMBase):
                     
                     corrected[batch2_mask] += correction_vector
             
-            print(f"     MNN correction applied to {len(unique_batches)} batches")
+            SCLLMOutput.status(f"   MNN correction applied to {len(unique_batches)} batches", indent=1)
             return corrected
             
         except Exception as e:
-            print(f"     MNN correction failed: {e}, using center_scale correction")
+            SCLLMOutput.status(f"   MNN correction failed: {e}, using center_scale correction", indent=1)
             return self._apply_center_scale_correction(embeddings, batch_labels)
     
     def _apply_center_scale_correction(self, embeddings: np.ndarray, batch_labels: pd.Series) -> np.ndarray:
         """Apply center and scale batch correction - same as scFoundation implementation."""
-        print("   Applying center and scale correction...")
+        SCLLMOutput.status(f" Applying center and scale correction...", indent=1)
         
         try:
             corrected = embeddings.copy()
@@ -539,11 +541,11 @@ class CellPLMModel(SCLLMBase):
                     # Center and scale to global statistics
                     corrected[batch_mask] = (batch_data - batch_mean) / batch_std * global_std + global_mean
             
-            print(f"     Center-scale correction applied to {len(batch_labels.unique())} batches")
+            SCLLMOutput.status(f"   Center-scale correction applied to {len(batch_labels.unique())} batches", indent=1)
             return corrected
             
         except Exception as e:
-            print(f"     Center-scale correction failed: {e}, returning original embeddings")
+            SCLLMOutput.status(f"   Center-scale correction failed: {e}, returning original embeddings", indent=1)
             return embeddings
     
     def fine_tune(self, 
@@ -583,7 +585,7 @@ class CellPLMModel(SCLLMBase):
         if 'celltype' not in train_adata.obs:
             raise ValueError("train_adata must have 'celltype' column in .obs")
         
-        print(f"🚀 Starting CellPLM fine-tuning for annotation task...")
+        SCLLMOutput.status(f" Starting CellPLM fine-tuning for annotation task...", "training")
         
         # Get training parameters with defaults matching other models
         epochs = kwargs.get('epochs', 100)  # CellPLM default is higher
@@ -593,10 +595,10 @@ class CellPLMModel(SCLLMBase):
         patience = kwargs.get('patience', 25)
         validation_split = kwargs.get('validation_split', 0.2)
         
-        print(f"Training parameters: epochs={epochs}, batch_size={batch_size}, lr={lr}")
+        SCLLMOutput.status(f"Training parameters: epochs={epochs}, batch_size={batch_size}, lr={lr}")
         
         # Prepare cell type mapping
-        print("📊 Preparing cell type mapping...")
+        SCLLMOutput.status(f"📊 Preparing cell type mapping...")
         with tqdm(total=3, desc="Data preparation", ncols=100) as pbar:
             unique_celltypes = train_adata.obs['celltype'].astype('category').cat.categories
             pbar.update(1)
@@ -608,10 +610,10 @@ class CellPLMModel(SCLLMBase):
             n_celltypes = len(unique_celltypes)
             pbar.update(1)
         
-        print(f"Found {n_celltypes} cell types: {list(unique_celltypes)}")
+        SCLLMOutput.status(f"Found {n_celltypes} cell types: {list(unique_celltypes)}", "info")
         
         # Prepare data for training
-        print("🔄 Preparing training and validation data...")
+        SCLLMOutput.status(f" Preparing training and validation data...", "preprocessing")
         if valid_adata is not None:
             # Validate that validation data has celltype column
             if 'celltype' not in valid_adata.obs:
@@ -628,7 +630,7 @@ class CellPLMModel(SCLLMBase):
                 pbar.update(1)
                 combined_adata = train_adata_copy.concatenate(valid_adata_copy, batch_key=None, index_unique=None)
                 pbar.update(1)
-            print(f"Using provided validation data: {train_adata.n_obs} train + {valid_adata.n_obs} valid cells")
+            SCLLMOutput.status(f"Using provided validation data: {train_adata.n_obs} train + {valid_adata.n_obs} valid cells", "info")
         else:
             # Use train/validation split
             with tqdm(total=1, desc="Copying dataset", ncols=100) as pbar:
@@ -651,9 +653,9 @@ class CellPLMModel(SCLLMBase):
                         combined_adata.obs.iloc[val_idx] = combined_adata.obs.iloc[val_idx].copy()
                         combined_adata.obs.iloc[val_idx, combined_adata.obs.columns.get_loc('split')] = 'valid'
                         pbar.update(1)
-                        print(f"Split data: {len(train_idx)} train, {len(val_idx)} validation")
+                        SCLLMOutput.status(f"Split data: {len(train_idx)} train, {len(val_idx)} validation")
                     except Exception as e:
-                        print(f"Warning: Could not stratify split due to {e}, using random split")
+                        SCLLMOutput.status(f"Could not stratify split due to {e}, using random split", "warning")
                         train_idx, val_idx = train_test_split(
                             range(combined_adata.n_obs),
                             test_size=validation_split,
@@ -665,10 +667,10 @@ class CellPLMModel(SCLLMBase):
                         combined_adata.obs.iloc[val_idx] = combined_adata.obs.iloc[val_idx].copy()
                         combined_adata.obs.iloc[val_idx, combined_adata.obs.columns.get_loc('split')] = 'valid'
                         pbar.update(1)
-                        print(f"Split data (random): {len(train_idx)} train, {len(val_idx)} validation")
+                        SCLLMOutput.status(f"Split data (random): {len(train_idx)} train, {len(val_idx)} validation")
             else:
                 combined_adata.obs['split'] = 'train'
-                print(f"Using all {combined_adata.n_obs} cells for training (no validation)")
+                SCLLMOutput.status(f"Using all {combined_adata.n_obs} cells for training (no validation)", "info")
         
         # Update model configuration based on number of cell types
         model_config = CellTypeAnnotationDefaultModelConfig.copy()
@@ -707,12 +709,12 @@ class CellPLMModel(SCLLMBase):
             # Check if we have validation data
             has_validation = 'valid' in combined_adata.obs['split'].values
             if not has_validation:
-                print("⚠ No validation data available, training without validation")
+                SCLLMOutput.status(f" No validation data available, training without validation", "warning")
                 train_config['es'] = 0  # Disable early stopping
             
             # Fine-tune the model with real-time progress tracking
-            print(f"🏋️ Starting training with CellPLM pipeline...")
-            print(f"📈 Training for {epochs} epochs with real-time metrics...")
+            SCLLMOutput.status(f"🏋️ Starting training with CellPLM pipeline...")
+            SCLLMOutput.status(f"📈 Training for {epochs} epochs with real-time metrics...")
             
             # Use custom training with progress bar and metrics display
             best_results = self._train_with_progress_bar(
@@ -722,22 +724,22 @@ class CellPLMModel(SCLLMBase):
             # Display final results summary
             if best_results and 'final_epoch' in best_results:
                 final_epoch = best_results['final_epoch']
-                print(f"\n📊 Final Training Results (Epoch {final_epoch}):")
+                SCLLMOutput.status(f"\n📊 Final Training Results (Epoch {final_epoch}):")
                 if 'train_acc' in best_results:
-                    print(f"   🎯 Train ACC: {best_results['train_acc']:.4f}")
+                    SCLLMOutput.status(f" 🎯 Train ACC: {best_results['train_acc']:.4f}", indent=1)
                 if 'valid_acc' in best_results:
-                    print(f"   ✅ Valid ACC: {best_results['valid_acc']:.4f}")
+                    SCLLMOutput.status(f" ✅ Valid ACC: {best_results['valid_acc']:.4f}", indent=1)
                 if 'train_f1' in best_results:
-                    print(f"   📈 Train F1:  {best_results['train_f1']:.4f}")
+                    SCLLMOutput.status(f" 📈 Train F1:  {best_results['train_f1']:.4f}", indent=1)
                 if 'valid_f1' in best_results:
-                    print(f"   📈 Valid F1:  {best_results['valid_f1']:.4f}")
+                    SCLLMOutput.status(f" 📈 Valid F1:  {best_results['valid_f1']:.4f}", indent=1)
             else:
-                print("   ℹ️ Final metrics will be available after real training")
+                SCLLMOutput.status(f" ℹ️ Final metrics will be available after real training", indent=1)
             
             self.fitted_tasks.add('annotation')
             self.is_loaded = True  # Mark model as loaded after successful fine-tuning
             
-            print("✓ CellPLM annotation fine-tuning completed successfully!")
+            SCLLMOutput.status(f" CellPLM annotation fine-tuning completed successfully!", "loaded")
             
             return {
                 'status': 'completed',
@@ -771,7 +773,7 @@ class CellPLMModel(SCLLMBase):
         if self.imputation_pipeline is None:
             self._load_imputation_pipeline(**kwargs)
         
-        print(f"🚀 Starting CellPLM fine-tuning for imputation task...")
+        SCLLMOutput.status(f" Starting CellPLM fine-tuning for imputation task...", "training")
         
         # Get training parameters with CellPLM defaults
         epochs = kwargs.get('epochs', 100)  # CellPLM default for imputation
@@ -780,7 +782,7 @@ class CellPLMModel(SCLLMBase):
         patience = kwargs.get('patience', 5)  # Less patience for imputation
         validation_split = kwargs.get('validation_split', 0.2)
         
-        print(f"Training parameters: epochs={epochs}, lr={lr}, patience={patience}")
+        SCLLMOutput.status(f"Training parameters: epochs={epochs}, lr={lr}, patience={patience}")
         
         # Prepare batch-gene mapping if provided
         batch_gene_list = kwargs.get('batch_gene_list', None)
@@ -793,7 +795,7 @@ class CellPLMModel(SCLLMBase):
             train_adata_copy.obs['split'] = 'train'
             valid_adata_copy.obs['split'] = 'valid'
             combined_adata = train_adata_copy.concatenate(valid_adata_copy, batch_key=None, index_unique=None)
-            print(f"Using provided validation data: {train_adata.n_obs} train + {valid_adata.n_obs} valid cells")
+            SCLLMOutput.status(f"Using provided validation data: {train_adata.n_obs} train + {valid_adata.n_obs} valid cells", "info")
         else:
             # Use train/validation split if split column doesn't exist
             combined_adata = train_adata.copy()
@@ -807,10 +809,10 @@ class CellPLMModel(SCLLMBase):
                 combined_adata.obs['split'] = 'train'
                 combined_adata.obs.iloc[val_idx] = combined_adata.obs.iloc[val_idx].copy()
                 combined_adata.obs.iloc[val_idx, combined_adata.obs.columns.get_loc('split')] = 'valid'
-                print(f"Split data: {len(train_idx)} train, {len(val_idx)} validation")
+                SCLLMOutput.status(f"Split data: {len(train_idx)} train, {len(val_idx)} validation")
             elif 'split' not in combined_adata.obs:
                 combined_adata.obs['split'] = 'train'
-                print(f"Using all {combined_adata.n_obs} cells for training (no validation)")
+                SCLLMOutput.status(f"Using all {combined_adata.n_obs} cells for training (no validation)", "info")
         
         # Set up training configuration
         train_config = ImputationDefaultPipelineConfig.copy() 
@@ -832,11 +834,11 @@ class CellPLMModel(SCLLMBase):
             # Check if we have validation data
             has_validation = 'valid' in combined_adata.obs['split'].values
             if not has_validation:
-                print("⚠ No validation data available, training without validation")
+                SCLLMOutput.status(f" No validation data available, training without validation", "warning")
             
             # Fine-tune the model with real-time progress tracking
-            print(f"🏋️ Starting imputation training with CellPLM pipeline...")
-            print(f"📈 Training for {epochs} epochs with real-time metrics...")
+            SCLLMOutput.status(f"🏋️ Starting imputation training with CellPLM pipeline...")
+            SCLLMOutput.status(f"📈 Training for {epochs} epochs with real-time metrics...")
             
             # Use custom training with progress bar for imputation
             best_results = self._train_imputation_with_progress_bar(
@@ -846,18 +848,18 @@ class CellPLMModel(SCLLMBase):
             # Display final results summary for imputation
             if best_results and 'final_epoch' in best_results:
                 final_epoch = best_results['final_epoch']
-                print(f"\n📊 Final Imputation Results (Epoch {final_epoch}):")
+                SCLLMOutput.status(f"\n📊 Final Imputation Results (Epoch {final_epoch}):")
                 if 'train_loss' in best_results:
-                    print(f"   📉 Train Loss: {best_results['train_loss']:.4f}")
+                    SCLLMOutput.status(f" 📉 Train Loss: {best_results['train_loss']:.4f}", indent=1)
                 if 'valid_loss' in best_results:
-                    print(f"   📉 Valid Loss: {best_results['valid_loss']:.4f}")
+                    SCLLMOutput.status(f" 📉 Valid Loss: {best_results['valid_loss']:.4f}", indent=1)
             else:
-                print("   ℹ️ Final metrics will be available after real training")
+                SCLLMOutput.status(f" ℹ️ Final metrics will be available after real training", indent=1)
             
             self.fitted_tasks.add('imputation')
             self.is_loaded = True  # Mark model as loaded after successful fine-tuning
             
-            print("✓ CellPLM imputation fine-tuning completed successfully!")
+            SCLLMOutput.status(f" CellPLM imputation fine-tuning completed successfully!", "loaded")
             
             return {
                 'status': 'completed',
@@ -892,7 +894,20 @@ class CellPLMModel(SCLLMBase):
         Returns:
             Cell embeddings as numpy array
         """
+        # Start embedding extraction with unified output
+        SCLLMOutput.data_summary(adata, model_name="CellPLM")
+        operation_start("get_embeddings", "CellPLM", {
+            "cells": f"{adata.n_obs:,}",
+            "genes": f"{adata.n_vars:,}"
+        })
+        
         results = self.predict(adata, task="embedding", **kwargs)
+        
+        operation_complete("get_embeddings", {
+            "embedding_shape": f"{results['embeddings'].shape}",
+            "embedding_dim": results['embeddings'].shape[1]
+        })
+        
         return results['embeddings']
     
     def predict_celltypes(self, query_adata: AnnData, **kwargs) -> Dict[str, Any]:
@@ -906,7 +921,26 @@ class CellPLMModel(SCLLMBase):
         Returns:
             Prediction results with cell type names and statistics
         """
-        return self.predict(query_adata, task="annotation", **kwargs)
+        operation_start("predict_celltypes", "CellPLM", {
+            "cells": f"{query_adata.n_obs:,}",
+            "genes": f"{query_adata.n_vars:,}"
+        })
+        
+        results = self.predict(query_adata, task="annotation", **kwargs)
+        
+        if 'predicted_celltypes' in results:
+            from collections import Counter
+            type_counts = Counter(results['predicted_celltypes'])
+            
+            operation_complete("predict_celltypes", {
+                "total_cells": len(results['predicted_celltypes']),
+                "unique_types": len(type_counts),
+                "most_common": type_counts.most_common(1)[0][0] if type_counts else "None"
+            })
+        else:
+            operation_complete("predict_celltypes", {"status": "completed"})
+        
+        return results
     
     def integrate(self, adata: AnnData, batch_key: str = "batch", **kwargs) -> Dict[str, Any]:
         """
@@ -986,9 +1020,9 @@ class CellPLMModel(SCLLMBase):
                     if 'celltype_mapping' in config:
                         self.celltype_to_id = config['celltype_mapping'].get('celltype_to_id', {})
                         self.id_to_celltype = {int(k): v for k, v in config['celltype_mapping'].get('id_to_celltype', {}).items()}
-                        print(f"✓ Loaded celltype mapping with {len(self.id_to_celltype)} cell types")
+                        SCLLMOutput.status(f" Loaded celltype mapping with {len(self.id_to_celltype)} cell types", "loaded")
         except Exception as e:
-            print(f"Warning: Could not load celltype mapping: {e}")
+            SCLLMOutput.status(f"Could not load celltype mapping: {e}", "warning")
     
     def predict_with_finetune(self, adata: AnnData, **kwargs) -> Dict[str, Any]:
         """
@@ -1098,10 +1132,10 @@ class CellPLMModel(SCLLMBase):
         
         # Save pipeline states if they have been fitted
         # Note: CellPLM pipelines handle their own model saving
-        print(f"CellPLM model configuration saved to {save_path}")
+        SCLLMOutput.status(f"CellPLM model configuration saved to {save_path}")
         if hasattr(self, 'celltype_to_id'):
-            print(f"  - Celltype mapping: {len(self.celltype_to_id)} cell types")
-        print(f"  - Fitted tasks: {list(self.fitted_tasks)}")
+            SCLLMOutput.status(f"- Celltype mapping: {len(self.celltype_to_id)} cell types", indent=1)
+        SCLLMOutput.status(f"- Fitted tasks: {list(self.fitted_tasks)}", indent=1)
     
     def _train_with_progress_bar(self, combined_adata, train_config, has_validation, epochs, kwargs):
         """
@@ -1225,7 +1259,7 @@ class CellPLMModel(SCLLMBase):
                             metrics_parts.append(f"Loss: {progress_state['train_loss']:.3f}")
                         
                         if metrics_parts:
-                            print(f"   {' | '.join(metrics_parts)}")
+                            SCLLMOutput.status(f" {' | '.join(metrics_parts)}", indent=1)
                             last_update_time = current_time
                     
                     last_epoch = current_epoch
@@ -1277,7 +1311,7 @@ class CellPLMModel(SCLLMBase):
             output_lines = metric_output.getvalue().split('\n')
             for line in output_lines:
                 if line and any(x in line.lower() for x in ['after filtering', 'genes remain', 'early stopped']):
-                    print(line)
+                    SCLLMOutput.status(str(line))
             
             # Wait for progress thread to finish
             if progress_thread.is_alive():
@@ -1364,7 +1398,7 @@ class CellPLMModel(SCLLMBase):
                             metrics_parts.append(f"Valid Loss: {progress_state['valid_loss']:.4f}")
                         
                         if metrics_parts:
-                            print(f"   {' | '.join(metrics_parts)}")
+                            SCLLMOutput.status(f" {' | '.join(metrics_parts)}", indent=1)
                             last_update_time = current_time
                     
                     last_epoch = current_epoch
@@ -1409,7 +1443,7 @@ class CellPLMModel(SCLLMBase):
             output_lines = metric_output.getvalue().split('\n')
             for line in output_lines:
                 if line and any(x in line.lower() for x in ['after filtering', 'genes remain', 'early stopped']):
-                    print(line)
+                    SCLLMOutput.status(str(line))
             
             # Wait for progress thread to finish
             if progress_thread.is_alive():

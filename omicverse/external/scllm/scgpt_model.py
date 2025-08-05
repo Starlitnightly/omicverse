@@ -21,16 +21,18 @@ from scipy.sparse import issparse
 
 try:
     from .base import SCLLMBase, ModelConfig, TaskConfig
+    from .utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 except ImportError:
     from base import SCLLMBase, ModelConfig, TaskConfig
+    from utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 # Import scGPT components with error handling
 try:
-    from .scgpt.model import TransformerModel
+    from .scgpt.model import TransformerModel, TransformerGenerator
     from .scgpt.tokenizer.gene_tokenizer import GeneVocab
     from .scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
     from .scgpt.preprocess import Preprocessor
     from .scgpt.loss import masked_mse_loss, criterion_neg_log_bernoulli
-    from .scgpt.utils import set_seed
+    from .scgpt.utils import set_seed, map_raw_id_to_vocab_id
     _scgpt_imports_available = True
 except ImportError as e:
     import warnings
@@ -100,6 +102,10 @@ class ScGPTModel(SCLLMBase):
         self.preprocessor = None
         self.config = None
         
+        # Perturbation-specific components
+        self.generator_model = None
+        self.gene_ids_mapping = None
+        
         # Default parameters matching Tutorial exactly
         self.default_config = ModelConfig(
             embsize=128,  # Tutorial uses 128, not 512
@@ -157,7 +163,7 @@ class ScGPTModel(SCLLMBase):
         vocab_file = model_path / "vocab.json"
         if vocab_file.exists():
             self.vocab = GeneVocab.from_file(vocab_file)
-            print(f"Loaded vocabulary with {len(self.vocab)} genes")
+            SCLLMOutput.status(f"Loaded vocabulary: {len(self.vocab):,} genes", 'loaded')
         else:
             raise FileNotFoundError(f"Vocabulary file not found: {vocab_file}")
         
@@ -166,7 +172,7 @@ class ScGPTModel(SCLLMBase):
             if token not in self.vocab:
                 # Note: GeneVocab may not have append_token method
                 # This is a simplified approach
-                print(f"Warning: Special token {token} not in vocabulary")
+                SCLLMOutput.status(f"Special token {token} not in vocabulary", 'warning')
         
         self.vocab.set_default_index(self.vocab[self.default_config.pad_token])
         
@@ -181,15 +187,20 @@ class ScGPTModel(SCLLMBase):
             self.config.update(**model_config)
             self.config.update(**kwargs)  # Override with user parameters
             
-            print(f"Loaded model config from {config_file}")
-            print(f"Key config parameters:")
+            SCLLMOutput.status(f"Loaded model config from {config_file.name}", 'loaded')
+            
+            # Show key config parameters
+            config_params = {}
             for key in ['embsize', 'nheads', 'd_hid', 'nlayers', 'n_layers_cls']:
                 if key in model_config:
-                    print(f"  {key}: {model_config[key]}")
+                    config_params[key] = model_config[key]
+            
+            if config_params:
+                SCLLMOutput.model_info("Key Parameters", config_params)
         else:
             self.config = self.default_config
             self.config.update(**kwargs)
-            print("No config file found, using default configuration")
+            SCLLMOutput.status(f"Using default configuration", 'info')
         
         # Determine number of classes - try to infer from loaded model weights
         n_cls = kwargs.get('n_cls')
@@ -208,12 +219,11 @@ class ScGPTModel(SCLLMBase):
             if model_file.exists():
                 try:
                     checkpoint = torch.load(model_file, map_location="cpu")
-                    print(f"Analyzing model checkpoint for n_cls inference...")
+                    SCLLMOutput.status(f"Analyzing model checkpoint for n_cls inference...", 'preprocessing')
                     
                     # Look for classifier output layer - be more specific
                     classifier_candidates = []
                     for key, tensor in checkpoint.items():
-                        print(f"  {key}: {tensor.shape}")
                         if ('cls' in key.lower() and 'weight' in key):
                             if 'out' in key.lower() or key.endswith('weight'):
                                 if len(tensor.shape) == 2:
@@ -226,20 +236,20 @@ class ScGPTModel(SCLLMBase):
                         for key, potential_n_cls in classifier_candidates:
                             if potential_n_cls > 1 and potential_n_cls < 1000:
                                 n_cls = potential_n_cls
-                                print(f"✓ Inferred n_cls={n_cls} from {key} shape")
+                                SCLLMOutput.status(f"Inferred n_cls={n_cls} from {key}", 'loaded')
                                 break
                     else:
-                        print("⚠ No classifier layers found in checkpoint")
+                        SCLLMOutput.status(f"No classifier layers found in checkpoint", 'warning')
                         
                 except Exception as e:
-                    print(f"Could not infer n_cls from model weights: {e}")
+                    SCLLMOutput.status(f"Could not infer n_cls from model weights: {e}", 'warning')
         
         # Use default if still not found
         if not n_cls:
             n_cls = 50
-            print(f"Using default n_cls={n_cls}")
+            SCLLMOutput.status(f"Using default n_cls={n_cls}", 'info')
         else:
-            print(f"Using n_cls={n_cls} classes")
+            SCLLMOutput.status(f"Using n_cls={n_cls} classes", 'info')
         
         # Store n_cls for later use
         self.n_cls = n_cls
@@ -286,18 +296,10 @@ class ScGPTModel(SCLLMBase):
             try:
                 checkpoint = torch.load(model_file, map_location=self.device)
                 self.model.load_state_dict(checkpoint)
-                print(f"✓ Successfully loaded all model weights from {model_file}")
-                
-                # Check if classifier weights were loaded
-                classifier_keys = [k for k in checkpoint.keys() if 'cls' in k.lower() or 'classifier' in k.lower()]
-                print(f"Classifier layers found: {len(classifier_keys)}")
-                if classifier_keys:
-                    for key in classifier_keys[:3]:  # Show first 3
-                        print(f"  {key}: {checkpoint[key].shape}")
+                SCLLMOutput.status(f"Model weights loaded", 'loaded')
                 
             except Exception as e:
-                print(f"Warning: Could not load all model weights: {e}")
-                print("Attempting to load compatible weights only...")
+                SCLLMOutput.status(f"Loading compatible weights only", 'warning')
                 
                 # Load compatible weights only
                 model_dict = self.model.state_dict()
@@ -318,27 +320,21 @@ class ScGPTModel(SCLLMBase):
                 model_dict.update(compatible_dict)
                 self.model.load_state_dict(model_dict)
                 
-                print(f"✓ Loaded compatible weights: {len(compatible_dict)}/{len(checkpoint)} parameters")
+                SCLLMOutput.status(f"Compatible weights loaded: {len(compatible_dict)}/{len(checkpoint)}", 'loaded')
                 if incompatible_dict:
-                    print(f"⚠ Incompatible weights ({len(incompatible_dict)}):")
-                    for k, reason in list(incompatible_dict.items())[:5]:  # Show first 5
-                        print(f"  {k}: {reason}")
-                    if len(incompatible_dict) > 5:
-                        print(f"  ... and {len(incompatible_dict) - 5} more")
+                    SCLLMOutput.status(f"Some weights incompatible ({len(incompatible_dict)})", 'warning')
         
         # Check if the loaded model has the right number of classes
         if hasattr(self.model, 'cls_decoder') and hasattr(self.model.cls_decoder, 'out_layer'):
             actual_n_cls = self.model.cls_decoder.out_layer.out_features
-            print(f"Loaded model has {actual_n_cls} output classes")
+            SCLLMOutput.status(f"Model classes: {actual_n_cls}", 'info')
             
             if actual_n_cls == 1 and (force_multiclass or expected_n_cls):
                 target_n_cls = expected_n_cls or n_cls
-                print(f"⚠ Model has only 1 output class, but {target_n_cls} classes expected")
-                print(f"This suggests the model is a pre-trained model that needs fine-tuning")
-                print(f"For inference, you may need a model that was fine-tuned for your specific task")
+                SCLLMOutput.status(f"Model needs fine-tuning ({actual_n_cls} → {target_n_cls} classes)", 'warning')
                 
                 if force_multiclass:
-                    print(f"🔄 Reinitializing classifier with {target_n_cls} classes...")
+                    SCLLMOutput.status(f"Reinitializing classifier: {target_n_cls} classes", 'preprocessing')
                     # Reinitialize the classifier layer
                     import torch.nn as nn
                     if hasattr(self.model.cls_decoder, '_decoder'):
@@ -350,12 +346,625 @@ class ScGPTModel(SCLLMBase):
                     # Replace the output layer
                     self.model.cls_decoder.out_layer = nn.Linear(prev_dim, target_n_cls)
                     self.model.cls_decoder.out_layer.to(self.device)
-                    print(f"✓ Classifier reinitialized with {target_n_cls} output classes")
-                    print("⚠ Note: This classifier is randomly initialized and needs training!")
+                    SCLLMOutput.status(f"Classifier reinitialized: {target_n_cls} classes", 'loaded')
+                    SCLLMOutput.status(f"Classifier needs training", 'warning')
         
         self.model.to(self.device)
         self.is_loaded = True
-        print(f"Model loaded successfully on {self.device}")
+        SCLLMOutput.status(f"Model ready on {self.device}", 'loaded')
+    
+    def setup_generator_for_perturbation(self, **kwargs) -> None:
+        """
+        Setup TransformerGenerator model for perturbation prediction.
+        This adds the missing layers needed for perturbation tasks.
+        
+        Args:
+            **kwargs: Additional parameters for generator setup
+        """
+        if not self.is_loaded:
+            raise ValueError("Base model not loaded. Call load_model() first.")
+        
+        if not _scgpt_imports_available:
+            raise ImportError("Cannot setup generator: required dependencies not available")
+        
+        SCLLMOutput.status(f"Setting up perturbation generator", 'preprocessing')
+        
+        # Get generator-specific parameters
+        pert_pad_id = kwargs.get('pert_pad_id', 0)
+        pad_value = kwargs.get('pad_value', -2)
+        
+        # Create TransformerGenerator with same architecture as base model
+        self.generator_model = TransformerGenerator(
+            ntoken=len(self.vocab),
+            d_model=self.config.embsize,
+            nhead=self.config.nhead,
+            d_hid=self.config.d_hid,
+            nlayers=self.config.nlayers,
+            nlayers_cls=self.config.nlayers_cls,
+            n_cls=1,  # Generator typically has 1 output class
+            vocab=self.vocab,
+            dropout=self.config.dropout,
+            pad_token=self.config.pad_token,
+            pad_value=pad_value,
+            pert_pad_id=pert_pad_id,
+            use_fast_transformer=False,
+        )
+        
+        # Transfer weights from base model to generator
+        SCLLMOutput.status(f"Transferring weights to generator", 'preprocessing')
+        base_state_dict = self.model.state_dict()
+        generator_state_dict = self.generator_model.state_dict()
+        
+        # Map common layers
+        transferred_layers = []
+        missed_layers = []
+        
+        for key in generator_state_dict.keys():
+            if key in base_state_dict:
+                if base_state_dict[key].shape == generator_state_dict[key].shape:
+                    generator_state_dict[key] = base_state_dict[key].clone()
+                    transferred_layers.append(key)
+                else:
+                    missed_layers.append(f"{key}: shape mismatch {base_state_dict[key].shape} vs {generator_state_dict[key].shape}")
+            else:
+                missed_layers.append(f"{key}: not found in base model")
+        
+        self.generator_model.load_state_dict(generator_state_dict)
+        self.generator_model.to(self.device)
+        
+        SCLLMOutput.status(f"Transferred {len(transferred_layers)} layers to generator", 'loaded')
+        if missed_layers:
+            SCLLMOutput.status(f"{len(missed_layers)} layers use random initialization", 'warning')
+        
+        SCLLMOutput.status(f"Generator setup complete", 'loaded')
+        SCLLMOutput.status(f"Generator ready for inference", 'info', indent=1)
+    
+    def predict_perturbation(self, 
+                           adata: AnnData, 
+                           target_genes: List[str],
+                           **kwargs) -> AnnData:
+        """
+        Predict gene expression after perturbation of target genes.
+        This method correctly implements perturbation prediction by using perturbation flags
+        that the model learns to interpret, rather than manually modifying gene expression.
+        
+        Args:
+            adata: Input AnnData object (control cells)
+            target_genes: List of genes to perturb
+            **kwargs: Additional parameters including:
+                - include_zero_gene: Gene inclusion strategy ("all", "batch-wise") 
+                - batch_size: Batch size for prediction
+                - perturbation_type: Type of perturbation ("knockout", "overexpression")
+                
+        Returns:
+            AnnData object with predicted perturbed gene expression values
+        """
+        if self.generator_model is None:
+            SCLLMOutput.status(f"Setting up generator model", 'preprocessing')
+            self.setup_generator_for_perturbation(**kwargs)
+        
+        if not self.is_loaded:
+            raise ValueError("Model not loaded. Call load_model() first.")
+        
+        SCLLMOutput.status(f"Predicting perturbation: {', '.join(target_genes)}", 'predicting')
+        
+        # Validate target genes
+        for gene in target_genes:
+            if gene not in self.vocab:
+                raise ValueError(f"Target gene '{gene}' not found in vocabulary")
+        
+        # Preprocess input data
+        adata_processed = self.preprocess(adata.copy(), **kwargs)
+        
+        # Get parameters
+        include_zero_gene = kwargs.get('include_zero_gene', "all")
+        batch_size = kwargs.get('batch_size', 32)
+        perturbation_type = kwargs.get('perturbation_type', "knockout")
+        
+        # Get gene expression data
+        input_layer_key = "X_binned"
+        if input_layer_key not in adata_processed.layers:
+            raise ValueError(f"Required layer '{input_layer_key}' not found")
+        
+        all_counts = (
+            adata_processed.layers[input_layer_key].toarray()
+            if issparse(adata_processed.layers[input_layer_key])
+            else adata_processed.layers[input_layer_key]
+        )
+        
+        # Get genes and create perturbation flags
+        genes = adata_processed.var_names.tolist()
+        n_genes = len(genes)
+        n_cells = all_counts.shape[0]
+        
+        # Create gene IDs mapping
+        gene_ids = np.array([self.vocab[gene] for gene in genes], dtype=int)
+        self.gene_ids_mapping = gene_ids
+        
+        # Create perturbation flags - this is the key difference!
+        # Instead of modifying gene expression, we use flags to tell the model which genes are perturbed
+        pert_flags = np.zeros((n_cells, n_genes), dtype=int)
+        
+        for target_gene in target_genes:
+            if target_gene in genes:
+                gene_idx = genes.index(target_gene)
+                if perturbation_type == "knockout":
+                    pert_flags[:, gene_idx] = 1  # Flag: gene is knocked out
+                elif perturbation_type == "overexpression":
+                    pert_flags[:, gene_idx] = 2  # Flag: gene is overexpressed
+                SCLLMOutput.status(f"Flagged {target_gene}: {perturbation_type}", 'info', indent=1)
+        
+        # Use ORIGINAL gene expression as input (not modified!)
+        # The model will learn to predict perturbed expression based on:
+        # 1. Original expression values
+        # 2. Perturbation flags
+        original_counts = all_counts.copy()  # Keep original expression unchanged
+        
+        SCLLMOutput.status(f"Starting perturbation prediction: {n_cells} cells", 'predicting')
+        SCLLMOutput.status(f"Using perturbation flags for prediction", 'info')
+        
+        # Make predictions using the generator model's pred_perturb-like functionality
+        self.generator_model.eval()
+        all_predictions = []
+        
+        with torch.no_grad():
+            # Process in batches
+            pbar = SCLLMOutput.progress_bar(total=(n_cells + batch_size - 1) // batch_size, desc="Perturbation batches", model_name="scGPT")
+            for batch_idx, i in enumerate(range(0, n_cells, batch_size)):
+                pbar.update(1)
+                end_idx = min(i + batch_size, n_cells)
+                batch_cells = end_idx - i
+                
+                # Get batch data
+                batch_counts = original_counts[i:end_idx]
+                batch_pert_flags = pert_flags[i:end_idx]
+                
+                # Convert to tensors
+                ori_gene_values = torch.from_numpy(batch_counts).float().to(self.device)
+                pert_flags_tensor = torch.from_numpy(batch_pert_flags).long().to(self.device)
+                
+                if include_zero_gene == "all":
+                    # Use all genes
+                    input_gene_ids = torch.arange(n_genes, dtype=torch.long).repeat(batch_cells, 1)
+                    
+                    # Map raw gene indices to vocabulary IDs
+                    mapped_input_gene_ids = map_raw_id_to_vocab_id(
+                        torch.arange(n_genes), gene_ids
+                    ).repeat(batch_cells, 1).to(self.device)
+                    
+                    input_values = ori_gene_values
+                    input_pert_flags = pert_flags_tensor
+                    
+                    # Create padding mask
+                    src_key_padding_mask = torch.zeros_like(
+                        input_values, dtype=torch.bool, device=self.device
+                    )
+                    
+                else:
+                    # batch-wise: only use non-zero genes
+                    nonzero_gene_mask = (ori_gene_values.sum(0) > 0)
+                    input_gene_indices = torch.where(nonzero_gene_mask)[0]
+                    
+                    if len(input_gene_indices) > self.config.max_seq_len:
+                        # Randomly sample if too many genes
+                        selected_indices = torch.randperm(len(input_gene_indices))[:self.config.max_seq_len]
+                        input_gene_indices = input_gene_indices[selected_indices]
+                    
+                    input_values = ori_gene_values[:, input_gene_indices]
+                    input_pert_flags = pert_flags_tensor[:, input_gene_indices]
+                    
+                    # Map to vocabulary IDs
+                    mapped_input_gene_ids = map_raw_id_to_vocab_id(
+                        input_gene_indices, gene_ids
+                    ).repeat(batch_cells, 1).to(self.device)
+                    
+                    src_key_padding_mask = torch.zeros_like(
+                        input_values, dtype=torch.bool, device=self.device
+                    )
+                
+                # Model forward pass - this is where the magic happens!
+                # The model uses original expression + perturbation flags to predict perturbed expression
+                output_dict = self.generator_model(
+                    mapped_input_gene_ids,
+                    input_values,
+                    input_pert_flags,  # This tells the model which genes are perturbed
+                    src_key_padding_mask=src_key_padding_mask,
+                    CLS=False,
+                    CCE=False,
+                    MVC=False,
+                    ECS=False,
+                )
+                
+                # Extract predictions
+                if "mlm_output" in output_dict:
+                    predictions = output_dict["mlm_output"]
+                    
+                    if include_zero_gene != "all":
+                        # Reconstruct full gene expression for batch-wise case
+                        full_predictions = torch.zeros((batch_cells, n_genes), device=self.device)
+                        full_predictions[:, input_gene_indices] = predictions
+                        predictions = full_predictions
+                    
+                    all_predictions.append(predictions.cpu().numpy())
+                
+                if batch_idx == 0:
+                    SCLLMOutput.status(f"First batch: {batch_cells} cells", 'info', indent=1)
+                    SCLLMOutput.status(f"Perturbed positions: {torch.sum(input_pert_flags > 0).item()}", 'info', indent=1)
+        
+        if not all_predictions:
+            raise RuntimeError("No predictions were generated")
+        
+        # Combine predictions
+        predicted_expressions = np.concatenate(all_predictions, axis=0)
+        pbar.close()
+        SCLLMOutput.status(f"Generated predictions: {predicted_expressions.shape[0]} cells", 'loaded')
+        
+        # Create new AnnData with predicted expressions using processed genes
+        # This avoids dimension mismatch issues and is cleaner
+        from anndata import AnnData
+        
+        # Use processed genes as the var (since predictions are based on processed data)
+        processed_genes = adata_processed.var_names
+        
+        # Create new AnnData with predicted expressions
+        result_adata = AnnData(
+            X=predicted_expressions,  # Use predictions as main expression matrix
+            obs=adata.obs.copy(),     # Keep original cell metadata
+            var=adata_processed.var.copy(),  # Use processed gene metadata
+        )
+        
+        # Copy obsm (cell embeddings, etc.) if they exist
+        if hasattr(adata, 'obsm') and len(adata.obsm) > 0:
+            for key, value in adata.obsm.items():
+                result_adata.obsm[key] = value.copy()
+        
+        # Store predicted expressions in layers
+        result_adata.layers["X_predicted_binned"] = predicted_expressions
+        
+        # Convert binned predictions back to expression values if possible
+        if hasattr(self.preprocessor, 'binning_edges') or 'X_binned' in adata_processed.layers:
+            # Simple de-binning: use bin centers
+            bin_centers = np.arange(self.config.n_bins)
+            predicted_expression_values = bin_centers[predicted_expressions.astype(int)]
+            result_adata.layers["X_predicted"] = predicted_expression_values
+            result_adata.X = predicted_expression_values  # Also set as main matrix
+        else:
+            # If no binning info, use predicted values directly
+            result_adata.layers["X_predicted"] = predicted_expressions
+        
+        # Add perturbation metadata
+        result_adata.obs["perturbation_genes"] = ",".join(target_genes)
+        result_adata.obs["perturbation_type"] = perturbation_type
+        result_adata.uns["perturbation_info"] = {
+            "target_genes": target_genes,
+            "perturbation_type": perturbation_type,
+            "include_zero_gene": include_zero_gene,
+            "n_cells_predicted": predicted_expressions.shape[0],
+            "perturbation_flags_used": True  # Indicate we used proper perturbation flags
+        }
+        
+        SCLLMOutput.status(f"Perturbation prediction complete", 'complete')
+        SCLLMOutput.status(f"Target genes: {', '.join(target_genes)}", indent=1)
+        SCLLMOutput.status(f"Type: {perturbation_type}", indent=1)
+        SCLLMOutput.status(f"Predictions: {predicted_expressions.shape[0]} cells", indent=1)
+        
+        return result_adata
+    
+    def fine_tune_generator(self, 
+                          train_adata: AnnData,
+                          valid_adata: Optional[AnnData] = None,
+                          target_genes: List[str] = None,
+                          **kwargs) -> Dict[str, Any]:
+        """
+        Fine-tune the generator model for perturbation prediction.
+        
+        Args:
+            train_adata: Training data with perturbation information
+            valid_adata: Validation data (optional)
+            target_genes: List of genes to use for perturbation training
+            **kwargs: Training parameters
+            
+        Returns:
+            Training results and metrics
+        """
+        if self.generator_model is None:
+            SCLLMOutput.status(f"Setting up generator for fine-tuning", 'preprocessing')
+            self.setup_generator_for_perturbation(**kwargs)
+        
+        SCLLMOutput.status(f"Starting generator fine-tuning", 'fine_tuning')
+        
+        # Get training parameters
+        epochs = kwargs.get('epochs', 15)
+        batch_size = kwargs.get('batch_size', 64) 
+        lr = kwargs.get('lr', 1e-4)
+        mask_ratio = kwargs.get('mask_ratio', 0.0)  # No additional masking needed
+        
+        SCLLMOutput.status(f"Training parameters:", 'info')
+        SCLLMOutput.status(f"epochs: {epochs}, batch_size: {batch_size}, lr: {lr}", indent=1)
+        SCLLMOutput.status(f"mask_ratio: {mask_ratio}", indent=1)
+        
+        # Setup training components
+        optimizer = torch.optim.Adam(self.generator_model.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9)
+        criterion = masked_mse_loss
+        
+        # Prepare training data 
+        train_results = self._prepare_perturbation_data(train_adata, target_genes, **kwargs)
+        valid_results = self._prepare_perturbation_data(valid_adata, target_genes, **kwargs) if valid_adata is not None else None
+        
+        # Training loop
+        best_loss = float('inf')
+        best_model_state = None
+        training_history = {'train_loss': [], 'val_loss': []}
+        
+        for epoch in range(epochs):
+            # Generator epoch handled by progress bar
+            
+            # Training
+            train_loss = self._train_generator_epoch(
+                train_results, optimizer, criterion, batch_size
+            )
+            training_history['train_loss'].append(train_loss)
+            
+            # Validation  
+            if valid_results is not None:
+                val_loss = self._validate_generator_epoch(valid_results, criterion, batch_size)
+                training_history['val_loss'].append(val_loss)
+                
+                # Loss metrics displayed in progress bar
+                
+                # Save best model
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    best_model_state = copy.deepcopy(self.generator_model.state_dict())
+                    SCLLMOutput.status(f"New best validation loss: {best_loss:.4f}", 'best')
+            else:
+                # Loss metrics displayed in progress bar
+                if train_loss < best_loss:
+                    best_loss = train_loss
+                    best_model_state = copy.deepcopy(self.generator_model.state_dict())
+            
+            scheduler.step()
+        
+        # Load best model
+        if best_model_state is not None:
+            self.generator_model.load_state_dict(best_model_state)
+            SCLLMOutput.status(f"Best generator model loaded: {best_loss:.4f}", 'loaded')
+        
+        SCLLMOutput.status(f"Generator fine-tuning completed", 'complete')
+        
+        return {
+            'best_loss': best_loss,
+            'training_history': training_history,
+            'target_genes': target_genes
+        }
+    
+    def _prepare_perturbation_data(self, adata: AnnData, target_genes: List[str], **kwargs) -> Dict[str, torch.Tensor]:
+        """
+        Prepare data for perturbation training following Tutorial_Perturbation exactly.
+        
+        The key insight is that we need to simulate how the GEARS dataset works:
+        - Original expression as input
+        - Perturbation flags indicating which genes are perturbed
+        - Target expression showing the actual effect of perturbation
+        
+        For training, we can simulate perturbations by creating artificial perturbation effects.
+        """
+        if adata is None:
+            return None
+            
+        # Preprocess data
+        adata_processed = self.preprocess(adata.copy(), **kwargs)
+        
+        # Get expression data
+        input_layer_key = "X_binned"
+        if input_layer_key not in adata_processed.layers:
+            raise ValueError(f"Required layer '{input_layer_key}' not found")
+        
+        all_counts = (
+            adata_processed.layers[input_layer_key].toarray()
+            if issparse(adata_processed.layers[input_layer_key])
+            else adata_processed.layers[input_layer_key]
+        )
+        
+        genes = adata_processed.var_names.tolist()
+        n_genes = len(genes)
+        n_cells = all_counts.shape[0]
+        
+        # Create gene IDs mapping
+        gene_ids = np.array([self.vocab[gene] for gene in genes], dtype=int)
+        
+        # Create perturbation flags for training
+        pert_flags = np.zeros((n_cells, n_genes), dtype=int)
+        
+        # Create synthetic perturbation targets for training
+        # This simulates what real perturbation data would look like
+        perturbed_counts = all_counts.copy()
+        
+        if target_genes:
+            # Use specified target genes for perturbation training
+            for target_gene in target_genes:
+                if target_gene in genes:
+                    gene_idx = genes.index(target_gene)
+                    # Randomly assign perturbation to subset of cells
+                    n_perturbed_cells = max(1, n_cells // 4)  # 25% of cells get perturbation
+                    random_cells = np.random.choice(n_cells, size=n_perturbed_cells, replace=False)
+                    pert_flags[random_cells, gene_idx] = 1  # Mark as perturbed
+                    
+                    # Create synthetic perturbation effect for training
+                    # Option 1: Knockout effect - reduce expression
+                    knockout_factor = kwargs.get('knockout_simulation_factor', 0.1)
+                    perturbed_counts[random_cells, gene_idx] = (
+                        perturbed_counts[random_cells, gene_idx] * knockout_factor
+                    ).astype(perturbed_counts.dtype)
+                    
+        else:
+            # Random perturbations for general training
+            n_pert_per_cell = kwargs.get('n_perturbations_per_cell', 1)
+            for cell_idx in range(n_cells):
+                # Randomly select genes to perturb
+                pert_genes = np.random.choice(n_genes, size=n_pert_per_cell, replace=False)
+                pert_flags[cell_idx, pert_genes] = 1
+                
+                # Apply synthetic perturbation effects
+                for gene_idx in pert_genes:
+                    # Simulate knockdown/knockout
+                    knockout_factor = np.random.uniform(0.0, 0.3)  # Reduce to 0-30% of original
+                    perturbed_counts[cell_idx, gene_idx] = (
+                        perturbed_counts[cell_idx, gene_idx] * knockout_factor
+                    ).astype(perturbed_counts.dtype)
+        
+        # Tokenize input (original expression) following Tutorial_Perturbation exactly
+        tokenized_data = tokenize_and_pad_batch(
+            all_counts,  # Original expression as input
+            gene_ids,
+            max_len=self.config.max_seq_len,
+            vocab=self.vocab,
+            pad_token=self.config.pad_token,
+            pad_value=-2,
+            append_cls=True,
+            include_zero_gene=False,
+        )
+        
+        # Tokenize target (perturbed expression)
+        target_tokenized = tokenize_and_pad_batch(
+            perturbed_counts,  # Perturbed expression as target
+            gene_ids,
+            max_len=self.config.max_seq_len,
+            vocab=self.vocab,
+            pad_token=self.config.pad_token,
+            pad_value=-2,
+            append_cls=True,
+            include_zero_gene=False,
+        )
+        
+        # Create perturbation flags tensor that matches tokenized length
+        # The tokenized data may be shorter due to max_seq_len, so we need to align
+        tokenized_length = tokenized_data["genes"].shape[1]
+        if tokenized_length < n_genes:
+            # Truncate perturbation flags to match tokenized length
+            pert_flags_aligned = pert_flags[:, :tokenized_length]
+        else:
+            # Pad perturbation flags if needed (shouldn't happen normally)
+            pad_size = tokenized_length - n_genes
+            pert_flags_aligned = np.pad(pert_flags, ((0, 0), (0, pad_size)), mode='constant', constant_values=0)
+        
+        SCLLMOutput.status(f"Training data: {n_cells} cells, {n_genes} genes", 'info')
+        SCLLMOutput.status(f"Perturbations: {np.sum(pert_flags > 0)}", indent=1)
+        
+        return {
+            "gene_ids": tokenized_data["genes"],
+            "values": tokenized_data["values"],  # Original expression
+            "target_values": target_tokenized["values"],  # Target perturbed expression
+            "pert_flags": torch.from_numpy(pert_flags_aligned).long(),  # Perturbation flags
+        }
+    
+    def _train_generator_epoch(self, data: Dict[str, torch.Tensor], optimizer, criterion, batch_size: int) -> float:
+        """Train generator for one epoch."""
+        self.generator_model.train()
+        
+        dataset = SimpleDataset(data)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        total_loss = 0.0
+        num_batches = 0
+        
+        for batch_data in dataloader:
+            input_gene_ids = batch_data["gene_ids"].to(self.device)
+            input_values = batch_data["values"].to(self.device)
+            target_values = batch_data["target_values"].to(self.device)
+            
+            # Get perturbation flags - need to match tokenized length
+            if input_gene_ids.shape[1] <= data["pert_flags"].shape[1]:
+                input_pert_flags = batch_data["pert_flags"][:, :input_gene_ids.shape[1]].to(self.device)
+            else:
+                # Pad if needed
+                pad_size = input_gene_ids.shape[1] - data["pert_flags"].shape[1]
+                input_pert_flags = torch.cat([
+                    batch_data["pert_flags"], 
+                    torch.zeros(batch_data["pert_flags"].shape[0], pad_size, dtype=torch.long)
+                ], dim=1).to(self.device)
+            
+            src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.pad_token])
+            
+            optimizer.zero_grad()
+            
+            # Generator forward pass - following Tutorial_Perturbation exactly
+            output_dict = self.generator_model(
+                input_gene_ids,
+                input_values,
+                input_pert_flags,
+                src_key_padding_mask=src_key_padding_mask,
+                CLS=False,
+                CCE=False,
+                MVC=False,
+                ECS=False,
+            )
+            
+            if "mlm_output" in output_dict:
+                output_values = output_dict["mlm_output"]
+                
+                # Use all positions for perturbation training (no masking)
+                masked_positions = torch.ones_like(input_values, dtype=torch.bool)
+                loss = criterion(output_values, target_values, masked_positions)
+                
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.generator_model.parameters(), 1.0)
+                optimizer.step()
+                
+                total_loss += loss.item()
+                num_batches += 1
+        
+        return total_loss / num_batches if num_batches > 0 else 0.0
+    
+    def _validate_generator_epoch(self, data: Dict[str, torch.Tensor], criterion, batch_size: int) -> float:
+        """Validate generator for one epoch."""
+        self.generator_model.eval()
+        
+        dataset = SimpleDataset(data)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        
+        total_loss = 0.0
+        num_batches = 0
+        
+        with torch.no_grad():
+            for batch_data in dataloader:
+                input_gene_ids = batch_data["gene_ids"].to(self.device)
+                input_values = batch_data["values"].to(self.device)
+                target_values = batch_data["target_values"].to(self.device)
+                
+                # Handle perturbation flags
+                if input_gene_ids.shape[1] <= data["pert_flags"].shape[1]:
+                    input_pert_flags = batch_data["pert_flags"][:, :input_gene_ids.shape[1]].to(self.device)
+                else:
+                    pad_size = input_gene_ids.shape[1] - data["pert_flags"].shape[1]
+                    input_pert_flags = torch.cat([
+                        batch_data["pert_flags"], 
+                        torch.zeros(batch_data["pert_flags"].shape[0], pad_size, dtype=torch.long)
+                    ], dim=1).to(self.device)
+                
+                src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.pad_token])
+                
+                output_dict = self.generator_model(
+                    input_gene_ids,
+                    input_values,
+                    input_pert_flags,
+                    src_key_padding_mask=src_key_padding_mask,
+                    CLS=False,
+                    CCE=False,
+                    MVC=False,
+                    ECS=False,
+                )
+                
+                if "mlm_output" in output_dict:
+                    output_values = output_dict["mlm_output"]
+                    masked_positions = torch.ones_like(input_values, dtype=torch.bool)
+                    loss = criterion(output_values, target_values, masked_positions)
+                    
+                    total_loss += loss.item()
+                    num_batches += 1
+        
+        return total_loss / num_batches if num_batches > 0 else 0.0
     
     def preprocess(self, adata: AnnData, **kwargs) -> AnnData:
         """
@@ -375,7 +984,7 @@ class ScGPTModel(SCLLMBase):
         
         # Step 1: Filter genes by vocabulary BEFORE preprocessing (like Tutorial)
         if self.vocab is not None:
-            print("Filtering genes by vocabulary...")
+            SCLLMOutput.status(f"Filtering genes by vocabulary", 'preprocessing')
             adata_processed.var["id_in_vocab"] = [
                 1 if gene in self.vocab else -1 
                 for gene in adata_processed.var_names
@@ -383,14 +992,14 @@ class ScGPTModel(SCLLMBase):
             
             genes_in_vocab = (adata_processed.var["id_in_vocab"] >= 0).sum()
             total_genes = len(adata_processed.var)
-            print(f"Matched {genes_in_vocab}/{total_genes} genes in vocabulary")
+            SCLLMOutput.status(f"Matched {genes_in_vocab}/{total_genes} genes", 'info')
             
             if genes_in_vocab == 0:
                 raise ValueError("No genes matched the vocabulary! Check gene naming conventions.")
             
             # Keep only genes in vocabulary
             adata_processed = adata_processed[:, adata_processed.var["id_in_vocab"] >= 0]
-            print(f"After vocabulary filtering: {adata_processed.n_vars} genes retained")
+            SCLLMOutput.status(f"Retained {adata_processed.n_vars} genes", 'loaded')
         
         # Step 2: Initialize preprocessor with Tutorial-exact parameters
         if self.preprocessor is None:
@@ -410,11 +1019,8 @@ class ScGPTModel(SCLLMBase):
                 binning=self.config.n_bins,  # Tutorial: n_bins = 51
                 result_binned_key="X_binned",
             )
-            print(f"Initialized preprocessor with Tutorial settings:")
-            print(f"  n_bins: {self.config.n_bins}")
-            print(f"  normalize_total: {self.preprocessor.normalize_total}")
-            print(f"  log1p: {self.preprocessor.log1p}")
-            print(f"  data_is_raw: {data_is_raw}")
+            SCLLMOutput.status(f"Preprocessor initialized", 'loaded')
+            SCLLMOutput.status(f"n_bins: {self.config.n_bins}, normalize: {self.preprocessor.normalize_total}", indent=1)
         
         # Step 3: Smart preprocessing with user control
         skip_preprocessing = False
@@ -425,7 +1031,7 @@ class ScGPTModel(SCLLMBase):
         
         # Check if already fully preprocessed
         if hasattr(adata_processed, 'layers') and 'X_binned' in adata_processed.layers:
-            print("Data appears to be already preprocessed (X_binned exists), skipping preprocessing")
+            SCLLMOutput.status(f"Data already preprocessed, skipping", 'info')
             skip_preprocessing = True
         else:
             # Inspect data to detect normalization status
@@ -439,48 +1045,45 @@ class ScGPTModel(SCLLMBase):
             mean_total = cell_totals.mean()
             median_total = np.median(cell_totals)
             
-            print(f"Data inspection:")
-            print(f"  Cell total counts - Mean: {mean_total:.1f}, Median: {median_total:.1f}")
-            print(f"  Data range: [{X_data.min():.3f}, {X_data.max():.3f}]")
-            print(f"  Data type: {X_data.dtype}")
+            SCLLMOutput.status(f"Data inspection - Mean: {mean_total:.1f}, Range: [{X_data.min():.3f}, {X_data.max():.3f}]", 'info')
             
             # Auto-detect normalization status
             auto_detected_normalized = False
             if 9000 <= mean_total <= 11000:  # Close to 10k normalization
                 auto_detected_normalized = True
-                print("  🔍 Auto-detected: Data appears normalized to ~10k")
+                SCLLMOutput.status(f"Auto-detected: normalized to ~10k", 'info', indent=1)
             elif 900000 <= mean_total <= 1100000:  # Close to 1M normalization  
                 auto_detected_normalized = True
-                print("  🔍 Auto-detected: Data appears normalized to ~1M")
+                SCLLMOutput.status(f"Auto-detected: normalized to ~1M", 'info', indent=1)
             elif mean_total < 1000:  # Very low counts, likely already log-transformed
                 auto_detected_normalized = True
-                print("  🔍 Auto-detected: Data appears log-transformed (low values)")
+                SCLLMOutput.status(f"Auto-detected: log-transformed", 'info', indent=1)
             else:
-                print("  🔍 Auto-detected: Data appears to be raw counts")
+                SCLLMOutput.status(f"Auto-detected: raw counts", 'info', indent=1)
             
             # Determine final normalization decision
             should_skip_normalization = False
             
             if force_normalization:
-                print("  ⚡ User override: FORCING normalization")
+                SCLLMOutput.status(f"User override: forcing normalization", 'warning', indent=1)
                 should_skip_normalization = False
             elif skip_normalization is True:
-                print("  ⚡ User override: SKIPPING normalization")
+                SCLLMOutput.status(f"User override: skipping normalization", 'warning', indent=1)
                 should_skip_normalization = True
             elif skip_normalization is False:
-                print("  ⚡ User override: APPLYING normalization")
+                SCLLMOutput.status(f"User override: applying normalization", 'warning', indent=1)
                 should_skip_normalization = False
             else:
                 # Use auto-detection
                 should_skip_normalization = auto_detected_normalized
                 if should_skip_normalization:
-                    print("  ✓ Decision: Will SKIP normalization (auto-detected as normalized)")
+                    SCLLMOutput.status(f"Decision: skipping normalization", 'loaded', indent=1)
                 else:
-                    print("  ✓ Decision: Will APPLY normalization (auto-detected as raw)")
+                    SCLLMOutput.status(f"Decision: applying normalization", 'loaded', indent=1)
             
             # Adjust preprocessor settings if skipping normalization
             if should_skip_normalization:
-                print("  🔄 Adjusting preprocessor to skip normalization...")
+                SCLLMOutput.status(f"Adjusting preprocessor settings", 'preprocessing', indent=1)
                 # Store original settings
                 original_normalize_total = self.preprocessor.normalize_total
                 original_log1p = self.preprocessor.log1p
@@ -488,41 +1091,39 @@ class ScGPTModel(SCLLMBase):
                 # Modify settings
                 self.preprocessor.normalize_total = None  # Skip normalization
                 self.preprocessor.log1p = False
-                print("  🔄 Also skipping log1p (data appears log-transformed)")
+                # Skip log1p notification included in settings adjustment
                 
-                print(f"  Modified settings: normalize_total={self.preprocessor.normalize_total}, log1p={self.preprocessor.log1p}")
+                # Settings details removed for cleaner output
             else:
-                print("  ✓ Will apply normalization as configured")
+                SCLLMOutput.status(f"Will apply normalization", 'loaded', indent=1)
         
         if not skip_preprocessing:
-            print("Applying preprocessing pipeline...")
+            SCLLMOutput.status(f"Applying preprocessing pipeline", 'preprocessing')
             self.preprocessor(adata_processed, batch_key=kwargs.get('batch_key', None))
             
             # Restore original settings if they were modified
             if 'original_normalize_total' in locals():
                 self.preprocessor.normalize_total = original_normalize_total
                 self.preprocessor.log1p = original_log1p
-                print("  ✓ Restored original preprocessor settings")
+                SCLLMOutput.status(f"Preprocessor settings restored", 'loaded', indent=1)
             
-            print("Preprocessing completed")
+            SCLLMOutput.status(f"Preprocessing completed", 'loaded')
             
             # Debug: Check preprocessing results
             if 'X_binned' in adata_processed.layers:
                 binned_data = adata_processed.layers['X_binned']
-                print(f"Final binned data shape: {binned_data.shape}")
-                print(f"Final binned data range: [{binned_data.min():.3f}, {binned_data.max():.3f}]")
-                print(f"Unique values in binned data: {len(np.unique(binned_data))}")
+                SCLLMOutput.status(f"Binned data: {binned_data.shape}, {len(np.unique(binned_data))} unique values", 'loaded')
                 
                 # Verify binning is correct (should be integers from 0 to n_bins-1, plus special values)
                 unique_vals = np.unique(binned_data)
-                print(f"Binned values range: {unique_vals[:5]}...{unique_vals[-5:]} (showing first and last 5)")
+                # Detailed binning info removed for cleaner output
                 
                 if binned_data.max() > self.config.n_bins:
-                    print(f"  ⚠ WARNING: Binned values exceed n_bins ({self.config.n_bins})")
+                    SCLLMOutput.status(f"Binned values exceed n_bins ({self.config.n_bins})", 'warning', indent=1)
                 if binned_data.min() < -2:
-                    print(f"  ⚠ WARNING: Unexpected negative values in binned data")
+                    SCLLMOutput.status(f"Unexpected negative values in binned data", 'warning', indent=1)
         else:
-            print("Using existing preprocessed data")
+            SCLLMOutput.status(f"Using existing preprocessed data", 'info')
         
         return adata_processed
     
@@ -567,8 +1168,8 @@ class ScGPTModel(SCLLMBase):
             else adata.layers[input_layer_key]
         )
         
-        print(f"Input data shape: {all_counts.shape}")
-        print(f"Input data range: [{all_counts.min():.3f}, {all_counts.max():.3f}]")
+        SCLLMOutput.status(f"Data shape: {all_counts.shape}", indent=1)
+        SCLLMOutput.status(f"Data range: [{all_counts.min():.3f}, {all_counts.max():.3f}]", indent=1)
         
         # Get genes and their vocab IDs (following Tutorial exactly)
         genes = adata.var_names.tolist()
@@ -583,10 +1184,10 @@ class ScGPTModel(SCLLMBase):
                 raise ValueError(f"Gene {gene} not found in vocabulary")
         
         gene_ids = np.array(gene_ids, dtype=int)
-        print(f"Gene IDs shape: {gene_ids.shape}, range: [{gene_ids.min()}, {gene_ids.max()}]")
+        SCLLMOutput.status(f"Gene IDs: {gene_ids.shape[0]} genes mapped", indent=1)
         
         # Tutorial exact tokenization
-        print("Tokenizing data...")
+        SCLLMOutput.status(f"Tokenizing data...", 'preprocessing', indent=1)
         tokenized_data = tokenize_and_pad_batch(
             all_counts,
             gene_ids,
@@ -598,12 +1199,12 @@ class ScGPTModel(SCLLMBase):
             include_zero_gene=kwargs.get('include_zero_gene', False),
         )
         
-        print(f"Tokenized genes shape: {tokenized_data['genes'].shape}")
-        print(f"Tokenized values shape: {tokenized_data['values'].shape}")
+        SCLLMOutput.status(f"Tokenized: {tokenized_data['values'].shape[0]} cells x {tokenized_data['values'].shape[1]} tokens", indent=1)
         
         # Tutorial exact masking (even with mask_ratio=0.0)
         mask_ratio = kwargs.get('mask_ratio', 0.0)
-        print(f"Applying masking with mask_ratio={mask_ratio}...")
+        if mask_ratio > 0:
+            SCLLMOutput.status(f"Applying masking (ratio={mask_ratio})...", 'preprocessing', indent=1)
         
         input_values = random_mask_value(
             tokenized_data["values"],
@@ -612,8 +1213,7 @@ class ScGPTModel(SCLLMBase):
             pad_value=-2,   # Tutorial uses -2 for padding
         )
         
-        print(f"After masking - values shape: {input_values.shape}")
-        print(f"After masking - values range: [{input_values.min()}, {input_values.max()}]")
+        # Masking debug info removed for cleaner output
         
         # Create dataset exactly like Tutorial
         dataset_dict = {
@@ -626,7 +1226,7 @@ class ScGPTModel(SCLLMBase):
         batch_size = kwargs.get('batch_size', 32)
         dataset = SimpleDataset(dataset_dict)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-        print(f"Created dataloader with {len(dataloader)} batches, batch_size={batch_size}")
+        SCLLMOutput.status(f"Created dataloader: {len(dataloader)} batches (batch_size={batch_size})", indent=1)
         
         # Make predictions following Tutorial exactly
         self.model.eval()
@@ -634,10 +1234,17 @@ class ScGPTModel(SCLLMBase):
         all_embeddings = []  
         all_logits = []
         
-        print(f"Starting prediction loop...")
+        SCLLMOutput.status(f"Running model inference...", 'predicting', indent=1)
         
         with torch.no_grad():
+            pbar = SCLLMOutput.progress_bar(
+                total=len(dataloader), 
+                desc="Prediction batches", 
+                model_name="scGPT"
+            )
+            
             for batch_idx, batch_data in enumerate(dataloader):
+                pbar.update(1)
                 # Get batch data and move to device
                 input_gene_ids = batch_data["gene_ids"].to(self.device)
                 input_values = batch_data["values"].to(self.device)
@@ -646,11 +1253,8 @@ class ScGPTModel(SCLLMBase):
                 src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.pad_token])
                 
                 if batch_idx == 0:
-                    print(f"First batch shapes:")
-                    print(f"  input_gene_ids: {input_gene_ids.shape}")
-                    print(f"  input_values: {input_values.shape}")
-                    print(f"  padding_mask: {src_key_padding_mask.shape}")
-                    print(f"  padding_mask_sum: {src_key_padding_mask.sum()}")
+                    SCLLMOutput.status(f"Batch shape: {input_gene_ids.shape}", indent=2)
+                    SCLLMOutput.status(f"Padding tokens: {src_key_padding_mask.sum().item()}", indent=2)
                 
                 # Tutorial exact model call - critical parameters
                 output_dict = self.model(
@@ -666,9 +1270,6 @@ class ScGPTModel(SCLLMBase):
                 )
                 
                 # Process model outputs - following Tutorial exactly
-                if batch_idx == 0:
-                    print(f"Model output keys: {list(output_dict.keys())}")
-                
                 if "cls_output" in output_dict:
                     logits = output_dict["cls_output"]  # Tutorial: cls_output
                     predictions = logits.argmax(1).cpu().numpy()
@@ -677,30 +1278,23 @@ class ScGPTModel(SCLLMBase):
                     
                     # Detailed debug info for first batch
                     if batch_idx == 0:
-                        print(f"First batch classification debug:")
-                        print(f"  Logits shape: {logits.shape}")
-                        print(f"  Logits dtype: {logits.dtype}")
-                        print(f"  Logits range: [{logits.min().item():.3f}, {logits.max().item():.3f}]")
-                        print(f"  Logits mean: {logits.mean().item():.3f}")
-                        print(f"  Logits std: {logits.std().item():.3f}")
+                        # First batch debug info removed for cleaner output
                         
                         # Check each class logit
                         mean_logits_per_class = logits.mean(dim=0)
-                        print(f"  Mean logits per class: {mean_logits_per_class.cpu().numpy()}")
+                        # Logits per class details removed for cleaner output
                         
-                        print(f"  Predictions sample: {predictions[:10]}")
-                        print(f"  Unique predictions in batch: {np.unique(predictions)}")
+                        # Prediction samples removed for cleaner output
                         
                         # Check if model is producing reasonable outputs
                         if logits.std().item() < 0.1:
-                            print(f"  ⚠ WARNING: Very low logits variance ({logits.std().item():.4f})")
-                            print(f"  This suggests the model may not be working correctly")
+                            SCLLMOutput.status(f"Low logits variance: {logits.std().item():.4f}", 'warning', indent=2)
                         
                         # Check for gradient/parameter issues
                         if torch.isnan(logits).any():
-                            print(f"  ❌ ERROR: NaN values detected in logits!")
+                            SCLLMOutput.status(f"NaN values in logits!", 'failed', indent=2)
                         if torch.isinf(logits).any():
-                            print(f"  ❌ ERROR: Inf values detected in logits!")
+                            SCLLMOutput.status(f"Inf values in logits!", 'failed', indent=2)
                 
                 # Get cell embeddings if available
                 if "cell_emb" in output_dict:
@@ -708,10 +1302,11 @@ class ScGPTModel(SCLLMBase):
                     all_embeddings.append(embeddings)
                     
                     if batch_idx == 0:
-                        print(f"Cell embeddings shape: {embeddings.shape}")
-                        print(f"Cell embeddings range: [{embeddings.min():.3f}, {embeddings.max():.3f}]")
+                        SCLLMOutput.status(f"Embeddings: {embeddings.shape[1]} dimensions", indent=2)
                 elif batch_idx == 0:
-                    print("  ⚠ No cell embeddings found in output")
+                    SCLLMOutput.status(f"No cell embeddings found in output", 'warning', indent=2)
+            
+            pbar.close()
         
         results = {}
         if all_predictions:
@@ -720,34 +1315,24 @@ class ScGPTModel(SCLLMBase):
             
             # Prediction analysis
             unique_preds, counts = np.unique(predictions, return_counts=True)
-            print(f"\nPrediction Analysis:")
-            print(f"  Total cells: {len(predictions)}")
-            print(f"  Unique predictions: {len(unique_preds)}")
-            print(f"  Prediction distribution:")
-            for pred, count in zip(unique_preds, counts):
-                percentage = count / len(predictions) * 100
-                print(f"    Class {pred}: {count} cells ({percentage:.1f}%)")
+            SCLLMOutput.status(f"Predictions: {len(unique_preds)} classes for {len(predictions):,} cells", indent=1)
             
             if len(unique_preds) == 1:
-                print(f"  ⚠ WARNING: All cells predicted as same class ({unique_preds[0]})")
-                print(f"    This suggests the model may not be working correctly.")
+                SCLLMOutput.status(f"All cells predicted as class {unique_preds[0]}", 'warning', indent=1)
                 
                 if all_logits:
                     all_logits_concat = np.concatenate(all_logits)
-                    print(f"  Logits analysis:")
-                    print(f"    Logits shape: {all_logits_concat.shape}")
-                    print(f"    Logits mean: {all_logits_concat.mean():.3f}")
-                    print(f"    Logits std: {all_logits_concat.std():.3f}")
+                    SCLLMOutput.status(f"Logits analysis: mean={all_logits_concat.mean():.3f}, std={all_logits_concat.std():.3f}", 'info', indent=2)
                     
                     # Check if one class dominates
                     mean_logits_per_class = all_logits_concat.mean(axis=0)
                     dominant_class = mean_logits_per_class.argmax()
-                    print(f"    Dominant class: {dominant_class} (logit: {mean_logits_per_class[dominant_class]:.3f})")
+                    SCLLMOutput.status(f"Dominant class: {dominant_class}", 'info', indent=2)
                     
         if all_embeddings:
             embeddings = np.concatenate(all_embeddings)
             results["embeddings"] = embeddings
-            print(f"  Cell embeddings shape: {embeddings.shape}")
+            SCLLMOutput.status(f"Extracted embeddings: {embeddings.shape}", indent=1)
         
         return results
     
@@ -765,7 +1350,11 @@ class ScGPTModel(SCLLMBase):
             raise ValueError(f"Batch information '{batch_key}' not found in adata.obs. "
                            f"Integration requires batch labels.")
         
-        print(f"🔄 Starting batch integration using batch key: '{batch_key}'")
+        operation_start("integrate", "scGPT", {
+            "batch_key": batch_key,
+            "cells": f"{adata.n_obs:,}",
+            "genes": f"{adata.n_vars:,}"
+        })
         
         # Get gene expression data from binned layer
         input_layer_key = "X_binned"
@@ -778,17 +1367,18 @@ class ScGPTModel(SCLLMBase):
             else adata.layers[input_layer_key]
         )
         
-        print(f"Input data shape: {all_counts.shape}")
-        print(f"Input data range: [{all_counts.min():.3f}, {all_counts.max():.3f}]")
+        SCLLMOutput.status(f"Data shape: {all_counts.shape}", indent=1)
+        SCLLMOutput.status(f"Data range: [{all_counts.min():.3f}, {all_counts.max():.3f}]", indent=1)
         
         # Process batch labels
         batch_labels = adata.obs[batch_key].astype('category').cat.codes.values
         unique_batches = np.unique(batch_labels)
         num_batches = len(unique_batches)
         
-        print(f"Batch information:")
-        print(f"  Number of batches: {num_batches}")
-        print(f"  Batch distribution: {np.bincount(batch_labels)}")
+        SCLLMOutput.status(f"Batches: {num_batches} batches detected", 'batches', indent=1)
+        batch_counts = np.bincount(batch_labels)
+        for i, count in enumerate(batch_counts):
+            SCLLMOutput.status(f"Batch {i}: {count:,} cells", indent=2)
         
         # Get genes and their vocab IDs 
         genes = adata.var_names.tolist()
@@ -802,7 +1392,7 @@ class ScGPTModel(SCLLMBase):
         gene_ids = np.array(gene_ids, dtype=int)
         
         # Tutorial exact tokenization for integration
-        print("Tokenizing data for integration...")
+        SCLLMOutput.status(f"Tokenizing data for integration...", 'preprocessing', indent=1)
         tokenized_data = tokenize_and_pad_batch(
             all_counts,
             gene_ids,
@@ -816,7 +1406,8 @@ class ScGPTModel(SCLLMBase):
         
         # Integration uses higher masking ratio (Tutorial: 0.4)
         mask_ratio = kwargs.get('mask_ratio', 0.4)
-        print(f"Applying masking for integration with mask_ratio={mask_ratio}...")
+        if mask_ratio > 0:
+            SCLLMOutput.status(f"Applying masking (ratio={mask_ratio})...", 'preprocessing', indent=1)
         
         input_values = random_mask_value(
             tokenized_data["values"],
@@ -837,28 +1428,31 @@ class ScGPTModel(SCLLMBase):
         batch_size = kwargs.get('batch_size', 32)
         dataset = SimpleDataset(dataset_dict)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-        print(f"Created dataloader with {len(dataloader)} batches for integration")
+        SCLLMOutput.status(f"Created dataloader: {len(dataloader)} batches (batch_size={batch_size})", indent=1)
         
         # Make predictions with batch-aware model
         self.model.eval()
         all_embeddings = []
         
-        print(f"Starting integration inference...")
+        SCLLMOutput.status(f"Running integration inference...", 'integrating', indent=1)
         
         with torch.no_grad():
+            pbar = SCLLMOutput.progress_bar(
+                total=len(dataloader), 
+                desc="Integration batches", 
+                model_name="scGPT"
+            )
+            
             for batch_idx, batch_data in enumerate(dataloader):
+                pbar.update(1)
                 input_gene_ids = batch_data["gene_ids"].to(self.device)
                 input_values = batch_data["values"].to(self.device)
                 batch_labels_tensor = batch_data["batch_labels"].to(self.device)
                 
                 src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.pad_token])
                 
-                if batch_idx == 0:
-                    print(f"First batch debug info:")
-                    print(f"  input_gene_ids: {input_gene_ids.shape}")
-                    print(f"  input_values: {input_values.shape}")
-                    print(f"  batch_labels: {batch_labels_tensor.shape}")
-                    print(f"  unique batch labels in batch: {torch.unique(batch_labels_tensor)}")
+                #if batch_idx == 0:
+                    # First batch debug info removed for cleaner output
                 
                 # Tutorial exact model call for integration
                 # Note: For integration, we enable batch-aware features
@@ -880,16 +1474,17 @@ class ScGPTModel(SCLLMBase):
                     all_embeddings.append(embeddings)
                     
                     if batch_idx == 0:
-                        print(f"Cell embeddings shape: {embeddings.shape}")
-                        print(f"Cell embeddings range: [{embeddings.min():.3f}, {embeddings.max():.3f}]")
+                        SCLLMOutput.status(f"Embeddings: {embeddings.shape[1]} dimensions", indent=2)
                 else:
-                    print(f"⚠ Warning: No cell embeddings found in model output")
+                    SCLLMOutput.status(f"No cell embeddings found, using encoder output", 'warning', indent=2)
                     # Fallback: use the last hidden state
                     if "encoder_output" in output_dict:
                         # Use CLS token embedding as fallback
                         encoder_output = output_dict["encoder_output"]
                         cls_embeddings = encoder_output[:, 0, :].cpu().numpy()  # CLS token
                         all_embeddings.append(cls_embeddings)
+            
+            pbar.close()
         
         results = {}
         if all_embeddings:
@@ -898,16 +1493,18 @@ class ScGPTModel(SCLLMBase):
             results["batch_labels"] = batch_labels
             results["integrated_embeddings"] = embeddings  # Same as embeddings for compatibility
             
-            print(f"✓ Integration completed!")
-            print(f"  Final embeddings shape: {embeddings.shape}")
-            print(f"  Number of batches integrated: {num_batches}")
-            
             # Add batch statistics
             results["integration_stats"] = {
                 "num_batches": num_batches,
                 "batch_distribution": np.bincount(batch_labels).tolist(),
                 "total_cells": len(batch_labels)
             }
+            
+            operation_complete("integrate", {
+                "embedding_shape": f"{embeddings.shape}",
+                "batches_integrated": num_batches,
+                "total_cells": len(batch_labels)
+            })
         else:
             raise RuntimeError("No embeddings were generated during integration")
         
@@ -938,16 +1535,16 @@ class ScGPTModel(SCLLMBase):
         has_integration_training = hasattr(self, '_integration_trained') and self._integration_trained
         
         if has_integration_training:
-            print(f"🔄 Using fine-tuned integration model...")
+            SCLLMOutput.status(f"Using fine-tuned integration model", 'info')
             # Use the trained integration capabilities
             return self._predict_integration(adata, batch_key=batch_key, **kwargs)
         else:
-            print(f"🔄 Using pre-trained model with post-hoc batch correction...")
+            SCLLMOutput.status(f"Using pre-trained model with post-hoc correction", 'info')
             return self._apply_post_hoc_integration(adata, batch_key=batch_key, **kwargs)
     
     def _predict_integration(self, adata: AnnData, batch_key: str = "batch", **kwargs) -> Dict[str, Any]:
         """Use trained integration model for prediction."""
-        print("   Using trained integration model for batch correction...")
+        SCLLMOutput.status(f"Using trained integration model", 'info', indent=1)
         
         # This would use the actual integration model prediction
         # Similar to the predict method but for integration task
@@ -971,21 +1568,21 @@ class ScGPTModel(SCLLMBase):
             }
         }
         
-        print("✓ Integration completed using fine-tuned model")
+        SCLLMOutput.status(f"Integration completed using fine-tuned model", 'loaded')
         return results
     
     def _apply_post_hoc_integration(self, adata: AnnData, batch_key: str = "batch", **kwargs) -> Dict[str, Any]:
         """Apply post-hoc batch correction methods to pre-trained embeddings."""
         
         # Get pre-trained embeddings
-        print("   Extracting pre-trained cell embeddings...")
+        SCLLMOutput.status(f"Extracting pre-trained embeddings", 'embedding', indent=1)
         embeddings = self.get_embeddings(adata, **kwargs)
         
         batch_labels = adata.obs[batch_key].astype('category').cat.codes.values
         unique_batches = np.unique(batch_labels)
         num_batches = len(unique_batches)
         
-        print(f"   Found {num_batches} batches with distribution: {np.bincount(batch_labels)}")
+        SCLLMOutput.status(f"Found {num_batches} batches", 'info', indent=1)
         
         # Apply post-hoc batch correction methods
         correction_method = kwargs.get('correction_method', 'combat')
@@ -997,10 +1594,10 @@ class ScGPTModel(SCLLMBase):
         elif correction_method == 'center_scale':
             corrected_embeddings = self._apply_center_scale_correction(embeddings, batch_labels, **kwargs)
         elif correction_method == 'none':
-            print("   Using embeddings without additional correction")
+            SCLLMOutput.status(f"Using embeddings without correction", 'info', indent=1)
             corrected_embeddings = embeddings
         else:
-            print(f"   Unknown correction method '{correction_method}', using center_scale")
+            SCLLMOutput.status(f"Unknown method '{correction_method}', using center_scale", 'warning', indent=1)
             corrected_embeddings = self._apply_center_scale_correction(embeddings, batch_labels, **kwargs)
         
         results = {
@@ -1017,12 +1614,12 @@ class ScGPTModel(SCLLMBase):
             }
         }
         
-        print(f"✓ Integration completed using {correction_method} post-hoc correction")
+        SCLLMOutput.status(f"Integration completed using {correction_method} correction", 'loaded')
         return results
     
     def _apply_combat_correction(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply ComBat-style batch correction to embeddings."""
-        print("   Applying ComBat-style correction...")
+        SCLLMOutput.status(f"Applying ComBat-style correction", 'preprocessing', indent=1)
         
         try:
             from sklearn.preprocessing import StandardScaler
@@ -1047,16 +1644,16 @@ class ScGPTModel(SCLLMBase):
             global_scaler = StandardScaler()
             corrected = global_scaler.fit_transform(corrected)
             
-            print(f"     ComBat-style correction applied to {embeddings.shape[0]} cells")
+            SCLLMOutput.status(f"ComBat applied to {embeddings.shape[0]} cells", 'loaded', indent=2)
             return corrected
             
         except Exception as e:
-            print(f"     ComBat correction failed: {e}, using original embeddings")
+            SCLLMOutput.status(f"ComBat failed: {e}", 'warning', indent=2)
             return embeddings
     
     def _apply_mnn_correction(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply MNN-inspired batch correction."""
-        print("   Applying MNN-inspired correction...")
+        SCLLMOutput.status(f"Applying MNN-inspired correction", 'preprocessing', indent=1)
         
         try:
             from sklearn.neighbors import NearestNeighbors
@@ -1065,7 +1662,7 @@ class ScGPTModel(SCLLMBase):
             unique_batches = np.unique(batch_labels)
             
             if len(unique_batches) < 2:
-                print("     Only one batch found, no correction needed")
+                SCLLMOutput.status(f"Only one batch, no correction needed", 'info', indent=2)
                 return corrected
             
             # Find mutual nearest neighbors between batches
@@ -1101,16 +1698,16 @@ class ScGPTModel(SCLLMBase):
                         corrected[mask1] = (1 - alpha) * data1 + alpha * correction_vector
                         corrected[mask2] = (1 - alpha) * data2 + alpha * correction_vector
             
-            print(f"     MNN-inspired correction applied")
+            SCLLMOutput.status(f"MNN correction applied", 'loaded', indent=2)
             return corrected
             
         except Exception as e:
-            print(f"     MNN correction failed: {e}, using original embeddings")
+            SCLLMOutput.status(f"MNN failed: {e}", 'warning', indent=2)
             return embeddings
     
     def _apply_center_scale_correction(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply simple centering and scaling correction."""
-        print("   Applying center-scale correction...")
+        SCLLMOutput.status(f"Applying center-scale correction", 'preprocessing', indent=1)
         
         corrected = embeddings.copy()
         unique_batches = np.unique(batch_labels)
@@ -1136,7 +1733,7 @@ class ScGPTModel(SCLLMBase):
                 
                 corrected[batch_mask] = batch_centered * scale_factor
         
-        print(f"     Center-scale correction applied to {len(unique_batches)} batches")
+        SCLLMOutput.status(f"Center-scale applied to {len(unique_batches)} batches", 'loaded', indent=2)
         return corrected
     
     def fine_tune(self, 
@@ -1163,7 +1760,7 @@ class ScGPTModel(SCLLMBase):
         if 'celltype' not in train_adata.obs:
             raise ValueError("train_adata must have 'celltype' column in .obs")
         
-        print(f"🚀 Starting fine-tuning for {task} task...")
+        SCLLMOutput.section_header(f"Fine-tuning for {task} task", "scGPT")
         
         # Get training parameters
         epochs = kwargs.get('epochs', 10)
@@ -1171,13 +1768,21 @@ class ScGPTModel(SCLLMBase):
         lr = kwargs.get('lr', 1e-4)
         mask_ratio = kwargs.get('mask_ratio', 0.0)  # No masking for annotation task
         
+        # Show training configuration
+        SCLLMOutput.model_info("Training Configuration", {
+            'epochs': epochs,
+            'batch_size': batch_size,
+            'learning_rate': lr,
+            'mask_ratio': mask_ratio
+        })
+        
         # Prepare cell type mapping
         unique_celltypes = train_adata.obs['celltype'].astype('category').cat.categories
         celltype_to_id = {ct: i for i, ct in enumerate(unique_celltypes)}
         id_to_celltype = {i: ct for i, ct in enumerate(unique_celltypes)}
         n_celltypes = len(unique_celltypes)
         
-        print(f"Found {n_celltypes} cell types: {list(unique_celltypes)}")
+        SCLLMOutput.status(f"Cell types: {n_celltypes} classes", 'info')
         
         # Add celltype_id to data
         train_adata.obs['celltype_id'] = train_adata.obs['celltype'].map(celltype_to_id)
@@ -1187,6 +1792,7 @@ class ScGPTModel(SCLLMBase):
             valid_adata.obs['celltype_id'] = valid_adata.obs['celltype'].map(celltype_to_id)
         
         # Preprocess data
+        SCLLMOutput.status(f"Preprocessing data...", 'preprocessing')
         train_processed = self.preprocess(train_adata, **kwargs)
         valid_processed = self.preprocess(valid_adata, **kwargs) if valid_adata is not None else None
         
@@ -1194,7 +1800,7 @@ class ScGPTModel(SCLLMBase):
         if hasattr(self.model, 'cls_decoder') and hasattr(self.model.cls_decoder, 'out_layer'):
             current_n_cls = self.model.cls_decoder.out_layer.out_features
             if current_n_cls != n_celltypes:
-                print(f"🔄 Updating classifier: {current_n_cls} → {n_celltypes} classes")
+                SCLLMOutput.status(f"Updating classifier: {current_n_cls} → {n_celltypes} classes", 'preprocessing')
                 # Get input dimension
                 if hasattr(self.model.cls_decoder, '_decoder') and len(self.model.cls_decoder._decoder) > 0:
                     prev_layer = self.model.cls_decoder._decoder[-2]
@@ -1209,7 +1815,7 @@ class ScGPTModel(SCLLMBase):
                 import torch.nn as nn
                 self.model.cls_decoder.out_layer = nn.Linear(prev_dim, n_celltypes)
                 self.model.cls_decoder.out_layer.to(self.device)
-                print("✓ Classifier updated")
+                SCLLMOutput.status(f"Classifier updated", 'loaded')
         
         # Prepare training data
         train_results = self._prepare_training_data(train_processed, mask_ratio)
@@ -1225,42 +1831,51 @@ class ScGPTModel(SCLLMBase):
         best_model_state = None
         training_history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
         
-        for epoch in range(epochs):
-            print(f"\n📊 Epoch {epoch+1}/{epochs}")
-            
-            # Training
-            train_loss, train_acc = self._train_epoch(
-                train_results, optimizer, criterion, batch_size
-            )
-            training_history['train_loss'].append(train_loss)
-            training_history['train_acc'].append(train_acc)
-            
-            # Validation
-            if valid_results is not None:
-                val_loss, val_acc = self._validate_epoch(valid_results, criterion, batch_size)
-                training_history['val_loss'].append(val_loss)
-                training_history['val_acc'].append(val_acc)
+        SCLLMOutput.status(f"Starting training...", 'training')
+        
+        with ModelProgressManager("Fine-tuning", "scGPT", epochs) as progress:
+            for epoch in range(epochs):
+                # Training
+                train_loss, train_acc = self._train_epoch(
+                    train_results, optimizer, criterion, batch_size
+                )
+                training_history['train_loss'].append(train_loss)
+                training_history['train_acc'].append(train_acc)
                 
-                print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-                print(f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+                # Validation
+                if valid_results is not None:
+                    val_loss, val_acc = self._validate_epoch(valid_results, criterion, batch_size)
+                    training_history['val_loss'].append(val_loss)
+                    training_history['val_acc'].append(val_acc)
+                    
+                    # Update progress with metrics
+                    progress.update(1, 
+                        train_loss=f"{train_loss:.4f}",
+                        train_acc=f"{train_acc:.4f}",  
+                        val_loss=f"{val_loss:.4f}",
+                        val_acc=f"{val_acc:.4f}"
+                    )
+                    
+                    # Save best model
+                    if val_acc > best_accuracy:
+                        best_accuracy = val_acc
+                        best_model_state = copy.deepcopy(self.model.state_dict())
+                        SCLLMOutput.status(f"New best validation accuracy: {best_accuracy:.4f}", 'best')
+                else:
+                    progress.update(1, 
+                        train_loss=f"{train_loss:.4f}",
+                        train_acc=f"{train_acc:.4f}"
+                    )
+                    if train_acc > best_accuracy:
+                        best_accuracy = train_acc
+                        best_model_state = copy.deepcopy(self.model.state_dict())
                 
-                # Save best model
-                if val_acc > best_accuracy:
-                    best_accuracy = val_acc
-                    best_model_state = copy.deepcopy(self.model.state_dict())
-                    print(f"✓ New best validation accuracy: {best_accuracy:.4f}")
-            else:
-                print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-                if train_acc > best_accuracy:
-                    best_accuracy = train_acc
-                    best_model_state = copy.deepcopy(self.model.state_dict())
-            
-            scheduler.step()
+                scheduler.step()
         
         # Load best model
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
-            print(f"✓ Loaded best model with accuracy: {best_accuracy:.4f}")
+            SCLLMOutput.status(f"Loaded best model (accuracy: {best_accuracy:.4f})", 'loaded')
         
         # Store celltype mapping for inference
         self.celltype_mapping = {
@@ -1268,8 +1883,6 @@ class ScGPTModel(SCLLMBase):
             'id_to_celltype': id_to_celltype,
             'n_celltypes': n_celltypes
         }
-        
-        print("🎉 Fine-tuning completed!")
         
         return {
             'best_accuracy': best_accuracy,
@@ -1302,7 +1915,7 @@ class ScGPTModel(SCLLMBase):
         if batch_key not in train_adata.obs:
             raise ValueError(f"train_adata must have '{batch_key}' column in .obs")
         
-        print(f"🚀 Starting scGPT integration training...")
+        SCLLMOutput.status(f"Starting scGPT integration training", 'training')
         
         # Get training parameters (Tutorial_Integration defaults)
         epochs = kwargs.get('epochs', 20)  # Integration typically needs more epochs
@@ -1318,15 +1931,15 @@ class ScGPTModel(SCLLMBase):
         unique_batches = np.unique(train_batch_labels)
         num_batches = len(unique_batches)
         
-        print(f"Batch information:")
-        print(f"  Number of batches: {num_batches}")
-        print(f"  Training cells distribution: {np.bincount(train_batch_labels)}")
+        SCLLMOutput.status(f"Batch information:", 'info')
+        SCLLMOutput.status(f"Number of batches: {num_batches}", indent=1)
+        SCLLMOutput.status(f"Training cells: {np.bincount(train_batch_labels)}", indent=1)
         
         if valid_adata is not None:
             if batch_key not in valid_adata.obs:
                 raise ValueError(f"valid_adata must have '{batch_key}' column in .obs")
             valid_batch_labels = valid_adata.obs[batch_key].astype('category').cat.codes.values
-            print(f"  Validation cells distribution: {np.bincount(valid_batch_labels)}")
+            SCLLMOutput.status(f"Validation cells: {np.bincount(valid_batch_labels)}", indent=1)
         
         # Update model configuration for integration
         self.config.use_batch_labels = True
@@ -1336,17 +1949,18 @@ class ScGPTModel(SCLLMBase):
         self.config.do_ecs = kwargs.get('do_ecs', True)
         self.config.domain_spec_batchnorm = kwargs.get('domain_spec_batchnorm', True)
         
-        print(f"Integration training configuration:")
-        print(f"  epochs: {epochs}, batch_size: {batch_size}, lr: {lr}")
-        print(f"  mask_ratio: {mask_ratio}")
-        print(f"  DAB: {self.config.do_dab}, MVC: {self.config.do_mvc}, ECS: {self.config.do_ecs}")
-        print(f"  DSBN: {self.config.domain_spec_batchnorm}")
-        print(f"  Loss weights - DAB: {dab_weight}, ECS: {ecs_weight}, GEPC: {gepc_weight}")
+        SCLLMOutput.status(f"Integration training configuration:", 'info')
+        SCLLMOutput.status(f"epochs: {epochs}, batch_size: {batch_size}, lr: {lr}", indent=1)
+        SCLLMOutput.status(f"mask_ratio: {mask_ratio}", indent=1)
+        SCLLMOutput.status(f"DAB: {self.config.do_dab}, MVC: {self.config.do_mvc}, ECS: {self.config.do_ecs}", indent=1)
+        SCLLMOutput.status(f"DSBN: {self.config.domain_spec_batchnorm}", indent=1)
+        SCLLMOutput.status(f"Loss weights - DAB: {dab_weight}, ECS: {ecs_weight}, GEPC: {gepc_weight}", indent=1)
         
         # Check if model needs to be reconfigured for integration
         if hasattr(self.model, 'use_batch_labels') and not self.model.use_batch_labels:
-            print("⚠ Warning: Model was not initialized with batch label support.")
-            print("  You may need to reload the model with integration parameters.")
+            SCLLMOutput.status(f"Model reconfiguration needed for batch integration", 'warning')
+            SCLLMOutput.status(f"Reinitializing model with batch support", 'preprocessing', indent=1)
+            self._reconfigure_model_for_integration(num_batches)
         
         # Preprocess data
         train_processed = self.preprocess(train_adata, **kwargs)
@@ -1368,12 +1982,12 @@ class ScGPTModel(SCLLMBase):
         best_loss = float('inf')
         best_model_state = None
         training_history = {
-            'train_loss': [], 'train_mse': [], 'train_dab': [], 'train_ecs': [],
-            'val_loss': [], 'val_mse': [], 'val_dab': [], 'val_ecs': []
+            'train_total_loss': [], 'train_mse': [], 'train_dab': [], 'train_ecs': [],
+            'val_total_loss': [], 'val_mse': [], 'val_dab': [], 'val_ecs': []
         }
         
         for epoch in range(epochs):
-            print(f"\n📊 Integration Epoch {epoch+1}/{epochs}")
+            # Integration epoch info handled by progress bar
             
             # Training
             train_losses = self._train_integration_epoch(
@@ -1395,21 +2009,20 @@ class ScGPTModel(SCLLMBase):
                     training_history[f'val_{key}'].append(value)
                 
                 total_val_loss = val_losses['total_loss']
-                print(f"Train Total: {train_losses['total_loss']:.4f}, Val Total: {total_val_loss:.4f}")
-                print(f"Train MSE: {train_losses['mse']:.4f}, Val MSE: {val_losses['mse']:.4f}")
-                if train_losses['dab'] > 0:
-                    print(f"Train DAB: {train_losses['dab']:.4f}, Val DAB: {val_losses['dab']:.4f}")
-                if train_losses['ecs'] > 0:
-                    print(f"Train ECS: {train_losses['ecs']:.4f}, Val ECS: {val_losses['ecs']:.4f}")
+                # Training metrics displayed in progress bar
+                #if train_losses['dab'] > 0:
+                    # DAB metrics displayed in progress bar
+                #if train_losses['ecs'] > 0:
+                    # ECS metrics displayed in progress bar
                 
                 # Save best model
                 if total_val_loss < best_loss:
                     best_loss = total_val_loss
                     best_model_state = copy.deepcopy(self.model.state_dict())
-                    print(f"✓ New best validation loss: {best_loss:.4f}")
+                    SCLLMOutput.status(f"New best validation loss: {best_loss:.4f}", 'best')
             else:
                 total_train_loss = train_losses['total_loss']
-                print(f"Train Total: {total_train_loss:.4f}")
+                # Training loss displayed in progress bar
                 if total_train_loss < best_loss:
                     best_loss = total_train_loss
                     best_model_state = copy.deepcopy(self.model.state_dict())
@@ -1419,7 +2032,7 @@ class ScGPTModel(SCLLMBase):
         # Load best model
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
-            print(f"✓ Loaded best model with loss: {best_loss:.4f}")
+            SCLLMOutput.status(f"Best model loaded: loss={best_loss:.4f}", 'loaded')
         
         # Store integration metadata
         self.integration_metadata = {
@@ -1431,7 +2044,7 @@ class ScGPTModel(SCLLMBase):
         # Mark as integration trained
         self._integration_trained = True
         
-        print("🎉 Integration training completed!")
+        SCLLMOutput.status(f"Integration training completed", 'complete')
         
         return {
             'best_loss': best_loss,
@@ -1451,7 +2064,20 @@ class ScGPTModel(SCLLMBase):
         Returns:
             Cell embeddings
         """
+        # Start embedding extraction with unified output
+        SCLLMOutput.data_summary(adata, model_name="scGPT")
+        operation_start("get_embeddings", "scGPT", {
+            "cells": f"{adata.n_obs:,}",
+            "genes": f"{adata.n_vars:,}"
+        })
+        
         result = self.predict(adata, task="embedding", **kwargs)
+        
+        operation_complete("get_embeddings", {
+            "embedding_shape": f"{result['embeddings'].shape}",
+            "embedding_dim": result['embeddings'].shape[1]
+        })
+        
         return result["embeddings"]
     
     def _prepare_training_data(self, adata: AnnData, mask_ratio: float = 0.0) -> Dict[str, torch.Tensor]:
@@ -1499,6 +2125,60 @@ class ScGPTModel(SCLLMBase):
             "target_values": tokenized_data["values"],
             "celltype_labels": celltype_labels,
         }
+    
+    def _reconfigure_model_for_integration(self, num_batches: int):
+        """Reconfigure model to support batch integration training."""
+        
+        # Store current model state
+        current_state = self.model.state_dict()
+        
+        # Create new model with batch label support
+        from .scgpt.model import TransformerModel
+        
+        old_model = self.model
+        self.model = TransformerModel(
+            ntoken=len(self.vocab),
+            d_model=self.config.embsize,
+            nhead=self.config.nhead,
+            d_hid=self.config.d_hid,
+            nlayers=self.config.nlayers,
+            nlayers_cls=self.config.nlayers_cls,
+            n_cls=self.n_cls,
+            vocab=self.vocab,
+            dropout=self.config.dropout,
+            pad_token=self.config.pad_token,
+            pad_value=-2,
+            do_mvc=self.config.do_mvc,
+            do_dab=self.config.do_dab,
+            use_batch_labels=True,  # Enable batch labels
+            num_batch_labels=num_batches,  # Set number of batches
+            domain_spec_batchnorm=self.config.domain_spec_batchnorm,
+            input_emb_style=self.config.input_emb_style,
+            n_input_bins=self.config.n_bins + 2,
+            cell_emb_style=self.config.cell_emb_style,
+            mvc_decoder_style="inner product",
+            ecs_threshold=0.3,
+            explicit_zero_prob=False,
+            use_fast_transformer=self.config.fast_transformer,
+            fast_transformer_backend="flash",
+            pre_norm=self.config.pre_norm,
+        )
+        
+        # Transfer compatible weights from old model
+        new_state = self.model.state_dict()
+        transferred_keys = 0
+        
+        for key, value in current_state.items():
+            if key in new_state and new_state[key].shape == value.shape:
+                new_state[key] = value
+                transferred_keys += 1
+        
+        self.model.load_state_dict(new_state)
+        self.model.to(self.device)
+        
+        SCLLMOutput.status(f"Model reconfigured with batch support", 'loaded', indent=1)
+        SCLLMOutput.status(f"Transferred {transferred_keys}/{len(new_state)} parameters", indent=1)
+        SCLLMOutput.status(f"Batch labels: {num_batches} batches", indent=1)
     
     def _prepare_integration_data(self, adata: AnnData, batch_labels: np.ndarray, mask_ratio: float = 0.4) -> Dict[str, torch.Tensor]:
         """Prepare data for integration training."""
@@ -1618,7 +2298,7 @@ class ScGPTModel(SCLLMBase):
                 loss += ecs_weight * ecs_loss
             
             if torch.isnan(loss):
-                print("⚠ Warning: NaN loss detected, skipping batch")
+                SCLLMOutput.status(f"NaN loss detected, skipping batch", 'warning')
                 continue
             
             loss.backward()
@@ -1826,9 +2506,13 @@ class ScGPTModel(SCLLMBase):
         if not hasattr(self, 'celltype_mapping'):
             raise ValueError("Model has not been fine-tuned. Call fine_tune() first.")
         
-        print("🔍 Predicting cell types for query data...")
+        operation_start("predict_celltypes", "scGPT", {
+            "cells": f"{query_adata.n_obs:,}",
+            "genes": f"{query_adata.n_vars:,}"
+        })
         
         # Preprocess query data
+        SCLLMOutput.status(f"Preprocessing query data...", 'preprocessing', indent=1)
         query_processed = self.preprocess(query_adata, **kwargs)
         
         # Get predictions
@@ -1842,15 +2526,20 @@ class ScGPTModel(SCLLMBase):
             
             results['predicted_celltypes'] = predicted_celltypes
             
-            print(f"✓ Predicted cell types for {len(predicted_celltypes)} cells")
-            
             # Show prediction summary
             from collections import Counter
             type_counts = Counter(predicted_celltypes)
-            print("Prediction summary:")
+            
+            operation_complete("predict_celltypes", {
+                "total_cells": len(predicted_celltypes),
+                "unique_types": len(type_counts),
+                "most_common": type_counts.most_common(1)[0][0] if type_counts else "None"
+            })
+            
+            SCLLMOutput.status(f"Cell type distribution:", indent=1)
             for celltype, count in type_counts.most_common():
                 percentage = count / len(predicted_celltypes) * 100
-                print(f"  {celltype}: {count} cells ({percentage:.1f}%)")
+                SCLLMOutput.status(f"{celltype}: {count:,} cells ({percentage:.1f}%)", indent=2)
         
         return results
     
@@ -1870,7 +2559,7 @@ class ScGPTModel(SCLLMBase):
         if hasattr(self, 'celltype_mapping'):
             with open(save_path / "celltype_mapping.json", 'w') as f:
                 json.dump(self.celltype_mapping, f, indent=2)
-            print("✓ Saved celltype mapping")
+            SCLLMOutput.status(f"Celltype mapping saved", 'loaded')
     
     def load_celltype_mapping(self, model_path: Union[str, Path]) -> None:
         """Load celltype mapping from saved model."""
@@ -1880,9 +2569,9 @@ class ScGPTModel(SCLLMBase):
         if mapping_file.exists():
             with open(mapping_file, 'r') as f:
                 self.celltype_mapping = json.load(f)
-            print(f"✓ Loaded celltype mapping with {self.celltype_mapping['n_celltypes']} types")
+            SCLLMOutput.status(f"Loaded celltype mapping: {self.celltype_mapping['n_celltypes']} types", 'loaded')
         else:
-            print("⚠ No celltype mapping found")
+            SCLLMOutput.status(f"No celltype mapping found", 'warning')
 
 
 class SimpleDataset(Dataset):

@@ -61,8 +61,10 @@ except ImportError:
 
 try:
     from .base import SCLLMBase
+    from .utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 except ImportError:
     from base import SCLLMBase
+    from utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 
 
 class GeneformerModel(SCLLMBase):
@@ -106,7 +108,7 @@ class GeneformerModel(SCLLMBase):
         self.training_args = kwargs.get('training_args', {})
         self.filter_data = kwargs.get('filter_data', {})
         
-        print(f"Initialized Geneformer model (version: {self.model_version})")
+        SCLLMOutput.status(f"Geneformer model initialized (version: {self.model_version})", 'loaded')
     
     def load_model(self, model_path: Union[str, Path], **kwargs) -> None:
         """
@@ -126,7 +128,7 @@ class GeneformerModel(SCLLMBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Model path {model_path} does not exist")
         
-        print(f"Loading Geneformer model from {model_path}")
+        SCLLMOutput.status(f"Loading Geneformer model", 'loading')
         
         # Update model version if specified
         if 'model_version' in kwargs:
@@ -140,7 +142,7 @@ class GeneformerModel(SCLLMBase):
         for key in ['gene_median_file', 'token_dictionary_file', 'gene_mapping_file']:
             if key in kwargs:
                 self.dict_files[key] = kwargs[key]
-                print(f"  Stored {key}: {kwargs[key]}")
+                SCLLMOutput.status(f"Stored {key}: {kwargs[key]}", indent=1)
         
         # Initialize tokenizer if requested
         if kwargs.get('load_tokenizer', True):
@@ -152,9 +154,8 @@ class GeneformerModel(SCLLMBase):
             self._initialize_tokenizer(**tokenizer_kwargs)
         
         self.is_loaded = True
-        print(f"✓ Geneformer model loaded successfully")
-        print(f"  Model version: {self.model_version}")
-        print(f"  Model path: {model_path}")
+        SCLLMOutput.status(f"Geneformer model loaded successfully", 'loaded')
+        SCLLMOutput.status(f"Version: {self.model_version}", indent=1)
     
     def _initialize_tokenizer(self, **tokenizer_kwargs):
         """Initialize the Geneformer tokenizer with external dictionary files."""
@@ -164,11 +165,9 @@ class GeneformerModel(SCLLMBase):
         missing_files = [f for f in required_files if f not in tokenizer_kwargs]
         
         if missing_files:
-            print("⚠️ Geneformer dictionary files are required but not provided")
-            print("📥 Dictionary files are not included in the package to reduce size.")
-            print("   You must download them separately and provide file paths.")
-            print("")
-            print("🔧 Required parameters:")
+            SCLLMOutput.status(f"Geneformer dictionary files required but not provided", 'warning')
+            SCLLMOutput.status(f"Dictionary files not included - download separately", 'info', indent=1)
+            SCLLMOutput.status(f"Required parameters:", 'info')
             param_examples = {
                 'gene_median_file': '/path/to/gene_median_dictionary_gc104M.pkl',
                 'token_dictionary_file': '/path/to/token_dictionary_gc104M.pkl', 
@@ -176,25 +175,15 @@ class GeneformerModel(SCLLMBase):
             }
             for file_param in required_files:
                 example_path = param_examples.get(file_param, f'/path/to/{file_param}.pkl')
-                print(f"   - {file_param}: {example_path}")
-            print("")
-            print("📋 Example usage:")
-            print("   manager.model.load_model('/path/to/geneformer/model',")
-            print("       gene_median_file='/path/to/gene_median_dictionary_gc104M.pkl',")
-            print("       token_dictionary_file='/path/to/token_dictionary_gc104M.pkl',")
-            print("       gene_mapping_file='/path/to/ensembl_mapping_dict_gc104M.pkl')")
-            print("")
-            print("📥 Download files from:")
-            print("   1. Hugging Face: git clone https://huggingface.co/ctheodoris/Geneformer")
-            print("   2. GitHub: git clone https://github.com/ctheodoris/Geneformer.git")
-            print("")
+                SCLLMOutput.status(f"{file_param}: {example_path}", indent=1)
+            SCLLMOutput.status(f"Download from Hugging Face or GitHub: Geneformer repository", indent=1)
             # Try to get suggested file names
             try:
                 from . import get_default_file_paths
                 suggested = get_default_file_paths(self.model_version)
-                print("📝 Required file names:")
+                SCLLMOutput.status(f"Required file names:", 'info')
                 for key, filename in suggested.items():
-                    print(f"   - {filename}")
+                    SCLLMOutput.status(filename, indent=1)
             except ImportError:
                 pass
             
@@ -240,25 +229,19 @@ class GeneformerModel(SCLLMBase):
             }
             
             self.tokenizer = TranscriptomeTokenizer(**tokenizer_config)
-            print("✓ Tokenizer initialized successfully with external dictionary files")
-            print(f"   Gene median file: {tokenizer_kwargs['gene_median_file']}")
-            print(f"   Token dictionary: {tokenizer_kwargs['token_dictionary_file']}")
-            print(f"   Gene mapping: {tokenizer_kwargs['gene_mapping_file']}")
+            SCLLMOutput.status(f"Tokenizer initialized with external dictionary files", 'loaded')
+            SCLLMOutput.status(f"Gene median: {Path(tokenizer_kwargs['gene_median_file']).name}", indent=1)
+            SCLLMOutput.status(f"Token dictionary: {Path(tokenizer_kwargs['token_dictionary_file']).name}", indent=1)
             
         except Exception as e:
             error_str = str(e)
-            print(f"⚠️ Failed to initialize tokenizer: {e}")
-            print("")
+            SCLLMOutput.status(f"Failed to initialize tokenizer: {e}", 'failed')
             if "invalid load key" in error_str or "UnpicklingError" in str(type(e).__name__):
-                print("💡 This suggests the dictionary files are corrupted or invalid.")
-                print("   Please re-download the files from:")
-                print("   - https://huggingface.co/ctheodoris/Geneformer")
-                print("   - https://github.com/ctheodoris/Geneformer.git")
+                SCLLMOutput.status(f"Dictionary files may be corrupted - re-download from repository", 'warning')
             elif "FileNotFoundError" in str(type(e).__name__):
-                print("💡 Dictionary file not found. Please check the file paths.")
+                SCLLMOutput.status(f"Dictionary file not found - check file paths", 'warning')
             elif "too small" in error_str:
-                print("💡 The file appears to be a Git LFS pointer, not the actual data.")
-                print("   Run 'git lfs pull' in the Geneformer repository to download actual files.")
+                SCLLMOutput.status(f"File is Git LFS pointer - run 'git lfs pull' to download", 'warning')
             
             self.tokenizer = None
     
@@ -275,13 +258,13 @@ class GeneformerModel(SCLLMBase):
         """
         try:
             if self.tokenizer is None:
-                print("⚠️ Tokenizer not available for data preparation")
+                SCLLMOutput.status(f"Tokenizer not available for data preparation", 'warning')
                 return None
             
             import os
             
             # Prepare input data following Geneformer requirements
-            print("   📋 Preparing data for Geneformer tokenization...")
+            SCLLMOutput.status(f"Preparing data for Geneformer tokenization", 'preprocessing', indent=1)
             
             # Step 1: Convert sparse matrix to dense if needed (use raw counts)
             if issparse(adata.X):
@@ -295,72 +278,71 @@ class GeneformerModel(SCLLMBase):
             
             # Step 2: Add required ensembl_id column to adata.var
             if 'ensembl_id' not in adata_copy.var.columns:
-                print("   ⚠️ Adding ensembl_id column to adata.var...")
+                SCLLMOutput.status(f"Adding ensembl_id column to adata.var", 'preprocessing', indent=1)
                 # Check if var.index looks like Ensembl IDs (starts with ENSG)
                 if adata_copy.var.index[0].startswith('ENSG'):
                     adata_copy.var['ensembl_id'] = adata_copy.var.index
-                    print("   ✓ Using var.index as ensembl_id (detected Ensembl format)")
+                    SCLLMOutput.status(f"Using var.index as ensembl_id (Ensembl format)", 'loaded', indent=1)
                 else:
                     # Gene symbols detected - warn user about potential issues
                     adata_copy.var['ensembl_id'] = adata_copy.var.index
-                    print("   ⚠️ Using var.index as ensembl_id (gene symbols detected)")
-                    print("   ⚠️ Note: Geneformer works best with Ensembl gene IDs")
-                    print("   ⚠️ Many genes may be filtered out during tokenization")
+                    SCLLMOutput.status(f"Using gene symbols as ensembl_id (may cause filtering)", 'warning', indent=1)
+                    SCLLMOutput.status(f"Geneformer works best with Ensembl gene IDs", 'info', indent=2)
                     
                     # Add detailed gene mapping analysis
-                    print("   📊 Gene mapping analysis:")
+                    SCLLMOutput.status(f"📊 Gene mapping analysis:", indent=1)
                     sample_genes = list(adata_copy.var.index[:10])
-                    print(f"   📋 Sample gene symbols in your data: {sample_genes}")
-                    print(f"   📋 Total genes in dataset: {adata_copy.n_vars}")
-                    print("   💡 Attempting to map gene symbols to Ensembl IDs...")
+                    SCLLMOutput.status(f"📋 Sample gene symbols in your data: {sample_genes}", indent=1)
+                    SCLLMOutput.status(f"📋 Total genes in dataset: {adata_copy.n_vars}", indent=1)
+                    SCLLMOutput.status(f"💡 Attempting to map gene symbols to Ensembl IDs...", indent=1)
                     
                     # Proactively attempt gene mapping for gene symbols
                     if hasattr(self, 'dict_files') and 'gene_mapping_file' in self.dict_files:
-                        print("   🔄 Proactive gene symbol mapping...")
+                        SCLLMOutput.status(f"🔄 Proactive gene symbol mapping...", indent=1)
                         try:
                             mapped_count = self._attempt_gene_mapping(adata_copy)
                             if mapped_count > 0:
-                                print(f"   ✅ Successfully mapped {mapped_count} genes to Ensembl IDs")
+                                SCLLMOutput.status(f"✅ Successfully mapped {mapped_count} genes to Ensembl IDs", indent=1)
                             else:
-                                print("   ⚠️ No genes could be mapped - proceeding with gene symbols")
+                                SCLLMOutput.status(f"⚠️ No genes could be mapped - proceeding with gene symbols", indent=1)
                         except Exception as mapping_error:
-                            print(f"   ⚠️ Gene mapping failed: {mapping_error}")
-                            print("   📋 Proceeding with original gene symbols")
+                            SCLLMOutput.status(f"⚠️ Gene mapping failed: {mapping_error}", indent=1)
+                            SCLLMOutput.status(f"📋 Proceeding with original gene symbols", indent=1)
                     else:
-                        print("   ⚠️ No gene mapping file available")
+                        SCLLMOutput.status(f"⚠️ No gene mapping file available", indent=1)
             else:
-                print("   ✓ ensembl_id column already present")
+                SCLLMOutput.status(f"✓ ensembl_id column already present", indent=1)
             
             # Step 3: Add required n_counts column to adata.obs  
             if 'n_counts' not in adata_copy.obs.columns:
-                print("   ⚠️ Adding n_counts column to adata.obs...")
+                SCLLMOutput.status(f"⚠️ Adding n_counts column to adata.obs...", indent=1)
                 adata_copy.obs['n_counts'] = np.array(adata_copy.X.sum(axis=1)).flatten()
-                print(f"   ✓ Added n_counts: mean={adata_copy.obs['n_counts'].mean():.1f}, std={adata_copy.obs['n_counts'].std():.1f}")
+                SCLLMOutput.status(f"✓ Added n_counts: mean={adata_copy.obs['n_counts'].mean():.1f}, std={adata_copy.obs['n_counts'].std():.1f}", indent=1)
             else:
-                print("   ✓ n_counts column already present")
+                SCLLMOutput.status(f"✓ n_counts column already present", indent=1)
             
             # Step 3.5: Add barcode information to preserve cell identity
             if 'cell_barcode' not in adata_copy.obs.columns:
-                print("   🔄 Adding cell_barcode column to preserve cell identity...")
+                SCLLMOutput.status(f"🔄 Adding cell_barcode column to preserve cell identity...", indent=1)
                 adata_copy.obs['cell_barcode'] = list(adata_copy.obs.index)
-                print(f"   ✓ Added cell_barcode column with {len(adata_copy.obs['cell_barcode'])} barcodes")
-                print(f"   📋 Sample barcodes: {list(adata_copy.obs['cell_barcode'][:3])}")
+                SCLLMOutput.status(f"✓ Added cell_barcode column with {len(adata_copy.obs['cell_barcode'])} barcodes", indent=1)
+                SCLLMOutput.status(f"📋 Sample barcodes: {list(adata_copy.obs['cell_barcode'][:3])}", indent=1)
             else:
-                print("   ✓ cell_barcode column already present")
+                SCLLMOutput.status(f"✓ cell_barcode column already present", indent=1)
             
             # Step 4: Ensure data is in correct format for tokenization
-            print(f"   ✓ Data shape: {adata_copy.n_obs} cells × {adata_copy.n_vars} genes")
-            print(f"   ✓ Expression range: {adata_copy.X.min():.2f} to {adata_copy.X.max():.2f}")
+            SCLLMOutput.status(f"✓ Data shape: {adata_copy.n_obs} cells × {adata_copy.n_vars} genes", indent=1)
+            SCLLMOutput.status(f"✓ Expression range: {adata_copy.X.min():.2f} to {adata_copy.X.max():.2f}", indent=1)
             
             # Create temporary h5ad file for tokenizer
             temp_h5ad_path = os.path.join(output_dir, "temp_data.h5ad")
             adata_copy.write_h5ad(temp_h5ad_path)
-            print(f"   ✓ Saved preprocessed data to {temp_h5ad_path}")
+            SCLLMOutput.status(f"✓ Saved preprocessed data to {temp_h5ad_path}", indent=1)
             
             # Output dataset directory path
             output_dataset_path = os.path.join(output_dir, "tokenized_data.dataset")
             
-            print(f"📊 Tokenizing data to {output_dataset_path}...")
+            SCLLMOutput.status(f"📊 Tokenizing data to {output_dataset_path}...")
             
             try:
                 # Use the real tokenizer to tokenize the data
@@ -368,17 +350,17 @@ class GeneformerModel(SCLLMBase):
                 if hasattr(self.tokenizer, 'tokenize_anndata'):
                     # Use the correct API signature from Geneformer source
                     try:
-                        print("   🔄 Attempting real Geneformer tokenization...")
+                        SCLLMOutput.status(f"🔄 Attempting real Geneformer tokenization...", indent=1)
                         
                         # Debug tokenizer configuration before calling tokenize_anndata
-                        print(f"   📋 Tokenizer special_token setting: {getattr(self.tokenizer, 'special_token', 'NOT_SET')}")
-                        print(f"   📋 Tokenizer model_version: {getattr(self.tokenizer, 'model_version', 'NOT_SET')}")
-                        print(f"   📋 Tokenizer model_input_size: {getattr(self.tokenizer, 'model_input_size', 'NOT_SET')}")
+                        SCLLMOutput.status(f"📋 Tokenizer special_token setting: {getattr(self.tokenizer, 'special_token', 'NOT_SET')}", indent=1)
+                        SCLLMOutput.status(f"📋 Tokenizer model_version: {getattr(self.tokenizer, 'model_version', 'NOT_SET')}", indent=1)
+                        SCLLMOutput.status(f"📋 Tokenizer model_input_size: {getattr(self.tokenizer, 'model_input_size', 'NOT_SET')}", indent=1)
                         if hasattr(self.tokenizer, 'gene_token_dict'):
                             cls_token_id = self.tokenizer.gene_token_dict.get('<cls>')
                             eos_token_id = self.tokenizer.gene_token_dict.get('<eos>')
-                            print(f"   📋 Tokenizer <cls> token ID: {cls_token_id}")
-                            print(f"   📋 Tokenizer <eos> token ID: {eos_token_id}")
+                            SCLLMOutput.status(f"📋 Tokenizer <cls> token ID: {cls_token_id}", indent=1)
+                            SCLLMOutput.status(f"📋 Tokenizer <eos> token ID: {eos_token_id}", indent=1)
                         
                         # Step 1: Call tokenize_anndata to get raw tokenized cells (without special tokens)
                         tokenized_cells, file_cell_metadata, tokenized_counts = self.tokenizer.tokenize_anndata(
@@ -386,26 +368,26 @@ class GeneformerModel(SCLLMBase):
                             target_sum=kwargs.get('target_sum', 10_000)
                         )
                         
-                        print(f"   ✅ Tokenization successful! Got {len(tokenized_cells)} tokenized cells")
+                        SCLLMOutput.status(f"✅ Tokenization successful! Got {len(tokenized_cells)} tokenized cells", indent=1)
                         
                         # Debug: Check raw tokenized cells (before special tokens)
-                        print(f"   🔍 Raw tokenized data (before special tokens):")
+                        SCLLMOutput.status(f"🔍 Raw tokenized data (before special tokens):", indent=1)
                         for i in range(min(3, len(tokenized_cells))):
                             cell = tokenized_cells[i]
-                            print(f"      Cell {i}: first 10 tokens = {cell[:10]}, length = {len(cell)}")
+                            SCLLMOutput.status(f"   Cell {i}: first 10 tokens = {cell[:10]}, length = {len(cell)}", indent=1)
                         
                         # Step 2: Use create_dataset to apply special tokens following official implementation
-                        print(f"   🔄 Applying special tokens using official create_dataset method...")
+                        SCLLMOutput.status(f"🔄 Applying special tokens using official create_dataset method...", indent=1)
                         
                         # CRITICAL: Add original_index before create_dataset to track cell order
-                        print(f"   🔄 Adding original_index to preserve cell order...")
+                        SCLLMOutput.status(f"🔄 Adding original_index to preserve cell order...", indent=1)
                         # Create a mapping of cell positions
                         for i, cell_metadata_entry in enumerate(file_cell_metadata.get('cell_barcode', [])):
                             if 'original_index' not in file_cell_metadata:
                                 file_cell_metadata['original_index'] = []
                             file_cell_metadata['original_index'].append(i)
                         
-                        print(f"   ✅ Added original_index mapping for {len(file_cell_metadata.get('original_index', []))} cells")
+                        SCLLMOutput.status(f"✅ Added original_index mapping for {len(file_cell_metadata.get('original_index', []))} cells", indent=1)
                         
                         dataset = self.tokenizer.create_dataset(
                             tokenized_cells=tokenized_cells,
@@ -415,45 +397,45 @@ class GeneformerModel(SCLLMBase):
                             keep_uncropped_input_ids=False
                         )
                         
-                        print(f"   ✅ Dataset created with special tokens applied")
+                        SCLLMOutput.status(f"✅ Dataset created with special tokens applied", indent=1)
                         
                         # Debug: Verify special tokens were applied
-                        print(f"   🔍 Verifying special tokens were applied:")
+                        SCLLMOutput.status(f"🔍 Verifying special tokens were applied:", indent=1)
                         first_tokens_after_processing = [dataset[i]['input_ids'][0] for i in range(min(3, len(dataset)))]
-                        print(f"      First tokens after processing: {first_tokens_after_processing}")
+                        SCLLMOutput.status(f"   First tokens after processing: {first_tokens_after_processing}", indent=1)
                         
                         # Verify CLS token is correct
                         cls_token_id = self.tokenizer.gene_token_dict.get('<cls>')
                         if all(token == cls_token_id for token in first_tokens_after_processing):
-                            print(f"   ✅ All sequences now start with correct <cls> token {cls_token_id}")
+                            SCLLMOutput.status(f"✅ All sequences now start with correct <cls> token {cls_token_id}", indent=1)
                         else:
-                            print(f"   ❌ Special token application failed. Expected {cls_token_id}, got {first_tokens_after_processing}")
+                            SCLLMOutput.status(f"❌ Special token application failed. Expected {cls_token_id}, got {first_tokens_after_processing}", indent=1)
                         
                         # Save the processed dataset
                         dataset.save_to_disk(output_dataset_path)
-                        print(f"   ✅ Dataset saved: {output_dataset_path}")
+                        SCLLMOutput.status(f"✅ Dataset saved: {output_dataset_path}", indent=1)
                         
                         # VERIFICATION: Check cell order in saved dataset
                         if "original_index" in dataset.column_names:
                             original_indices = dataset["original_index"]
-                            print(f"   🔍 DATASET VERIFICATION:")
-                            print(f"   📊 Total cells in dataset: {len(original_indices)}")
-                            print(f"   📊 Original indices range: {min(original_indices)} to {max(original_indices)}")
-                            print(f"   📊 First 10 original_indices: {original_indices[:10]}")
-                            print(f"   📊 Expected sequential order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]")
+                            SCLLMOutput.status(f"🔍 DATASET VERIFICATION:", indent=1)
+                            SCLLMOutput.status(f"📊 Total cells in dataset: {len(original_indices)}", indent=1)
+                            SCLLMOutput.status(f"📊 Original indices range: {min(original_indices)} to {max(original_indices)}", indent=1)
+                            SCLLMOutput.status(f"📊 First 10 original_indices: {original_indices[:10]}", indent=1)
+                            SCLLMOutput.status(f"📊 Expected sequential order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]", indent=1)
                             
                             # Check if cells are in original order or sorted by length
                             is_sequential = all(original_indices[i] == i for i in range(min(len(original_indices), 10)))
                             if is_sequential:
-                                print(f"   ✅ Dataset cells are in ORIGINAL order (not sorted by length)")
+                                SCLLMOutput.status(f"✅ Dataset cells are in ORIGINAL order (not sorted by length)", indent=1)
                             else:
-                                print(f"   ⚠️  Dataset cells are SORTED by length, will need restoration later")
-                                print(f"   💡 Cell order restoration will be applied during embedding extraction")
+                                SCLLMOutput.status(f"⚠️  Dataset cells are SORTED by length, will need restoration later", indent=1)
+                                SCLLMOutput.status(f"💡 Cell order restoration will be applied during embedding extraction", indent=1)
                                 
                             # Show which original cells are at the first few positions
-                            print(f"   🔍 Position mapping: pos[0]->cell{original_indices[0]}, pos[1]->cell{original_indices[1]}, pos[2]->cell{original_indices[2]}")
+                            SCLLMOutput.status(f"🔍 Position mapping: pos[0]->cell{original_indices[0]}, pos[1]->cell{original_indices[1]}, pos[2]->cell{original_indices[2]}", indent=1)
                         else:
-                            print(f"   ⚠️  No original_index found in dataset - cell order cannot be verified")
+                            SCLLMOutput.status(f"⚠️  No original_index found in dataset - cell order cannot be verified", indent=1)
                         
                         return output_dataset_path
                             
@@ -462,34 +444,34 @@ class GeneformerModel(SCLLMBase):
                         error_str = str(tokenize_error)
                         
                         if "multiply" in error_str and "dtype" in error_str:
-                            print(f"   ❌ Gene ID format error: {tokenize_error}")
-                            print("   🔍 Root cause: Gene symbols cannot be mapped to tokens")
-                            print("   💡 This happens when using gene symbols instead of Ensembl IDs")
+                            SCLLMOutput.status(f"❌ Gene ID format error: {tokenize_error}", indent=1)
+                            SCLLMOutput.status(f"🔍 Root cause: Gene symbols cannot be mapped to tokens", indent=1)
+                            SCLLMOutput.status(f"💡 This happens when using gene symbols instead of Ensembl IDs", indent=1)
                             
                             # Check gene format
                             sample_gene = adata_copy.var.index[0]
                             if not sample_gene.startswith('ENSG'):
-                                print(f"   ⚠️ Detected gene symbol: '{sample_gene}'")
-                                print("   ✅ Geneformer requires Ensembl IDs (ENSG...)")
+                                SCLLMOutput.status(f"⚠️ Detected gene symbol: '{sample_gene}'", indent=1)
+                                SCLLMOutput.status(f"✅ Geneformer requires Ensembl IDs (ENSG...)", indent=1)
                                 
                                 # Try to use gene mapping dictionary for conversion
-                                print(f"   🔍 Checking gene mapping capabilities...")
-                                print(f"   📋 Tokenizer has gene_mapping_dict: {hasattr(self.tokenizer, 'gene_mapping_dict')}")
+                                SCLLMOutput.status(f"🔍 Checking gene mapping capabilities...", indent=1)
+                                SCLLMOutput.status(f"📋 Tokenizer has gene_mapping_dict: {hasattr(self.tokenizer, 'gene_mapping_dict')}", indent=1)
                                 if hasattr(self.tokenizer, 'gene_mapping_dict'):
                                     gene_mapping_dict = getattr(self.tokenizer, 'gene_mapping_dict', None)
                                     if gene_mapping_dict:
-                                        print(f"   📋 Gene mapping dictionary size: {len(gene_mapping_dict)} entries")
+                                        SCLLMOutput.status(f"📋 Gene mapping dictionary size: {len(gene_mapping_dict)} entries", indent=1)
                                         # Show some example mappings
                                         sample_mappings = list(gene_mapping_dict.items())[:3]
-                                        print(f"   📋 Example mappings: {sample_mappings}")
+                                        SCLLMOutput.status(f"📋 Example mappings: {sample_mappings}", indent=1)
                                     else:
-                                        print(f"   ❌ Gene mapping dictionary is None or empty")
+                                        SCLLMOutput.status(f"❌ Gene mapping dictionary is None or empty", indent=1)
                                         
-                                    print("   🔄 Attempting gene symbol to Ensembl ID conversion...")
+                                    SCLLMOutput.status(f"🔄 Attempting gene symbol to Ensembl ID conversion...", indent=1)
                                     try:
                                         mapped_count = self._attempt_gene_mapping(adata_copy)
                                         if mapped_count > 0:
-                                            print(f"   ✅ Mapped {mapped_count} genes, retrying tokenization...")
+                                            SCLLMOutput.status(f"✅ Mapped {mapped_count} genes, retrying tokenization...", indent=1)
                                             # Save updated data and retry
                                             adata_copy.write_h5ad(temp_h5ad_path)
                                             
@@ -499,10 +481,10 @@ class GeneformerModel(SCLLMBase):
                                                 target_sum=kwargs.get('target_sum', 10_000)
                                             )
                                             
-                                            print(f"   ✅ Tokenization successful after gene mapping! Got {len(tokenized_cells)} tokenized cells")
+                                            SCLLMOutput.status(f"✅ Tokenization successful after gene mapping! Got {len(tokenized_cells)} tokenized cells", indent=1)
                                             
                                             # Create dataset using official method to apply special tokens
-                                            print(f"   🔄 Applying special tokens using official create_dataset method...")
+                                            SCLLMOutput.status(f"🔄 Applying special tokens using official create_dataset method...", indent=1)
                                             dataset = self.tokenizer.create_dataset(
                                                 tokenized_cells=tokenized_cells,
                                                 cell_metadata=file_cell_metadata,
@@ -516,56 +498,56 @@ class GeneformerModel(SCLLMBase):
                                             cls_token_id = self.tokenizer.gene_token_dict.get('<cls>')
                                             
                                             if all(token == cls_token_id for token in first_tokens_after_processing):
-                                                print(f"   ✅ All sequences start with correct <cls> token {cls_token_id}")
+                                                SCLLMOutput.status(f"✅ All sequences start with correct <cls> token {cls_token_id}", indent=1)
                                             else:
-                                                print(f"   ❌ Special token application failed. Expected {cls_token_id}, got {first_tokens_after_processing}")
+                                                SCLLMOutput.status(f"❌ Special token application failed. Expected {cls_token_id}, got {first_tokens_after_processing}", indent=1)
                                             
                                             # Save the processed dataset
                                             dataset.save_to_disk(output_dataset_path)
-                                            print(f"   ✅ Dataset saved: {output_dataset_path}")
+                                            SCLLMOutput.status(f"✅ Dataset saved: {output_dataset_path}", indent=1)
                                             
                                             # VERIFICATION: Check cell order in saved dataset
                                             if "original_index" in dataset.column_names:
                                                 original_indices = dataset["original_index"]
-                                                print(f"   🔍 DATASET VERIFICATION (after gene mapping):")
-                                                print(f"   📊 Total cells in dataset: {len(original_indices)}")
-                                                print(f"   📊 Original indices range: {min(original_indices)} to {max(original_indices)}")
-                                                print(f"   📊 First 10 original_indices: {original_indices[:10]}")
-                                                print(f"   📊 Expected sequential order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]")
+                                                SCLLMOutput.status(f"🔍 DATASET VERIFICATION (after gene mapping):", indent=1)
+                                                SCLLMOutput.status(f"📊 Total cells in dataset: {len(original_indices)}", indent=1)
+                                                SCLLMOutput.status(f"📊 Original indices range: {min(original_indices)} to {max(original_indices)}", indent=1)
+                                                SCLLMOutput.status(f"📊 First 10 original_indices: {original_indices[:10]}", indent=1)
+                                                SCLLMOutput.status(f"📊 Expected sequential order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]", indent=1)
                                                 
                                                 # Check if cells are in original order or sorted by length
                                                 is_sequential = all(original_indices[i] == i for i in range(min(len(original_indices), 10)))
                                                 if is_sequential:
-                                                    print(f"   ✅ Dataset cells are in ORIGINAL order (not sorted by length)")
+                                                    SCLLMOutput.status(f"✅ Dataset cells are in ORIGINAL order (not sorted by length)", indent=1)
                                                 else:
-                                                    print(f"   ⚠️  Dataset cells are SORTED by length, will need restoration later")
-                                                    print(f"   💡 Cell order restoration will be applied during embedding extraction")
+                                                    SCLLMOutput.status(f"⚠️  Dataset cells are SORTED by length, will need restoration later", indent=1)
+                                                    SCLLMOutput.status(f"💡 Cell order restoration will be applied during embedding extraction", indent=1)
                                                     
                                                 # Show which original cells are at the first few positions
-                                                print(f"   🔍 Position mapping: pos[0]->cell{original_indices[0]}, pos[1]->cell{original_indices[1]}, pos[2]->cell{original_indices[2]}")
+                                                SCLLMOutput.status(f"🔍 Position mapping: pos[0]->cell{original_indices[0]}, pos[1]->cell{original_indices[1]}, pos[2]->cell{original_indices[2]}", indent=1)
                                             else:
-                                                print(f"   ⚠️  No original_index found in dataset - cell order cannot be verified")
+                                                SCLLMOutput.status(f"⚠️  No original_index found in dataset - cell order cannot be verified", indent=1)
                                             
                                             return output_dataset_path
                                         else:
-                                            print("   ❌ Gene mapping failed - no genes could be converted")
-                                            print("   💡 This suggests the gene symbols in your data don't match the mapping dictionary")
+                                            SCLLMOutput.status(f"❌ Gene mapping failed - no genes could be converted", indent=1)
+                                            SCLLMOutput.status(f"💡 This suggests the gene symbols in your data don't match the mapping dictionary", indent=1)
                                     except Exception as mapping_error:
-                                        print(f"   ❌ Gene mapping attempt failed: {mapping_error}")
+                                        SCLLMOutput.status(f"❌ Gene mapping attempt failed: {mapping_error}", indent=1)
                                         import traceback
-                                        print(f"   🔍 Detailed error: {traceback.format_exc()}")
+                                        SCLLMOutput.status(f"🔍 Detailed error: {traceback.format_exc()}", indent=1)
                                 else:
-                                    print("   ❌ No gene mapping dictionary available")
-                                    print("   💡 Gene mapping requires the ensembl_mapping_dict_gc104M.pkl file")
+                                    SCLLMOutput.status(f"❌ No gene mapping dictionary available", indent=1)
+                                    SCLLMOutput.status(f"💡 Gene mapping requires the ensembl_mapping_dict_gc104M.pkl file", indent=1)
                                     if hasattr(self, 'dict_files'):
                                         mapping_file = self.dict_files.get('gene_mapping_file', 'Not provided')
-                                        print(f"   📋 Expected mapping file: {mapping_file}")
+                                        SCLLMOutput.status(f"📋 Expected mapping file: {mapping_file}", indent=1)
                                         if mapping_file != 'Not provided':
                                             from pathlib import Path
                                             file_exists = Path(mapping_file).exists()
-                                            print(f"   📋 File exists: {file_exists}")
+                                            SCLLMOutput.status(f"📋 File exists: {file_exists}", indent=1)
                                     else:
-                                        print("   📋 dict_files not available")
+                                        SCLLMOutput.status(f"📋 dict_files not available", indent=1)
                         
                         # If all else fails, raise the original error to trigger fallback
                         raise Exception(f"Real tokenization failed: {tokenize_error}")
@@ -573,13 +555,13 @@ class GeneformerModel(SCLLMBase):
                     # If method doesn't exist, raise an error to trigger fallback
                     raise AttributeError("tokenize_anndata method not found")
                 
-                print(f"✓ Real tokenization completed: {output_dataset_path}")
+                SCLLMOutput.status(f" Real tokenization completed: {output_dataset_path}", "loaded")
                 return output_dataset_path
                 
             except Exception as tokenize_error:
                 # If real tokenization fails, create a minimal mock dataset
-                print(f"⚠️ Real tokenization failed: {tokenize_error}")
-                print("📊 Creating mock dataset for testing...")
+                SCLLMOutput.status(f" Real tokenization failed: {tokenize_error}", "warning")
+                SCLLMOutput.status(f"📊 Creating mock dataset for testing...")
                 
                 try:
                     # Try to import datasets
@@ -587,7 +569,7 @@ class GeneformerModel(SCLLMBase):
                         from datasets import Dataset
                         datasets_available = True
                     except ImportError:
-                        print("⚠️ datasets library not available, using alternative approach")
+                        SCLLMOutput.status(f" datasets library not available, using alternative approach", "warning")
                         datasets_available = False
                     
                     if datasets_available:
@@ -596,10 +578,10 @@ class GeneformerModel(SCLLMBase):
                         max_cells_param = kwargs.get('max_ncells', 1000)
                         if max_cells_param and max_cells_param < adata.n_obs:
                             n_cells = max_cells_param
-                            print(f"   Limiting to max_ncells parameter: {n_cells}")
+                            SCLLMOutput.status(f"Limiting to max_ncells parameter: {n_cells}", indent=1)
                         else:
                             n_cells = adata.n_obs
-                            print(f"   Creating mock data for all cells: {n_cells}")
+                            SCLLMOutput.status(f"Creating mock data for all cells: {n_cells}", indent=1)
                         mock_data = []
                         
                         # Get cls token ID from the token dictionary if available
@@ -610,9 +592,9 @@ class GeneformerModel(SCLLMBase):
                                 with open(self.dict_files['token_dictionary_file'], 'rb') as f:
                                     token_dict = pickle.load(f)
                                     cls_token_id = token_dict.get('<cls>', 0)
-                                    print(f"   Using <cls> token ID: {cls_token_id}")
+                                    SCLLMOutput.status(f"Using <cls> token ID: {cls_token_id}", indent=1)
                         except Exception as e:
-                            print(f"   Could not load <cls> token ID, using default: {e}")
+                            SCLLMOutput.status(f"Could not load <cls> token ID, using default: {e}", indent=1)
                         
                         for i in range(n_cells):
                             # Create mock tokenized cell data with proper format
@@ -633,14 +615,14 @@ class GeneformerModel(SCLLMBase):
                         # Save as dataset directory
                         dataset.save_to_disk(output_dataset_path)
                         
-                        print(f"✓ Mock dataset created with proper <cls> tokens: {output_dataset_path}")
+                        SCLLMOutput.status(f" Mock dataset created with proper <cls> tokens: {output_dataset_path}", "loaded")
                         
                         # VERIFICATION: Check cell order in mock dataset (should be sequential since no sorting applied)
-                        print(f"   🔍 MOCK DATASET VERIFICATION:")
-                        print(f"   📊 Total cells in mock dataset: {len(mock_data)}")
-                        print(f"   📊 Mock dataset uses sequential order: [0, 1, 2, 3, 4, 5, ...]")
-                        print(f"   ✅ Mock dataset cells are in ORIGINAL order (no sorting applied)")
-                        print(f"   💡 embeddings[0] will correspond to input cell 0, embeddings[1] to input cell 1, etc.")
+                        SCLLMOutput.status(f"🔍 MOCK DATASET VERIFICATION:", indent=1)
+                        SCLLMOutput.status(f"📊 Total cells in mock dataset: {len(mock_data)}", indent=1)
+                        SCLLMOutput.status(f"📊 Mock dataset uses sequential order: [0, 1, 2, 3, 4, 5, ...]", indent=1)
+                        SCLLMOutput.status(f"✅ Mock dataset cells are in ORIGINAL order (no sorting applied)", indent=1)
+                        SCLLMOutput.status(f"💡 embeddings[0] will correspond to input cell 0, embeddings[1] to input cell 1, etc.", indent=1)
                         
                         return output_dataset_path
                     else:
@@ -658,9 +640,9 @@ class GeneformerModel(SCLLMBase):
                                 with open(self.dict_files['token_dictionary_file'], 'rb') as f:
                                     token_dict = pickle.load(f)
                                     cls_token_id = token_dict.get('<cls>', 0)
-                                    print(f"   Using <cls> token ID for manual dataset: {cls_token_id}")
+                                    SCLLMOutput.status(f"Using <cls> token ID for manual dataset: {cls_token_id}", indent=1)
                         except Exception as e:
-                            print(f"   Could not load <cls> token ID for manual dataset, using default: {e}")
+                            SCLLMOutput.status(f"Could not load <cls> token ID for manual dataset, using default: {e}", indent=1)
                         
                         # Create dataset_info.json
                         dataset_info = {
@@ -700,7 +682,7 @@ class GeneformerModel(SCLLMBase):
                             f.write(f"This is a placeholder dataset structure.\n")
                             f.write(f"For real functionality, provide proper dictionary files.\n")
                         
-                        print(f"✓ Manual mock dataset structure created with <cls> token {cls_token_id}: {output_dataset_path}")
+                        SCLLMOutput.status(f" Manual mock dataset structure created with <cls> token {cls_token_id}: {output_dataset_path}", "loaded")
                         
                         # VERIFICATION: Check cell order in manual mock dataset
                         max_cells_param = kwargs.get('max_ncells', 1000)
@@ -708,20 +690,20 @@ class GeneformerModel(SCLLMBase):
                             n_cells = max_cells_param
                         else:
                             n_cells = adata.n_obs
-                        print(f"   🔍 MANUAL MOCK DATASET VERIFICATION:")
-                        print(f"   📊 Total cells in manual mock dataset: {n_cells}")
-                        print(f"   📊 Manual mock dataset uses sequential order: [0, 1, 2, 3, 4, 5, ...]")
-                        print(f"   ✅ Manual mock dataset cells are in ORIGINAL order (no sorting applied)")
-                        print(f"   💡 embeddings[0] will correspond to input cell 0, embeddings[1] to input cell 1, etc.")
+                        SCLLMOutput.status(f"🔍 MANUAL MOCK DATASET VERIFICATION:", indent=1)
+                        SCLLMOutput.status(f"📊 Total cells in manual mock dataset: {n_cells}", indent=1)
+                        SCLLMOutput.status(f"📊 Manual mock dataset uses sequential order: [0, 1, 2, 3, 4, 5, ...]", indent=1)
+                        SCLLMOutput.status(f"✅ Manual mock dataset cells are in ORIGINAL order (no sorting applied)", indent=1)
+                        SCLLMOutput.status(f"💡 embeddings[0] will correspond to input cell 0, embeddings[1] to input cell 1, etc.", indent=1)
                         
                         return output_dataset_path
                         
                 except Exception as mock_error:
-                    print(f"⚠️ Mock dataset creation failed: {mock_error}")
+                    SCLLMOutput.status(f" Mock dataset creation failed: {mock_error}", "warning")
                     return None
             
         except Exception as e:
-            print(f"⚠️ Data preparation failed: {e}")
+            SCLLMOutput.status(f" Data preparation failed: {e}", "warning")
             return None
     
     def _attempt_gene_mapping(self, adata_copy):
@@ -730,15 +712,15 @@ class GeneformerModel(SCLLMBase):
             # Load the gene mapping dictionary
             mapping_file = self.dict_files.get('gene_mapping_file')
             if not mapping_file or not Path(mapping_file).exists():
-                print(f"   ❌ Gene mapping file not found: {mapping_file}")
+                SCLLMOutput.status(f"❌ Gene mapping file not found: {mapping_file}", indent=1)
                 return 0
             
-            print(f"   📋 Loading gene mapping from: {mapping_file}")
+            SCLLMOutput.status(f"📋 Loading gene mapping from: {mapping_file}", indent=1)
             import pickle
             with open(mapping_file, 'rb') as f:
                 gene_mapping_dict = pickle.load(f)
             
-            print(f"   ✓ Loaded mapping dictionary with {len(gene_mapping_dict)} entries")
+            SCLLMOutput.status(f"✓ Loaded mapping dictionary with {len(gene_mapping_dict)} entries", indent=1)
             
             # Attempt to map gene symbols to Ensembl IDs
             original_genes = list(adata_copy.var.index)
@@ -767,32 +749,32 @@ class GeneformerModel(SCLLMBase):
                 else:
                     unmapped_genes.append(gene_symbol)
             
-            print(f"   📊 Mapping results:")
-            print(f"      ✅ Mapped: {len(mapped_genes)} genes")
-            print(f"      ❌ Unmapped: {len(unmapped_genes)} genes")
-            print(f"      📈 Success rate: {len(mapped_genes)/(len(mapped_genes)+len(unmapped_genes))*100:.1f}%")
+            SCLLMOutput.status(f"📊 Mapping results:", indent=1)
+            SCLLMOutput.status(f"   ✅ Mapped: {len(mapped_genes)} genes", indent=1)
+            SCLLMOutput.status(f"   ❌ Unmapped: {len(unmapped_genes)} genes", indent=1)
+            SCLLMOutput.status(f"   📈 Success rate: {len(mapped_genes)/(len(mapped_genes)+len(unmapped_genes))*100:.1f}%", indent=1)
             
             # Show examples of successful and failed mappings
             if mapped_genes:
-                print(f"   📋 Example successful mappings:")
+                SCLLMOutput.status(f"📋 Example successful mappings:", indent=1)
                 for i in range(min(5, len(mapped_genes))):
                     original = mapped_genes[i]
                     ensembl = mapped_ensembl_ids[i]
-                    print(f"      {original} → {ensembl}")
+                    SCLLMOutput.status(f"   {original} → {ensembl}", indent=1)
             
             if unmapped_genes:
-                print(f"   📋 Example unmapped genes:")
+                SCLLMOutput.status(f"📋 Example unmapped genes:", indent=1)
                 for i in range(min(5, len(unmapped_genes))):
-                    print(f"      {unmapped_genes[i]} (not found in mapping dictionary)")
+                    SCLLMOutput.status(f"   {unmapped_genes[i]} (not found in mapping dictionary)", indent=1)
                     
             # Give user actionable advice
             success_rate = len(mapped_genes)/(len(mapped_genes)+len(unmapped_genes))*100
             if success_rate < 50:
-                print(f"   ⚠️ Low mapping success rate ({success_rate:.1f}%)")
-                print(f"   💡 Consider using data with Ensembl gene IDs for better results")
+                SCLLMOutput.status(f"⚠️ Low mapping success rate ({success_rate:.1f}%)", indent=1)
+                SCLLMOutput.status(f"💡 Consider using data with Ensembl gene IDs for better results", indent=1)
             elif success_rate < 80:
-                print(f"   ⚠️ Moderate mapping success rate ({success_rate:.1f}%)")
-                print(f"   💡 Some genes will be filtered out during tokenization")
+                SCLLMOutput.status(f"⚠️ Moderate mapping success rate ({success_rate:.1f}%)", indent=1)
+                SCLLMOutput.status(f"💡 Some genes will be filtered out during tokenization", indent=1)
             
             if mapped_genes:
                 # Filter AnnData to only include mapped genes
@@ -804,7 +786,7 @@ class GeneformerModel(SCLLMBase):
                 adata_filtered.var['ensembl_id'] = mapped_ensembl_ids
                 adata_filtered.var['original_gene_symbol'] = mapped_genes
                 
-                print(f"   ✅ Filtered data: {adata_filtered.n_obs} cells × {adata_filtered.n_vars} genes")
+                SCLLMOutput.status(f"✅ Filtered data: {adata_filtered.n_obs} cells × {adata_filtered.n_vars} genes", indent=1)
                 
                 # Replace the original data
                 adata_copy._inplace_subset_var(mapped_mask)
@@ -814,11 +796,11 @@ class GeneformerModel(SCLLMBase):
                 
                 return len(mapped_genes)
             else:
-                print("   ❌ No genes could be mapped")
+                SCLLMOutput.status(f"❌ No genes could be mapped", indent=1)
                 return 0
                 
         except Exception as e:
-            print(f"   ❌ Gene mapping failed: {e}")
+            SCLLMOutput.status(f"❌ Gene mapping failed: {e}", indent=1)
             return 0
     
     def _extract_cell_mapping_info(self, tokenized_data_path: str, original_adata: AnnData) -> Dict[str, Any]:
@@ -837,9 +819,9 @@ class GeneformerModel(SCLLMBase):
             # Add adata.obs.index information for reference
             if hasattr(original_adata, 'obs') and hasattr(original_adata.obs, 'index'):
                 cell_mapping["original_obs_index"] = list(original_adata.obs.index)
-                print(f"   📋 Original adata.obs.index type: {type(original_adata.obs.index)}")
-                print(f"   📋 Original adata.obs.index first 5: {list(original_adata.obs.index[:5])}")
-                print(f"   📋 Sample obs.index values: {original_adata.obs.index[:3].tolist()}")
+                SCLLMOutput.status(f"📋 Original adata.obs.index type: {type(original_adata.obs.index)}", indent=1)
+                SCLLMOutput.status(f"📋 Original adata.obs.index first 5: {list(original_adata.obs.index[:5])}", indent=1)
+                SCLLMOutput.status(f"📋 Sample obs.index values: {original_adata.obs.index[:3].tolist()}", indent=1)
             
             if "original_index" in dataset.column_names:
                 original_indices = dataset["original_index"]
@@ -853,8 +835,8 @@ class GeneformerModel(SCLLMBase):
                 if "cell_barcode" in dataset.column_names:
                     # Use the barcodes directly from the tokenized dataset
                     processed_obs_indices = dataset["cell_barcode"]
-                    print(f"   ✅ Found cell_barcode in dataset - using real barcode mapping")
-                    print(f"   📋 First 5 barcodes from dataset: {processed_obs_indices[:5]}")
+                    SCLLMOutput.status(f"✅ Found cell_barcode in dataset - using real barcode mapping", indent=1)
+                    SCLLMOutput.status(f"📋 First 5 barcodes from dataset: {processed_obs_indices[:5]}", indent=1)
                     
                     cell_mapping["processed_obs_indices"] = processed_obs_indices
                     cell_mapping["barcode_source"] = "tokenized_dataset"
@@ -877,13 +859,13 @@ class GeneformerModel(SCLLMBase):
                                         processed_metadata[col] = []
                                     processed_metadata[col].append(barcode_row[col])
                             else:
-                                print(f"   ⚠️ Barcode {barcode} not found in original adata")
+                                SCLLMOutput.status(f"⚠️ Barcode {barcode} not found in original adata", indent=1)
                         
                         cell_mapping["processed_cell_metadata"] = processed_metadata
                         
                 else:
                     # Fallback to index-based mapping (original problematic approach)
-                    print(f"   ⚠️ No cell_barcode found, using index-based mapping (may be incorrect)")
+                    SCLLMOutput.status(f"⚠️ No cell_barcode found, using index-based mapping (may be incorrect)", indent=1)
                     processed_obs_indices = []
                     processed_metadata = {}
                     
@@ -901,20 +883,20 @@ class GeneformerModel(SCLLMBase):
                     cell_mapping["processed_obs_indices"] = processed_obs_indices
                     cell_mapping["barcode_source"] = "index_based_fallback"
                     
-                print(f"   📊 Cell mapping info created:")
-                print(f"   📋 Original cells: {cell_mapping['total_original_cells']}")
-                print(f"   📋 Processed cells: {cell_mapping['total_processed_cells']}")
-                print(f"   📋 First 5 embedding->original mapping: {dict(list(cell_mapping['embedding_to_original_mapping'].items())[:5])}")
+                SCLLMOutput.status(f"📊 Cell mapping info created:", indent=1)
+                SCLLMOutput.status(f"📋 Original cells: {cell_mapping['total_original_cells']}", indent=1)
+                SCLLMOutput.status(f"📋 Processed cells: {cell_mapping['total_processed_cells']}", indent=1)
+                SCLLMOutput.status(f"📋 First 5 embedding->original mapping: {dict(list(cell_mapping['embedding_to_original_mapping'].items())[:5])}", indent=1)
                 
                 # Show barcode mapping for first few cells
                 if "processed_obs_indices" in cell_mapping:
-                    print(f"   📋 First 5 barcode mapping: {cell_mapping['processed_obs_indices'][:5]}")
-                    print(f"   📋 Barcode source: {cell_mapping.get('barcode_source', 'unknown')}")
+                    SCLLMOutput.status(f"📋 First 5 barcode mapping: {cell_mapping['processed_obs_indices'][:5]}", indent=1)
+                    SCLLMOutput.status(f"📋 Barcode source: {cell_mapping.get('barcode_source', 'unknown')}", indent=1)
                 
             else:
                 # Fallback: assume sequential processing (for mock datasets or simple cases)
-                print(f"   ⚠️ No original_index found, creating sequential mapping assumption")
-                print(f"   💡 Assuming embeddings correspond to first N cells in original order")
+                SCLLMOutput.status(f"⚠️ No original_index found, creating sequential mapping assumption", indent=1)
+                SCLLMOutput.status(f"💡 Assuming embeddings correspond to first N cells in original order", indent=1)
                 
                 # Create sequential mapping (embedding[i] -> original_cell[i])
                 n_processed = len(dataset)
@@ -946,13 +928,13 @@ class GeneformerModel(SCLLMBase):
                         cell_mapping["processed_cell_metadata"] = processed_metadata
                         cell_mapping["processed_obs_indices"] = processed_obs_indices
                     
-                    print(f"   ✅ Created sequential mapping for {n_processed} cells")
-                    print(f"   📋 Mapping: embedding[0]->cell[0], embedding[1]->cell[1], ...")
+                    SCLLMOutput.status(f"✅ Created sequential mapping for {n_processed} cells", indent=1)
+                    SCLLMOutput.status(f"📋 Mapping: embedding[0]->cell[0], embedding[1]->cell[1], ...", indent=1)
                     if "processed_obs_indices" in cell_mapping:
-                        print(f"   📋 First 5 processed obs.index barcodes: {cell_mapping['processed_obs_indices'][:5]}")
-                        print(f"   🔍 obs.index type check: {type(cell_mapping['processed_obs_indices'][0]) if cell_mapping['processed_obs_indices'] else 'empty'}")
+                        SCLLMOutput.status(f"📋 First 5 processed obs.index barcodes: {cell_mapping['processed_obs_indices'][:5]}", indent=1)
+                        SCLLMOutput.status(f"🔍 obs.index type check: {type(cell_mapping['processed_obs_indices'][0]) if cell_mapping['processed_obs_indices'] else 'empty'}", indent=1)
                 else:
-                    print(f"   ❌ Cannot create mapping: {n_processed} embeddings > {n_original} original cells")
+                    SCLLMOutput.status(f"❌ Cannot create mapping: {n_processed} embeddings > {n_original} original cells", indent=1)
                     cell_mapping.update({
                         "warning": "Cannot create cell mapping - more embeddings than original cells",
                         "recommendation": "Check max_ncells parameter and data processing"
@@ -961,9 +943,9 @@ class GeneformerModel(SCLLMBase):
             return cell_mapping
             
         except Exception as e:
-            print(f"   ⚠️ Failed to extract cell mapping info: {e}")
+            SCLLMOutput.status(f"⚠️ Failed to extract cell mapping info: {e}", indent=1)
             import traceback
-            print(f"   🔍 Error details: {traceback.format_exc()}")
+            SCLLMOutput.status(f"🔍 Error details: {traceback.format_exc()}", indent=1)
             return {
                 "error": str(e),
                 "warning": "Cell mapping information unavailable",
@@ -986,7 +968,7 @@ class GeneformerModel(SCLLMBase):
         Returns:
             Preprocessed AnnData object
         """
-        print("Preprocessing data for Geneformer...")
+        SCLLMOutput.status(f"Preprocessing data for Geneformer...", "preprocessing")
         
         adata_processed = adata.copy()
         
@@ -998,27 +980,27 @@ class GeneformerModel(SCLLMBase):
         if normalize_total:
             import scanpy as sc
             sc.pp.normalize_total(adata_processed, target_sum=1e4)
-            print("✓ Normalized total counts")
+            SCLLMOutput.status(f" Normalized total counts", "loaded")
         
         if log1p:
             import scanpy as sc
             sc.pp.log1p(adata_processed)
-            print("✓ Applied log1p transformation")
+            SCLLMOutput.status(f" Applied log1p transformation", "loaded")
         
         if hvg:
             import scanpy as sc
             sc.pp.highly_variable_genes(adata_processed)
             adata_processed = adata_processed[:, adata_processed.var.highly_variable].copy()
-            print(f"✓ Selected {adata_processed.n_vars} highly variable genes")
+            SCLLMOutput.status(f" Selected {adata_processed.n_vars} highly variable genes", "loaded")
         
         # Tokenization for Geneformer (if tokenizer available)
         if kwargs.get('tokenize', False) and self.tokenizer is not None:
-            print("🔄 Tokenizing data...")
+            SCLLMOutput.status(f" Tokenizing data...", "preprocessing")
             # This would typically involve converting to the Geneformer dataset format
             # The actual implementation depends on the specific tokenizer interface
             pass
         
-        print(f"Preprocessing completed: {adata_processed.n_obs} cells × {adata_processed.n_vars} genes")
+        SCLLMOutput.status(f"Preprocessing completed: {adata_processed.n_obs} cells × {adata_processed.n_vars} genes", "preprocessing")
         return adata_processed
     
     def predict(self, adata: AnnData, task: str = "embedding", **kwargs) -> Dict[str, Any]:
@@ -1050,7 +1032,7 @@ class GeneformerModel(SCLLMBase):
     
     def _predict_embedding(self, adata: AnnData, **kwargs) -> Dict[str, Any]:
         """Extract cell embeddings using Geneformer."""
-        print("🔍 Extracting cell embeddings with Geneformer...")
+        SCLLMOutput.status(f" Extracting cell embeddings with Geneformer...", "predicting")
         
         if not _geneformer_available:
             raise ImportError(
@@ -1078,7 +1060,7 @@ class GeneformerModel(SCLLMBase):
         # Use stored dictionary files (from load_model) if available
         if hasattr(self, 'dict_files') and self.dict_files:
             tokenizer_files.update(self.dict_files)
-            print(f"ℹ️ Using stored dictionary files: {list(tokenizer_files.keys())}")
+            SCLLMOutput.status(f" Using stored dictionary files: {list(tokenizer_files.keys())}", "info")
         
         # Fall back to tokenizer if available
         elif self.tokenizer is not None:
@@ -1088,7 +1070,7 @@ class GeneformerModel(SCLLMBase):
                 tokenizer_files['token_dictionary_file'] = self.tokenizer.token_dictionary_file
             if hasattr(self.tokenizer, 'gene_mapping_file'):
                 tokenizer_files['gene_mapping_file'] = self.tokenizer.gene_mapping_file
-            print(f"ℹ️ Using dictionary files from tokenizer: {list(tokenizer_files.keys())}")
+            SCLLMOutput.status(f" Using dictionary files from tokenizer: {list(tokenizer_files.keys())}", "info")
         
         # Check if we have the required dictionary files
         if not tokenizer_files or 'token_dictionary_file' not in tokenizer_files:
@@ -1124,7 +1106,7 @@ class GeneformerModel(SCLLMBase):
                 os.makedirs(temp_output_dir, exist_ok=True)
                 
                 # Step 1: Convert AnnData to Geneformer format and tokenize
-                print("📊 Converting AnnData to Geneformer format...")
+                SCLLMOutput.status(f"📊 Converting AnnData to Geneformer format...")
                 tokenized_data = self._prepare_data_for_geneformer(adata, temp_input_dir, **kwargs)
                 
                 if tokenized_data is None:
@@ -1140,7 +1122,7 @@ class GeneformerModel(SCLLMBase):
                     )
                 
                 # Step 2: Initialize EmbExtractor following the official example
-                print("🔧 Initializing EmbExtractor...")
+                SCLLMOutput.status(f"🔧 Initializing EmbExtractor...")
                 
                 # Extract parameters with defaults matching the notebook example
                 filter_data = kwargs.get('filter_data', {"cell_type": ["all"]}) if kwargs.get('filter_data') else {}
@@ -1172,41 +1154,41 @@ class GeneformerModel(SCLLMBase):
                 # Note: EmbExtractor only accepts token_dictionary_file, not gene_median_file or gene_mapping_file
                 
                 # Note: Don't pass special_token to EmbExtractor as it's not a valid parameter
-                print(f"   📋 Tokenizer uses special_token: {getattr(self.tokenizer, 'special_token', 'unknown')}")
+                SCLLMOutput.status(f"📋 Tokenizer uses special_token: {getattr(self.tokenizer, 'special_token', 'unknown')}", indent=1)
                 
-                print(f"   EmbExtractor config: {extractor_kwargs}")
+                SCLLMOutput.status(f"EmbExtractor config: {extractor_kwargs}", indent=1)
                 
                 self.emb_extractor = EmbExtractor(**extractor_kwargs)
                 
                 # Debug: Check EmbExtractor's understanding of <cls> token
-                print(f"   🔍 EmbExtractor debugging:")
+                SCLLMOutput.status(f"🔍 EmbExtractor debugging:", indent=1)
                 try:
                     if hasattr(self.emb_extractor, 'token_gene_dict'):
                         gene_token_dict = {v: k for k, v in self.emb_extractor.token_gene_dict.items()}
                         emb_cls_token_id = gene_token_dict.get("<cls>")
-                        print(f"      EmbExtractor <cls> token ID: {emb_cls_token_id}")
+                        SCLLMOutput.status(f"   EmbExtractor <cls> token ID: {emb_cls_token_id}", indent=1)
                     else:
-                        print(f"      EmbExtractor token_gene_dict not available")
+                        SCLLMOutput.status(f"   EmbExtractor token_gene_dict not available", indent=1)
                         
                     # Try to access the internal token dictionary directly
                     import pickle
                     with open(tokenizer_files['token_dictionary_file'], 'rb') as f:
                         direct_token_dict = pickle.load(f)
                         direct_cls_id = direct_token_dict.get('<cls>')
-                        print(f"      Direct from file <cls> token ID: {direct_cls_id}")
+                        SCLLMOutput.status(f"   Direct from file <cls> token ID: {direct_cls_id}", indent=1)
                         
                         # Show some example tokens for comparison
                         sample_tokens = list(direct_token_dict.items())[:5]
-                        print(f"      Sample tokens from dictionary: {sample_tokens}")
+                        SCLLMOutput.status(f"   Sample tokens from dictionary: {sample_tokens}", indent=1)
                         
                 except Exception as debug_error:
-                    print(f"      Debug error: {debug_error}")
+                    SCLLMOutput.status(f"   Debug error: {debug_error}", indent=1)
                 
                 # Step 3: Extract embeddings following the notebook example
-                print("🚀 Extracting embeddings...")
+                SCLLMOutput.status(f" Extracting embeddings...", "training")
                 
                 # CRITICAL: Patch the EmbExtractor to preserve cell order
-                print("   🔧 Applying cell order preservation patch...")
+                SCLLMOutput.status(f"🔧 Applying cell order preservation patch...", indent=1)
                 
                 # Load and preprocess the tokenized dataset
                 from datasets import load_from_disk
@@ -1222,17 +1204,17 @@ class GeneformerModel(SCLLMBase):
                         )
                     except ImportError:
                         filtered_input_data = tokenized_dataset
-                        print("   ⚠️ Could not import perturber_utils, using unfiltered data")
+                        SCLLMOutput.status(f"⚠️ Could not import perturber_utils, using unfiltered data", indent=1)
                 else:
                     filtered_input_data = tokenized_dataset
                 
                 # Use our custom order-preserving downsampling instead of the official sort
-                print("   🔄 Applying order-preserving downsampling...")
+                SCLLMOutput.status(f"🔄 Applying order-preserving downsampling...", indent=1)
                 processed_data = self._downsample_without_sorting(filtered_input_data, max_ncells)
                 
-                print(f"   ✅ Processed data shape: {len(processed_data)} cells")
-                print(f"   📋 First 5 original_indices: {processed_data['original_index'][:5]}")
-                print(f"   📋 Cell order verification: processed_data[0] corresponds to original_cell[{processed_data['original_index'][0]}]")
+                SCLLMOutput.status(f"✅ Processed data shape: {len(processed_data)} cells", indent=1)
+                SCLLMOutput.status(f"📋 First 5 original_indices: {processed_data['original_index'][:5]}", indent=1)
+                SCLLMOutput.status(f"📋 Cell order verification: processed_data[0] corresponds to original_cell[{processed_data['original_index'][0]}]", indent=1)
                 
                 # Now extract embeddings using modified dataset
                 try:
@@ -1242,11 +1224,11 @@ class GeneformerModel(SCLLMBase):
                     
                     # Use fine-tuned model if available, otherwise load from path
                     if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned and hasattr(self, 'fine_tuned_base_model'):
-                        print("   🔧 Using fine-tuned model from memory")
+                        SCLLMOutput.status(f"🔧 Using fine-tuned model from memory", indent=1)
                         model = self.fine_tuned_base_model
                         model.eval()  # Set to evaluation mode
                     else:
-                        print("   🔧 Loading model from path")
+                        SCLLMOutput.status(f"🔧 Loading model from path", indent=1)
                         # Load model from path (original behavior)
                         model = pu.load_model(
                             self.emb_extractor.model_type, 
@@ -1258,8 +1240,8 @@ class GeneformerModel(SCLLMBase):
                     # Calculate layer to extract
                     layer_to_quant = pu.quant_layers(model) + self.emb_extractor.emb_layer
                     
-                    print(f"   🔧 Extracting embeddings from layer {layer_to_quant}")
-                    print(f"   📊 Processing {len(processed_data)} cells in original order")
+                    SCLLMOutput.status(f"🔧 Extracting embeddings from layer {layer_to_quant}", indent=1)
+                    SCLLMOutput.status(f"📊 Processing {len(processed_data)} cells in original order", indent=1)
                     
                     # Extract embeddings with preserved order
                     embs = get_embs(
@@ -1273,11 +1255,11 @@ class GeneformerModel(SCLLMBase):
                         summary_stat=getattr(self.emb_extractor, 'summary_stat', None),
                     )
                     
-                    print(f"   ✅ Embeddings extracted with preserved cell order!")
+                    SCLLMOutput.status(f"✅ Embeddings extracted with preserved cell order!", indent=1)
                     
                 except ImportError as import_error:
-                    print(f"   ⚠️ Could not import required modules: {import_error}")
-                    print("   🔄 Falling back to standard EmbExtractor (cell order may change)")
+                    SCLLMOutput.status(f"⚠️ Could not import required modules: {import_error}", indent=1)
+                    SCLLMOutput.status(f"🔄 Falling back to standard EmbExtractor (cell order may change)", indent=1)
                     
                     # Fallback to original method
                     embs = self.emb_extractor.extract_embs(
@@ -1287,7 +1269,7 @@ class GeneformerModel(SCLLMBase):
                         output_prefix="embeddings"
                     )
                     
-                    print(f"   ✅ Embeddings extracted with original cell order")
+                    SCLLMOutput.status(f"✅ Embeddings extracted with original cell order", indent=1)
                     
                 # Step 4: Convert embeddings to numpy array format and restore original order
                 if embs is not None:
@@ -1306,13 +1288,13 @@ class GeneformerModel(SCLLMBase):
                         except Exception:
                             embeddings = np.array(embs)
                     
-                    print(f"✓ Extracted embeddings from EmbExtractor: {embeddings.shape}")
+                    SCLLMOutput.status(f" Extracted embeddings from EmbExtractor: {embeddings.shape}", "loaded")
                     
                     # Note: With our order preservation patch, embeddings should now be in original order
-                    print(f"   ℹ️ Cell order information:")
-                    print(f"   📊 Embeddings are now in ORIGINAL input order (order preserved)")
-                    print(f"   📊 This is different from official Geneformer behavior (which sorts by length)")
-                    print(f"   💡 embeddings[0] corresponds to input adata cell[0], embeddings[1] to input adata cell[1], etc.")
+                    SCLLMOutput.status(f"ℹ️ Cell order information:", indent=1)
+                    SCLLMOutput.status(f"📊 Embeddings are now in ORIGINAL input order (order preserved)", indent=1)
+                    SCLLMOutput.status(f"📊 This is different from official Geneformer behavior (which sorts by length)", indent=1)
+                    SCLLMOutput.status(f"💡 embeddings[0] corresponds to input adata cell[0], embeddings[1] to input adata cell[1], etc.", indent=1)
                     
                     # Check if embeddings match input cell count
                     expected_cells = adata.n_obs
@@ -1392,7 +1374,7 @@ class GeneformerModel(SCLLMBase):
     
     def _predict_annotation(self, adata: AnnData, **kwargs) -> Dict[str, Any]:
         """Predict cell type annotations using fine-tuned Geneformer."""
-        print("🔍 Predicting cell types with Geneformer...")
+        SCLLMOutput.status(f" Predicting cell types with Geneformer...", "predicting")
         
         # Check if we have a fine-tuned model available
         if not (hasattr(self, 'fine_tuned_model') and self.fine_tuned_model is not None):
@@ -1409,7 +1391,7 @@ class GeneformerModel(SCLLMBase):
             import os
             
             # Step 1: Prepare data for prediction (similar to fine-tuning)
-            print("📊 Preparing data for prediction...")
+            SCLLMOutput.status(f"📊 Preparing data for prediction...")
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_input_dir = os.path.join(temp_dir, "input")
                 os.makedirs(temp_input_dir, exist_ok=True)
@@ -1424,7 +1406,7 @@ class GeneformerModel(SCLLMBase):
                 from datasets import load_from_disk
                 tokenized_dataset = load_from_disk(tokenized_data_path)
                 
-                print(f"   ✅ Tokenized {len(tokenized_dataset)} cells for prediction")
+                SCLLMOutput.status(f"✅ Tokenized {len(tokenized_dataset)} cells for prediction", indent=1)
                 
                 # Step 2: Create data collator and dataloader
                 class GeneformerDataCollator:
@@ -1477,7 +1459,7 @@ class GeneformerModel(SCLLMBase):
                 )
                 
                 # Step 3: Run prediction
-                print("🚀 Running cell type prediction...")
+                SCLLMOutput.status(f" Running cell type prediction...", "training")
                 model = self.fine_tuned_model
                 model.eval()
                 
@@ -1500,18 +1482,18 @@ class GeneformerModel(SCLLMBase):
                         pred_classes = logits.argmax(dim=-1)
                         predictions.extend(pred_classes.cpu().tolist())
                 
-                print(f"   ✅ Predicted {len(predictions)} cells")
+                SCLLMOutput.status(f"✅ Predicted {len(predictions)} cells", indent=1)
                 
                 # Step 4: Convert predictions to cell type names
                 if hasattr(self, 'celltype_mapping') and 'id_to_celltype' in self.celltype_mapping:
                     id_to_celltype = self.celltype_mapping['id_to_celltype']
                     predicted_celltypes = [id_to_celltype[pred] for pred in predictions]
                     
-                    print(f"   📊 Prediction summary:")
+                    SCLLMOutput.status(f"📊 Prediction summary:", indent=1)
                     from collections import Counter
                     pred_counts = Counter(predicted_celltypes)
                     for celltype, count in pred_counts.most_common():
-                        print(f"      {celltype}: {count} cells")
+                        SCLLMOutput.status(f"   {celltype}: {count} cells", indent=1)
                     
                     return {
                         'predictions': predictions,
@@ -1520,7 +1502,7 @@ class GeneformerModel(SCLLMBase):
                         'n_cells': len(predictions)
                     }
                 else:
-                    print("   ⚠️ Celltype mapping not available, returning numerical predictions")
+                    SCLLMOutput.status(f"⚠️ Celltype mapping not available, returning numerical predictions", indent=1)
                     return {
                         'predictions': predictions,
                         'n_cells': len(predictions)
@@ -1539,7 +1521,7 @@ class GeneformerModel(SCLLMBase):
         3. Forward pass through Geneformer model  
         4. Calculate cosine similarities between original and perturbed embeddings
         """
-        print("🔬 Performing in silico perturbation with Geneformer...")
+        SCLLMOutput.status(f" Performing in silico perturbation with Geneformer...", "predicting")
         
         #To do
     
@@ -1552,7 +1534,7 @@ class GeneformerModel(SCLLMBase):
         try:
             from .tokenizer import TranscriptomeTokenizer
             
-            print("   📝 Preparing data for tokenization...")
+            SCLLMOutput.status(f"📝 Preparing data for tokenization...", indent=1)
             
             # Subset data if needed
             if adata.n_obs > max_ncells:
@@ -1589,7 +1571,7 @@ class GeneformerModel(SCLLMBase):
                 )
                 
                 # Tokenize
-                print("   🔄 Running tokenization...")
+                SCLLMOutput.status(f"🔄 Running tokenization...", indent=1)
                 output_path = os.path.join(temp_dir, "tokenized")
                 
                 tokenizer.tokenize_data(
@@ -1607,11 +1589,11 @@ class GeneformerModel(SCLLMBase):
                     tokenized_dataset = load_from_disk(dataset_path)
                     return tokenized_dataset
                 else:
-                    print(f"   ❌ Tokenized dataset not found at {dataset_path}")
+                    SCLLMOutput.status(f"❌ Tokenized dataset not found at {dataset_path}", indent=1)
                     return None
                     
         except Exception as e:
-            print(f"   ❌ Tokenization failed: {e}")
+            SCLLMOutput.status(f"❌ Tokenization failed: {e}", indent=1)
             return None
     
     def _load_gene_token_dict(self) -> Dict[str, int]:
@@ -1623,14 +1605,14 @@ class GeneformerModel(SCLLMBase):
             if TOKEN_DICTIONARY_FILE_30M.exists():
                 with open(TOKEN_DICTIONARY_FILE_30M, 'rb') as f:
                     gene_token_dict = pickle.load(f)
-                print(f"   ✅ Loaded {len(gene_token_dict)} gene tokens")
+                SCLLMOutput.status(f"✅ Loaded {len(gene_token_dict)} gene tokens", indent=1)
                 return gene_token_dict
             else:
-                print(f"   ❌ Token dictionary not found at {TOKEN_DICTIONARY_FILE_30M}")
+                SCLLMOutput.status(f"❌ Token dictionary not found at {TOKEN_DICTIONARY_FILE_30M}", indent=1)
                 return None
                 
         except Exception as e:
-            print(f"   ❌ Failed to load gene token dictionary: {e}")
+            SCLLMOutput.status(f"❌ Failed to load gene token dictionary: {e}", indent=1)
             return None
     
     def _perturb_gene_in_dataset(self, tokenized_dataset: Dataset, gene: str, gene_token: int,
@@ -1650,17 +1632,17 @@ class GeneformerModel(SCLLMBase):
             example_cell = tokenized_dataset.select([0])
             
             # Create perturbation batch using real logic
-            print(f"   🔧 Creating perturbation batch for {gene}...")
+            SCLLMOutput.status(f"🔧 Creating perturbation batch for {gene}...", indent=1)
             
             perturbation_batch, indices_to_perturb = self._make_perturbation_batch(
                 example_cell, perturb_type, [gene_token], gene, forward_batch_size
             )
             
             if perturbation_batch is None or len(perturbation_batch) == 0:
-                print(f"   ⚠️ No perturbations created for {gene}")
+                SCLLMOutput.status(f"⚠️ No perturbations created for {gene}", indent=1)
                 return None
             
-            print(f"   📊 Created {len(perturbation_batch)} perturbation samples")
+            SCLLMOutput.status(f"📊 Created {len(perturbation_batch)} perturbation samples", indent=1)
             
             # For now, return mock results based on the structure
             # In real implementation, this would do forward pass through Geneformer
@@ -1702,7 +1684,7 @@ class GeneformerModel(SCLLMBase):
             }
             
         except Exception as e:
-            print(f"   ❌ Gene perturbation failed for {gene}: {e}")
+            SCLLMOutput.status(f"❌ Gene perturbation failed for {gene}: {e}", indent=1)
             return None
     
     def _make_perturbation_batch(self, example_cell: Dataset, perturb_type: str, 
@@ -1730,14 +1712,14 @@ class GeneformerModel(SCLLMBase):
                     indices_to_perturb.extend([[idx] for idx in indices])
             
             if not indices_to_perturb:
-                print(f"   ⚠️ Gene token not found in cell sequence")
+                SCLLMOutput.status(f"⚠️ Gene token not found in cell sequence", indent=1)
                 # For overexpress, we can still create perturbation by adding the token
                 if perturb_type == "overexpress":
                     indices_to_perturb = [[-100]]  # Special indicator for not present
                 else:
                     return None, None
             
-            print(f"   📍 Found {len(indices_to_perturb)} perturbation sites")
+            SCLLMOutput.status(f"📍 Found {len(indices_to_perturb)} perturbation sites", indent=1)
             
             # Create perturbation dataset
             length = len(indices_to_perturb)
@@ -1768,7 +1750,7 @@ class GeneformerModel(SCLLMBase):
             return perturbation_dataset, indices_to_perturb
             
         except Exception as e:
-            print(f"   ❌ Failed to create perturbation batch: {e}")
+            SCLLMOutput.status(f"❌ Failed to create perturbation batch: {e}", indent=1)
             return None, None
     
     def _delete_indices_real(self, example):
@@ -1850,7 +1832,7 @@ class GeneformerModel(SCLLMBase):
         
         当前实现是近似方法，直接修改表达矩阵来模拟token序列的变化效果。
         """
-        print(f"   ⚠️ 使用简化扰动方法（真实方法需要完整的tokenization pipeline）")
+        SCLLMOutput.status(f"⚠️ 使用简化扰动方法（真实方法需要完整的tokenization pipeline）", indent=1)
         
         adata_perturbed = adata.copy()
         
@@ -1863,7 +1845,7 @@ class GeneformerModel(SCLLMBase):
             # 模拟从rank value encoding中删除基因token
             # 效果：完全去除该基因的信号
             adata_perturbed.X[:, gene_idx] = 0
-            print(f"   🗑️ 模拟删除 {target_gene} token（设表达量为0）")
+            SCLLMOutput.status(f"🗑️ 模拟删除 {target_gene} token（设表达量为0）", indent=1)
             
         elif perturb_type == 'overexpress':
             # 模拟将基因token移动到序列开头（最高表达位置）
@@ -1871,7 +1853,7 @@ class GeneformerModel(SCLLMBase):
             max_expr_per_cell = np.array(adata_perturbed.X.max(axis=1)).flatten()
             # 设置为比最高表达基因高50%
             adata_perturbed.X[:, gene_idx] = (max_expr_per_cell * 1.5).reshape(-1, 1)
-            print(f"   📈 模拟过表达 {target_gene}（移至rank序列开头）")
+            SCLLMOutput.status(f"📈 模拟过表达 {target_gene}（移至rank序列开头）", indent=1)
             
         elif perturb_type == 'inhibit':
             # 模拟将基因token移动到序列后部（低表达位置）
@@ -1879,7 +1861,7 @@ class GeneformerModel(SCLLMBase):
             current_expr = adata_perturbed.X[:, gene_idx]
             # 将表达量设为原来的10%，模拟rank下降
             adata_perturbed.X[:, gene_idx] = current_expr * 0.1
-            print(f"   📉 模拟抑制 {target_gene}（降至rank序列后部）")
+            SCLLMOutput.status(f"📉 模拟抑制 {target_gene}（降至rank序列后部）", indent=1)
             
         elif perturb_type == 'activate':
             # 模拟将基因token移动到序列前部（高表达位置）
@@ -1889,7 +1871,7 @@ class GeneformerModel(SCLLMBase):
             max_expr_per_cell = np.array(adata_perturbed.X.max(axis=1)).flatten()
             target_expr = np.minimum(current_expr * 3, max_expr_per_cell * 0.8)
             adata_perturbed.X[:, gene_idx] = target_expr.reshape(-1, 1)
-            print(f"   📊 模拟激活 {target_gene}（升至rank序列前部）")
+            SCLLMOutput.status(f"📊 模拟激活 {target_gene}（升至rank序列前部）", indent=1)
             
         else:
             raise ValueError(f"Unknown perturbation type: {perturb_type}")
@@ -1975,7 +1957,7 @@ class GeneformerModel(SCLLMBase):
                     perturbed_adata_dict[gene] = adata_perturbed
             
             results['perturbed_adata'] = perturbed_adata_dict
-            print(f"   📦 Mock: 创建了 {len(perturbed_adata_dict)} 个扰动后的adata对象")
+            SCLLMOutput.status(f"📦 Mock: 创建了 {len(perturbed_adata_dict)} 个扰动后的adata对象", indent=1)
         
         return results
     
@@ -1988,11 +1970,11 @@ class GeneformerModel(SCLLMBase):
         2. 在token序列上应用扰动
         3. 用扰动后的序列计算embedding
         """
-        print(f"🔬 应用真实的token-based扰动: {target_gene} {perturb_type}")
+        SCLLMOutput.status(f" 应用真实的token-based扰动: {target_gene} {perturb_type}", "predicting")
         
         try:
             # Step 1: 创建简化的tokenizer和基因字典
-            print("   📊 Step 1: 准备tokenization...")
+            SCLLMOutput.status(f"📊 Step 1: 准备tokenization...", indent=1)
             
             # 创建基因到token的映射（简化版本）
             gene_names = list(adata.var_names)
@@ -2004,10 +1986,10 @@ class GeneformerModel(SCLLMBase):
                 raise ValueError(f"Target gene {target_gene} not found in data")
             
             target_token = gene_token_dict[target_gene]
-            print(f"      目标基因 {target_gene} 对应token: {target_token}")
+            SCLLMOutput.status(f"   目标基因 {target_gene} 对应token: {target_token}", indent=1)
             
             # Step 2: 对每个细胞进行tokenization（rank value encoding）
-            print("   🔢 Step 2: 执行rank value encoding...")
+            SCLLMOutput.status(f"🔢 Step 2: 执行rank value encoding...", indent=1)
             baseline_tokenized_cells = []
             perturbed_tokenized_cells = []
             
@@ -2037,10 +2019,10 @@ class GeneformerModel(SCLLMBase):
                 )
                 perturbed_tokenized_cells.append(perturbed_tokens)
             
-            print(f"      成功tokenize {len(baseline_tokenized_cells)} 个细胞")
+            SCLLMOutput.status(f"   成功tokenize {len(baseline_tokenized_cells)} 个细胞", indent=1)
             
             # Step 3: 创建mock dataset格式
-            print("   📦 Step 3: 创建tokenized datasets...")
+            SCLLMOutput.status(f"📦 Step 3: 创建tokenized datasets...", indent=1)
             
             baseline_dataset = {
                 'input_ids': baseline_tokenized_cells,
@@ -2053,7 +2035,7 @@ class GeneformerModel(SCLLMBase):
             }
             
             # Step 4: 模拟embedding计算（使用随机embedding作为示例）
-            print("   🧠 Step 4: 模拟embedding计算...")
+            SCLLMOutput.status(f"🧠 Step 4: 模拟embedding计算...", indent=1)
             
             # 这里应该用真实的Geneformer模型，但我们用mock embedding
             baseline_embeddings = self._compute_mock_embeddings_from_tokens(
@@ -2064,15 +2046,15 @@ class GeneformerModel(SCLLMBase):
             )
             
             # Step 5: 计算扰动效果
-            print("   📊 Step 5: 计算扰动效果...")
+            SCLLMOutput.status(f"📊 Step 5: 计算扰动效果...", indent=1)
             embedding_shifts = np.linalg.norm(
                 perturbed_embeddings - baseline_embeddings, axis=1
             )
             mean_shift = np.mean(embedding_shifts)
             
-            print(f"   ✅ Token-based扰动完成!")
-            print(f"      平均embedding shift: {mean_shift:.4f}")
-            print(f"      扰动影响的细胞数: {len(embedding_shifts)}")
+            SCLLMOutput.status(f"✅ Token-based扰动完成!", indent=1)
+            SCLLMOutput.status(f"   平均embedding shift: {mean_shift:.4f}", indent=1)
+            SCLLMOutput.status(f"   扰动影响的细胞数: {len(embedding_shifts)}", indent=1)
             
             return {
                 'baseline_tokenized': baseline_dataset,
@@ -2088,8 +2070,8 @@ class GeneformerModel(SCLLMBase):
             }
             
         except Exception as e:
-            print(f"   ❌ Token-based扰动失败: {e}")
-            print("   🔄 回退到简化方法...")
+            SCLLMOutput.status(f"❌ Token-based扰动失败: {e}", indent=1)
+            SCLLMOutput.status(f"🔄 回退到简化方法...", indent=1)
             return None
     
     def _apply_token_perturbation(self, input_ids: list, target_token: int, 
@@ -2104,7 +2086,7 @@ class GeneformerModel(SCLLMBase):
             # 删除目标基因的token（如果存在）
             if target_token in perturbed_ids:
                 perturbed_ids.remove(target_token)
-                print(f"      🗑️ 从序列中删除 {target_gene} token")
+                SCLLMOutput.status(f"   🗑️ 从序列中删除 {target_gene} token", indent=1)
                 had_effect = True
             else:
                 # 即使基因未表达，删除操作也会对细胞网络产生影响
@@ -2116,7 +2098,7 @@ class GeneformerModel(SCLLMBase):
                     perturbed_ids[swap_indices[0]], perturbed_ids[swap_indices[1]] = \
                         perturbed_ids[swap_indices[1]], perturbed_ids[swap_indices[0]]
                     had_effect = True
-                print(f"      ⚠️ {target_gene} 在此细胞中未表达，但扰动仍影响基因网络")
+                SCLLMOutput.status(f"   ⚠️ {target_gene} 在此细胞中未表达，但扰动仍影响基因网络", indent=1)
                 
         elif perturb_type == 'overexpress':
             # 将目标基因token移动到序列开头（最高表达位置）
@@ -2125,11 +2107,11 @@ class GeneformerModel(SCLLMBase):
                 perturbed_ids.remove(target_token)
                 # 插入到开头
                 perturbed_ids.insert(0, target_token)
-                print(f"      📈 将 {target_gene} 移动到序列开头（过表达）")
+                SCLLMOutput.status(f"   📈 将 {target_gene} 移动到序列开头（过表达）", indent=1)
             else:
                 # 如果该基因在此细胞中不表达，直接在开头插入
                 perturbed_ids.insert(0, target_token)
-                print(f"      📈 在序列开头插入 {target_gene} token（过表达）")
+                SCLLMOutput.status(f"   📈 在序列开头插入 {target_gene} token（过表达）", indent=1)
             had_effect = True
                 
         elif perturb_type == 'inhibit':
@@ -2139,12 +2121,12 @@ class GeneformerModel(SCLLMBase):
                 # 插入到75%位置（后部）
                 insert_pos = int(len(perturbed_ids) * 0.75)
                 perturbed_ids.insert(insert_pos, target_token)
-                print(f"      📉 将 {target_gene} 移动到序列后部（抑制）")
+                SCLLMOutput.status(f"   📉 将 {target_gene} 移动到序列后部（抑制）", indent=1)
             else:
                 # 对于抑制，即使基因未表达也要确保它不会表达
                 insert_pos = len(perturbed_ids)  # 添加到末尾作为抑制信号
                 perturbed_ids.append(target_token)
-                print(f"      📉 在序列末尾添加 {target_gene} token（抑制信号）")
+                SCLLMOutput.status(f"   📉 在序列末尾添加 {target_gene} token（抑制信号）", indent=1)
             had_effect = True
                 
         elif perturb_type == 'activate':
@@ -2154,12 +2136,12 @@ class GeneformerModel(SCLLMBase):
                 # 插入到25%位置（前部）
                 insert_pos = max(1, int(len(perturbed_ids) * 0.25))
                 perturbed_ids.insert(insert_pos, target_token)
-                print(f"      📊 将 {target_gene} 移动到序列前部（激活）")
+                SCLLMOutput.status(f"   📊 将 {target_gene} 移动到序列前部（激活）", indent=1)
             else:
                 # 在前部插入
                 insert_pos = max(1, len(perturbed_ids) // 4)
                 perturbed_ids.insert(insert_pos, target_token)
-                print(f"      📊 在序列前部插入 {target_gene} token（激活）")
+                SCLLMOutput.status(f"   📊 在序列前部插入 {target_gene} token（激活）", indent=1)
             had_effect = True
         
         # 确保每次扰动都有一定的效果（模拟真实的生物网络扰动）
@@ -2252,7 +2234,7 @@ class GeneformerModel(SCLLMBase):
         Returns:
             扰动后的AnnData对象
         """
-        print(f"🧬 创建 {target_gene} {perturb_type} 扰动后的adata...")
+        SCLLMOutput.status(f" 创建 {target_gene} {perturb_type} 扰动后的adata...", "embedding")
         
         if target_gene not in adata.var_names:
             raise ValueError(f"基因 {target_gene} 不在数据中")
@@ -2269,7 +2251,7 @@ class GeneformerModel(SCLLMBase):
             'original_n_vars': adata.n_vars
         }
         
-        print(f"✅ 创建完成: {adata_perturbed.n_obs} × {adata_perturbed.n_vars}")
+        SCLLMOutput.status(f"✅ 创建完成: {adata_perturbed.n_obs} × {adata_perturbed.n_vars}")
         
         return adata_perturbed
     
@@ -2287,7 +2269,7 @@ class GeneformerModel(SCLLMBase):
         Returns:
             包含基因表达变化信息的DataFrame
         """
-        print("📊 比较扰动前后的基因表达...")
+        SCLLMOutput.status(f"📊 比较扰动前后的基因表达...")
         
         if adata_baseline.n_vars != adata_perturbed.n_vars:
             raise ValueError("基线和扰动数据的基因数量不匹配")
@@ -2319,7 +2301,7 @@ class GeneformerModel(SCLLMBase):
         if target_gene and target_gene in results_df['gene'].values:
             results_df['is_target'] = results_df['gene'] == target_gene
         
-        print(f"✅ 分析完成，返回前 {top_n} 个变化最大的基因")
+        SCLLMOutput.status(f"✅ 分析完成，返回前 {top_n} 个变化最大的基因")
         
         return results_df.head(top_n)
  
@@ -2351,7 +2333,7 @@ class GeneformerModel(SCLLMBase):
                 "3. Make sure all dependencies are properly installed"
             )
         
-        print(f"🔧 Fine-tuning Geneformer for {task} task...")
+        SCLLMOutput.status(f"🔧 Fine-tuning Geneformer for {task} task...")
         
         # Validate input data
         if task == "annotation" and 'celltype' not in train_adata.obs:
@@ -2370,7 +2352,7 @@ class GeneformerModel(SCLLMBase):
                 'n_celltypes': n_classes
             }
             
-            print(f"Cell types detected: {list(unique_celltypes)}")
+            SCLLMOutput.status(f"Cell types detected: {list(unique_celltypes)}")
         
         # Check if tokenizer is available (needed for fine-tuning)
         if self.tokenizer is None:
@@ -2386,7 +2368,7 @@ class GeneformerModel(SCLLMBase):
         
         try:
             # Use simplified approach inspired by biollm design
-            print("🔧 Starting fine-tuning using simplified approach...")
+            SCLLMOutput.status(f"🔧 Starting fine-tuning using simplified approach...")
             
             # Import required components
             import torch
@@ -2397,7 +2379,7 @@ class GeneformerModel(SCLLMBase):
             import os
             
             # Step 1: Prepare tokenized dataset using our existing method
-            print("📊 Creating tokenized dataset...")
+            SCLLMOutput.status(f"📊 Creating tokenized dataset...")
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_input_dir = os.path.join(temp_dir, "input")
                 os.makedirs(temp_input_dir, exist_ok=True)
@@ -2412,14 +2394,14 @@ class GeneformerModel(SCLLMBase):
                 from datasets import load_from_disk
                 tokenized_dataset = load_from_disk(tokenized_data_path)
                 
-                print(f"   ✅ Tokenized {len(tokenized_dataset)} cells")
+                SCLLMOutput.status(f"✅ Tokenized {len(tokenized_dataset)} cells", indent=1)
                 
                 # Step 2: Add cell type labels and prepare for training
-                print("🔄 Adding labels and splitting dataset...")
+                SCLLMOutput.status(f" Adding labels and splitting dataset...", "preprocessing")
                 
                 # Add cell type labels using barcode mapping
                 if "cell_barcode" in tokenized_dataset.column_names:
-                    print("   Using cell_barcode mapping for labels...")
+                    SCLLMOutput.status(f"Using cell_barcode mapping for labels...", indent=1)
                     labels = []
                     for barcode in tokenized_dataset["cell_barcode"]:
                         if barcode in train_adata.obs.index:
@@ -2429,7 +2411,7 @@ class GeneformerModel(SCLLMBase):
                             # Fallback to first cell type
                             labels.append(0)
                 else:
-                    print("   Using sequential order for labels...")
+                    SCLLMOutput.status(f"Using sequential order for labels...", indent=1)
                     labels = []
                     for i in range(len(tokenized_dataset)):
                         if i < len(train_adata.obs):
@@ -2449,11 +2431,11 @@ class GeneformerModel(SCLLMBase):
                 train_dataset = tokenized_dataset.select(range(train_size))
                 eval_dataset = tokenized_dataset.select(range(train_size, len(tokenized_dataset)))
                 
-                print(f"   Train set: {len(train_dataset)} cells")
-                print(f"   Eval set: {len(eval_dataset)} cells")
+                SCLLMOutput.status(f"Train set: {len(train_dataset)} cells", indent=1)
+                SCLLMOutput.status(f"Eval set: {len(eval_dataset)} cells", indent=1)
                 
                 # Step 3: Initialize model for fine-tuning
-                print("🔧 Initializing model for fine-tuning...")
+                SCLLMOutput.status(f"🔧 Initializing model for fine-tuning...")
                 model = BertForSequenceClassification.from_pretrained(
                     str(self.model_path),
                     num_labels=n_classes,
@@ -2464,10 +2446,10 @@ class GeneformerModel(SCLLMBase):
                 if hasattr(self, 'device'):
                     model = model.to(self.device)
                 
-                print(f"   ✅ Model initialized with {n_classes} classes")
+                SCLLMOutput.status(f"✅ Model initialized with {n_classes} classes", indent=1)
                 
                 # Step 4: Setup training arguments
-                print("🔧 Setting up training arguments...")
+                SCLLMOutput.status(f"🔧 Setting up training arguments...")
                 
                 output_dir = kwargs.get('output_dir', '/tmp/geneformer_finetune')
                 os.makedirs(output_dir, exist_ok=True)
@@ -2564,7 +2546,7 @@ class GeneformerModel(SCLLMBase):
                 data_collator = GeneformerDataCollator(tokenizer_pad_token_id=0)  # Assuming <pad> token is 0
                 
                 # Step 7: Initialize trainer
-                print("🔧 Initializing trainer...")
+                SCLLMOutput.status(f"🔧 Initializing trainer...")
                 trainer = Trainer(
                     model=model,
                     args=training_args,
@@ -2575,10 +2557,10 @@ class GeneformerModel(SCLLMBase):
                 )
                 
                 # Step 8: Start training
-                print("🚀 Starting training...")
+                SCLLMOutput.status(f" Starting training...", "training")
                 trainer.train()
                 
-                print(f"✅ Fine-tuning completed!")
+                SCLLMOutput.status(f"✅ Fine-tuning completed!")
                 
                 # Get the best model
                 best_model = trainer.model
@@ -2587,27 +2569,27 @@ class GeneformerModel(SCLLMBase):
                 self.fine_tuned_model = best_model
                 
                 # IMPORTANT: Extract and store the base model for embedding extraction
-                print("🔄 Preparing fine-tuned model for inference...")
+                SCLLMOutput.status(f" Preparing fine-tuned model for inference...", "preprocessing")
                 
                 # Extract the BERT base model from the classification model
                 # This is what we need for embedding extraction
                 if hasattr(best_model, 'bert'):
                     # For BertForSequenceClassification, the base model is in .bert
                     self.fine_tuned_base_model = best_model.bert
-                    print("   ✅ Extracted BERT base model from classification model")
+                    SCLLMOutput.status(f"✅ Extracted BERT base model from classification model", indent=1)
                 elif hasattr(best_model, 'base_model'):
                     # Alternative structure
                     self.fine_tuned_base_model = best_model.base_model
-                    print("   ✅ Extracted base model from classification model")
+                    SCLLMOutput.status(f"✅ Extracted base model from classification model", indent=1)
                 else:
                     # Fallback: use the whole model (this might not work for embedding extraction)
                     self.fine_tuned_base_model = best_model
-                    print("   ⚠️ Using whole classification model (may not work for embeddings)")
+                    SCLLMOutput.status(f"⚠️ Using whole classification model (may not work for embeddings)", indent=1)
                 
                 # Set flag to indicate we have a fine-tuned model
                 self.is_fine_tuned = True
                 
-                print(f"   ✅ Fine-tuned model ready for inference")
+                SCLLMOutput.status(f"✅ Fine-tuned model ready for inference", indent=1)
                 
                 # Get training history
                 training_history = trainer.state.log_history
@@ -2632,8 +2614,8 @@ class GeneformerModel(SCLLMBase):
                 
         except ImportError as import_error:
             # Fallback: Create a mock fine-tuning result
-            print(f"⚠️ Required libraries not available: {import_error}")
-            print("📊 Creating mock fine-tuning result...")
+            SCLLMOutput.status(f" Required libraries not available: {import_error}", "warning")
+            SCLLMOutput.status(f"📊 Creating mock fine-tuning result...")
             
             results = {
                 'training_stats': {
@@ -2649,9 +2631,9 @@ class GeneformerModel(SCLLMBase):
                 'note': 'Mock fine-tuning result - no actual training performed'
             }
             
-            print(f"📊 Mock training completed:")
-            print(f"   Final accuracy: {results['training_stats']['eval_accuracy'][-1]:.2%}")
-            print(f"   Cell types trained: {list(self.celltype_mapping['celltype_to_id'].keys())}")
+            SCLLMOutput.status(f"📊 Mock training completed:")
+            SCLLMOutput.status(f"Final accuracy: {results['training_stats']['eval_accuracy'][-1]:.2%}", indent=1)
+            SCLLMOutput.status(f"Cell types trained: {list(self.celltype_mapping['celltype_to_id'].keys())}", indent=1)
             
             return results
         
@@ -2677,20 +2659,20 @@ class GeneformerModel(SCLLMBase):
         if use_fine_tuned:
             if hasattr(self, 'fine_tuned_base_model') and self.fine_tuned_base_model is not None:
                 if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
-                    print("✅ Already using fine-tuned model for inference")
+                    SCLLMOutput.status(f"✅ Already using fine-tuned model for inference")
                 else:
-                    print("🔄 Switching to fine-tuned model for inference...")
+                    SCLLMOutput.status(f" Switching to fine-tuned model for inference...", "preprocessing")
                     self.is_fine_tuned = True
-                    print("   ✅ Now using fine-tuned model")
+                    SCLLMOutput.status(f"✅ Now using fine-tuned model", indent=1)
             else:
-                print("⚠️ No fine-tuned model available. Use fine_tune() first.")
+                SCLLMOutput.status(f" No fine-tuned model available. Use fine_tune() first.", "warning")
         else:
             if hasattr(self, 'is_fine_tuned'):
-                print("🔄 Switching to original pretrained model...")
+                SCLLMOutput.status(f" Switching to original pretrained model...", "preprocessing")
                 self.is_fine_tuned = False
-                print("   ✅ Now using original pretrained model")
+                SCLLMOutput.status(f"✅ Now using original pretrained model", indent=1)
             else:
-                print("ℹ️ Already using original pretrained model")
+                SCLLMOutput.status(f" Already using original pretrained model", "info")
     
     def get_embeddings(self, adata: AnnData, **kwargs) -> np.ndarray:
         """
@@ -2703,7 +2685,20 @@ class GeneformerModel(SCLLMBase):
         Returns:
             Cell embeddings
         """
+        # Start embedding extraction with unified output
+        SCLLMOutput.data_summary(adata, model_name="Geneformer")
+        operation_start("get_embeddings", "Geneformer", {
+            "cells": f"{adata.n_obs:,}",
+            "genes": f"{adata.n_vars:,}"
+        })
+        
         result = self.predict(adata, task="embedding", **kwargs)
+        
+        operation_complete("get_embeddings", {
+            "embedding_shape": f"{result['embeddings'].shape}",
+            "embedding_dim": result['embeddings'].shape[1]
+        })
+        
         return result["embeddings"]
     
 
@@ -2722,8 +2717,10 @@ class GeneformerModel(SCLLMBase):
             raise ValueError("Model has not been fine-tuned for cell type annotation. "
                            "Call fine_tune() first.")
         
-        print("🔍 Predicting cell types for query data using Geneformer...")
-        print(f"   Query data: {query_adata.n_obs} cells × {query_adata.n_vars} genes")
+        operation_start("predict_celltypes", "Geneformer", {
+            "cells": f"{query_adata.n_obs:,}",
+            "genes": f"{query_adata.n_vars:,}"
+        })
         
         # Get predictions
         results = self._predict_annotation(query_adata, **kwargs)
@@ -2738,17 +2735,13 @@ class GeneformerModel(SCLLMBase):
             
             results['predicted_celltypes'] = predicted_celltypes
             
-            print(f"✓ Predicted cell types for {len(predicted_celltypes)} cells")
-            
             # Generate prediction summary
             from collections import Counter
             type_counts = Counter(predicted_celltypes)
             
-            print("📊 Prediction summary:")
             prediction_summary = {}
             for celltype, count in type_counts.most_common():
                 percentage = count / len(predicted_celltypes) * 100
-                print(f"   {celltype}: {count} cells ({percentage:.1f}%)")
                 prediction_summary[celltype] = {
                     'count': count,
                     'percentage': percentage
@@ -2756,6 +2749,17 @@ class GeneformerModel(SCLLMBase):
             
             results['prediction_summary'] = prediction_summary
             results['celltype_mapping'] = self.celltype_mapping
+            
+            operation_complete("predict_celltypes", {
+                "total_cells": len(predicted_celltypes),
+                "unique_types": len(type_counts),
+                "most_common": type_counts.most_common(1)[0][0] if type_counts else "None"
+            })
+            
+            SCLLMOutput.status(f"Cell type distribution:", indent=1)
+            for celltype, count in type_counts.most_common():
+                percentage = count / len(predicted_celltypes) * 100
+                SCLLMOutput.status(f"{celltype}: {count:,} cells ({percentage:.1f}%)", indent=2)
         
         return results
     
@@ -2777,7 +2781,7 @@ class GeneformerModel(SCLLMBase):
         if batch_key not in adata.obs:
             raise ValueError(f"Batch information '{batch_key}' not found in adata.obs")
         
-        print(f"🔄 Performing batch integration with Geneformer embeddings...")
+        SCLLMOutput.status(f" Performing batch integration with Geneformer embeddings...", "preprocessing")
         
         # Extract embeddings
         embeddings = self.get_embeddings(adata, **kwargs)
@@ -2788,7 +2792,7 @@ class GeneformerModel(SCLLMBase):
         num_batches = len(unique_batches)
         batch_distribution = np.bincount(batch_labels)
         
-        print(f"   Found {num_batches} batches with distribution: {batch_distribution}")
+        SCLLMOutput.status(f"Found {num_batches} batches with distribution: {batch_distribution}", indent=1)
         
         # For Geneformer, we can use the embeddings directly as they are already 
         # trained on diverse datasets and should have some batch-invariant properties
@@ -2811,10 +2815,10 @@ class GeneformerModel(SCLLMBase):
                     batch_std = batch_data.std(axis=0) + 1e-8
                     corrected_embeddings[batch_mask] = (batch_data - batch_mean) / batch_std * global_std + global_mean
             
-            print("   Applied center and scale correction")
+            SCLLMOutput.status(f"Applied center and scale correction", indent=1)
         else:
             corrected_embeddings = embeddings
-            print("   Using raw Geneformer embeddings")
+            SCLLMOutput.status(f"Using raw Geneformer embeddings", indent=1)
         
         results = {
             'embeddings': corrected_embeddings,
@@ -2830,7 +2834,7 @@ class GeneformerModel(SCLLMBase):
             }
         }
         
-        print(f"✓ Integration completed using {correction_method} method")
+        SCLLMOutput.status(f" Integration completed using {correction_method} method", "loaded")
         return results
     
     def perturb_genes(self, 
@@ -2863,7 +2867,7 @@ class GeneformerModel(SCLLMBase):
         if self.celltype_mapping is not None:
             with open(save_path / "celltype_mapping.json", 'w') as f:
                 json.dump(self.celltype_mapping, f, indent=2)
-            print("✓ Saved celltype mapping")
+            SCLLMOutput.status(f" Saved celltype mapping", "loaded")
         
         # Save model configuration
         config = {
@@ -2876,7 +2880,7 @@ class GeneformerModel(SCLLMBase):
         
         with open(save_path / "geneformer_config.json", 'w') as f:
             json.dump(config, f, indent=2)
-        print("✓ Saved Geneformer configuration")
+        SCLLMOutput.status(f" Saved Geneformer configuration", "loaded")
 
     def _downsample_without_sorting(self, data, max_ncells=None):
         """
@@ -2891,14 +2895,14 @@ class GeneformerModel(SCLLMBase):
         
         # if max number of cells is defined, then subsample to this max number
         if max_ncells is not None and num_cells > max_ncells:
-            print(f"   🔄 Subsampling from {num_cells} to {max_ncells} cells (preserving order)")
+            SCLLMOutput.status(f"🔄 Subsampling from {num_cells} to {max_ncells} cells (preserving order)", indent=1)
             # Take first max_ncells to preserve order instead of shuffling
             data_subset = data.select([i for i in range(max_ncells)])
         else:
-            print(f"   ✅ Using all {num_cells} cells (preserving order)")
+            SCLLMOutput.status(f"✅ Using all {num_cells} cells (preserving order)", indent=1)
             data_subset = data
         
-        print(f"   📊 Cell order preservation: original[0]->processed[0], original[1]->processed[1], etc.")
+        SCLLMOutput.status(f"📊 Cell order preservation: original[0]->processed[0], original[1]->processed[1], etc.", indent=1)
         return data_subset
 
 

@@ -24,8 +24,10 @@ import scanpy as sc
 
 try:
     from .base import SCLLMBase, ModelConfig, TaskConfig
+    from .utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 except ImportError:
     from base import SCLLMBase, ModelConfig, TaskConfig
+    from utils.output_utils import SCLLMOutput, ModelProgressManager, operation_start, operation_complete
 
 # Import scFoundation components with error handling
 try:
@@ -141,12 +143,12 @@ class ScFoundationModel(SCLLMBase):
             if gene_file.exists():
                 gene_list_df = pd.read_csv(gene_file, header=0, delimiter='\t')
                 self.gene_list = list(gene_list_df['gene_name'])
-                print(f"Loaded gene list with {len(self.gene_list)} genes")
+                SCLLMOutput.status(f"Gene list loaded: {len(self.gene_list)} genes", 'loaded')
             else:
-                print(f"Warning: Gene list file not found at {gene_file}")
+                SCLLMOutput.status(f"Gene list file not found at {gene_file}", 'warning')
                 self.gene_list = None
         except Exception as e:
-            print(f"Warning: Could not load gene list: {e}")
+            SCLLMOutput.status(f"Could not load gene list: {e}", 'warning')
             self.gene_list = None
     
     def load_model(self, model_path: Union[str, Path], **kwargs) -> None:
@@ -193,8 +195,7 @@ class ScFoundationModel(SCLLMBase):
                         if preferred_key in available_mmf_keys:
                             return preferred_key
                         else:
-                            print(f"⚠️  Preferred key '{preferred_key}' not found.")
-                            print(f"   Auto-selecting from available keys: {available_mmf_keys}")
+                            SCLLMOutput.status(f"Preferred key '{preferred_key}' not found, auto-selecting", 'warning')
                             return available_mmf_keys[0]  # Use first available
                 return preferred_key
             except Exception:
@@ -203,33 +204,32 @@ class ScFoundationModel(SCLLMBase):
         # Try to auto-detect the correct key
         detected_key = auto_detect_key(model_path, key)
         if detected_key != key:
-            print(f"🔄 Auto-detected key changed from '{key}' to '{detected_key}'")
+            SCLLMOutput.status(f"Auto-detected key: {key} → {detected_key}", 'info')
             key = detected_key
         
-        print(f"Loading scFoundation model from {model_path} with key '{key}'")
+        SCLLMOutput.status(f"Loading scFoundation model with key '{key}'", 'loading')
         
         # First, inspect the checkpoint to understand its format
-        print("🔍 Inspecting checkpoint format...")
+        SCLLMOutput.status(f"Inspecting checkpoint format", 'preprocessing')
         try:
             checkpoint_preview = torch.load(str(model_path), map_location='cpu')
             if isinstance(checkpoint_preview, dict):
-                print(f"Checkpoint contains keys: {list(checkpoint_preview.keys())}")
+                # Checkpoint keys details removed for cleaner output
                 
                 # Check if it's MMF format
                 if key in checkpoint_preview:
-                    print(f"✓ Found '{key}' key - appears to be MMF format")
+                    SCLLMOutput.status(f"Found '{key}' key - MMF format", 'loaded')
                     if isinstance(checkpoint_preview[key], dict):
                         sub_keys = list(checkpoint_preview[key].keys())
-                        print(f"  Sub-keys: {sub_keys}")
+                        # Sub-keys details removed for cleaner output
                 elif any(k in checkpoint_preview for k in ['gene', 'cell', 'rde']):
                     available_keys = [k for k in ['gene', 'cell', 'rde'] if k in checkpoint_preview]
-                    print(f"⚠️  MMF format detected but '{key}' not found. Available keys: {available_keys}")
-                    print(f"   You may want to use one of: {available_keys}")
+                    SCLLMOutput.status(f"MMF format: '{key}' not found. Available: {available_keys}", 'warning')
                 else:
-                    print("⚠️  Not MMF format - trying standard loading approaches")
+                    SCLLMOutput.status(f"Not MMF format, trying standard loading", 'info')
             del checkpoint_preview  # Free memory
         except Exception as preview_e:
-            print(f"⚠️  Could not preview checkpoint: {preview_e}")
+            SCLLMOutput.status(f"Could not preview checkpoint: {preview_e}", 'warning')
         
         try:
             # Try to load model using scFoundation's loader
@@ -243,35 +243,27 @@ class ScFoundationModel(SCLLMBase):
             # Set model to evaluation mode
             self.model.eval()
             
-            print(f"Successfully loaded scFoundation model")
-            print(f"Model type: {self.config.get('model_type', 'unknown')}")
-            print(f"Key configuration parameters:")
-            for key in ['model_type', 'seq_len', 'n_class', 'pad_token_id']:
-                if key in self.config:
-                    print(f"  {key}: {self.config[key]}")
+            SCLLMOutput.status(f"scFoundation model loaded successfully", 'loaded')
+            SCLLMOutput.status(f"Model type: {self.config.get('model_type', 'unknown')}", indent=1)
             
             self.is_loaded = True
-            print(f"Model loaded successfully on {self.device}")
+            SCLLMOutput.status(f"Model ready on {self.device}", 'loaded')
             
         except KeyError as e:
             error_msg = str(e)
             if "not found in checkpoint" in error_msg:
                 # This is our improved error message with available keys
-                print(f"❌ {error_msg}")
+                SCLLMOutput.status(error_msg, 'failed')
                 
                 # Extract available keys from error message if possible
                 if "Available MMF keys:" in error_msg:
-                    print("💡 Suggestion: Try specifying a different key parameter, e.g.:")
-                    print("   model.load_model(path, key='gene')")
-                    print("   model.load_model(path, key='cell')")
-                    print("   model.load_model(path, key='rde')")
+                    SCLLMOutput.status(f"Try different key: 'gene', 'cell', or 'rde'", 'info', indent=1)
                 
                 # Don't try fallback for key errors - user needs to specify correct key
                 raise RuntimeError(f"Model loading failed: {error_msg}")
                 
             elif str(e) == "'configs'":
-                print(f"Warning: Model checkpoint appears to be in old format")
-                print(f"Trying to load with direct model loading...")
+                SCLLMOutput.status(f"Old format checkpoint, trying direct loading", 'warning')
                 try:
                     # Try alternative loading method
                     model_data = torch.load(str(model_path), map_location=self.device)
@@ -296,8 +288,8 @@ class ScFoundationModel(SCLLMBase):
                         self.model.eval()
                         self.is_loaded = True
                         
-                        print(f"✓ Successfully loaded model with default configuration")
-                        print(f"Warning: Using default configuration parameters")
+                        SCLLMOutput.status(f"Model loaded with default configuration", 'loaded')
+                        SCLLMOutput.status(f"Using default parameters", 'warning')
                         
                     else:
                         raise ValueError(f"Key '{key}' not found in model checkpoint")
@@ -309,22 +301,14 @@ class ScFoundationModel(SCLLMBase):
                 raise RuntimeError(f"Failed to load scFoundation model: {e}")
         except Exception as e:
             # Try a more direct loading approach
-            print(f"Warning: Standard loading failed ({e}). Trying direct loading...")
+            SCLLMOutput.status(f"Standard loading failed, trying direct loading", 'warning')
             try:
                 # Load checkpoint directly
                 checkpoint = torch.load(str(model_path), map_location=self.device)
                 
                 # Debug: print checkpoint structure
-                print("🔍 Debugging checkpoint structure:")
-                if isinstance(checkpoint, dict):
-                    print(f"Checkpoint keys: {list(checkpoint.keys())}")
-                    
-                    # Look for keys that might contain models
-                    for key in checkpoint.keys():
-                        if isinstance(checkpoint[key], dict):
-                            print(f"  '{key}' contains: {list(checkpoint[key].keys())}")
-                else:
-                    print(f"Checkpoint type: {type(checkpoint)}")
+                SCLLMOutput.status(f"Debugging checkpoint structure", 'preprocessing')
+                # Checkpoint structure details removed for cleaner output
                 
                 # Try different loading strategies
                 loaded_successfully = False
@@ -332,24 +316,24 @@ class ScFoundationModel(SCLLMBase):
                 # Strategy 1: Check if 'cell' key exists and contains model data
                 if key in checkpoint and isinstance(checkpoint[key], dict):
                     model_data = checkpoint[key]
-                    print(f"Found '{key}' data with keys: {list(model_data.keys())}")
+                    SCLLMOutput.status(f"Found '{key}' data", 'info')
                     
                     # Look for state dict in different places
                     state_dict = None
                     if 'state_dict' in model_data:
                         state_dict = model_data['state_dict']
-                        print("Found state_dict in model_data")
+                        SCLLMOutput.status(f"Found state_dict", 'loaded', indent=1)
                     elif 'model_state_dict' in model_data:
                         state_dict = model_data['model_state_dict'] 
-                        print("Found model_state_dict in model_data")
+                        SCLLMOutput.status(f"Found model_state_dict", 'loaded', indent=1)
                     elif 'model' in model_data and isinstance(model_data['model'], dict):
                         state_dict = model_data['model']
-                        print("Found model dict in model_data")
+                        SCLLMOutput.status(f"Found model dict", 'loaded', indent=1)
                     
                     if state_dict is not None:
                         # Use default configuration
                         self.config = self.default_config.to_dict()
-                        print("Using default model configuration")
+                        SCLLMOutput.status(f"Using default configuration", 'info', indent=1)
                         
                         # Create model
                         self.model = select_model(self.config)
@@ -360,13 +344,13 @@ class ScFoundationModel(SCLLMBase):
                             self.model.eval()
                             self.is_loaded = True
                             loaded_successfully = True
-                            print("✓ Model loaded successfully with Strategy 1")
+                            SCLLMOutput.status(f"Model loaded with Strategy 1", 'loaded')
                         except Exception as load_e:
-                            print(f"Strategy 1 failed: {load_e}")
+                            SCLLMOutput.status(f"Strategy 1 failed: {load_e}", 'warning')
                 
                 # Strategy 2: Try to load entire checkpoint as state dict
                 if not loaded_successfully:
-                    print("Trying Strategy 2: entire checkpoint as state dict...")
+                    SCLLMOutput.status(f"Trying Strategy 2: entire checkpoint", 'preprocessing')
                     try:
                         self.config = self.default_config.to_dict()
                         self.model = select_model(self.config)
@@ -375,13 +359,13 @@ class ScFoundationModel(SCLLMBase):
                         self.model.eval()
                         self.is_loaded = True
                         loaded_successfully = True
-                        print("✓ Model loaded successfully with Strategy 2")
+                        SCLLMOutput.status(f"Model loaded with Strategy 2", 'loaded')
                     except Exception as load_e:
-                        print(f"Strategy 2 failed: {load_e}")
+                        SCLLMOutput.status(f"Strategy 2 failed: {load_e}", 'warning')
                 
                 # Strategy 3: Try to find any dict that looks like a state dict
                 if not loaded_successfully:
-                    print("Trying Strategy 3: searching for state dict patterns...")
+                    SCLLMOutput.status(f"Trying Strategy 3: searching patterns", 'preprocessing')
                     for top_key, top_value in checkpoint.items():
                         if isinstance(top_value, dict):
                             # Look for common model parameter patterns
@@ -390,7 +374,7 @@ class ScFoundationModel(SCLLMBase):
                             )]
                             
                             if len(param_like_keys) > 5:  # Likely a state dict
-                                print(f"Found potential state dict in '{top_key}' with {len(param_like_keys)} parameter keys")
+                                SCLLMOutput.status(f"Found potential state dict in '{top_key}'", 'info')
                                 try:
                                     self.config = self.default_config.to_dict()
                                     self.model = select_model(self.config)
@@ -399,27 +383,15 @@ class ScFoundationModel(SCLLMBase):
                                     self.model.eval()
                                     self.is_loaded = True
                                     loaded_successfully = True
-                                    print(f"✓ Model loaded successfully from '{top_key}' with Strategy 3")
+                                    SCLLMOutput.status(f"Model loaded from '{top_key}' with Strategy 3", 'loaded')
                                     break
                                 except Exception as load_e:
-                                    print(f"Strategy 3 with '{top_key}' failed: {load_e}")
+                                    SCLLMOutput.status(f"Strategy 3 with '{top_key}' failed: {load_e}", 'warning')
                 
                 if not loaded_successfully:
                     # Final attempt: print more detailed error information
-                    print("❌ All loading strategies failed. Checkpoint structure:")
+                    SCLLMOutput.status(f"All loading strategies failed", 'failed')
                     
-                    def print_dict_structure(d, prefix="", max_depth=3, current_depth=0):
-                        if current_depth >= max_depth:
-                            return
-                        for k, v in d.items():
-                            if isinstance(v, dict):
-                                print(f"{prefix}{k}: dict with {len(v)} keys")
-                                if len(v) < 10:  # Only show details for small dicts
-                                    print_dict_structure(v, prefix + "  ", max_depth, current_depth + 1)
-                            elif isinstance(v, torch.Tensor):
-                                print(f"{prefix}{k}: Tensor{list(v.shape)}")
-                            else:
-                                print(f"{prefix}{k}: {type(v).__name__}")
                     
                     if isinstance(checkpoint, dict):
                         print_dict_structure(checkpoint)
@@ -432,7 +404,7 @@ class ScFoundationModel(SCLLMBase):
                                  f"Original error: {e}, Direct loading error: {direct_e}")
         
         if self.is_loaded:
-            print(f"Model ready for inference on {self.device}")
+            SCLLMOutput.status(f"Model ready for inference on {self.device}", 'loaded')
     
     def preprocess(self, adata: AnnData, **kwargs) -> AnnData:
         """
@@ -453,13 +425,12 @@ class ScFoundationModel(SCLLMBase):
         pre_normalized = kwargs.get('pre_normalized', 'F')
         input_type = kwargs.get('input_type', 'singlecell')
         
-        print(f"Preprocessing data for scFoundation...")
-        print(f"Input shape: {adata_processed.shape}")
-        print(f"Pre-normalized: {pre_normalized}, Input type: {input_type}")
+        SCLLMOutput.status(f"Preprocessing data for scFoundation", 'preprocessing')
+        SCLLMOutput.status(f"Input: {adata_processed.shape}, Type: {input_type}", 'info')
         
         # Step 1: Gene selection and padding to match scFoundation's gene set
         if self.gene_list is not None:
-            print("Filtering and padding genes to match scFoundation gene set...")
+            SCLLMOutput.status(f"Filtering genes to match scFoundation gene set", 'preprocessing')
             
             # Convert to DataFrame for gene selection
             if issparse(adata_processed.X):
@@ -488,10 +459,7 @@ class ScFoundationModel(SCLLMBase):
             genes_matched = (adata_processed.var['mask'] == 0).sum()
             genes_padded = (adata_processed.var['mask'] == 1).sum()
             
-            print(f"Gene matching results:")
-            print(f"  Matched genes: {genes_matched}")
-            print(f"  Padded genes: {genes_padded}")
-            print(f"  Total genes: {adata_processed.n_vars}")
+            SCLLMOutput.status(f"Gene matching: {genes_matched} matched, {genes_padded} padded", 'loaded')
             
             if genes_matched == 0:
                 raise ValueError("No genes matched the scFoundation gene set! Check gene naming conventions.")
@@ -500,27 +468,27 @@ class ScFoundationModel(SCLLMBase):
         if input_type == 'singlecell':
             if pre_normalized == 'F':
                 # Raw counts - need normalization
-                print("Applying normalization and log transformation...")
+                SCLLMOutput.status(f"Applying normalization and log transformation", 'preprocessing')
                 sc.pp.normalize_total(adata_processed, target_sum=1e4)
                 sc.pp.log1p(adata_processed)
             elif pre_normalized == 'T':
                 # Already normalized and log-transformed
-                print("Data already normalized and log-transformed")
+                SCLLMOutput.status(f"Data already normalized and log-transformed", 'info')
             elif pre_normalized == 'A':
                 # Special case - data normalized with total count appended
-                print("Data pre-normalized with total count appended")
+                SCLLMOutput.status(f"Data pre-normalized with total count appended", 'info')
             else:
                 raise ValueError("pre_normalized must be 'F', 'T', or 'A'")
                 
         elif input_type == 'bulk':
             if pre_normalized == 'F':
                 # Raw bulk data - apply normalization
-                print("Applying bulk data normalization...")
+                SCLLMOutput.status(f"Applying bulk data normalization", 'preprocessing')
                 sc.pp.normalize_total(adata_processed)
                 sc.pp.log1p(adata_processed)
             elif pre_normalized == 'T':
                 # Already log10 normalized
-                print("Bulk data already normalized")
+                SCLLMOutput.status(f"Bulk data already normalized", 'info')
             else:
                 raise ValueError("For bulk data, pre_normalized must be 'F' or 'T'")
         else:
@@ -535,9 +503,9 @@ class ScFoundationModel(SCLLMBase):
                 total_counts = adata_processed.X.sum(axis=1)
             
             adata_processed.obs['total_count'] = total_counts
-            print(f"Added total count information (mean: {total_counts.mean():.2f})")
+            SCLLMOutput.status(f"Added total count info (mean: {total_counts.mean():.2f})", 'loaded')
         
-        print(f"Preprocessing completed. Final shape: {adata_processed.shape}")
+        SCLLMOutput.status(f"Preprocessing completed: {adata_processed.shape}", 'loaded')
         
         return adata_processed
     
@@ -578,7 +546,7 @@ class ScFoundationModel(SCLLMBase):
         input_type = kwargs.get('input_type', 'singlecell')
         pre_normalized = kwargs.get('pre_normalized', 'T')  # Assume preprocessed
         
-        print(f"Generating {output_type} embeddings...")
+        SCLLMOutput.status(f"Generating {output_type} embeddings...", 'embedding', indent=1)
         
         # Get expression data
         if issparse(adata.X):
@@ -586,12 +554,21 @@ class ScFoundationModel(SCLLMBase):
         else:
             gexpr_data = adata.X
         
+        SCLLMOutput.status(f"Data shape: {gexpr_data.shape}", indent=1)
+        
         all_embeddings = []
         batch_container = []
         
         # Process each cell
-        print("Processing cells...")
-        for i in tqdm(range(adata.n_obs)):
+        SCLLMOutput.status(f"Processing cells...", 'preprocessing', indent=1)
+        pbar = SCLLMOutput.progress_bar(
+            total=adata.n_obs, 
+            desc="Cell embeddings", 
+            model_name="scFoundation"
+        )
+        
+        for i in range(adata.n_obs):
+            pbar.update(1)
             with torch.no_grad():
                 if input_type == 'singlecell':
                     # Single cell processing
@@ -680,10 +657,6 @@ class ScFoundationModel(SCLLMBase):
                     all_embeddings.append(geneembmerge.detach().cpu().numpy())
                 
                 elif output_type == 'gene_batch':
-                    # Collect for batch processing
-                    batch_container.append(pretrain_gene_x.float())
-                    
-                    if len(batch_container) == adata.n_obs:
                         # Process all cells in batch
                         batch_container = torch.concat(batch_container, axis=0)
                         self.model.to_final = None
@@ -734,13 +707,15 @@ class ScFoundationModel(SCLLMBase):
                     out = out[:, :19264, :].contiguous()
                     all_embeddings.append(out.detach().cpu().numpy())
         
+        pbar.close()
+        
         # Format results
         if output_type == 'gene_batch':
             embeddings = all_embeddings
         else:
             embeddings = np.squeeze(np.array(all_embeddings))
         
-        print(f"Generated embeddings shape: {embeddings.shape}")
+        SCLLMOutput.status(f"Generated embeddings: {embeddings.shape}", indent=1)
         
         return {
             "embeddings": embeddings,
@@ -753,11 +728,11 @@ class ScFoundationModel(SCLLMBase):
         
         # Check if fine-tuned model is available
         if hasattr(self, 'finetune_model') and hasattr(self, 'celltype_mapping'):
-            print("Using fine-tuned scFoundation model for annotation...")
+            SCLLMOutput.status(f"Using fine-tuned model for annotation...", 'predicting', indent=1)
             return self.predict_with_finetune(adata, **kwargs)
         else:
-            print("No fine-tuned model available. Returning embeddings only.")
-            print("For cell type annotation, use fine_tune() first or train a classifier on the embeddings.")
+            SCLLMOutput.status(f"No fine-tuned model available", 'warning', indent=1)
+            SCLLMOutput.status(f"Use fine_tune() first for cell type annotation", indent=2)
             
             result = self._predict_embedding(adata, **kwargs)
             
@@ -795,22 +770,22 @@ class ScFoundationModel(SCLLMBase):
             raise ValueError(f"Batch information '{batch_key}' not found in adata.obs. "
                            f"Integration requires batch labels.")
         
-        print(f"🔄 Starting batch integration using scFoundation embeddings...")
-        print(f"Batch key: '{batch_key}', Correction method: '{correction_method}'")
+        SCLLMOutput.status(f"Starting scFoundation batch integration", 'integrating')
+        SCLLMOutput.status(f"Batch key: '{batch_key}', Method: '{correction_method}'", 'info')
         
         # Get unique batches
         batch_labels = adata.obs[batch_key].astype('category')
         unique_batches = batch_labels.cat.categories
         batch_codes = batch_labels.cat.codes.values
         
-        print(f"Found {len(unique_batches)} batches: {list(unique_batches)}")
+        SCLLMOutput.status(f"Found {len(unique_batches)} batches", 'info')
         
         # Extract scFoundation embeddings
-        print("Extracting scFoundation embeddings...")
+        SCLLMOutput.status(f"Extracting scFoundation embeddings", 'embedding')
         embedding_result = self._predict_embedding(adata, **kwargs)
         embeddings = embedding_result["embeddings"]
         
-        print(f"Embeddings shape: {embeddings.shape}")
+        SCLLMOutput.status(f"Embeddings: {embeddings.shape}", 'loaded')
         
         # Apply post-hoc batch correction
         if correction_method == 'harmony':
@@ -825,7 +800,7 @@ class ScFoundationModel(SCLLMBase):
             raise ValueError(f"Unknown correction method: {correction_method}. "
                            f"Available methods: harmony, combat, scanorama, mnn")
         
-        print(f"✓ Integration completed using {correction_method}")
+        SCLLMOutput.status(f"Integration completed using {correction_method}", 'loaded')
         
         return {
             "embeddings": integrated_embeddings,
@@ -843,7 +818,7 @@ class ScFoundationModel(SCLLMBase):
         except ImportError:
             raise ImportError("harmonypy is required for Harmony correction. Install with: pip install harmonypy")
         
-        print("Applying Harmony correction...")
+        SCLLMOutput.status(f"Applying Harmony correction", 'preprocessing')
         
         # Create metadata DataFrame for Harmony
         meta_data = pd.DataFrame({'batch': batch_codes})
@@ -873,7 +848,7 @@ class ScFoundationModel(SCLLMBase):
         except ImportError:
             raise ImportError("pycombat is required for ComBat correction. Install with: pip install combat")
         
-        print("Applying ComBat correction...")
+        SCLLMOutput.status(f"Applying ComBat correction", 'preprocessing')
         
         # Convert to DataFrame
         df_embeddings = pd.DataFrame(embeddings.T)  # ComBat expects features x samples
@@ -891,7 +866,7 @@ class ScFoundationModel(SCLLMBase):
         except ImportError:
             raise ImportError("scanorama is required for Scanorama correction. Install with: pip install scanorama")
         
-        print("Applying Scanorama correction...")
+        SCLLMOutput.status(f"Applying Scanorama correction", 'preprocessing')
         
         # Split embeddings by batch
         batch_embeddings = []
@@ -926,7 +901,7 @@ class ScFoundationModel(SCLLMBase):
         except ImportError:
             raise ImportError("scanpy is required for MNN correction")
         
-        print("Applying MNN correction...")
+        SCLLMOutput.status(f"Applying MNN correction", 'preprocessing')
         
         # Create temporary AnnData object
         temp_adata = AnnData(X=embeddings)
@@ -947,7 +922,7 @@ class ScFoundationModel(SCLLMBase):
     
     def _predict_generation(self, adata: AnnData, **kwargs) -> Dict[str, Any]:
         """Generate gene expression (placeholder)."""
-        print("Gene expression generation not implemented for scFoundation.")
+        SCLLMOutput.status(f"Gene expression generation not implemented for scFoundation", 'warning')
         return {
             "generated_expression": None,
             "note": "Generation functionality not implemented"
@@ -984,7 +959,7 @@ class ScFoundationModel(SCLLMBase):
         if 'celltype' not in train_adata.obs:
             raise ValueError("train_adata must have 'celltype' column in .obs")
         
-        print(f"🚀 Starting scFoundation fine-tuning for {task} task...")
+        SCLLMOutput.status(f"Starting scFoundation fine-tuning for {task}", 'fine_tuning')
         
         # Get training parameters
         epochs = kwargs.get('epochs', 10)
@@ -998,7 +973,7 @@ class ScFoundationModel(SCLLMBase):
         id_to_celltype = {i: ct for i, ct in enumerate(unique_celltypes)}
         n_classes = kwargs.get('n_classes', len(unique_celltypes))
         
-        print(f"Found {n_classes} cell types: {list(unique_celltypes)}")
+        SCLLMOutput.status(f"Found {n_classes} cell types", 'info')
         
         # Add celltype_id to data
         train_adata.obs['celltype_id'] = train_adata.obs['celltype'].map(celltype_to_id)
@@ -1020,7 +995,7 @@ class ScFoundationModel(SCLLMBase):
         )
         finetune_model.to(self.device)
         
-        print(f"Created fine-tuning model with {n_classes} classes")
+        SCLLMOutput.status(f"Fine-tuning model created: {n_classes} classes", 'loaded')
         
         # Prepare training data
         train_dataset = self._prepare_finetune_data(train_processed)
@@ -1040,7 +1015,7 @@ class ScFoundationModel(SCLLMBase):
         training_history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
         
         for epoch in range(epochs):
-            print(f"\n📊 Epoch {epoch+1}/{epochs}")
+            # Epoch info handled by progress bar
             
             # Training
             train_loss, train_acc = self._train_finetune_epoch(
@@ -1057,16 +1032,15 @@ class ScFoundationModel(SCLLMBase):
                 training_history['val_loss'].append(val_loss)
                 training_history['val_acc'].append(val_acc)
                 
-                print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-                print(f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
+                # Training metrics displayed in progress bar
                 
                 # Save best model
                 if val_acc > best_accuracy:
                     best_accuracy = val_acc
                     best_model_state = copy.deepcopy(finetune_model.state_dict())
-                    print(f"✓ New best validation accuracy: {best_accuracy:.4f}")
+                    SCLLMOutput.status(f"New best validation accuracy: {best_accuracy:.4f}", 'best')
             else:
-                print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+                # Training metrics displayed in progress bar
                 if train_acc > best_accuracy:
                     best_accuracy = train_acc
                     best_model_state = copy.deepcopy(finetune_model.state_dict())
@@ -1076,7 +1050,7 @@ class ScFoundationModel(SCLLMBase):
         # Load best model
         if best_model_state is not None:
             finetune_model.load_state_dict(best_model_state)
-            print(f"✓ Loaded best model with accuracy: {best_accuracy:.4f}")
+            SCLLMOutput.status(f"Best model loaded: accuracy={best_accuracy:.4f}", 'loaded')
         
         # Store the fine-tuned model and mapping
         self.finetune_model = finetune_model
@@ -1086,7 +1060,7 @@ class ScFoundationModel(SCLLMBase):
             'n_classes': n_classes
         }
         
-        print("🎉 Fine-tuning completed!")
+        SCLLMOutput.status(f"Fine-tuning completed", 'complete')
         
         return {
             'best_accuracy': best_accuracy,
@@ -1107,7 +1081,20 @@ class ScFoundationModel(SCLLMBase):
         Returns:
             Cell embeddings
         """
+        # Start embedding extraction with unified output
+        SCLLMOutput.data_summary(adata, model_name="scFoundation")
+        operation_start("get_embeddings", "scFoundation", {
+            "cells": f"{adata.n_obs:,}",
+            "genes": f"{adata.n_vars:,}"
+        })
+        
         result = self.predict(adata, task="embedding", **kwargs)
+        
+        operation_complete("get_embeddings", {
+            "embedding_shape": f"{result['embeddings'].shape}",
+            "embedding_dim": result['embeddings'].shape[1]
+        })
+        
         return result["embeddings"]
     
     def _save_model_specific(self, save_path: Path, **kwargs) -> None:
@@ -1124,7 +1111,7 @@ class ScFoundationModel(SCLLMBase):
             with open(save_path / "config.json", 'w') as f:
                 json.dump(self.config, f, indent=2)
         
-        print("✓ Saved scFoundation model")
+        SCLLMOutput.status(f"scFoundation model saved", 'loaded')
     
     def _prepare_finetune_data(self, adata: AnnData):
         """Prepare data for fine-tuning."""
@@ -1210,7 +1197,7 @@ class ScFoundationModel(SCLLMBase):
         if not hasattr(self, 'celltype_mapping'):
             raise ValueError("No cell type mapping available. Call fine_tune() first.")
         
-        print("🔍 Predicting cell types using fine-tuned scFoundation model...")
+        SCLLMOutput.status(f"Predicting cell types using scFoundation", 'predicting')
         
         # Preprocess data
         adata_processed = self.preprocess(adata, **kwargs)
@@ -1247,11 +1234,11 @@ class ScFoundationModel(SCLLMBase):
         # Show prediction summary
         from collections import Counter
         type_counts = Counter(predicted_celltypes)
-        print(f"✓ Predicted cell types for {len(predicted_celltypes)} cells")
-        print("Prediction summary:")
+        SCLLMOutput.status(f"Predicted cell types for {len(predicted_celltypes)} cells", 'loaded')
+        SCLLMOutput.status(f"Prediction summary:", 'info')
         for celltype, count in type_counts.most_common():
             percentage = count / len(predicted_celltypes) * 100
-            print(f"  {celltype}: {count} cells ({percentage:.1f}%)")
+            SCLLMOutput.status(f"{celltype}: {count} cells ({percentage:.1f}%)", indent=1)
         
         return {
             'predictions': predictions,
@@ -1286,8 +1273,8 @@ class ScFoundationModel(SCLLMBase):
             raise ValueError("Model has not been fine-tuned for cell type annotation. "
                            "Call fine_tune() first or load a fine-tuned model.")
         
-        print("🔍 Predicting cell types for query data using scFoundation...")
-        print(f"   Query data: {query_adata.n_obs} cells × {query_adata.n_vars} genes")
+        SCLLMOutput.status(f"Predicting cell types for query data", 'predicting')
+        SCLLMOutput.status(f"Query data: {query_adata.n_obs} cells × {query_adata.n_vars} genes", indent=1)
         
         # Use the existing predict_with_finetune method
         results = self.predict_with_finetune(query_adata, **kwargs)
@@ -1303,17 +1290,17 @@ class ScFoundationModel(SCLLMBase):
             # Add cell type names to results
             results['predicted_celltypes'] = predicted_celltypes
             
-            print(f"✓ Predicted cell types for {len(predicted_celltypes)} cells")
+            SCLLMOutput.status(f"Predicted cell types for {len(predicted_celltypes)} cells", 'loaded')
             
             # Generate prediction summary
             from collections import Counter
             type_counts = Counter(predicted_celltypes)
             
-            print("📊 Prediction summary:")
+            SCLLMOutput.status(f"Prediction summary:", 'info')
             prediction_summary = {}
             for celltype, count in type_counts.most_common():
                 percentage = count / len(predicted_celltypes) * 100
-                print(f"   {celltype}: {count} cells ({percentage:.1f}%)")
+                SCLLMOutput.status(f"{celltype}: {count} cells ({percentage:.1f}%)", indent=1)
                 prediction_summary[celltype] = {
                     'count': count,
                     'percentage': percentage
@@ -1338,12 +1325,10 @@ class ScFoundationModel(SCLLMBase):
                 
                 results['confidence_stats'] = confidence_stats
                 
-                print(f"📈 Confidence statistics:")
-                print(f"   Mean confidence: {confidence_stats['mean_confidence']:.3f}")
-                print(f"   High confidence cells (>80%): {confidence_stats['high_confidence_cells']}")
-                print(f"   Low confidence cells (<50%): {confidence_stats['low_confidence_cells']}")
+                SCLLMOutput.status(f"Confidence statistics:", 'info')
+                SCLLMOutput.status(f"Mean: {confidence_stats['mean_confidence']:.3f}, High (>80%): {confidence_stats['high_confidence_cells']}, Low (<50%): {confidence_stats['low_confidence_cells']}", indent=1)
         else:
-            print("⚠️  No predictions found in results")
+            SCLLMOutput.status(f"No predictions found in results", 'warning')
         
         return results
 
@@ -1393,9 +1378,8 @@ class LinearProbingClassifier(nn.Module):
         # Batch normalization
         self.norm = nn.BatchNorm1d(hidden_dim, affine=False, eps=1e-6)
         
-        print(f"LinearProbingClassifier initialized with {n_classes} classes")
-        print(f"Hidden dimension: {hidden_dim}")
-        print(f"Frozen more: {frozen_more}")
+        SCLLMOutput.status(f"LinearProbingClassifier: {n_classes} classes", 'loaded')
+        SCLLMOutput.status(f"Hidden dimension: {hidden_dim}, Frozen: {frozen_more}", indent=1)
     
     def _freeze_pretrained_layers(self):
         """Freeze pre-trained layers according to the fine-tuning strategy."""
@@ -1406,7 +1390,7 @@ class LinearProbingClassifier(nn.Module):
                 p.requires_grad = False
             for _, p in self.pos_emb.named_parameters():
                 p.requires_grad = False
-            print('Token and position embeddings frozen')
+            SCLLMOutput.status(f"Token and position embeddings frozen", 'info')
         
         # Freeze all encoder layers
         for na, param in self.encoder.named_parameters():
@@ -1416,9 +1400,9 @@ class LinearProbingClassifier(nn.Module):
         if hasattr(self.encoder, 'transformer_encoder') and len(self.encoder.transformer_encoder) > 2:
             for na, param in self.encoder.transformer_encoder[-2].named_parameters():
                 param.requires_grad = True
-                print(f'Unfrozen encoder layer: {na}')
+                SCLLMOutput.status(f"Unfrozen encoder layer: {na}", 'info')
         else:
-            print('Warning: Could not find transformer_encoder layers to unfreeze')
+            SCLLMOutput.status(f"Could not find transformer_encoder layers to unfreeze", 'warning')
     
     def forward(self, x: torch.Tensor, targets: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -1486,8 +1470,8 @@ class LinearProbingClassifier(nn.Module):
         if batch_key not in adata.obs:
             raise ValueError(f"Batch information '{batch_key}' not found in adata.obs")
         
-        print(f"🔄 Performing batch integration with scFoundation model...")
-        print(f"   Batch key: {batch_key}")
+        SCLLMOutput.status(f"Performing batch integration with scFoundation", 'integrating')
+        SCLLMOutput.status(f"Batch key: {batch_key}", indent=1)
         
         # Get batch information
         batch_labels = adata.obs[batch_key].astype('category').cat.codes.values
@@ -1495,10 +1479,10 @@ class LinearProbingClassifier(nn.Module):
         num_batches = len(unique_batches)
         batch_distribution = np.bincount(batch_labels)
         
-        print(f"   Found {num_batches} batches with distribution: {batch_distribution}")
+        SCLLMOutput.status(f"Found {num_batches} batches", indent=1)
         
         # Extract embeddings from scFoundation model
-        print("   Extracting cell embeddings...")
+        SCLLMOutput.status(f"Extracting cell embeddings", 'embedding', indent=1)
         embeddings = self.get_embeddings(adata, **kwargs)
         
         # Apply post-hoc batch correction
@@ -1511,10 +1495,10 @@ class LinearProbingClassifier(nn.Module):
         elif correction_method == 'center_scale':
             corrected_embeddings = self._apply_center_scale_correction(embeddings, batch_labels, **kwargs)
         elif correction_method == 'none':
-            print("   Using embeddings without additional correction")
+            SCLLMOutput.status(f"Using embeddings without correction", 'info', indent=1)
             corrected_embeddings = embeddings
         else:
-            print(f"   Unknown correction method '{correction_method}', using center_scale")
+            SCLLMOutput.status(f"Unknown method '{correction_method}', using center_scale", 'warning', indent=1)
             corrected_embeddings = self._apply_center_scale_correction(embeddings, batch_labels, **kwargs)
         
         results = {
@@ -1531,12 +1515,12 @@ class LinearProbingClassifier(nn.Module):
             }
         }
         
-        print(f"✓ Integration completed using {correction_method} post-hoc correction")
+        SCLLMOutput.status(f"Integration completed using {correction_method}", 'loaded')
         return results
     
     def _apply_combat_correction_simple(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply simple ComBat-style batch correction for integrate function."""
-        print("   Applying ComBat-style correction...")
+        SCLLMOutput.status(f"Applying ComBat-style correction", 'preprocessing', indent=1)
         
         try:
             from sklearn.preprocessing import StandardScaler
@@ -1561,16 +1545,16 @@ class LinearProbingClassifier(nn.Module):
             global_scaler = StandardScaler()
             corrected = global_scaler.fit_transform(corrected)
             
-            print(f"     ComBat-style correction applied to {embeddings.shape[0]} cells")
+            SCLLMOutput.status(f"ComBat applied to {embeddings.shape[0]} cells", 'loaded', indent=2)
             return corrected
             
         except Exception as e:
-            print(f"     ComBat correction failed: {e}, using original embeddings")
+            SCLLMOutput.status(f"ComBat failed: {e}", 'warning', indent=2)
             return embeddings
     
     def _apply_mnn_correction_simple(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply simple MNN-style batch correction for integrate function."""
-        print("   Applying MNN-style correction...")
+        SCLLMOutput.status(f"Applying MNN-style correction", 'preprocessing', indent=1)
         
         try:
             from sklearn.neighbors import NearestNeighbors
@@ -1579,7 +1563,7 @@ class LinearProbingClassifier(nn.Module):
             unique_batches = np.unique(batch_labels)
             
             if len(unique_batches) < 2:
-                print("     Only one batch found, no correction needed")
+                SCLLMOutput.status(f"Only one batch, no correction needed", 'info', indent=2)
                 return embeddings
             
             # Simple MNN-style correction between consecutive batches
@@ -1612,16 +1596,16 @@ class LinearProbingClassifier(nn.Module):
                     
                     corrected[batch2_mask] += correction_vector
             
-            print(f"     MNN-style correction applied to {len(unique_batches)} batches")
+            SCLLMOutput.status(f"MNN applied to {len(unique_batches)} batches", 'loaded', indent=2)
             return corrected
             
         except Exception as e:
-            print(f"     MNN correction failed: {e}, using center_scale correction")
+            SCLLMOutput.status(f"MNN failed: {e}", 'warning', indent=2)
             return self._apply_center_scale_correction(embeddings, batch_labels, **kwargs)
     
     def _apply_center_scale_correction(self, embeddings: np.ndarray, batch_labels: np.ndarray, **kwargs) -> np.ndarray:
         """Apply center and scale batch correction."""
-        print("   Applying center and scale correction...")
+        SCLLMOutput.status(f"Applying center and scale correction", 'preprocessing', indent=1)
         
         try:
             corrected = embeddings.copy()
@@ -1643,11 +1627,11 @@ class LinearProbingClassifier(nn.Module):
                     # Center and scale to global statistics
                     corrected[batch_mask] = (batch_data - batch_mean) / batch_std * global_std + global_mean
             
-            print(f"     Center and scale correction applied to {embeddings.shape[0]} cells")
+            SCLLMOutput.status(f"Center-scale applied to {embeddings.shape[0]} cells", 'loaded', indent=2)
             return corrected
             
         except Exception as e:
-            print(f"     Center-scale correction failed: {e}, using original embeddings")
+            SCLLMOutput.status(f"Center-scale failed: {e}", 'warning', indent=2)
             return embeddings
 
 
@@ -1678,9 +1662,8 @@ class FineTuneDataset(Dataset):
         
         self.labels = torch.from_numpy(label_array).long()
         
-        print(f"FineTuneDataset created with {len(self.expressions)} samples")
-        print(f"Expression shape: {self.expressions.shape}")
-        print(f"Labels shape: {self.labels.shape}")
+        SCLLMOutput.status(f"FineTuneDataset: {len(self.expressions)} samples", 'loaded')
+        SCLLMOutput.status(f"Expression: {self.expressions.shape}, Labels: {self.labels.shape}", indent=1)
     
     def __len__(self):
         return len(self.expressions)
@@ -1708,8 +1691,8 @@ class PredictionDataset(Dataset):
         else:
             self.expressions = torch.from_numpy(adata.X).float()
         
-        print(f"PredictionDataset created with {len(self.expressions)} samples")
-        print(f"Expression shape: {self.expressions.shape}")
+        SCLLMOutput.status(f"PredictionDataset: {len(self.expressions)} samples", 'loaded')
+        SCLLMOutput.status(f"Expression shape: {self.expressions.shape}", indent=1)
     
     def __len__(self):
         return len(self.expressions)
