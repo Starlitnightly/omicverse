@@ -11,11 +11,13 @@ try:
     from .scgpt_model import ScGPTModel
     from .scfoundation_model import ScFoundationModel
     from .geneformer_model import GeneformerModel
+    from .cellplm_model import CellPLMModel
 except ImportError:
     from base import SCLLMBase
     from scgpt_model import ScGPTModel
     from scfoundation_model import ScFoundationModel
     from geneformer_model import GeneformerModel
+    from cellplm_model import CellPLMModel
 
 
 class ModelFactory:
@@ -31,6 +33,7 @@ class ModelFactory:
         "scgpt": ScGPTModel,
         "scfoundation": ScFoundationModel,
         "geneformer": GeneformerModel,
+        "cellplm": CellPLMModel,
         # Future models can be added here:
         # "scbert": ScBERTModel,
         # "celllm": CellLMModel,
@@ -72,6 +75,14 @@ class ModelFactory:
                 from datasets import Dataset
             except ImportError:
                 raise ImportError("datasets is required for scFoundation model. Please install it using `pip install datasets`.")
+        
+        elif model_type.lower() == "cellplm":
+            try:
+                import torch
+                import scanpy as sc
+            except ImportError:
+                import warnings
+                warnings.warn("torch and scanpy are recommended for full CellPLM functionality.")
             
         if model_type.lower() not in cls._models:
             available_models = list(cls._models.keys())
@@ -1284,3 +1295,430 @@ def fine_tune_geneformer(train_adata,
         print(f"✓ Fine-tuned model saved to {save_path}")
     
     return results
+
+
+# Convenience functions for CellPLM
+def load_cellplm(model_path: Union[str, Path], 
+                 pretrain_version: str = "20231027_85M",
+                 device: Optional[str] = None, 
+                 **kwargs) -> 'CellPLMModel':
+    """
+    Quick function to load a CellPLM model.
+    
+    Args:
+        model_path: Path to the CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model (e.g., '20231027_85M')
+        device: Device to run the model on
+        **kwargs: Additional parameters
+        
+    Returns:
+        Loaded CellPLM model
+    """
+    return ModelFactory.create_model(
+        "cellplm", 
+        model_path, 
+        device, 
+        pretrain_version=pretrain_version,
+        **kwargs
+    )
+
+
+def get_embeddings_with_cellplm(adata, 
+                               model_path: Union[str, Path],
+                               pretrain_version: str = "20231027_85M",
+                               device: Optional[str] = None,
+                               **kwargs):
+    """
+    Quick function to get embeddings with CellPLM.
+    
+    Args:
+        adata: AnnData object
+        model_path: Path to the CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        device: Device to run the model on
+        **kwargs: Additional parameters
+        
+    Returns:
+        Cell embeddings
+    """
+    model = load_cellplm(model_path, pretrain_version, device, **kwargs)
+    return model.get_embeddings(adata, **kwargs)
+
+
+def end_to_end_cellplm_embedding(adata,
+                                model_path: Union[str, Path],
+                                pretrain_version: str = "20231027_85M",
+                                save_embeddings_path: Optional[Union[str, Path]] = None,
+                                device: Optional[str] = None,
+                                **kwargs):
+    """
+    Complete workflow for extracting embeddings with CellPLM.
+    
+    Args:
+        adata: Input AnnData object
+        model_path: Path to CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        save_embeddings_path: Path to save embeddings (optional)
+        device: Device for computation
+        **kwargs: Additional parameters
+        
+    Returns:
+        Dictionary with embeddings and metadata
+    """
+    print("🚀 Starting CellPLM embedding extraction workflow...")
+    
+    # Load model
+    manager = SCLLMManager(
+        model_type="cellplm",
+        model_path=model_path,
+        device=device,
+        pretrain_version=pretrain_version
+    )
+    
+    # Extract embeddings
+    embeddings = manager.get_embeddings(adata, **kwargs)
+    
+    # Add embeddings to adata
+    adata.obsm['X_cellplm'] = embeddings
+    print("✓ Cell embeddings added to adata.obsm['X_cellplm']")
+    
+    # Save embeddings if requested
+    if save_embeddings_path is not None:
+        np.save(save_embeddings_path, embeddings)
+        print(f"💾 Embeddings saved to: {save_embeddings_path}")
+    
+    print("🎉 CellPLM embedding extraction completed!")
+    
+    return {
+        'embeddings': embeddings,
+        'model_path': str(model_path),
+        'pretrain_version': pretrain_version
+    }
+
+
+def fine_tune_cellplm(train_adata,
+                     model_path: Union[str, Path],
+                     pretrain_version: str = "20231027_85M",
+                     valid_adata=None,
+                     save_path: Optional[Union[str, Path]] = None,
+                     device: Optional[str] = None,
+                     task: str = "annotation",
+                     **kwargs):
+    """
+    Complete workflow for fine-tuning CellPLM on reference data.
+    
+    Args:
+        train_adata: Training data with 'celltype' in .obs (for annotation)
+        model_path: Path to CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        valid_adata: Validation data (optional)
+        save_path: Path to save fine-tuned model (optional)
+        device: Device for training
+        task: Task type ('annotation', 'imputation')
+        **kwargs: Training parameters
+        
+    Returns:
+        Dictionary with fine-tuning results and trained model
+    """
+    print(f"🚀 Starting CellPLM {task} fine-tuning workflow...")
+    
+    # Load model
+    model = load_cellplm(model_path, pretrain_version, device, task=task, **kwargs)
+    
+    # Fine-tune the model
+    results = model.fine_tune(
+        train_adata=train_adata,
+        valid_adata=valid_adata,
+        task=task,
+        **kwargs
+    )
+    
+    # Save fine-tuned model if requested
+    if save_path is not None:
+        model.save_model(save_path)
+        print(f"💾 Fine-tuned model saved to: {save_path}")
+    
+    return {
+        "model": model,
+        "results": results
+    }
+
+
+def predict_celltypes_with_cellplm(query_adata,
+                                  finetuned_model_path: Union[str, Path],
+                                  pretrain_version: str = "20231027_85M",
+                                  device: Optional[str] = None,
+                                  save_predictions: bool = True,
+                                  **kwargs):
+    """
+    Complete workflow for predicting cell types with fine-tuned CellPLM.
+    
+    Args:
+        query_adata: Query data to predict
+        finetuned_model_path: Path to fine-tuned CellPLM model
+        pretrain_version: Version of pretrained model
+        device: Device for prediction
+        save_predictions: Whether to save predictions to query_adata.obs
+        **kwargs: Prediction parameters
+        
+    Returns:
+        Dictionary with predictions and metadata
+    """
+    print("🔍 Starting CellPLM cell type prediction workflow...")
+    
+    # Load fine-tuned model
+    manager = SCLLMManager(
+        model_type="cellplm",
+        model_path=finetuned_model_path,
+        device=device,
+        pretrain_version=pretrain_version,
+        task="annotation"
+    )
+    
+    # Predict cell types
+    results = manager.model.predict_celltypes(query_adata, **kwargs)
+    
+    # Add predictions to adata if requested
+    if save_predictions:
+        if 'predicted_celltypes' in results:
+            query_adata.obs['predicted_celltype'] = results['predicted_celltypes']
+        if 'predictions' in results:
+            query_adata.obs['predicted_celltype_id'] = results['predictions']
+        print("✓ Predictions added to query_adata.obs")
+    
+    return results
+
+
+def end_to_end_cellplm_annotation(reference_adata,
+                                 query_adata,
+                                 model_path: Union[str, Path],
+                                 pretrain_version: str = "20231027_85M",
+                                 save_finetuned_path: Optional[Union[str, Path]] = None,
+                                 device: Optional[str] = None,
+                                 validation_split: float = 0.2,
+                                 **kwargs):
+    """
+    Complete end-to-end workflow: fine-tune CellPLM and predict on query data.
+    
+    Args:
+        reference_adata: Reference data with known cell types
+        query_adata: Query data to predict
+        model_path: Path to CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        save_finetuned_path: Path to save fine-tuned model
+        device: Device for computation
+        validation_split: Fraction of reference data for validation
+        **kwargs: Training and prediction parameters
+        
+    Returns:
+        Dictionary with fine-tuning results and predictions
+    """
+    print("🎯 Starting end-to-end CellPLM annotation workflow...")
+    
+    # Validate data
+    if 'celltype' not in reference_adata.obs:
+        raise ValueError("Reference data must have 'celltype' column in .obs")
+    
+    # Split reference data into train/validation
+    if validation_split > 0:
+        from sklearn.model_selection import train_test_split
+        train_idx, val_idx = train_test_split(
+            range(reference_adata.n_obs),
+            test_size=validation_split,
+            stratify=reference_adata.obs['celltype'],
+            random_state=kwargs.get('random_state', 42)
+        )
+        train_adata = reference_adata[train_idx].copy()  
+        valid_adata = reference_adata[val_idx].copy()
+        print(f"📊 Split data: {len(train_idx)} train, {len(val_idx)} validation")
+    else:
+        train_adata = reference_adata.copy()
+        valid_adata = None
+        print(f"📊 Using all {reference_adata.n_obs} cells for training")
+    
+    # Fine-tune model
+    fine_tune_result = fine_tune_cellplm(
+        train_adata=train_adata,
+        model_path=model_path,
+        pretrain_version=pretrain_version,
+        valid_adata=valid_adata,
+        save_path=save_finetuned_path,
+        device=device,
+        task="annotation",
+        **kwargs
+    )
+    
+    # Predict on query data using fine-tuned model
+    if save_finetuned_path is not None:
+        prediction_results = predict_celltypes_with_cellplm(
+            query_adata=query_adata,
+            finetuned_model_path=save_finetuned_path,
+            pretrain_version=pretrain_version,
+            device=device,
+            **kwargs
+        )
+    else:
+        # Use the fine-tuned model directly
+        prediction_results = fine_tune_result["model"].predict_celltypes(query_adata, **kwargs)
+        if 'predicted_celltypes' in prediction_results:
+            query_adata.obs['predicted_celltype'] = prediction_results['predicted_celltypes']
+        if 'predictions' in prediction_results:
+            query_adata.obs['predicted_celltype_id'] = prediction_results['predictions']
+    
+    print("🎉 End-to-end CellPLM annotation completed!")
+    
+    return {
+        "fine_tune_results": fine_tune_result["results"],
+        "prediction_results": prediction_results,
+        "model": fine_tune_result["model"]
+    }
+
+
+# Integration functions for CellPLM
+def integrate_with_cellplm(query_adata,
+                          model_path: Union[str, Path],
+                          pretrain_version: str = "20231027_85M",
+                          batch_key: str = "batch",
+                          correction_method: str = "harmony",
+                          device: Optional[str] = None,
+                          save_embeddings: bool = True,
+                          **kwargs):
+    """
+    Complete workflow for batch integration using CellPLM.
+    
+    Args:
+        query_adata: Query data with batch information
+        model_path: Path to CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        batch_key: Column name for batch labels
+        correction_method: Integration method ('harmony', 'center_scale', 'none')
+        device: Device for computation
+        save_embeddings: Whether to save embeddings to query_adata.obsm
+        **kwargs: Integration parameters
+        
+    Returns:
+        Dictionary with integration results
+    """
+    print("🔍 Starting CellPLM batch integration workflow...")
+    
+    # Load CellPLM model
+    manager = SCLLMManager(
+        model_type="cellplm",
+        model_path=model_path,
+        device=device,
+        pretrain_version=pretrain_version,
+        task="embedding"
+    )
+    
+    # Perform integration
+    results = manager.model.integrate(
+        query_adata, 
+        batch_key=batch_key,
+        correction_method=correction_method,
+        **kwargs
+    )
+    
+    # Add integrated embeddings to adata if requested
+    if save_embeddings and 'embeddings' in results:
+        query_adata.obsm['X_cellplm_integrated'] = results['embeddings']
+        print("✓ Integrated embeddings added to query_adata.obsm['X_cellplm_integrated']")
+        
+        # Also save original embeddings for comparison
+        if 'original_embeddings' in results:
+            query_adata.obsm['X_cellplm_original'] = results['original_embeddings']
+            print("✓ Original embeddings added to query_adata.obsm['X_cellplm_original']")
+    
+    return results
+
+
+def end_to_end_cellplm_integration(query_adata,
+                                  model_path: Union[str, Path],
+                                  pretrain_version: str = "20231027_85M",
+                                  batch_key: str = "batch",
+                                  correction_methods: List[str] = ["harmony"],
+                                  device: Optional[str] = None,
+                                  save_all_methods: bool = False,
+                                  **kwargs):
+    """
+    Complete end-to-end integration workflow with multiple correction methods.
+    
+    Args:
+        query_adata: Query data with batch information
+        model_path: Path to CellPLM checkpoint directory
+        pretrain_version: Version of pretrained model
+        batch_key: Column name for batch labels
+        correction_methods: List of correction methods to try
+        device: Device for computation
+        save_all_methods: Whether to save results from all methods
+        **kwargs: Integration parameters
+        
+    Returns:
+        Dictionary with results from all methods
+    """
+    print("🎯 Starting end-to-end CellPLM integration workflow...")
+    
+    # Load model once
+    manager = SCLLMManager(
+        model_type="cellplm",
+        model_path=model_path,
+        device=device,
+        pretrain_version=pretrain_version,
+        task="embedding"
+    )
+    
+    all_results = {}
+    
+    for method in correction_methods:
+        print(f"\n📊 Testing integration method: {method}")
+        
+        try:
+            # Perform integration with this method
+            results = manager.model.integrate(
+                query_adata,
+                batch_key=batch_key,
+                correction_method=method,
+                **kwargs
+            )
+            
+            all_results[method] = results
+            
+            # Save embeddings if requested
+            if save_all_methods or method == correction_methods[0]:
+                if method == correction_methods[0]:
+                    # Save the first method as the default
+                    query_adata.obsm['X_cellplm_integrated'] = results['embeddings']
+                    print(f"✓ {method} embeddings saved as default integration")
+                
+                if save_all_methods:
+                    query_adata.obsm[f'X_cellplm_{method}'] = results['embeddings']
+                    print(f"✓ {method} embeddings saved to query_adata.obsm")
+            
+        except Exception as e:
+            print(f"❌ Integration with {method} failed: {e}")
+            all_results[method] = {"error": str(e)}
+    
+    # Save original embeddings for comparison
+    if len(all_results) > 0:
+        first_successful = next((r for r in all_results.values() if 'embeddings' in r), None)
+        if first_successful and 'original_embeddings' in first_successful:
+            query_adata.obsm['X_cellplm_original'] = first_successful['original_embeddings']
+            print("✓ Original embeddings saved for comparison")
+    
+    print("🎉 End-to-end CellPLM integration completed!")
+    
+    # Summary
+    successful_methods = [m for m, r in all_results.items() if 'embeddings' in r]
+    failed_methods = [m for m, r in all_results.items() if 'error' in r]
+    
+    print(f"\n📈 Integration Summary:")
+    print(f"  Successful methods: {successful_methods}")
+    if failed_methods:
+        print(f"  Failed methods: {failed_methods}")
+    
+    return {
+        "results": all_results,
+        "successful_methods": successful_methods,
+        "failed_methods": failed_methods,
+        "batch_key": batch_key,
+        "model_path": str(model_path)
+    }
