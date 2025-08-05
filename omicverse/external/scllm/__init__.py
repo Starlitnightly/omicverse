@@ -9,6 +9,7 @@ Main classes:
 - ModelFactory: Factory for creating different model types
 - ScGPTModel: scGPT model implementation
 - ScFoundationModel: scFoundation model implementation
+- CellPLMModel: CellPLM model implementation
 
 Quick start with scGPT:
 ```python
@@ -40,6 +41,30 @@ manager = ov.external.scllm.SCLLMManager(
 # Get cell embeddings
 embeddings = manager.get_embeddings(adata)
 ```
+
+Quick start with CellPLM:
+```python
+import omicverse as ov
+
+# Load and use CellPLM for cell embedding
+manager = ov.external.scllm.SCLLMManager(
+    model_type="cellplm",
+    model_path="/path/to/cellplm/checkpoint",
+    pretrain_version="20231027_85M"
+)
+
+# Get embeddings
+embeddings = manager.get_embeddings(adata)
+
+# Fine-tune for annotation
+results = manager.fine_tune(train_adata, task="annotation")
+
+# Predict cell types
+predictions = manager.annotate_cells(adata)
+
+# Integrate batches
+integration_results = manager.integrate(adata, batch_key="batch")
+```
 """
 
 # Import only essential components to avoid dependency issues
@@ -47,6 +72,7 @@ from .base import SCLLMBase, ModelConfig, TaskConfig
 from .scgpt_model import ScGPTModel
 from .scfoundation_model import ScFoundationModel
 from .geneformer_model import GeneformerModel
+from .cellplm_model import CellPLMModel
 from .model_factory import (
     ModelFactory, SCLLMManager, load_scgpt, annotate_with_scgpt,
     fine_tune_scgpt, predict_celltypes_workflow, end_to_end_scgpt_annotation,
@@ -55,7 +81,9 @@ from .model_factory import (
     end_to_end_scfoundation_embedding, fine_tune_scfoundation, 
     predict_celltypes_with_scfoundation, end_to_end_scfoundation_annotation,
     integrate_with_scfoundation, integrate_batches_with_scfoundation, 
-    end_to_end_scfoundation_integration
+    end_to_end_scfoundation_integration, load_cellplm, get_embeddings_with_cellplm,
+    end_to_end_cellplm_embedding, fine_tune_cellplm, predict_celltypes_with_cellplm,
+    end_to_end_cellplm_annotation, integrate_with_cellplm, end_to_end_cellplm_integration
 )
 
 # Optional import of scgpt module - only if dependencies are available
@@ -75,6 +103,7 @@ __all__ = [
     "ScGPTModel",
     "ScFoundationModel",
     "GeneformerModel",
+    "CellPLMModel",
     "ModelFactory",
     "SCLLMManager",
     "load_scgpt",
@@ -95,6 +124,14 @@ __all__ = [
     "integrate_with_scfoundation",
     "integrate_batches_with_scfoundation",
     "end_to_end_scfoundation_integration",
+    "load_cellplm",
+    "get_embeddings_with_cellplm",
+    "end_to_end_cellplm_embedding",
+    "fine_tune_cellplm",
+    "predict_celltypes_with_cellplm",
+    "end_to_end_cellplm_annotation",
+    "integrate_with_cellplm",
+    "end_to_end_cellplm_integration",
 ]
 
 # Add scgpt to __all__ only if available
