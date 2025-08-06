@@ -162,13 +162,13 @@ class UCEModel(SCLLMBase):
     
     def get_embeddings(self, adata: AnnData, **kwargs) -> np.ndarray:
         """
-        Extract cell embeddings using UCE model.
+        Extract cell embeddings using UCE model directly from memory.
         
-        This method follows the exact workflow of eval_single_anndata.py:
-        1. Save adata to temporary file
-        2. Run UCE preprocessing
-        3. Generate indices
-        4. Run evaluation
+        This method processes AnnData directly in memory without file I/O:
+        1. Process adata in memory
+        2. Generate protein embeddings and chromosome mappings
+        3. Run UCE model inference
+        4. Return embeddings
         
         Args:
             adata: Input AnnData object
@@ -182,30 +182,17 @@ class UCEModel(SCLLMBase):
         
         SCLLMOutput.status("Extracting cell embeddings using UCE", 'embedding')
         
-        # Create temporary directory for UCE processing
-        temp_dir = tempfile.mkdtemp()
-        temp_adata_path = os.path.join(temp_dir, "temp_adata.h5ad")
-        
+        # Process adata directly in memory
         try:
-            # Save adata temporarily (UCE requires file-based input)
-            adata_copy = adata.copy()
-            if issparse(adata_copy.X):
-                adata_copy.X = adata_copy.X.toarray()
-            adata_copy.write_h5ad(temp_adata_path)
-            
-            # Run the exact UCE workflow (paths already patched in load_model)
-            embeddings = self._run_uce_workflow(temp_adata_path, temp_dir, **kwargs)
+            # Run the direct UCE workflow (no file I/O)
+            embeddings = self._run_uce_workflow_direct(adata, **kwargs)
             
             SCLLMOutput.status(f"Extracted embeddings: {embeddings.shape}", 'embedding')
             return embeddings
             
-        finally:
-            # Clean up temporary files
-            try:
-                import shutil
-                shutil.rmtree(temp_dir)
-            except:
-                pass  # Ignore cleanup errors
+        except Exception as e:
+            SCLLMOutput.status(f"UCE embedding extraction failed: {e}", 'error')
+            raise RuntimeError(f"UCE embedding extraction failed: {e}")
     
     def _run_uce_workflow(self, adata_path: str, output_dir: str, **kwargs) -> np.ndarray:
         """
@@ -258,6 +245,397 @@ class UCEModel(SCLLMBase):
                                          accelerator, args)
         
         return embeddings
+    
+    def _run_uce_workflow_direct(self, adata: AnnData, **kwargs) -> np.ndarray:
+        """
+        Run UCE workflow directly on memory adata object without file I/O.
+        
+        Args:
+            adata: Input AnnData object
+            **kwargs: Additional parameters
+            
+        Returns:
+            Cell embeddings as numpy array
+        """
+        from accelerate import Accelerator
+        
+        # Import UCE components
+        try:
+            from .UCE.eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
+            from .UCE.model import TransformerModel
+        except ImportError:
+            # Fallback for direct execution
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
+            from model import TransformerModel
+        
+        # Create accelerator
+        accelerator = Accelerator()
+        
+        # Step 1: Process adata directly in memory
+        SCLLMOutput.status("Processing data in memory", 'embedding')
+        processed_adata, pe_row_idxs, dataset_chroms, dataset_pos = self._process_adata_direct(adata, **kwargs)
+        
+        # Step 2: Create shapes dict
+        shapes_dict = {"memory_adata": (processed_adata.n_obs, processed_adata.n_vars)}
+        
+        # Step 3: Run evaluation with direct data
+        embeddings = self._run_eval_direct(
+            processed_adata, pe_row_idxs, dataset_chroms, dataset_pos, shapes_dict, accelerator
+        )
+        
+        return embeddings
+    
+    def _process_adata_direct(self, adata: AnnData, **kwargs) -> Tuple[AnnData, torch.Tensor, np.ndarray, np.ndarray]:
+        """
+        Process AnnData directly in memory to extract gene embeddings and chromosome information.
+        
+        Args:
+            adata: Input AnnData object
+            
+        Returns:
+            Tuple of (processed_adata, pe_row_idxs, dataset_chroms, dataset_pos)
+        """
+        # Make a copy and ensure dense matrix
+        adata_processed = adata.copy()
+        if issparse(adata_processed.X):
+            adata_processed.X = adata_processed.X.toarray()
+        
+        # Apply basic filtering if requested
+        filter_cells = kwargs.get('filter_cells', False)
+        filter_genes = kwargs.get('filter_genes', False)
+        
+        if filter_cells:
+            import scanpy as sc
+            min_genes = kwargs.get('min_genes', 25)
+            sc.pp.filter_cells(adata_processed, min_genes=min_genes)
+        
+        if filter_genes:
+            import scanpy as sc
+            min_cells = kwargs.get('min_cells', 10)
+            sc.pp.filter_genes(adata_processed, min_cells=min_cells)
+        
+        # Load gene embeddings using our inline function
+        try:
+            from .UCE.data_proc.data_utils import load_gene_embeddings_adata_inline
+        except ImportError:
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from data_proc.data_utils import load_gene_embeddings_adata_inline
+        
+        # Process gene embeddings
+        adata_processed, protein_embeddings = load_gene_embeddings_adata_inline(
+            adata_processed, 
+            species=[self.config['species']],
+            embedding_model="ESM2",
+            protein_embeddings_dir=str(self.protein_embeddings_dir)
+        )
+        
+        # Generate protein embedding indices and chromosome information
+        pe_row_idxs, dataset_chroms, dataset_pos = self._generate_indices_direct(adata_processed)
+        
+        return adata_processed, pe_row_idxs, dataset_chroms, dataset_pos
+    
+    def _generate_indices_direct(self, adata_processed: AnnData) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
+        """
+        Generate protein embedding indices and chromosome information directly from adata.
+        
+        Args:
+            adata_processed: Processed AnnData object
+            
+        Returns:
+            Tuple of (pe_row_idxs, dataset_chroms, dataset_pos)
+        """
+        # Import UCE data processing functions
+        try:
+            from .UCE.data_proc.data_utils import get_species_to_pe, get_spec_chrom_csv
+        except ImportError:
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from data_proc.data_utils import get_species_to_pe, get_spec_chrom_csv
+        
+        # Load species protein embeddings
+        species_to_pe = get_species_to_pe(str(self.protein_embeddings_dir))
+        
+        # Load species offsets
+        with open(self.offset_pkl_path, "rb") as f:
+            species_to_offsets = pickle.load(f)
+        
+        # Load chromosome position information
+        gene_to_chrom_pos = get_spec_chrom_csv(str(self.spec_chrom_csv_path))
+        
+        # Generate indices
+        dataset_species = self.config['species']
+        spec_pe_genes = list(species_to_pe[dataset_species].keys())
+        offset = species_to_offsets[dataset_species]
+        
+        # Create protein embedding row indices
+        pe_row_idxs = torch.tensor([spec_pe_genes.index(k.upper()) + offset for k in adata_processed.var_names]).long()
+        
+        # Create chromosome mappings
+        spec_chrom = gene_to_chrom_pos[gene_to_chrom_pos["species"] == dataset_species].set_index("gene_symbol")
+        gene_chrom = spec_chrom.loc[[k.upper() for k in adata_processed.var_names]]
+        dataset_chroms = gene_chrom["spec_chrom"].cat.codes  # chromosome codes
+        dataset_pos = gene_chrom["start"].values  # genomic positions
+        
+        return pe_row_idxs, dataset_chroms, dataset_pos
+    
+    def _run_eval_direct(self, adata: AnnData, pe_row_idxs: torch.Tensor, 
+                        dataset_chroms: np.ndarray, dataset_pos: np.ndarray,
+                        shapes_dict: dict, accelerator) -> np.ndarray:
+        """
+        Run UCE model evaluation directly with in-memory data.
+        
+        Args:
+            adata: Processed AnnData object
+            pe_row_idxs: Protein embedding indices
+            dataset_chroms: Chromosome codes
+            dataset_pos: Genomic positions
+            shapes_dict: Shape information dictionary
+            accelerator: Accelerator object
+            
+        Returns:
+            Cell embeddings as numpy array
+        """
+        # Import UCE components
+        try:
+            from .UCE.eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
+            from .UCE.model import TransformerModel
+        except ImportError:
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
+            from model import TransformerModel
+        
+        from torch.utils.data import DataLoader
+        from tqdm.auto import tqdm
+        
+        # Set random seeds for reproducibility (crucial for identical results)
+        torch.manual_seed(23)
+        np.random.seed(23)
+        
+        # Set deterministic behavior
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
+        #### Set up the model exactly like evaluate.py ####
+        token_dim = self.config['token_dim']
+        emsize = 1280  # embedding dimension (fixed in UCE)
+        d_hid = self.config['d_hid']
+        nlayers = self.config['nlayers']
+        nhead = 20  # fixed in UCE
+        dropout = 0.05  # fixed in UCE
+        
+        # Create model exactly like UCE
+        model = TransformerModel(token_dim=token_dim, d_model=emsize, nhead=nhead,
+                               d_hid=d_hid, nlayers=nlayers, dropout=dropout,
+                               output_dim=self.config['output_dim'])
+        
+        # Initialize empty protein embeddings
+        empty_pe = torch.zeros(145469, 5120)
+        empty_pe.requires_grad = False
+        model.pe_embedding = nn.Embedding.from_pretrained(empty_pe)
+        
+        # Load model weights
+        model.load_state_dict(torch.load(str(self.model_path), map_location="cpu"), strict=True)
+        
+        # Load real token embeddings using UCE's function
+        all_pe = self._get_ESM2_embeddings_direct()
+        if all_pe.shape[0] != 145469:
+            all_pe.requires_grad = False
+            model.pe_embedding = nn.Embedding.from_pretrained(all_pe)
+        
+        SCLLMOutput.status("UCE model loaded and ready for inference", 'embedding')
+        model = model.eval()
+        
+        # Let accelerator handle the device placement
+        model = accelerator.prepare(model)
+        
+        # After accelerator.prepare, ensure embedding weights are on the same device as model
+        if hasattr(model, 'pe_embedding') or (hasattr(model, 'module') and hasattr(model.module, 'pe_embedding')):
+            pe_embedding = model.pe_embedding if hasattr(model, 'pe_embedding') else model.module.pe_embedding
+            model_device = next(model.parameters()).device
+            if pe_embedding.weight.device != model_device:
+                pe_embedding.weight.data = pe_embedding.weight.data.to(model_device)
+        
+        #### Create dataset directly from memory data ####
+        # Instead of using file-based dataset, create data directly
+        dataset_embeds = []
+        
+        # Convert adata to the format expected by UCE
+        X_data = adata.X.astype(np.int64)  # UCE expects integer counts
+        
+        # Process data in batches
+        batch_size = self.config['batch_size']
+        n_cells = X_data.shape[0]
+        
+        # Create a proper UCE-style dataset
+        SCLLMOutput.status("Creating UCE dataset in memory", 'embedding')
+        dataset = self._create_uce_dataset_direct(
+            adata, pe_row_idxs, dataset_chroms, dataset_pos, shapes_dict
+        )
+        
+        # Create data loader with UCE's collator
+        try:
+            from .UCE.eval_data import MultiDatasetSentenceCollator
+        except ImportError:
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from eval_data import MultiDatasetSentenceCollator
+        
+        # Create args for the collator and multi-gpu check
+        args = self._create_uce_args_direct()
+        
+        collator = MultiDatasetSentenceCollator(args)
+        from torch.utils.data import DataLoader
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
+                              collate_fn=collator, num_workers=0)
+        dataloader = accelerator.prepare(dataloader)
+        
+        # Run inference using UCE's exact format
+        pbar = tqdm(dataloader, disable=not accelerator.is_local_main_process, desc="UCE inference")
+        
+        with torch.no_grad():
+            for batch in pbar:
+                batch_sentences, mask, idxs = batch[0], batch[1], batch[2]
+                
+                # Move tensors to correct device
+                device = next(model.parameters()).device
+                batch_sentences = batch_sentences.to(device)
+                mask = mask.to(device)
+                
+                # Transpose to UCE's expected format: (seq_len, batch_size)
+                batch_sentences = batch_sentences.permute(1, 0)
+                
+                # Apply protein embeddings
+                if args.multi_gpu:
+                    batch_sentences = model.module.pe_embedding(batch_sentences.long())
+                else:
+                    batch_sentences = model.pe_embedding(batch_sentences.long())
+                    
+                batch_sentences = nn.functional.normalize(batch_sentences, dim=2)
+                
+                # Forward pass with proper mask
+                _, embedding = model.forward(batch_sentences, mask=mask)
+                
+                # Gather embeddings
+                accelerator.wait_for_everyone()
+                embeddings = accelerator.gather_for_metrics(embedding)
+                if accelerator.is_main_process:
+                    dataset_embeds.append(embeddings.detach().cpu().numpy())
+        
+        # Combine embeddings
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            final_embeddings = np.vstack(dataset_embeds)
+            return final_embeddings
+        else:
+            return np.array([])  # Non-main process returns empty
+    
+    def _get_ESM2_embeddings_direct(self):
+        """
+        Load ESM2 embeddings directly (exact copy of UCE's get_ESM2_embeddings function).
+        """
+        # Load ESM2 embeddings and special tokens
+        all_pe = torch.load(str(self.token_file))
+        if all_pe.shape[0] == 143574:
+            torch.manual_seed(23)
+            CHROM_TENSORS = torch.normal(mean=0, std=1, size=(1895, self.config['token_dim']))
+            # 1895 is the total number of chromosome choices, hardcoded in UCE
+            all_pe = torch.vstack((all_pe, CHROM_TENSORS))
+            all_pe.requires_grad = False
+        
+        return all_pe
+    
+    def _create_uce_args_direct(self) -> Any:
+        """Create args object for direct processing (no file paths needed)."""
+        class Args:
+            pass
+        
+        args = Args()
+        
+        # UCE configuration (no file paths)
+        args.pad_length = self.config['pad_length']
+        args.sample_size = self.config['sample_size']
+        args.cls_token_idx = self.config['cls_token_idx']
+        args.chrom_token_left_idx = self.config['chrom_token_left_idx'] 
+        args.chrom_token_right_idx = self.config['chrom_token_right_idx']
+        args.pad_token_idx = self.config['pad_token_idx']
+        args.CHROM_TOKEN_OFFSET = self.config['CHROM_TOKEN_OFFSET']
+        args.multi_gpu = self.config['multi_gpu']
+        
+        return args
+    
+    def _create_uce_dataset_direct(self, adata: AnnData, pe_row_idxs: torch.Tensor,
+                                  dataset_chroms: np.ndarray, dataset_pos: np.ndarray,
+                                  shapes_dict: dict):
+        """Create a UCE-style dataset from memory data."""
+        
+        class MemoryUCEDataset:
+            def __init__(self, adata, pe_row_idxs, dataset_chroms, dataset_pos, shapes_dict, args):
+                self.adata = adata
+                self.pe_row_idxs = pe_row_idxs
+                self.dataset_chroms = dataset_chroms  
+                self.dataset_pos = dataset_pos
+                self.shapes_dict = shapes_dict
+                self.args = args
+                self.n_obs = adata.n_obs
+                self.X_data = adata.X.astype(np.int64)  # UCE expects integer counts
+                
+                # Setup exactly like MultiDatasetSentences
+                self.dataset_name = "memory_adata"
+                self.num_cells = {self.dataset_name: self.n_obs}
+                self.num_genes = {self.dataset_name: adata.n_vars}
+                self.total_num_cells = self.n_obs
+                
+                # Create the mappings that UCE expects
+                self.dataset_to_protein_embeddings = {self.dataset_name: pe_row_idxs}
+                self.dataset_to_chroms = {self.dataset_name: dataset_chroms}
+                self.dataset_to_starts = {self.dataset_name: dataset_pos}
+            
+            def __len__(self):
+                return self.n_obs
+                
+            def __getitem__(self, idx):
+                if isinstance(idx, int):
+                    # Get the count data for this cell
+                    counts = torch.tensor(self.X_data[idx]).unsqueeze(0)
+                    weights = torch.log1p(counts)
+                    weights = (weights / torch.sum(weights))
+                    
+                    # Use UCE's sample_cell_sentences function
+                    try:
+                        from .UCE.eval_data import sample_cell_sentences
+                    except ImportError:
+                        import sys
+                        uce_path = Path(__file__).parent / "UCE"  # Fixed path
+                        if str(uce_path) not in sys.path:
+                            sys.path.insert(0, str(uce_path))
+                        from eval_data import sample_cell_sentences
+                    
+                    batch_sentences, mask, seq_len, cell_sentences = \
+                        sample_cell_sentences(counts, weights, self.dataset_name, self.args,
+                                            dataset_to_protein_embeddings=self.dataset_to_protein_embeddings,
+                                            dataset_to_chroms=self.dataset_to_chroms,
+                                            dataset_to_starts=self.dataset_to_starts)
+                    
+                    return batch_sentences, mask, idx, seq_len, cell_sentences
+                else:
+                    raise NotImplementedError
+        
+        args = self._create_uce_args_direct()
+        return MemoryUCEDataset(adata, pe_row_idxs, dataset_chroms, dataset_pos, shapes_dict, args)
     
     def _create_uce_args(self, adata_path: str, output_dir: str, **kwargs):
         """Create args object matching eval_single_anndata.py argument parser."""
