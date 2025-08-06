@@ -495,6 +495,14 @@ def _handle_mask_var(
     ):
         mask_var = "highly_variable"
 
+    # Handle default case and explicit use_highly_variable=True
+    if use_highly_variable or (
+        use_highly_variable is None
+        and mask_var is _empty
+        and "highly_variable_features" in adata.var.columns
+    ):
+        mask_var = "highly_variable_features"
+
     # Without highly variable genes, we don’t use a mask by default
     if mask_var is _empty or mask_var is None:
         return None, None

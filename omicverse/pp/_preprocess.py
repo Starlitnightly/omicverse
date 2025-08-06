@@ -54,10 +54,10 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
 def calc_mean_and_var(X: Union[csr_matrix, np.ndarray], axis: int) -> Tuple[np.ndarray, np.ndarray]:
     if issparse(X):
-        from ..cylib.fast_utils import calc_mean_and_var_sparse
+        #from ..cylib.fast_utils import calc_mean_and_var_sparse
         return calc_mean_and_var_sparse(X.shape[0], X.shape[1], X.data, X.indices, X.indptr, axis)
     else:
-        from ..cylib.fast_utils import calc_mean_and_var_dense
+        #from ..cylib.fast_utils import calc_mean_and_var_dense
         return calc_mean_and_var_dense(X.shape[0], X.shape[1], X, axis)
 def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: \
     Union[pd.Categorical, np.ndarray, list]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -70,10 +70,10 @@ def calc_stat_per_batch(X: Union[csr_matrix, np.ndarray], batch: \
         nbatch = codes.max() + 1 # assume cluster label starts from 0
 
     if issparse(X):
-        from ..cylib.fast_utils import calc_stat_per_batch_sparse
+        #from ..cylib.fast_utils import calc_stat_per_batch_sparse
         return calc_stat_per_batch_sparse(X.shape[0], X.shape[1], X.data, X.indices, X.indptr, nbatch, codes)
     else:
-        from ..cylib.fast_utils import calc_stat_per_batch_dense
+        #from ..cylib.fast_utils import calc_stat_per_batch_dense
         return calc_stat_per_batch_dense(X.shape[0], X.shape[1], X, nbatch, codes)
 
 def estimate_feature_statistics(data: anndata.AnnData, batch: str) -> None:
@@ -525,7 +525,7 @@ def highly_variable_genes(adata,**kwargs):
         adata, **kwargs,
     )
 
-def scale(adata,max_value=10,layers_add='scaled'):
+def scale(adata,max_value=10,layers_add='scaled',**kwargs):
     """
     Scale the input AnnData object.
 
@@ -539,7 +539,7 @@ def scale(adata,max_value=10,layers_add='scaled'):
 
     """
     if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
-        adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value)
+        adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value,**kwargs)
         adata.layers[layers_add] = adata_mock.X.copy()
         del adata_mock
     else:
@@ -666,7 +666,8 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
             adata.uns[key + '|pca_var_ratios'] = adata_mock.uns['pca']['variance_ratio']
             adata.uns[key + '|cum_sum_eigenvalues'] = adata_mock.uns['pca']['variance']
         else:
-            sc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
+            from ._pca import pca as _pca
+            _pca(adata, layer=layer,n_comps=n_pcs,use_gpu=False,**kwargs)
             adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
             adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
             adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
@@ -682,7 +683,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         adata.uns[key + '|cum_sum_eigenvalues'] = adata.uns['pca']['variance']
     else:
         import rapids_singlecell as rsc
-        rsc.pp.pca(adata, layer=layer,n_comps=n_pcs)
+        rsc.pp.pca(adata, layer=layer,n_comps=n_pcs,**kwargs)
         adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
         adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
         adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
@@ -1139,3 +1140,129 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
         print("    `.obsp['{}_connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(key_added,int(elapsed_time // 60), int(elapsed_time % 60)))
     add_reference(adata,'pymde','MDE with pymde')
     #return emb
+
+
+import numpy as np
+
+def calc_mean_and_var_sparse(M, N, data, indices, indptr, axis):
+    i, j=0,0
+
+    size=0
+    value=0.0
+
+    size = N if axis == 0 else M
+    mean = np.zeros(size, dtype = np.float64)
+    var = np.zeros(size, dtype = np.float64)
+
+    mean_view = mean
+    var_view = var
+
+    for i in range(M):
+        for j in range(indptr[i], indptr[i + 1]):
+            value = data[j]
+            if axis == 0:
+                mean_view[indices[j]] += value
+                var_view[indices[j]] += value * value
+            else:
+                mean_view[i] += value
+                var_view[i] += value * value
+
+    size = M if axis == 0 else N
+    for i in range(mean_view.size):
+        mean_view[i] /= size
+        var_view[i] = (var_view[i] - size * mean_view[i] * mean_view[i]) / (size - 1)
+
+    return mean, var
+
+def calc_stat_per_batch_sparse(M, N, data, indices, indptr,nbatch, codes):
+    i, j=0,0
+
+    col=0
+    code=0
+    value=0.0
+
+    ncells = np.zeros(nbatch, dtype = np.int32)
+    means = np.zeros((N, nbatch), dtype = np.float64)
+    partial_sum = np.zeros((N, nbatch), dtype = np.float64)
+
+    ncells_view = ncells
+    means_view = means
+    ps_view = partial_sum
+
+    for i in range(M):
+        code = codes[i]
+        ncells_view[code] += 1
+        for j in range(indptr[i], indptr[i + 1]):
+            col = indices[j]
+            value = data[j]
+            means_view[col, code] += value
+            ps_view[col, code] += value * value
+
+    for j in range(nbatch):
+        if ncells_view[j] > 1:
+            for i in range(N):
+                means_view[i, j] /= ncells_view[j]
+                ps_view[i, j] = ps_view[i, j] - ncells_view[j] * means_view[i, j] * means_view[i, j]
+
+    return ncells, means, partial_sum
+
+def calc_mean_and_var_dense(M, N, X, axis):
+    i, j=0,0
+
+    size=0
+    value=0.0
+
+    size = N if axis == 0 else M
+    mean = np.zeros(size, dtype = np.float64)
+    var = np.zeros(size, dtype = np.float64)
+
+    mean_view = mean
+    var_view = var
+
+    for i in range(M):
+        for j in range(N):
+            value = X[i, j]
+            if axis == 0:
+                mean_view[j] += value
+                var_view[j] += value * value
+            else:
+                mean_view[i] += value
+                var_view[i] += value * value
+
+    size = M if axis == 0 else N
+    for i in range(mean_view.size):
+        mean_view[i] /= size
+        var_view[i] = (var_view[i] - size * mean_view[i] * mean_view[i]) / (size - 1)
+
+    return mean, var
+
+
+def calc_stat_per_batch_dense(M, N, X, nbatch, codes):
+    i, j=0,0
+
+    code, col=0,0
+    value=0.0
+
+    ncells = np.zeros(nbatch, dtype = np.int32)
+    means = np.zeros((N, nbatch), dtype = np.float64)
+    partial_sum = np.zeros((N, nbatch), dtype = np.float64)
+
+    ncells_view = ncells
+    means_view = means
+    ps_view = partial_sum
+
+    for i in range(M):
+        code = codes[i]
+        ncells_view[code] += 1
+        for j in range(N):
+            value = X[i, j]
+            means_view[j, code] += value
+            ps_view[j, code] += value * value
+
+    for j in range(nbatch):
+        if ncells_view[j] > 1:
+            for i in range(N):
+                means_view[i, j] /= ncells_view[j]
+                ps_view[i, j] = ps_view[i, j] - ncells_view[j] * means_view[i, j] * means_view[i, j]
+
+    return ncells, means, partial_sum
