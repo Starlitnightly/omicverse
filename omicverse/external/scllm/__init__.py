@@ -10,6 +10,7 @@ Main classes:
 - ScGPTModel: scGPT model implementation
 - ScFoundationModel: scFoundation model implementation
 - CellPLMModel: CellPLM model implementation
+- UCEModel: UCE (Universal Cell Embeddings) model implementation
 
 Quick start with scGPT:
 ```python
@@ -65,6 +66,24 @@ predictions = manager.annotate_cells(adata)
 # Integrate batches
 integration_results = manager.integrate(adata, batch_key="batch")
 ```
+
+Quick start with UCE:
+```python
+import omicverse as ov
+
+# Load and use UCE for universal cell embeddings
+manager = ov.external.scllm.SCLLMManager(
+    model_type="uce",
+    model_path="/path/to/uce/model.torch",
+    species="human"
+)
+
+# Get embeddings
+embeddings = manager.get_embeddings(adata)
+
+# Integrate batches using UCE embeddings
+integration_results = manager.integrate(adata, batch_key="batch")
+```
 """
 
 # Import only essential components to avoid dependency issues
@@ -73,6 +92,16 @@ from .scgpt_model import ScGPTModel
 from .scfoundation_model import ScFoundationModel
 from .geneformer_model import GeneformerModel
 from .cellplm_model import CellPLMModel
+
+# Import UCEModel with error handling
+try:
+    from .uce_model import UCEModel
+    _uce_model_available = True
+except ImportError as e:
+    import warnings
+    warnings.warn(f"UCE model not fully available due to missing files or dependencies: {e}")
+    UCEModel = None
+    _uce_model_available = False
 from .model_factory import (
     ModelFactory, SCLLMManager, load_scgpt, annotate_with_scgpt,
     fine_tune_scgpt, predict_celltypes_workflow, end_to_end_scgpt_annotation,
@@ -85,6 +114,19 @@ from .model_factory import (
     end_to_end_cellplm_embedding, fine_tune_cellplm, predict_celltypes_with_cellplm,
     end_to_end_cellplm_annotation, integrate_with_cellplm, end_to_end_cellplm_integration
 )
+
+# Import UCE functions conditionally
+if _uce_model_available:
+    try:
+        from .model_factory import load_uce, get_embeddings_with_uce, end_to_end_uce_embedding, integrate_with_uce
+        
+        # Import UCE convenience functions
+        try:
+            from .uce_convenience import *
+        except ImportError:
+            pass  # UCE convenience functions not available
+    except ImportError:
+        pass  # UCE functions not available
 
 # Optional import of scgpt module - only if dependencies are available
 try:
@@ -106,6 +148,7 @@ __all__ = [
     "CellPLMModel",
     "ModelFactory",
     "SCLLMManager",
+
     "load_scgpt",
     "annotate_with_scgpt",
     "fine_tune_scgpt",
@@ -115,6 +158,7 @@ __all__ = [
     "integrate_batches_workflow",
     "end_to_end_scgpt_integration",
     "integrate_with_scgpt",
+    
     "load_scfoundation",
     "get_embeddings_with_scfoundation",
     "end_to_end_scfoundation_embedding",
@@ -124,6 +168,7 @@ __all__ = [
     "integrate_with_scfoundation",
     "integrate_batches_with_scfoundation",
     "end_to_end_scfoundation_integration",
+
     "load_cellplm",
     "get_embeddings_with_cellplm",
     "end_to_end_cellplm_embedding",
@@ -133,6 +178,16 @@ __all__ = [
     "integrate_with_cellplm",
     "end_to_end_cellplm_integration",
 ]
+
+# Add UCE functions to __all__ if available
+if _uce_model_available and UCEModel is not None:
+    __all__.extend([
+        "UCEModel",
+        "load_uce",
+        "get_embeddings_with_uce", 
+        "end_to_end_uce_embedding",
+        "integrate_with_uce",
+    ])
 
 # Add scgpt to __all__ only if available
 if _scgpt_available:

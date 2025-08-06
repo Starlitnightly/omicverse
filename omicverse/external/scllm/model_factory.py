@@ -12,12 +12,24 @@ try:
     from .scfoundation_model import ScFoundationModel
     from .geneformer_model import GeneformerModel
     from .cellplm_model import CellPLMModel
+    try:
+        from .uce_model import UCEModel
+        _uce_available = True
+    except ImportError:
+        UCEModel = None
+        _uce_available = False
 except ImportError:
     from base import SCLLMBase
     from scgpt_model import ScGPTModel
     from scfoundation_model import ScFoundationModel
     from geneformer_model import GeneformerModel
     from cellplm_model import CellPLMModel
+    try:
+        from uce_model import UCEModel
+        _uce_available = True
+    except ImportError:
+        UCEModel = None
+        _uce_available = False
 
 
 class ModelFactory:
@@ -38,6 +50,10 @@ class ModelFactory:
         # "scbert": ScBERTModel,
         # "celllm": CellLMModel,
     }
+    
+    # Add UCE model if available
+    if _uce_available and UCEModel is not None:
+        _models["uce"] = UCEModel
     
     @classmethod
     def create_model(cls, 
@@ -83,6 +99,25 @@ class ModelFactory:
             except ImportError:
                 import warnings
                 warnings.warn("torch and scanpy are recommended for full CellPLM functionality.")
+        
+        elif model_type.lower() == "uce":
+            try:
+                import torch
+                import scanpy as sc
+            except ImportError:
+                import warnings
+                warnings.warn("torch and scanpy are recommended for full UCE functionality.")
+            try:
+                from accelerate import Accelerator
+            except ImportError:
+                import warnings
+                warnings.warn("accelerate is recommended for UCE functionality. Install with `pip install accelerate`.")
+            
+        # Extract UCE-specific asset paths from kwargs
+        uce_assets = {}
+        if model_type.lower() == "uce":
+            uce_asset_keys = ['token_file', 'protein_embeddings_dir', 'spec_chrom_csv_path', 'offset_pkl_path']
+            uce_assets = {key: kwargs.pop(key, None) for key in uce_asset_keys if key in kwargs}
             
         if model_type.lower() not in cls._models:
             available_models = list(cls._models.keys())
@@ -90,11 +125,20 @@ class ModelFactory:
                            f"Available models: {available_models}")
         
         model_class = cls._models[model_type.lower()]
-        model = model_class(device=device, **kwargs)
+        
+        # Handle UCE-specific asset paths
+        if model_type.lower() == "uce":
+            model = model_class(device=device, **uce_assets, **kwargs)
+        else:
+            model = model_class(device=device, **kwargs)
         
         # Load pre-trained model if path provided
         if model_path is not None:
-            model.load_model(model_path, **kwargs)
+            if model_type.lower() == "uce":
+                # For UCE, pass the asset paths back to load_model
+                model.load_model(model_path, **uce_assets, **kwargs)
+            else:
+                model.load_model(model_path, **kwargs)
         
         return model
     

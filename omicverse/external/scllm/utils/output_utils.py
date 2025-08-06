@@ -23,38 +23,38 @@ class SCLLMOutput:
     # Unified emoji and formatting standards
     EMOJIS = {
         # Model operations
-        'loading': '📥',
-        'saving': '💾', 
-        'loaded': '✓',
-        'failed': '❌',
-        'warning': '⚠️',
-        'info': 'ℹ️',
+        'loading': '[Loading]',
+        'saving': '[Saving]', 
+        'loaded': '[Loaded]',
+        'failed': '[Failed]',
+        'warning': '[Warning]',
+        'info': '[ℹ️Info]',
         
         # Training/Processing
-        'training': '🔥',
-        'predicting': '🔮',
-        'embedding': '🧬',
-        'integrating': '🔗',
-        'fine_tuning': '⚡',
-        'preprocessing': '🔄',
-        'postprocessing': '🎯',
+        'training': '[Training]',
+        'predicting': '[Predicting]',
+        'embedding': '[Embedding]',
+        'integrating': '[Integrating]',
+        'fine_tuning': '[Fine-tuning]',
+        'preprocessing': '[Preprocessing]',
+        'postprocessing': '[Postprocessing]',
         
         # Progress
-        'epoch': '📊',
-        'batch': '📦',
-        'complete': '🎉',
-        'best': '🏆',
+        'epoch': '[♻️Epoch]',
+        'batch': '[Batch]',
+        'complete': '[✅Complete]',
+        'best': '[🏆Best]',
         
         # Data
-        'cells': '🔬',
-        'genes': '🧬',
-        'batches': '📊',
+        'cells': '[🔬Cells]',
+        'genes': '[🧬Genes]',
+        'batches': '[Batches]',
     }
     
     @staticmethod
     def status(message: str, emoji_key: Optional[str] = None, indent: int = 0) -> None:
         """Print status message with consistent formatting."""
-        prefix = "  " * indent
+        prefix = "    " * indent
         if emoji_key and emoji_key in SCLLMOutput.EMOJIS:
             emoji = SCLLMOutput.EMOJIS[emoji_key]
             print(f"{prefix}{emoji} {message}")
@@ -130,7 +130,7 @@ class SCLLMOutput:
     @staticmethod
     def subsection(title: str, indent: int = 0) -> None:
         """Print subsection with consistent formatting."""
-        prefix = "  " * indent
+        prefix = "    " * indent
         print(f"\n{prefix}{'-'*40}")
         print(f"{prefix}{title}")
         print(f"{prefix}{'-'*40}")
@@ -146,7 +146,7 @@ class SCLLMOutput:
     def training_metrics(epoch: int, total_epochs: int, metrics: Dict[str, float], 
                         model_name: Optional[str] = None, indent: int = 0) -> None:
         """Print training metrics in consistent format."""
-        prefix = "  " * indent
+        prefix = "    " * indent
         model_prefix = f"[{model_name}] " if model_name else ""
         
         print(f"{prefix}📊 {model_prefix}Epoch {epoch}/{total_epochs}")
