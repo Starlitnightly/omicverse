@@ -16,11 +16,11 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-from gene_embeddings import load_gene_embeddings_adata
+from .gene_embeddings import load_gene_embeddings_adata
 import pandas as pd
 import numpy as np
 from scanpy import AnnData
-from data_utils import process_raw_anndata
+from .data_utils import process_raw_anndata
 
 def data_to_torch_X(X):
     if isinstance(X, sc.AnnData):

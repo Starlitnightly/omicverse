@@ -157,9 +157,77 @@ class UCEModel(SCLLMBase):
         # Set global protein embeddings directory for UCE modules
         self._set_global_protein_embeddings_dir()
         
+        # Initialize UCE TransformerModel directly during load_model
+        self._initialize_uce_transformer_model()
+        
         self.is_loaded = True
         SCLLMOutput.status("UCE model loaded successfully", 'loaded')
     
+    def _initialize_uce_transformer_model(self):
+        """Initialize UCE TransformerModel during load_model for fine-tuning access."""
+        import torch
+        import torch.nn as nn
+        
+        # Import UCE components
+        try:
+            from .UCE.model import TransformerModel
+        except ImportError:
+            import sys
+            uce_path = Path(__file__).parent / "UCE"
+            if str(uce_path) not in sys.path:
+                sys.path.insert(0, str(uce_path))
+            from model import TransformerModel
+        
+        SCLLMOutput.status("Initializing UCE TransformerModel for fine-tuning", 'loading')
+        
+        # Model parameters (same as in _run_eval_custom)
+        token_dim = self.config['token_dim']
+        emsize = 1280  # embedding dimension (fixed in UCE)
+        d_hid = self.config['d_hid']
+        nlayers = self.config['nlayers']
+        nhead = 20  # fixed in UCE
+        dropout = 0.05  # fixed in UCE
+        
+        # Create UCE TransformerModel
+        model = TransformerModel(token_dim=token_dim, d_model=emsize, nhead=nhead,
+                               d_hid=d_hid, nlayers=nlayers, dropout=dropout,
+                               output_dim=self.config['output_dim'])
+        
+        # Initialize empty protein embeddings
+        empty_pe = torch.zeros(145469, 5120)
+        empty_pe.requires_grad = False
+        model.pe_embedding = nn.Embedding.from_pretrained(empty_pe)
+        
+        # Load model weights
+        model.load_state_dict(torch.load(str(self.model_path), map_location="cpu"), strict=True)
+        
+        # Load real token embeddings
+        all_pe = self._load_uce_token_embeddings()
+        if all_pe.shape[0] != 145469:
+            all_pe.requires_grad = False
+            model.pe_embedding = nn.Embedding.from_pretrained(all_pe)
+        
+        # Store the model components for fine-tuning
+        self.model = model.eval()
+        self.model_pe_embedding = model.pe_embedding
+        
+        SCLLMOutput.status("UCE TransformerModel initialized successfully", 'loaded')
+    
+    def _load_uce_token_embeddings(self):
+        """Load UCE token embeddings (same logic as _get_ESM2_embeddings)."""
+        import torch
+        
+        # Load ESM2 embeddings and special tokens
+        all_pe = torch.load(str(self.token_file))
+        if all_pe.shape[0] == 143574:
+            # For now, use zeros for chromosome tokens since we don't have access to the model yet
+            # This will be properly handled when the model is used
+            chrom_tokens = torch.zeros(1895, 5120)  # 1895 is the number of chromosome choices
+            all_pe = torch.vstack((all_pe, chrom_tokens))
+            all_pe.requires_grad = False
+        
+        return all_pe
+
     def get_embeddings(self, adata: AnnData, **kwargs) -> np.ndarray:
         """
         Extract cell embeddings using UCE model directly from memory.
@@ -180,23 +248,19 @@ class UCEModel(SCLLMBase):
         if not self.is_loaded:
             raise ValueError("Model not loaded. Call load_model() first.")
         
-        # 检查模型是否已微调
-        if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
-            SCLLMOutput.status("🎯 Extracting embeddings using fine-tuned UCE model", 'embedding')
-        else:
-            SCLLMOutput.status("Extracting cell embeddings using UCE", 'embedding')
-        
         # Process adata directly in memory
         try:
-            # Run the direct UCE workflow (no file I/O)
-            embeddings = self._run_uce_workflow_direct(adata, **kwargs)
-            
-            # 微调后的UCE embeddings保持不变，分类在predict_celltype中处理
+            # 检查模型是否已微调
             if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
-                SCLLMOutput.status(f"Extracted embeddings from fine-tuned UCE: {embeddings.shape}", 'embedding')
+                SCLLMOutput.status("🎯 Extracting embeddings using fine-tuned UCE model", 'embedding')
+                # 使用微调后的模型提取embeddings
+                embeddings = self._extract_embeddings_from_finetuned_model(adata, **kwargs)
             else:
+                SCLLMOutput.status("Extracting cell embeddings using UCE", 'embedding')
+                # 使用原始预训练模型
+                embeddings = self._run_uce_workflow_direct(adata, **kwargs)
                 SCLLMOutput.status(f"Extracted embeddings: {embeddings.shape}", 'embedding')
-                
+            
             return embeddings
             
         except Exception as e:
@@ -347,11 +411,11 @@ class UCEModel(SCLLMBase):
         )
         
         # Generate protein embedding indices and chromosome information
-        pe_row_idxs, dataset_chroms, dataset_pos = self._generate_indices_direct(adata_processed)
+        adata_processed, pe_row_idxs, dataset_chroms, dataset_pos = self._generate_indices_direct(adata_processed)
         
         return adata_processed, pe_row_idxs, dataset_chroms, dataset_pos
     
-    def _generate_indices_direct(self, adata_processed: AnnData) -> Tuple[torch.Tensor, np.ndarray, np.ndarray]:
+    def _generate_indices_direct(self, adata_processed: AnnData) -> Tuple[AnnData, torch.Tensor, np.ndarray, np.ndarray]:
         """
         Generate protein embedding indices and chromosome information directly from adata.
         
@@ -386,16 +450,65 @@ class UCEModel(SCLLMBase):
         spec_pe_genes = list(species_to_pe[dataset_species].keys())
         offset = species_to_offsets[dataset_species]
         
-        # Create protein embedding row indices
-        pe_row_idxs = torch.tensor([spec_pe_genes.index(k.upper()) + offset for k in adata_processed.var_names]).long()
+        # Create protein embedding row indices with error handling
+        valid_genes = []
+        pe_indices = []
+        missing_genes = []
         
-        # Create chromosome mappings
+        for gene in adata_processed.var_names:
+            gene_upper = gene.upper()
+            if gene_upper in spec_pe_genes:
+                valid_genes.append(gene)
+                pe_indices.append(spec_pe_genes.index(gene_upper) + offset)
+            else:
+                missing_genes.append(gene)
+        
+        if missing_genes:
+            SCLLMOutput.status(f"Warning: {len(missing_genes)} genes not found in UCE protein embeddings", 'warning')
+            if len(missing_genes) <= 10:
+                SCLLMOutput.status(f"Missing genes: {missing_genes}", 'warning')
+            else:
+                SCLLMOutput.status(f"First 10 missing genes: {missing_genes[:10]}...", 'warning')
+            
+            # Filter adata to only include valid genes
+            valid_gene_mask = [gene in valid_genes for gene in adata_processed.var_names]
+            adata_processed = adata_processed[:, valid_gene_mask].copy()
+            SCLLMOutput.status(f"Filtered data to {len(valid_genes)} valid genes", 'warning')
+        
+        pe_row_idxs = torch.tensor(pe_indices).long()
+        
+        # Create chromosome mappings with error handling
         spec_chrom = gene_to_chrom_pos[gene_to_chrom_pos["species"] == dataset_species].set_index("gene_symbol")
-        gene_chrom = spec_chrom.loc[[k.upper() for k in adata_processed.var_names]]
-        dataset_chroms = gene_chrom["spec_chrom"].cat.codes  # chromosome codes
-        dataset_pos = gene_chrom["start"].values  # genomic positions
         
-        return pe_row_idxs, dataset_chroms, dataset_pos
+        # Filter genes that exist in chromosome mapping
+        chrom_genes = []
+        chrom_codes = []
+        chrom_positions = []
+        final_pe_indices = []
+        
+        for i, gene in enumerate(adata_processed.var_names):
+            gene_upper = gene.upper()
+            if gene_upper in spec_chrom.index:
+                chrom_genes.append(gene)
+                chrom_codes.append(spec_chrom.loc[gene_upper, "spec_chrom"])
+                chrom_positions.append(spec_chrom.loc[gene_upper, "start"])
+                final_pe_indices.append(pe_indices[i])
+        
+        if len(chrom_genes) < len(adata_processed.var_names):
+            SCLLMOutput.status(f"Further filtered to {len(chrom_genes)} genes with chromosome info", 'warning')
+            # Final filtering of adata
+            final_gene_mask = [gene in chrom_genes for gene in adata_processed.var_names]
+            adata_processed = adata_processed[:, final_gene_mask].copy()
+        
+        pe_row_idxs = torch.tensor(final_pe_indices).long()
+        
+        # Convert chromosome codes to categorical codes
+        import pandas as pd
+        chrom_cat = pd.Categorical(chrom_codes)
+        dataset_chroms = chrom_cat.codes
+        dataset_pos = np.array(chrom_positions)
+        
+        return adata_processed, pe_row_idxs, dataset_chroms, dataset_pos
     
     def _run_eval_direct(self, adata: AnnData, pe_row_idxs: torch.Tensor, 
                         dataset_chroms: np.ndarray, dataset_pos: np.ndarray,
@@ -466,6 +579,11 @@ class UCEModel(SCLLMBase):
         
         SCLLMOutput.status("UCE model loaded and ready for inference", 'embedding')
         model = model.eval()
+        
+        # STORE THE LOADED MODEL AS CLASS ATTRIBUTE FOR FINE-TUNING
+        self.model = model  # This is the actual UCE TransformerModel
+        self.model_pe_embedding = model.pe_embedding  # Store the protein embedding layer
+        self.accelerator = accelerator
         
         # Let accelerator handle the device placement
         model = accelerator.prepare(model)
@@ -776,6 +894,12 @@ class UCEModel(SCLLMBase):
                               collate_fn=multi_dataset_sentence_collator, num_workers=0)
         dataloader = accelerator.prepare(dataloader)
         
+        # STORE THE LOADED MODEL AS CLASS ATTRIBUTE FOR FINE-TUNING
+        self.model = model  # This is the actual UCE TransformerModel
+        self.model_pe_embedding = model.pe_embedding  # Store the protein embedding layer
+        self.accelerator = accelerator
+        self.args = args
+
         # Run inference
         pbar = tqdm(dataloader, disable=not accelerator.is_local_main_process)
         dataset_embeds = []
@@ -944,7 +1068,7 @@ class UCEModel(SCLLMBase):
                 
             return result
             
-        elif task == "annotation" and hasattr(self, 'classification_head'):
+        elif task == "annotation" and hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
             # 如果是注释任务且模型已微调，使用分类头
             predicted_celltypes = self.predict_celltype(adata, **kwargs)
             return {
@@ -955,7 +1079,7 @@ class UCEModel(SCLLMBase):
             }
         else:
             available_tasks = ["embedding"]
-            if hasattr(self, 'classification_head'):
+            if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
                 available_tasks.append("annotation")
             raise ValueError(f"Task '{task}' not supported. Available tasks: {available_tasks}")
     
@@ -989,7 +1113,12 @@ class UCEModel(SCLLMBase):
         if 'celltype' not in train_adata.obs:
             raise ValueError("train_adata must have 'celltype' column in .obs")
         
-        SCLLMOutput.status("🎯 Starting UCE end-to-end fine-tuning for cell type annotation", 'fine_tuning')
+        # 根据freeze_backbone参数显示正确的训练模式
+        freeze_backbone = kwargs.get('freeze_backbone', False)
+        if freeze_backbone:
+            SCLLMOutput.status("🎯 Starting UCE linear probing fine-tuning for cell type annotation", 'fine_tuning')
+        else:
+            SCLLMOutput.status("🎯 Starting UCE end-to-end fine-tuning for cell type annotation", 'fine_tuning')
         
         # Get training parameters
         epochs = kwargs.get('epochs', 10)
@@ -1012,31 +1141,83 @@ class UCEModel(SCLLMBase):
                 raise ValueError("valid_adata must have 'celltype' column in .obs")
             valid_adata.obs['celltype_id'] = valid_adata.obs['celltype'].map(celltype_to_id)
         
-        # Create fine-tuning model that combines UCE backbone with classifier
-        finetune_model = self._create_uce_finetune_model(n_classes, freeze_backbone)
-        
         # Preprocess data for UCE format
         train_processed = self.preprocess(train_adata, **kwargs)
         valid_processed = self.preprocess(valid_adata, **kwargs) if valid_adata is not None else None
+
+        # Create fine-tuning model that combines UCE backbone with classifier
+        if freeze_backbone:
+            # 线性探测模式：预计算embeddings，只训练分类头
+            finetune_model, train_embeddings, valid_embeddings = self._create_linear_probing_model(
+                n_classes, train_processed, valid_processed
+            )
+        else:
+            # 端到端模式：完整的可微分训练
+            finetune_model = self._create_uce_finetune_model(n_classes, freeze_backbone)
+            train_embeddings = None
+            valid_embeddings = None
         
         # Prepare training datasets
-        train_dataset = self._prepare_finetune_dataset(train_processed)
-        valid_dataset = self._prepare_finetune_dataset(valid_processed) if valid_processed else None
+        if freeze_backbone:
+            # 线性探测：使用预计算的embeddings
+            train_dataset = self._prepare_linear_probing_dataset(train_embeddings, train_processed.obs['celltype_id'])
+            valid_dataset = self._prepare_linear_probing_dataset(valid_embeddings, valid_processed.obs['celltype_id']) if valid_processed else None
+        else:
+            # 端到端：使用原始数据
+            train_dataset = self._prepare_finetune_dataset(train_processed)
+            valid_dataset = self._prepare_finetune_dataset(valid_processed) if valid_processed else None
         
         # Setup training  
         from torch.utils.data import DataLoader
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False) if valid_dataset else None
+        
+        # 为端到端训练定义collate函数
+        def uce_collate_fn(batch):
+            """自定义collate函数，处理UCE的(batch_sentences, mask)格式"""
+            batch_data_list = []
+            labels_list = []
+            
+            for (batch_sentences, mask), label in batch:
+                batch_data_list.append((batch_sentences, mask))
+                labels_list.append(label)
+            
+            # 将多个(batch_sentences, mask)组合成batch
+            if len(batch_data_list) > 0:
+                # Stack batch_sentences and masks
+                all_batch_sentences = torch.stack([item[0] for item in batch_data_list])
+                all_masks = torch.stack([item[1] for item in batch_data_list])
+                batched_data = (all_batch_sentences, all_masks)
+                batched_labels = torch.stack(labels_list)
+                return batched_data, batched_labels
+            else:
+                return batch_data_list, labels_list
+        
+        # 根据训练模式选择collate函数
+        if freeze_backbone:
+            # 线性探测：使用默认collate（处理embeddings）
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False) if valid_dataset else None
+        else:
+            # 端到端：使用自定义collate（处理UCE数据格式）
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=uce_collate_fn)
+            valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=uce_collate_fn) if valid_dataset else None
         
         optimizer = torch.optim.Adam(finetune_model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9)
         criterion = torch.nn.CrossEntropyLoss()
         
         # Training loop
-        training_results = self._train_uce_finetune_model(
-            finetune_model, train_loader, valid_loader, 
-            optimizer, scheduler, criterion, epochs
-        )
+        if freeze_backbone:
+            # 线性探测：使用简化的训练循环
+            training_results = self._train_linear_probing_model(
+                finetune_model, train_loader, valid_loader,
+                optimizer, scheduler, criterion, epochs
+            )
+        else:
+            # 端到端：使用完整的UCE训练循环
+            training_results = self._train_uce_finetune_model(
+                finetune_model, train_loader, valid_loader, 
+                optimizer, scheduler, criterion, epochs
+            )
         
         # Store the trained components
         self.finetune_model = finetune_model
@@ -1280,56 +1461,115 @@ class UCEModel(SCLLMBase):
         
         SCLLMOutput.status("Predicting cell types using fine-tuned UCE model", 'predicting')
         
-        # Preprocess data
-        adata_processed = self.preprocess(adata, **kwargs)
+        # 检测微调模型类型
+        is_linear_probing = 'UCELinearProbingModel' in str(type(self.finetune_model))
         
-        # Prepare dataset 
-        try:
+        if is_linear_probing:
+            # 线性探测模型：直接使用预计算的embeddings，避免重复处理原始数据
+            SCLLMOutput.status("Using linear probing model for prediction", 'predicting')
+            SCLLMOutput.status("Computing embeddings for linear probing prediction...", 'embedding')
+            
+            # 对于线性探测，UCE backbone权重冻结未改变，直接使用预训练模型
+            # 跳过额外的预处理，直接使用原始数据
+            SCLLMOutput.status("Using original UCE model for embeddings (backbone frozen)", 'embedding')
+            embeddings = self._run_uce_workflow_direct(adata, **kwargs)
+            SCLLMOutput.status(f"Generated embeddings: {embeddings.shape}", 'embedding')
+            
+            # 使用embeddings直接预测
+            import torch
+            X = torch.FloatTensor(embeddings)
+            if self.device and self.device != 'cpu':
+                X = X.to(self.device)
+            
+            self.finetune_model.eval()
+            all_predictions = []
+            
+            # 分批处理以节省内存
+            batch_size = 1000
+            with torch.no_grad():
+                for i in range(0, X.shape[0], batch_size):
+                    batch_X = X[i:i+batch_size]
+                    # 直接通过分类头预测（跳过UCE backbone）
+                    logits = self.finetune_model.classifier(batch_X)
+                    _, predicted = torch.max(logits.data, 1)
+                    all_predictions.extend(predicted.cpu().numpy())
+            
+            # 转换预测结果为cell type名称
+            predicted_celltypes = [self.id_to_celltype[pred_id] for pred_id in all_predictions]
+            SCLLMOutput.status(f"Predicted cell types for {len(predicted_celltypes)} cells", 'predicting')
+            return np.array(predicted_celltypes)
+            
+        else:
+            # 端到端模型：需要完整的数据处理流程
+            SCLLMOutput.status("Using end-to-end model for prediction", 'predicting')
+            # 端到端模式需要预处理
+            adata_processed = self.preprocess(adata, **kwargs)
             predict_dataset = self._prepare_finetune_dataset(adata_processed)
+            
             from torch.utils.data import DataLoader
-            predict_loader = DataLoader(predict_dataset, batch_size=32, shuffle=False)
+            
+            # 定义自定义collate函数处理UCE数据格式
+            def uce_collate_fn(batch):
+                """自定义collate函数，处理UCE的(batch_sentences, mask)格式"""
+                batch_data_list = []
+                labels_list = []
+                
+                for (batch_sentences, mask), label in batch:
+                    batch_data_list.append((batch_sentences, mask))
+                    labels_list.append(label)
+                
+                # 将多个(batch_sentences, mask)组合成batch
+                if len(batch_data_list) > 0:
+                    # Stack batch_sentences and masks
+                    all_batch_sentences = torch.stack([item[0] for item in batch_data_list])
+                    all_masks = torch.stack([item[1] for item in batch_data_list])
+                    batched_data = (all_batch_sentences, all_masks)
+                    batched_labels = torch.stack(labels_list)
+                    return batched_data, batched_labels
+                else:
+                    return batch_data_list, labels_list
+            
+            predict_loader = DataLoader(predict_dataset, batch_size=32, shuffle=False, collate_fn=uce_collate_fn)
             
             # Predict using fine-tuned model
             self.finetune_model.eval()
             all_predictions = []
             
             with torch.no_grad():
-                for batch_embeddings, _ in predict_loader:
-                    # Move to device
+                for batch_data, _ in predict_loader:
+                    # Move to device with proper handling of different data types
                     if self.device and self.device != 'cpu':
-                        batch_embeddings = batch_embeddings.to(self.device)
-                        
-                    logits = self.finetune_model(batch_embeddings)
+                        if isinstance(batch_data, tuple) and len(batch_data) == 2:
+                            # Format: (batch_sentences, mask)
+                            batch_sentences, mask = batch_data
+                            if hasattr(batch_sentences, 'to'):
+                                batch_sentences = batch_sentences.to(self.device)
+                            if hasattr(mask, 'to'):
+                                mask = mask.to(self.device)
+                            batch_data = (batch_sentences, mask)
+                        elif isinstance(batch_data, list):
+                            # Handle list of data - convert to proper format
+                            SCLLMOutput.status("Converting list batch_data to tensor format", 'preprocessing')
+                            # This shouldn't happen normally, but as a safety check
+                            if len(batch_data) == 2 and hasattr(batch_data[0], 'to'):
+                                batch_data = (batch_data[0].to(self.device), batch_data[1].to(self.device))
+                            else:
+                                raise ValueError(f"Unexpected batch_data format: {type(batch_data)}, length: {len(batch_data) if hasattr(batch_data, '__len__') else 'unknown'}")
+                        elif hasattr(batch_data, 'to'):
+                            # Single tensor
+                            batch_data = batch_data.to(self.device)
+                        else:
+                            SCLLMOutput.status(f"Warning: Cannot move batch_data to device, type: {type(batch_data)}", 'warning')
+                    
+                    # Forward pass through fine-tuned UCE model
+                    logits = self.finetune_model(batch_data)
                     _, predicted = torch.max(logits.data, 1)
                     all_predictions.extend(predicted.cpu().numpy())
             
             # Convert predictions to cell type names
             predicted_celltypes = [self.id_to_celltype[pred_id] for pred_id in all_predictions]
-            
             SCLLMOutput.status(f"Predicted cell types for {len(predicted_celltypes)} cells", 'predicting')
-            
             return np.array(predicted_celltypes)
-            
-        except NotImplementedError:
-            # Fallback: use embeddings + classification head if available
-            if hasattr(self, 'classification_head') and hasattr(self, 'label_encoder'):
-                SCLLMOutput.status("Using fallback prediction via embeddings", 'warning')
-                embeddings = self.get_embeddings(adata, **kwargs)
-                
-                X = torch.FloatTensor(embeddings)
-                if self.device and self.device != 'cpu':
-                    X = X.to(self.device)
-                
-                self.classification_head.eval()
-                with torch.no_grad():
-                    outputs = self.classification_head(X)
-                    _, predicted = torch.max(outputs.data, 1)
-                    predicted_labels = predicted.cpu().numpy()
-                
-                predicted_celltypes = self.label_encoder.inverse_transform(predicted_labels)
-                return predicted_celltypes
-            else:
-                raise ValueError("No valid fine-tuned model available for prediction")
     
     def integrate(self, adata: AnnData, batch_key: str = "batch", 
                   correction_method: str = "mnn", **kwargs) -> Dict[str, Any]:
@@ -1354,9 +1594,22 @@ class UCEModel(SCLLMBase):
         if batch_key not in adata.obs:
             raise ValueError(f"Batch key '{batch_key}' not found in adata.obs")
         
-        # Extract embeddings for all cells (will use fine-tuned model if available)
+        # Extract embeddings for integration
         SCLLMOutput.status("Extracting embeddings for integration", 'integration')
-        embeddings = self.get_embeddings(adata, **kwargs)
+        
+        # 对于线性探测模式，使用原始UCE模型（backbone权重未改变）
+        if hasattr(self, 'is_fine_tuned') and self.is_fine_tuned:
+            is_linear_probing = hasattr(self, 'finetune_model') and 'UCELinearProbingModel' in str(type(self.finetune_model))
+            
+            if is_linear_probing:
+                SCLLMOutput.status("Using original UCE model for integration (backbone frozen)", 'integration')
+                # 跳过预处理，直接使用原始数据避免重复处理
+                embeddings = self._run_uce_workflow_direct(adata, **kwargs)
+            else:
+                SCLLMOutput.status("Using fine-tuned UCE model for integration", 'integration')
+                embeddings = self.get_embeddings(adata, **kwargs)
+        else:
+            embeddings = self.get_embeddings(adata, **kwargs)
         
         # Apply batch correction
         try:
@@ -1494,6 +1747,261 @@ class UCEModel(SCLLMBase):
             SCLLMOutput.status(f"Center-scale correction failed: {e}, returning original embeddings", 'warning')
             return embeddings
     
+    def _extract_embeddings_from_finetuned_model(self, adata: AnnData, **kwargs) -> np.ndarray:
+        """
+        使用微调后的UCE模型提取cell embeddings。
+        
+        Args:
+            adata: Input AnnData object
+            **kwargs: Additional parameters
+            
+        Returns:
+            Cell embeddings from fine-tuned UCE backbone
+        """
+        if not hasattr(self, 'finetune_model') or self.finetune_model is None:
+            SCLLMOutput.status("Warning: Fine-tuned model not found, using original model", 'warning')
+            return self._run_uce_workflow_direct(adata, **kwargs)
+        
+        # 检查微调模型类型
+        is_linear_probing = 'UCELinearProbingModel' in str(type(self.finetune_model))
+        
+        if is_linear_probing:
+            SCLLMOutput.status("Extracting embeddings from linear probing model (frozen UCE backbone)", 'embedding')
+        else:
+            SCLLMOutput.status("Extracting embeddings from end-to-end fine-tuned UCE model", 'embedding')
+        
+        # 预处理数据
+        adata_processed = self.preprocess(adata, **kwargs)
+        
+        # 准备dataset（复用微调时的数据准备逻辑）
+        dataset = self._prepare_finetune_dataset(adata_processed)
+        
+        from torch.utils.data import DataLoader
+        dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
+        
+        # 使用微调后的UCE backbone提取embeddings
+        self.finetune_model.eval()
+        all_embeddings = []
+        
+        with torch.no_grad():
+            for batch_data, _ in dataloader:
+                # Move to device
+                if self.device and self.device != 'cpu':
+                    batch_sentences, mask = batch_data
+                    batch_sentences = batch_sentences.to(self.device)
+                    mask = mask.to(self.device)
+                    batch_data = (batch_sentences, mask)
+                
+                # 通过UCE backbone获取cell embeddings（不通过分类头）
+                batch_sentences, mask = batch_data
+                
+                # 检查模型是否有pe_embedding和uce_backbone属性
+                if not hasattr(self.finetune_model, 'pe_embedding') or not hasattr(self.finetune_model, 'uce_backbone'):
+                    raise AttributeError(f"Fine-tuned model {type(self.finetune_model)} missing pe_embedding or uce_backbone")
+                
+                # Forward pass through UCE backbone only
+                batch_sentences = batch_sentences.permute(1, 0)
+                batch_sentences = self.finetune_model.pe_embedding(batch_sentences.long())
+                batch_sentences = torch.nn.functional.normalize(batch_sentences, dim=2)
+                
+                # Forward through UCE transformer to get cell embeddings
+                _, cell_embeddings = self.finetune_model.uce_backbone.forward(batch_sentences, mask)
+                
+                all_embeddings.append(cell_embeddings.cpu().numpy())
+        
+        # 合并所有embeddings
+        final_embeddings = np.vstack(all_embeddings)
+        
+        SCLLMOutput.status(f"Extracted embeddings from fine-tuned UCE: {final_embeddings.shape}", 'embedding')
+        return final_embeddings
+
+    def _create_linear_probing_model(self, n_classes: int, train_adata, valid_adata=None):
+        """创建线性探测模型，预计算embeddings."""
+        import torch.nn as nn
+        
+        SCLLMOutput.status("Pre-computing UCE embeddings for linear probing...", 'preprocessing')
+        
+        # 预计算训练数据的embeddings
+        train_embeddings = self.get_embeddings(train_adata)
+        valid_embeddings = self.get_embeddings(valid_adata) if valid_adata is not None else None
+        
+        SCLLMOutput.status(f"Pre-computed embeddings: train={train_embeddings.shape}", 'preprocessing')
+        if valid_embeddings is not None:
+            SCLLMOutput.status(f"Pre-computed embeddings: valid={valid_embeddings.shape}", 'preprocessing')
+        
+        # 创建完整的线性探测模型，包含UCE backbone + 分类头
+        class UCELinearProbingModel(nn.Module):
+            def __init__(self, uce_model, input_dim, n_classes):
+                super().__init__()
+                self.uce_model = uce_model
+                # Store the UCE backbone for consistent interface
+                self.uce_backbone = uce_model.model
+                self.pe_embedding = uce_model.model_pe_embedding
+                
+                # 简单分类头（只在线性探测中训练）
+                self.classifier = nn.Sequential(
+                    nn.Linear(input_dim, 512),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(512, 256),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(256, n_classes)
+                )
+                
+                # 冻结UCE backbone
+                for param in self.uce_backbone.parameters():
+                    param.requires_grad = False
+                for param in self.pe_embedding.parameters():
+                    param.requires_grad = False
+            
+            def forward(self, batch_data):
+                """处理两种输入：batch_data (原始数据) 或 embeddings (预计算)"""
+                if isinstance(batch_data, tuple) and len(batch_data) == 2:
+                    # 原始数据格式用于预测：(batch_sentences, mask)
+                    batch_sentences, mask = batch_data
+                    with torch.no_grad():
+                        batch_sentences = batch_sentences.permute(1, 0)
+                        batch_sentences = self.pe_embedding(batch_sentences.long())
+                        batch_sentences = nn.functional.normalize(batch_sentences, dim=2)
+                        _, cell_embedding = self.uce_backbone.forward(batch_sentences, mask)
+                    return self.classifier(cell_embedding)
+                else:
+                    # 预计算embeddings格式用于训练
+                    return self.classifier(batch_data)
+        
+        # 创建模型
+        input_dim = train_embeddings.shape[1]  # UCE embedding dimension
+        model = UCELinearProbingModel(self, input_dim, n_classes)
+        model.to(self.device)
+        
+        return model, train_embeddings, valid_embeddings
+
+    def _prepare_linear_probing_dataset(self, embeddings, labels):
+        """准备线性探测数据集，使用预计算的embeddings."""
+        from torch.utils.data import Dataset
+        import torch
+        
+        class LinearProbingDataset(Dataset):
+            def __init__(self, embeddings, labels):
+                self.embeddings = torch.FloatTensor(embeddings)
+                self.labels = torch.LongTensor(labels.values)
+            
+            def __len__(self):
+                return len(self.labels)
+            
+            def __getitem__(self, idx):
+                return self.embeddings[idx], self.labels[idx]
+        
+        return LinearProbingDataset(embeddings, labels)
+
+    def _train_linear_probing_model(self, model, train_loader, valid_loader, optimizer, scheduler, criterion, epochs):
+        """训练线性探测模型（仅分类头，使用预计算embeddings）."""
+        import torch
+        from sklearn.metrics import accuracy_score
+        
+        training_results = {
+            'epoch_losses': [],
+            'epoch_accuracies': [],
+            'best_accuracy': 0.0,
+            'best_model_state': None
+        }
+        
+        SCLLMOutput.status(f"Starting linear probing training for {epochs} epochs", 'training')
+        
+        # Create progress bar for epochs
+        from tqdm.auto import tqdm
+        epoch_pbar = tqdm(range(epochs), desc="Linear Probing", 
+                         bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")
+        
+        for epoch in epoch_pbar:
+            # Training phase
+            model.train()
+            epoch_loss = 0.0
+            all_preds = []
+            all_labels = []
+            
+            for batch_embeddings, batch_labels in train_loader:
+                if self.device and self.device != 'cpu':
+                    batch_embeddings = batch_embeddings.to(self.device)
+                    batch_labels = batch_labels.to(self.device)
+                
+                optimizer.zero_grad()
+                
+                # 简单的前向传播：直接分类预计算的embeddings
+                outputs = model(batch_embeddings)
+                loss = criterion(outputs, batch_labels)
+                
+                loss.backward()
+                optimizer.step()
+                
+                epoch_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(batch_labels.cpu().numpy())
+            
+            # Calculate training metrics
+            avg_loss = epoch_loss / len(train_loader)
+            train_acc = accuracy_score(all_labels, all_preds)
+            
+            # Validation phase
+            valid_acc = None
+            if valid_loader is not None:
+                model.eval()
+                valid_preds = []
+                valid_labels = []
+                
+                with torch.no_grad():
+                    for batch_embeddings, batch_labels in valid_loader:
+                        if self.device and self.device != 'cpu':
+                            batch_embeddings = batch_embeddings.to(self.device)
+                            batch_labels = batch_labels.to(self.device)
+                        
+                        outputs = model(batch_embeddings)
+                        _, predicted = torch.max(outputs.data, 1)
+                        valid_preds.extend(predicted.cpu().numpy())
+                        valid_labels.extend(batch_labels.cpu().numpy())
+                
+                valid_acc = accuracy_score(valid_labels, valid_preds)
+                
+                # Save best model
+                if valid_acc > training_results['best_accuracy']:
+                    training_results['best_accuracy'] = valid_acc
+                    training_results['best_model_state'] = model.state_dict().copy()
+            
+            # Update progress bar with metrics
+            if valid_acc is not None:
+                epoch_pbar.set_postfix({
+                    'Loss': f"{avg_loss:.4f}",
+                    'TrainAcc': f"{train_acc:.3f}",
+                    'ValidAcc': f"{valid_acc:.3f}"
+                })
+            else:
+                epoch_pbar.set_postfix({
+                    'Loss': f"{avg_loss:.4f}",
+                    'TrainAcc': f"{train_acc:.3f}"
+                })
+            
+            # Store results
+            training_results['epoch_losses'].append(avg_loss)
+            training_results['epoch_accuracies'].append(valid_acc if valid_acc is not None else train_acc)
+            
+            # Update learning rate scheduler
+            if scheduler is not None:
+                if valid_acc is not None:
+                    scheduler.step(valid_acc)
+                else:
+                    scheduler.step(avg_loss)
+        
+        epoch_pbar.close()
+        
+        # Load best model if validation was used
+        if training_results['best_model_state'] is not None:
+            model.load_state_dict(training_results['best_model_state'])
+            SCLLMOutput.status(f"Best validation accuracy: {training_results['best_accuracy']:.4f}", 'training')
+        
+        return training_results
+
     def _save_model_specific(self, save_path: Path, **kwargs) -> None:
         """UCE model saving (not implemented)."""
         SCLLMOutput.status("Model saving not implemented for UCE", 'warning')
@@ -1502,7 +2010,7 @@ class UCEModel(SCLLMBase):
         return f"UCEModel(device={self.device}, loaded={self.is_loaded})"
     
     def _create_uce_finetune_model(self, n_classes: int, freeze_backbone: bool = False):
-        """Create a complete UCE fine-tuning model with classification head."""
+        """Create a complete UCE fine-tuning model with differentiable forward pass."""
         import torch.nn as nn
         
         class UCEFineTuneModel(nn.Module):
@@ -1510,6 +2018,14 @@ class UCEModel(SCLLMBase):
                 super().__init__()
                 self.uce_model = uce_model
                 self.freeze_backbone = freeze_backbone
+                
+                # Get the actual UCE TransformerModel
+                if not hasattr(uce_model, 'model') or uce_model.model is None:
+                    raise ValueError("UCE TransformerModel not initialized. This should not happen after load_model().")
+                
+                # Store the UCE backbone for end-to-end training
+                self.uce_backbone = uce_model.model
+                self.pe_embedding = uce_model.model_pe_embedding
                 
                 # Classification head - similar to scGPT
                 hidden_dim = uce_model.config['output_dim']  # UCE output dimension (typically 1280)
@@ -1523,48 +2039,49 @@ class UCEModel(SCLLMBase):
                     nn.Linear(256, n_classes)
                 )
                 
-                # Freeze UCE backbone if requested
+                # Configure backbone training
                 if freeze_backbone:
-                    for param in self.uce_model.model.parameters():
+                    for param in self.uce_backbone.parameters():
                         param.requires_grad = False
-                    SCLLMOutput.status("UCE backbone frozen", 'info')
+                    SCLLMOutput.status("UCE backbone frozen - linear probing mode", 'info')
                 else:
-                    SCLLMOutput.status("UCE backbone unfrozen - Note: Currently using linear probing approach", 'warning')
-                    SCLLMOutput.status("Full end-to-end UCE fine-tuning requires differentiable forward pass implementation", 'info')
+                    for param in self.uce_backbone.parameters():
+                        param.requires_grad = True
+                    SCLLMOutput.status("UCE backbone unfrozen - end-to-end fine-tuning mode", 'info')
             
-            def forward(self, embeddings):
-                """Forward pass through classifier."""
-                # embeddings are pre-computed UCE embeddings
-                # Move to correct device
-                if embeddings.device != next(self.classifier.parameters()).device:
-                    embeddings = embeddings.to(next(self.classifier.parameters()).device)
+            def forward(self, batch_data):
+                """Forward pass through UCE + classifier with optional backbone freezing."""
+                # batch_data contains (batch_sentences, mask)
+                batch_sentences, mask = batch_data
                 
-                # Pass through classifier
-                logits = self.classifier(embeddings)
-                return logits
-            
-            def _get_uce_embeddings_differentiable(self, adata_batch):
-                """Get UCE embeddings in a differentiable way."""
-                # For now, use the non-differentiable version and detach/reattach gradients
-                # This is a simplified approach - a full implementation would require
-                # reconstructing UCE's forward pass in PyTorch
-                
-                with torch.no_grad():
-                    # Extract embeddings using the existing method
-                    embeddings_np = self.uce_model.get_embeddings(adata_batch)
+                if self.freeze_backbone:
+                    # Linear probing mode: use frozen backbone embeddings
+                    with torch.no_grad():
+                        # Forward pass through UCE backbone without gradients
+                        batch_sentences = batch_sentences.permute(1, 0)
+                        batch_sentences = self.pe_embedding(batch_sentences.long())
+                        batch_sentences = nn.functional.normalize(batch_sentences, dim=2)
+                        _, cell_embedding = self.uce_backbone.forward(batch_sentences, mask)
                     
-                # Convert to tensor and enable gradients
-                embeddings = torch.tensor(embeddings_np, dtype=torch.float32, 
-                                        requires_grad=True, device=self.uce_model.device)
-                
-                return embeddings
+                    # Only the classifier will have gradients
+                    logits = self.classifier(cell_embedding)
+                    return logits
+                else:
+                    # End-to-end mode: full gradient flow
+                    batch_sentences = batch_sentences.permute(1, 0)
+                    batch_sentences = self.pe_embedding(batch_sentences.long())
+                    batch_sentences = nn.functional.normalize(batch_sentences, dim=2)
+                    _, cell_embedding = self.uce_backbone.forward(batch_sentences, mask)
+                    logits = self.classifier(cell_embedding)
+                    return logits
         
+        # Initialize fine-tuning model
         finetune_model = UCEFineTuneModel(self, n_classes, freeze_backbone)
         finetune_model.to(self.device)
         return finetune_model
     
     def _prepare_finetune_dataset(self, adata_processed):
-        """Prepare dataset for UCE fine-tuning."""
+        """Prepare dataset for UCE end-to-end fine-tuning."""
         from torch.utils.data import Dataset
         
         class UCEFineTuneDataset(Dataset):
@@ -1581,27 +2098,81 @@ class UCEModel(SCLLMBase):
                     self.labels = np.zeros(self.n_obs, dtype=int)  # Dummy labels
                     self.has_labels = False
                 
-                # Pre-compute all embeddings to avoid AnnData issues in DataLoader
-                SCLLMOutput.status("Pre-computing embeddings for training dataset...", 'preprocessing')
-                self.embeddings = self.uce_model.get_embeddings(self.adata)
-                SCLLMOutput.status(f"Pre-computed embeddings: {self.embeddings.shape}", 'preprocessing')
+                # Prepare UCE-style data processing for differentiable forward pass
+                SCLLMOutput.status(f"Preparing UCE raw data for {adata.n_obs} cells × {adata.n_vars} genes...", 'preprocessing')
+                self._prepare_uce_raw_data(adata)
                     
+            def _prepare_uce_raw_data(self, adata):
+                """Prepare raw data in UCE format for differentiable forward pass."""
+                # Process adata to UCE format (similar to _process_adata_direct)
+                adata_filtered, pe_row_idxs, dataset_chroms, dataset_pos = self.uce_model._generate_indices_direct(adata)
+                
+                # Update the stored adata to use the filtered version
+                self.adata = adata_filtered
+                
+                # Store processed data
+                self.pe_row_idxs = pe_row_idxs
+                self.dataset_chroms = dataset_chroms
+                self.dataset_pos = dataset_pos
+                self.X_data = adata_filtered.X.astype(np.int64)  # UCE expects integer counts
+                
+                # Update dataset size after filtering
+                self.n_obs = adata_filtered.n_obs
+                self.adata = adata_filtered
+                
+                SCLLMOutput.status(f"Raw UCE data prepared: {self.X_data.shape}", 'preprocessing')
+            
             def __len__(self):
                 return self.n_obs
                 
             def __getitem__(self, idx):
-                # Return pre-computed embedding and label
-                embedding = torch.tensor(self.embeddings[idx], dtype=torch.float32)
-                label = torch.tensor(self.labels[idx], dtype=torch.long)
+                # Get raw count data for this cell
+                counts = torch.tensor(self.X_data[idx]).unsqueeze(0)
+                weights = torch.log1p(counts)
+                weights = (weights / torch.sum(weights))
                 
-                return embedding, label
+                # Generate UCE sentence format (same as in _create_uce_dataset_direct)
+                try:
+                    from .UCE.eval_data import sample_cell_sentences
+                except ImportError:
+                    import sys
+                    uce_path = Path(__file__).parent / "UCE"
+                    if str(uce_path) not in sys.path:
+                        sys.path.insert(0, str(uce_path))
+                    from eval_data import sample_cell_sentences
+                
+                # Create UCE args for sampling
+                args = self.uce_model._create_uce_args_direct()
+                dataset_name = "memory_adata"
+                
+                dataset_to_protein_embeddings = {dataset_name: self.pe_row_idxs}
+                dataset_to_chroms = {dataset_name: self.dataset_chroms}
+                dataset_to_starts = {dataset_name: self.dataset_pos}
+                
+                batch_sentences, mask, seq_len, cell_sentences = sample_cell_sentences(
+                    counts, weights, dataset_name, args,
+                    dataset_to_protein_embeddings=dataset_to_protein_embeddings,
+                    dataset_to_chroms=dataset_to_chroms,
+                    dataset_to_starts=dataset_to_starts
+                )
+                
+                # Remove the batch dimension since we're processing single cells
+                # batch_sentences shape: (1, seq_len) -> (seq_len,)
+                # mask shape: (1, seq_len) -> (seq_len,)  
+                batch_sentences = batch_sentences.squeeze(0)
+                mask = mask.squeeze(0)
+                
+                # Return data in format expected by forward pass
+                label = torch.tensor(self.labels[idx], dtype=torch.long)
+                return (batch_sentences, mask), label
         
         return UCEFineTuneDataset(adata_processed, self)
     
     def _train_uce_finetune_model(self, model, train_loader, valid_loader, 
                                  optimizer, scheduler, criterion, epochs):
-        """Train the UCE fine-tuning model."""
-        from tqdm.auto import tqdm
+        """Train the UCE end-to-end fine-tuning model with optimized progress display."""
+        import contextlib
+        import io
         from sklearn.metrics import accuracy_score
         
         training_history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
@@ -1614,36 +2185,47 @@ class UCEModel(SCLLMBase):
             all_preds = []
             all_labels = []
             
-            pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}", leave=False)
-            for batch_idx, (batch_embeddings, batch_labels) in enumerate(pbar):
-                optimizer.zero_grad()
+            # Capture verbose output to reduce clutter
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                total_batches = len(train_loader)
+                batch_count = 0
                 
-                # Move to device
-                if self.device and self.device != 'cpu':
-                    batch_embeddings = batch_embeddings.to(self.device)
-                    batch_labels = batch_labels.to(self.device)
-                
-                # Forward pass
-                try:
-                    logits = model(batch_embeddings)
-                    loss = criterion(logits, batch_labels)
+                for batch_idx, (batch_data, batch_labels) in enumerate(train_loader):
+                    batch_count += 1
+                    optimizer.zero_grad()
                     
-                    # Backward pass
-                    loss.backward()
-                    optimizer.step()
+                    # Move to device
+                    if self.device and self.device != 'cpu':
+                        batch_sentences, mask = batch_data
+                        batch_sentences = batch_sentences.to(self.device)
+                        mask = mask.to(self.device)
+                        batch_data = (batch_sentences, mask)
+                        batch_labels = batch_labels.to(self.device)
                     
-                    train_loss += loss.item()
+                    # Forward pass through UCE + classifier
+                    try:
+                        logits = model(batch_data)
+                        loss = criterion(logits, batch_labels)
+                        
+                        # Backward pass
+                        loss.backward()
+                        optimizer.step()
+                        
+                        train_loss += loss.item()
+                        
+                        # Track predictions
+                        _, predicted = torch.max(logits.data, 1)
+                        all_preds.extend(predicted.cpu().numpy())
+                        all_labels.extend(batch_labels.cpu().numpy())
+                        
+                        # Show minimal progress every 10% of batches
+                        if batch_count % max(1, total_batches // 10) == 0 or batch_count == total_batches:
+                            progress = int((batch_count / total_batches) * 100)
+                            SCLLMOutput.status(f"🎯 Epoch {epoch+1}/{epochs} [{progress:3d}%] Loss: {loss.item():.4f}", 'fine_tuning')
                     
-                    # Track predictions
-                    _, predicted = torch.max(logits.data, 1)
-                    all_preds.extend(predicted.cpu().numpy())
-                    all_labels.extend(batch_labels.cpu().numpy())
-                    
-                    pbar.set_postfix({'loss': f'{loss.item():.4f}'})
-                
-                except Exception as e:
-                    SCLLMOutput.status(f"Training error: {e}", 'error')
-                    raise e
+                    except Exception as e:
+                        SCLLMOutput.status(f"Training error: {e}", 'error')
+                        raise e
             
             # Calculate training metrics
             avg_train_loss = train_loss / len(train_loader)
@@ -1659,14 +2241,17 @@ class UCEModel(SCLLMBase):
                 val_preds = []
                 val_labels = []
                 
-                with torch.no_grad():
-                    for batch_embeddings, batch_labels in valid_loader:
+                with torch.no_grad(), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    for batch_data, batch_labels in valid_loader:
                         # Move to device
                         if self.device and self.device != 'cpu':
-                            batch_embeddings = batch_embeddings.to(self.device)
+                            batch_sentences, mask = batch_data
+                            batch_sentences = batch_sentences.to(self.device)
+                            mask = mask.to(self.device)
+                            batch_data = (batch_sentences, mask)
                             batch_labels = batch_labels.to(self.device)
                             
-                        logits = model(batch_embeddings)
+                        logits = model(batch_data)
                         loss = criterion(logits, batch_labels)
                         val_loss += loss.item()
                         
@@ -1685,10 +2270,10 @@ class UCEModel(SCLLMBase):
             # Update scheduler
             scheduler.step()
             
-            # Print progress
-            metrics_str = f"Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.4f}"
+            # Print epoch summary
+            metrics_str = f"Loss: {avg_train_loss:.4f}, Acc: {train_acc:.4f}"
             if valid_loader is not None:
                 metrics_str += f", Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}"
-            SCLLMOutput.status(f"Epoch {epoch+1}/{epochs} - {metrics_str}", 'fine_tuning')
+            SCLLMOutput.status(f"🎯 Epoch {epoch+1}/{epochs} completed - {metrics_str}", 'fine_tuning')
         
         return training_history
