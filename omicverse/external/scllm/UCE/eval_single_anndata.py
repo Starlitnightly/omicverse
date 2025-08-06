@@ -75,7 +75,7 @@ Returns:
 
 
 import argparse
-from evaluate import AnndataProcessor
+from .evaluate import AnndataProcessor
 from accelerate import Accelerator
 
 def main(args, accelerator):

@@ -1,12 +1,6 @@
 import os
 
 # os.environ["NCCL_DEBUG"] = "INFO"
-os.environ["OMP_NUM_THREADS"] = "12"  # export OMP_NUM_THREADS=4
-os.environ["OPENBLAS_NUM_THREADS"] = "12"  # export OPENBLAS_NUM_THREADS=4
-os.environ["MKL_NUM_THREADS"] = "12"  # export MKL_NUM_THREADS=6
-os.environ["VECLIB_MAXIMUM_THREADS"] = "12"  # export VECLIB_MAXIMUM_THREADS=4
-os.environ["NUMEXPR_NUM_THREADS"] = "12"
-
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -15,12 +9,12 @@ import scanpy as sc
 from tqdm.auto import tqdm
 from torch import nn, Tensor
 
-from model import TransformerModel
-from eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
-from utils import figshare_download
+from .model import TransformerModel
+from .eval_data import MultiDatasetSentences, MultiDatasetSentenceCollator
+from .utils import figshare_download
 
 from torch.utils.data import DataLoader
-from data_proc.data_utils import adata_path_to_prot_chrom_starts, \
+from .data_proc.data_utils import adata_path_to_prot_chrom_starts, \
     get_spec_chrom_csv, process_raw_anndata, get_species_to_pe
 
 import os
