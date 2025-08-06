@@ -321,7 +321,7 @@ class DEG:
             return res
         elif self.method == 'memento-de':
             self.result=self.result_1d
-            self.result['baseMean']=np.mean(self.adata_test.to_df(),axis=0).iloc[self.result.index].to_list()
+            self.result['baseMean']=np.mean(self.adata_test.to_df(),axis=0).loc[self.result.index].to_list()
             return self.result
         else:
             raise ValueError(f"Method {self.method} not supported")
