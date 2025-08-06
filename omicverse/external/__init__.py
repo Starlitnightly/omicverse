@@ -93,5 +93,4 @@ __all__ = [
     'VIA',
     'gaston',
     'pyscenic',
-    'scllm',
 ]

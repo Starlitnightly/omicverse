@@ -38,7 +38,7 @@ except ModuleNotFoundError:
     version = lambda name: get_distribution(name).version
 
 # Core submodules
-from . import bulk, single, utils, bulk2single, pp, space, pl
+from . import bulk, single, utils, bulk2single, pp, space, pl, llm
 
 # Optional PopV module requires ``scvi-tools``. Skip if dependency missing.
 

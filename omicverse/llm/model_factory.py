@@ -6,30 +6,8 @@ from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
 import numpy as np
 
-try:
-    from .base import SCLLMBase
-    from .scgpt_model import ScGPTModel
-    from .scfoundation_model import ScFoundationModel
-    from .geneformer_model import GeneformerModel
-    from .cellplm_model import CellPLMModel
-    try:
-        from .uce_model import UCEModel
-        _uce_available = True
-    except ImportError:
-        UCEModel = None
-        _uce_available = False
-except ImportError:
-    from base import SCLLMBase
-    from scgpt_model import ScGPTModel
-    from scfoundation_model import ScFoundationModel
-    from geneformer_model import GeneformerModel
-    from cellplm_model import CellPLMModel
-    try:
-        from uce_model import UCEModel
-        _uce_available = True
-    except ImportError:
-        UCEModel = None
-        _uce_available = False
+from .base import SCLLMBase
+
 
 
 class ModelFactory:
@@ -41,26 +19,30 @@ class ModelFactory:
     """
     
     # Registry of available models
+    from .scgpt_model import ScGPTModel
+    from .scfoundation_model import ScFoundationModel
+    from .geneformer_model import GeneformerModel
+    from .cellplm_model import CellPLMModel
+    from .uce_model import UCEModel
+
     _models = {
         "scgpt": ScGPTModel,
         "scfoundation": ScFoundationModel,
         "geneformer": GeneformerModel,
         "cellplm": CellPLMModel,
+        "uce": UCEModel,
         # Future models can be added here:
         # "scbert": ScBERTModel,
         # "celllm": CellLMModel,
     }
     
-    # Add UCE model if available
-    if _uce_available and UCEModel is not None:
-        _models["uce"] = UCEModel
     
     @classmethod
     def create_model(cls, 
                      model_type: str, 
                      model_path: Optional[Union[str, Path]] = None,
                      device: Optional[str] = None,
-                     **kwargs) -> SCLLMBase:
+                     **kwargs):
         """
         Create a model instance.
         
@@ -316,7 +298,7 @@ class SCLLMManager:
 
 
 # Convenience functions for quick access
-def load_scgpt(model_path: Union[str, Path], device: Optional[str] = None, **kwargs) -> ScGPTModel:
+def load_scgpt(model_path: Union[str, Path], device: Optional[str] = None, **kwargs):
     """
     Quick function to load a scGPT model.
     
@@ -746,7 +728,8 @@ def integrate_with_scgpt(query_adata,
 
 
 # Convenience functions for scFoundation
-def load_scfoundation(model_path: Union[str, Path], device: Optional[str] = None, **kwargs) -> ScFoundationModel:
+def load_scfoundation(model_path: Union[str, Path], 
+                      device: Optional[str] = None, **kwargs):
     """
     Quick function to load a scFoundation model.
     
@@ -1180,7 +1163,7 @@ def load_geneformer(model_path: Union[str, Path],
                    gene_mapping_file: Union[str, Path],
                    device: Optional[str] = None, 
                    model_version: str = "V1",
-                   **kwargs) -> 'GeneformerModel':
+                   **kwargs):
     """
     Quick function to load a Geneformer model with external dictionary files.
     
@@ -1345,7 +1328,7 @@ def fine_tune_geneformer(train_adata,
 def load_cellplm(model_path: Union[str, Path], 
                  pretrain_version: str = "20231027_85M",
                  device: Optional[str] = None, 
-                 **kwargs) -> 'CellPLMModel':
+                 **kwargs):
     """
     Quick function to load a CellPLM model.
     
