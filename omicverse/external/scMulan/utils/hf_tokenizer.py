@@ -27,7 +27,7 @@ class scMulanTokenizer(PreTrainedTokenizer):
         else:
             try:
                 return self.get_stoi()
-            except:
+            except AttributeError:
                 return self.stoi
     
     @property
