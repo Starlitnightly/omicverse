@@ -351,7 +351,9 @@ def get_sparse_from_igraph(graph: ig.Graph, weight_attr=None):
     shape = graph.vcount()
     shape = (shape, shape)
     if len(edges) > 0:
-        return csr_matrix((weights, zip(*edges)), shape=shape)
+        row_indices, col_indices = zip(*edges)
+        return csr_matrix((weights, (row_indices, col_indices)), shape=shape)
+        # return csr_matrix((weights, zip(*edges)), shape=shape)
     return csr_matrix(shape)
 
 
