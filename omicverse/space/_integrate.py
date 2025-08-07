@@ -261,7 +261,7 @@ class pySTAligner(object):
         data_list = []
         for adata_tmp in Batch_list:
             adata_tmp = adata_tmp[:, comm_gene].copy()   # line 268 avoid 'ArrayView'
-            adata_tmp_X = adata.X.toarray() if hasattr(adata_tmp.X, 'toarray') else adata_tmp.X
+            adata_tmp_X = adata_tmp.X.toarray() if hasattr(adata_tmp.X, 'toarray') else adata_tmp.X
             edge_index = np.nonzero(adata_tmp.uns['adj'])
             data_list.append(
                 Data(edge_index=torch.LongTensor(np.array([edge_index[0], edge_index[1]])),
