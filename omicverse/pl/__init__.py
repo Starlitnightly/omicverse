@@ -57,7 +57,7 @@ from ._bulk import *
 from ._space import *
 from ._cpdb import *
 from ._flowsig import *
-from ._embedding import *
+from ._embedding import embedding_atlas
 from ._density import *
 from ._cpdbviz import *
 from ._dotplot import dotplot, rank_genes_groups_dotplot
