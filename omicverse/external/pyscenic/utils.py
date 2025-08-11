@@ -154,23 +154,43 @@ def add_correlation(
     # below.
 
     # Calculate Pearson correlation to infer repression or activation.
-    if mask_dropouts:
+    if mask_dropouts and (ex_mtx == 0.0).sum().sum() > 0:
         ex_mtx = ex_mtx.sort_index(axis=1)
-        col_idx_pairs = _create_idx_pairs(adjacencies, ex_mtx)
-        rhos = masked_rho4pairs(ex_mtx.values, col_idx_pairs, 0.0)
-    else:
-        genes = list(
-            set(adjacencies[COLUMN_NAME_TF]).union(set(adjacencies[COLUMN_NAME_TARGET]))
+        ex_columns = ex_mtx.columns 
+        z_columns_id = np.where((ex_mtx == 0.0).sum() > 0)[0]   # zero column id
+        print(r"pairwise correlation will be very slowly, maybe you can remove these genes, if they aren't important.")
+        print(f"{len(z_columns_id)} genes: ", ex_columns[z_columns_id].astype(str).to_list())
+    
+        corr_mtx = pd.DataFrame(
+            index=ex_columns,
+            columns=ex_columns,
+            data=np.corrcoef(ex_mtx.values.T),
         )
-        ex_mtx = ex_mtx[ex_mtx.columns[ex_mtx.columns.isin(genes)]]
+
+        col_idx_pairs = _create_idx_pairs(adjacencies, ex_mtx)
+        col_idx_pairs = col_idx_pairs[(np.isin(col_idx_pairs, z_columns_id).any(axis=1))]
+        rhos_mask = masked_rho4pairs(ex_mtx.values, col_idx_pairs, 0.0)
+
+        for i in np.arange(col_idx_pairs.shape[0]):
+            s1 = ex_columns[col_idx_pairs[i,0]]
+            s2 = ex_columns[col_idx_pairs[i,1]]
+            corr_mtx[s2][s1] = rhos_mask[i]
+
+    else:
+        if not mask_dropouts:
+            genes = set(adjacencies[[COLUMN_NAME_TF, COLUMN_NAME_TARGET]].stack().unique())
+            genes &= set(ex_mtx.columns)
+            ex_mtx = ex_mtx.loc[:, list(genes)]
+        
         corr_mtx = pd.DataFrame(
             index=ex_mtx.columns,
             columns=ex_mtx.columns,
             data=np.corrcoef(ex_mtx.values.T),
         )
-        rhos = np.array(
-            [corr_mtx[s2][s1] for s1, s2 in zip(adjacencies.TF, adjacencies.target)]
-        )
+
+    rhos = np.array(
+        [corr_mtx[s2][s1] for s1, s2 in zip(adjacencies.TF, adjacencies.target)]
+    )
 
     regulations = (rhos > rho_threshold).astype(int) - (rhos < -rho_threshold).astype(
         int
@@ -306,7 +326,7 @@ def modules_from_adjacencies(
     # matrix.
     # In addition, also make sure the expression matrix consists of floating point numbers. This requirement might
     # be violated when dealing with raw counts as input.
-    ex_mtx = ex_mtx.T[~ex_mtx.columns.duplicated(keep="first")].T.astype(float)
+    ex_mtx = ex_mtx.loc[:, ~ex_mtx.columns.duplicated(keep='first')].astype(np.float64, copy=False)
 
     # To make the pySCENIC code more robust to the selection of the network inference method in the first step of
     # the pipeline, it is better to use percentiles instead of absolute values for the weight thresholds.
@@ -316,7 +336,7 @@ def modules_from_adjacencies(
             yield from chain(
                 chain.from_iterable(
                     modules4thr(
-                        adjc, thr, context, pattern="weight>{}%".format(frac * 100)
+                        adjc, thr, context, pattern=f"weight>{frac*100:.2f}%"
                     )
                     for thr, frac in zip(
                         list(adjacencies[COLUMN_NAME_WEIGHT].quantile(thresholds)),

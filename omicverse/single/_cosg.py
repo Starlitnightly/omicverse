@@ -532,6 +532,10 @@ def cosg(
             n_cells_i=np.sum(idx_i)
             scores[n_cells_expressed<n_cells_i*expressed_pct]= -1
 
+        if n_genes_user > len(scores):
+            print(f"The length of scores is {len(scores)}, n_genes_user {n_genes_user} shouldn't be greater than {len(scores)}.")
+            print(f"So n_genes_user was auto set to {len(scores)}.")
+            n_genes_user = len(scores)
         global_indices = _select_top_n(scores, n_genes_user)
 
         if rank_stats is None:
