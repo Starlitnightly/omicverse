@@ -30,7 +30,7 @@ class EdgeSampler(data_utils.Dataset):
         while not generated:
             candidate_ne = np.random.randint(0, self.num_nodes, size=(2*self.num_neg, 2), dtype=np.int64)
             cne1, cne2 = candidate_ne[:, 0], candidate_ne[:, 1]
-            to_keep = (1 - self.A[cne1, cne2]).astype(np.bool).A1 * (cne1 != cne2)
+            to_keep = (1 - self.A[cne1, cne2]).astype(bool).A1 * (cne1 != cne2)
             next_nonedges = candidate_ne[to_keep][:self.num_neg]
             generated = to_keep.sum() >= self.num_neg
         return torch.LongTensor(next_edges), torch.LongTensor(next_nonedges)

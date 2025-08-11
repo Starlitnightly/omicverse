@@ -24,7 +24,8 @@ def CAST_MARK(coords_raw_t,exp_dict_t,output_path_t,task_name_t = None,
     print(f'Constructing delaunay graphs for {len(samples)} samples...')
     for sample_t in samples:
         graph_dgl_t = delaunay_dgl(sample_t,coords_raw_t[sample_t],output_path_t,if_plot=if_plot,strategy_t = graph_strategy).to(device)
-        feat_torch_t = torch.tensor(exp_dict_t[sample_t], dtype=torch.float32, device=device)
+        torch_data = exp_dict_t[sample_t].toarray() if hasattr(exp_dict_t[sample_t], 'toarray') else exp_dict_t[sample_t]
+        feat_torch_t = torch.tensor(torch_data, dtype=torch.float32, device=device)
         inputs.append((sample_t, graph_dgl_t, feat_torch_t))
     
     ### parameters setting

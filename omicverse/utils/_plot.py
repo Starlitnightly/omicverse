@@ -786,10 +786,10 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
                         adata.obs[celltype_key].cat.categories):
         ax2.scatter(100,
                 cell,c=cell_color_dict[cell],s=50)
-        ax2.plot((100,cell_num_pd.loc[cell,celltype_key]),(idx,idx),
+        ax2.plot((100,cell_num_pd.loc[cell,'count']),(idx,idx),
                 c=cell_color_dict[cell],lw=4)
         ax2.text(100,idx+0.2,
-                cell+'('+str("{:,}".format(cell_num_pd.loc[cell,celltype_key]))+')',fontsize=11)
+                cell+'('+str("{:,}".format(cell_num_pd.loc[cell,'count']))+')',fontsize=11)
     ax2.set_xlim(xlim,cell_num_pd.iloc[1].values[0]) 
     ax2.text(xlim,idx+1,title,fontsize=12)
     ax2.grid(False)

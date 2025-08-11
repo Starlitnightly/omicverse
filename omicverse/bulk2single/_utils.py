@@ -71,7 +71,7 @@ def bulk2single_plot_cellprop(generate_single_data:anndata.AnnData,
     generate_single_data.obs[celltype_key]=generate_single_data.obs[celltype_key].astype('category')
     key_name=list(generate_single_data.obs[celltype_key].cat.categories)
     ct_name = list(ct_stat.index)
-    ct_num = list(ct_stat[celltype_key])
+    ct_num = list(ct_stat['count'])
     if '{}_colors'.format(celltype_key) in generate_single_data.uns.keys():
         color=generate_single_data.uns['{}_colors'.format(celltype_key)]
         color_dict=dict(zip(key_name,color))
