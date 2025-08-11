@@ -129,7 +129,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         robjects.r.library("mclust")
 
         import rpy2.robjects.numpy2ri
-        rpy2.robjects.numpy2ri.activate()
+        # rpy2.robjects.numpy2ri.activate()
         r_random_seed = robjects.r['set.seed']
         r_random_seed(random_state)
         rmclust = robjects.r['Mclust']
