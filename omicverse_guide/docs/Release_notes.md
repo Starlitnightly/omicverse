@@ -585,7 +585,14 @@ Optimated the plot effect of `ov.pl.violin`
 ### utils Module
 - Added scICE to calculate the best cluster (#329)
 
-### v 1.7.5
+### v 1.7.6
+
+## LLM Module
+- Added `GeneFromer`, `scGPT`, `scFoundation`, `UCE`, `CellPLM` to call directly in OmicVerse.
+
+## Pl Module
+- Optimized the visualization effect of embedding.
+- Added `ov.pl.umap`, `ov.pl.pca`, `ov.pl.mde`, and `ov.pl.tsne` 
 
 
 

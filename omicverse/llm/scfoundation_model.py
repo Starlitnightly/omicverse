@@ -1014,9 +1014,15 @@ class ScFoundationModel(SCLLMBase):
         best_model_state = None
         training_history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
         
+        # Create progress bar for epochs  
+        progress_bar = SCLLMOutput.progress_bar(
+            total=epochs,
+            desc="Fine-tuning epochs",
+            model_name="scFoundation"
+        )
+        
         for epoch in range(epochs):
-            # Epoch info handled by progress bar
-            
+            progress_bar.update(1)
             # Training
             train_loss, train_acc = self._train_finetune_epoch(
                 finetune_model, train_loader, optimizer, criterion
@@ -1032,7 +1038,10 @@ class ScFoundationModel(SCLLMBase):
                 training_history['val_loss'].append(val_loss)
                 training_history['val_acc'].append(val_acc)
                 
-                # Training metrics displayed in progress bar
+                # Display epoch results
+                progress_bar.set_description(
+                    f"Fine-tuning epochs - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}"
+                )
                 
                 # Save best model
                 if val_acc > best_accuracy:
@@ -1040,12 +1049,18 @@ class ScFoundationModel(SCLLMBase):
                     best_model_state = copy.deepcopy(finetune_model.state_dict())
                     SCLLMOutput.status(f"New best validation accuracy: {best_accuracy:.4f}", 'best')
             else:
-                # Training metrics displayed in progress bar
+                # Display epoch results (training only)
+                progress_bar.set_description(
+                    f"Fine-tuning epochs - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}"
+                )
+                
                 if train_acc > best_accuracy:
                     best_accuracy = train_acc
                     best_model_state = copy.deepcopy(finetune_model.state_dict())
             
             scheduler.step()
+        
+        progress_bar.close()
         
         # Load best model
         if best_model_state is not None:
