@@ -44,6 +44,113 @@ from scanpy.plotting._utils import (
     VBound,
 )
 
+def mde(adata: AnnData, **kwargs):
+    r"""
+    Plot MDE embedding.
+
+    Arguments:
+        adata: Annotated data matrix.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        fig: figure and axis
+        ax: axis
+    """
+    if 'X_mde' not in adata.obsm.keys():
+        raise ValueError('X_mde not found in adata.obsm. Please run ov.pp.mde first.')
+    return embedding(adata, basis='X_mde', **kwargs)
+
+def tsne(adata: AnnData, **kwargs):
+    r"""
+    Plot t-SNE embedding.
+
+    Arguments:
+        adata: Annotated data matrix.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        fig: figure and axis
+        ax: axis
+    """
+    if 'X_tsne' not in adata.obsm.keys():
+        raise ValueError('X_tsne not found in adata.obsm. Please run ov.pp.tsne first.')
+    return embedding(adata, basis='X_tsne', **kwargs)
+
+def pca(adata: AnnData, **kwargs):
+    r"""
+    Plot PCA embedding.
+
+    Arguments:
+        adata: Annotated data matrix.
+        **kwargs: Additional keyword arguments.
+    """
+    if 'X_pca' not in adata.obsm.keys() or 'scaled|original|X_pca' not in adata.obsm.keys():
+        raise ValueError('X_pca not found in adata.obsm. Please run ov.pp.pca first.')
+    if 'scaled|original|X_pca' in adata.obsm.keys():
+        adata.obsm['X_pca'] = adata.obsm['scaled|original|X_pca']
+
+    return embedding(adata, basis='X_pca', **kwargs)
+
+def umap(adata: AnnData, **kwargs):
+    r"""
+    Plot UMAP embedding.
+
+    Arguments:
+        adata: Annotated data matrix.
+        color: Keys for annotations of observations/cells or variables/genes. (None)
+        gene_symbols: Key for field in `.var` that stores gene symbols. (None)
+        use_raw: Use `.raw` attribute of `adata` if present. (None)
+        sort_order: For continuous annotations used as color parameter, plot data points with higher values on top of others. (True)
+        edges: Show edges between cells. (False)
+        edges_width: Width of edges. (0.1)
+        edges_color: Color of edges. ('grey')
+        neighbors_key: Key to use for neighbors. (None)
+        arrows: Show arrows for velocity. (False)
+        arrows_kwds: Keyword arguments for arrow plots. (None)
+        groups: Groups to highlight. (None)
+        components: Components to plot. (None)
+        dimensions: Dimensions to plot. (None)
+        layer: Name of the layer to use for coloring. (None)
+        projection: Type of projection ('2d' or '3d'). ('2d')
+        scale_factor: Scaling factor for sizes. (None)
+        color_map: Colormap to use for continuous variables. (None)
+        cmap: Colormap to use for continuous variables. (None)
+        palette: Colors to use for categorical variables. (None)
+        na_color: Color to use for NaN values. ('lightgray')
+        na_in_legend: Include NaN values in legend. (True)
+        size: Size of the dots. (None)
+        frameon: Draw a frame around the plot. ('small')
+        legend_fontsize: Font size for legend. (None)
+        legend_fontweight: Font weight for legend. ('bold')
+        legend_loc: Location of legend. ('right margin')
+        legend_fontoutline: Outline width for legend text. (None)
+        colorbar_loc: Location of colorbar. ('right')
+        vmax: Maximum value for colorbar. (None)
+        vmin: Minimum value for colorbar. (None)
+        vcenter: Center value for colorbar. (None)
+        norm: Normalization for colorbar. (None)
+        add_outline: Add outline to points. (False)
+        outline_width: Width of outline. ((0.3, 0.05))
+        outline_color: Color of outline. (('black', 'white'))
+        ncols: Number of columns for subplots. (4)
+        hspace: Height spacing between subplots. (0.25)
+        wspace: Width spacing between subplots. (None)
+        title: Title for the plot. (None)
+        show: Show the plot. (None)
+        save: Save the plot. (None)
+        ax: Matplotlib axes object. (None)
+        return_fig: Return figure object. (None)
+        marker: Marker style. ('.')
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        fig: figure and axis
+        ax: axis
+    """
+    if 'X_umap' not in adata.obsm.keys():
+        raise ValueError('X_umap not found in adata.obsm. Please run ov.pp.umap first.')
+    return embedding(adata, basis='X_umap', **kwargs)
+
 def embedding(
     adata: AnnData,
     basis: str,
