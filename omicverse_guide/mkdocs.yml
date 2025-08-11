@@ -66,6 +66,13 @@ nav:
         - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
         - Spatial IsoDepth Calculation: Tutorials-space/t_gaston.ipynb
         - Single cell spatial alignment tools: Tutorials-space/t_slat.ipynb 
+    - LLM:
+        - UCE: Tutorials-llm/t_uce.ipynb
+        - scGPT: Tutorials-llm/t_scgpt.ipynb
+        - scFoundation: Tutorials-llm/t_scfoundation.ipynb
+        - GeneFormer: Tutorials-llm/t_geneformer.ipynb
+        - CellPlm: Tutorials-llm/t_cellplm.ipynb
+
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
