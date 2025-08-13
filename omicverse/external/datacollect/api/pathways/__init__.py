@@ -2,8 +2,8 @@
 Pathways API clients for datacollect module.
 """
 
-from .kegg import KeggClient
+from .kegg import KEGGClient
+from .gtopdb import GtoPdbClient
 from .reactome import ReactomeClient
-from .gtopdb import GtopdbClient
 
-__all__ = ["KeggClient", "ReactomeClient", "GtopdbClient"]
+__all__ = ["KEGGClient", "GtoPdbClient", "ReactomeClient"]

@@ -1,7 +1,7 @@
 """AlphaFold Protein Structure Database API client."""
 
 from typing import Dict, List, Optional, Any
-from omicverse.external.datacollect.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class AlphaFoldClient(BaseAPIClient):

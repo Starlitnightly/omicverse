@@ -8,7 +8,7 @@ from omicverse.external.datacollect.api.string import STRINGClient
 from omicverse.external.datacollect.models.protein import Protein
 from omicverse.external.datacollect.models.interaction import ProteinInteraction
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)
