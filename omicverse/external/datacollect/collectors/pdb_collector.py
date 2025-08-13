@@ -4,10 +4,10 @@ import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from omicverse.external.datacollect.api.pdb_simple import SimplePDBClient
-from omicverse.external.datacollect.models.structure import Structure, Chain, Ligand
+from src.api.pdb_simple import SimplePDBClient
+from src.models.structure import Structure, Chain, Ligand
 from .base import BaseCollector
-from ..config import settings
+from config import settings
 
 
 logger = logging.getLogger(__name__)

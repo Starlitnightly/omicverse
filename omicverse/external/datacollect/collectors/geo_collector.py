@@ -4,10 +4,10 @@ import logging
 import json
 from typing import Any, Dict, List, Optional, Union
 
-from omicverse.external.datacollect.api.geo import GEOClient
-from omicverse.external.datacollect.models.genomic import Gene, Expression
+from src.api.geo import GEOClient
+from src.models.genomic import Gene, Expression
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

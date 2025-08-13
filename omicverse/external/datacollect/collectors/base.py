@@ -8,8 +8,8 @@ import json
 
 from sqlalchemy.orm import Session
 
-from omicverse.external.datacollect.models.base import get_db
-from ..config import settings
+from src.models.base import get_db
+from config import settings
 
 
 logger = logging.getLogger(__name__)

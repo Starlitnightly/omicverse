@@ -3,10 +3,10 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.ucsc import UCSCClient
-from omicverse.external.datacollect.models.genomic import Gene, Variant
+from src.api.ucsc import UCSCClient
+from src.models.genomic import Gene, Variant
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)
