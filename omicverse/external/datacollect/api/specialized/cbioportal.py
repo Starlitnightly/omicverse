@@ -3,8 +3,8 @@
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from .base import BaseAPIClient
-from omicverse.external.datacollect.config.config import settings
+from ..base import BaseAPIClient
+from ...config import settings
 
 logger = logging.getLogger(__name__)
 

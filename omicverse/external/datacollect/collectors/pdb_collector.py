@@ -7,7 +7,7 @@ from datetime import datetime
 from omicverse.external.datacollect.api.pdb_simple import SimplePDBClient
 from omicverse.external.datacollect.models.structure import Structure, Chain, Ligand
 from .base import BaseCollector
-from config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

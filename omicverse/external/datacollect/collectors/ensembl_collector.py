@@ -8,7 +8,7 @@ from omicverse.external.datacollect.api.ensembl import EnsemblClient
 from omicverse.external.datacollect.models.genomic import Gene, Variant
 from omicverse.external.datacollect.models.protein import Protein
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

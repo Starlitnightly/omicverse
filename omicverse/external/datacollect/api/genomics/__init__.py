@@ -2,11 +2,11 @@
 Genomics API clients for datacollect module.
 """
 
+from .ucsc import UCSCClient
+from .clinvar import ClinVarClient
+from .gwas_catalog import GWASCatalogClient
+from .gnomad import GnomADClient
 from .ensembl import EnsemblClient
-from .clinvar import ClinvarClient
-from .dbsnp import DbsnpClient
-from .gnomad import GnomadClient
-from .ucsc import UcscClient
-from .gwas_catalog import GwasCatalogClient
+from .dbsnp import dbSNPClient
 
-__all__ = ["EnsemblClient", "ClinvarClient", "DbsnpClient", "GnomadClient", "UcscClient", "GwasCatalogClient"]
+__all__ = ["UCSCClient", "ClinVarClient", "GWASCatalogClient", "GnomADClient", "EnsemblClient", "dbSNPClient"]

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from omicverse.external.datacollect.api.gnomad import GnomADClient
 from omicverse.external.datacollect.models.genomic import Gene, Variant
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

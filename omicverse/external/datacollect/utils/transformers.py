@@ -8,9 +8,9 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import pandas as pd
 
-from omicverse.external.datacollect.models.protein import Protein
-from omicverse.external.datacollect.models.structure import Structure
-from omicverse.external.datacollect.models.genomic import Gene, Variant
+from ..models.protein import Protein
+from ..models.structure import Structure
+from ..models.genomic import Gene, Variant
 
 
 logger = logging.getLogger(__name__)
