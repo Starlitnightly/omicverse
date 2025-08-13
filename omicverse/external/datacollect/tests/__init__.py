@@ -1,0 +1,1 @@
+"""Test suite for bioinformatics data collection tool."""
