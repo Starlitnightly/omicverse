@@ -4,11 +4,11 @@ import logging
 from typing import Any, Dict, List, Optional
 import json
 
-from omicverse.external.datacollect.api.opentargets import OpenTargetsClient
-from omicverse.external.datacollect.models.genomic import Gene
-from omicverse.external.datacollect.models.disease import Disease
+from src.api.opentargets import OpenTargetsClient
+from src.models.genomic import Gene
+from src.models.disease import Disease
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

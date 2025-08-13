@@ -8,9 +8,9 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import pandas as pd
 
-from ..models.protein import Protein
-from ..models.structure import Structure
-from ..models.genomic import Gene, Variant
+from src.models.protein import Protein
+from src.models.structure import Structure
+from src.models.genomic import Gene, Variant
 
 
 logger = logging.getLogger(__name__)

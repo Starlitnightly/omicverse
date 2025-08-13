@@ -4,10 +4,10 @@ import logging
 import json
 from typing import Any, Dict, List, Optional, Union
 
-from omicverse.external.datacollect.api.clinvar import ClinVarClient
-from omicverse.external.datacollect.models.genomic import Variant, Gene
+from src.api.clinvar import ClinVarClient
+from src.models.genomic import Variant, Gene
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

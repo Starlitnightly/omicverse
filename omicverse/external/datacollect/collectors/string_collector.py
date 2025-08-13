@@ -4,11 +4,11 @@ import logging
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from omicverse.external.datacollect.api.string import STRINGClient
-from omicverse.external.datacollect.models.protein import Protein
-from omicverse.external.datacollect.models.interaction import ProteinInteraction
+from src.api.string import STRINGClient
+from src.models.protein import Protein
+from src.models.interaction import ProteinInteraction
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

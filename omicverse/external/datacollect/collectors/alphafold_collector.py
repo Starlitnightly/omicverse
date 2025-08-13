@@ -4,11 +4,11 @@ import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from omicverse.external.datacollect.api.alphafold import AlphaFoldClient
-from omicverse.external.datacollect.models.structure import Structure, Chain
-from omicverse.external.datacollect.models.protein import Protein
+from src.api.alphafold import AlphaFoldClient
+from src.models.structure import Structure, Chain
+from src.models.protein import Protein
 from .base import BaseCollector
-from ..config import settings
+from config import settings
 
 
 logger = logging.getLogger(__name__)
