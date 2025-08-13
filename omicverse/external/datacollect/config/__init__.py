@@ -1,5 +1,5 @@
-"""Configuration module for DataCollect."""
+"""Configuration module."""
 
-from .config import settings
+from .config import settings, APIConfig, StorageConfig, LoggingConfig
 
-__all__ = ['settings']
+__all__ = ["settings", "APIConfig", "StorageConfig", "LoggingConfig"]
