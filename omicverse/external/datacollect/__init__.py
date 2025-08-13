@@ -19,50 +19,21 @@ Main API clients:
     Specialized: BLAST, JASPAR, MPD, IUCN, PRIDE, cBioPortal, RegulomeDB
 """
 
-# Core API clients - proteins
+# Import all API clients from organized structure
 try:
-    from .api.uniprot import UniProtClient
-    from .api.pdb import PDBClient
-    from .api.alphafold import AlphaFoldClient
-    from .api.interpro import InterProClient
-    from .api.string import STRINGClient
-    from .api.emdb import EMDBClient
+    from .api import *
 except ImportError:
     pass
 
-# Core API clients - genomics  
+# Import collectors
 try:
-    from .api.ensembl import EnsemblClient
-    from .api.clinvar import ClinVarClient
-    from .api.dbsnp import dbSNPClient
-    from .api.gnomad import gnomADClient
-    from .api.gwas_catalog import GWASCatalogClient
-    from .api.ucsc import UCSCClient
+    from .collectors import *
 except ImportError:
     pass
 
-# Core API clients - expression
+# Import utilities
 try:
-    from .api.geo import GEOClient
-    from .api.ccre import CCREClient
-except ImportError:
-    pass
-
-# Core API clients - pathways
-try:
-    from .api.kegg import KEGGClient
-    from .api.reactome import ReactomeClient
-    from .api.gtopdb import GtoPdbClient
-except ImportError:
-    pass
-
-# Specialized clients
-try:
-    from .api.blast import BLASTClient
-    from .api.jaspar import JASPARClient
-    from .api.pride import PRIDEClient
-    from .api.cbioportal import cBioPortalClient
-    from .api.regulomedb import RegulomeDBClient
+    from .utils.omicverse_adapters import to_pandas, to_anndata, to_mudata
 except ImportError:
     pass
 
@@ -96,14 +67,11 @@ def collect_protein_data(identifier, source='uniprot', to_format='pandas', **kwa
     
     # Convert to desired format
     if to_format == 'anndata':
-        from .utils.transformers import to_anndata
         return to_anndata(data)
     elif to_format == 'mudata':
-        from .utils.transformers import to_mudata
         return to_mudata(data)
     elif to_format == 'pandas':
-        from .utils.transformers import to_pandas
-        return to_pandas(data)
+        return to_pandas(data, "protein")
     else:
         return data
 
@@ -171,14 +139,11 @@ def collect_pathway_data(identifier, source='kegg', to_format='pandas', **kwargs
     
     # Convert to desired format
     if to_format == 'anndata':
-        from .utils.transformers import to_anndata
         return to_anndata(data)
     elif to_format == 'mudata':
-        from .utils.transformers import to_mudata
         return to_mudata(data)
     elif to_format == 'pandas':
-        from .utils.transformers import to_pandas
-        return to_pandas(data)
+        return to_pandas(data, "protein")
     else:
         return data
 
