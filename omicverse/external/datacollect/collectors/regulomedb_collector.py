@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from omicverse.external.datacollect.api.regulomedb import RegulomeDBClient
 from omicverse.external.datacollect.models.genomic import Variant
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

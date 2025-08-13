@@ -8,7 +8,7 @@ from omicverse.external.datacollect.api.interpro import InterProClient
 from omicverse.external.datacollect.models.interpro import Domain, DomainLocation
 from omicverse.external.datacollect.models.protein import Protein
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

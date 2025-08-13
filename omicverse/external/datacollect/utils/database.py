@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import Pool
 
 from omicverse.external.datacollect.models.base import Base, init_db
-from config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

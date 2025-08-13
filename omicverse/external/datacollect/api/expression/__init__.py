@@ -2,10 +2,10 @@
 Expression API clients for datacollect module.
 """
 
-from .geo import GeoClient
-from .opentargets import OpentargetsClient
-from .opentargets_genetics import OpentargetsGeneticsClient
-from .remap import RemapClient
-from .ccre import CcreClient
+from .geo import GEOClient
+from .remap import ReMapClient
+from .opentargets import OpenTargetsClient
+from .ccre import CCREClient
+from .opentargets_genetics import OpenTargetsGeneticsClient
 
-__all__ = ["GeoClient", "OpentargetsClient", "OpentargetsGeneticsClient", "RemapClient", "CcreClient"]
+__all__ = ["GEOClient", "ReMapClient", "OpenTargetsClient", "CCREClient", "OpenTargetsGeneticsClient"]
