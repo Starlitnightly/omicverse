@@ -40,6 +40,13 @@ except ModuleNotFoundError:
 # Core submodules
 from . import bulk, single, utils, bulk2single, pp, space, pl, llm
 
+# External modules
+try:
+    from .external import datacollect
+except ImportError:
+    # Gracefully handle missing datacollect module
+    datacollect = None
+
 # Optional PopV module requires ``scvi-tools``. Skip if dependency missing.
 
 #usually
