@@ -7,7 +7,7 @@ from omicverse.external.datacollect.api.gwas_catalog import GWASCatalogClient
 from omicverse.external.datacollect.models.genomic import Gene, Variant
 from omicverse.external.datacollect.models.disease import Disease
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from omicverse.external.datacollect.api.geo import GEOClient
 from omicverse.external.datacollect.models.genomic import Gene, Expression
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

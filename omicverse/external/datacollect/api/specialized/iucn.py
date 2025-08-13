@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, List, Optional, Any
-from omicverse.external.datacollect.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 logger = logging.getLogger(__name__)
 

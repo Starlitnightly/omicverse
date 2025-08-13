@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from omicverse.external.datacollect.api.clinvar import ClinVarClient
 from omicverse.external.datacollect.models.genomic import Variant, Gene
 from .base import BaseCollector
-from omicverse.external.datacollect.config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)

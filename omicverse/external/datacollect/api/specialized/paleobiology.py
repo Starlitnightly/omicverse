@@ -1,7 +1,7 @@
 """Paleobiology Database API client for fossil data."""
 
 from typing import Dict, List, Optional, Any
-from omicverse.external.datacollect.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class PaleobiologyClient(BaseAPIClient):

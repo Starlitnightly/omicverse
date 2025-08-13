@@ -2,14 +2,14 @@
 Specialized API clients for datacollect module.
 """
 
-from .blast import BlastClient
-from .jaspar import JasparClient
-from .mpd import MpdClient
-from .iucn import IucnClient
-from .pride import PrideClient
-from .cbioportal import CbioportalClient
-from .regulomedb import RegulomedbClient
-from .worms import WormsClient
+from .iucn import IUCNClient
+from .regulomedb import RegulomeDBClient
+from .mpd import MPDClient
 from .paleobiology import PaleobiologyClient
+from .cbioportal import cBioPortalClient
+from .worms import WoRMSClient
+from .jaspar import JASPARClient
+from .blast import BLASTClient
+from .pride import PRIDEClient
 
-__all__ = ["BlastClient", "JasparClient", "MpdClient", "IucnClient", "PrideClient", "CbioportalClient", "RegulomedbClient", "WormsClient", "PaleobiologyClient"]
+__all__ = ["IUCNClient", "RegulomeDBClient", "MPDClient", "PaleobiologyClient", "cBioPortalClient", "WoRMSClient", "JASPARClient", "BLASTClient", "PRIDEClient"]
