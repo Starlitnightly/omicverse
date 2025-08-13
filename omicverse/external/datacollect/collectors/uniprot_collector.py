@@ -4,8 +4,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from omicverse.external.datacollect.api.uniprot import UniProtClient
-from omicverse.external.datacollect.models.protein import Protein, ProteinFeature, GOTerm
+from src.api.uniprot import UniProtClient
+from src.models.protein import Protein, ProteinFeature, GOTerm
 from .base import BaseCollector
 
 

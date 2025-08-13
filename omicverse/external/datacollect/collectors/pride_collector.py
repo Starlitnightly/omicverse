@@ -3,10 +3,10 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.pride import PRIDEClient
-from omicverse.external.datacollect.models.protein import Protein
+from src.api.pride import PRIDEClient
+from src.models.protein import Protein
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

@@ -3,12 +3,12 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.kegg import KEGGClient
-from omicverse.external.datacollect.models.pathway import Pathway
-from omicverse.external.datacollect.models.genomic import Gene
-from omicverse.external.datacollect.models.protein import Protein
+from src.api.kegg import KEGGClient
+from src.models.pathway import Pathway
+from src.models.genomic import Gene
+from src.models.protein import Protein
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

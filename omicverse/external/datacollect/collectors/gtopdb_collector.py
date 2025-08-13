@@ -3,12 +3,12 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.gtopdb import GtoPdbClient
-from omicverse.external.datacollect.models.genomic import Gene
-from omicverse.external.datacollect.models.protein import Protein
-from omicverse.external.datacollect.models.disease import Disease
+from src.api.gtopdb import GtoPdbClient
+from src.models.genomic import Gene
+from src.models.protein import Protein
+from src.models.disease import Disease
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

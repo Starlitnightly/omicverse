@@ -3,11 +3,11 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.gwas_catalog import GWASCatalogClient
-from omicverse.external.datacollect.models.genomic import Gene, Variant
-from omicverse.external.datacollect.models.disease import Disease
+from src.api.gwas_catalog import GWASCatalogClient
+from src.models.genomic import Gene, Variant
+from src.models.disease import Disease
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

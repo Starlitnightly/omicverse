@@ -4,11 +4,11 @@ import logging
 import json
 from typing import Any, Dict, List, Optional
 
-from omicverse.external.datacollect.api.ensembl import EnsemblClient
-from omicverse.external.datacollect.models.genomic import Gene, Variant
-from omicverse.external.datacollect.models.protein import Protein
+from src.api.ensembl import EnsemblClient
+from src.models.genomic import Gene, Variant
+from src.models.protein import Protein
 from .base import BaseCollector
-from ..config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)
