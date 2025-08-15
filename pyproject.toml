@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "omicverse"
-version = "1.7.6"
+version = "1.7.8rc1"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -75,6 +75,7 @@ dependencies = [
     'requests>=2.0',
     'transformers>=0.30',
     'marsilea',
+    'wandb',
     #'cvxpy>=1.3',
 
 ]
