@@ -237,9 +237,14 @@ def get_cluster_celltype(
     base_url,
     provider,
     api_key=None,
+    timeout=30,
+    max_retries=2,
+    retry_backoff=1.5,
+    verbose=True,
 ):
     # from openai import OpenAI
     import os
+    import time
     import numpy as np
     import pandas as pd
     import requests as requests
@@ -262,6 +267,7 @@ def get_cluster_celltype(
 
     headers = {
         "Authorization": "Bearer " + api_key,
+        "Content-Type": "application/json",
     }
     cluster_celltype = {}
     from tqdm import tqdm
@@ -277,21 +283,77 @@ def get_cluster_celltype(
             f"Only provide the cell type name. Do not show numbers before the name. Some can be a mixture of multiple cell types."
             f"Do not provide the plural form of celltype."
         )
-        # print(question)
 
         params = {
             "messages": [{"role": "user", "content": question}],
             # 如果需要切换模型，在这里修改
             "model": model,
         }
-        response = requests.post(
-            f"{base_url}/chat/completions", headers=headers, json=params, stream=False
-        )
-        res = response.json()
-        answer = res["choices"][0]["message"]["content"].split("\n")
-        # 将回答加入结果字典
-        cluster_celltype[cluster_id] = answer[0].lower()
+        url = f"{base_url}/chat/completions"
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    url, headers=headers, json=params, stream=False, timeout=timeout
+                )
+                if response.status_code >= 400:
+                    try:
+                        err_json = response.json()
+                    except Exception:
+                        err_json = {"error": response.text[:200]}
+                    raise RuntimeError(
+                        f"HTTP {response.status_code} from provider: {err_json}"
+                    )
+
+                try:
+                    res = response.json()
+                except Exception as e:
+                    raise ValueError(f"Invalid JSON response: {str(e)}")
+
+                try:
+                    content = (
+                        res.get("choices", [{}])[0]
+                        .get("message", {})
+                        .get("content", "")
+                    )
+                except Exception as e:
+                    raise ValueError(f"Malformed completion format: {str(e)}")
+
+                if not content:
+                    raise ValueError("Empty completion content")
+
+                first_line = content.split("\n", 1)[0].strip()
+                label = first_line.lower() if first_line else None
+
+                if not label:
+                    raise ValueError("Empty label parsed from completion")
+
+                cluster_celltype[cluster_id] = label
+                last_error = None
+                break
+
+            except (requests.Timeout) as e:
+                last_error = f"Timeout: {str(e)}"
+            except requests.RequestException as e:
+                last_error = f"Request error: {str(e)}"
+            except Exception as e:
+                last_error = f"{type(e).__name__}: {str(e)}"
+
+            if attempt < max_retries:
+                sleep_s = retry_backoff ** attempt
+                if verbose:
+                    print(
+                        f"[CellVote] cluster {cluster_id}: attempt {attempt+1} failed ({last_error}); retrying in {sleep_s:.1f}s"
+                    )
+                time.sleep(sleep_s)
+
+        if last_error is not None and cluster_id not in cluster_celltype:
+            if verbose:
+                print(
+                    f"[CellVote] cluster {cluster_id}: using fallback due to errors: {last_error}"
+                )
+            fallback = (celltypes[0].lower() if celltypes else "unknown")
+            cluster_celltype[cluster_id] = fallback
 
     return cluster_celltype
-
 
