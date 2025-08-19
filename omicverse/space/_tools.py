@@ -816,25 +816,27 @@ def visium_10x_hd_cellpose_gex(
     
 def salvage_secondary_labels(
         adata,
-        primary_labels_key="labels_he", 
-        secondary_labels_key="labels_gex",
+        primary_label="labels_he", 
+        secondary_label="labels_gex",
         labels_key="labels_joint",
         **kwargs,
 ):
     from ..external.bin2cell import salvage_secondary_labels
-    salvage_secondary_labels(adata, primary_labels_key=primary_labels_key,
-                             secondary_labels_key=secondary_labels_key,
+    salvage_secondary_labels(adata, primary_label=primary_label,
+                             secondary_label=secondary_label,
                              labels_key=labels_key)  
     
     
     
-def bin_to_cell(
+def bin2cell(
         adata,
         labels_key="labels_joint",
-        **kwargs,
+        spatial_keys=["spatial"],
+        diameter_scale_factor=None,
 ):
     from ..external.bin2cell import bin_to_cell
-    bin_to_cell(adata, labels_key=labels_key, **kwargs)
+    return bin_to_cell(adata, labels_key=labels_key, 
+                spatial_keys=spatial_keys,diameter_scale_factor=diameter_scale_factor)
     
     
     

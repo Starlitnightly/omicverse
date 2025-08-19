@@ -56,16 +56,20 @@ nav:
         - Bulk RNA-seq to Single RNA-seq: Tutorials-bulk2single/t_bulk2single.ipynb
         - Single RNA-seq to Spatial RNA-seq: Tutorials-bulk2single/t_single2spatial.ipynb
     - Space:
-        - Crop and Rotation of spatial transcriptomic data: Tutorials-space/t_crop_rotate.ipynb
-        - Spatial clustering and denoising expressions: Tutorials-space/t_cluster_space.ipynb
-        - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
-        - Mapping single-cell profile onto spatial profile: Tutorials-space/t_mapping.ipynb
-        - Deconvolution spatial transcriptomic without scRNA-seq: Tutorials-space/t_starfysh.ipynb
-        - Spatial transition tensor of single cells: Tutorials-space/t_stt.ipynb
-        - Spatial Communication: Tutorials-space/t_commot_flowsig.ipynb
-        - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
-        - Spatial IsoDepth Calculation: Tutorials-space/t_gaston.ipynb
-        - Single cell spatial alignment tools: Tutorials-space/t_slat.ipynb 
+        - Preprocess:
+            - Crop and Rotation of spatial transcriptomic data: Tutorials-space/t_crop_rotate.ipynb
+            - Visium 10x HD Cellpose: Tutorials-space/t_cellpose.ipynb
+            - Spatial clustering and denoising expressions: Tutorials-space/t_cluster_space.ipynb
+            - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
+        - Deconvolution:
+            - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
+            - Mapping single-cell profile onto spatial profile: Tutorials-space/t_mapping.ipynb
+            - Deconvolution spatial transcriptomic without scRNA-seq: Tutorials-space/t_starfysh.ipynb
+        - Downstream:
+            - Spatial transition tensor of single cells: Tutorials-space/t_stt.ipynb
+            - Spatial Communication: Tutorials-space/t_commot_flowsig.ipynb
+            - Spatial IsoDepth Calculation: Tutorials-space/t_gaston.ipynb
+            - Single cell spatial alignment tools: Tutorials-space/t_slat.ipynb 
     - LLM:
         - UCE: Tutorials-llm/t_uce.ipynb
         - scGPT: Tutorials-llm/t_scgpt.ipynb

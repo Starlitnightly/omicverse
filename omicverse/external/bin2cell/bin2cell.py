@@ -1889,8 +1889,7 @@ def salvage_secondary_labels(adata, primary_label="labels_he_expanded", secondar
     print("Salvaged "+str(len(secondary_to_take))+" secondary labels")
 
 def bin_to_cell(adata, labels_key="labels_expanded", 
-                spatial_keys=["spatial"], diameter_scale_factor=None, 
-                store_segmentation=True, segmentation_key="segmentation"):
+                spatial_keys=["spatial"], diameter_scale_factor=None,):
     '''
     Collapse all bins for a given nonzero ``labels_key`` into a single cell. 
     Gene expression added up, array coordinates and ``spatial_keys`` averaged out. 
@@ -1978,9 +1977,7 @@ def bin_to_cell(adata, labels_key="labels_expanded",
         cell_adata.obs[labels_key+"_source"] = [mapping[i] for i in cell_adata.obs_names]
     
     # Generate and store segmentation mask for cell boundary visualization
-    if store_segmentation:
-        _add_segmentation_to_adata(cell_adata, adata, labels_key, segmentation_key)
-    
+
     return cell_adata
 
 
