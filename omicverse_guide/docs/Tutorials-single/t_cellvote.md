@@ -28,6 +28,14 @@ print(adata.obs["CellVote_celltype"].value_counts())
 
 The final consensus label is stored in `adata.obs['CellVote_celltype']`.
 
+## Example Notebook (PBMC3k)
+
+For a complete, step-by-step walkthrough on PBMC3k, see the Jupyter notebook:
+
+- Tutorials-single/t_cellvote_pbmc3k.ipynb
+
+It covers preprocessing, clustering, marker selection, simulated multi-method annotations, and both offline and optional online CellVote arbitration.
+
 ## Advanced options
 
 The `vote` method exposes a few additional arguments:
@@ -51,4 +59,3 @@ cv.vote(
 - Ensure that the marker dictionary contains biologically meaningful genes to help resolve disagreements between annotation methods.
 - You can inspect `adata.obs[['scsa_annotation','scMulan_anno','CellVote_celltype']]` to compare individual predictions with the final vote.
 - Any number of annotation columns can be provided in `celltype_keys`.
-
