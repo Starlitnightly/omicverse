@@ -511,6 +511,12 @@ def view_stardist_labels(image_path, labels_npz_path, crop, **kwargs):
     '''
     #PIL is better at handling crops memory efficiently than cv2
     import cv2
+    # allow very large images without triggering decompression bomb errors
+    try:
+        from PIL import Image as _PILImage
+        _PILImage.MAX_IMAGE_PIXELS = None
+    except Exception:
+        pass
     img = Image.open(image_path)
     img = img.crop(crop)
     #stardist likes images on a 0-1 scale
@@ -589,6 +595,11 @@ def view_labels(image_path, labels_npz_path,
         img = load_image(image_path, dtype=dtype)
     else:
         #PIL is better at handling crops memory efficiently than cv2
+        try:
+            from PIL import Image as _PILImage
+            _PILImage.MAX_IMAGE_PIXELS = None
+        except Exception:
+            pass
         img = Image.open(image_path)
         #ensure that it's in RGB (otherwise there's a single channel for greyscale)
         img = np.array(img.crop(crop).convert('RGB'), dtype=dtype)
@@ -1877,7 +1888,9 @@ def salvage_secondary_labels(adata, primary_label="labels_he_expanded", secondar
     #notify of how much was salvaged
     print("Salvaged "+str(len(secondary_to_take))+" secondary labels")
 
-def bin_to_cell(adata, labels_key="labels_expanded", spatial_keys=["spatial"], diameter_scale_factor=None):
+def bin_to_cell(adata, labels_key="labels_expanded", 
+                spatial_keys=["spatial"], diameter_scale_factor=None, 
+                store_segmentation=True, segmentation_key="segmentation"):
     '''
     Collapse all bins for a given nonzero ``labels_key`` into a single cell. 
     Gene expression added up, array coordinates and ``spatial_keys`` averaged out. 
@@ -1902,6 +1915,11 @@ def bin_to_cell(adata, labels_key="labels_expanded", spatial_keys=["spatial"], d
         The object's ``"spot_diameter_fullres"`` will be multiplied by this much to reflect 
         the change in unit per observation. If ``None``, will default to the square root of 
         the mean of the per-cell bin counts.
+    store_segmentation : ``bool``, optional (default: ``True``)
+        Whether to generate and store cell segmentation boundaries in the resulting AnnData object.
+        The segmentation mask will be reconstructed from the labels and stored for visualization.
+    segmentation_key : ``str``, optional (default: ``"segmentation"``)
+        Key name to store the segmentation mask in ``adata.uns['spatial'][library_id]['images']``.
     '''
     #a label of 0 means there's nothing there, ditch those bins from this operation
     adata = adata[adata.obs[labels_key]!=0]
@@ -1958,4 +1976,217 @@ def bin_to_cell(adata, labels_key="labels_expanded", spatial_keys=["spatial"], d
         mapping = adata.obs[[labels_key,labels_key+"_source"]].drop_duplicates().astype(str).set_index(labels_key).to_dict()[labels_key+"_source"]
         #translate the labels from the cell object
         cell_adata.obs[labels_key+"_source"] = [mapping[i] for i in cell_adata.obs_names]
+    
+    # Generate and store segmentation mask for cell boundary visualization
+    if store_segmentation:
+        _add_segmentation_to_adata(cell_adata, adata, labels_key, segmentation_key)
+    
     return cell_adata
+
+
+def _add_segmentation_to_adata(cell_adata, original_adata, labels_key, segmentation_key):
+    """
+    Generate segmentation mask from cell labels and add to cell_adata for boundary visualization.
+    
+    Parameters
+    ----------
+    cell_adata : AnnData
+        The cell-level AnnData object to add segmentation data to.
+    original_adata : AnnData 
+        The original bin-level AnnData object containing spatial coordinates and labels.
+    labels_key : str
+        The key in obs containing cell labels.
+    segmentation_key : str
+        Key name for storing the segmentation mask.
+    """
+    import numpy as np
+    from scipy.spatial import cKDTree
+    
+    # Get library key for accessing spatial data structures
+    library = list(cell_adata.uns['spatial'].keys())[0]
+    
+    # Get spatial dimensions from the original data
+    # We need to reconstruct a segmentation mask from the bin labels and spatial coordinates
+    spatial_coords = original_adata.obsm['spatial']
+    labels = original_adata.obs[labels_key].values
+    
+    # Determine the image dimensions based on spatial coordinates
+    # Add some padding to ensure all cells are captured
+    min_coords = np.floor(spatial_coords.min(axis=0)).astype(int)
+    max_coords = np.ceil(spatial_coords.max(axis=0)).astype(int) + 1
+    
+    # Create segmentation mask
+    height = max_coords[1] - min_coords[1]
+    width = max_coords[0] - min_coords[0]
+    segmentation_mask = np.zeros((height, width), dtype=np.int32)
+    
+    # Map each spatial location to its label
+    # Adjust coordinates to start from (0,0)
+    adjusted_coords = (spatial_coords - min_coords).astype(int)
+    
+    # Fill the segmentation mask
+    for i, (x, y) in enumerate(adjusted_coords):
+        if 0 <= y < height and 0 <= x < width:
+            segmentation_mask[y, x] = labels[i]
+    
+    # Store the segmentation mask in the spatial data structure
+    cell_adata.uns['spatial'][library]['images'][segmentation_key] = segmentation_mask
+    
+    # Add cell_id column to obs for compatibility with spatial plotting functions
+    cell_adata.obs['cell_id'] = cell_adata.obs['object_id']
+    
+    # Store metadata about the segmentation
+    if 'segmentation_metadata' not in cell_adata.uns['spatial'][library]:
+        cell_adata.uns['spatial'][library]['segmentation_metadata'] = {}
+    
+    cell_adata.uns['spatial'][library]['segmentation_metadata'][segmentation_key] = {
+        'original_coords_min': min_coords,
+        'original_coords_max': max_coords,
+        'mask_shape': (height, width),
+        'labels_key': labels_key
+    }
+
+
+def plot_cell_boundaries(cell_adata, 
+                        color=None, 
+                        segmentation_key="segmentation",
+                        seg_cell_id="cell_id",
+                        seg_outline=True,
+                        seg_contourpx=None,
+                        library_id=None,
+                        auto_detect=True,
+                        **kwargs):
+    """
+    Plot cell boundaries using the stored segmentation mask.
+    
+    This function provides a convenient interface to visualize cell boundaries
+    similar to omicverse.pl.spatial() with segmentation support.
+    
+    Parameters
+    ----------
+    cell_adata : AnnData
+        Cell-level AnnData object with segmentation data stored by bin_to_cell().
+    color : str or None
+        Gene or observation to color the cells by. If None, shows segmentation only.
+    segmentation_key : str, optional (default: "segmentation")
+        Key name for the segmentation mask in spatial images.
+    seg_cell_id : str, optional (default: "cell_id") 
+        Column name in cell_adata.obs containing cell IDs for segmentation.
+    seg_outline : bool, optional (default: True)
+        Whether to show cell boundaries as outlines.
+    seg_contourpx : int or None, optional
+        Width of boundary contours in pixels. If specified, boundaries will be eroded.
+    library_id : str or None, optional
+        Library ID to use. If None, uses the first available library.
+    auto_detect : bool, optional (default: True)
+        Whether to automatically detect and fix parameter mismatches.
+    **kwargs
+        Additional arguments passed to plotting function.
+        
+    Returns
+    -------
+    matplotlib axis or None
+        The plotting axis if successful.
+    """
+    try:
+        # Import the spatial plotting function
+        from omicverse.pl._spatial import spatial
+        
+        # Get library_id if not specified
+        if library_id is None:
+            library_id = list(cell_adata.uns['spatial'].keys())[0]
+        
+        # Check if segmentation data exists
+        if (segmentation_key not in cell_adata.uns['spatial'][library_id]['images']):
+            raise ValueError(f"Segmentation key '{segmentation_key}' not found. "
+                           "Make sure to call bin_to_cell() with store_segmentation=True")
+        
+        # Check if cell_id column exists
+        if seg_cell_id not in cell_adata.obs:
+            raise ValueError(f"Cell ID column '{seg_cell_id}' not found in cell_adata.obs")
+        
+        # Build plot parameters with auto-detection
+        plot_params = {
+            'color': color,
+            'seg': True,
+            'seg_key': segmentation_key,
+            'seg_cell_id': seg_cell_id,
+            'seg_outline': seg_outline,
+            'seg_contourpx': seg_contourpx
+        }
+        
+        # Auto-detect library parameters if enabled
+        if auto_detect:
+            # Only specify library_id if there are multiple libraries
+            if len(list(cell_adata.uns['spatial'].keys())) == 1:
+                # Single library case - let spatial function auto-detect
+                pass
+            else:
+                plot_params['library_id'] = library_id
+                
+                # Try to find appropriate library_key
+                potential_keys = ['fov', 'library', 'library_id', 'sample', 'batch']
+                for key in potential_keys:
+                    if (key in cell_adata.obs and 
+                        library_id in cell_adata.obs[key].astype(str).values):
+                        plot_params['library_key'] = key
+                        break
+        else:
+            plot_params['library_id'] = library_id
+        
+        # Add user-specified parameters
+        plot_params.update(kwargs)
+        
+        # Use omicverse spatial plotting with segmentation
+        ax = spatial(cell_adata, **plot_params)
+        return ax
+        
+    except ImportError:
+        print("Warning: omicverse.pl.spatial not available. Using basic matplotlib visualization.")
+        return _plot_boundaries_matplotlib(cell_adata, color, segmentation_key, library_id, **kwargs)
+
+
+def _plot_boundaries_matplotlib(cell_adata, color, segmentation_key, library_id, **kwargs):
+    """
+    Basic matplotlib-based boundary visualization as fallback.
+    """
+    import matplotlib.pyplot as plt
+    from skimage.segmentation import find_boundaries
+    import numpy as np
+    
+    # Get segmentation mask
+    seg_mask = cell_adata.uns['spatial'][library_id]['images'][segmentation_key]
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=kwargs.get('figsize', (10, 10)))
+    
+    # Find boundaries
+    boundaries = find_boundaries(seg_mask)
+    
+    # Create boundary visualization
+    if color is None:
+        # Just show boundaries
+        ax.imshow(boundaries, cmap='gray')
+        ax.set_title('Cell Boundaries')
+    else:
+        # Show colored cells with boundaries
+        # This is a simplified version - full implementation would need proper color mapping
+        colored_mask = np.zeros_like(seg_mask, dtype=float)
+        if color in cell_adata.obs:
+            for i, cell_id in enumerate(cell_adata.obs['cell_id']):
+                mask = seg_mask == cell_id
+                colored_mask[mask] = cell_adata.obs[color].iloc[i]
+        
+        im = ax.imshow(colored_mask, cmap=kwargs.get('cmap', 'viridis'))
+        
+        # Add boundaries
+        boundary_mask = boundaries[..., np.newaxis] * np.array([1, 1, 1])  # White boundaries
+        ax.imshow(boundary_mask, alpha=0.5)
+        
+        plt.colorbar(im, ax=ax, label=color)
+        ax.set_title(f'Cells colored by {color}')
+    
+    ax.set_xlabel('X coordinate')
+    ax.set_ylabel('Y coordinate')
+    
+    return ax
