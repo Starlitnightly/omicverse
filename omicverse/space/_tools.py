@@ -711,5 +711,130 @@ def map_spatial_manual(
             adata_rotated.obsm['spatial'][:, 1].mean() / (adata_rotated.obsm['spatial'][:, 1].max())
     )
     return adata_rotated
-    
 
+
+def read_visium_10x(
+        adata,
+        **kwargs,
+):
+    from ..external.bin2cell import read_visium
+    adata = read_visium(adata, **kwargs)
+    adata.var_names_make_unique()
+    return adata
+
+
+def visium_10x_hd_cellpose_he(
+        adata,
+        mpp=0.3,
+        he_save_path="stardist/he_colon.tiff",
+        prob_thresh=0,
+        flow_threshold=0.2,
+        gpu=True,
+        buffer=150,
+        backend='tifffile',
+        **kwargs,
+):
+    """
+    Convert Visium 10x data to cell-level data.
+    
+    """
+    from ..external.bin2cell import destripe, scaled_he_image, stardist, insert_labels
+
+    if not os.path.exists(he_save_path):    
+        destripe(adata)
+        scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=he_save_path,
+                        backend=backend)
+    else:
+        print(f"he_save_path {he_save_path} already exists, skipping destripe and scaled_he_image")
+    stardist(image_path=he_save_path    , 
+             labels_npz_path=he_save_path.replace(".tiff", ".npz"), 
+             stardist_model="2D_versatile_he", 
+             prob_thresh=prob_thresh,
+             flow_threshold=flow_threshold,
+             gpu=gpu,
+             **kwargs,
+            )
+    insert_labels(adata, 
+                  labels_npz_path=he_save_path.replace(".tiff", ".npz"), 
+                  basis="spatial", 
+                  spatial_key=f"spatial_cropped_{buffer}_buffer",
+                  mpp=mpp, 
+                  labels_key="labels_he"
+                 )
+    
+def visium_10x_hd_cellpose_expand(
+        adata,
+        max_bin_distance=4,
+        labels_key="labels_he",
+        expanded_labels_key="labels_he_expanded",
+        **kwargs,
+):
+    from ..external.bin2cell import expand_labels
+    expand_labels(adata, 
+                  labels_key=labels_key, 
+                  expanded_labels_key=expanded_labels_key,
+                  max_bin_distance=max_bin_distance,
+                  **kwargs,
+                 )
+    
+def visium_10x_hd_cellpose_gex(
+        adata,
+        obs_key="n_counts_adjusted",
+        log1p=False,
+        mpp=0.3,
+        sigma=5,
+        gex_save_path="stardist/gex_colon.tiff",
+        prob_thresh=0.01,
+        nms_thresh=0.1,
+        gpu=True,
+        buffer=150,
+        **kwargs,
+):
+    from ..external.bin2cell import grid_image, stardist, insert_labels,destripe
+    #if gex_save_path's file exist, jump grid_image to stardist
+    if obs_key not in adata.obs.keys():
+        destripe(adata)
+    if not os.path.exists(gex_save_path):
+        grid_image(adata, obs_key, log1p=log1p,
+                mpp=mpp, sigma=sigma, save_path=gex_save_path)
+    else:
+        print(f"gex_save_path {gex_save_path} already exists, skipping grid_image")
+    stardist(image_path=gex_save_path, 
+             labels_npz_path=gex_save_path.replace(".tiff", ".npz"), 
+             stardist_model="2D_versatile_fluo", 
+             prob_thresh=prob_thresh, 
+             nms_thresh=nms_thresh,gpu=gpu,
+             **kwargs,
+            )
+    insert_labels(adata, 
+                  labels_npz_path=gex_save_path.replace(".tiff", ".npz"), 
+                  basis="spatial", 
+                  spatial_key=f"spatial_cropped_{buffer}_buffer",
+                  mpp=mpp, 
+                  labels_key="labels_gex"
+                 )
+    
+def salvage_secondary_labels(
+        adata,
+        primary_labels_key="labels_he", 
+        secondary_labels_key="labels_gex",
+        labels_key="labels_joint",
+        **kwargs,
+):
+    from ..external.bin2cell import salvage_secondary_labels
+    salvage_secondary_labels(adata, primary_labels_key=primary_labels_key,
+                             secondary_labels_key=secondary_labels_key,
+                             labels_key=labels_key)  
+    
+    
+    
+def bin_to_cell(
+        adata,
+        labels_key="labels_joint",
+        **kwargs,
+):
+    from ..external.bin2cell import bin_to_cell
+    bin_to_cell(adata, labels_key=labels_key, **kwargs)
+    
+    
+    
