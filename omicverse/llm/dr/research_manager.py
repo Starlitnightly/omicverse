@@ -10,13 +10,16 @@ consistency.
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Tuple
 
 from ..model_factory import ModelFactory
 from ..utils.message_standards import MessageStandards
 from .scope.manager import ScopeManager, ProjectBrief
 from .research.supervisor import Supervisor, Finding
+from .research.agent import SourceCitation
 from .write.report import ReportWriter, Section
+from .validation import validate_query
+from .cache import cache
 
 
 class ResearchManager:
@@ -67,41 +70,83 @@ class ResearchManager:
         print(message)
 
     # ------------------------------------------------------------------
-    def scope(self, request: str) -> ProjectBrief:
-        """Convert a user ``request`` into a :class:`ProjectBrief`.
-
-        The request is recorded as part of the scope dialogue before
-        generating the brief.
-        """
-
+    @cache
+    def _scope_cached(self, request: str) -> ProjectBrief:
         self._status(MessageStandards.PREPROCESSING_START)
         self.scope_manager.add_message(request)
         brief = self.scope_manager.generate_brief()
         self._status(MessageStandards.PREPROCESSING_COMPLETE)
         return brief
 
-    # ------------------------------------------------------------------
-    def research(self, brief: ProjectBrief) -> Sequence[Finding]:
-        """Produce findings for each objective in ``brief``."""
+    def scope(self, request: str) -> ProjectBrief:
+        """Convert a user ``request`` into a :class:`ProjectBrief`.
 
+        The request is recorded as part of the scope dialogue before
+        generating the brief. The ``request`` is validated before processing
+        and the result is cached to avoid recomputation.
+        """
+
+        validate_query(request)
+        return self._scope_cached(request)
+
+    # ------------------------------------------------------------------
+    @cache
+    def _research_cached(self, objectives: Tuple[str, ...]) -> Sequence[Finding]:
         self._status(MessageStandards.PREDICTING_START)
-        topics = "\n".join(brief.objectives)
+        topics = "\n".join(objectives)
         findings = self.supervisor.run(topics)
         self._status(MessageStandards.PREDICTING_COMPLETE)
         return findings
 
-    # ------------------------------------------------------------------
-    def write(self, brief: ProjectBrief, findings: Sequence[Finding]) -> str:
-        """Compose a report from ``findings`` informed by ``brief``."""
+    def research(self, brief: ProjectBrief) -> Sequence[Finding]:
+        """Produce findings for each objective in ``brief``."""
 
+        for obj in brief.objectives:
+            validate_query(obj)
+        return self._research_cached(tuple(brief.objectives))
+
+    # ------------------------------------------------------------------
+    @cache
+    def _write_cached(
+        self,
+        sections_key: Tuple,
+    ) -> str:
         self._status(MessageStandards.EMBEDDING_START)
-        sections = [
-            Section(title=f.topic, text=f.text, citations=f.sources)
-            for f in findings
-        ]
+        sections = []
+        for title, text, citations in sections_key:
+            section_citations = [
+                SourceCitation(
+                    source_id=cid,
+                    content=content,
+                    metadata=dict(meta) if meta is not None else None,
+                )
+                for cid, content, meta in citations
+            ]
+            sections.append(Section(title=title, text=text, citations=section_citations))
         report = self.report_writer.compose(sections)
         self._status(MessageStandards.EMBEDDING_COMPLETE)
         return report
+
+    def write(self, brief: ProjectBrief, findings: Sequence[Finding]) -> str:
+        """Compose a report from ``findings`` informed by ``brief``."""
+
+        validate_query(brief.title)
+        sections_key = tuple(
+            (
+                f.topic,
+                f.text,
+                tuple(
+                    (
+                        c.source_id,
+                        c.content,
+                        tuple(sorted(c.metadata.items())) if c.metadata else None,
+                    )
+                    for c in f.sources
+                ),
+            )
+            for f in findings
+        )
+        return self._write_cached(sections_key)
 
     # ------------------------------------------------------------------
     def run(self, request: str) -> str:
