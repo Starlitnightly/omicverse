@@ -68,5 +68,15 @@ but accessed on-demand via SCLLMManager or from model_factory module directly.
 from .base import SCLLMBase, ModelConfig, TaskConfig
 
 from .model_factory import SCLLMManager, ModelFactory
+from . import dr
+from .dr import ResearchManager
 
-
+__all__ = [
+    "SCLLMBase",
+    "ModelConfig",
+    "TaskConfig",
+    "SCLLMManager",
+    "ModelFactory",
+    "dr",
+    "ResearchManager",
+]
