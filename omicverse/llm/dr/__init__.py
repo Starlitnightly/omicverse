@@ -1,7 +1,20 @@
 """Domain research utilities for LLM models.
 
 This submodule exposes high-level interfaces like :class:`ResearchManager`.
+
+Deprecated: `omicverse.llm.dr` is deprecated and will be removed in a
+future release. Please import from `omicverse.llm.domain_research` instead.
 """
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "'omicverse.llm.dr' is deprecated; use 'omicverse.llm.domain_research'",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 try:
     from .research_manager import ResearchManager
@@ -25,4 +38,3 @@ __all__ = [
     "query_store",
     "delete_documents",
 ]
-

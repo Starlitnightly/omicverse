@@ -18,6 +18,7 @@ from .scope.manager import ScopeManager, ProjectBrief
 from .research.supervisor import Supervisor, Finding
 from .research.agent import SourceCitation
 from .write.report import ReportWriter, Section
+from .write.synthesizer import TextSynthesizer, SimpleSynthesizer, SynthesisInput
 from .validation import validate_query
 from .cache import cache
 
@@ -52,6 +53,8 @@ class ResearchManager:
         vector_store,
         tools: Iterable | None = None,
         fmt: str = "markdown",
+        # Report synthesis configuration
+        synthesizer: TextSynthesizer | None = None,
         **model_kwargs,
     ) -> None:
         self._status(MessageStandards.LOADING_MODEL)
@@ -61,8 +64,26 @@ class ResearchManager:
         self._status(MessageStandards.MODEL_LOADED)
 
         self.scope_manager = ScopeManager()
-        self.supervisor = Supervisor(vector_store, tools)
+        # Allow simple string flag to enable web-backed retrieval
+        vs = vector_store
+        if isinstance(vs, str):
+            vs_flag = vs.lower().strip()
+            if vs_flag in {"web", "web:tavily", "web:duckduckgo"}:
+                from .retrievers.web_store import WebRetrieverStore
+
+                if vs_flag == "web":
+                    import os
+
+                    backend = "tavily" if os.getenv("TAVILY_API_KEY") else "duckduckgo"
+                elif vs_flag == "web:tavily":
+                    backend = "tavily"
+                else:
+                    backend = "duckduckgo"
+                vs = WebRetrieverStore(backend=backend)
+
+        self.supervisor = Supervisor(vs, tools)
         self.report_writer = ReportWriter(fmt=fmt)
+        self.synthesizer = synthesizer or SimpleSynthesizer()
 
     def _status(self, message: str) -> None:
         """Output a standardised status message."""
@@ -128,23 +149,50 @@ class ResearchManager:
         return report
 
     def write(self, brief: ProjectBrief, findings: Sequence[Finding]) -> str:
-        """Compose a report from ``findings`` informed by ``brief``."""
+        """Compose a comprehensive report from ``findings`` informed by ``brief``.
+
+        This method first synthesizes a top-level report body using the configured
+        synthesizer (defaults to an offline simple synthesizer), then appends
+        per-topic sections for transparency, and finally formats the document
+        with citations using :class:`ReportWriter`.
+        """
 
         validate_query(brief.title)
+
+        # 1) Synthesize an executive-style top section
+        synthesis_text = self.synthesizer.synthesize(
+            SynthesisInput(title=brief.title, objectives=brief.objectives, findings=findings)
+        )
+
+        # Collect union of citations for the synthesized section
+        union_citations = []
+        for f in findings:
+            union_citations.extend(f.sources)
+
+        sections: list[Section] = [
+            Section(title="Comprehensive Report", text=synthesis_text, citations=union_citations)
+        ]
+
+        # 2) Add transparent per-topic sections
+        for f in findings:
+            sections.append(Section(title=f.topic, text=f.text, citations=f.sources))
+
+        # 3) Render
+        # Convert to cacheable tuple key
         sections_key = tuple(
             (
-                f.topic,
-                f.text,
+                s.title,
+                s.text,
                 tuple(
                     (
                         c.source_id,
                         c.content,
                         tuple(sorted(c.metadata.items())) if c.metadata else None,
                     )
-                    for c in f.sources
+                    for c in s.citations
                 ),
             )
-            for f in findings
+            for s in sections
         )
         return self._write_cached(sections_key)
 

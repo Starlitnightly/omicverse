@@ -71,6 +71,8 @@ nav:
             - Spatial IsoDepth Calculation: Tutorials-space/t_gaston.ipynb
             - Single cell spatial alignment tools: Tutorials-space/t_slat.ipynb 
     - LLM:
+        - Domain Research (dr): Tutorials-llm/t_dr.ipynb
+        - Domain Research (dr) — Live Web: Tutorials-llm/t_dr_web.md
         - UCE: Tutorials-llm/t_uce.ipynb
         - scGPT: Tutorials-llm/t_scgpt.ipynb
         - scFoundation: Tutorials-llm/t_scfoundation.ipynb
