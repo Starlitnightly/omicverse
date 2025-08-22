@@ -58,6 +58,30 @@ OmicVerse can be installed via conda or pypi and you need to install `pytorch` a
 You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
 
 Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
+### Research workflow
+
+The `omicverse.llm.dr` submodule offers an end-to-end research pipeline driven by large language models. It scopes a request, gathers findings from a vector store and writes a cited report.
+
+Additional dependencies may be required depending on the chosen model, such as `torch`, `scanpy`, `tdigest`, `peft`, `datasets` and `accelerate`.
+
+```python
+from omicverse.llm.dr import ResearchManager
+
+class DemoStore:
+    def search(self, query):
+        class Doc:
+            def __init__(self, text):
+                self.id = 0
+                self.text = text
+        return [Doc(f"information about {query}")]
+
+rm = ResearchManager(vector_store=DemoStore())
+brief = rm.scope("Demo project")
+findings = rm.research(brief)
+report = rm.write(brief, findings)
+print(report)
+```
+
 
 ## `4` [Data Framework and Reference](#)
 
