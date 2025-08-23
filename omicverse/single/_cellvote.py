@@ -1,4 +1,6 @@
 
+import requests
+
 
 class CellVote(object):
 
