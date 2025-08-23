@@ -58,6 +58,63 @@ OmicVerse can be installed via conda or pypi and you need to install `pytorch` a
 You can use `conda install omicverse -c conda-forge` or `pip install -U omicverse` for installation.
 
 Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
+### Research workflow (dr)
+
+The `omicverse.llm.dr` submodule generates a comprehensive, cited report from a user query: it scopes the request, researches via a vector store, synthesizes an executive-style summary, and appends per-topic sections with references.
+
+See tutorial: `omicverse_guide/docs/Tutorials-llm/t_dr.ipynb`.
+
+```python
+from omicverse.llm.domain_research import ResearchManager
+
+class DemoStore:
+    def search(self, query):
+        class Doc:
+            def __init__(self, text):
+                self.id = 0
+                self.text = text
+        return [Doc(f"information about {query}")]
+
+rm = ResearchManager(vector_store=DemoStore())  # offline comprehensive report by default
+brief = rm.scope("Demo project")
+findings = rm.research(brief)
+report = rm.write(brief, findings)
+print(report)
+```
+
+Optional: LLM-backed synthesis for the executive summary (OpenAI-compatible):
+
+```python
+import os
+from omicverse.llm.domain_research.write.synthesizer import PromptSynthesizer
+
+synth = PromptSynthesizer(
+    model="gpt-4o-mini",
+    base_url="https://api.openai.com/v1",
+    api_key=os.getenv("OPENAI_API_KEY", ""),
+)
+rm = ResearchManager(vector_store=DemoStore(), synthesizer=synth)
+print(rm.run("Single-cell integration overview"))
+```
+
+Additional dependencies may be required depending on the chosen model or vector store, such as `torch`, `scanpy`, `tdigest`, `peft`, `datasets`, `accelerate`, `chromadb`, and `langchain_community`.
+
+Live web search retrieval:
+
+```python
+import os
+from omicverse.llm.domain_research import ResearchManager
+
+# Simplest: auto-selects Tavily if TAVILY_API_KEY is set, else DuckDuckGo
+rm = ResearchManager(vector_store="web")
+print(rm.run("Recent advances in single-cell RNA-seq batch correction"))
+```
+
+Notes:
+- Pass `vector_store="web:tavily"` or `"web:duckduckgo"` to force a backend.
+- Tavily requires `TAVILY_API_KEY` and returns high-quality results with snippets.
+- DuckDuckGo works without keys; for stability, install `duckduckgo_search` and `beautifulsoup4`.
+
 
 ## `4` [Data Framework and Reference](#)
 
