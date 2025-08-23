@@ -88,10 +88,40 @@ class ReportWriter:
         return f"[{idx}]"
 
     def _format_references(self, citations: Sequence[Tuple[int, SourceCitation]]) -> str:
-        """Format the reference list for the collected citations."""
+        """Format the reference list with light normalization and dedup."""
+
+        def normalize(c: SourceCitation) -> str:
+            # Try to build a friendly reference when metadata exists
+            md = c.metadata or {}
+            title = md.get("title") or ""
+            url = md.get("url") or ""
+            doi = md.get("doi") or ""
+            date = md.get("date") or md.get("year") or ""
+            core = title.strip() or c.content.strip()
+            extra = []
+            if date:
+                extra.append(str(date))
+            if doi:
+                extra.append(f"doi:{doi}")
+            if url:
+                extra.append(url)
+            if extra:
+                return f"{core} ({', '.join(extra)})"
+            return core
+
+        # Deduplicate by DOI or URL or normalized text (case-insensitive)
+        seen_keys = set()
+        norm_items: List[Tuple[int, str]] = []
+        for num, c in citations:
+            md = c.metadata or {}
+            key = (md.get("doi") or md.get("url") or normalize(c)).strip().lower()
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            norm_items.append((num, normalize(c)))
 
         if self.fmt == "html":
-            items = "\n".join(f"<li>{c.content}</li>" for _, c in citations)
+            items = "\n".join(f"<li>{txt}</li>" for _, txt in norm_items)
             return f"<h2>References</h2>\n<ol>\n{items}\n</ol>"
-        items = "\n".join(f"[{num}] {c.content}" for num, c in citations)
+        items = "\n".join(f"[{num}] {txt}" for num, txt in norm_items)
         return f"## References\n{items}"

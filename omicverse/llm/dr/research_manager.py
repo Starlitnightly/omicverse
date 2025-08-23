@@ -11,6 +11,7 @@ consistency.
 from __future__ import annotations
 
 from typing import Iterable, Sequence, Tuple
+import os
 
 from ..model_factory import ModelFactory
 from ..utils.message_standards import MessageStandards
@@ -55,6 +56,8 @@ class ResearchManager:
         fmt: str = "markdown",
         # Report synthesis configuration
         synthesizer: TextSynthesizer | None = None,
+        # Scope configuration
+        llm_scope: bool = False,
         **model_kwargs,
     ) -> None:
         self._status(MessageStandards.LOADING_MODEL)
@@ -64,22 +67,30 @@ class ResearchManager:
         self._status(MessageStandards.MODEL_LOADED)
 
         self.scope_manager = ScopeManager()
+        self.llm_scope = llm_scope or bool(os.getenv("OV_DR_LLM_SCOPE"))
         # Allow simple string flag to enable web-backed retrieval
         vs = vector_store
         if isinstance(vs, str):
             vs_flag = vs.lower().strip()
-            if vs_flag in {"web", "web:tavily", "web:duckduckgo"}:
+            if vs_flag in {"web", "web:tavily", "web:duckduckgo", "web:embed", "web:embed:tavily", "web:embed:duckduckgo"}:
                 from .retrievers.web_store import WebRetrieverStore
+                try:
+                    from .retrievers.embed_web import EmbedWebRetriever
+                except Exception:
+                    EmbedWebRetriever = None  # type: ignore
 
                 if vs_flag == "web":
                     import os
 
                     backend = "tavily" if os.getenv("TAVILY_API_KEY") else "duckduckgo"
-                elif vs_flag == "web:tavily":
+                elif vs_flag in {"web:tavily", "web:embed:tavily"}:
                     backend = "tavily"
                 else:
                     backend = "duckduckgo"
-                vs = WebRetrieverStore(backend=backend)
+                if vs_flag.startswith("web:embed") and EmbedWebRetriever is not None:
+                    vs = EmbedWebRetriever(backend=backend)
+                else:
+                    vs = WebRetrieverStore(backend=backend)
 
         self.supervisor = Supervisor(vs, tools)
         self.report_writer = ReportWriter(fmt=fmt)
@@ -96,6 +107,18 @@ class ResearchManager:
         self._status(MessageStandards.PREPROCESSING_START)
         self.scope_manager.add_message(request)
         brief = self.scope_manager.generate_brief()
+        # Optional LLM-assisted scoping
+        if self.llm_scope:
+            try:
+                from .scope.llm_scoper import suggest_brief
+
+                sug = suggest_brief(request)
+                if sug.get("objectives"):
+                    brief.objectives = list(dict.fromkeys([*brief.objectives, *sug["objectives"]]))
+                if sug.get("constraints"):
+                    brief.constraints = list(dict.fromkeys([*brief.constraints, *sug["constraints"]]))
+            except Exception:
+                pass
         self._status(MessageStandards.PREPROCESSING_COMPLETE)
         return brief
 
@@ -112,19 +135,43 @@ class ResearchManager:
 
     # ------------------------------------------------------------------
     @cache
-    def _research_cached(self, objectives: Tuple[str, ...]) -> Sequence[Finding]:
+    def _research_cached(self, objectives: Tuple[str, ...], constraints_key: Tuple[str, ...]) -> Sequence[Finding]:
         self._status(MessageStandards.PREDICTING_START)
-        topics = "\n".join(objectives)
+        topics = "\n".join(self._augment_topics_with_constraints(objectives, constraints_key))
         findings = self.supervisor.run(topics)
         self._status(MessageStandards.PREDICTING_COMPLETE)
         return findings
+
+    def _augment_topics_with_constraints(self, objectives: Sequence[str], constraints: Sequence[str]) -> Sequence[str]:
+        # Inject simple domain/date constraints into topics for web backends
+        # Parse constraints like 'date:>=YYYY' and 'domain:foo|bar'
+        date_since = None
+        domains: list[str] = []
+        for c in constraints:
+            c = c.strip()
+            if c.startswith("date:") and ">=" in c:
+                date_since = c.split(">=", 1)[1]
+            if c.startswith("domain:"):
+                domains.extend([d.strip() for d in c.split(":", 1)[1].split("|") if d.strip()])
+
+        out = []
+        for obj in objectives:
+            q = obj
+            if domains:
+                # simple site biasing tokens
+                q += " " + " ".join(f"site:{d}" for d in domains)
+            if date_since:
+                # advisory token for engines that support it; otherwise influences ranking
+                q += f" after:{date_since}"
+            out.append(q)
+        return out
 
     def research(self, brief: ProjectBrief) -> Sequence[Finding]:
         """Produce findings for each objective in ``brief``."""
 
         for obj in brief.objectives:
             validate_query(obj)
-        return self._research_cached(tuple(brief.objectives))
+        return self._research_cached(tuple(brief.objectives), tuple(brief.constraints))
 
     # ------------------------------------------------------------------
     @cache
