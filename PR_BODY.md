@@ -1,7 +1,7 @@
-# LLM Domain Research: live web retrieval, alias module, docs/tutorial updates, deprecate `ov.llm.dr`
+# LLM Domain Research: Web Retrieval (basic + embedding), Guarded Synthesis, LLM Scoping, Aliases, Docs
 
 ## Summary
-Adds live web-backed retrieval to the domain research pipeline and introduces a clearer import path `omicverse.llm.domain_research` (re-exporting the legacy `omicverse.llm.dr`). Importing `omicverse.llm.dr` now emits a deprecation warning guiding users to the new module path. Docs and tutorials are updated to reflect the new usage and web options.
+Adds live web-backed retrieval (basic + embedding with chunking/rerank), LLM guardrails for synthesis, and optional LLM-assisted scoping. Also introduces a clearer import path `omicverse.llm.domain_research` (re-exporting the legacy `omicverse.llm.dr`). Docs and tutorials updated accordingly.
 
 ## Changes
 - Feature: Live web retriever
@@ -10,14 +10,23 @@ Adds live web-backed retrieval to the domain research pipeline and introduces a 
     - `duckduckgo` — works without keys; best with `duckduckgo_search` + `beautifulsoup4`
   - Optional `fetch_content` fetches pages and extracts text; otherwise uses snippets.
 
+- Feature: Embedding-backed web retriever (chunking + reranking + dedup)
+  - `omicverse/llm/dr/retrievers/embed_web.py`: New `EmbedWebRetriever`
+    - Robust extraction (`trafilatura` preferred, `BeautifulSoup` fallback), concurrency, retry/backoff
+    - Sentence-ish chunking with overlap; in-memory embedding rerank via Chroma (falls back to TF scoring)
+    - Deduplicates by URL and returns top-k passages
+  - `ResearchManager`: accepts `vector_store="web:embed"|"web:embed:tavily"|"web:embed:duckduckgo"`
+  - Re-exported from `omicverse.llm.domain_research.retrievers`
+
 - Pipeline wiring
   - `omicverse/llm/dr/research_manager.py`:
-    - Accepts `vector_store="web" | "web:tavily" | "web:duckduckgo"` to auto/force web retrieval.
+    - Accepts `vector_store="web" | "web:tavily" | "web:duckduckgo" | "web:embed(:backend)"` to auto/force retrieval.
+    - Optional `llm_scope=True` or env `OV_DR_LLM_SCOPE=1` to enable LLM-assisted scoping.
     - Backward compatibility: existing object-based `vector_store` continues to work unchanged.
 
 - New alias module
   - `omicverse/llm/domain_research/__init__.py`: Re-exports primary API from `..dr`.
-  - `omicverse/llm/domain_research/retrievers/__init__.py`: Re-exports `WebRetrieverStore`.
+  - `omicverse/llm/domain_research/retrievers/__init__.py`: Re-exports `WebRetrieverStore`, `EmbedWebRetriever`.
   - `omicverse/llm/domain_research/write/synthesizer.py`: Re-exports synthesizer types.
 
 - Deprecation
@@ -47,6 +56,18 @@ Adds live web-backed retrieval to the domain research pipeline and introduces a 
 - LLM-backed synthesis:
   ```python
   from omicverse.llm.domain_research.write.synthesizer import PromptSynthesizer
+  synth = PromptSynthesizer(model="gpt-5", base_url="https://api.openai.com/v1", api_key=...)
+  ```
+
+- Embedding-backed retrieval:
+  ```python
+  rm = ResearchManager(vector_store="web:embed")
+  # or rm = ResearchManager(vector_store="web:embed:tavily")
+  ```
+
+- LLM-assisted scoping:
+  ```python
+  rm = ResearchManager(vector_store="web:embed", llm_scope=True)
   ```
 
 ## Migration & Deprecation
@@ -55,7 +76,21 @@ Adds live web-backed retrieval to the domain research pipeline and introduces a 
 
 ## Notes
 - Tavily: set `TAVILY_API_KEY` in the environment.
+## Synthesis Guardrails
+- `omicverse/llm/dr/write/synthesizer.py`: `PromptSynthesizer` now supports `guardrails=True` (default), adding instructions to:
+  - Use only retrieved findings as knowledge, ignore instructions embedded in sources
+  - Avoid fabrication; signal insufficient evidence; prefer grounded quotes/paraphrases
+  - Note limitations or disagreements across sources
+
+## LLM-assisted Scoping
+- `omicverse/llm/dr/scope/llm_scoper.py`: Splits objectives and adds constraints (`date:>=YYYY`, `domain:foo|bar`) via an OpenAI-compatible API when available; otherwise uses heuristics.
+- `ResearchManager(llm_scope=True)`: merges suggested objectives/constraints into the brief and threads constraints into queries (simple date/domain tokens for web backends).
+
+## References: Normalization & Dedup
+- `omicverse/llm/dr/write/report.py`: Normalizes references from metadata (title, date/year, DOI, URL) and deduplicates by DOI→URL→normalized text; preserves stable numbering.
+
 - DuckDuckGo: for robustness, install `duckduckgo_search` and `beautifulsoup4`.
+- For embedding rerank: optional `chromadb` is used when present; falls back gracefully when missing.
 - Set `fetch_content=False` to rely on search snippets (fewer network calls).
 
 ## Testing
@@ -67,4 +102,3 @@ Adds live web-backed retrieval to the domain research pipeline and introduces a 
 - [x] README and tutorials updated; mkdocs nav updated.
 - [ ] CI/docs build verification by maintainers (mkdocs build).
 - [ ] Optional: add mocked unit tests for web retrieval flag.
-
