@@ -56,6 +56,9 @@ class ResearchManager:
         fmt: str = "markdown",
         # Report synthesis configuration
         synthesizer: TextSynthesizer | None = None,
+        # Retrieval/runtime configuration
+        cache: bool | None = None,
+        verify: bool = False,
         # Scope configuration
         llm_scope: bool = False,
         **model_kwargs,
@@ -72,7 +75,7 @@ class ResearchManager:
         vs = vector_store
         if isinstance(vs, str):
             vs_flag = vs.lower().strip()
-            if vs_flag in {"web", "web:tavily", "web:duckduckgo", "web:embed", "web:embed:tavily", "web:embed:duckduckgo"}:
+            if vs_flag in {"web", "web:tavily", "web:duckduckgo", "web:brave", "web:embed", "web:embed:tavily", "web:embed:duckduckgo", "web:embed:brave"}:
                 from .retrievers.web_store import WebRetrieverStore
                 try:
                     from .retrievers.embed_web import EmbedWebRetriever
@@ -82,19 +85,23 @@ class ResearchManager:
                 if vs_flag == "web":
                     import os
 
-                    backend = "tavily" if os.getenv("TAVILY_API_KEY") else "duckduckgo"
+                    backend = "tavily" if os.getenv("TAVILY_API_KEY") else ("brave" if os.getenv("BRAVE_API_KEY") else "duckduckgo")
                 elif vs_flag in {"web:tavily", "web:embed:tavily"}:
                     backend = "tavily"
+                elif vs_flag in {"web:brave", "web:embed:brave"}:
+                    backend = "brave"
                 else:
                     backend = "duckduckgo"
+                cache_enabled = cache if cache is not None else bool(os.getenv("OV_DR_CACHE"))
                 if vs_flag.startswith("web:embed") and EmbedWebRetriever is not None:
-                    vs = EmbedWebRetriever(backend=backend)
+                    vs = EmbedWebRetriever(backend=backend, cache=cache_enabled)
                 else:
-                    vs = WebRetrieverStore(backend=backend)
+                    vs = WebRetrieverStore(backend=backend, cache=cache_enabled)
 
         self.supervisor = Supervisor(vs, tools)
         self.report_writer = ReportWriter(fmt=fmt)
         self.synthesizer = synthesizer or SimpleSynthesizer()
+        self._verify_outputs = verify
 
     def _status(self, message: str) -> None:
         """Output a standardised status message."""
@@ -215,6 +222,19 @@ class ResearchManager:
         union_citations = []
         for f in findings:
             union_citations.extend(f.sources)
+
+        # Optional verification/quality scoring
+        if self._verify_outputs and union_citations:
+            try:
+                from .verify.quality import SourceVerifier
+
+                verifier = SourceVerifier()
+                union_citations = verifier.verify_all(union_citations)
+                # Also verify per-finding citations
+                for f in findings:
+                    f.sources = verifier.verify_all(f.sources)
+            except Exception:
+                pass
 
         sections: list[Section] = [
             Section(title="Comprehensive Report", text=synthesis_text, citations=union_citations)
