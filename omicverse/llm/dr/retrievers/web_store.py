@@ -5,11 +5,12 @@ This module provides a `WebRetrieverStore` that conforms to the
 search and optional page fetching to return lightweight document
 objects with `id`, `text`, and `metadata` fields.
 
-Two backends are supported:
+Backends supported:
 
 - "tavily": Uses the Tavily Search API (`TAVILY_API_KEY` required).
 - "duckduckgo": Uses the `duckduckgo_search` package if available,
   otherwise falls back to parsing DuckDuckGo HTML results.
+- "brave": Uses Brave Search API (`BRAVE_API_KEY` required).
 
 The implementation is dependency-light and degrades gracefully when
 optional libraries are not installed. For reliability and quality,
@@ -46,7 +47,7 @@ class WebRetrieverStore:
     Parameters
     ----------
     backend: str
-        One of {"tavily", "duckduckgo"}. Defaults to "duckduckgo".
+        One of {"tavily", "duckduckgo", "brave"}. Defaults to "duckduckgo".
     max_results: int
         Maximum number of search results to use.
     fetch_content: bool
@@ -58,6 +59,12 @@ class WebRetrieverStore:
         Custom User-Agent header for page fetches.
     tavily_api_key: str | None
         API key for Tavily. If None, taken from `TAVILY_API_KEY` env.
+    brave_api_key: str | None
+        API key for Brave. If None, taken from `BRAVE_API_KEY` env.
+    cache: bool
+        If True and `requests_cache` is installed, cache HTTP responses.
+    cache_ttl: int
+        Cache expiration in seconds (if cache enabled).
     """
 
     def __init__(
@@ -69,6 +76,9 @@ class WebRetrieverStore:
         request_timeout: int = 20,
         user_agent: Optional[str] = None,
         tavily_api_key: Optional[str] = None,
+        brave_api_key: Optional[str] = None,
+        cache: bool = False,
+        cache_ttl: int = 600,
     ) -> None:
         self.backend = backend.lower()
         self.max_results = max_results
@@ -80,17 +90,39 @@ class WebRetrieverStore:
             "(KHTML, like Gecko) Chrome/118.0 Safari/537.36"
         )
         self.tavily_api_key = tavily_api_key or os.getenv("TAVILY_API_KEY")
+        self.brave_api_key = brave_api_key or os.getenv("BRAVE_API_KEY")
+        self.cache_enabled = cache or bool(os.getenv("OV_DR_CACHE"))
+        self.cache_ttl = cache_ttl
 
-        if self.backend not in {"tavily", "duckduckgo"}:
-            raise ValueError("backend must be 'tavily' or 'duckduckgo'")
+        # Per-instance session (optionally cached)
+        try:
+            if self.cache_enabled:
+                import requests_cache  # type: ignore
+
+                self.session = requests_cache.CachedSession(
+                    cache_name="ov_dr_cache",
+                    backend="sqlite",
+                    expire_after=self.cache_ttl,
+                )
+            else:  # pragma: no cover - trivial
+                self.session = requests.Session()
+        except Exception:  # pragma: no cover - optional
+            self.session = requests.Session()
+
+        if self.backend not in {"tavily", "duckduckgo", "brave"}:
+            raise ValueError("backend must be 'tavily', 'duckduckgo' or 'brave'")
 
         if self.backend == "tavily" and not self.tavily_api_key:
             raise ValueError("TAVILY_API_KEY is required for Tavily backend")
+        if self.backend == "brave" and not self.brave_api_key:
+            raise ValueError("BRAVE_API_KEY is required for Brave backend")
 
     # ------------------------------------------------------------------
     def search(self, query: str) -> Sequence[WebDocument]:
         if self.backend == "tavily":
             results = self._search_tavily(query)
+        elif self.backend == "brave":
+            results = self._search_brave(query)
         else:
             results = self._search_duckduckgo(query)
 
@@ -132,10 +164,32 @@ class WebRetrieverStore:
             "max_results": self.max_results,
             "include_answer": False,
         }
-        resp = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+        resp = self.session.post(url, json=payload, headers=headers, timeout=self.timeout)
         resp.raise_for_status()
         data = resp.json()
         return list(data.get("results", []))
+
+    def _search_brave(self, query: str) -> List[Dict[str, Any]]:
+        url = "https://api.search.brave.com/res/v1/web/search"
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": self.brave_api_key or "",
+            "User-Agent": self.user_agent,
+        }
+        params = {"q": query, "count": self.max_results}
+        resp = self.session.get(url, headers=headers, params=params, timeout=self.timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        results: List[Dict[str, Any]] = []
+        for item in (data.get("web", {}) or {}).get("results", [])[: self.max_results]:
+            results.append(
+                {
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "snippet": item.get("description") or "",
+                }
+            )
+        return results
 
     def _search_duckduckgo(self, query: str) -> List[Dict[str, Any]]:
         # Prefer python package if present for stability
@@ -161,7 +215,7 @@ class WebRetrieverStore:
         # Fallback: parse HTML results page (brittle, but no extra deps)
         params = {"q": query}
         headers = {"User-Agent": self.user_agent}
-        resp = requests.get("https://duckduckgo.com/html/", params=params, headers=headers, timeout=self.timeout)
+        resp = self.session.get("https://duckduckgo.com/html/", params=params, headers=headers, timeout=self.timeout)
         resp.raise_for_status()
         html = resp.text
         results: List[Dict[str, Any]] = []
@@ -186,7 +240,7 @@ class WebRetrieverStore:
     def _fetch_text(self, url: str) -> str:
         try:
             headers = {"User-Agent": self.user_agent}
-            resp = requests.get(url, headers=headers, timeout=self.timeout)
+            resp = self.session.get(url, headers=headers, timeout=self.timeout)
             resp.raise_for_status()
             content_type = resp.headers.get("Content-Type", "")
             if "text/html" not in content_type:
@@ -204,4 +258,3 @@ class WebRetrieverStore:
             return text[:20_000]
         except Exception:
             return ""
-

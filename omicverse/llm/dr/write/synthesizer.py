@@ -99,13 +99,28 @@ class PromptSynthesizer(TextSynthesizer):
         self.guardrails = guardrails
 
     def _prepare_findings_blob(self, findings: Sequence[Finding]) -> str:
+        def _sanitize(s: str) -> str:
+            # Remove common injection patterns and fence markers
+            s = s.replace("```", "`")
+            bad_patterns = [
+                "ignore previous instructions",
+                "disregard previous",
+                "system:",
+                "you are now",
+            ]
+            low = s.lower()
+            for pat in bad_patterns:
+                if pat in low:
+                    low = low.replace(pat, "")
+            return low[:2000]
+
         lines = []
         for f in findings:
-            lines.append(f"### {f.topic}\n{f.text}")
+            lines.append(f"### {f.topic}\n{_sanitize(f.text)}")
             if f.sources:
                 lines.append("Sources:")
                 for s in f.sources:
-                    src_line = f"- [{s.source_id}] {s.content}"
+                    src_line = f"- [{s.source_id}] {_sanitize(s.content)}"
                     lines.append(src_line)
         return "\n\n".join(lines)
 

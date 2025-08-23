@@ -48,10 +48,13 @@ class EmbedWebRetriever:
         request_timeout: int = 20,
         user_agent: Optional[str] = None,
         tavily_api_key: Optional[str] = None,
+        brave_api_key: Optional[str] = None,
+        cache: bool = False,
         # Embedding search parameters
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         top_k: int = 5,
+        max_concurrency: int = 4,
     ) -> None:
         from .web_store import WebRetrieverStore
 
@@ -62,10 +65,14 @@ class EmbedWebRetriever:
             request_timeout=request_timeout,
             user_agent=user_agent,
             tavily_api_key=tavily_api_key,
+            brave_api_key=brave_api_key,
+            cache=cache,
         )
         self.chunk_size = max(200, chunk_size)
         self.chunk_overlap = max(0, min(chunk_overlap, self.chunk_size // 2))
         self.top_k = top_k
+        self.max_concurrency = max(1, min(16, max_concurrency))
+        self.session = getattr(self.web, "session", None)
 
     # ------------------------------------------------------------------
     def search(self, query: str) -> Sequence[PassageDoc]:
@@ -79,7 +86,7 @@ class EmbedWebRetriever:
             return self._robust_fetch_and_extract(url, fallback_text)
 
         passages: List[PassageDoc] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as ex:
             futs = []
             for idx, r in enumerate(results):
                 url = r.metadata.get("url") if hasattr(r, "metadata") else None
@@ -134,7 +141,9 @@ class EmbedWebRetriever:
         headers = {"User-Agent": getattr(self.web, "user_agent", "Mozilla/5.0")}
         for i in range(3):
             try:
-                resp = requests.get(url, headers=headers, timeout=getattr(self.web, "timeout", 20))
+                # Prefer shared session if available (enables caching)
+                sess = self.session or requests
+                resp = sess.get(url, headers=headers, timeout=getattr(self.web, "timeout", 20))
                 resp.raise_for_status()
                 html = resp.text
                 # prefer trafilatura if available
@@ -211,4 +220,3 @@ class EmbedWebRetriever:
                 txt = p.text.lower()
                 return sum(txt.count(t) for t in terms)
             return sorted(passages, key=score, reverse=True)
-
