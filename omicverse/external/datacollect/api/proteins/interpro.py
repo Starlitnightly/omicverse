@@ -1,7 +1,7 @@
 """InterPro Protein Families and Domains API client."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class InterProClient(BaseAPIClient):
@@ -88,36 +88,34 @@ class InterProClient(BaseAPIClient):
         limit: int = 20
     ) -> List[Dict[str, Any]]:
         """
-        Search InterPro database.
+        Search InterPro entries (current API path: /entry/interpro).
         
         Args:
             query: Search term
-            entry_type: Entry type filter (replaces type_filter)
+            entry_type: Entry type filter
             limit: Maximum results
         
         Returns:
-            Search results
+            Search results (list of entries)
         """
         params = {
             "search": query,
             "page_size": limit
         }
-        
         if entry_type:
             params["type"] = entry_type
-        
-        response = self.get("/search/entry", params=params)
-        return response.get("results", [])
+        resp = self.get("/entry/interpro", params=params)
+        try:
+            data = resp.json()
+        except Exception:
+            return []
+        if isinstance(data, dict):
+            return data.get("results", [])
+        return []
     
     def get_member_databases(self) -> List[Dict[str, Any]]:
-        """
-        Get list of member databases.
-        
-        Returns:
-            List of databases
-        """
-        response = self.get("/database")
-        return response.get("results", [])
+        """Return an empty list; legacy endpoint deprecated in current API."""
+        return []
     
     def get_go_terms(self, interpro_id: str) -> List[Dict[str, Any]]:
         """

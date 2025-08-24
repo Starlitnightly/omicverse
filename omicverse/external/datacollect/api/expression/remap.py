@@ -1,7 +1,7 @@
 """ReMap Transcription Factor Binding Database API client."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class ReMapClient(BaseAPIClient):

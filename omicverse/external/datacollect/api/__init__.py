@@ -27,11 +27,11 @@ __all__ = [
     # Protein APIs
     'UniProtClient', 'PDBClient', 'AlphaFoldClient', 'InterProClient', 'STRINGClient', 'EMDBClient',
     # Genomics APIs  
-    'EnsemblClient', 'ClinVarClient', 'dbSNPClient', 'gnomADClient', 'GWASCatalogClient', 'UCSCClient', 'RegulomeDBClient',
+    'EnsemblClient', 'ClinVarClient', 'dbSNPClient', 'GnomADClient', 'GWASCatalogClient', 'UCSCClient', 'RegulomeDBClient',
     # Expression APIs
     'GEOClient', 'OpenTargetsClient', 'OpenTargetsGeneticsClient', 'ReMapClient', 'CCREClient',
     # Pathway APIs
     'KEGGClient', 'ReactomeClient', 'GtoPdbClient',
     # Specialized APIs
-    'BLASTClient', 'JASPARClient', 'MPDClient', 'IUCNClient', 'PRIDEClient', 'cBioPortalClient', 'WORMSClient', 'PaleobiologyClient'
+    'BLASTClient', 'JASPARClient', 'MPDClient', 'IUCNClient', 'PRIDEClient', 'cBioPortalClient', 'WoRMSClient', 'PaleobiologyClient'
 ]
