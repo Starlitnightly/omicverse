@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from src.api.geo import GEOClient
 from src.models.genomic import Gene, Expression
 from .base import BaseCollector
-from ..config.config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

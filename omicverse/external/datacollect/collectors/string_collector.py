@@ -8,7 +8,7 @@ from src.api.string import STRINGClient
 from src.models.protein import Protein
 from src.models.interaction import ProteinInteraction
 from .base import BaseCollector
-from ..config.config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

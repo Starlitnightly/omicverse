@@ -8,7 +8,7 @@ from src.models.genomic import Gene
 from src.models.protein import Protein
 from src.models.disease import Disease
 from .base import BaseCollector
-from ..config.config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)

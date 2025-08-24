@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as install_rich_traceback
 
-from ..config.config import settings
+from config import settings
 
 
 # Install rich traceback handler
