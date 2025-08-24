@@ -65,6 +65,12 @@ from . import (scSLAT,CEFCON,mofapy2,GNTD,spaceflow,STT,
                CAST,scanorama,scdiffusion,BINARY,cellanova,VIA,gaston,pyscenic,
                 bin2cell,
                )
+# Optionally expose DataCollect if available so that `ov.external.datacollect` exists
+try:
+    from . import datacollect  # noqa: F401
+except Exception:
+    # Keep module importable even if datacollect has unmet deps
+    pass
 __all__ = [
     'scSLAT',
     'CEFCON',
@@ -94,4 +100,5 @@ __all__ = [
     'gaston',
     'pyscenic',
     'bin2cell',
+    # datacollect is optional and not exported by default to avoid hard deps
 ]
