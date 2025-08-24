@@ -8,7 +8,7 @@ from src.models.pathway import Pathway
 from src.models.genomic import Gene
 from src.models.protein import Protein
 from .base import BaseCollector
-from config.config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)

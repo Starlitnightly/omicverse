@@ -7,7 +7,7 @@ from src.api.gwas_catalog import GWASCatalogClient
 from src.models.genomic import Gene, Variant
 from src.models.disease import Disease
 from .base import BaseCollector
-from config.config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)
