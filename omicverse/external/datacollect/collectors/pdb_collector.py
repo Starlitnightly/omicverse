@@ -7,7 +7,7 @@ from datetime import datetime
 from src.api.pdb_simple import SimplePDBClient
 from src.models.structure import Structure, Chain, Ligand
 from .base import BaseCollector
-from ..config.config import settings
+from config import settings
 
 
 logger = logging.getLogger(__name__)
