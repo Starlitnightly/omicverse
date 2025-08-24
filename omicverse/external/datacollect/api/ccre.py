@@ -1,25 +1,28 @@
-"""ENCODE cCRE (candidate cis-Regulatory Elements) API client."""
+"""ENCODE cCRE (candidate cis-Regulatory Elements) API client.
+
+Updated to use the ENCODE Portal search API which returns JSON when
+`Accept: application/json` and `format=json` are provided.
+"""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from .base import BaseAPIClient
 
 
 class CCREClient(BaseAPIClient):
-    """Client for ENCODE SCREEN cCRE API."""
+    """Client for ENCODE Portal cCRE search API."""
     
     def __init__(self):
         super().__init__(
-            base_url="https://screen.encodeproject.org",
-            rate_limit=1.0
+            base_url="https://www.encodeproject.org",
+            rate_limit=2.0
         )
     
-    
     def get_default_headers(self) -> Dict[str, str]:
-        """Get default headers for requests."""
         return {
             "User-Agent": "BioinformaticsCollector/1.0",
             "Accept": "application/json"
         }
+
     def region_to_ccre_screen(
         self,
         chromosome: str,
@@ -27,26 +30,16 @@ class CCREClient(BaseAPIClient):
         end: int,
         genome: str = "GRCh38"
     ) -> Dict[str, Any]:
-        """
-        Find cCREs in a genomic region.
-        
-        Args:
-            chromosome: Chromosome (e.g., "chr1")
-            start: Start position
-            end: End position
-            genome: Genome assembly (GRCh38 or mm10)
-        
-        Returns:
-            Dict containing cCRE data
-        """
+        """Find cCREs in a genomic region via ENCODE Portal search."""
         params = {
-            "chromosome": chromosome,
-            "start": start,
-            "end": end,
-            "genome": genome
+            "type": "Annotation",
+            "annotation_type": "candidate Cis-Regulatory Elements",
+            "assembly": genome,
+            "region": f"{chromosome}:{start}-{end}",
+            "format": "json",
+            "limit": 100
         }
-        
-        response = self.get("/api/v1/ccres", params=params)
+        response = self.get("/search/", params=params)
         return response.json()
     
     def get_ccre_details(self, accession: str) -> Dict[str, Any]:
