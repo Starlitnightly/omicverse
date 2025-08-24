@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from src.api.dbsnp import dbSNPClient
 from src.models.genomic import Variant, Gene
 from .base import BaseCollector
-from ..config.config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)
