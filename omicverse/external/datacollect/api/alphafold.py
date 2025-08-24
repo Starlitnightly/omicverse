@@ -1,7 +1,7 @@
 """AlphaFold Protein Structure Database API client."""
 
 from typing import Dict, List, Optional, Any
-from .base import BaseAPIClient
+from src.api.base import BaseAPIClient
 
 
 class AlphaFoldClient(BaseAPIClient):

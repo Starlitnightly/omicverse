@@ -7,16 +7,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Union
 from urllib.parse import urljoin
 
-from typing import TYPE_CHECKING
-try:
-    import httpx  # type: ignore
-except Exception:  # pragma: no cover - allow import without httpx
-    httpx = None  # type: ignore
+import httpx
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..config.config import settings
+from config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -77,8 +73,7 @@ class BaseAPIClient(ABC):
         self.session = self._create_session()
         
         # Client for async requests
-        # Defer httpx usage until actually needed; keep import optional
-        self._async_client = None  # type: ignore
+        self._async_client: Optional[httpx.AsyncClient] = None
     
     def _create_session(self) -> requests.Session:
         """Create a requests session with retry logic."""
@@ -101,12 +96,8 @@ class BaseAPIClient(ABC):
         return session
     
     @property
-    async def async_client(self):  # -> httpx.AsyncClient
+    async def async_client(self) -> httpx.AsyncClient:
         """Get or create async client."""
-        if httpx is None:
-            raise ImportError(
-                "httpx is required for async requests. Install with: pip install httpx"
-            )
         if self._async_client is None:
             self._async_client = httpx.AsyncClient(
                 timeout=self.timeout,
@@ -222,7 +213,7 @@ class BaseAPIClient(ABC):
     def close(self):
         """Close the session."""
         self.session.close()
-        if self._async_client and httpx is not None:
+        if self._async_client:
             asyncio.create_task(self._async_client.aclose())
     
     def __enter__(self):
@@ -239,5 +230,5 @@ class BaseAPIClient(ABC):
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
-        if self._async_client and httpx is not None:
+        if self._async_client:
             await self._async_client.aclose()

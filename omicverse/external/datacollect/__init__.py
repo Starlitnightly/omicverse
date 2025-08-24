@@ -19,14 +19,11 @@ Main API clients:
     Specialized: BLAST, JASPAR, MPD, IUCN, PRIDE, cBioPortal, RegulomeDB
 """
 
-# Import API clients if all dependencies are available; otherwise defer to lazy imports in wrappers
+# Import all API clients from organized structure
 try:
-    from .api import *  # noqa: F401,F403
-except Exception as _e:
-    # Defer failures to function-level lazy imports so the module remains usable
-    _API_IMPORT_ERROR = _e  # type: ignore
-else:
-    _API_IMPORT_ERROR = None  # type: ignore
+    from .api import *
+except ImportError:
+    pass
 
 # Import collectors
 try:
@@ -54,26 +51,12 @@ def collect_protein_data(identifier, source='uniprot', to_format='pandas', **kwa
     Returns:
     - Data in specified format
     """
-    # Lazy import to avoid failing on optional dependencies at module import time
-    try:
-        from .api.proteins import (
-            UniProtClient,
-            PDBClient,
-            AlphaFoldClient,
-            InterProClient,
-            STRINGClient,
-        )
-    except Exception as e:
-        raise ImportError(
-            f"Protein API clients unavailable. Ensure dependencies are installed (e.g., httpx). Root cause: {e}"
-        )
-
     source_map = {
         'uniprot': UniProtClient,
         'pdb': PDBClient,
         'alphafold': AlphaFoldClient,
         'interpro': InterProClient,
-        'string': STRINGClient,
+        'string': STRINGClient
     }
     
     if source not in source_map:
@@ -105,17 +88,9 @@ def collect_expression_data(identifier, source='geo', to_format='anndata', **kwa
     Returns:
     - Expression data in AnnData format (default) or specified format
     """
-    # Lazy import
-    try:
-        from .api.expression import GEOClient, CCREClient
-    except Exception as e:
-        raise ImportError(
-            f"Expression API clients unavailable. Ensure dependencies are installed. Root cause: {e}"
-        )
-
     source_map = {
         'geo': GEOClient,
-        'ccre': CCREClient,
+        'ccre': CCREClient
     }
     
     if source not in source_map:
@@ -150,18 +125,10 @@ def collect_pathway_data(identifier, source='kegg', to_format='pandas', **kwargs
     Returns:
     - Pathway data in specified format
     """
-    # Lazy import
-    try:
-        from .api.pathways import KEGGClient, ReactomeClient, GtoPdbClient
-    except Exception as e:
-        raise ImportError(
-            f"Pathway API clients unavailable. Ensure dependencies are installed. Root cause: {e}"
-        )
-
     source_map = {
         'kegg': KEGGClient,
         'reactome': ReactomeClient,
-        'gtopdb': GtoPdbClient,
+        'gtopdb': GtoPdbClient
     }
     
     if source not in source_map:
@@ -176,7 +143,7 @@ def collect_pathway_data(identifier, source='kegg', to_format='pandas', **kwargs
     elif to_format == 'mudata':
         return to_mudata(data)
     elif to_format == 'pandas':
-        return to_pandas(data, "pathway")
+        return to_pandas(data, "protein")
     else:
         return data
 

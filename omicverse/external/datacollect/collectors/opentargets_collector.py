@@ -8,7 +8,7 @@ from src.api.opentargets import OpenTargetsClient
 from src.models.genomic import Gene
 from src.models.disease import Disease
 from .base import BaseCollector
-from ..config.config import settings
+from config.config import settings
 
 
 logger = logging.getLogger(__name__)
