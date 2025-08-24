@@ -2,6 +2,8 @@
 
 import logging
 from typing import Any, Dict, List, Optional
+import time
+import requests
 import json
 
 from .base import BaseAPIClient
@@ -50,13 +52,20 @@ class OpenTargetsGeneticsClient(BaseAPIClient):
         if variables:
             payload["variables"] = variables
         
-        response = self.session.post(
-            self.base_url,
-            json=payload,
-            headers=self.get_default_headers()
-        )
-        response.raise_for_status()
-        return response.json()
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self.session.post(
+                    self.base_url,
+                    json=payload,
+                    headers=self.get_default_headers()
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                last_err = e
+                time.sleep(1.0 * (attempt + 1))
+        raise last_err
     
     def get_gene_info(self, gene_id: str) -> Dict[str, Any]:
         """Get gene information.
