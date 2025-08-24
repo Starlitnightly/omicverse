@@ -14,7 +14,9 @@ This module provides API clients for genomics databases including:
 from .ensembl import EnsemblClient
 from .clinvar import ClinVarClient
 from .dbsnp import dbSNPClient
-from .gnomad import gnomADClient
+# Export both canonical and legacy-cased names for compatibility
+from .gnomad import GnomADClient as gnomADClient  # legacy alias
+from .gnomad import GnomADClient
 from .gwas_catalog import GWASCatalogClient
 from .ucsc import UCSCClient
 from .regulomedb import RegulomeDBClient
@@ -23,8 +25,9 @@ __all__ = [
     'EnsemblClient',
     'ClinVarClient',
     'dbSNPClient',
-    'gnomADClient',
-    'GWASCatalogClient', 
+    'GnomADClient',
+    'gnomADClient',  # legacy export
+    'GWASCatalogClient',
     'UCSCClient',
-    'RegulomeDBClient'
+    'RegulomeDBClient',
 ]

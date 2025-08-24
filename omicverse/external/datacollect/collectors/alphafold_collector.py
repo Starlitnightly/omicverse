@@ -8,7 +8,7 @@ from src.api.alphafold import AlphaFoldClient
 from src.models.structure import Structure, Chain
 from src.models.protein import Protein
 from .base import BaseCollector
-from config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)

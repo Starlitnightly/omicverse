@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import json
 
 from .base import BaseAPIClient
-from config.config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)
