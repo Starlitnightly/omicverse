@@ -1,6 +1,7 @@
 """Mouse Phenome Database API client."""
 
 from typing import Dict, List, Optional, Any
+import requests
 from .base import BaseAPIClient
 
 
@@ -69,8 +70,26 @@ class MPDClient(BaseAPIClient):
         if panel:
             params["panel"] = panel
         
-        response = self.get("/api/strains/search", params=params)
-        return response.json().get("strains", [])
+        try:
+            response = self.get("/api/strains/search", params=params)
+            data = response.json()
+            # Newer API may return list directly
+            return data.get("strains", data if isinstance(data, list) else [])
+        except requests.exceptions.HTTPError as e:
+            status = getattr(e.response, "status_code", None)
+            # Try alternative endpoints if route changed
+            for alt in ("/api/strains", "/api/strain/search"):
+                try:
+                    resp = self.get(alt, params=params)
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        data = []
+                    return data.get("strains", data if isinstance(data, list) else [])
+                except requests.exceptions.HTTPError:
+                    continue
+            # If all fail, bubble original error
+            raise
     
     def get_strain_info(self, strain_name: str) -> Dict[str, Any]:
         """
