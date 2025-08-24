@@ -4,8 +4,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from .base import BaseAPIClient
-from config.config import settings
+from ..base import BaseAPIClient
+from ...config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,6 @@ class STRINGClient(BaseAPIClient):
             rate_limit=kwargs.get("rate_limit", 10),
             **kwargs
         )
-        self.api_version = "v11"
     
     def get_default_headers(self) -> Dict[str, str]:
         """Get STRING-specific headers."""
@@ -46,7 +45,7 @@ class STRINGClient(BaseAPIClient):
         Returns:
             List of STRING ID mappings
         """
-        endpoint = f"/{self.api_version}/json/get_string_ids"
+        endpoint = f"/json/get_string_ids"
         params = {
             "identifiers": "\r".join(identifiers),  # STRING expects \r separated
             "species": species,
@@ -72,7 +71,7 @@ class STRINGClient(BaseAPIClient):
         Returns:
             List of interactions
         """
-        endpoint = f"/{self.api_version}/json/network"
+        endpoint = f"/json/network"
         params = {
             "identifiers": "\r".join(identifiers),
             "species": species,
@@ -97,7 +96,7 @@ class STRINGClient(BaseAPIClient):
         Returns:
             List of interaction partners
         """
-        endpoint = f"/{self.api_version}/json/interaction_partners"
+        endpoint = f"/json/interaction_partners"
         params = {
             "identifiers": "\r".join(identifiers),
             "species": species,
@@ -120,7 +119,7 @@ class STRINGClient(BaseAPIClient):
         Returns:
             List of enriched terms
         """
-        endpoint = f"/{self.api_version}/json/enrichment"
+        endpoint = f"/json/enrichment"
         params = {
             "identifiers": "\r".join(identifiers),
             "species": species,
@@ -144,7 +143,7 @@ class STRINGClient(BaseAPIClient):
         Returns:
             PPI enrichment statistics
         """
-        endpoint = f"/{self.api_version}/json/ppi_enrichment"
+        endpoint = f"/json/ppi_enrichment"
         params = {
             "identifiers": "\r".join(identifiers),
             "species": species,

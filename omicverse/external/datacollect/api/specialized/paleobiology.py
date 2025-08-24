@@ -1,7 +1,7 @@
 """Paleobiology Database API client for fossil data."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class PaleobiologyClient(BaseAPIClient):

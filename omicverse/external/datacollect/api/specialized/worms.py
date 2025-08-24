@@ -1,7 +1,7 @@
 """WoRMS (World Register of Marine Species) API client."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class WoRMSClient(BaseAPIClient):
@@ -57,19 +57,16 @@ class WoRMSClient(BaseAPIClient):
         Args:
             name: Scientific or common name
             marine_only: Only marine species
-            fuzzy: Use fuzzy matching
+            fuzzy: Use fuzzy matching (not supported via this path; falls back to strict)
         
         Returns:
             List of matching species
         """
-        params = {
-            "scientificname": name,
-            "marine_only": "true" if marine_only else "false"
-        }
-        
-        endpoint = "/AphiaRecordsByMatchNames" if fuzzy else "/AphiaRecordsByName"
+        # WoRMS REST uses path parameters for name-based queries
+        endpoint = f"/AphiaRecordsByName/{name}"
+        params = {"marine_only": "true" if marine_only else "false"}
         response = self.get(endpoint, params=params)
-        return response if isinstance(response, list) else [response]
+        return response if isinstance(response, list) else ([response] if response else [])
     
     def get_aphia_records_by_name(
         self,
