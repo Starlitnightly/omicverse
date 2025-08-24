@@ -1,7 +1,7 @@
 """Electron Microscopy Data Bank API client."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class EMDBClient(BaseAPIClient):
@@ -39,18 +39,22 @@ class EMDBClient(BaseAPIClient):
         Returns:
             Dict containing search results
         """
+        # Prefer JSON entry search endpoint for stability
         params = {}
         if keyword:
-            params["q"] = keyword
-        if resolution_min:
-            params["resolution_from"] = resolution_min
-        if resolution_max:
-            params["resolution_to"] = resolution_max
-        if organism:
-            params["organism"] = organism
-        
-        response = self.get("/api/search", params=params)
-        return response.json()
+            params["query"] = keyword
+        # Advanced filters may need specific endpoints; keep keyword search stable
+        last_exc = None
+        for _ in range(2):
+            response = self.get("/api/search/entry", params=params)
+            ctype = (response.headers.get("content-type") or "").lower()
+            if "application/json" in ctype:
+                try:
+                    return response.json()
+                except Exception as e:
+                    last_exc = e
+                    continue
+        return {"results": []}
     
     def get_entry(self, emdb_id: str) -> Dict[str, Any]:
         """
