@@ -78,22 +78,26 @@ class ReactomeClient(BaseAPIClient):
         """
         endpoint = f"/data/pathways/low/diagram/entity/{gene_name}/allForms"
         params = {"species": species}
+        headers = self.get_default_headers()
         
         response = self.session.get(
             f"{self.base_url}{endpoint}",
             params=params,
-            headers=self.get_default_headers()
+            headers=headers
         )
         
-        if response.status_code == 404:
-            # Try alternative endpoint
-            endpoint = f"/data/query/{gene_name}/pathways"
-            response = self.session.get(
-                f"{self.base_url}{endpoint}",
-                headers=self.get_default_headers()
+        if response.status_code != 200:
+            # Fallback: perform a search for pathways mentioning the gene
+            search_ep = "/search/query"
+            search_params = {"query": gene_name, "types": "Pathway", "species": species, "cluster": True}
+            resp2 = self.session.get(
+                f"{self.base_url}{search_ep}",
+                params=search_params,
+                headers=headers
             )
+            resp2.raise_for_status()
+            return resp2.json()
         
-        response.raise_for_status()
         return response.json()
     
     def get_pathway_details(self, pathway_id: str) -> Dict[str, Any]:
