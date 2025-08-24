@@ -18,7 +18,7 @@ from .mpd import MPDClient
 from .iucn import IUCNClient
 from .pride import PRIDEClient
 from .cbioportal import cBioPortalClient
-from .worms import WORMSClient
+from .worms import WoRMSClient
 from .paleobiology import PaleobiologyClient
 
 __all__ = [
@@ -28,6 +28,6 @@ __all__ = [
     'IUCNClient',
     'PRIDEClient',
     'cBioPortalClient',
-    'WORMSClient',
+    'WoRMSClient',
     'PaleobiologyClient'
 ]

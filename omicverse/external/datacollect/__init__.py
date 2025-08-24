@@ -63,7 +63,21 @@ def collect_protein_data(identifier, source='uniprot', to_format='pandas', **kwa
         raise ValueError(f"Unknown source: {source}. Available: {list(source_map.keys())}")
     
     client = source_map[source]()
-    data = client.get_data(identifier, **kwargs)
+    # Dispatch to a sensible method per source
+    if source == 'uniprot':
+        data = client.get_entry(identifier)
+    elif source == 'pdb':
+        # Prefer structured JSON entry by default
+        data = client.get_entry(identifier)
+    elif source == 'alphafold':
+        data = client.get_prediction_by_uniprot(identifier)
+    elif source == 'interpro':
+        data = client.get_entry(identifier)
+    elif source == 'string':
+        id_list = kwargs.pop('identifiers', [identifier])
+        data = client.get_interaction_partners(id_list, **kwargs)
+    else:
+        raise ValueError(f"Unsupported protein source: {source}")
     
     # Convert to desired format
     if to_format == 'anndata':
@@ -97,17 +111,33 @@ def collect_expression_data(identifier, source='geo', to_format='anndata', **kwa
         raise ValueError(f"Unknown source: {source}. Available: {list(source_map.keys())}")
     
     client = source_map[source]()
-    data = client.get_data(identifier, **kwargs)
+    if source == 'geo':
+        # If GEO accession provided, get summary; else perform search
+        ident = str(identifier)
+        if ident.upper().startswith(('GSE', 'GDS', 'GPL')):
+            data = client.get_dataset_summary(ident)
+        else:
+            data = client.search(ident, max_results=kwargs.pop('max_results', 20))
+    elif source == 'ccre':
+        # Expect genomic region parameters in kwargs
+        required = {'chromosome', 'start', 'end'}
+        if not required.issubset(kwargs):
+            raise ValueError("CCRE requires chromosome, start, end kwargs")
+        data = client.region_to_ccre_screen(
+            chromosome=kwargs['chromosome'],
+            start=kwargs['start'],
+            end=kwargs['end'],
+            genome=kwargs.get('genome', 'GRCh38')
+        )
+    else:
+        raise ValueError(f"Unsupported expression source: {source}")
     
     # Convert to desired format (default: anndata for OmicVerse compatibility)
     if to_format == 'anndata':
-        from .utils.transformers import to_anndata
         return to_anndata(data)
     elif to_format == 'mudata':
-        from .utils.transformers import to_mudata
         return to_mudata(data)
     elif to_format == 'pandas':
-        from .utils.transformers import to_pandas
         return to_pandas(data)
     else:
         return data
@@ -135,7 +165,19 @@ def collect_pathway_data(identifier, source='kegg', to_format='pandas', **kwargs
         raise ValueError(f"Unknown source: {source}. Available: {list(source_map.keys())}")
     
     client = source_map[source]()
-    data = client.get_data(identifier, **kwargs)
+    if source == 'kegg':
+        data = client.get_entry(identifier)
+    elif source == 'reactome':
+        data = client.get_pathway_details(str(identifier))
+    elif source == 'gtopdb':
+        # numeric = target id; otherwise search
+        try:
+            tid = int(str(identifier))
+            data = client.get_target(tid)
+        except ValueError:
+            data = client.search_targets(str(identifier))
+    else:
+        raise ValueError(f"Unsupported pathway source: {source}")
     
     # Convert to desired format
     if to_format == 'anndata':
@@ -143,7 +185,7 @@ def collect_pathway_data(identifier, source='kegg', to_format='pandas', **kwargs
     elif to_format == 'mudata':
         return to_mudata(data)
     elif to_format == 'pandas':
-        return to_pandas(data, "protein")
+        return to_pandas(data, "pathway")
     else:
         return data
 
@@ -168,7 +210,7 @@ __all__ = [
     'EnsemblClient',
     'ClinVarClient',
     'dbSNPClient',
-    'gnomADClient',
+    'GnomADClient',
     'GWASCatalogClient',
     'UCSCClient',
     
