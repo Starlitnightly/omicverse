@@ -1,7 +1,7 @@
 """WoRMS (World Register of Marine Species) API client."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 
 class WoRMSClient(BaseAPIClient):

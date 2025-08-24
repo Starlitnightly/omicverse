@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from src.api.gnomad import GnomADClient
 from src.models.genomic import Gene, Variant
 from .base import BaseCollector
-from config.config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from src.api.pride import PRIDEClient
 from src.models.protein import Protein
 from .base import BaseCollector
-from config.config import settings
+from ..config.config import settings
 
 
 logger = logging.getLogger(__name__)

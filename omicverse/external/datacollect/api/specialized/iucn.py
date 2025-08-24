@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from ..base import BaseAPIClient
 
 logger = logging.getLogger(__name__)
 
