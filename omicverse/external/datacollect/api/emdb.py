@@ -229,4 +229,12 @@ class EMDBClient(BaseAPIClient):
         Returns:
             Database statistics
         """
-        return self.get("/api/statistics").json()
+        resp = self.get("/api/statistics")
+        ctype = (resp.headers.get("content-type") or "").lower()
+        if "application/json" in ctype:
+            try:
+                return resp.json()
+            except Exception:
+                pass
+        # Fallback when service returns HTML/text
+        return {"raw": resp.text}

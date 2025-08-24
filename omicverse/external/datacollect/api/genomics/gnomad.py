@@ -3,6 +3,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 import json
+import time
+import requests
 
 from ..base import BaseAPIClient
 from ...config import settings
@@ -51,13 +53,28 @@ class GnomADClient(BaseAPIClient):
         if variables:
             payload["variables"] = variables
         
-        response = self.session.post(
-            self.base_url,
-            json=payload,
-            headers=self.get_default_headers()
-        )
-        response.raise_for_status()
-        return response.json()
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self.session.post(
+                    self.base_url,
+                    json=payload,
+                    headers=self.get_default_headers()
+                )
+                try:
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as e:
+                    body = ''
+                    try:
+                        body = response.text[:1000]
+                    except Exception:
+                        pass
+                    raise requests.exceptions.HTTPError(f"{e}; body: {body}") from e
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                last_err = e
+                time.sleep(1.0 * (attempt + 1))
+        raise last_err
 
     def get_variant(self, variant_id: str, dataset: str = "gnomad_r4") -> Dict[str, Any]:
         """Get minimal variant info using a stable GraphQL shape.
