@@ -1,7 +1,7 @@
 """Paleobiology Database API client for fossil data."""
 
 from typing import Dict, List, Optional, Any
-from src.api.base import BaseAPIClient
+from .base import BaseAPIClient
 
 
 class PaleobiologyClient(BaseAPIClient):
@@ -47,7 +47,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["continent"] = continent
         
         response = self.get("/occs/list.json", params=params)
-        return response
+        # Return parsed JSON directly
+        try:
+            return response.json()
+        except Exception:
+            return {"raw": response.text}
     
     def get_occurrences(
         self,
@@ -81,7 +85,12 @@ class PaleobiologyClient(BaseAPIClient):
             params["cc"] = country
         
         response = self.get("/occs/list.json", params=params)
-        return response.get("records", [])
+        data = {}
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def search_occurrences(
         self,
@@ -108,13 +117,21 @@ class PaleobiologyClient(BaseAPIClient):
         if country:
             params["cc"] = country
         
-        return self.get("/occs/list.json", params=params)
+        response = self.get("/occs/list.json", params=params)
+        try:
+            return response.json()
+        except Exception:
+            return {"raw": response.text}
     
     def get_occurrence(self, occurrence_id: str) -> Dict[str, Any]:
         """Get single occurrence by ID."""
         params = {"id": occurrence_id, "show": "full"}
         response = self.get("/occs/single.json", params=params)
-        return response.get("records", [{}])[0] if response.get("records") else {}
+        try:
+            data = response.json()
+        except Exception:
+            return {}
+        return data.get("records", [{}])[0] if data.get("records") else {}
     
     def get_taxa(
         self,
@@ -144,7 +161,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["extant"] = "no" if extinct else "yes"
         
         response = self.get("/taxa/list.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def search_taxa(
         self,
@@ -168,13 +189,21 @@ class PaleobiologyClient(BaseAPIClient):
         if extinct is not None:
             params["extant"] = "no" if extinct else "yes"
         
-        return self.get("/taxa/list.json", params=params)
+        response = self.get("/taxa/list.json", params=params)
+        try:
+            return response.json()
+        except Exception:
+            return {"raw": response.text}
     
     def get_taxon(self, taxon_id: str) -> Dict[str, Any]:
         """Get single taxon by ID."""
         params = {"id": taxon_id, "show": "full"}
         response = self.get("/taxa/single.json", params=params)
-        return response.get("records", [{}])[0] if response.get("records") else {}
+        try:
+            data = response.json()
+        except Exception:
+            return {}
+        return data.get("records", [{}])[0] if data.get("records") else {}
     
     def get_collections(
         self,
@@ -203,7 +232,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["cc"] = country
         
         response = self.get("/colls/list.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def search_collections(
         self,
@@ -227,13 +260,21 @@ class PaleobiologyClient(BaseAPIClient):
         if country:
             params["cc"] = country
         
-        return self.get("/colls/list.json", params=params)
+        response = self.get("/colls/list.json", params=params)
+        try:
+            return response.json()
+        except Exception:
+            return {"raw": response.text}
     
     def get_collection(self, collection_id: str) -> Dict[str, Any]:
         """Get single collection by ID."""
         params = {"id": collection_id, "show": "full"}
         response = self.get("/colls/single.json", params=params)
-        return response.get("records", [{}])[0] if response.get("records") else {}
+        try:
+            data = response.json()
+        except Exception:
+            return {}
+        return data.get("records", [{}])[0] if data.get("records") else {}
     
     def get_time_intervals(self) -> List[Dict[str, Any]]:
         """
@@ -244,7 +285,11 @@ class PaleobiologyClient(BaseAPIClient):
         """
         params = {"scale": "all"}
         response = self.get("/intervals/list.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def get_intervals(
         self,
@@ -260,7 +305,11 @@ class PaleobiologyClient(BaseAPIClient):
         if max_age:
             params["max_ma"] = max_age
         
-        return self.get("/intervals/list.json", params=params)
+        response = self.get("/intervals/list.json", params=params)
+        try:
+            return response.json()
+        except Exception:
+            return {"raw": response.text}
     
     def get_diversity(
         self,
@@ -289,7 +338,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["interval"] = interval
         
         response = self.get("/occs/diversity.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def get_references(
         self,
@@ -314,7 +367,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["year"] = year
         
         response = self.get("/refs/list.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def get_measurements(
         self,
@@ -337,7 +394,11 @@ class PaleobiologyClient(BaseAPIClient):
             params["meas_type"] = measurement_type
         
         response = self.get("/specs/measurements.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])
     
     def get_strata(
         self,
@@ -362,4 +423,8 @@ class PaleobiologyClient(BaseAPIClient):
             params["rank"] = rank
         
         response = self.get("/strata/list.json", params=params)
-        return response.get("records", [])
+        try:
+            data = response.json()
+        except Exception:
+            return []
+        return data.get("records", [])

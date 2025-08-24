@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import json
 
 from .base import BaseAPIClient
-from config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -59,57 +59,15 @@ class OpenTargetsClient(BaseAPIClient):
         return response.json()
     
     def get_target(self, ensembl_id: str) -> Dict[str, Any]:
-        """Get target (gene) information.
-        
-        Args:
-            ensembl_id: Ensembl gene ID
-        
-        Returns:
-            Target information
-        """
+        """Get minimal target information (stable GraphQL fields)."""
         query = """
-        query TargetInfo($ensemblId: String!) {
-            target(ensemblId: $ensemblId) {
-                id
-                approvedSymbol
-                approvedName
-                bioType
-                hgncId
-                uniprotIds
-                genomicLocation {
-                    chromosome
-                    start
-                    end
-                    strand
-                }
-                alternativeGenes
-                pathways {
-                    pathway
-                    pathwayId
-                }
-                proteinAnnotations {
-                    id
-                    functions
-                }
-                tractability {
-                    id
-                    modality
-                    value
-                }
-                safety {
-                    adverseEvents {
-                        count
-                        criticalValue
-                    }
-                    safetyLiabilities {
-                        event
-                        eventId
-                    }
-                }
-            }
+        query($ensemblId: String!) {
+          target(ensemblId: $ensemblId) {
+            id
+            approvedSymbol
+          }
         }
         """
-        
         variables = {"ensemblId": ensembl_id}
         result = self.query(query, variables)
         target_data = result.get("data", {}).get("target")

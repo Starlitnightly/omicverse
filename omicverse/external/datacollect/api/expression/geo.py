@@ -4,8 +4,8 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 import xml.etree.ElementTree as ET
 
-from .base import BaseAPIClient
-from config.config import settings
+from ..base import BaseAPIClient
+from ...config import settings
 
 
 logger = logging.getLogger(__name__)

@@ -3,9 +3,11 @@
 import logging
 from typing import Any, Dict, List, Optional
 import json
+import time
+import requests
 
-from .base import BaseAPIClient
-from config.config import settings
+from ..base import BaseAPIClient
+from ...config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -51,13 +53,47 @@ class GnomADClient(BaseAPIClient):
         if variables:
             payload["variables"] = variables
         
-        response = self.session.post(
-            self.base_url,
-            json=payload,
-            headers=self.get_default_headers()
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self.session.post(
+                    self.base_url,
+                    json=payload,
+                    headers=self.get_default_headers()
+                )
+                try:
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as e:
+                    body = ''
+                    try:
+                        body = response.text[:1000]
+                    except Exception:
+                        pass
+                    raise requests.exceptions.HTTPError(f"{e}; body: {body}") from e
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                last_err = e
+                time.sleep(1.0 * (attempt + 1))
+        raise last_err
+
+    def get_variant(self, variant_id: str, dataset: str = "gnomad_r4") -> Dict[str, Any]:
+        """Get minimal variant info using a stable GraphQL shape.
+
+        Args:
+            variant_id: Variant identifier in chr-pos-ref-alt format
+            dataset: Dataset ID (e.g., 'gnomad_r4', 'gnomad_r3')
+
+        Returns:
+            Dict with minimal variant fields if found; {} otherwise.
+        """
+        query = (
+            "query($variantId:String!, $dataset:DatasetId!) { "
+            "variant(variantId:$variantId, dataset:$dataset) { variantId rsid } }"
         )
-        response.raise_for_status()
-        return response.json()
+        variables = {"variantId": variant_id, "dataset": dataset}
+        result = self.query(query, variables)
+        data = result.get("data", {}).get("variant")
+        return data if data is not None else {}
     
     def get_gene(self, gene_symbol: str, dataset: str = "gnomad_r3") -> Dict[str, Any]:
         """Get gene information and variants.

@@ -2,10 +2,12 @@
 
 import logging
 from typing import Any, Dict, List, Optional
+import time
+import requests
 import json
 
 from .base import BaseAPIClient
-from config.config import settings
+from ..config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -51,13 +53,30 @@ class GnomADClient(BaseAPIClient):
         if variables:
             payload["variables"] = variables
         
-        response = self.session.post(
-            self.base_url,
-            json=payload,
-            headers=self.get_default_headers()
-        )
-        response.raise_for_status()
-        return response.json()
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self.session.post(
+                    self.base_url,
+                    json=payload,
+                    headers=self.get_default_headers()
+                )
+                try:
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as e:
+                    # Attach response body for easier debugging
+                    body = ""
+                    try:
+                        body = response.text[:1000]
+                    except Exception:
+                        pass
+                    raise requests.exceptions.HTTPError(f"{e}; body: {body}") from e
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                last_err = e
+                time.sleep(1.0 * (attempt + 1))
+        # Exhausted retries
+        raise last_err
     
     def get_gene(self, gene_symbol: str, dataset: str = "gnomad_r3") -> Dict[str, Any]:
         """Get gene information and variants.
