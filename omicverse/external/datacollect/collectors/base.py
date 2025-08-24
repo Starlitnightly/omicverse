@@ -8,8 +8,14 @@ import json
 
 from sqlalchemy.orm import Session
 
-from src.models.base import get_db
-from config import settings
+from ..config.config import settings
+
+# Optional DB session import; provide a safe fallback if models are not bundled
+try:
+    from ..models.base import get_db  # type: ignore
+except Exception:  # pragma: no cover - soft fallback for environments without DB
+    def get_db():  # type: ignore
+        raise ImportError("Database models not available; get_db cannot be used.")
 
 
 logger = logging.getLogger(__name__)

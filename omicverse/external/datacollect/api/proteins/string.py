@@ -4,8 +4,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from .base import BaseAPIClient
-from config.config import settings
+from ..base import BaseAPIClient
+from ...config.config import settings
 
 
 logger = logging.getLogger(__name__)

@@ -7,8 +7,23 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import Pool
 
-from src.models.base import Base, init_db
-from config import settings
+from ..config.config import settings
+
+# Optional models import: make this module import-safe when DB models are absent
+try:
+    # When packaged standalone, models may live under datacollect.models
+    from ..models.base import Base, init_db  # type: ignore
+except Exception:  # pragma: no cover - soft fallback for environments without DB
+    class _PlaceholderMeta:
+        tables = {}
+
+    class _BasePlaceholder:
+        metadata = _PlaceholderMeta()
+
+    Base = _BasePlaceholder()  # type: ignore
+
+    def init_db():  # type: ignore
+        return None
 
 
 logger = logging.getLogger(__name__)
