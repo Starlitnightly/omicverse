@@ -773,7 +773,7 @@ class cNMF():
         kmeans_cluster_labels = pd.Series(kmeans_model.labels_+1, index=l2_spectra.index)
 
         # Find median usage for each gene across cluster
-        median_spectra = l2_spectra.groupby(kmeans_cluster_labels).median()
+        median_spectra = l2_spectra.groupby(kmeans_cluster_labels).median(numeric_only=True)
 
         # Normalize median spectra to probability distributions.
         median_spectra = (median_spectra.T/median_spectra.sum(1)).T
