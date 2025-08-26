@@ -380,6 +380,11 @@ class BulkTrajBlend(object):
             else:
                 pair_dict_r[str(nocd_class)]=now_celltype
                 repeat_celltype[now_celltype]+=1
+        
+        # Ensure all keys from 0 to K-1 exist in pair_dict_r to prevent KeyError
+        for j in range(self.nocd_obj.K):
+            if str(j) not in pair_dict_r:
+                pair_dict_r[str(j)] = f'unknown_{j}'
 
         def li_range(li,max_len):
             r=[0]*max_len   
