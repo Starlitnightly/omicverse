@@ -304,8 +304,13 @@ def create_mock_dataset(
             
             adata = adata[:, adata.var.highly_variable]
             sc.pp.scale(adata, max_value=10)
-            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, max(1, adata.n_vars - 1)))
-            sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
+            n_comps = min(50, adata.n_vars - 1, adata.n_obs - 1)
+            if n_comps <= 0:
+                n_comps = min(10, adata.n_vars - 1, adata.n_obs - 1)
+            sc.tl.pca(adata, svd_solver='arpack', n_comps=max(1, n_comps))
+            # Use available PCs for neighbors computation
+            n_pcs_neighbors = min(40, n_comps, adata.obsm['X_pca'].shape[1])
+            sc.pp.neighbors(adata, n_neighbors=10, n_pcs=n_pcs_neighbors)
             sc.tl.umap(adata)
             
             # Add some clustering results
