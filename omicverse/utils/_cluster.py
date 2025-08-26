@@ -207,10 +207,51 @@ def filtered(adata:anndata.AnnData,
 
 class LDA_topic(object):
 
+    def _apply_torch_compatibility_fix(self):
+        """
+        Apply compatibility fix for PyTorch versions missing torch._subclasses.schema_check_mode.
+        
+        This error commonly occurs when using mira-multiome with certain PyTorch versions.
+        The fix creates a mock module to prevent ImportError.
+        """
+        try:
+            import torch._subclasses.schema_check_mode
+        except (ImportError, ModuleNotFoundError):
+            try:
+                import torch
+                import sys
+                from types import ModuleType
+                
+                # Create mock schema_check_mode module
+                mock_module = ModuleType('schema_check_mode')
+                
+                # Add basic attributes that might be expected
+                mock_module.__file__ = '<mock>'
+                mock_module.__path__ = []
+                
+                # Create the submodules structure if needed
+                if not hasattr(torch, '_subclasses'):
+                    torch._subclasses = ModuleType('_subclasses')
+                    sys.modules['torch._subclasses'] = torch._subclasses
+                
+                # Add the mock module
+                torch._subclasses.schema_check_mode = mock_module
+                sys.modules['torch._subclasses.schema_check_mode'] = mock_module
+                
+                print("Applied PyTorch compatibility fix for missing torch._subclasses.schema_check_mode")
+                
+            except Exception as e:
+                print(f"Warning: Could not apply PyTorch compatibility fix: {e}")
+                print("This may cause issues with mira functionality. Consider updating PyTorch.")
+
     def __init__(self,adata,feature_type='expression',
                   highly_variable_key='highly_variable_features',
                  layers='counts',batch_key=None,learning_rate=1e-3,ondisk=False):
         global mira_install
+        
+        # Apply PyTorch compatibility fix for missing torch._subclasses.schema_check_mode
+        self._apply_torch_compatibility_fix()
+        
         try:
             import mira
             mira_install=True
