@@ -163,9 +163,6 @@ def transform_roe_values(roe):
     )
     return transformed_roe
 
-def roe_plot_heatmap(adata, display_numbers=True, **kwargs):
-    """Plot ROE heatmap - alias for plot_heatmap function"""
-    return plot_heatmap(adata, display_numbers=display_numbers, **kwargs)
 
 # roe(adata, sample_key='batch', cell_type_key='celltypist_cell_label_coarse')
 # plot_heatmap(adata, display_numbers=True)
