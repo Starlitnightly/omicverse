@@ -149,23 +149,23 @@ def roe_plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value
 
 
 def transform_roe_values(roe):
-    # Transform roe DataFrame to string format for annotation, following Nature paper thresholds
-    # +++: Ro/e > 1
-    # ++: 0.8 < Ro/e ≤ 1  
-    # +: 0.2 ≤ Ro/e ≤ 0.8
-    # +/-: 0 < Ro/e < 0.2
-    # —: Ro/e = 0
+    # Transform roe DataFrame to string format for annotation
+    # Current implementation thresholds: ≥2 (+++), ≥1.5 (++), ≥1 (+), <1 (+/-)
     transformed_roe = roe.copy()
     transformed_roe = transformed_roe.applymap(
         lambda x: '—' if x == 0 else (
-            '+/-' if 0 < x < 0.2 else (
-                '+' if 0.2 <= x <= 0.8 else (
-                    '++' if 0.8 < x <= 1 else '+++'
+            '+/-' if x < 1 else (
+                '+' if 1 <= x < 1.5 else (
+                    '++' if 1.5 <= x < 2 else '+++'
                 )
             )
         )
     )
     return transformed_roe
+
+def roe_plot_heatmap(adata, display_numbers=True, **kwargs):
+    """Plot ROE heatmap - alias for plot_heatmap function"""
+    return plot_heatmap(adata, display_numbers=display_numbers, **kwargs)
 
 # roe(adata, sample_key='batch', cell_type_key='celltypist_cell_label_coarse')
 # plot_heatmap(adata, display_numbers=True)
