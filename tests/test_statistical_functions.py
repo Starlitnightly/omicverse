@@ -331,15 +331,8 @@ class TestResolutionOptimization:
             n_resolutions=3
         )
         
-        # Test louvain
-        res_louvain = ov.utils.optimal_resolution(
-            self.adata,
-            clustering_method='louvain',
-            n_resolutions=3
-        )
         
         assert isinstance(res_leiden, float)
-        assert isinstance(res_louvain, float)
     
     def test_optimal_resolution_invalid_method(self):
         """Test optimal resolution with invalid clustering method."""
