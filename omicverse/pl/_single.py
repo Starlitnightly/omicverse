@@ -416,12 +416,9 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     """
 
     adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
-    if pd.__version__>="2.0.0":
-        cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
-        cell_num_pd[celltype_key]=cell_num_pd['count']
-    else:
-        cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
-        
+    cell_counts=adata.obs[celltype_key].value_counts()
+    cell_num_pd=pd.DataFrame({celltype_key: cell_counts.values}, index=cell_counts.index)
+    
     if '{}_colors'.format(celltype_key) in adata.uns.keys():
         cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories.tolist(),
                         adata.uns['{}_colors'.format(celltype_key)]))
