@@ -176,11 +176,22 @@ def load_clustering_tutorial_data() -> AnnData:
         
         # Ensure it has the necessary preprocessing for clustering
         if 'X_pca' not in adata.obsm:
-            sc.tl.pca(adata, svd_solver='arpack')
+            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, adata.n_vars - 1))
             
         if 'neighbors' not in adata.uns:
             sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
             
+        # Add cell_type column for tests (use existing louvain clusters)
+        if 'cell_type' not in adata.obs.columns:
+            if 'louvain' in adata.obs.columns:
+                adata.obs['cell_type'] = adata.obs['louvain'].astype(str)
+            else:
+                # Create simple cell type assignment
+                import numpy as np
+                np.random.seed(42)
+                cell_types = ['T cell', 'B cell', 'NK cell', 'Monocyte']
+                adata.obs['cell_type'] = np.random.choice(cell_types, size=adata.n_obs)
+                
         print("Loaded clustering tutorial data based on PBMC 3k")
         return adata
         
@@ -233,7 +244,8 @@ def create_mock_dataset(
         ct_mask = cell_type_labels == ct
         if np.sum(ct_mask) > 0:
             # Make some genes more highly expressed in this cell type
-            high_genes = np.random.choice(n_genes, size=100, replace=False)
+            high_genes_size = min(100, n_genes // 2)  # Use at most half the genes, max 100
+            high_genes = np.random.choice(n_genes, size=high_genes_size, replace=False)
             X[ct_mask][:, high_genes] *= np.random.uniform(2, 5)
     
     # Create gene names
@@ -277,7 +289,7 @@ def create_mock_dataset(
             adata.raw = adata
             adata = adata[:, adata.var.highly_variable]
             sc.pp.scale(adata, max_value=10)
-            sc.tl.pca(adata, svd_solver='arpack')
+            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, adata.n_vars - 1))
             sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
             sc.tl.umap(adata)
             
@@ -289,6 +301,14 @@ def create_mock_dataset(
     
     print(f"Created mock dataset: {n_cells} cells, {n_genes} genes, {n_cell_types} cell types")
     return adata
+
+
+def load_dataset(dataset_name, **kwargs):
+    """Load dataset by name."""
+    if dataset_name == 'mock_dataset':
+        return create_mock_dataset(**kwargs)
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
 
 
 def list_available_datasets() -> List[str]:

@@ -151,9 +151,11 @@ def compare_shannon_diversity(
         sample_adata = adata[sample_mask].copy()
         
         # Calculate diversity for this sample
+        # Add a dummy groupby column since we already filtered to single sample
+        sample_adata.obs['_dummy_group'] = 'all'
         diversity_result = shannon_diversity(
             sample_adata, 
-            groupby='sample',  # Use a dummy groupby since we want per-sample diversity
+            groupby='_dummy_group',  # Use dummy groupby since we want per-sample diversity
             cell_type_key=cell_type_key,
             base=base,
             calculate_evenness=True
