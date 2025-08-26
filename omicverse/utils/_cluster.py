@@ -201,7 +201,7 @@ def filtered(adata:anndata.AnnData,
     adata.obs['gmm_cluster']=adata.obs['gmm_cluster'].astype(str)
     adata.obs.loc[adata.obs[cluster_key].isin(adata.obs[cluster_key].value_counts()[adata.obs[cluster_key].value_counts()<cluster_minsize].index.tolist()),cluster_key]='-1'
     adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
-    adata.obs['gmm_cluster'].cat.categories=pd.Index(list(range(len(adata.obs['gmm_cluster'].cat.categories))))
+    adata.obs['gmm_cluster'] = adata.obs['gmm_cluster'].cat.rename_categories(pd.Index(list(range(len(adata.obs['gmm_cluster'].cat.categories)))))
     print(f"""filtered {new_num} clusters and changed the cluster labels to '-1'(adata.obs, categorical)""")
 
 
