@@ -23,24 +23,100 @@ from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Color
 
 
 
-def mads(meta, cov, nmads=5, lt=None):
+def mads(meta, cov, nmads=5, lt=None, batch_key=None):
     """
-    Given a certain array, it calculate its Median Absolute Deviation (MAD).
+    Calculate Median Absolute Deviation (MAD) thresholds.
+    
+    If batch_key is provided, calculates MAD per batch and returns
+    a dictionary mapping batch values to (lower, upper) thresholds.
+    If batch_key is None, calculates global MAD as before.
+    
+    Parameters
+    ----------
+    meta : pd.DataFrame
+        Metadata dataframe containing the column to analyze
+    cov : str
+        Column name to calculate MAD for
+    nmads : float, default 5
+        Number of MADs for threshold calculation
+    lt : dict, optional
+        Lower thresholds to use if calculated threshold <= 0
+    batch_key : str, optional
+        Column name for batch information. If provided, calculates per-batch MAD
+        
+    Returns
+    -------
+    If batch_key is None:
+        tuple: (lower_threshold, upper_threshold)
+    If batch_key is provided:
+        dict: {batch_value: (lower_threshold, upper_threshold)}
     """
-    x = meta[cov]
-    mad = np.median(np.absolute(x - np.median(x)))
-    t1 = np.median(x) - (nmads * mad)
-    t1 = t1 if t1 > 0 else lt[cov]
-    t2 = np.median(x) + (nmads * mad)
-    return t1, t2
+    if batch_key is None:
+        # Original global MAD calculation
+        x = meta[cov]
+        mad = np.median(np.absolute(x - np.median(x)))
+        t1 = np.median(x) - (nmads * mad)
+        t1 = t1 if t1 > 0 else lt[cov]
+        t2 = np.median(x) + (nmads * mad)
+        return t1, t2
+    else:
+        # Batch-wise MAD calculation
+        batch_thresholds = {}
+        for batch in meta[batch_key].unique():
+            batch_mask = meta[batch_key] == batch
+            x_batch = meta.loc[batch_mask, cov]
+            
+            if len(x_batch) == 0:
+                continue
+                
+            mad = np.median(np.absolute(x_batch - np.median(x_batch)))
+            t1 = np.median(x_batch) - (nmads * mad)
+            t1 = t1 if t1 > 0 else lt[cov]
+            t2 = np.median(x_batch) + (nmads * mad)
+            batch_thresholds[batch] = (t1, t2)
+            
+        return batch_thresholds
 
-def mads_test(meta, cov, nmads=5, lt=None):
+def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
     """
-    Given a certain array, it returns a boolean array with True values only at indeces 
-    from entries within x < n_mads*mad and x > n_mads*mad.
+    Apply MAD-based filtering with optional batch awareness.
+    
+    Returns a boolean array with True values for entries within MAD thresholds.
+    If batch_key is provided, applies per-batch MAD thresholds.
+    
+    Parameters
+    ----------
+    meta : pd.DataFrame
+        Metadata dataframe containing the column to analyze
+    cov : str
+        Column name to test
+    nmads : float, default 5
+        Number of MADs for threshold calculation
+    lt : dict, optional
+        Lower thresholds to use if calculated threshold <= 0
+    batch_key : str, optional
+        Column name for batch information. If provided, applies per-batch MAD
+        
+    Returns
+    -------
+    pd.Series
+        Boolean series indicating which cells pass the MAD filter
     """
-    tresholds = mads(meta, cov, nmads=nmads, lt=lt)
-    return (meta[cov] > tresholds[0]) & (meta[cov] < tresholds[1])
+    if batch_key is None:
+        # Original global MAD test
+        thresholds = mads(meta, cov, nmads=nmads, lt=lt)
+        return (meta[cov] > thresholds[0]) & (meta[cov] < thresholds[1])
+    else:
+        # Batch-wise MAD test
+        batch_thresholds = mads(meta, cov, nmads=nmads, lt=lt, batch_key=batch_key)
+        result = pd.Series(False, index=meta.index, dtype=bool)
+        
+        for batch, (t1, t2) in batch_thresholds.items():
+            batch_mask = meta[batch_key] == batch
+            batch_test = (meta.loc[batch_mask, cov] > t1) & (meta.loc[batch_mask, cov] < t2)
+            result.loc[batch_mask] = batch_test
+            
+        return result
 
 def qc(adata,**kwargs):
     '''
@@ -63,7 +139,8 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
        min_cells=3, min_genes=200, nmads=5,
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,use_gpu=True):
+       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,use_gpu=True,
+       batch_wise_mad=None):
     """
     Perform quality control on a dictionary of AnnData objects.
     
@@ -152,8 +229,8 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.obs['passing_ngenes'] = adata.obs['detected_genes'] > tresh['detected_genes']
     elif mode == 'mads':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
-        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh, batch_key=batch_key)
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh, batch_key=batch_key)
 
     # Report
     n1 = adata.shape[0]
@@ -365,8 +442,8 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         adata.obs['passing_ngenes'] = adata.obs['detected_genes'] > tresh['detected_genes']
     elif mode == 'mads':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
-        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh, batch_key=batch_key)
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh, batch_key=batch_key)
 
     # Report
     n1 = adata.shape[0]
@@ -551,8 +628,8 @@ def qc_gpu(adata, mode='seurat',
         adata.obs['passing_ngenes'] = adata.obs['detected_genes'] > tresh['detected_genes']
     elif mode == 'mads':
         adata.obs['passing_mt'] = adata.obs['mito_perc'] < tresh['mito_perc']
-        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh)
-        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh)
+        adata.obs['passing_nUMIs'] = mads_test(adata.obs, 'nUMIs', nmads=nmads, lt=tresh, batch_key=batch_key)
+        adata.obs['passing_ngenes'] = mads_test(adata.obs, 'detected_genes', nmads=nmads, lt=tresh, batch_key=batch_key)
     
     # Report
     n1 = adata.shape[0]
