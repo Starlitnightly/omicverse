@@ -113,22 +113,22 @@ class TestROE:
         # All ROE values should be close to 1 for balanced data
         np.testing.assert_array_almost_equal(result.values, 1.0, decimal=10)
     
-    def test_roe_threshold_categorization_current(self):
-        """Test current threshold categorization implementation"""
+    def test_roe_threshold_categorization_nature_paper_implementation(self):
+        """Test Nature paper threshold categorization implementation"""
         from omicverse.utils._roe import transform_roe_values
         
         # Test data with known ROE values
         test_roe = pd.DataFrame({
-            'sample1': [0.1, 0.5, 1.2, 1.8, 2.5],
-            'sample2': [0.0, 1.0, 1.5, 2.0, 3.0]
+            'sample1': [0.0, 0.1, 0.3, 0.9, 1.2],
+            'sample2': [0.05, 0.2, 0.8, 1.0, 2.5]
         }, index=['cell1', 'cell2', 'cell3', 'cell4', 'cell5'])
         
         result = transform_roe_values(test_roe)
         
-        # Current implementation thresholds: ≥2 (+++), ≥1.5 (++), ≥1 (+), <1 (+/-)
+        # Nature paper thresholds: >1 (+++), 0.8<x≤1 (++), 0.2≤x≤0.8 (+), 0<x<0.2 (+/-), =0 (—)
         expected = pd.DataFrame({
-            'sample1': ['+/-', '+/-', '+', '+', '+++'],
-            'sample2': ['+/-', '+', '++', '+++', '+++']
+            'sample1': ['—', '+/-', '+', '++', '+++'],
+            'sample2': ['+/-', '+', '+', '++', '+++']
         }, index=['cell1', 'cell2', 'cell3', 'cell4', 'cell5'])
         
         pd.testing.assert_frame_equal(result, expected)
