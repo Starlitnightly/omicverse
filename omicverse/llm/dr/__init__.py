@@ -18,7 +18,8 @@ warnings.warn(
 
 try:
     from .research_manager import ResearchManager
-except Exception:  # pragma: no cover - implementation may be optional
+except ImportError:  # pragma: no cover - implementation may be optional
+    # Only treat genuine import-time missing-dependency issues as optional
     ResearchManager = None  # type: ignore
 
 try:  # pragma: no cover - optional dependency
