@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import scipy.stats as st
-from typing import Sequence, Union, Optional, Literal
+from typing import Sequence, Union, Optional, Literal, List
 from matplotlib.axes import Axes
 from collections import OrderedDict
 
@@ -63,7 +63,7 @@ def violin(
     background_color: str = 'white',
     spine_color: str = '#b4aea9',
     grid_lines: bool = True,
-    statistical_tests: bool = False,
+    statistical_tests: Union[bool, str, List[str]] = False,
     custom_colors: Optional[Sequence[str]] = None,
     figsize: Optional[tuple] = None,
     fontsize=13,
@@ -105,7 +105,7 @@ def violin(
         background_color: str. Background color of the plot. ('white')
         spine_color: str. Color of plot spines. ('#b4aea9')
         grid_lines: bool. Whether to show horizontal grid lines. (True)
-        statistical_tests: bool. Whether to perform and display statistical tests. (False)
+        statistical_tests: bool | str | List[str]. Statistical tests to perform. Options: False (no tests), True (auto-select), 'wilcox', 'ttest', 'anova', 'kruskal', 'mannwhitney', or list of methods. (False)
         custom_colors: Sequence[str] | None. Custom colors for groups. (None)
         figsize: tuple | None. Figure size (width, height). (None)
         fontsize: int. Font size for labels and ticks. (13)
@@ -379,7 +379,7 @@ def violin(
         
         # Add statistical tests
         if statistical_tests:
-            _add_statistical_tests(current_ax, plot_data, group_categories)
+            _add_statistical_tests(current_ax, plot_data, group_categories, statistical_tests)
         
         # Customize axis
         _customize_axis(
@@ -619,34 +619,102 @@ def _add_mean_annotations(ax, plot_data, group_categories):
             ha='left'
         )
 
-def _add_statistical_tests(ax, plot_data, group_categories):
+def _add_statistical_tests(ax, plot_data, group_categories, statistical_tests):
     """Add statistical test results."""
     if len(group_categories) < 2:
         return
     
     try:
-        from scipy.stats import f_oneway, ttest_ind
+        from scipy.stats import (
+            f_oneway, ttest_ind, mannwhitneyu, kruskal, 
+            ranksums, wilcoxon
+        )
         
         data_arrays = [plot_data[cat] for cat in group_categories if len(plot_data[cat]) > 0]
         
-        if len(data_arrays) == 2:
-            # T-test for two groups
-            stat, p_val = ttest_ind(data_arrays[0], data_arrays[1])
-            test_text = f"t-test: p = {p_val:.2e}"
-        elif len(data_arrays) > 2:
-            # ANOVA for multiple groups
-            stat, p_val = f_oneway(*data_arrays)
-            test_text = f"ANOVA: F = {stat:.2f}, p = {p_val:.2e}"
+        if len(data_arrays) < 2:
+            return
+            
+        # Determine which tests to perform
+        if statistical_tests is True:
+            # Auto-select based on number of groups (backward compatibility)
+            if len(data_arrays) == 2:
+                tests_to_perform = ['ttest']
+            else:
+                tests_to_perform = ['anova']
+        elif isinstance(statistical_tests, str):
+            tests_to_perform = [statistical_tests]
+        elif isinstance(statistical_tests, list):
+            tests_to_perform = statistical_tests
         else:
             return
         
+        test_results = []
+        
+        for test_method in tests_to_perform:
+            test_method = test_method.lower()
+            
+            try:
+                if test_method in ['wilcox', 'wilcoxon'] and len(data_arrays) == 2:
+                    # Wilcoxon rank-sum test (Mann-Whitney U test)
+                    stat, p_val = mannwhitneyu(data_arrays[0], data_arrays[1], 
+                                              alternative='two-sided')
+                    test_results.append(f"Wilcox: p = {p_val:.2e}")
+                    
+                elif test_method == 'mannwhitney' and len(data_arrays) == 2:
+                    # Mann-Whitney U test (same as wilcox rank-sum)
+                    stat, p_val = mannwhitneyu(data_arrays[0], data_arrays[1], 
+                                              alternative='two-sided')
+                    test_results.append(f"Mann-Whitney: p = {p_val:.2e}")
+                    
+                elif test_method == 'ttest' and len(data_arrays) == 2:
+                    # T-test for two groups
+                    stat, p_val = ttest_ind(data_arrays[0], data_arrays[1])
+                    test_results.append(f"t-test: p = {p_val:.2e}")
+                    
+                elif test_method == 'anova' and len(data_arrays) >= 2:
+                    # ANOVA for multiple groups
+                    stat, p_val = f_oneway(*data_arrays)
+                    test_results.append(f"ANOVA: F = {stat:.2f}, p = {p_val:.2e}")
+                    
+                elif test_method == 'kruskal' and len(data_arrays) >= 2:
+                    # Kruskal-Wallis test (non-parametric alternative to ANOVA)
+                    stat, p_val = kruskal(*data_arrays)
+                    test_results.append(f"Kruskal-Wallis: H = {stat:.2f}, p = {p_val:.2e}")
+                    
+                elif test_method in ['wilcox', 'wilcoxon', 'mannwhitney'] and len(data_arrays) > 2:
+                    # Perform pairwise tests for multiple groups
+                    from itertools import combinations
+                    pairwise_results = []
+                    for i, (cat1, cat2) in enumerate(combinations(group_categories, 2)):
+                        if cat1 in plot_data and cat2 in plot_data:
+                            if len(plot_data[cat1]) > 0 and len(plot_data[cat2]) > 0:
+                                stat, p_val = mannwhitneyu(plot_data[cat1], plot_data[cat2], 
+                                                          alternative='two-sided')
+                                pairwise_results.append(f"{cat1}-{cat2}: p = {p_val:.2e}")
+                                # Only show first 3 pairwise comparisons to avoid clutter
+                                if i >= 2:
+                                    pairwise_results.append("...")
+                                    break
+                    if pairwise_results:
+                        test_results.append(f"Pairwise Wilcox: {'; '.join(pairwise_results)}")
+                        
+                else:
+                    print(f"Warning: Test method '{test_method}' not supported or not appropriate for {len(data_arrays)} groups")
+                    
+            except Exception as e:
+                print(f"Warning: Failed to perform {test_method} test: {str(e)}")
+        
         # Add test result text
-        ax.text(0.02, 0.98, test_text, transform=ax.transAxes, 
-               fontsize=10, verticalalignment='top',
-               bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
+        if test_results:
+            test_text = "\n".join(test_results)
+            ax.text(0.02, 0.98, test_text, transform=ax.transAxes, 
+                   fontsize=9, verticalalignment='top',
+                   bbox=dict(boxstyle="round", facecolor="white", alpha=0.9),
+                   family='monospace')
                
-    except ImportError:
-        print("Statistical tests require scipy")
+    except ImportError as e:
+        print(f"Statistical tests require scipy: {str(e)}")
 
 def _customize_axis(ax, group_categories, xlabel, ylabel, groupby, rotation, log, order):
     """Customize axis labels and ticks."""
