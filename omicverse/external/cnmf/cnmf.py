@@ -749,10 +749,24 @@ class cNMF():
                 del(partitioning_order)
                 del(distance_to_nearest_neighbors)
 
-            density_filter = local_density.iloc[:, 0] < density_threshold
+            # Apply density filtering only if threshold is reasonable
+            if density_threshold >= 2.0:
+                # Documentation states "2.0 or greater applies no filter"
+                density_filter = pd.Series([True] * len(l2_spectra), index=l2_spectra.index)
+            else:
+                density_filter = local_density.iloc[:, 0] < density_threshold
+            
             l2_spectra = l2_spectra.loc[density_filter, :]
             if l2_spectra.shape[0] == 0:
-                raise RuntimeError("Zero components remain after density filtering. Consider increasing density threshold")
+                local_density_stats = local_density.iloc[:, 0].describe()
+                raise RuntimeError(
+                    f"Zero components remain after density filtering with threshold {density_threshold}.\n"
+                    f"Local density statistics:\n{local_density_stats}\n"
+                    f"Consider:\n"
+                    f"- Increasing density_threshold (try {local_density_stats['75%']:.3f} or higher)\n"
+                    f"- Using density_threshold=2.0 or higher to disable filtering\n"
+                    f"- Using a smaller local_neighborhood_size parameter"
+                )
 
         kmeans_model = KMeans(n_clusters=k, n_init=10, random_state=1)
         kmeans_model.fit(l2_spectra)
