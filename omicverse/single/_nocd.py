@@ -149,7 +149,7 @@ class scnocd(object):
     def save(self,gnn_save_dir:str='save_model',
             gnn_save_name:str='gnn',):
         """
-        Saves the trained GNN model.
+        Saves the trained GNN model and necessary metadata.
 
         Arguments:
             gnn_save_dir: the directory to save the trained GNN model. Default is 'save_model'.
@@ -159,21 +159,71 @@ class scnocd(object):
         path_save = os.path.join(gnn_save_dir, f"{gnn_save_name}.pth")
         if not os.path.exists(gnn_save_dir):
             os.makedirs(gnn_save_dir)
-        torch.save(self.gnn.state_dict(), path_save)
-        print(f"...save trained gnn in {path_save}.")
+        
+        # Save model state and necessary metadata for loading
+        save_dict = {
+            'model_state_dict': self.gnn.state_dict(),
+            'adata_obs_index': self.adata.obs.index.tolist(),
+            'K': self.K,
+            'device_type': str(self.device),
+            'clustertype': self.clustertype,
+            'use_rep': self.use_rep,
+            'neighbor_rep': self.neighbor_rep,
+            'ground_truth': self.ground_truth
+        }
+        
+        # Also save the adata object structure
+        adata_save_path = os.path.join(gnn_save_dir, f"{gnn_save_name}_adata.h5ad")
+        self.adata.write_h5ad(adata_save_path)
+        
+        torch.save(save_dict, path_save)
+        print(f"...save trained gnn model in {path_save}.")
+        print(f"...save adata metadata in {adata_save_path}.")
 
     def load(self,gnn_load_dir):
         """
-        Loads the trained GNN model.
+        Loads the trained GNN model and restores necessary metadata.
 
         Arguments:
             gnn_load_dir: the directory to load the trained GNN model.
 
         """
-        #path_load = os.path.join(gnn_load_dir, "gnn.pth")
-        #self.model_saver.load_state_dict(torch.load(path_load))
         print(f'loading model from {gnn_load_dir}')
-        self.gnn.load_state_dict(torch.load(gnn_load_dir, map_location=self.device))
+        
+        # Load the saved data
+        checkpoint = torch.load(gnn_load_dir, map_location=self.device)
+        
+        # Handle both old and new save format for backward compatibility
+        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            # New format with metadata
+            self.gnn.load_state_dict(checkpoint['model_state_dict'])
+            
+            # Restore metadata
+            if 'K' in checkpoint:
+                self.K = checkpoint['K']
+            if 'clustertype' in checkpoint:
+                self.clustertype = checkpoint['clustertype']
+            if 'use_rep' in checkpoint:
+                self.use_rep = checkpoint['use_rep']
+            if 'neighbor_rep' in checkpoint:
+                self.neighbor_rep = checkpoint['neighbor_rep']
+            if 'ground_truth' in checkpoint:
+                self.ground_truth = checkpoint['ground_truth']
+            
+            # Try to load the adata file
+            gnn_dir = os.path.dirname(gnn_load_dir)
+            gnn_name = os.path.splitext(os.path.basename(gnn_load_dir))[0]
+            adata_path = os.path.join(gnn_dir, f"{gnn_name}_adata.h5ad")
+            
+            if os.path.exists(adata_path):
+                print(f'loading adata from {adata_path}')
+                self.adata = anndata.read_h5ad(adata_path)
+            else:
+                print(f'Warning: adata file not found at {adata_path}. Some functionality may be limited.')
+        else:
+            # Old format (just state dict) - for backward compatibility
+            print('Warning: Loading old format model. Some functionality may be limited due to missing metadata.')
+            self.gnn.load_state_dict(checkpoint)
 
     
     
