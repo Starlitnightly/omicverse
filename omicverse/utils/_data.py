@@ -180,6 +180,85 @@ def download_geneid_annotation_pair():
             model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
     print('......Geneid Annotation Pair download finished!')
 
+def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
+    r"""Convert GTF file to gene ID mapping pairs TSV format
+    
+    This function extracts gene_id and gene_name from GTF files and creates
+    a TSV file compatible with Matrix_ID_mapping function.
+    
+    Parameters
+    ----------
+    gtf_path : str
+        Path to input GTF file
+    output_path : str
+        Path for output TSV file
+    gene_id_version : bool, optional
+        Whether to keep version numbers in gene IDs (default: True)
+        
+    Returns
+    -------
+    gene_count : int
+        Number of genes processed
+        
+    Examples
+    --------
+    >>> import omicverse as ov
+    >>> # Convert GTF to mapping pairs
+    >>> ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')
+    >>> # Use for gene mapping
+    >>> data = ov.bulk.Matrix_ID_mapping(data, 'gene_pairs.tsv')
+    """
+    import pandas as pd
+    from ._genomics import read_gtf
+    
+    print(f'......Reading GTF file: {gtf_path}')
+    
+    # Read GTF file using existing reader
+    gtf = read_gtf(gtf_path)
+    
+    # Filter for gene features only
+    gene_features = gtf[gtf['feature'] == 'gene'].copy()
+    print(f'......Found {len(gene_features)} gene features')
+    
+    if len(gene_features) == 0:
+        raise ValueError("No gene features found in GTF file!")
+    
+    # Split attributes to extract gene_id and gene_name
+    gene_features = gene_features.split_attribute()
+    
+    # Check required columns
+    if 'gene_id' not in gene_features.columns:
+        raise ValueError("gene_id not found in GTF attributes!")
+    
+    # Extract gene_id and gene_name
+    gene_pairs = []
+    for idx, row in gene_features.iterrows():
+        gene_id = str(row['gene_id'])
+        
+        # Handle version numbers in gene IDs
+        if not gene_id_version and '.' in gene_id:
+            gene_id = gene_id.split('.')[0]
+        
+        # Use gene_name if available, otherwise use gene_id as symbol
+        if 'gene_name' in gene_features.columns and pd.notna(row['gene_name']) and str(row['gene_name']) != '.':
+            symbol = str(row['gene_name'])
+        else:
+            symbol = gene_id
+            
+        gene_pairs.append([gene_id, symbol])
+    
+    # Create DataFrame and remove duplicates
+    df = pd.DataFrame(gene_pairs, columns=['gene_id', 'symbol'])
+    df = df.drop_duplicates(subset=['gene_id'], keep='first')
+    
+    print(f'......Processed {len(df)} unique genes')
+    
+    # Save to TSV
+    df.to_csv(output_path, sep='\t', index=False)
+    print(f'......Gene mapping pairs saved to: {output_path}')
+    
+    return len(df)
+
 def download_tosica_gmt():
     r"""load TOSICA gmt dataset
 
