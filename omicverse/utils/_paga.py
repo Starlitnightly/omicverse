@@ -395,6 +395,23 @@ def default_basis(adata, **kwargs):
         raise ValueError("No basis specified.")
     return keys[-1] if len(keys) > 0 else None
 
+def _safe_categorical_to_str(adata, color_key):
+    """
+    Safely convert categorical values to string format for plotting.
+    
+    This function addresses pandas compatibility issues where direct assignment
+    to cat.categories is no longer allowed in newer pandas versions.
+    """
+    if color_key in adata.obs.columns and hasattr(adata.obs[color_key], 'cat'):
+        # Create a copy to avoid modifying the original data
+        adata_copy = adata.copy()
+        # Convert categorical values to string using cat.rename_categories
+        if hasattr(adata_copy.obs[color_key].cat, 'categories'):
+            str_categories = adata_copy.obs[color_key].cat.categories.astype(str)
+            adata_copy.obs[color_key] = adata_copy.obs[color_key].cat.rename_categories(str_categories)
+        return adata_copy
+    return adata
+
 def plot_paga(adata,
     basis=None,
     vkey="velocity",
@@ -443,8 +460,14 @@ def plot_paga(adata,
     if layout is not None:
         basis = None
     
+    # Fix for pandas compatibility: when using basis with categorical colors,
+    # scvelo may fail due to read-only categories in newer pandas versions
+    adata_processed = adata
+    if basis is not None and color is not None:
+        adata_processed = _safe_categorical_to_str(adata, color)
+    
     import scvelo as scv
-    return scv.pl.paga(adata,
+    return scv.pl.paga(adata_processed,
     basis=basis,
     vkey=vkey,
     color=color,
