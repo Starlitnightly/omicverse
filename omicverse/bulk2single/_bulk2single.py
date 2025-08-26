@@ -126,12 +126,36 @@ class Bulk2Single:
         if self.bulk_group!=None:
             cell_total_num=self.single_data.shape[0]*self.bulk_data[self.bulk_group].mean(axis=1).sum()/self.single_data.to_df().sum().sum()
             print('Predicted Total Cell Num:',cell_total_num)
-            self.cell_target_num=dict(pd.Series(CellFractionPrediction.loc[self.bulk_group].mean()*cell_total_num*scale_size).astype(int))
-        
+            predicted_fractions=CellFractionPrediction.loc[self.bulk_group].mean()*cell_total_num*scale_size
         else:
             cell_total_num=self.single_data.shape[0]*self.bulk_data.mean(axis=1).sum()/self.single_data.to_df().sum().sum()
             print('Predicted Total Cell Num:',cell_total_num)
-            self.cell_target_num=dict(pd.Series(CellFractionPrediction.mean()*cell_total_num*scale_size).astype(int))
+            predicted_fractions=CellFractionPrediction.mean()*cell_total_num*scale_size
+            
+        # Get actual cell types from single-cell reference data
+        actual_cell_types = list(set(self.single_data.obs[self.celltype_key]))
+        predicted_cell_types = predicted_fractions.index.tolist()
+        
+        # Create cell_target_num dictionary with matching cell type names
+        self.cell_target_num = {}
+        
+        # First, try exact matching
+        for cell_type in actual_cell_types:
+            if cell_type in predicted_cell_types:
+                self.cell_target_num[cell_type] = int(predicted_fractions[cell_type])
+        
+        # For cell types not found in predictions, use average of predicted values
+        if len(self.cell_target_num) < len(actual_cell_types):
+            avg_fraction = int(predicted_fractions.mean())
+            for cell_type in actual_cell_types:
+                if cell_type not in self.cell_target_num:
+                    print(f"Warning: Cell type '{cell_type}' not found in deconvolution predictions. Using average value: {avg_fraction}")
+                    self.cell_target_num[cell_type] = avg_fraction
+                    
+        # Ensure minimum of 1 cell per type to avoid zero cell generation
+        for cell_type in self.cell_target_num:
+            if self.cell_target_num[cell_type] <= 0:
+                self.cell_target_num[cell_type] = 1
         
         return CellFractionPrediction
 
