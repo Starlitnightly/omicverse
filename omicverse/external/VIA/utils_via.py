@@ -353,8 +353,9 @@ def get_sparse_from_igraph(graph: ig.Graph, weight_attr=None):
     if len(edges) > 0:
         row_indices, col_indices = zip(*edges)
         return csr_matrix((weights, (row_indices, col_indices)), shape=shape)
-        # return csr_matrix((weights, zip(*edges)), shape=shape)
-    return csr_matrix(shape)
+    else:
+        # Handle the case when there are no edges - return empty sparse matrix
+        return csr_matrix(shape)
 
 
 def recompute_weights(graph: ig.Graph, label_counts: Counter):
