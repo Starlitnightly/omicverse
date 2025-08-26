@@ -1,0 +1,18 @@
+#!genome-build GRCh38.p14
+#!genome-version GRCh38
+#!genome-date 2013-12
+#!genome-build-accession NCBI_Assembly:GCF_000001405.40
+#!genebuild-last-updated 2022-07
+1	havana	gene	11869	14409	.	+	.	gene_id "ENSG00000223972.5"; gene_version "5"; gene_name "DDX11L1"; gene_source "havana"; gene_biotype "transcribed_unprocessed_pseudogene";
+1	havana	transcript	11869	14409	.	+	.	gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; gene_name "DDX11L1"; transcript_name "DDX11L1-202";
+1	havana	exon	11869	12227	.	+	.	gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; gene_name "DDX11L1"; exon_number "1";
+1	havana	gene	14404	29570	.	-	.	gene_id "ENSG00000227232.5"; gene_version "5"; gene_name "WASH7P"; gene_source "havana"; gene_biotype "unprocessed_pseudogene";
+1	havana	transcript	14404	29570	.	-	.	gene_id "ENSG00000227232.5"; transcript_id "ENST00000488147.1"; gene_name "WASH7P"; transcript_name "WASH7P-201";
+1	havana	exon	14404	14501	.	-	.	gene_id "ENSG00000227232.5"; transcript_id "ENST00000488147.1"; gene_name "WASH7P"; exon_number "11";
+1	havana	gene	17369	17436	.	-	.	gene_id "ENSG00000278267.1"; gene_version "1"; gene_name "MIR6859-1"; gene_source "mirbase"; gene_biotype "miRNA";
+1	havana	transcript	17369	17436	.	-	.	gene_id "ENSG00000278267.1"; transcript_id "ENST00000619216.1"; gene_name "MIR6859-1"; transcript_name "MIR6859-1-201";
+1	havana	exon	17369	17436	.	-	.	gene_id "ENSG00000278267.1"; transcript_id "ENST00000619216.1"; gene_name "MIR6859-1"; exon_number "1";
+1	ensembl_havana	gene	29554	31109	.	+	.	gene_id "ENSG00000243485.5"; gene_version "5"; gene_name "MIR1302-2HG"; gene_source "ensembl_havana"; gene_biotype "lncRNA";
+1	havana	transcript	29554	31097	.	+	.	gene_id "ENSG00000243485.5"; transcript_id "ENST00000473358.1"; gene_name "MIR1302-2HG"; transcript_name "MIR1302-2HG-201";
+1	havana	exon	29554	30039	.	+	.	gene_id "ENSG00000243485.5"; transcript_id "ENST00000473358.1"; gene_name "MIR1302-2HG"; exon_number "1";
+1	ensembl	gene	34554	36081	.	-	.	gene_id "ENSG00000237613.2"; gene_version "2"; gene_name "FAM138A"; gene_source "ensembl"; gene_biotype "lncRNA";
