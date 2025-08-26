@@ -163,11 +163,21 @@ def download_geneid_annotation_pair():
         'pair_GRCh37':'https://figshare.com/ndownloader/files/39820693',
         'pair_danRer11':'https://figshare.com/ndownloader/files/39820696',
         'pair_danRer7':'https://figshare.com/ndownloader/files/39820699',
+        'pair_hgnc_all':'https://github.com/Starlitnightly/omicverse/files/14664966/pair_hgnc_all.tsv.tar.gz',
     }
      
     for datasets_name in _datasets.keys():
         print('......Geneid Annotation Pair download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
+        if datasets_name == 'pair_hgnc_all':
+            # Handle the tar.gz file for HGNC mapping
+            import tarfile
+            tar_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tar.gz'.format(datasets_name),title=datasets_name)
+            # Extract the TSV file from tar.gz
+            with tarfile.open(tar_path, 'r:gz') as tar:
+                tar.extractall(path='genesets/')
+            print('......Extracted pair_hgnc_all.tsv from tar.gz')
+        else:
+            model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
     print('......Geneid Annotation Pair download finished!')
 
 def download_tosica_gmt():
