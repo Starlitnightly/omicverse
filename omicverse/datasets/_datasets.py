@@ -287,6 +287,21 @@ def create_mock_dataset(
             sc.pp.log1p(adata)
             sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
             adata.raw = adata
+            
+            # Ensure we have at least some highly variable genes for downstream analysis
+            if adata.var.highly_variable.sum() == 0:
+                # If no genes are highly variable, mark top 1000 by variance as highly variable
+                gene_vars = np.var(adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X, axis=0)
+                top_genes = np.argsort(gene_vars)[::-1][:min(1000, n_genes)]
+                adata.var.highly_variable[:] = False
+                adata.var.iloc[top_genes, adata.var.columns.get_loc('highly_variable')] = True
+            elif adata.var.highly_variable.sum() < 50:
+                # If too few highly variable genes, ensure we have at least 50
+                gene_vars = np.var(adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X, axis=0)
+                top_genes = np.argsort(gene_vars)[::-1][:min(50, n_genes)]
+                adata.var.highly_variable[:] = False
+                adata.var.iloc[top_genes, adata.var.columns.get_loc('highly_variable')] = True
+            
             adata = adata[:, adata.var.highly_variable]
             sc.pp.scale(adata, max_value=10)
             sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, adata.n_vars - 1))
