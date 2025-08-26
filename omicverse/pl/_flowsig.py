@@ -302,7 +302,13 @@ def plot_flowsig_network(flow_network,
         layers = {"layer1": list(set(sender_li)), 
                    "layer3": list(set(receptor_li)),
                    "layer2": list(set(gem_li)),}
-    pos = nx.multipartite_layout(flow_network, subset_key=layers,align='horizontal',scale=2.0)
+    
+    # Assign layer information to node attributes
+    for layer_name, node_list in layers.items():
+        for node in node_list:
+            flow_network.nodes[node]['layer'] = layer_name
+    
+    pos = nx.multipartite_layout(flow_network, subset_key='layer', align='horizontal', scale=2.0)
 
     #fig, ax = plt.subplots(figsize=(8,8)) 
     sub_G=flow_network.subgraph(sender_li+receptor_li+gem_plot).copy()
