@@ -47,7 +47,7 @@ def make_rm():
 
 def test_write_composes_report():
     rm = make_rm()
-    brief = ProjectBrief(title="T", objectives=["topic"], constraints=[])
+    brief = ProjectBrief(title="Test Title", objectives=["topic"], constraints=[])
     findings = [Finding(topic="topic", text="summary", sources=[SourceCitation(source_id="1", content="ref")])]
     report = rm.write(brief, findings)
     assert "topic" in report
@@ -56,8 +56,8 @@ def test_write_composes_report():
 
 def test_run_pipeline(monkeypatch):
     rm = make_rm()
-    monkeypatch.setattr(rm.scope_manager, "generate_brief", lambda: ProjectBrief(title="T", objectives=["topic"], constraints=[]))
-    report = rm.run("T")
+    monkeypatch.setattr(rm.scope_manager, "generate_brief", lambda: ProjectBrief(title="Test Title", objectives=["topic"], constraints=[]))
+    report = rm.run("Test Query")
     assert "topic" in report
     assert "text about topic" in report
     assert "[1]" in report
