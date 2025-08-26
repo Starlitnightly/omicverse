@@ -53,7 +53,7 @@ def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42
         from ctxcore.genesig import GeneSignature
 
     matrix = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix)
+    percentiles = derive_auc_threshold(matrix, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
 
     n_cells = matrix.shape[0]
@@ -108,7 +108,7 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
 
 
     matrix = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix)
+    percentiles = derive_auc_threshold(matrix, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
 
     np_rnk_sparse=fast_rank(matrix, seed= seed)
@@ -151,7 +151,7 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
         from ctxcore.genesig import GeneSignature
 
     matrix = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix)
+    percentiles = derive_auc_threshold(matrix, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
 
     np_rnk_sparse=fast_rank(matrix, seed= seed)
@@ -197,7 +197,7 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
         from ctxcore.genesig import GeneSignature
 
     matrix = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix)
+    percentiles = derive_auc_threshold(matrix, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
     
     n_cells = matrix.shape[0]
@@ -251,7 +251,7 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
 
     # Use sparse matrix for both derive_auc_threshold and aucell
     matrix_sparse = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix_sparse)
+    percentiles = derive_auc_threshold(matrix_sparse, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
 
     # Pass sparse matrix directly to aucell with index and columns
@@ -293,7 +293,7 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
 
     # Use sparse matrix for derive_auc_threshold
     matrix_sparse = adata.X.copy()
-    percentiles = derive_auc_threshold(matrix_sparse)
+    percentiles = derive_auc_threshold(matrix_sparse, AUC_threshold)
     auc_threshold = percentiles[AUC_threshold]
 
     # Process in chunks using sparse matrix slicing

@@ -76,7 +76,7 @@ def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
     )
 
 
-def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
+def derive_auc_threshold(ex_mtx: pd.DataFrame, AUC_threshold: float = None) -> pd.DataFrame:
     """
     Derive AUC thresholds for an expression matrix.
 
@@ -85,15 +85,19 @@ def derive_auc_threshold(ex_mtx: pd.DataFrame) -> pd.DataFrame:
     
     Arguments:
         ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).
+        AUC_threshold: Specific AUC threshold to include in the quantile calculation. If None, returns default quantiles.
     
     Returns:
         A dataframe with AUC threshold for different quantiles over the number cells: a fraction of 0.01 designates that when using this value as the AUC threshold for 99% of the cells all ranked genes used for AUC calculation will have had a detected expression in the single-cell experiment.
 
     """
+    quantiles = [0.01, 0.05, 0.10, 0.50, 1]
+    if AUC_threshold is not None and AUC_threshold not in quantiles:
+        quantiles.append(AUC_threshold)
+        quantiles.sort()
+    
     return (
-        pd.Series(np.count_nonzero(ex_mtx, axis=1)).quantile(
-            [0.01, 0.05, 0.10, 0.50, 1]
-        )
+        pd.Series(np.count_nonzero(ex_mtx, axis=1)).quantile(quantiles)
         / ex_mtx.shape[1]
     )
 
