@@ -209,7 +209,6 @@ class DEG:
         if self.adata_test.shape[0] == 0:
             raise ValueError(f"No cells found for DEG analysis")
         elif self.adata_test.shape[0] > max_cells:
-            EMOJI['warning']="⚠️"
             print(f"{EMOJI['warning']} Total cells: {self.adata_test.shape[0]} is too large, will be downsampled to {max_cells}")
             print(f"If you want to keep all cells, please set max_cells to None")
             try:
