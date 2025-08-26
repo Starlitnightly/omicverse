@@ -99,6 +99,13 @@ from ._cellvote import get_cluster_celltype,CellVote
 from ._deg_ct import DCT,DEG
 from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
+from ._lazy_checkpoint import lazy_checkpoint, resume_from_checkpoint, list_checkpoints, cleanup_checkpoints
+from ._lazy_step_by_step import (
+    lazy_step_qc, lazy_step_preprocess, lazy_step_scale, lazy_step_pca,
+    lazy_step_cell_cycle, lazy_step_harmony, lazy_step_scvi, 
+    lazy_step_select_best_method, lazy_step_mde, lazy_step_clustering,
+    lazy_step_final_embeddings, lazy_step_by_step_guide
+)
 from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
 from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulation,plot_grn
@@ -108,6 +115,22 @@ __all__ = [
     # Core analysis functions
     'cosg',
     'lazy',
+    'lazy_checkpoint', 
+    'resume_from_checkpoint',
+    'list_checkpoints',
+    'cleanup_checkpoints',
+    'lazy_step_qc',
+    'lazy_step_preprocess',
+    'lazy_step_scale',
+    'lazy_step_pca',
+    'lazy_step_cell_cycle',
+    'lazy_step_harmony',
+    'lazy_step_scvi',
+    'lazy_step_select_best_method',
+    'lazy_step_mde',
+    'lazy_step_clustering',
+    'lazy_step_final_embeddings',
+    'lazy_step_by_step_guide',
     'aucell',
     
     # Cell type annotation
