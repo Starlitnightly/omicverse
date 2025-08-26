@@ -83,8 +83,6 @@ class ResearchManager:
                     EmbedWebRetriever = None  # type: ignore
 
                 if vs_flag == "web":
-                    import os
-
                     backend = "tavily" if os.getenv("TAVILY_API_KEY") else ("brave" if os.getenv("BRAVE_API_KEY") else "duckduckgo")
                 elif vs_flag in {"web:tavily", "web:embed:tavily"}:
                     backend = "tavily"
