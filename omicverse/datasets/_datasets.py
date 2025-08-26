@@ -176,7 +176,7 @@ def load_clustering_tutorial_data() -> AnnData:
         
         # Ensure it has the necessary preprocessing for clustering
         if 'X_pca' not in adata.obsm:
-            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, adata.n_vars - 1))
+            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, max(1, adata.n_vars - 1)))
             
         if 'neighbors' not in adata.uns:
             sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
@@ -289,7 +289,7 @@ def create_mock_dataset(
             adata.raw = adata
             adata = adata[:, adata.var.highly_variable]
             sc.pp.scale(adata, max_value=10)
-            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, adata.n_vars - 1))
+            sc.tl.pca(adata, svd_solver='arpack', n_comps=min(50, max(1, adata.n_vars - 1)))
             sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
             sc.tl.umap(adata)
             

@@ -114,7 +114,7 @@ def test_qc_with_scanpy_pbmc3k_data():
         adata = adata_raw
     
     # Make variable names unique to avoid issues
-    adata.var_names_unique()
+    adata.var_names_make_unique()
     
     # Remove existing QC columns if they exist
     qc_cols = ['n_genes', 'n_counts', 'pct_counts_mt', 'nUMIs', 'detected_genes', 'mito_perc']

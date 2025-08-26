@@ -175,7 +175,7 @@ def compare_shannon_diversity(
         if test_method == 'kruskal':
             # Kruskal-Wallis test for multiple groups
             groups_data = [
-                [diversity_values[label] for i in range(1) if label == group] 
+                [diversity_values[group] for i in range(1)] 
                 for group in set(group_labels)
             ]
             # Since we only have one value per group, we'll use the values directly
