@@ -47,7 +47,7 @@ except ModuleNotFoundError:
     version = lambda name: get_distribution(name).version
 
 # Core submodules
-from . import bulk, single, utils, bulk2single, pp, space, pl, llm
+from . import bulk, single, utils, bulk2single, pp, space, pl, llm, datasets
 
 # External modules
 try:

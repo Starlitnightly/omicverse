@@ -71,6 +71,9 @@ from ._scatterplot import *
 from ._knn import *
 from ._heatmap import *
 from ._roe import roe
+from ._odds_ratio import odds_ratio, plot_odds_ratio_heatmap
+from ._shannon_diversity import shannon_diversity, compare_shannon_diversity, plot_shannon_diversity
+from ._resolution import optimal_resolution, plot_resolution_optimization, resolution_stability_analysis
 from ._paga import cal_paga,plot_paga
 from ._cluster import cluster,LDA_topic,filtered,refine_label
 from ._venn import venny4py
