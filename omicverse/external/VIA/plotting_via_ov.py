@@ -2796,9 +2796,8 @@ def via_streamplot_ov(adata,clusters,via_object, embedding: ndarray = None, dens
 
             line = np.linspace(0, 1, len(set(color_labels)))
             color_true_list=adata.uns['{}_colors'.format(clusters)]
-            line = range(len(color_labels))
-
-            for color, group in zip(line, list(adata.obs[clusters].cat.categories)):
+            
+            for color, group in zip(range(len(adata.obs[clusters].cat.categories)), list(adata.obs[clusters].cat.categories)):
                 where = np.where(np.array(color_labels) == group)[0]
                 ax.scatter(embedding[where, 0], embedding[where, 1], label=group,
                            c=color_true_list[color],
