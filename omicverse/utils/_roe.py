@@ -59,7 +59,7 @@ def roe(
         else:
             print(f"Some expected frequencies are less than {expected_value_threshold}. "
                   f"Fisher's exact test is not available for tables larger than 2x2. "
-                  f"Results may be unreliable.")
+                  f"Consider using other statistical methods. Results may be unreliable.")
     
     # Check p-value
     if p <= pval_threshold:
@@ -78,6 +78,7 @@ def roe(
         expected_data = pd.DataFrame(expected, index=num_cell.index, columns=num_cell.columns)
         roe = num_cell / expected_data
         adata.uns['unsig_roe_results'] = roe
+        adata.uns['expected_values'] = expected_data
 
     if 'sig_roe_results' in adata.uns:
         return adata.uns['sig_roe_results']
@@ -149,12 +150,17 @@ def roe_plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value
 
 def transform_roe_values(roe):
     # Transform roe DataFrame to string format for annotation, following Nature paper thresholds
+    # +++: Ro/e > 1
+    # ++: 0.8 < Ro/e ≤ 1  
+    # +: 0.2 ≤ Ro/e ≤ 0.8
+    # +/-: 0 < Ro/e < 0.2
+    # —: Ro/e = 0
     transformed_roe = roe.copy()
     transformed_roe = transformed_roe.applymap(
         lambda x: '—' if x == 0 else (
-            '+++' if x > 1 else (
-                '++' if 0.8 < x <= 1 else (
-                    '+' if 0.2 <= x <= 0.8 else '+/-'
+            '+/-' if 0 < x < 0.2 else (
+                '+' if 0.2 <= x <= 0.8 else (
+                    '++' if 0.8 < x <= 1 else '+++'
                 )
             )
         )
