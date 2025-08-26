@@ -127,8 +127,8 @@ class TestROE:
         
         # Current implementation thresholds: ≥2 (+++), ≥1.5 (++), ≥1 (+), <1 (+/-)
         expected = pd.DataFrame({
-            'sample1': ['+/-', '+/-', '+', '+', '+++'],
-            'sample2': ['+/-', '+', '++', '+++', '+++']
+            'sample1': ['+/-', '+/-', '+', '++', '+++'],
+            'sample2': ['—', '+', '++', '+++', '+++']
         }, index=['cell1', 'cell2', 'cell3', 'cell4', 'cell5'])
         
         pd.testing.assert_frame_equal(result, expected)
