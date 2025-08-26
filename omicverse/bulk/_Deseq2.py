@@ -13,9 +13,6 @@ import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
 from ..pl import volcano
-import psutil
-import gc
-import warnings
 
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str,keep_unmapped:bool=True)->pd.DataFrame:
     r"""Map gene IDs in the input data to gene symbols using a reference table.
@@ -171,37 +168,6 @@ def estimateDispersions(counts:pd.DataFrame)->pd.Series:
     
     return disp
 
-def _get_memory_usage_gb():
-    """Get current memory usage in GB."""
-    return psutil.virtual_memory().used / (1024**3)
-
-def _get_available_memory_gb():
-    """Get available memory in GB."""
-    return psutil.virtual_memory().available / (1024**3)
-
-def _estimate_deseq2_memory_requirement(n_samples, n_genes):
-    """Estimate memory requirement for DEseq2 analysis in GB."""
-    # Rough estimation based on count matrix size and intermediate calculations
-    base_memory = (n_samples * n_genes * 8) / (1024**3)  # 8 bytes per float64
-    # DEseq2 creates several intermediate matrices during dispersion fitting
-    estimated_memory = base_memory * 4  # Conservative multiplier
-    return estimated_memory
-
-def _check_memory_availability(n_samples, n_genes, safety_margin=2.0):
-    """Check if there's enough memory for DEseq2 analysis."""
-    required_memory = _estimate_deseq2_memory_requirement(n_samples, n_genes)
-    available_memory = _get_available_memory_gb()
-    
-    if required_memory * safety_margin > available_memory:
-        warnings.warn(
-            f"⚠️  Memory Warning: Estimated memory requirement ({required_memory:.1f}GB) "
-            f"may exceed available memory ({available_memory:.1f}GB). "
-            f"Consider using memory_efficient=True or reducing chunk_size.",
-            UserWarning
-        )
-        return False
-    return True
-
 def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     r"""Drop the duplicated index of data.
 
@@ -217,39 +183,6 @@ def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     # Drop duplicates, keeping the first occurrence (which is the highest due to sorting)
     data = data.loc[~data.index.duplicated(keep='first')]
     return data
-
-def suggest_memory_optimization_params(n_samples, n_genes, available_memory_gb=None):
-    """Suggest optimal parameters for memory-efficient DEseq2 analysis.
-    
-    Arguments:
-        n_samples: Number of samples (cells)
-        n_genes: Number of genes
-        available_memory_gb: Available memory in GB (auto-detected if None)
-        
-    Returns:
-        dict: Recommended parameters
-    """
-    if available_memory_gb is None:
-        available_memory_gb = _get_available_memory_gb()
-    
-    estimated_memory = _estimate_deseq2_memory_requirement(n_samples, n_genes)
-    
-    recommendations = {
-        'method': 'DEseq2',
-        'memory_efficient': True,
-        'chunk_size': None,  # Auto-calculate
-        'n_cpus': 4,  # Conservative for memory
-    }
-    
-    if n_samples > 30000:
-        recommendations['method'] = 'ttest'
-        recommendations['note'] = 'Dataset very large, t-test recommended for speed'
-    elif estimated_memory > available_memory_gb * 0.8:
-        recommendations['memory_efficient'] = True
-        recommendations['chunk_size'] = min(1000, n_samples // 4)
-        recommendations['note'] = 'Memory optimization required'
-    
-    return recommendations
 
 class pyDEG(object):
 
@@ -274,29 +207,6 @@ class pyDEG(object):
         """
         self.data=data_drop_duplicates_index(self.data)
         return self.data
-    
-    def get_memory_optimization_suggestions(self, group1, group2):
-        """Get memory optimization suggestions for DEseq2 analysis.
-        
-        Arguments:
-            group1: First group samples
-            group2: Second group samples
-            
-        Returns:
-            dict: Optimization recommendations
-        """
-        n_samples = len(group1) + len(group2)
-        n_genes = self.data.shape[0]
-        
-        suggestions = suggest_memory_optimization_params(n_samples, n_genes)
-        suggestions['dataset_info'] = {
-            'n_samples': n_samples,
-            'n_genes': n_genes,
-            'estimated_memory_gb': _estimate_deseq2_memory_requirement(n_samples, n_genes),
-            'available_memory_gb': _get_available_memory_gb()
-        }
-        
-        return suggestions
 
     def normalize(self)->pd.DataFrame:
         r"""Normalize the data using DESeq2 method.
@@ -578,8 +488,7 @@ class pyDEG(object):
     def deg_analysis(self,group1:list,group2:list,
                  method:str='DEseq2',alpha:float=0.05,
                  multipletests_method:str='fdr_bh',n_cpus:int=8,
-                 cooks_filter:bool=True, independent_filter:bool=True,
-                 chunk_size:int=None, memory_efficient:bool=True)->pd.DataFrame:
+                 cooks_filter:bool=True, independent_filter:bool=True)->pd.DataFrame:
         r"""
         Differential expression analysis.
 
@@ -600,10 +509,9 @@ class pyDEG(object):
                 - `hommel` : closed method based on Simes tests (non-negative)
                 - `fdr_bh` : Benjamini/Hochberg  (non-negative)
                 - `fdr_by` : Benjamini/Yekutieli (negative)
+                - `fdr_tsbh` : two stage fdr correction (non-negative)
                 - `fdr_tsbky` : two stage fdr correction (non-negative)
-            chunk_size: Size of chunks for memory-efficient processing. If None, auto-calculated.
-            memory_efficient: Enable memory optimization for large datasets.
-            
+
         Returns
             result: The result of differential expression analysis.
         """
@@ -652,33 +560,17 @@ class pyDEG(object):
             print(f"⚙️ You are using {method} method for differential expression analysis.")
         elif method=='DEseq2':
             import pydeseq2
-            n_samples = len(group1 + group2)
-            n_genes = self.data.shape[0]
-            
-            # Memory optimization logic
-            if memory_efficient:
-                print(f"📊 Dataset size: {n_samples} samples × {n_genes} genes")
-                memory_available = _get_available_memory_gb()
-                print(f"💾 Available memory: {memory_available:.1f}GB")
-                
-                # Check if we need memory optimization
-                if not _check_memory_availability(n_samples, n_genes) or n_samples > 20000:
-                    print(f"⚡ Using memory-efficient processing for large dataset...")
-                    return self._memory_efficient_deseq2(group1, group2, alpha, n_cpus, 
-                                                       cooks_filter, independent_filter, chunk_size)
-            
-            # Standard DEseq2 processing for smaller datasets
             counts_df = self.data[group1+group2].T
             clinical_df = pd.DataFrame(index=group1+group2)
+
             clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
-            
             print(f"⏰ Start to create DeseqDataSet...")
             # Determine pydeseq2 version and create the DeseqDataSet accordingly
             if pydeseq2.__version__ <= '0.3.5':
                 dds = DeseqDataSet(
                     counts=counts_df,
                     clinical=clinical_df,
-                    design_factors="condition",
+                    design_factors="condition",  # compare samples based on "condition"
                     ref_level=["condition", "Control"],
                     refit_cooks=True,
                     n_cpus=n_cpus,
@@ -706,39 +598,29 @@ class pyDEG(object):
                     inference=inference,
                 )
         
-            # Memory monitoring during computation
-            print("Fitting size factors...")
             dds.fit_size_factors()
-            
-            print("Using None as control genes, passed at DeseqDataSet initialization")
-            print("Fitting dispersions...")
-            start_memory = _get_memory_usage_gb()
             dds.fit_genewise_dispersions()
             dds.fit_dispersion_trend()
             dds.fit_dispersion_prior()
-            print(f"... done in {0:.2f} seconds.")
             print(f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}")
-            
-            print("Fitting MAP dispersions...")
             dds.fit_MAP_dispersions()
-            print(f"... done in {0:.2f} seconds.")
-            end_memory = _get_memory_usage_gb()
-            print(f"💾 Memory usage during dispersion fitting: {end_memory - start_memory:.1f}GB")
-            
             dds.fit_LFC()
             dds.calculate_cooks()
             if dds.refit_cooks:
                 dds.refit()
         
-            # Statistical testing
+            # Add the 'contrast' parameter here:
+        # FIX: Adding version check for DeseqStats constructor
             if pydeseq2.__version__<='0.3.5':
                 stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
             elif pydeseq2.__version__ <= '0.4.1':
+                # For newer PyDESeq2 versions that require the contrast parameter
                 stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
                                     alpha=alpha, cooks_filter=cooks_filter, independent_filter=independent_filter)
                 stat_res.run_wald_test()
                 if stat_res.cooks_filter:
                     stat_res._cooks_filtering()
+                    
                 if stat_res.independent_filter:
                     stat_res._independent_filtering()
                 else:
@@ -754,11 +636,13 @@ class pyDEG(object):
                 stat_res.run_wald_test()
                 if stat_res.cooks_filter:
                     stat_res._cooks_filtering()
+                    
                 if stat_res.independent_filter:
                     stat_res._independent_filtering()
                 else:
                     stat_res._p_value_adjustment()
 
+                    
             self.stat_res = stat_res
             stat_res.summary()
             result = stat_res.results_df
@@ -774,172 +658,6 @@ class pyDEG(object):
             self.result = result
             print(f"✅ Differential expression analysis completed.")
             return result
-    
-    def _memory_efficient_deseq2(self, group1, group2, alpha, n_cpus, cooks_filter, independent_filter, chunk_size=None):
-        """Memory-efficient DEseq2 processing for large datasets."""
-        from pydeseq2.dds import DeseqDataSet
-        from pydeseq2.ds import DeseqStats
-        import pydeseq2
-        
-        n_samples = len(group1 + group2)
-        n_genes = self.data.shape[0]
-        
-        # Auto-calculate chunk size if not provided
-        if chunk_size is None:
-            available_memory_gb = _get_available_memory_gb()
-            # Target using 50% of available memory per chunk
-            target_memory_per_chunk = available_memory_gb * 0.5
-            # Estimate samples per chunk based on memory usage
-            samples_per_gb = 1000  # Conservative estimate
-            chunk_size = max(500, int(target_memory_per_chunk * samples_per_gb))
-            chunk_size = min(chunk_size, n_samples // 2)  # Don't make chunks too large
-        
-        print(f"📋 Processing {n_samples} samples in chunks of {chunk_size}")
-        
-        # For very large datasets, recommend using simpler statistical methods
-        if n_samples > 30000:
-            print(f"⚠️  Warning: Dataset has {n_samples} samples. ")
-            print(f"DESeq2 may not be optimal for such large single-cell datasets.")
-            print(f"Consider using the 'ttest' or 'wilcox' method instead for faster processing.")
-            
-            # Automatically fall back to t-test for extremely large datasets
-            if n_samples > 50000:
-                print(f"🔄 Auto-switching to t-test method for performance...")
-                return self.deg_analysis(group1, group2, method='ttest', alpha=alpha, 
-                                       multipletests_method='fdr_bh')
-        
-        # Subsample for faster processing if dataset is very large
-        if len(group1) > 5000 or len(group2) > 5000:
-            print(f"🎯 Subsampling large groups for DESeq2 processing...")
-            np.random.seed(42)  # For reproducibility
-            
-            # Sample up to 5000 cells from each group
-            if len(group1) > 5000:
-                group1_sampled = np.random.choice(group1, 5000, replace=False).tolist()
-            else:
-                group1_sampled = group1
-                
-            if len(group2) > 5000:
-                group2_sampled = np.random.choice(group2, 5000, replace=False).tolist()
-            else:
-                group2_sampled = group2
-            
-            print(f"Sampled {len(group1_sampled)} from group1, {len(group2_sampled)} from group2")
-            
-            # Run DESeq2 on subsampled data
-            counts_df = self.data[group1_sampled + group2_sampled].T
-            clinical_df = pd.DataFrame(index=group1_sampled + group2_sampled)
-            clinical_df['condition'] = ['Treatment'] * len(group1_sampled) + ['Control'] * len(group2_sampled)
-            
-        else:
-            # Use full dataset if manageable
-            counts_df = self.data[group1 + group2].T
-            clinical_df = pd.DataFrame(index=group1 + group2)
-            clinical_df['condition'] = ['Treatment'] * len(group1) + ['Control'] * len(group2)
-        
-        print(f"⏰ Start to create DeseqDataSet...")
-        
-        # Create DeseqDataSet with memory optimizations
-        try:
-            if pydeseq2.__version__ <= '0.3.5':
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    clinical=clinical_df,
-                    design_factors="condition",
-                    ref_level=["condition", "Control"],
-                    refit_cooks=True,
-                    n_cpus=min(n_cpus, 4),  # Limit CPU usage to reduce memory pressure
-                )
-            elif pydeseq2.__version__ <= '0.4.1':
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    metadata=clinical_df,
-                    design_factors="condition",
-                    refit_cooks=False,  # Disable Cooks filtering to save memory
-                    n_cpus=min(n_cpus, 4),
-                )
-            else:
-                from pydeseq2.default_inference import DefaultInference
-                inference = DefaultInference(n_cpus=min(n_cpus, 4))
-                dds = DeseqDataSet(
-                    counts=counts_df,
-                    metadata=clinical_df,
-                    design_factors="condition",
-                    refit_cooks=False,
-                    inference=inference,
-                )
-        except MemoryError:
-            print("❌ Memory error during DeseqDataSet creation. Dataset too large for DESeq2.")
-            print("🔄 Falling back to t-test method...")
-            return self.deg_analysis(group1, group2, method='ttest', alpha=alpha, 
-                                   multipletests_method='fdr_bh')
-        
-        # Force garbage collection
-        gc.collect()
-        
-        print("Fitting size factors...")
-        dds.fit_size_factors()
-        
-        print("Using None as control genes, passed at DeseqDataSet initialization")
-        print("Fitting dispersions...")
-        dds.fit_genewise_dispersions()
-        print("... done in 8.46 seconds.")
-        
-        dds.fit_dispersion_trend()
-        dds.fit_dispersion_prior()
-        print(f"logres_prior={dds.uns['_squared_logres']}, sigma_prior={dds.uns['prior_disp_var']}")
-        
-        print("Fitting MAP dispersions...")
-        try:
-            dds.fit_MAP_dispersions()
-            print("... done in 15.18 seconds.")
-        except MemoryError:
-            print("❌ Memory error during MAP dispersion fitting.")
-            print("🔄 Falling back to t-test method...")
-            return self.deg_analysis(group1, group2, method='ttest', alpha=alpha,
-                                   multipletests_method='fdr_bh')
-        
-        dds.fit_LFC()
-        dds.calculate_cooks()
-        
-        # Skip refitting to save memory
-        # if dds.refit_cooks:
-        #     dds.refit()
-        
-        # Statistical testing with memory optimizations
-        if pydeseq2.__version__<='0.3.5':
-            stat_res = DeseqStats(dds, alpha=alpha, cooks_filter=False, independent_filter=False)
-        elif pydeseq2.__version__ <= '0.4.1':
-            stat_res = DeseqStats(dds, contrast=["condition", "Treatment", "Control"], 
-                                alpha=alpha, cooks_filter=False, independent_filter=False)
-            stat_res.run_wald_test()
-            stat_res._p_value_adjustment()
-        else:
-            stat_res=DeseqStats(
-                        dds,
-                        contrast=["condition", "Treatment", "Control"], 
-                        alpha=alpha,
-                        cooks_filter=False,
-                        independent_filter=False,
-                    )
-            stat_res.run_wald_test()
-            stat_res._p_value_adjustment()
-
-        self.stat_res = stat_res
-        stat_res.summary()
-        result = stat_res.results_df
-        result['qvalue'] = result['padj']
-        result['-log(pvalue)'] = -np.log10(result['pvalue'])
-        result['-log(qvalue)'] = -np.log10(result['padj'])
-        result['BaseMean'] = result['baseMean']
-        result['log2(BaseMean)'] = np.log2(result['baseMean'] + 1)
-        result['log2FC'] = result['log2FoldChange']
-        result['abs(log2FC)'] = abs(result['log2FC'])
-        result['sig'] = 'normal'
-        result.loc[result['qvalue'] < alpha, 'sig'] = 'sig'
-        self.result = result
-        print(f"✅ Memory-efficient differential expression analysis completed.")
-        return result
             
         
         elif method == 'edgepy':
