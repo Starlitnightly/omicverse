@@ -14,12 +14,13 @@ from typing import Union,Tuple
 from ..utils import plot_boxplot
 from ..pl import volcano
 
-def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
+def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str,keep_unmapped:bool=True)->pd.DataFrame:
     r"""Map gene IDs in the input data to gene symbols using a reference table.
 
     Arguments:
         data: The input data containing gene IDs as index.
         gene_ref_path: The path to the reference table containing the mapping from gene IDs to gene symbols.
+        keep_unmapped: Whether to keep genes that are not found in the mapping table. If True, unmapped genes retain their original IDs. If False, unmapped genes are removed (original behavior). Default: True.
 
     Returns:
         data: The input data with gene IDs mapped to gene symbols.
@@ -27,17 +28,43 @@ def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str)->pd.DataFrame:
     """
     
     pair=pd.read_csv(gene_ref_path,sep='\t',index_col=0)
-    ret_gene=list(set(data.index.tolist()) & set(pair.index.tolist()))
-    data=data.loc[ret_gene]
-    #data=data_drop_duplicates_index(data)
-    new_index=[]
-    for i in ret_gene:
-        a=pair.loc[i,'symbol']
-        if str(a)=='nan':
-            new_index.append(i)
-        else:
-            new_index.append(a)
-    data.index=new_index
+    
+    if keep_unmapped:
+        # Keep all genes, map those that exist in the reference
+        all_genes = data.index.tolist()
+        mapped_genes = list(set(all_genes) & set(pair.index.tolist()))
+        unmapped_genes = list(set(all_genes) - set(pair.index.tolist()))
+        
+        new_index = []
+        
+        # Process mapped genes
+        for gene in all_genes:
+            if gene in pair.index:
+                symbol = pair.loc[gene, 'symbol']
+                if str(symbol) == 'nan':
+                    new_index.append(gene)  # Keep original ID if symbol is NaN
+                else:
+                    new_index.append(symbol)
+            else:
+                new_index.append(gene)  # Keep original ID for unmapped genes
+        
+        data.index = new_index
+        print(f"......Mapped {len(mapped_genes)} genes to symbols, kept {len(unmapped_genes)} unmapped genes with original IDs")
+    else:
+        # Original behavior: only keep genes that can be mapped
+        original_genes = data.index.tolist()
+        ret_gene=list(set(original_genes) & set(pair.index.tolist()))
+        data=data.loc[ret_gene]
+        new_index=[]
+        for i in ret_gene:
+            a=pair.loc[i,'symbol']
+            if str(a)=='nan':
+                new_index.append(i)
+            else:
+                new_index.append(a)
+        data.index=new_index
+        print(f"......Mapped {len(ret_gene)} genes to symbols, removed {len(original_genes) - len(ret_gene)} unmapped genes")
+    
     return data
 
 
