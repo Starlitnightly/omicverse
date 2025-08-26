@@ -30,5 +30,6 @@ from ._datasets import (
     load_clustering_tutorial_data,
     download_and_cache,
     list_available_datasets,
-    create_mock_dataset
+    create_mock_dataset,
+    load_dataset
 )
