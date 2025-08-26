@@ -53,7 +53,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import transformers
 from tqdm.auto import tqdm, trange
 from transformers import Trainer
@@ -67,8 +66,6 @@ from . import (
 from . import classifier_utils as cu
 from . import evaluation_utils as eu
 from . import perturber_utils as pu
-
-sns.set()
 
 
 logger = logging.getLogger(__name__)
