@@ -70,7 +70,7 @@ from ._syn import *
 from ._scatterplot import *
 from ._knn import *
 from ._heatmap import *
-from ._roe import roe
+from ._roe import roe, roe_plot_heatmap
 from ._odds_ratio import odds_ratio, plot_odds_ratio_heatmap
 from ._shannon_diversity import shannon_diversity, compare_shannon_diversity, plot_shannon_diversity
 from ._resolution import optimal_resolution, plot_resolution_optimization, resolution_stability_analysis

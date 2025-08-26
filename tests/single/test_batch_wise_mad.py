@@ -105,9 +105,13 @@ def test_qc_with_scanpy_pbmc3k_data():
     # Reset to raw counts for proper QC testing
     # We'll simulate having raw count data
     if adata.raw is not None:
-        adata.X = adata.raw.X.copy()
-        adata.var = adata.raw.var.copy()
-        adata.var_names = adata.raw.var_names
+        # Create a new AnnData object with raw data to avoid shape mismatch
+        import anndata as ad
+        adata_raw = ad.AnnData(X=adata.raw.X.copy())
+        adata_raw.var = adata.raw.var.copy()
+        adata_raw.var_names = adata.raw.var_names
+        adata_raw.obs = adata.obs.copy()
+        adata = adata_raw
     
     # Make variable names unique to avoid issues
     adata.var_names_unique()
