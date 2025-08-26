@@ -31,6 +31,15 @@ Examples:
     >>> ov.pl.umap(adata, color='leiden')
 """
 
+# Fix PyArrow compatibility issue
+# PyExtensionType was renamed to ExtensionType in newer versions
+try:
+    import pyarrow
+    if hasattr(pyarrow, 'ExtensionType') and not hasattr(pyarrow, 'PyExtensionType'):
+        pyarrow.PyExtensionType = pyarrow.ExtensionType
+except ImportError:
+    pass
+
 try:
     from importlib.metadata import version
 except ModuleNotFoundError:
