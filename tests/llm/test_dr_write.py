@@ -13,7 +13,7 @@ def load_components():
         def validate_query(q):
             return True, ""
     oq.QueryManager = QM
-    sys.modules.setdefault("OvIntelligence.query_manager", oq)
+    sys.modules["OvIntelligence.query_manager"] = oq
     mf = types.ModuleType("omicverse.llm.model_factory")
     class DummyFactory:
         @staticmethod
