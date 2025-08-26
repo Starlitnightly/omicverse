@@ -661,22 +661,41 @@ class GASTON(object):
         slope_mat, intercept_mat, _, _ = self.pw_fit_dict['all_cell_types']
 
         gene_list = list(self.binning_output['gene_labels_idx']) # 获取基因列表
-        adata2=adata2[:,gene_list]
+        
+        # Filter gene_list to only include genes that are actually in adata2 and gene_labels_idx
+        valid_genes = []
+        for gene_name in gene_list:
+            if gene_name in adata2.var_names and gene_name in self.gene_labels_idx:
+                valid_genes.append(gene_name)
+        
+        # Update adata2 to only include valid genes
+        adata2=adata2[:,valid_genes]
         all_gene_outputs = []
 
-        for gene_name in tqdm(gene_list):
-            if gene_name in self.binning_output['gene_labels_idx']:
-                gene_index = np.where(self.gene_labels_idx == gene_name)[0]
+        for gene_name in tqdm(valid_genes):
+            gene_index = np.where(self.gene_labels_idx == gene_name)[0]
+            
+            if len(gene_index) == 0:
+                # This shouldn't happen with our validation above, but keep as safety check
+                continue
+                
+            outputs = np.zeros(self.gaston_isodepth_restrict.shape[0])
+            for i in range(self.gaston_isodepth_restrict.shape[0]):
+                dom = int(self.gaston_labels_restrict[i])
+                slope = slope_mat[gene_index, dom]
+                intercept = intercept_mat[gene_index, dom]
+                outputs[i] = np.log(offset) + intercept + slope * self.gaston_isodepth_restrict[i]
 
-                outputs = np.zeros(self.gaston_isodepth_restrict.shape[0])
-                for i in range(self.gaston_isodepth_restrict.shape[0]):
-                    dom = int(self.gaston_labels_restrict[i])
-                    slope = slope_mat[gene_index, dom]
-                    intercept = intercept_mat[gene_index, dom]
-                    outputs[i] = np.log(offset) + intercept + slope * self.gaston_isodepth_restrict[i]
+            all_gene_outputs.append(outputs)
 
-                all_gene_outputs.append(outputs)
-
+        # Final validation
+        if len(all_gene_outputs) == 0:
+            raise ValueError("No valid gene outputs generated. Check gene filtering and binning steps.")
+            
+        if len(all_gene_outputs) != adata2.n_vars:
+            raise ValueError(f"Gene output count ({len(all_gene_outputs)}) doesn't match adata2 gene count ({adata2.n_vars}). "
+                           f"Valid genes found: {len(valid_genes)}")
+            
         sparse_output_matrix = csr_matrix(all_gene_outputs)
         adata2.layers['GASTON_ReX']=sparse_output_matrix.T
         return adata2
