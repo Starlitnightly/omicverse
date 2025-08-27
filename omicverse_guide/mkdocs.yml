@@ -131,6 +131,8 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
   #- mkautodoc
   - attr_list
   - md_in_html
