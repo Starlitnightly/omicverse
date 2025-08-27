@@ -46,22 +46,35 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
-# Core submodules
-from . import bulk, single, utils, bulk2single, pp, space, pl, llm, datasets
+# Lazy loading system for faster imports
+from ._lazy_loader import create_lazy_module, create_lazy_attribute
 
-# External modules
+# Core submodules - loaded lazily to improve import speed
+bulk = create_lazy_module('omicverse.bulk', globals())
+single = create_lazy_module('omicverse.single', globals())
+utils = create_lazy_module('omicverse.utils', globals())
+bulk2single = create_lazy_module('omicverse.bulk2single', globals())
+pp = create_lazy_module('omicverse.pp', globals())
+space = create_lazy_module('omicverse.space', globals())
+pl = create_lazy_module('omicverse.pl', globals())
+llm = create_lazy_module('omicverse.llm', globals())
+datasets = create_lazy_module('omicverse.datasets', globals())
+
+# External modules - loaded lazily  
+external = create_lazy_module('omicverse.external', globals())
+
+# Optional datacollect module
 try:
-    from .external import datacollect
+    # Test if datacollect is available by attempting import
+    import omicverse.external.datacollect
+    datacollect = create_lazy_module('omicverse.external.datacollect', globals())
 except ImportError:
     # Gracefully handle missing datacollect module
     datacollect = None
 
-# Optional PopV module requires ``scvi-tools``. Skip if dependency missing.
-
-#usually
+# Essential utilities - keep these as direct imports for compatibility
 from .utils._data import read
-from .utils._plot import palette,ov_plot_set,plot_set
-
+from .utils._plot import palette, ov_plot_set, plot_set
 
 name = "omicverse"
 try:
@@ -69,22 +82,10 @@ try:
 except Exception:
     __version__ = "unknown"
 
+from ._settings import settings, generate_reference_table
 
-from ._settings import settings,generate_reference_table
-
-
-# 导入 matplotlib.pyplot
-import matplotlib.pyplot as plt
-
-# 将 plt 作为 omicverse 的一个属性
-plt = plt  # 注意：确保没有其他变量名冲突
-
-import numpy as np
-
-np = np  # 注意：确保没有其他变量名冲突
-
-# 导入 pandas
-import pandas as pd
-
-# 将 pd 作为 omicverse 的一个属性
-pd = pd  # 注意：确保没有其他变量名冲突
+# Heavy libraries - loaded lazily to improve import speed
+# These will only be imported when first accessed
+plt = create_lazy_attribute('matplotlib.pyplot')
+np = create_lazy_attribute('numpy')  
+pd = create_lazy_attribute('pandas')
