@@ -53,8 +53,17 @@ conda_install_pkg(){
 }
 
 #————————————————————————
-# helper: install pip pkgs if missing 🛠️
+# helper: ensure uv is installed and install pip pkgs if missing 🛠️
 #————————————————————————
+ensure_uv(){
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "🔄 Installing uv (ultra-fast Python package manager)"
+    pip install uv $PIP_INDEX
+  else
+    echo "✅ uv already installed"
+  fi
+}
+
 pip_install_pkg(){
   missing=()
   for pkg in "$@"; do
@@ -68,11 +77,16 @@ pip_install_pkg(){
 
   if [ "${#missing[@]}" -gt 0 ]; then
     echo "🔄 Installing missing pip packages: ${missing[*]}"
-    pip install "${missing[@]}" $PIP_INDEX
+    uv pip install "${missing[@]}" $PIP_INDEX
   else
     echo "✅ All pip packages already installed"
   fi
 }
+
+#————————————————————————
+# 0.5. Ensure uv is installed 🚀
+#————————————————————————
+ensure_uv
 
 #————————————————————————
 # 1. Conda: core packages 🐾
@@ -95,8 +109,8 @@ else
   TORCH_VERSION="$(pip index versions torch 2>/dev/null \
     | grep -oP 'Available versions: \K[0-9]+\.[0-9]+\.[0-9]+' \
     | head -1)"
-  echo "🌟 Installing torch==$TORCH_VERSION and letting pip pick matching torchvision/torchaudio"
-  pip install \
+  echo "🌟 Installing torch==$TORCH_VERSION and letting uv pick matching torchvision/torchaudio"
+  uv pip install \
     torch \
     torchvision \
     torchaudio \
