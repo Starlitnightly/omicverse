@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-#————————————————————————
+#------------------------
 # Check Python version (only 3.10 and 3.11 supported)
-#————————————————————————
+#------------------------
 PYTHON_VERSION=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 if [[ "$PYTHON_VERSION" != "3.10" && "$PYTHON_VERSION" != "3.11" ]]; then
   echo "❌ Error: Python version $PYTHON_VERSION is not supported"
@@ -12,9 +12,9 @@ if [[ "$PYTHON_VERSION" != "3.10" && "$PYTHON_VERSION" != "3.11" ]]; then
 fi
 echo "✅ Python $PYTHON_VERSION detected"
 
-#————————————————————————
+#------------------------
 # 0. Speed‐test PyPI mirrors & pick the fastest 📡
-#————————————————————————
+#------------------------
 MIRRORS=(
   "https://pypi.tuna.tsinghua.edu.cn/simple"
   "https://pypi.org/simple"
@@ -39,22 +39,32 @@ done
 echo "✔️ Selected fastest mirror: $BEST_MIRROR"
 PIP_INDEX="-i $BEST_MIRROR"
 
-#————————————————————————
-# helper: install a conda pkg if missing 🐍
-#————————————————————————
-conda_install_pkg(){
-  pkg=$1
-  if conda list --no-pip | awk '{print $1}' | grep -xq "$pkg"; then
-    echo "✅ Skipping conda:$pkg (already installed)"
+#------------------------
+# helper: ensure mamba is installed and install conda pkg if missing 🐍
+#------------------------
+ensure_mamba(){
+  if ! command -v mamba >/dev/null 2>&1; then
+    echo "🔄 Installing mamba (ultra-fast conda package manager)"
+    conda install -c conda-forge -y mamba
   else
-    echo "🔄 Installing conda:$pkg"
-    conda install -c conda-forge -y "$pkg"
+    echo "✅ mamba already installed"
   fi
 }
 
-#————————————————————————
+conda_install_pkg(){
+  pkg=$1
+  # Check using conda list since mamba and conda share the same environment
+  if conda list --no-pip | awk '{print $1}' | grep -xq "$pkg"; then
+    echo "✅ Skipping mamba:$pkg (already installed)"
+  else
+    echo "🔄 Installing mamba:$pkg"
+    mamba install -c conda-forge -y "$pkg"
+  fi
+}
+
+#------------------------
 # helper: ensure uv is installed and install pip pkgs if missing 🛠️
-#————————————————————————
+#------------------------
 ensure_uv(){
   if ! command -v uv >/dev/null 2>&1; then
     echo "🔄 Installing uv (ultra-fast Python package manager)"
@@ -83,20 +93,21 @@ pip_install_pkg(){
   fi
 }
 
-#————————————————————————
-# 0.5. Ensure uv is installed 🚀
-#————————————————————————
+#------------------------
+# 0.5. Ensure fast package managers are installed 🚀
+#------------------------
+ensure_mamba
 ensure_uv
 
-#————————————————————————
-# 1. Conda: core packages 🐾
-#————————————————————————
+#------------------------
+# 1. Mamba: core packages 🐾
+#------------------------
 conda_install_pkg s_gd2
 conda_install_pkg opencv
 
-#————————————————————————
+#------------------------
 # 2. Torch: use existing or install latest 🔥
-#————————————————————————
+#------------------------
 if pip show torch >/dev/null 2>&1; then
   TORCH_VERSION="$(python - << 'PYCODE'
 import torch
@@ -117,9 +128,9 @@ else
     $PIP_INDEX
 fi
 
-#————————————————————————
+#------------------------
 # 3. Detect CUDA & prepare PyG wheel URL 🚀
-#————————————————————————
+#------------------------
 CUDA_TAG="$(python - << 'PYCODE'
 import torch
 if torch.cuda.is_available() and torch.version.cuda:
@@ -132,20 +143,20 @@ echo "🔍 CUDA tag: $CUDA_TAG"
 PYG_WHL_URL="https://data.pyg.org/whl/torch-${TORCH_VERSION}+${CUDA_TAG}.html"
 echo "🔗 PyG wheel index: $PYG_WHL_URL"
 
-#————————————————————————
+#------------------------
 # 4. Install PyG & extensions 🧩
-#————————————————————————
+#------------------------
 pip_install_pkg torch_geometric
 
 
-#————————————————————————
+#------------------------
 # 5. Install OmicVerse 🧬
-#————————————————————————
+#------------------------
 pip_install_pkg omicverse
 
-#————————————————————————
+#------------------------
 # 6. Other deep‐bio packages 🌱
-#————————————————————————
+#------------------------
 pip_install_pkg \
   tangram-sc \
   fa2-modified \
@@ -161,9 +172,9 @@ pip_install_pkg \
   scikit-image \
   memento-de
 
-#————————————————————————
+#------------------------
 # 7. Dynamics & analysis tools 🔬
-#————————————————————————
+#------------------------
 pip_install_pkg \
   harmonypy \
   intervaltree \
@@ -191,16 +202,17 @@ pip_install_pkg \
 
 
 
-#————————————————————————
+#------------------------
 # 8. Version‐locked packages 🔒
-#————————————————————————
+#------------------------
 
 
-#————————————————————————
+#------------------------
 # 9. Miscellaneous tools 🛠️
-#————————————————————————
+#------------------------
 #pip_install_pkg backports.tarfile openpyxl 
 
 python -c "import omicverse as ov; ov.plot_set()"
 
-echo "🎉 All set! (torch==$TORCH_VERSION, CUDA tag==$CUDA_TAG) 🚀"
+echo "🎉 All set! (torch==$TORCH_VERSION, CUDA tag==$CUDA_TAG)"
+echo "🚀 Optimized with mamba + uv for ultra-fast package management!"
