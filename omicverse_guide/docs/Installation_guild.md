@@ -1,6 +1,6 @@
 # 🧬 OmicVerse Installation Guide
 
-> 📚 For Chinese version, please check [安装指南 (中文版)](Installation_guide_zh.md)
+> 📚 For the Chinese version, please check [安装指南 (中文版)](Installation_guide_zh.md)
 
 ## 📋 Prerequisites
 
@@ -8,28 +8,29 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
 
 !!! note 
 
-    We recommend installing within a `conda` environment to avoid dependency conflicts. Use `pip install -U omicverse` to update existing installations.
+    We recommend installing OmicVerse within a `conda` environment to avoid dependency conflicts. Use `pip install -U omicverse` to update existing installations.
 
-    We also recommend using within `uv pip` instead of `pip`, you can run `pip install uv` to install `uv`.
+    We also recommend using `uv pip` instead of regular `pip`. You can install `uv` by running `pip install uv`.
 
 ### Platform-Specific Requirements
 
 === "Windows (WSL)"
 
-    Install the [WSL subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and configure conda within WSL
+    Install the [WSL subsystem](https://learn.microsoft.com/en-us/windows/wsl/install) and configure conda within WSL.
 
 === "Windows (Native)"
 
-    From version `1.6.2`, OmicVerse supports native Windows (requires `torch` and `torch_geometric`)
+    Starting from version `1.6.2`, OmicVerse supports native Windows. You'll need to install `torch` and `torch_geometric` first.
 
 === "Linux"
 
-    Install [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+    Install [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
     
 === "macOS"
 
-    Use [`miniforge`](https://github.com/conda-forge/miniforge) or [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/)
-    OmicVerse requires a native version of Python on Apple Silicon Macs. Install using a native Apple Silicon version of mambaforge (available via Homebrew with `brew install --cask mambaforge`).
+    Use [`miniforge`](https://github.com/conda-forge/miniforge) or [`mambaforge`](https://www.rho-signal-effective-analytics.com/modules/pre-course/miniconda-installation/).
+    
+    **Important for Apple Silicon Macs:** OmicVerse requires a native version of Python. Install a native Apple Silicon version of mambaforge using Homebrew: `brew install --cask mambaforge`.
 
 
 ## 🚀 Installation Methods
@@ -41,7 +42,7 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
         The easiest way to install OmicVerse is using our installation script:
 
         ```shell
-        #Only for Linux
+        # Linux only
         curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
         ```
 
@@ -55,21 +56,21 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
 
     !!! note "Conda/Mamba"
 
-        1. **Create and activate environment**:
+        1. **Create and activate a new environment**:
           ```shell
           conda create -n omicverse python=3.10
           conda activate omicverse
           ```
 
-        2. **Install PyTorch and PyG**:
+        2. **Install PyTorch and PyTorch Geometric (PyG)**:
           ```shell
-          # For CUDA (check your version with 'nvcc --version')
+          # For CUDA support (check your CUDA version with 'nvcc --version')
           conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
           
-          # OR for CPU only
+          # OR for CPU-only installation
           conda install pytorch torchvision torchaudio cpuonly -c pytorch
           
-          # Install PyG
+          # Install PyTorch Geometric
           conda install pyg -c pyg
           ```
 
@@ -78,7 +79,7 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
           conda install omicverse -c conda-forge
           ```
 
-        4. **Verify installation**:
+        4. **Verify the installation**:
           ```shell
           python -c "import omicverse"
           ```
@@ -87,15 +88,15 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
 
     !!! note "pip/Pypi"
 
-        1. **Install uv**
+        1. **Install uv (recommended package manager)**:
             ```shell
             pip install uv
             ```
-        2. **Install torch**
+        2. **Install PyTorch**:
             ```shell
             uv pip install torch torchvision torchaudio
             ```
-        3. **Install PyG Extensions**
+        3. **Install PyTorch Geometric**:
             ```shell
             uv pip install torch_geometric
             ```
@@ -103,65 +104,74 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
           ```shell
           uv pip install omicverse
           ```
-        5. **Verify installation**:
+        5. **Verify the installation**:
           ```shell
           python -c "import omicverse"
           ```
 
-## Other Importantance
+## Other Important Options
 
 
-!!! tip "Nightly Version"
+!!! tip "Nightly Version (Latest Development Build)"
+
+    To install the latest development version with newest features:
 
     ```shell
-    # Option 1: Clone and install
+    # Option 1: Clone repository and install locally
     git clone https://github.com/Starlitnightly/omicverse.git
     cd omicverse
     pip install .
 
-    # Option 2: Direct install from GitHub
+    # Option 2: Install directly from GitHub
     pip install git+https://github.com/Starlitnightly/omicverse.git
     ```
 
 !!! tip "Development Setup"
 
-    For development:
+    For developers who want to contribute to OmicVerse:
 
     ```shell
     pip install -e ".[dev,docs]"
     ```
 
-!!! tip "GPU-Accelerated Installation"
+!!! tip "GPU-Accelerated Installation (with RAPIDS)"
+
+    For maximum performance with GPU acceleration:
 
     ```shell
-    #1. create a new conda env
+    # 1. Create a new conda environment
     conda create -n rapids python=3.11
-    #2. install rapids using conda
+    
+    # 2. Install RAPIDS using conda
     conda install rapids=24.04 -c rapidsai -c conda-forge -c nvidia -y   
-    #3. install cuml
+    
+    # 3. Install additional RAPIDS components
     conda install cudf=24.04 cuml=24.04 cugraph=24.04 cuxfilter=24.04 cucim=24.04 pylibraft=24.04 raft-dask=24.04 cuvs=24.04 -c rapidsai -c conda-forge -c nvidia -y   
-    #4. install rapid_single_cell
+    
+    # 4. Install rapids-singlecell
     pip install rapids-singlecell
-    #5. install omicverse
+    
+    # 5. Install OmicVerse
     curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
     ```
-    Here, we install the rapids==24.04, that's because our system's glibc<2.28. You can follow the official tutorial to install the latest version of rapids.
+    
+    **Note:** We install RAPIDS version 24.04 because some systems have glibc<2.28. You can follow the official RAPIDS tutorial to install the latest version if your system supports it.
 
-## Docker 
+## Docker Installation
 
-Docker images are available on [Docker Hub](https://hub.docker.com/r/starlitnightly/omicverse).
+Pre-built Docker images are available on [Docker Hub](https://hub.docker.com/r/starlitnightly/omicverse).
 
 ## Jupyter Lab Setup
 
-!!! note "Jupyer Lab"
+!!! note "Jupyter Lab"
 
-    We recommend Jupyter Lab for interactive analysis:
+    We recommend using Jupyter Lab for interactive analysis:
 
     ```shell
     pip install jupyter-lab
     ```
 
-    After installation, run `jupyter-lab` in your terminal (from the omicverse environment). A URL will appear that you can open in your browser.
+    After installation, activate your omicverse environment and run `jupyter-lab` in your terminal. A URL will appear that you can open in your browser.
 
 
 ![jupyter-light](img/light_jupyter.jpg#gh-light-mode-only)
@@ -185,21 +195,25 @@ Docker images are available on [Docker Hub](https://hub.docker.com/r/starlitnigh
     gcc --version
     ```
 
-!!! info "Package installation issues"
+!!! info "Package Installation Issues"
 
-    If pip cannot install certain packages (e.g., scikit-misc), try conda:
+    If pip fails to install certain packages (e.g., scikit-misc), try using conda instead:
     ```shell
     conda install scikit-misc -c conda-forge -c bioconda
     ```
-!!! info "Apple Silicon (M1/M2) issues"
 
+!!! info "Apple Silicon (M1/M2) Issues"
+
+    For Apple Silicon Mac users experiencing issues:
     ```shell
     conda install s_gd2 -c conda-forge
     pip install -U omicverse
     conda install pytorch::pytorch torchvision torchaudio -c pytorch
     ```
 
+!!! info "Apple Silicon Requirements"
 
-!!! info "Apple Silicon Note"
-
-    OmicVerse requires a native version of Python on Apple Silicon Macs. Install using a native Apple Silicon version of mambaforge (available via Homebrew with `brew install --cask mambaforge`).
+    **Important:** OmicVerse requires a native version of Python on Apple Silicon Macs. Make sure to install a native Apple Silicon version of mambaforge using Homebrew:
+    ```shell
+    brew install --cask mambaforge
+    ```
