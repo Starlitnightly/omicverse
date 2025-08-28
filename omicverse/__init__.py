@@ -80,7 +80,9 @@ from .utils.registry import (
     find_function,
     list_functions,
     get_function_help,
-    recommend_function
+    recommend_function,
+    export_registry,
+    import_registry
 )
 
 name = "omicverse"
