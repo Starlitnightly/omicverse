@@ -26,9 +26,17 @@ Key features:
 Examples:
     >>> import omicverse as ov
     >>> adata = ov.read('data.h5ad')
+    >>> 
+    >>> # Traditional approach
     >>> ov.pp.preprocess(adata)
     >>> ov.single.leiden(adata)
     >>> ov.pl.umap(adata, color='leiden')
+    >>> 
+    >>> # Smart Agent approach  
+    >>> agent = ov.Agent(model="gpt-4o-mini", api_key="your-key")
+    >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
+    >>> adata = agent.run("preprocess with 2000 HVGs", adata)
+    >>> adata = agent.run("leiden clustering resolution=1.0", adata)
 """
 
 # Fix PyArrow compatibility issue
@@ -84,6 +92,9 @@ from .utils.registry import (
     export_registry,
     import_registry
 )
+
+# Smart Agent system using Pantheon
+from .utils.smart_agent import Agent
 
 name = "omicverse"
 try:

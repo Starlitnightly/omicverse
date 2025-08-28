@@ -62,6 +62,27 @@ class FunctionRegistry:
         func_name = func.__name__
         full_name = f"{module_name}.{func_name}"
         
+        # Extract function signature and parameters
+        try:
+            sig = inspect.signature(func)
+            signature = str(sig)
+            
+            # Extract parameter details with defaults
+            params_info = []
+            for param_name, param in sig.parameters.items():
+                param_str = param_name
+                if param.default != inspect.Parameter.empty:
+                    param_str += f"={repr(param.default)}"
+                params_info.append(param_str)
+            
+            # Get full docstring for help
+            docstring = inspect.getdoc(func) or "No documentation available"
+            
+        except Exception:
+            signature = "(adata, **kwargs)"
+            params_info = ["adata", "**kwargs"]
+            docstring = "No documentation available"
+        
         # Create registry entry
         entry = {
             'function': func,
@@ -73,8 +94,9 @@ class FunctionRegistry:
             'description': description,
             'examples': examples or [],
             'related': related or [],
-            'signature': str(inspect.signature(func)),
-            'docstring': inspect.getdoc(func)
+            'signature': signature,
+            'parameters': params_info,
+            'docstring': docstring
         }
         
         # Register under all aliases

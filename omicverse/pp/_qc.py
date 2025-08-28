@@ -122,9 +122,9 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
 @register_function(
     aliases=["质控", "qc", "quality_control", "质量控制"],
     category="preprocessing",
-    description="Perform comprehensive quality control on single-cell data, including mitochondrial percentage filtering, doublet detection, and cell/gene filtering",
+    description="Perform comprehensive quality control on single-cell data. For seurat mode, use tresh dict with keys: 'mito_perc', 'nUMIs', 'detected_genes'",
     examples=[
-        "ov.pp.qc(adata, mode='seurat', min_genes=200)",
+        "ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})",
         "ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)"
     ],
     related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
