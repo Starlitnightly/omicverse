@@ -43,7 +43,7 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
 
         ```shell
         # Linux only
-        curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
+        curl -sSL omicverse.com/install | bash -s
         ```
 
         This script will automatically:

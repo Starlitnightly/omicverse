@@ -20,6 +20,7 @@ import seaborn as sns
 from scipy.sparse import issparse
 
 from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Colors
+from ..utils.registry import register_function
 
 
 
@@ -118,6 +119,16 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
             
         return result
 
+@register_function(
+    aliases=["质控", "qc", "quality_control", "质量控制"],
+    category="preprocessing",
+    description="Perform comprehensive quality control on single-cell data, including mitochondrial percentage filtering, doublet detection, and cell/gene filtering",
+    examples=[
+        "ov.pp.qc(adata, mode='seurat', min_genes=200)",
+        "ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)"
+    ],
+    related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
+)
 def qc(adata,**kwargs):
     '''
     qc

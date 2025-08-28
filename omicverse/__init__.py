@@ -46,35 +46,42 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
-# Lazy loading system for faster imports
-from ._lazy_loader import create_lazy_module, create_lazy_attribute
+# Core submodules - direct imports
+from . import bulk
+from . import single
+from . import utils
+from . import bulk2single
+from . import pp
+from . import space
+from . import pl
+from . import datasets
 
-# Core submodules - loaded lazily to improve import speed
-bulk = create_lazy_module('omicverse.bulk', globals())
-single = create_lazy_module('omicverse.single', globals())
-utils = create_lazy_module('omicverse.utils', globals())
-bulk2single = create_lazy_module('omicverse.bulk2single', globals())
-pp = create_lazy_module('omicverse.pp', globals())
-space = create_lazy_module('omicverse.space', globals())
-pl = create_lazy_module('omicverse.pl', globals())
-llm = create_lazy_module('omicverse.llm', globals())
-datasets = create_lazy_module('omicverse.datasets', globals())
+# External modules
+from . import external
 
-# External modules - loaded lazily  
-external = create_lazy_module('omicverse.external', globals())
+# Optional modules
+try:
+    from . import llm
+except ImportError:
+    llm = None
 
 # Optional datacollect module
 try:
-    # Test if datacollect is available by attempting import
-    import omicverse.external.datacollect
-    datacollect = create_lazy_module('omicverse.external.datacollect', globals())
+    from .external import datacollect
 except ImportError:
-    # Gracefully handle missing datacollect module
     datacollect = None
 
 # Essential utilities - keep these as direct imports for compatibility
 from .utils._data import read
 from .utils._plot import palette, ov_plot_set, plot_set
+
+# Function registry system for discovery and search
+from .utils.registry import (
+    find_function,
+    list_functions,
+    get_function_help,
+    recommend_function
+)
 
 name = "omicverse"
 try:
@@ -84,8 +91,7 @@ except Exception:
 
 from ._settings import settings, generate_reference_table
 
-# Heavy libraries - loaded lazily to improve import speed
-# These will only be imported when first accessed
-plt = create_lazy_attribute('matplotlib.pyplot')
-np = create_lazy_attribute('numpy')  
-pd = create_lazy_attribute('pandas')
+# Common libraries - direct imports for convenience
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd

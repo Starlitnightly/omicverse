@@ -42,7 +42,7 @@ OmicVerse 可以通过 conda 或 pip 安装，但首先需要安装 `PyTorch`。
 
         ```shell
         # 仅适用于 Linux
-        curl -sSL https://raw.githubusercontent.com/Starlitnightly/omicverse/refs/heads/master/install.sh | bash -s
+        curl -sSL omicverse.com/install | bash -s
         ```
 
         **国内用户加速版本**：
