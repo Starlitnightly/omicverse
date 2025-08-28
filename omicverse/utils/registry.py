@@ -10,6 +10,8 @@ from functools import wraps
 import inspect
 from difflib import get_close_matches
 import warnings
+import json
+from pathlib import Path
 
 
 class FunctionRegistry:
@@ -476,6 +478,130 @@ def recommend_function(task_description: str, n: int = 5) -> List[Callable]:
     return [entry[1][1]['function'] for entry in sorted_entries]
 
 
+def export_registry(filepath: Optional[str] = None, 
+                   format: str = "json",
+                   include_source: bool = False) -> Union[str, Dict]:
+    """
+    Export the current registry to JSON format.
+    
+    Parameters
+    ----------
+    filepath : str, optional
+        File path to save the registry. If None, returns the data as dict/string
+    format : str
+        Export format: 'json' or 'dict'
+    include_source : bool
+        Whether to include source code of functions (warning: large file)
+    
+    Returns
+    -------
+    Union[str, Dict]
+        Registry data as JSON string or dictionary
+        
+    Examples
+    --------
+    >>> # Export to file
+    >>> ov.export_registry('registry.json')
+    
+    >>> # Get as dictionary
+    >>> data = ov.export_registry(format='dict')
+    
+    >>> # Get as JSON string
+    >>> json_str = ov.export_registry(format='json')
+    """
+    export_data = {}
+    
+    # Get all unique functions
+    processed_functions = set()
+    
+    for entry in _global_registry._registry.values():
+        full_name = entry['full_name']
+        if full_name in processed_functions:
+            continue
+        processed_functions.add(full_name)
+        
+        func_data = {
+            'full_name': entry['full_name'],
+            'short_name': entry['short_name'],
+            'module': entry['module'],
+            'aliases': entry['aliases'],
+            'category': entry['category'],
+            'description': entry['description'],
+            'examples': entry['examples'],
+            'related': entry['related'],
+            'signature': entry['signature'],
+            'docstring': entry['docstring']
+        }
+        
+        if include_source:
+            try:
+                func_data['source_code'] = inspect.getsource(entry['function'])
+            except Exception:
+                func_data['source_code'] = "Source not available"
+        
+        export_data[full_name] = func_data
+    
+    # Add metadata
+    export_metadata = {
+        'exported_at': str(__import__('datetime').datetime.now()),
+        'total_functions': len(export_data),
+        'categories': list(_global_registry._categories.keys()),
+        'omicverse_version': getattr(__import__('omicverse'), '__version__', 'unknown')
+    }
+    
+    final_data = {
+        'metadata': export_metadata,
+        'functions': export_data
+    }
+    
+    if format == 'dict':
+        result = final_data
+    else:  # json
+        result = json.dumps(final_data, indent=2, ensure_ascii=False)
+    
+    if filepath:
+        filepath = Path(filepath)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            if format == 'dict':
+                json.dump(final_data, f, indent=2, ensure_ascii=False)
+            else:
+                f.write(result)
+        print(f"Registry exported to: {filepath}")
+        print(f"Total functions: {len(export_data)}")
+        return str(filepath)
+    
+    return result
+
+
+def import_registry(filepath: str) -> Dict:
+    """
+    Import registry data from JSON file.
+    
+    Parameters
+    ----------
+    filepath : str
+        Path to the JSON file
+        
+    Returns
+    -------
+    Dict
+        Imported registry data
+        
+    Examples
+    --------
+    >>> data = ov.import_registry('registry.json')
+    """
+    filepath = Path(filepath)
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    print(f"Registry imported from: {filepath}")
+    print(f"Total functions: {data['metadata']['total_functions']}")
+    print(f"Categories: {', '.join(data['metadata']['categories'])}")
+    
+    return data
+
+
 # Export registry instance and API functions
 __all__ = [
     'register_function',
@@ -483,6 +609,8 @@ __all__ = [
     'list_functions',
     'get_function_help',
     'recommend_function',
+    'export_registry',
+    'import_registry',
     'FunctionRegistry',
     '_global_registry'
 ]
