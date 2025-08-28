@@ -13,6 +13,7 @@ import time
 
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
+from ..utils.registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference
 from datetime import datetime
 
@@ -393,6 +394,16 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
 
+@register_function(
+    aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
+    category="preprocessing",
+    description="Complete preprocessing pipeline including normalization, HVG selection, scaling, and PCA",
+    examples=[
+        "ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=2000)",
+        "ov.pp.preprocess(adata, mode='pearson|pearson', target_sum=50e4)"
+    ],
+    related=["qc", "normalize", "scale", "pca", "highly_variable_genes"]
+)
 def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     organism='human', no_cc=False,batch_key=None,):
     """
@@ -525,6 +536,13 @@ def highly_variable_genes(adata,**kwargs):
         adata, **kwargs,
     )
 
+@register_function(
+    aliases=["标准化", "scale", "scaling", "标准化处理"],
+    category="preprocessing",
+    description="Scale data to unit variance and zero mean",
+    examples=["ov.pp.scale(adata, max_value=10)"],
+    related=["normalize", "regress"]
+)
 def scale(adata,max_value=10,layers_add='scaled',**kwargs):
     """
     Scale the input AnnData object.
@@ -632,6 +650,13 @@ class my_PCA:
 
         return self
 
+@register_function(
+    aliases=["主成分分析", "pca", "PCA", "降维"],
+    category="preprocessing",
+    description="Perform Principal Component Analysis for dimensionality reduction",
+    examples=["ov.pp.pca(adata, n_pcs=50)"],
+    related=["umap", "tsne", "mde"]
+)
 def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
     """
     Performs Principal Component Analysis (PCA) on the data stored in a scanpy AnnData object.
@@ -794,6 +819,13 @@ _MetricScipySpatial = Literal[
     ]
 _Metric = Union[_MetricSparseCapable, _MetricScipySpatial]
 from types import MappingProxyType
+@register_function(
+    aliases=["计算邻居", "neighbors", "knn", "邻居图"],
+    category="preprocessing",
+    description="Compute neighborhood graph of cells",
+    examples=["ov.pp.neighbors(adata, n_neighbors=15)"],
+    related=["umap", "leiden", "louvain"]
+)
 def neighbors(
     adata: anndata.AnnData,
     n_neighbors: int = 15,
@@ -879,6 +911,13 @@ def neighbors(
     add_reference(adata,'scanpy','neighbors with scanpy')
 
 
+@register_function(
+    aliases=["umap", "UMAP", "非线性降维"],
+    category="preprocessing",
+    description="Compute UMAP embedding for visualization",
+    examples=["ov.pp.umap(adata)"],
+    related=["tsne", "pca", "mde", "neighbors"]
+)
 def umap(adata, **kwargs):
     """
     Run UMAP on AnnData, choosing implementation based on settings.mode,
@@ -927,6 +966,13 @@ def louvain(adata, **kwargs):
         rsc.tl.louvain(adata, **kwargs)
         add_reference(adata,'louvain','Louvain clustering with RAPIDS')
 
+@register_function(
+    aliases=["莱顿聚类", "leiden", "clustering", "聚类"],
+    category="preprocessing",
+    description="Perform Leiden community detection clustering",
+    examples=["ov.pp.leiden(adata, resolution=1.0)"],
+    related=["louvain", "neighbors"]
+)
 def leiden(adata, **kwargs):
     '''
     leiden clustering
