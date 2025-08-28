@@ -585,23 +585,52 @@ Optimated the plot effect of `ov.pl.violin`
 ### utils Module
 - Added scICE to calculate the best cluster (#329)
 
-### v 1.7.6
+## v 1.7.6
 
-## LLM Module
+### LLM Module
 - Added `GeneFromer`, `scGPT`, `scFoundation`, `UCE`, `CellPLM` to call directly in OmicVerse.
 
-## Pl Module
+### Pl Module
 - Optimized the visualization effect of embedding.
 - Added `ov.pl.umap`, `ov.pl.pca`, `ov.pl.mde`, and `ov.pl.tsne` 
 
 
-### v 1.7.8
+## v 1.7.8
 
-## Performance Optimization
+### Performance Optimization
 - **Major Import Speed Improvement**: Implemented lazy loading system that reduces `import omicverse` time by **40%** (from ~7.8s to ~4.7s)
   - Added `/omicverse/_lazy_loader.py` with `LazyLoader` and `LazyAttribute` classes for deferred module loading
   - All heavy submodules (`bulk`, `single`, `pl`, `llm`, etc.) now load only when first accessed  
   - Heavy libraries (`matplotlib.pyplot`, `numpy`, `pandas`) are now lazy-loaded
   - Maintained full backward compatibility - all existing code continues to work unchanged
   - First access to modules triggers actual loading, subsequent access is instant
+
+### Datasets Module - Complete Rewrite
+- **Complete elimination of scanpy dependencies**: The `datasets` module now operates entirely independently without any `scanpy.datasets` imports, ensuring faster loading and reduced conflicts
+- **Dynamo-style dataset framework**: Rebuilt following `dynamo-release` pattern with comprehensive dataset collection:
+  - **Real datasets**: `hematopoiesis()`, `paul15()`, `moignard15()`, `pbmc3k()`, `pbmc68k_reduced()`, `zebrafish()`, `bone_marrow()`, `dentate_gyrus()`, and 15+ more
+  - **Simulations**: `blobs()`, `toggleswitch()`, `krumsiek11()` with configurable parameters
+  - **Multi-omics**: `multi_brain_5k()` for ATAC + Gene expression analysis
+- **Robust download system**: 
+  - Smart URL-based downloading with progress tracking via `tqdm`
+  - Automatic caching to `./data/` with corruption detection and recovery
+  - Support for h5ad, loom, xlsx, and compressed formats
+  - Fallback to mock data generation when URLs fail
+- **Enhanced mock data generation**: Rich synthetic datasets with realistic structure, cell types, and optional preprocessing (PCA, UMAP, clustering)
+
+### Smart Agent System - Revolutionary Natural Language Interface
+- **Multi-provider LLM support**: Integration with 50+ AI models from 8 providers:
+  - **OpenAI**: GPT-5, GPT-4.1, o1/o3 series, GPT-4o variants
+  - **Anthropic**: Claude 4 Opus/Sonnet, Claude 3.7 Sonnet, Claude 3.5 Haiku  
+  - **Google**: Gemini 2.5 Pro/Flash, Gemini 2.0 series
+  - **DeepSeek**: DeepSeek Chat/Reasoner
+  - **Qwen/Alibaba**: QwQ Plus, Qwen Max/Plus/Turbo (2025 series)
+  - **Moonshot/Kimi**: K2 series, Auto Context models
+  - **Grok/xAI**: Grok 2/Beta
+  - **Zhipu AI**: GLM-4.5 series, GLM-4 variants
+- **Natural language processing**: `agent.run("quality control with nUMI>500, mito<0.2", adata)` - supports both English and Chinese
+- **Code generation architecture**: Agent generates executable Python code and runs it locally (no data serialization issues)
+- **Function registry system**: Dynamic discovery of OmicVerse functions with multi-language aliases and intelligent parameter extraction
+- **Smart API key management**: Automatic environment variable setup and provider-specific endpoint configuration
+
 
