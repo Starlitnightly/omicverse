@@ -19,15 +19,16 @@ from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 
 # Add pantheon path if not already in path
-pantheon_path = '/Users/fernandozeng/Desktop/analysis/pantheon/pantheon-agents'
-if pantheon_path not in sys.path:
-    sys.path.append(pantheon_path)
+try:
+    from pantheon.agent import Agent as PantheonAgent
+except ImportError:
+    PANTHEON_INSTALLED = False
+else:
+    PANTHEON_INSTALLED = True
 
-from pantheon.agent import Agent as PantheonAgent
-from pantheon.toolsets.python import PythonInterpreterToolSet
-
-# Import registry system
+# Import registry system and model configuration
 from .registry import _global_registry
+from .model_config import ModelConfig, PROVIDER_API_KEYS, AVAILABLE_MODELS
 
 
 class OmicVerseAgent:
@@ -42,7 +43,7 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: Optional[str] = None):
+    def __init__(self, model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: Optional[str] = None):
         """
         Initialize the OmicVerse Smart Agent.
         
@@ -51,18 +52,68 @@ class OmicVerseAgent:
         model : str
             LLM model to use for reasoning (default: "gpt-4o-mini")
         api_key : str, optional
-            OpenAI API key. If not provided, will use environment variable
+            API key for the model provider. If not provided, will use environment variable
+        endpoint : str, optional
+            Custom API endpoint. If not provided, will use default for the provider
         """
+        if PANTHEON_INSTALLED:
+            print(f" Initializing OmicVerse Smart Agent...")
+        else:
+            print(f"❌ Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
+            raise ImportError("Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
+        
+        # Validate model
+        is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
+        if not is_valid:
+            print(f"❌ {validation_msg}")
+            raise ValueError(validation_msg)
+        
         self.model = model
         self.api_key = api_key
+        self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
         self.agent = None
         
-        # Set API key if provided
-        if api_key:
-            import os
-            os.environ['OPENAI_API_KEY'] = api_key
+        # Set up API key based on provider
+        self._setup_api_keys(api_key)
         
-        self._setup_agent()
+        # Display model info
+        provider = ModelConfig.get_provider_from_model(model)
+        model_desc = ModelConfig.get_model_description(model)
+        print(f"    Model: {model_desc}")
+        print(f"    Provider: {provider.title()}")
+        print(f"    Endpoint: {self.endpoint}")
+        
+        # Check API key status
+        key_available, key_msg = ModelConfig.check_api_key_availability(model)
+        if key_available:
+            print(f"   ✅ {key_msg}")
+        else:
+            print(f"   ⚠️  {key_msg}")
+        
+        try:
+            self._setup_agent()
+            stats = self._get_registry_stats()
+            print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
+            print(f"✅ Smart Agent initialized successfully!")
+        except Exception as e:
+            print(f"❌ Agent initialization failed: {e}")
+            raise
+    
+    def _get_registry_stats(self) -> dict:
+        """Get statistics about the function registry."""
+        # Get all unique functions from registry
+        unique_functions = set()
+        categories = set()
+        
+        for entry in _global_registry._registry.values():
+            unique_functions.add(entry['full_name'])
+            categories.add(entry['category'])
+        
+        return {
+            'total_functions': len(unique_functions),
+            'categories': len(categories),
+            'category_list': list(categories)
+        }
     
     def _get_available_functions_info(self) -> str:
         """Get formatted information about all available functions."""
@@ -90,8 +141,32 @@ class OmicVerseAgent:
         
         return json.dumps(functions_info, indent=2, ensure_ascii=False)
     
+    def _setup_api_keys(self, api_key: Optional[str] = None):
+        """Setup API keys based on the model provider"""
+        import os
+        
+        if api_key:
+            # Determine which environment variable to set based on model
+            required_key = PROVIDER_API_KEYS.get(self.model)
+            if required_key:
+                os.environ[required_key] = api_key
+                # Also set OPENAI_API_KEY for backwards compatibility if it's an OpenAI model
+                if required_key == "OPENAI_API_KEY":
+                    os.environ['OPENAI_API_KEY'] = api_key
+    
     def _setup_agent(self):
         """Setup the pantheon agent with dynamic instructions."""
+        
+        # Suppress debug logs from Pantheon
+        import logging
+        import sys
+        try:
+            from loguru import logger
+            logger.remove()  # Remove default handler
+            logger.add(sys.stderr, level="INFO")  # Only show INFO and above
+        except ImportError:
+            # Fallback to standard logging
+            logging.getLogger('pantheon').setLevel(logging.WARNING)
         
         # Get current function information dynamically
         functions_info = self._get_available_functions_info()
@@ -161,20 +236,21 @@ User request: "quality control with nUMI>500, mito<0.2"
 - Handle errors gracefully and suggest alternatives if needed
 """
         
-        # Setup Python interpreter
-        python_toolset = PythonInterpreterToolSet("python")
+        # Set API key as environment variable if provided
+        if self.api_key:
+            provider = ModelConfig.get_provider_from_model(self.model)
+            required_key = PROVIDER_API_KEYS.get(self.model)
+            if required_key and not os.getenv(required_key):
+                os.environ[required_key] = self.api_key
         
-        # Create the pantheon agent
+        # Create the pantheon agent with only function discovery tools
         self.agent = PantheonAgent(
             "omicverse_agent",
             instructions,
             model=self.model,
         )
         
-        # Add toolsets
-        self.agent.toolset(python_toolset)
-        
-        # Add custom tools for function discovery
+        # Add custom tools for function discovery (no Python interpreter needed)
         self.agent.tool(self._search_functions)
         self.agent.tool(self._get_function_details)
     
@@ -438,7 +514,29 @@ Example workflow:
         return asyncio.run(self.run_async(request, adata))
 
 
-def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None) -> OmicVerseAgent:
+def list_supported_models(show_all: bool = False) -> str:
+    """
+    List all supported models for OmicVerse Smart Agent.
+    
+    Parameters
+    ----------
+    show_all : bool, optional
+        If True, show all models. If False, show top 3 per provider (default: False)
+        
+    Returns
+    -------
+    str
+        Formatted list of supported models with API key status
+        
+    Examples
+    --------
+    >>> import omicverse as ov
+    >>> print(ov.list_supported_models())
+    >>> print(ov.list_supported_models(show_all=True))
+    """
+    return ModelConfig.list_supported_models(show_all)
+
+def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: Optional[str] = None) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
     
@@ -448,9 +546,11 @@ def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None) -> OmicVers
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gpt-4o-mini")
+        LLM model to use (default: "gpt-4o-mini"). Use list_supported_models() to see all options
     api_key : str, optional
-        OpenAI API key. If not provided, will use environment variable
+        API key for the model provider. If not provided, will use environment variable
+    endpoint : str, optional
+        Custom API endpoint. If not provided, will use default for the provider
         
     Returns
     -------
@@ -477,8 +577,8 @@ def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None) -> OmicVers
     >>> # Use agent for clustering
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)
     """
-    return OmicVerseAgent(model=model, api_key=api_key)
+    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint)
 
 
-# Export the main function
-__all__ = ['Agent', 'OmicVerseAgent']
+# Export the main functions
+__all__ = ['Agent', 'OmicVerseAgent', 'list_supported_models']
