@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn import decomposition as skldec 
 
 from ..utils import plot_text_set
+from ..utils.registry import register_function
 import matplotlib
 
 def geneset_enrichment(gene_list:list,pathways_dict:dict,
@@ -219,6 +220,20 @@ def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
                 cbar.grid(False)
     return ax
 
+@register_function(
+    aliases=["富集分析可视化", "geneset_plot", "enrichment_plot", "通路富集图", "pathway_plot"],
+    category="bulk",
+    description="Visualize gene set enrichment analysis results with bubble plot",
+    examples=[
+        "# Basic usage",
+        "ov.bulk.geneset_plot(enrich_res, num=10)",
+        "# Custom appearance",
+        "ov.bulk.geneset_plot(enrich_res, num=15, figsize=(3,5), cmap='RdBu')",
+        "# Adjust node sizes and colors",
+        "ov.bulk.geneset_plot(enrich_res, node_size=[10,20,30], fig_title='KEGG Pathways')"
+    ],
+    related=["bulk.geneset_enrichment", "bulk.geneset_plot_multi", "pl.volcano", "pl.dotplot"]
+)
 def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
                         cax_loc:list=[2, 0.55, 0.5, 0.02],cax_fontsize:int=12,
                         fig_title:str='',fig_xlabel:str='Fractions of genes',
@@ -230,24 +245,23 @@ def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
 
     Arguments:
         enrich_res: Enrichment results DataFrame.
-        num: The number of enriched terms to plot. (10)
-        node_size: A list of integers defining the size of nodes in the plot. ([5,10,15])
-        cax_loc: The location, width and height of the colorbar on the plot. ([2, 0.55, 0.5, 0.02])
-        cax_fontsize: The fontsize of the colorbar label. (12)
-        fig_title: The title of the plot. ('')
-        fig_xlabel: The label of the x-axis. ('Fractions of genes')
-        figsize: The size of the plot. ((2,4))
-        cmap: The colormap to use for the plot. ('YlGnBu')
-        text_knock: The number of characters to knock off the end of the term name. (5)
-        text_maxsize: The maximum fontsize of the term names. (20)
-        bbox_to_anchor_used: The anchor point for placing the legend. ((-0.45, -13))
-        node_diameter: The base size for nodes in the plot. (10)
-        custom_ticks: Custom tick marks for the plot. ([5,10])
-        ax: Matplotlib axes object. (None)
+        num: The number of enriched terms to plot. Default: 10.
+        node_size: A list of integers defining the size of nodes in the plot. Default: [5,10,15].
+        cax_loc: The location, width and height of the colorbar on the plot. Default: [2, 0.55, 0.5, 0.02].
+        cax_fontsize: The fontsize of the colorbar label. Default: 12.
+        fig_title: The title of the plot. Default: ''.
+        fig_xlabel: The label of the x-axis. Default: 'Fractions of genes'.
+        figsize: The size of the plot. Default: (2,4).
+        cmap: The colormap to use for the plot. Default: 'YlGnBu'.
+        text_knock: The number of characters to knock off the end of the term name. Default: 5.
+        text_maxsize: The maximum fontsize of the term names. Default: 20.
+        bbox_to_anchor_used: The anchor point for placing the legend. Default: (-0.45, -13).
+        node_diameter: The base size for nodes in the plot. Default: 10.
+        custom_ticks: Custom tick marks for the plot. Default: [5,10].
+        ax: Matplotlib axes object. Default: None.
 
     Returns:
-        ax: A matplotlib.axes.Axes object.
-    
+        ax: A matplotlib.axes.Axes object containing the enrichment bubble plot.
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
@@ -350,6 +364,22 @@ class pyGSE(object):
         return geneset_plot(self.enrich_res,num,node_size,cax_loc,cax_fontsize,
                             fig_title,fig_xlabel,figsize,cmap,text_knock,text_maxsize)
     
+@register_function(
+    aliases=["GSEA分析", "pyGSEA", "gene_set_enrichment", "基因集富集分析"],
+    category="bulk",
+    description="Gene Set Enrichment Analysis (GSEA) for ranked gene lists",
+    examples=[
+        "# Initialize GSEA object",
+        "gsea_obj = ov.bulk.pyGSEA(ranked_genes, pathway_dict)",
+        "# Run enrichment analysis",
+        "enrich_res = gsea_obj.enrichment()",
+        "# Visualize enrichment results",
+        "gsea_obj.plot_enrichment(num=10, figsize=(3,5))",
+        "# Plot GSEA for specific term",
+        "gsea_obj.plot_gsea(term_num=0, gene_set_title='KEGG Pathway')"
+    ],
+    related=["bulk.geneset_enrichment", "bulk.pyDEG.ranking2gsea", "utils.geneset_prepare"]
+)
 class pyGSEA(object):
 
     def __init__(self,gene_rnk:pd.DataFrame,pathways_dict:dict,

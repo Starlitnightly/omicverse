@@ -17,6 +17,7 @@ from scipy.sparse import diags, issparse, spmatrix, csr_matrix, isspmatrix_csr
 import warnings
 from scipy.stats import norm
 from .._settings import Colors  # Import Colors from settings
+from .registry import register_function
 
 
 def read(path,**kwargs):
@@ -133,9 +134,30 @@ def download_GDSC_data():
             data_downloader(url=_datasets[datasets_name],path='models/{}.tsv.gz'.format(datasets_name),title=datasets_name)
     print('......GDSC data download finished!')
 
+@register_function(
+    aliases=["下载通路数据库", "download_pathway_database", "download_genesets", "通路数据下载"],
+    category="utils",
+    description="Download pathway and gene set databases for enrichment analysis",
+    examples=[
+        "ov.utils.download_pathway_database()",
+        "# Downloads the following databases:",
+        "# - GO_Biological_Process_2021",
+        "# - GO_Cellular_Component_2021", 
+        "# - GO_Molecular_Function_2021",
+        "# - WikiPathway_2021_Human",
+        "# - WikiPathways_2019_Mouse",
+        "# - Reactome_2022"
+    ],
+    related=["utils.geneset_prepare", "bulk.geneset_enrichment", "bulk.pyGSEA"]
+)
 def download_pathway_database():
-    r"""load pathway_database
+    r"""Download pathway and gene set databases for enrichment analysis.
 
+    Arguments:
+        None
+
+    Returns:
+        None: The function downloads pathway databases to the genesets/ directory including GO_Biological_Process_2021, GO_Cellular_Component_2021, GO_Molecular_Function_2021, WikiPathway_2021_Human, WikiPathways_2019_Mouse, and Reactome_2022.
     """
     _datasets = {
         'GO_Biological_Process_2021':'https://figshare.com/ndownloader/files/39820720',
@@ -152,9 +174,28 @@ def download_pathway_database():
     print('......Pathway Geneset download finished!')
     print('......Other Genesets can be dowload in `https://maayanlab.cloud/Enrichr/#libraries`')
 
+@register_function(
+    aliases=["下载基因ID注释", "download_geneid_annotation_pair", "download_gene_mapping", "基因ID映射下载"],
+    category="utils",
+    description="Download gene ID annotation mapping files for various organisms",
+    examples=[
+        "ov.utils.download_geneid_annotation_pair()",
+        "# Files downloaded to genesets/ directory:",
+        "# - pair_GRCm39.tsv (Mouse)",
+        "# - pair_GRCh38.tsv (Human)",
+        "# - pair_GRCh37.tsv (Human legacy)",
+        "# - pair_danRer11.tsv (Zebrafish)"
+    ],
+    related=["bulk.Matrix_ID_mapping", "utils.geneset_prepare"]
+)
 def download_geneid_annotation_pair():
-    r"""load geneid_annotation_pair
+    r"""Download gene ID annotation mapping files for various organisms.
 
+    Arguments:
+        None
+
+    Returns:
+        None: The function downloads mapping files to the genesets/ directory including pair_GRCm39.tsv (Mouse), pair_GRCh38.tsv (Human), pair_GRCh37.tsv (Human legacy), and pair_danRer11.tsv (Zebrafish).
     """
     _datasets = {
         'pair_GRCm39':'https://figshare.com/ndownloader/files/39820684',
@@ -180,33 +221,39 @@ def download_geneid_annotation_pair():
             model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
     print('......Geneid Annotation Pair download finished!')
 
+@register_function(
+    aliases=["GTF转换", "gtf_to_pair_tsv", "gtf_to_mapping", "GTF基因映射", "convert_gtf"],
+    category="utils",
+    description="Convert GTF file to gene ID mapping pairs TSV format for Matrix_ID_mapping",
+    examples=[
+        "# Convert GTF to mapping pairs",
+        "gene_count = ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')",
+        "# Keep version numbers in gene IDs",
+        "ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv', gene_id_version=True)",
+        "# Remove version numbers from gene IDs", 
+        "ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv', gene_id_version=False)",
+        "# Use converted file for gene mapping",
+        "data = ov.bulk.Matrix_ID_mapping(data, 'gene_pairs.tsv')"
+    ],
+    related=["bulk.Matrix_ID_mapping", "utils.download_geneid_annotation_pair", "utils.read_gtf"]
+)
 def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
-    r"""Convert GTF file to gene ID mapping pairs TSV format
-    
-    This function extracts gene_id and gene_name from GTF files and creates
-    a TSV file compatible with Matrix_ID_mapping function.
-    
-    Parameters
-    ----------
-    gtf_path : str
-        Path to input GTF file
-    output_path : str
-        Path for output TSV file
-    gene_id_version : bool, optional
-        Whether to keep version numbers in gene IDs (default: True)
-        
-    Returns
-    -------
-    gene_count : int
-        Number of genes processed
-        
-    Examples
-    --------
-    >>> import omicverse as ov
-    >>> # Convert GTF to mapping pairs
-    >>> ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')
-    >>> # Use for gene mapping
-    >>> data = ov.bulk.Matrix_ID_mapping(data, 'gene_pairs.tsv')
+    r"""Convert GTF file to gene ID mapping pairs TSV format.
+
+    Arguments:
+        gtf_path: Path to input GTF file.
+        output_path: Path for output TSV file.
+        gene_id_version: Whether to keep version numbers in gene IDs. Default: True.
+
+    Returns:
+        gene_count: Number of genes processed and written to the output file.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Convert GTF to mapping pairs
+        >>> gene_count = ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')
+        >>> # Use converted file for gene mapping
+        >>> data = ov.bulk.Matrix_ID_mapping(data, 'gene_pairs.tsv')
     """
     import pandas as pd
     from ._genomics import read_gtf
@@ -278,20 +325,30 @@ def download_tosica_gmt():
         model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
     print('......TOSICA gmt dataset download finished!')
 
+@register_function(
+    aliases=["基因集准备", "geneset_prepare", "pathway_prepare", "基因集加载", "load_geneset"],
+    category="utils",
+    description="Load and prepare gene sets from GMT/TXT files for enrichment analysis",
+    examples=[
+        "# Load human gene sets",
+        "geneset_dict = ov.utils.geneset_prepare('KEGG_pathways.gmt', organism='Human')",
+        "# Load mouse gene sets",
+        "geneset_dict = ov.utils.geneset_prepare('GO_biological_process.txt', organism='Mouse')",
+        "# Use with enrichment analysis",
+        "geneset_dict = ov.utils.geneset_prepare('c2.cp.kegg.v7.4.symbols.gmt')",
+        "enrich_res = ov.bulk.geneset_enrichment(gene_list, geneset_dict)"
+    ],
+    related=["bulk.geneset_enrichment", "utils.download_tosica_gmt", "single.pathway_enrichment"]
+)
 def geneset_prepare(geneset_path,organism='Human',):
-    r"""load geneset
+    r"""Load and prepare gene sets from GMT/TXT files for enrichment analysis.
 
-    Parameters
-    ----------
-    - geneset_path: `str`
-        Path of geneset file.
-    - organism: `str`
-        Organism of geneset file. Default: 'Human'
+    Arguments:
+        geneset_path: Path of geneset file.
+        organism: Organism of geneset file. Default: 'Human'.
 
-    Returns
-    -------
-    - go_bio_dict: `dict`
-        A dictionary of geneset.
+    Returns:
+        go_bio_dict: A dictionary of geneset where keys are pathway names and values are lists of gene symbols.
     """
     result_dict = {}
     file_path=geneset_path

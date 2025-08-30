@@ -7,7 +7,30 @@ from lifelines.statistics import logrank_test
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional, Union
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["TCGA分析", "pyTCGA", "tcga_analysis", "癌症基因组分析"],
+    category="bulk",
+    description="TCGA (The Cancer Genome Atlas) data analysis including survival analysis",
+    examples=[
+        "# Initialize TCGA analysis",
+        "tcga = ov.bulk.pyTCGA(gdc_sample_sheet, gdc_download_files, clinical_cart)",
+        "# Initialize AnnData object from TCGA data",
+        "tcga.adata_init()",
+        "# Or read existing AnnData",
+        "tcga.adata_read('tcga_data.h5ad')",
+        "# Initialize metadata",
+        "tcga.adata_meta_init()",
+        "# Initialize survival data",
+        "tcga.survial_init()",
+        "# Perform survival analysis for single gene",
+        "tcga.survival_analysis('TP53', layer='deseq_normalize', plot=True)",
+        "# Perform survival analysis for all genes",
+        "tcga.survial_analysis_all()"
+    ],
+    related=["bulk.pyDEG", "utils.download_geneid_annotation_pair", "pl.survival_plot"]
+)
 class pyTCGA(object):
     r"""
     TCGA (The Cancer Genome Atlas) data analysis module.
