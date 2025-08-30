@@ -1,4 +1,5 @@
 from ..utils._scatterplot import _embedding
+from ..utils.registry import register_function
 import collections.abc as cabc
 from copy import copy
 from numbers import Integral
@@ -151,6 +152,24 @@ def umap(adata: AnnData, **kwargs):
         raise ValueError('X_umap not found in adata.obsm. Please run ov.pp.umap first.')
     return embedding(adata, basis='X_umap', **kwargs)
 
+@register_function(
+    aliases=["细胞嵌入图", "embedding", "scatter_plot", "降维可视化", "嵌入图"],
+    category="pl",
+    description="Scatter plot for user specified embedding basis (UMAP, t-SNE, PCA, etc)",
+    examples=[
+        "# Basic UMAP plot",
+        "ov.pl.embedding(adata, basis='X_umap', color='cell_type')",
+        "# Multiple genes visualization",
+        "ov.pl.embedding(adata, basis='X_umap', color=['CD3D', 'CD8A', 'CD4'])",
+        "# Customized embedding plot",
+        "ov.pl.embedding(adata, basis='X_tsne', color='leiden',",
+        "                palette=ov.pl.red_color, frameon='small')",
+        "# 3D embedding",
+        "ov.pl.embedding(adata, basis='X_umap', color='cell_type',",
+        "                projection='3d', ncols=2)"
+    ],
+    related=["pp.umap", "pp.tsne", "pp.pca", "pl.umap", "pl.tsne", "pl.pca"]
+)
 def embedding(
     adata: AnnData,
     basis: str,
@@ -277,6 +296,22 @@ def embedding(
 
 
 
+@register_function(
+    aliases=["细胞比例图", "cellproportion", "cell_proportion", "细胞组成", "比例图"],
+    category="pl",
+    description="Plot cell proportion of each cell type in each visual cluster",
+    examples=[
+        "# Basic cell proportion plot",
+        "ov.pl.cellproportion(adata, celltype_clusters='cell_type', groupby='leiden')",
+        "# Horizontal bar plot",
+        "ov.pl.cellproportion(adata, celltype_clusters='cell_type', groupby='leiden',",
+        "                     transpose=True, figsize=(6,4))",
+        "# Custom group order",
+        "ov.pl.cellproportion(adata, celltype_clusters='cell_type', groupby='leiden',",
+        "                     groupby_li=['0', '1', '2'], legend=True)"
+    ],
+    related=["pl.embedding", "tl.leiden"]
+)
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
@@ -385,6 +420,22 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     
 
 
+@register_function(
+    aliases=["细胞类型嵌入图", "embedding_celltype", "celltype_embedding", "嵌入细胞类型", "细胞类型可视化"],
+    category="pl",
+    description="Plot embedding with celltype color visualization",
+    examples=[
+        "# Basic celltype embedding plot",
+        "ov.pl.embedding_celltype(adata, celltype_key='cell_type')",
+        "# Custom parameters",
+        "ov.pl.embedding_celltype(adata, basis='tsne', figsize=(8,6),",
+        "                         celltype_key='leiden', title='Cell Types')",
+        "# Adjust range parameters",
+        "ov.pl.embedding_celltype(adata, celltype_range=(1,8),",
+        "                         embedding_range=(2,12))"
+    ],
+    related=["pl.embedding", "pl.cellproportion"]
+)
 def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
                             celltype_key:str='major_celltype',title:str=None,
                             celltype_range:tuple=(2,9),
@@ -487,6 +538,24 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     return fig,[ax1,ax2]
 
 
+@register_function(
+    aliases=["凸包", "ConvexHull", "convex_hull", "凸包图", "轮廓图"],
+    category="pl",
+    description="Plot the ConvexHull for a cluster in embedding visualization",
+    examples=[
+        "# Basic ConvexHull plot",
+        "import matplotlib.pyplot as plt",
+        "fig, ax = plt.subplots()",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden', ax=ax, show=False)",
+        "ov.pl.ConvexHull(adata, basis='X_umap', cluster_key='leiden',",
+        "                 hull_cluster='0', ax=ax)",
+        "# Multiple clusters",
+        "for cluster in ['0', '1', '2']:",
+        "    ov.pl.ConvexHull(adata, basis='X_umap', cluster_key='leiden',",
+        "                     hull_cluster=cluster, ax=ax, alpha=0.3)"
+    ],
+    related=["pl.embedding", "pl.contour"]
+)
 def ConvexHull(adata:AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
     r"""
@@ -535,6 +604,22 @@ def ConvexHull(adata:AnnData,basis:str,cluster_key:str,
     return ax
 
 
+@register_function(
+    aliases=["嵌入标签调整", "embedding_adjust", "adjust_labels", "标签调整", "嵌入图调整"],
+    category="pl",
+    description="Get locations of cluster median and adjust text labels accordingly on embedding",
+    examples=[
+        "# Basic label adjustment",
+        "ov.pl.embedding_adjust(adata, groupby='leiden')",
+        "# Exclude specific clusters",
+        "ov.pl.embedding_adjust(adata, groupby='cell_type', exclude=('Unknown',))",
+        "# Custom parameters",
+        "ov.pl.embedding_adjust(adata, groupby='leiden', basis='X_tsne',",
+        "                       adjust_kwargs={'avoid_text': True},",
+        "                       text_kwargs={'fontsize': 12, 'weight': 'bold'})"
+    ],
+    related=["pl.embedding", "pl.embedding_celltype"]
+)
 def embedding_adjust(
     adata, groupby, exclude=(), 
     basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
@@ -586,6 +671,23 @@ def embedding_adjust(
     return texts
 
 
+@register_function(
+    aliases=["嵌入密度图", "embedding_density", "density_embedding", "密度嵌入图", "嵌入密度可视化"],
+    category="pl",
+    description="Create density visualization for specific clusters on embedding",
+    examples=[
+        "# Basic embedding density plot",
+        "ov.pl.embedding_density(adata, basis='X_umap', groupby='leiden',",
+        "                        target_clusters=['0', '1'])",
+        "# Multiple clusters",
+        "ov.pl.embedding_density(adata, basis='X_tsne', groupby='cell_type',",
+        "                        target_clusters=['T_cell', 'B_cell'])",
+        "# Custom visualization parameters",
+        "ov.pl.embedding_density(adata, basis='X_umap', groupby='leiden',",
+        "                        target_clusters=['2'], color='viridis')"
+    ],
+    related=["pl.embedding", "pl.calculate_gene_density", "pl.add_density_contour"]
+)
 def embedding_density(adata,basis,groupby,target_clusters,**kwargs):
     if 'X_' in basis:
         basis1=basis.split('_')[1]
@@ -601,6 +703,22 @@ def embedding_density(adata,basis,groupby,target_clusters,**kwargs):
                    **kwargs
                  )
 
+@register_function(
+    aliases=["柱点图", "bardotplot", "bar_dot_plot", "柱状点图", "条形点图"],
+    category="pl",
+    description="Create combined bar plot and dot plot for categorical data visualization",
+    examples=[
+        "# Basic bar dot plot",
+        "ov.pl.bardotplot(adata, groupby='cell_type', color='CD3D')",
+        "# Custom styling",
+        "ov.pl.bardotplot(adata, groupby='leiden', color='marker_gene',",
+        "                 figsize=(10,4), fontsize=14)",
+        "# Return values for further processing",
+        "values = ov.pl.bardotplot(adata, groupby='cluster', color='gene',",
+        "                          return_values=True)"
+    ],
+    related=["pl.violin", "pl.dotplot", "pl.boxplot"]
+)
 def bardotplot(adata,groupby,color,figsize=(8,3),return_values=False,
                fontsize=12,xlabel='',ylabel='',xticks_rotation=90,ax=None,
                bar_kwargs=None,scatter_kwargs=None):
@@ -704,6 +822,23 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy.stats import kruskal
 
+@register_function(
+    aliases=["单组箱线图", "single_group_boxplot", "single_boxplot", "单个组箱图", "单组箱形图"],
+    category="pl",
+    description="Create boxplot for single group comparison with statistical analysis",
+    examples=[
+        "# Basic single group boxplot",
+        "ov.pl.single_group_boxplot(adata, groupby='cell_type', color='CD3D')",
+        "# Custom styling with color dictionary",
+        "colors = {'T_cell': 'red', 'B_cell': 'blue', 'NK_cell': 'green'}",
+        "ov.pl.single_group_boxplot(adata, groupby='cell_type', color='marker_gene',",
+        "                           type_color_dict=colors, title='Expression Comparison')",
+        "# Multiple comparisons",
+        "ov.pl.single_group_boxplot(adata, groupby='leiden', color='gene_expression',",
+        "                           ylabel='Expression Level')"
+    ],
+    related=["pl.boxplot", "pl.violin", "pl.bardotplot"]
+)
 def single_group_boxplot(adata,
                          groupby: str = '',
                          color: str = '',
@@ -886,6 +1021,25 @@ def single_group_boxplot(adata,
     if ax is None:
         return fig, ax
 
+@register_function(
+    aliases=["等高线图", "contour", "contour_plot", "轮廓线", "密度等高线"],
+    category="pl",
+    description="Add density contour lines for specific clusters on embedding plot",
+    examples=[
+        "# Basic contour plot",
+        "import matplotlib.pyplot as plt",
+        "fig, ax = plt.subplots()",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden', ax=ax, show=False)",
+        "ov.pl.contour(ax, adata, groupby='leiden', clusters=['0', '1'])",
+        "# Custom parameters",
+        "ov.pl.contour(ax, adata, groupby='cell_type', clusters=['T_cell'],",
+        "              basis='X_tsne', grid_density=150, contour_threshold=0.05)",
+        "# Multiple cluster contours",
+        "for cluster in ['0', '1', '2']:",
+        "    ov.pl.contour(ax, adata, groupby='leiden', clusters=[cluster])"
+    ],
+    related=["pl.embedding", "pl.ConvexHull", "pl.add_density_contour"]
+)
 def contour(ax,adata,groupby,clusters,basis='X_umap',
             grid_density=100,contour_threshold=0.1,
            **kwargs):

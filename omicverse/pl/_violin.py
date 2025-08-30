@@ -5,6 +5,7 @@ import scipy.stats as st
 from typing import Sequence, Union, Optional, Literal, List
 from matplotlib.axes import Axes
 from collections import OrderedDict
+from ..utils.registry import register_function
 
 try:
     from anndata import AnnData
@@ -33,6 +34,25 @@ except ImportError:
 # Type definitions to match scanpy
 DensityNorm = Literal["area", "count", "width"]
 
+@register_function(
+    aliases=["小提琴图", "violin", "violin_plot", "小提琴", "表达分布图"],
+    category="pl",
+    description="Enhanced violin plot for visualizing gene expression distribution across groups",
+    examples=[
+        "# Basic violin plot",
+        "ov.pl.violin(adata, keys=['CD3D', 'CD8A'], groupby='cell_type')",
+        "# Enhanced violin plot with statistics",
+        "ov.pl.violin(adata, keys=['GAPDH'], groupby='leiden',",
+        "             stripplot=True, statistical_tests=True)",
+        "# Multiple genes",
+        "ov.pl.violin(adata, keys=['CD3D', 'CD4', 'CD8A'], groupby='cell_type',",
+        "             custom_colors=['red', 'blue', 'green'], figsize=(8,6))",
+        "# With boxplot overlay",
+        "ov.pl.violin(adata, keys=['marker_gene'], groupby='cluster',",
+        "             show_boxplot=True, show_means=True)"
+    ],
+    related=["pl.embedding", "pl.dotplot"]
+)
 def violin(
     adata: AnnData,
     keys: Union[str, Sequence[str]],

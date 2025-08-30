@@ -1,6 +1,23 @@
+from ..utils.registry import register_function
 
 
-
+@register_function(
+    aliases=["添加P值", "add_palue", "add_pvalue", "p值标注", "统计标注"],
+    category="pl",
+    description="Add p-value annotation with connecting line to matplotlib plot",
+    examples=[
+        "# Basic p-value annotation",
+        "fig, ax = ov.pl.boxplot(data, hue='group', x_value='condition', y_value='value')",
+        "ov.pl.add_palue(ax, line_x1=0, line_x2=1, line_y=50, text_y=2, text='p<0.001')",
+        "# Multiple comparisons",
+        "ov.pl.add_palue(ax, line_x1=-0.5, line_x2=0.5, line_y=40, text_y=1,",
+        "                text='$p={}$'.format(0.001), fontsize=12)",
+        "# Custom styling",
+        "ov.pl.add_palue(ax, line_x1=1, line_x2=2, line_y=60, text_y=3,",
+        "                text='***', fontcolor='red', fontsize=14)"
+    ],
+    related=["pl.boxplot", "pl.violin", "pl.bardotplot"]
+)
 def add_palue(ax,line_x1,line_x2,line_y,
               text_y,text,fontsize=11,fontcolor='#000000',
              horizontalalignment='center',):
