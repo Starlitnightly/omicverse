@@ -2,9 +2,26 @@ import numpy as np
 import scanpy as sc
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
+from ..utils.registry import register_function
 
 
 
+@register_function(
+    aliases=["基因密度计算", "calculate_gene_density", "gene_density", "密度计算", "表达密度"],
+    category="pl",
+    description="Calculate weighted kernel density estimates for gene expression on 2D embeddings",
+    examples=[
+        "# Basic gene density calculation",
+        "ov.pl.calculate_gene_density(adata, features=['CD3D', 'CD8A'])",
+        "# Custom parameters",
+        "ov.pl.calculate_gene_density(adata, features=['marker_gene'],",
+        "                             basis='X_tsne', adjust=0.5)",
+        "# Multiple genes with threshold",
+        "ov.pl.calculate_gene_density(adata, features=marker_genes,",
+        "                             min_expr=0.2, adjust=1.5)"
+    ],
+    related=["pl.embedding_density", "pl.add_density_contour", "pl.embedding"]
+)
 def calculate_gene_density(
     adata,
     features,
@@ -79,6 +96,26 @@ import numpy as np
 from scipy.stats import gaussian_kde
 from matplotlib import pyplot as plt
 
+@register_function(
+    aliases=["添加密度等高线", "add_density_contour", "density_contour", "密度等高线", "等高线添加"],
+    category="pl",
+    description="Add KDE-based density contours to existing matplotlib plot",
+    examples=[
+        "# Basic density contour",
+        "import matplotlib.pyplot as plt",
+        "fig, ax = plt.subplots()",
+        "ax.scatter(embeddings[:, 0], embeddings[:, 1])",
+        "ov.pl.add_density_contour(ax, embeddings, weights)",
+        "# Customized contours",
+        "ov.pl.add_density_contour(ax, embeddings, expression_values,",
+        "                          levels='quantile', n_quantiles=10,",
+        "                          cmap_contour='Blues', fill=True)",
+        "# With embedding plot",
+        "ax = ov.pl.embedding(adata, basis='X_umap', color='cell_type', show=False)",
+        "ov.pl.add_density_contour(ax, adata.obsm['X_umap'], adata.obs['marker_gene'])"
+    ],
+    related=["pl.calculate_gene_density", "pl.embedding_density", "pl.embedding"]
+)
 def add_density_contour(
     ax,
     embeddings,              # (n_cells, 2) array

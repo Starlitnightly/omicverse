@@ -5,7 +5,23 @@ import statsmodels.api as sm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["火山图", "volcano", "volcano_plot", "差异基因可视化", "火山图绘制"],
+    category="pl",
+    description="Create volcano plot for differential expression analysis visualization",
+    examples=[
+        "# Basic volcano plot",
+        "ov.pl.volcano(deg_results, pval_name='qvalue', fc_name='log2FoldChange')",
+        "# Customized volcano plot",
+        "ov.pl.volcano(deg_results, pval_threshold=0.05, fc_max=2, fc_min=-2,",
+        "             title='DEGs Analysis', figsize=(6,6))",
+        "# With gene labels",
+        "ov.pl.volcano(deg_results, plot_genes=['GENE1', 'GENE2'], plot_genes_num=15)"
+    ],
+    related=["bulk.pyDEG", "bulk.pyDEG.deg_analysis"]
+)
 def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None,
             figsize:tuple=(4,4),title:str='',titlefont:dict={'weight':'normal','size':14,},
                      up_color:str='#e25d5d',down_color:str='#7388c1',normal_color:str='#d7d7d7',
@@ -322,6 +338,22 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
     
     return ax
 
+@register_function(
+    aliases=["韦恩图", "venn", "venn_diagram", "集合可视化", "韦恩图绘制"],
+    category="pl",
+    description="Create Venn diagram to visualize set overlaps and intersections",
+    examples=[
+        "# Basic Venn diagram",
+        "sets = {'Set1': {1,2,3}, 'Set2': {2,3,4}, 'Set3': {3,4,5}}",
+        "ov.pl.venn(sets=sets)",
+        "# Customized Venn diagram",
+        "ov.pl.venn(sets=sets, palette=ov.pl.red_color, fontsize=8)",
+        "# Gene set comparison",
+        "gene_sets = {'UP_genes': up_genes, 'DOWN_genes': down_genes}",
+        "ov.pl.venn(sets=gene_sets, figsize=(6,6))"
+    ],
+    related=["bulk.pyDEG.deg_analysis"]
+)
 def venn(sets={}, out='./', palette='bgrc',
              ax=False, ext='png', dpi=300, fontsize=3.5,
              bbox_to_anchor=(.5, .99),nc=2,cs=4):
@@ -351,6 +383,24 @@ def venn(sets={}, out='./', palette='bgrc',
              )
     return ax
 
+@register_function(
+    aliases=["箱线图", "boxplot", "box_plot", "盒图", "箱形图"],
+    category="pl",
+    description="Create boxplot with jittered points for data distribution visualization",
+    examples=[
+        "# Basic boxplot",
+        "import seaborn as sns",
+        "data = sns.load_dataset('tips')",
+        "ov.pl.boxplot(data, hue='sex', x_value='day', y_value='total_bill')",
+        "# Customized boxplot",
+        "ov.pl.boxplot(data, hue='time', x_value='day', y_value='tip',",
+        "             palette=ov.pl.blue_color, figsize=(8,4))",
+        "# With statistical annotation",
+        "fig, ax = ov.pl.boxplot(data, hue='smoker', x_value='time', y_value='total_bill')",
+        "ov.pl.add_palue(ax, line_x1=0, line_x2=1, line_y=40, text='p<0.001')"
+    ],
+    related=["pl.add_palue"]
+)
 def boxplot(data,hue,x_value,y_value,width=0.3,title='',
                  figsize=(6,3),palette=None,fontsize=10,
                  legend_bbox=(1, 0.55),legend_ncol=1,hue_order=None):

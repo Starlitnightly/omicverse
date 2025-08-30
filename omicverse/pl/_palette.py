@@ -1,6 +1,7 @@
 import scanpy as sc
 import numpy as np
 import pandas as pd
+from ..utils.registry import register_function
 
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', 
@@ -2112,6 +2113,26 @@ def get_forbidden():
 #from ._forbiddencity import get_forbidden
 Forbiddencity = get_forbidden()
 
+@register_function(
+    aliases=["禁城色彩", "ForbiddenCity", "forbidden_city", "中国传统色", "故宫色彩"],
+    category="pl",
+    description="Traditional Chinese color palette from Forbidden City with 384 colors",
+    examples=[
+        "# Initialize Forbidden City color palette",
+        "fb = ov.pl.ForbiddenCity()",
+        "# Get specific color by name",
+        "color = fb.get_color('凝夜紫')",
+        "# Get RGB values",
+        "rgb = fb.get_color_rgb('群青')",
+        "# Create custom colormap",
+        "colors = [fb.get_color_rgb('群青'), fb.get_color_rgb('半见'), fb.get_color_rgb('丹缽')]",
+        "cmap = fb.get_cmap_seg(colors)",
+        "# Use in plotting",
+        "ov.pl.embedding(adata, basis='X_umap', color='cell_type',",
+        "                palette=fb.red[:])"
+    ],
+    related=["pl.embedding", "pl.volcano", "pl.boxplot"]
+)
 class ForbiddenCity:
 
     green1=Forbidden_Cmap(range(1,19))

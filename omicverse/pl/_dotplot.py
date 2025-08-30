@@ -10,9 +10,29 @@ import functools
 import operator
 from typing import Any
 from ._palette import palette_28, palette_56
+from ..utils.registry import register_function
 
 _VarNames = Union[str, Sequence[str]]
 
+@register_function(
+    aliases=["点图", "dotplot", "dot_plot", "表达点图", "基因表达点图"],
+    category="pl",
+    description="Create dot plot showing gene expression levels and fraction of expressing cells",
+    examples=[
+        "# Basic dot plot",
+        "ov.pl.dotplot(adata, var_names=['CD3D', 'CD8A'], groupby='cell_type')",
+        "# Grouped genes",
+        "genes = {'T_cells': ['CD3D', 'CD8A'], 'B_cells': ['CD19', 'MS4A1']}",
+        "ov.pl.dotplot(adata, var_names=genes, groupby='cell_type')",
+        "# Customized dot plot",
+        "ov.pl.dotplot(adata, var_names=marker_genes, groupby='leiden',",
+        "              standard_scale='var', figsize=(8,6))",
+        "# With dendrogram",
+        "ov.pl.dotplot(adata, var_names=genes, groupby='cluster',",
+        "              dendrogram=True, swap_axes=True)"
+    ],
+    related=["pl.violin", "pl.heatmap"]
+)
 def dotplot(
     adata: AnnData,
     var_names: Union[_VarNames, Mapping[str, _VarNames]],
