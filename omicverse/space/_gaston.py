@@ -7,7 +7,29 @@ from scipy.sparse import issparse, csr_matrix
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from .._settings import add_reference
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["GASTON空间深度分析", "GASTON", "spatial_depth_analysis", "空间深度建模", "组织空间组织"],
+    category="space",
+    description="GASTON spatial depth estimation and clustering using neural networks",
+    examples=[
+        "# Basic GASTON analysis",
+        "gaston = ov.space.GASTON(adata)",
+        "counts, coords, genes = gaston.get_gaston_input()",
+        "features = gaston.get_top_pearson_residuals(num_dims=10)",
+        "gaston.load_rescale(features)",
+        "gaston.train(num_epochs=5000)",
+        "# Get results",
+        "model, features, coords = gaston.get_best_model()",
+        "isodepth, labels = gaston.cal_iso_depth(num_domains=5)",
+        "# With RGB features",
+        "counts, coords, genes, rgb = gaston.get_gaston_input(get_rgb=True)",
+        "# Plotting results",
+        "gaston.plot_gaston_scatter()"
+    ],
+    related=["space.clusters", "space.svg", "space.pySTAGATE"]
+)
 class GASTON(object):
     r"""GASTON spatial depth estimation and clustering.
     

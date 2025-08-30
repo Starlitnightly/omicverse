@@ -10,7 +10,29 @@ import numpy as np
 import os
 from scipy.sparse import csr_matrix
 from .._settings import add_reference
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["STAGATE空间聚类", "pySTAGATE", "STAGATE", "空间聚类模型", "图注意力自编码器"],
+    category="space",
+    description="PyTorch implementation of STAGATE for spatial transcriptomics analysis using graph attention autoencoder",
+    examples=[
+        "# Basic STAGATE analysis",
+        "stagate = ov.space.pySTAGATE(adata, num_batch_x=3, num_batch_y=2,",
+        "                            spatial_key=['X','Y'], rad_cutoff=200)",
+        "stagate.train()",
+        "stagate.predicted()",
+        "# Custom parameters",
+        "stagate = ov.space.pySTAGATE(adata, num_batch_x=4, num_batch_y=3,",
+        "                            num_epoch=1500, lr=0.001, device='cuda:0')",
+        "# With pseudotime analysis",
+        "stagate.cal_pSM(n_neighbors=20, resolution=1)",
+        "# Access results",
+        "embedding = adata.obsm['STAGATE']",
+        "denoised_expr = adata.layers['STAGATE_ReX']"
+    ],
+    related=["space.svg", "space.clusters", "utils.cluster", "utils.refine_label"]
+)
 class pySTAGATE:
     """
     A class representing the PyTorch implementation of STAGATE (Spatial Transcriptomics Analysis using Graph Attention autoEncoder).
@@ -240,6 +262,29 @@ class pySTAGATE:
         # End-of-file (EOF)
 
 
+@register_function(
+    aliases=["空间聚类分析", "clusters", "spatial_clustering", "多方法聚类", "空间域聚类"],
+    category="space",
+    description="Perform spatial clustering using multiple methods (STAGATE, GraphST, CAST, BINARY)",
+    examples=[
+        "# Multiple clustering methods",
+        "methods = ['STAGATE', 'GraphST']",
+        "methods_kwargs = {",
+        "    'STAGATE': {'num_batch_x': 3, 'num_batch_y': 2, 'device': 'cuda:0'},",
+        "    'GraphST': {'device': 'cuda:0', 'n_pcs': 30}",
+        "}",
+        "adata = ov.space.clusters(adata, methods=methods,",
+        "                         methods_kwargs=methods_kwargs)",
+        "# Single method clustering",
+        "methods_kwargs = {'BINARY': {'device': 'cuda:0', 'n_epochs': 1000}}",
+        "adata = ov.space.clusters(adata, methods=['BINARY'],",
+        "                         methods_kwargs=methods_kwargs)",
+        "# Access results",
+        "stagate_embedding = adata.obsm['STAGATE']",
+        "graphst_embedding = adata.obsm['GraphST_embedding']"
+    ],
+    related=["space.pySTAGATE", "space.svg", "utils.cluster", "utils.refine_label"]
+)
 def clusters(adata,
              methods,
              methods_kwargs,
@@ -462,6 +507,27 @@ def clusters(adata,
             print(f'The method {method} is not supported.')
     return adata
 
+@register_function(
+    aliases=["合并类群", "merge_cluster", "cluster_merge", "类群合并", "合并空间类群"],
+    category="space",
+    description="Merge spatial clusters based on hierarchical clustering of their representation",
+    examples=[
+        "# Basic cluster merging",
+        "result = ov.space.merge_cluster(adata, groupby='mclust_GraphST',",
+        "                                use_rep='graphst|original|X_pca',",
+        "                                threshold=0.2, plot=True)",
+        "# STAGATE cluster merging",
+        "result = ov.space.merge_cluster(adata, groupby='mclust_STAGATE',",
+        "                                use_rep='STAGATE', threshold=0.05)",
+        "# Custom merging parameters",
+        "result = ov.space.merge_cluster(adata, groupby='leiden',",
+        "                                use_rep='X_pca', threshold=0.1,",
+        "                                start_idx=1, plot=False)",
+        "# Access merged clusters",
+        "merged_labels = adata.obs[f'{groupby}_tree']"
+    ],
+    related=["space.clusters", "utils.cluster", "utils.refine_label"]
+)
 def merge_cluster(adata,
                   groupby='mclust',
                   use_rep='STAGATE',

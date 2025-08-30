@@ -2,7 +2,25 @@ import scanpy as sc
 from ..external.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
 from ..pp import preprocess
 from .._settings import add_reference
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["空间变异基因", "svg", "spatially_variable_genes", "空间变异基因检测", "SVG检测"],
+    category="space",
+    description="Identify spatially variable genes using multiple methods (PROST, Pearson, Spateo)",
+    examples=[
+        "# Basic SVG detection with PROST",
+        "adata = ov.space.svg(adata, mode='prost', n_svgs=3000)",
+        "# Using Pearson correlation method",
+        "adata = ov.space.svg(adata, mode='pearsonr', n_svgs=2000)",
+        "# High-resolution analysis",
+        "adata = ov.space.svg(adata, mode='prost', n_svgs=5000,",
+        "                     target_sum=1e5, platform='visium')",
+        "# Access identified SVGs",
+        "svgs = adata.var_names[adata.var['space_variable_features']]"
+    ],
+    related=["pp.preprocess", "space.clusters", "space.pySTAGATE"]
+)
 def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         mt_startwith='MT-',**kwargs):
     r"""Identify spatially variable genes using multiple methods.

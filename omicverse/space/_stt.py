@@ -5,7 +5,30 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 from .._settings import add_reference
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["STT空间转换张量", "STT", "spatial_transition_tensor", "空间转换分析", "空间动力学"],
+    category="space",
+    description="Spatial Transition Tensor analysis for modeling spatial dynamics and cell state transitions",
+    examples=[
+        "# Basic STT analysis",
+        "stt = ov.space.STT(adata, spatial_loc='spatial',",
+        "                   region='tissue_region')",
+        "# Stage estimation",
+        "stt.stage_estimate()",
+        "# Train STT model",
+        "stt.train(n_states=10)",
+        "# Vector field analysis",
+        "stt.vector_field()",
+        "# Spatial dynamics",
+        "stt.cal_pseudotime()",
+        "# Custom parameters",
+        "stt = ov.space.STT(adata, spatial_loc='xy_loc',",
+        "                   region='Region')"
+    ],
+    related=["space.svg", "space.clusters", "external.scvelo"]
+)
 class STT(object):
     r"""Spatial Transition Tensor (STT) analysis class.
     

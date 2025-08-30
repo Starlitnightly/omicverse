@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import anndata
 from .._settings import add_reference
+from .registry import register_function
 
 mira_install=False
 def global_imports(modulename,shortname = None, asfunction = False):
@@ -159,6 +160,26 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
 
 
       
+@register_function(
+    aliases=["精化标签", "refine_label", "label_refinement", "标签优化", "邻域投票"],
+    category="utils",
+    description="Optimize cluster labels by majority voting in spatial neighborhood",
+    examples=[
+        "# Basic label refinement for spatial data",
+        "adata.obs['refined_clusters'] = ov.utils.refine_label(",
+        "    adata, radius=50, key='leiden')",
+        "# Custom spatial representation",
+        "adata.obs['refined_stagate'] = ov.utils.refine_label(",
+        "    adata, use_rep='STAGATE', radius=30, key='mclust')",
+        "# Fine-grained refinement",
+        "adata.obs['refined_labels'] = ov.utils.refine_label(",
+        "    adata, use_rep='spatial', radius=20, key='graphst_clusters')",
+        "# After spatial clustering",
+        "adata.obs['mclust_GraphST'] = ov.utils.refine_label(",
+        "    adata, radius=50, key='mclust')"
+    ],
+    related=["utils.cluster", "space.merge_cluster", "space.clusters"]
+)
 def refine_label(adata, use_rep='spatial',radius=50, key='label'):
     """
     Optimize the label by majority voting in the neighborhood.
