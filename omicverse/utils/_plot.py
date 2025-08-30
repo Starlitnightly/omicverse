@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 import warnings
 import platform
 import os
+from .registry import register_function
 try:
     import torch  # Optional, used for GPU information
 except ImportError:  # pragma: no cover - optional dependency
@@ -160,6 +161,17 @@ EMOJI = {
 }
 
 
+@register_function(
+    aliases=["绘图设置", "plot_set", "ov_plot_set", "plotset", "设置绘图"],
+    category="utils",
+    description="Configure plotting settings for OmicVerse including matplotlib, scanpy, and GPU detection",
+    examples=[
+        "ov.utils.ov_plot_set()",
+        "ov.utils.plot_set(dpi=100, figsize=6)",
+        "ov.utils.plot_set(scanpy=False, fontsize=12)"
+    ],
+    related=["pl.embedding", "pl.volcano", "utils.palette"]
+)
 def plot_set(verbosity: int = 3, dpi: int = 80, 
              facecolor: str = 'white', 
              font_path: str = None,
@@ -173,17 +185,21 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              ):
     r"""Configure plotting settings for OmicVerse.
     
-    Sets up scanpy verbosity, matplotlib parameters, suppresses warnings,
-    detects GPU devices, and displays the OmicVerse logo.
-    
     Arguments:
-        verbosity: Scanpy verbosity level (3)
-        dpi: Resolution for matplotlib figures (80) 
-        facecolor: Background color for figures ('white')
-        font_path: Path to font for custom fonts (None)
+        verbosity: Scanpy verbosity level. Default: 3.
+        dpi: Resolution for matplotlib figures. Default: 80.
+        facecolor: Background color for figures. Default: 'white'.
+        font_path: Path to font for custom fonts. Default: None.
+        ipython_format: IPython display format. Default: 'retina'.
+        dpi_save: Resolution for saved figures. Default: 300.
+        transparent: Whether to use transparent background. Default: None.
+        scanpy: Whether to apply scanpy settings. Default: True.
+        fontsize: Default font size for plots. Default: 14.
+        color_map: Default color map for plots. Default: None.
+        figsize: Default figure size. Default: None.
         
     Returns:
-        None
+        None: The function configures global plotting settings and displays initialization information.
     """
     global _has_printed_logo
 

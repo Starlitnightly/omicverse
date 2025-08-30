@@ -12,8 +12,19 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union,Tuple
 from ..utils import plot_boxplot
+from ..utils.registry import register_function
 from ..pl import volcano
 
+@register_function(
+    aliases=["基因ID映射", "gene_id_mapping", "id_mapping", "基因符号转换", "gene_symbol_mapping"],
+    category="bulk",
+    description="Map gene IDs to gene symbols using a reference table for bulk RNA-seq data",
+    examples=[
+        "ov.bulk.Matrix_ID_mapping(data, gene_ref_path='gene_reference.txt')",
+        "ov.bulk.Matrix_ID_mapping(data, gene_ref_path='gene_ref.tsv', keep_unmapped=False)"
+    ],
+    related=["bulk.deseq2_normalize", "utils.gene_symbol_to_ensembl", "pp.filter_genes"]
+)
 def Matrix_ID_mapping(data:pd.DataFrame,gene_ref_path:str,keep_unmapped:bool=True)->pd.DataFrame:
     r"""Map gene IDs in the input data to gene symbols using a reference table.
 
@@ -184,6 +195,29 @@ def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     data = data.loc[~data.index.duplicated(keep='first')]
     return data
 
+@register_function(
+    aliases=["差异表达分析", "DEG", "differential_expression", "差异基因分析", "pyDEG"],
+    category="bulk", 
+    description="Python implementation of differential expression analysis for bulk RNA-seq data",
+    examples=[
+        "# Initialize with raw count data",
+        "dds = ov.bulk.pyDEG(raw_count_data)",
+        "# Remove duplicate gene IDs",
+        "dds.drop_duplicates_index()",
+        "# Normalize using DESeq2 method",
+        "dds.normalize()",
+        "# Perform differential expression analysis",
+        "dds.deg_analysis(treatment_groups, control_groups, method='DEseq2')",
+        "# Set fold change thresholds",
+        "dds.foldchange_set(fc_threshold=2, pval_threshold=0.05)",
+        "# Visualize results",
+        "dds.plot_volcano(title='DEG Analysis')",
+        "dds.plot_boxplot(genes=['GENE1', 'GENE2'], treatment_groups, control_groups)",
+        "# Prepare ranking for GSEA",
+        "ranked_genes = dds.ranking2gsea()"
+    ],
+    related=["bulk.deseq2_normalize", "single.rank_genes_groups", "utils.volcano_plot"]
+)
 class pyDEG(object):
 
 

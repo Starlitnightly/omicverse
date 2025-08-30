@@ -30,6 +30,7 @@ from ..gseapy.plot import dotplot
 from pandas.api.types import is_numeric_dtype
 
 from .geneExp import *
+from ...utils.registry import register_function
 
 
 
@@ -56,6 +57,44 @@ ENDC = "\033[0m"
 BOLD = "\033[1m"
 UNDERLINE = "\033[4m"
 
+@register_function(
+    aliases=["WGCNA分析", "pyWGCNA", "wgcna_analysis", "加权基因共表达网络"],
+    category="bulk",
+    description="Weighted Gene Co-expression Network Analysis (WGCNA) for identifying gene modules",
+    examples=[
+        "# Initialize WGCNA analysis",
+        "wgcna = ov.bulk.pyWGCNA(name='MyAnalysis', species='mus musculus', geneExp=data.T)",
+        "# Preprocessing workflow",
+        "wgcna.preprocess()",
+        "# Calculate soft threshold",
+        "wgcna.calculate_soft_threshold()",
+        "# Calculate adjacency matrix",
+        "wgcna.calculating_adjacency_matrix()",
+        "# Calculate TOM similarity matrix",
+        "wgcna.calculating_TOM_similarity_matrix()",
+        "# Build co-expression network",
+        "wgcna.calculate_geneTree()",
+        "wgcna.calculate_dynamicMods()",
+        "wgcna.calculate_gene_module()",
+        "# Visualize network",
+        "wgcna.plot_matrix()",
+        "# Save and load analysis",
+        "wgcna.saveWGCNA()",
+        "# Get submodules and networks",
+        "sub_genes = wgcna.get_sub_module(['lightgreen'], mod_type='module_color')",
+        "sub_network = wgcna.get_sub_network(['lightgreen'], correlation_threshold=0.2)",
+        "wgcna.plot_sub_network(['lightgreen'], figsize=(8,8))",
+        "# Sample information and analysis",
+        "wgcna.updateSampleInfo('sample_info.csv')",
+        "wgcna.setMetadataColor('condition', {'Control': 'blue', 'Treatment': 'red'})",
+        "wgcna.analyseWGCNA()",
+        "wgcna.plotModuleEigenGene('lightgreen', metadata)",
+        "wgcna.barplotModuleEigenGene('lightgreen', metadata)",
+        "# Find hub genes",
+        "hub_genes = wgcna.top_n_hub_genes('lightgreen', n=10)"
+    ],
+    related=["bulk.readWGCNA", "utils.read", "pl.network"]
+)
 class pyWGCNA(GeneExp):
     """
     A class used to do weighted gene co-expression network analysis.

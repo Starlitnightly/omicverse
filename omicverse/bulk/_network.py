@@ -4,21 +4,31 @@ import pandas as pd
 import networkx as nx
 import itertools
 from ..utils import plot_network
+from ..utils.registry import register_function
 from typing import Union,Tuple
 import matplotlib
 
+@register_function(
+    aliases=["STRING交互分析", "string_interaction", "ppi_analysis", "蛋白质交互分析"],
+    category="bulk",
+    description="Analyze protein-protein interaction network using STRING database",
+    examples=[
+        "# Get PPI network for gene list",
+        "interactions = ov.bulk.string_interaction(gene_list, species=9606)",
+        "# Species codes: Human=9606, Mouse=10090, Yeast=4932",
+        "# Returns DataFrame with interaction scores"
+    ],
+    related=["bulk.pyPPI", "bulk.string_map", "utils.plot_network"]
+)
 def string_interaction(gene:list,species:int) -> pd.DataFrame:
     r"""Analyze protein-protein interaction network using STRING database.
   
     Arguments:
-        gene: List of gene names for PPI analysis
-        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms)
+        gene: List of gene names for PPI analysis.
+        species: NCBI taxon identifiers (e.g. Human is 9606, see STRING organisms).
     
     Returns:
-        res: DataFrame containing protein-protein interaction data with columns:
-             stringId_A, stringId_B, preferredName_A, preferredName_B, ncbiTaxonId,
-             score, nscore, fscore, pscore, ascore, escore, dscore, tscore
-    
+        res: DataFrame containing protein-protein interaction data with columns stringId_A, stringId_B, preferredName_A, preferredName_B, ncbiTaxonId, score, nscore, fscore, pscore, ascore, escore, dscore, tscore.
     """
     import requests ## python -m pip install requests
     string_api_url = "https://string-db.org/api"
@@ -147,6 +157,25 @@ def generate_G(gene:list,species:int,score:float=0.4) -> nx.Graph:
             G.add_edge(col_label,row_label)
     return G
 
+@register_function(
+    aliases=["PPI网络分析", "pyPPI", "protein_interaction", "蛋白质互作网络"],
+    category="bulk",
+    description="Protein-protein interaction network analysis and visualization using STRING database",
+    examples=[
+        "# Initialize PPI analysis",
+        "gene_list = ['TP53', 'BRCA1', 'EGFR', 'MYC']",
+        "gene_type_dict = dict(zip(gene_list, ['Type1']*2 + ['Type2']*2))",
+        "gene_color_dict = dict(zip(gene_list, ['red']*2 + ['blue']*2))",
+        "ppi = ov.bulk.pyPPI(gene=gene_list, species=9606,",
+        "                     gene_type_dict=gene_type_dict,",
+        "                     gene_color_dict=gene_color_dict)",
+        "# Perform interaction analysis",
+        "G = ppi.interaction_analysis()",
+        "# Plot network",
+        "fig, ax = ppi.plot_network(figsize=(8,8), node_size=1000)"
+    ],
+    related=["bulk.string_interaction", "bulk.string_map", "utils.plot_network"]
+)
 class pyPPI(object):
 
     def __init__(self,gene: list,species: int,gene_type_dict: dict,gene_color_dict: dict,

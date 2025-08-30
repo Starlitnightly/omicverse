@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 from .comparison import *
+from ...utils.registry import register_function
 
 # bcolors
 HEADER = '\033[95m'
@@ -21,15 +22,26 @@ UNDERLINE = '\033[4m'
 
 
 # read WGCNA obj
+@register_function(
+    aliases=["读取WGCNA", "readWGCNA", "load_wgcna", "WGCNA加载"],
+    category="bulk",
+    description="Read and load a saved WGCNA object from pickle file",
+    examples=[
+        "# Load saved WGCNA object",
+        "wgcna_obj = ov.bulk.readWGCNA('wgcna_analysis.p')",
+        "# Use loaded object for further analysis",
+        "hub_genes = wgcna_obj.top_n_hub_genes('lightgreen', n=10)"
+    ],
+    related=["bulk.pyWGCNA", "bulk.pyWGCNA.saveWGCNA"]
+)
 def readWGCNA(file):
-    """
-    Read a WGCNA from a saved pickle file.
+    r"""Read and load a saved WGCNA object from pickle file.
 
-    :param file: Name / path of WGCNA object
-    :type file: str
+    Arguments:
+        file: Name or path of WGCNA object file.
 
-    :return: PyWGCNA object
-    :rtype: PyWGCNA class
+    Returns:
+        wgcna: PyWGCNA object loaded from the pickle file.
     """
     if not os.path.isfile(file):
         raise ValueError('WGCNA object not found at given path!')
