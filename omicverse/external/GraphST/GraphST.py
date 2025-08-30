@@ -10,7 +10,30 @@ import torch.nn.functional as F
 from scipy.sparse.csc import csc_matrix
 from scipy.sparse.csr import csr_matrix
 import pandas as pd
+from ...utils.registry import register_function
     
+@register_function(
+    aliases=["GraphST空间模型", "GraphST", "graph_spatial_transcriptomics", "图空间转录组", "GraphST聚类"],
+    category="external",
+    description="Graph-based spatial transcriptomics analysis with contrastive learning and deconvolution",
+    examples=[
+        "# Basic GraphST analysis",
+        "graphst = ov.external.GraphST.GraphST(adata, device='cuda:0')",
+        "adata = graphst.train(n_pcs=30)",
+        "# With deconvolution",
+        "graphst = ov.external.GraphST.GraphST(adata, adata_sc=sc_adata,",
+        "                                      deconvolution=True, device='cuda:0')",
+        "adata = graphst.train()",
+        "# Custom parameters",
+        "graphst = ov.external.GraphST.GraphST(adata, epochs=800,",
+        "                                      learning_rate=0.001,",
+        "                                      alpha=10, beta=1)",
+        "# Access results",
+        "embedding = adata.obsm['GraphST_embedding']",
+        "pca_coords = adata.obsm['graphst|original|X_pca']"
+    ],
+    related=["space.clusters", "space.pySTAGATE", "utils.cluster"]
+)
 class GraphST():
     def __init__(self, 
         adata,

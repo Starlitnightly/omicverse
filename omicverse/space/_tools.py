@@ -8,7 +8,28 @@ from matplotlib.cm import ScalarMappable
 import scanpy as sc
 import torch
 import torch.nn.functional as F
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["裁剪空间数据", "crop_space_visium", "crop_visium", "空间数据裁剪", "Visium裁剪"],
+    category="space",
+    description="Crop Visium spatial transcriptomics data to focus on specific region of interest",
+    examples=[
+        "# Basic cropping",
+        "adata_cropped = ov.space.crop_space_visium(",
+        "    adata, crop_loc=(500, 500), crop_area=(1000, 1000),",
+        "    library_id='V1_Human_Brain', scale=1.0)",
+        "# Small region cropping",
+        "adata_roi = ov.space.crop_space_visium(",
+        "    adata, crop_loc=(0, 0), crop_area=(800, 600),",
+        "    library_id=list(adata.uns['spatial'].keys())[0], scale=1)",
+        "# High resolution cropping",
+        "adata_hires = ov.space.crop_space_visium(",
+        "    adata, crop_loc=(200, 200), crop_area=(1500, 1500),",
+        "    library_id='sample_1', scale=2, res='hires')"
+    ],
+    related=["space.rotate_space_visium", "space.map_spatial_auto"]
+)
 def crop_space_visium(adata, crop_loc, crop_area,
                      library_id, scale, spatial_key='spatial', res='hires'):
     """
@@ -75,6 +96,27 @@ def crop_space_visium(adata, crop_loc, crop_area,
 import numpy as np
 import scipy.ndimage  # 导入 scipy.ndimage 库用于图像旋转
 
+@register_function(
+    aliases=["旋转空间数据", "rotate_space_visium", "rotate_visium", "空间数据旋转", "Visium旋转"],
+    category="space",
+    description="Rotate Visium spatial data image and coordinates by specified angle",
+    examples=[
+        "# Basic rotation",
+        "adata_rotated = ov.space.rotate_space_visium(",
+        "    adata, angle=45, library_id='V1_Human_Brain')",
+        "# Custom center rotation",
+        "adata_rotated = ov.space.rotate_space_visium(",
+        "    adata, angle=90, center=(100, 100),",
+        "    library_id='sample_1', interpolation_order=3)",
+        "# Precise rotation with high-quality interpolation",
+        "adata_rotated = ov.space.rotate_space_visium(",
+        "    adata, angle=30, res='hires',",
+        "    library_id=library_id, interpolation_order=1)",
+        "# Apply spatial mapping after rotation",
+        "ov.space.map_spatial_auto(adata_rotated, method='phase')"
+    ],
+    related=["space.crop_space_visium", "space.map_spatial_auto", "space.map_spatial_manual"]
+)
 def rotate_space_visium(
     adata,
     angle,
@@ -533,6 +575,23 @@ def _map_spatial_img(adata_rotated, color=None,
     return adata_rotated
 
 
+@register_function(
+    aliases=["自动空间映射", "map_spatial_auto", "auto_spatial_mapping", "空间自动映射", "自动对齐"],
+    category="space",
+    description="Automatically map and align spatial transcriptomics data with tissue image",
+    examples=[
+        "# Basic auto mapping with phase correlation",
+        "ov.space.map_spatial_auto(adata_rotated, method='phase')",
+        "# Feature-based alignment",
+        "ov.space.map_spatial_auto(adata_rotated, method='feature')",
+        "# Hybrid alignment approach",
+        "ov.space.map_spatial_auto(adata_rotated, method='hybrid')",
+        "# After rotation, apply auto mapping",
+        "adata_rotated = ov.space.rotate_space_visium(adata, angle=45)",
+        "ov.space.map_spatial_auto(adata_rotated)"
+    ],
+    related=["space.map_spatial_manual", "space.rotate_space_visium", "space.crop_space_visium"]
+)
 def map_spatial_auto(adata_rotated, method='phase'):
     """
     Automatically map and align spatial transcriptomics data.
@@ -667,6 +726,22 @@ def map_spatial_auto(adata_rotated, method='phase'):
     )
     return adata_rotated
 
+@register_function(
+    aliases=["手动空间映射", "map_spatial_manual", "manual_spatial_mapping", "空间手动映射", "手动对齐"],
+    category="space",
+    description="Manually adjust spatial transcriptomics data alignment with specified offset",
+    examples=[
+        "# Apply manual offset",
+        "ov.space.map_spatial_manual(adata_rotated, offset=(-1500, 1000))",
+        "# Fine-tune alignment",
+        "ov.space.map_spatial_manual(adata_rotated, offset=(50, -30))",
+        "# Large adjustment",
+        "ov.space.map_spatial_manual(adata_rotated, offset=(-500, 200))",
+        "# Access manually aligned coordinates",
+        "manual_coords = adata_rotated.obsm['spatial1']"
+    ],
+    related=["space.map_spatial_auto", "space.rotate_space_visium", "space.crop_space_visium"]
+)
 def map_spatial_manual(
         adata_rotated,
         offset,
@@ -713,6 +788,20 @@ def map_spatial_manual(
     return adata_rotated
 
 
+@register_function(
+    aliases=["读取Visium数据", "read_visium_10x", "load_visium", "Visium数据读取", "空间数据载入"],
+    category="space",
+    description="Read and process 10x Visium spatial transcriptomics data",
+    examples=[
+        "# Basic Visium data loading",
+        "adata = ov.space.read_visium_10x(adata_path)",
+        "# With custom parameters",
+        "adata = ov.space.read_visium_10x(adata_path, genome='GRCh38')",
+        "# Load with filtering",
+        "adata = ov.space.read_visium_10x(path, min_counts=100)"
+    ],
+    related=["space.svg", "space.crop_space_visium"]
+)
 def read_visium_10x(
         adata,
         **kwargs,
@@ -723,6 +812,23 @@ def read_visium_10x(
     return adata
 
 
+@register_function(
+    aliases=["Visium细胞分割HE", "visium_10x_hd_cellpose_he", "cellpose_he", "HE图像分割", "细胞核分割"],
+    category="space",
+    description="Cell segmentation on H&E images for high-resolution Visium data using CellPose",
+    examples=[
+        "# Basic H&E segmentation",
+        "adata = ov.space.visium_10x_hd_cellpose_he(adata, mpp=0.3)",
+        "# Custom parameters",
+        "adata = ov.space.visium_10x_hd_cellpose_he(adata, mpp=0.5,",
+        "                                           prob_thresh=0.1,",
+        "                                           flow_threshold=0.3)",
+        "# GPU acceleration",
+        "adata = ov.space.visium_10x_hd_cellpose_he(adata, gpu=True,",
+        "                                           buffer=200)"
+    ],
+    related=["space.visium_10x_hd_cellpose_gex", "space.bin2cell"]
+)
 def visium_10x_hd_cellpose_he(
         adata,
         mpp=0.3,
@@ -762,6 +868,24 @@ def visium_10x_hd_cellpose_he(
                   labels_key="labels_he"
                  )
     
+@register_function(
+    aliases=["Visium细胞扩展", "visium_10x_hd_cellpose_expand", "cellpose_expand", "细胞标签扩展", "空间扩展"],
+    category="space",
+    description="Expand cell segmentation labels to nearby bins for improved coverage",
+    examples=[
+        "# Basic label expansion",
+        "adata = ov.space.visium_10x_hd_cellpose_expand(adata,",
+        "                                               max_bin_distance=4)",
+        "# Custom parameters",
+        "adata = ov.space.visium_10x_hd_cellpose_expand(adata,",
+        "                                               max_bin_distance=6,",
+        "                                               labels_key='cellpose_labels')",
+        "# Different expansion keys",
+        "adata = ov.space.visium_10x_hd_cellpose_expand(adata,",
+        "                                               expanded_labels_key='expanded_cells')"
+    ],
+    related=["space.visium_10x_hd_cellpose_he", "space.visium_10x_hd_cellpose_gex"]
+)
 def visium_10x_hd_cellpose_expand(
         adata,
         max_bin_distance=4,
@@ -777,6 +901,23 @@ def visium_10x_hd_cellpose_expand(
                   **kwargs,
                  )
     
+@register_function(
+    aliases=["Visium细胞基因表达", "visium_10x_hd_cellpose_gex", "cellpose_gex", "细胞基因表达映射", "细胞水平表达"],
+    category="space",
+    description="Map gene expression to cell level using CellPose segmentation",
+    examples=[
+        "# Basic gene expression mapping",
+        "adata = ov.space.visium_10x_hd_cellpose_gex(adata)",
+        "# Custom parameters",
+        "adata = ov.space.visium_10x_hd_cellpose_gex(adata,",
+        "                                            obs_key='total_counts',",
+        "                                            mpp=0.5, sigma=3)",
+        "# With log transformation",
+        "adata = ov.space.visium_10x_hd_cellpose_gex(adata, log1p=True,",
+        "                                            prob_thresh=0.1)"
+    ],
+    related=["space.visium_10x_hd_cellpose_he", "space.bin2cell"]
+)
 def visium_10x_hd_cellpose_gex(
         adata,
         obs_key="n_counts_adjusted",
@@ -814,6 +955,23 @@ def visium_10x_hd_cellpose_gex(
                   labels_key="labels_gex"
                  )
     
+@register_function(
+    aliases=["挂失次级标签", "salvage_secondary_labels", "rescue_labels", "标签救救", "次级标签恢复"],
+    category="space",
+    description="Salvage secondary labels by combining primary and secondary segmentation results",
+    examples=[
+        "# Basic label salvaging",
+        "ov.space.salvage_secondary_labels(adata, primary_label='labels_he',",
+        "                                   secondary_label='labels_gex')",
+        "# Custom label keys",
+        "ov.space.salvage_secondary_labels(adata, primary_label='cellpose_he',",
+        "                                   secondary_label='cellpose_gex',",
+        "                                   labels_key='combined_labels')",
+        "# Access combined labels",
+        "joint_labels = adata.obs['labels_joint']"
+    ],
+    related=["space.visium_10x_hd_cellpose_he", "space.visium_10x_hd_cellpose_gex", "space.bin2cell"]
+)
 def salvage_secondary_labels(
         adata,
         primary_label="labels_he", 
@@ -828,6 +986,22 @@ def salvage_secondary_labels(
     
     
     
+@register_function(
+    aliases=["空间段到细胞", "bin2cell", "bin_to_cell", "空间细胞化", "段级到细胞级"],
+    category="space",
+    description="Convert spatial bins to single-cell resolution using segmentation labels",
+    examples=[
+        "# Basic bin to cell conversion",
+        "adata_cell = ov.space.bin2cell(adata, labels_key='labels_joint')",
+        "# Custom spatial keys",
+        "adata_cell = ov.space.bin2cell(adata, labels_key='segmentation',",
+        "                               spatial_keys=['spatial'])",
+        "# With diameter scaling",
+        "adata_cell = ov.space.bin2cell(adata, labels_key='cellpose_labels',",
+        "                               diameter_scale_factor=1.5)"
+    ],
+    related=["space.visium_10x_hd_cellpose_he", "space.visium_10x_hd_cellpose_gex"]
+)
 def bin2cell(
         adata,
         labels_key="labels_joint",

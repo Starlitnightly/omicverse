@@ -11,9 +11,32 @@ import numpy as np
 import scanpy as sc
 from anndata import AnnData
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 tg_install=False
 
+@register_function(
+    aliases=["Tangram空间解卷积", "Tangram", "spatial_deconvolution", "空间解卷积分析", "空间映射"],
+    category="space",
+    description="Tangram spatial deconvolution for mapping scRNA-seq cell types to spatial locations",
+    examples=[
+        "# Basic Tangram analysis",
+        "tangram = ov.space.Tangram(adata_sc=sc_adata, adata_sp=spatial_adata,",
+        "                          clusters='cell_type')",
+        "# Train mapping model",
+        "tangram.train(mode='clusters', num_epochs=500)",
+        "# Project cell types to spatial locations",
+        "adata_mapped = tangram.cell2location()",
+        "# Gene imputation",
+        "tangram.gene_imputation()",
+        "# Custom marker selection",
+        "tangram = ov.space.Tangram(sc_adata, spatial_adata,",
+        "                          clusters='leiden', marker_size=200)",
+        "# Access mapping results",
+        "mapping_matrix = tangram.ad_map"
+    ],
+    related=["space.clusters", "bulk.pyDEG", "space.svg"]
+)
 class Tangram(object):
     r"""Tangram spatial deconvolution class for cell type mapping.
     

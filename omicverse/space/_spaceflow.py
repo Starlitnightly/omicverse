@@ -12,9 +12,31 @@ from scipy.spatial import distance_matrix
 from torch_geometric.nn import GCNConv, DeepGraphInfomax
 from sklearn.neighbors import kneighbors_graph
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 sf_install = False
 
+@register_function(
+    aliases=["SpaceFlow空间流", "pySpaceFlow", "SpaceFlow", "空间流分析", "伪空间图谱"],
+    category="space",
+    description="SpaceFlow spatial flow analysis using deep graph neural networks with spatial regularization",
+    examples=[
+        "# Basic SpaceFlow analysis",
+        "spaceflow = ov.space.pySpaceFlow(adata)",
+        "embedding = spaceflow.train(spatial_regularization_strength=0.1,",
+        "                            z_dim=50, epochs=1000)",
+        "# Calculate pseudo-spatial map",
+        "spaceflow.cal_pSM(n_neighbors=20, resolution=1,",
+        "                   psm_key='pSM_spaceflow')",
+        "# Custom parameters",
+        "embedding = spaceflow.train(spatial_regularization_strength=0.2,",
+        "                            lr=1e-3, gpu=0, random_seed=42)",
+        "# Access results",
+        "spatial_embedding = adata.obsm['spaceflow']",
+        "psm_values = adata.obs['pSM_spaceflow']"
+    ],
+    related=["space.svg", "space.pySTAGATE", "space.clusters"]
+)
 class pySpaceFlow(object):
     r"""SpaceFlow spatial flow analysis class.
     

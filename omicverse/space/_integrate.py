@@ -40,8 +40,27 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 
+@register_function(
+    aliases=["空间网络构建", "Cal_Spatial_Net", "spatial_network", "空间邻域网络", "构建空间图"],
+    category="space",
+    description="Construct spatial neighbor networks for spatial transcriptomics integration",
+    examples=[
+        "# Radius-based spatial network",
+        "ov.space.Cal_Spatial_Net(adata, rad_cutoff=150, model='Radius')",
+        "# K-nearest neighbor network",
+        "ov.space.Cal_Spatial_Net(adata, k_cutoff=6, model='KNN')",
+        "# Custom parameters",
+        "ov.space.Cal_Spatial_Net(adata, rad_cutoff=200, max_neigh=100,",
+        "                         model='Radius', verbose=True)",
+        "# Access network results",
+        "spatial_graph = adata.uns['Spatial_Net']",
+        "adjacency_matrix = adata.uns['adj']"
+    ],
+    related=["space.pySTAligner", "space.clusters", "space.pySTAGATE"]
+)
 def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
                     max_neigh=50, model='Radius', verbose=True):
     r"""Construct spatial neighbor networks for spatial integration.
@@ -133,6 +152,27 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     adata.uns['adj'] = G
 
 
+@register_function(
+    aliases=["STAligner空间整合", "pySTAligner", "STAligner", "空间数据整合", "空间转录组整合"],
+    category="space",
+    description="STAligner for integrating spatial transcriptomics data across conditions and technologies",
+    examples=[
+        "# Basic STAligner integration",
+        "staligner = ov.space.pySTAligner(adata, batch_name='batch',",
+        "                                 device='cuda:0')",
+        "staligner.train()",
+        "adata_integrated = staligner.train_STAligner()",
+        "# Custom parameters",
+        "staligner = ov.space.pySTAligner(adata, batch_name='condition',",
+        "                                 k_cutoff=6, device='cpu')",
+        "# Multi-batch integration",
+        "staligner.train_STAligner(epochs=800, lr=0.001, weight_decay=1e-4)",
+        "# Access integrated results",
+        "integrated_embedding = adata.obsm['STAligner']",
+        "batch_corrected = adata.obsm['STAligner_embed']"
+    ],
+    related=["space.Cal_Spatial_Net", "space.clusters", "space.svg"]
+)
 class pySTAligner(object):
     r"""STAligner for spatial transcriptomics data integration.
     
