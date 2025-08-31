@@ -15,6 +15,7 @@ from typing import (
     Literal,
 )
 from warnings import warn
+from .registry import register_function
 
 import numpy as np
 import pandas as pd
@@ -52,6 +53,23 @@ from scanpy._settings import settings
 from scanpy._utils import sanitize_anndata, _doc_params, Empty, _empty
 
 
+@register_function(
+    aliases=["嵌入可视化", "embedding", "scatter_plot", "嵌入绘图", "降维可视化"],
+    category="utils",
+    description="Scatter plot visualization of single-cell embeddings with flexible coloring options",
+    examples=[
+        "# Basic UMAP visualization",
+        "ov.utils.embedding(adata, basis='X_umap', color='leiden')",
+        "# Multiple color variables",
+        "ov.utils.embedding(adata, basis='X_pca', color=['n_genes', 'leiden', 'CD14'])",
+        "# Gene expression visualization",
+        "ov.utils.embedding(adata, basis='X_tsne', color=['CD3D', 'CD79A'])",
+        "# Custom visualization settings",
+        "ov.utils.embedding(adata, basis='X_umap', color='celltype',",
+        "                   frameon=False, legend_loc='right margin')"
+    ],
+    related=["pp.pca", "utils.mde", "pl.umap", "pl.tsne"]
+)
 @_doc_params(
     adata_color_etc=doc_adata_color_etc,
     edges_arrows=doc_edges_arrows,

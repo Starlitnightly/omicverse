@@ -817,19 +817,39 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
 
     return fig,[ax1,ax2]
 
+@register_function(
+    aliases=["标签生成", "gen_mpl_labels", "cluster_labels", "添加标签", "embedding_labels"],
+    category="utils",
+    description="Add cluster labels at median positions in embedding plots with automatic text positioning",
+    examples=[
+        "# Basic cluster labeling",
+        "fig, ax = plt.subplots()",
+        "ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
+        "ov.utils.gen_mpl_labels(adata, groupby='leiden', ax=ax)",
+        "# Custom basis and text styling",
+        "ov.utils.gen_mpl_labels(adata, groupby='celltype', basis='X_tsne',",
+        "                        text_kwargs={'fontsize': 12, 'weight': 'bold'})",
+        "# Exclude specific clusters",
+        "ov.utils.gen_mpl_labels(adata, groupby='leiden', exclude=['0', '1'])",
+        "# With automatic text adjustment",
+        "ov.utils.gen_mpl_labels(adata, groupby='leiden', ax=ax,", 
+        "                        adjust_kwargs={'arrowprops': {'arrowstyle': '->'}})"
+    ],
+    related=["utils.embedding", "utils.plot_ConvexHull", "pl.umap"]
+)
 def gen_mpl_labels(
     adata, groupby, exclude=(), 
     basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
 ):
-    r"""Add cluster labels at median positions in embedding plots.
+    """Add cluster labels at median positions in embedding plots with automatic text positioning.
     
     Arguments:
-        adata: AnnData object
-        groupby: Column name for grouping
-        exclude: Groups to exclude from labeling (())
-        basis: Embedding basis name ('X_umap')
-        ax: Matplotlib axes object (None)
-        adjust_kwargs: Parameters for text adjustment (None)
+        adata: AnnData object containing single-cell data.
+        groupby: Column name for grouping in adata.obs.
+        exclude: Groups to exclude from labeling. Default: ().
+        basis: Embedding basis name in adata.obsm. Default: 'X_umap'.
+        ax: Matplotlib axes object. Default: None.
+        adjust_kwargs: Parameters for adjustText text adjustment. Default: None.
         text_kwargs: Parameters for text styling (None)
         
     Returns:
@@ -911,6 +931,26 @@ def normalize_to_minus_one_to_one(arr):
     
     return normalized_arr
 
+@register_function(
+    aliases=["堆叠火山图", "stacking_vol", "multiple_volcano", "火山图组合", "比较火山图"],
+    category="utils", 
+    description="Create stacked volcano plots for comparing differential expression across multiple datasets",
+    examples=[
+        "# Basic stacked volcano plot",
+        "data_dict = {'Dataset1': deg_df1, 'Dataset2': deg_df2}",
+        "color_dict = {'Dataset1': 'red', 'Dataset2': 'blue'}",
+        "fig, axes = ov.utils.stacking_vol(data_dict, color_dict)",
+        "# Custom thresholds and styling",
+        "fig, axes = ov.utils.stacking_vol(data_dict, color_dict,",
+        "                                 pval_threshold=0.05, log2fc_threshold=1.5,",
+        "                                 figsize=(10,6), plot_genes_num=15)",
+        "# Three-way comparison",
+        "data_dict = {'Control': deg1, 'Treatment1': deg2, 'Treatment2': deg3}",
+        "color_dict = {'Control': '#1f77b4', 'Treatment1': '#ff7f0e', 'Treatment2': '#2ca02c'}",
+        "fig, axes = ov.utils.stacking_vol(data_dict, color_dict)"
+    ],
+    related=["pl.volcano", "bulk.get_deg", "single.cosg"]
+)
 def stacking_vol(data_dict:dict,color_dict:dict,
                  pval_threshold:float=0.01,
                  log2fc_threshold:int=2,
@@ -920,10 +960,10 @@ def stacking_vol(data_dict:dict,color_dict:dict,
                  plot_genes_num:int=10,
                  plot_genes_fontsize:int=8,
                 plot_genes_weight:str='bold')->tuple:
-    r"""Create stacked volcano plots for comparing multiple datasets.
+    """Create stacked volcano plots for comparing differential expression across multiple datasets.
     
     Arguments:
-        data_dict: Dictionary with DataFrames containing 'logfoldchanges', 'pvals_adj', 'names'
+        data_dict: Dictionary with DataFrames containing 'logfoldchanges', 'pvals_adj', 'names' columns.
         color_dict: Dictionary mapping dataset names to colors
         pval_threshold: P-value significance threshold (0.01)
         log2fc_threshold: Log2 fold change threshold (2)
@@ -1007,21 +1047,50 @@ def stacking_vol(data_dict:dict,color_dict:dict,
     return fig,axes
 
 
+@register_function(
+    aliases=["凸包绘制", "plot_ConvexHull", "convex_hull", "凸包轮廓", "cluster_hull"],
+    category="utils",
+    description="Add convex hull outline for a specific cluster in embedding plot",
+    examples=[
+        "# Basic convex hull for a cluster",
+        "fig, ax = plt.subplots()",
+        "ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
+        "ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',",
+        "                         hull_cluster='0', ax=ax)",
+        "# Custom color and transparency",
+        "ov.utils.plot_ConvexHull(adata, basis='X_tsne', cluster_key='celltype',",
+        "                         hull_cluster='T cells', ax=ax, color='red', alpha=0.3)",
+        "# Multiple cluster hulls",
+        "for cluster in ['0', '1', '2']:",
+        "    ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',",
+        "                             hull_cluster=cluster, ax=ax)"
+    ],
+    related=["utils.embedding", "pl.umap", "pl.tsne"]
+)
 def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
-    r"""Add convex hull outline for a specific cluster in embedding plot.
+    """Add convex hull outline for a specific cluster in embedding plot.
     
     Arguments:
-        adata: AnnData object
-        basis: Embedding basis name in adata.obsm
-        cluster_key: Column name for cluster assignments
-        hull_cluster: Specific cluster to outline
-        ax: Matplotlib axes object
-        color: Hull color (None for automatic)
-        alpha: Hull transparency (0.2)
+        adata: AnnData object containing single-cell data.
+        basis: Embedding basis name in adata.obsm (e.g., 'X_umap', 'X_tsne').
+        cluster_key: Column name for cluster assignments in adata.obs.
+        hull_cluster: Specific cluster identifier to outline.
+        ax: Matplotlib axes object to draw on.
+        color: Hull color. Default: None (automatic).
+        alpha: Hull transparency level. Default: 0.2.
         
     Returns:
-        Modified matplotlib axes object
+        ax: Modified matplotlib axes object with convex hull added.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> import matplotlib.pyplot as plt
+        >>> # Create embedding plot with convex hull
+        >>> fig, ax = plt.subplots()
+        >>> ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)
+        >>> ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',
+        ...                          hull_cluster='0', ax=ax)
     """
     
     adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
@@ -1233,6 +1302,22 @@ class geneset_wordcloud(object):
 
 from scanpy.plotting._anndata import ranking
 from scanpy.plotting._utils import savefig_or_show
+@register_function(
+    aliases=["主成分方差比", "plot_pca_variance_ratio", "pca_variance", "PCA方差", "主成分分析方差"],
+    category="utils",
+    description="Plot PCA variance ratio to determine optimal number of principal components",
+    examples=[
+        "# Basic PCA variance ratio plot",
+        "ov.pp.pca(adata, n_pcs=50)",
+        "ov.utils.plot_pca_variance_ratio(adata, n_pcs=30)",
+        "# Custom variance ratios with log scale",
+        "ov.utils.plot_pca_variance_ratio(adata, n_pcs=50, log=True)",
+        "# Check different representation",
+        "ov.utils.plot_pca_variance_ratio(adata, use_rep='scaled|original|pca_var_ratios',",
+        "                                 n_pcs=20)"
+    ],
+    related=["pp.pca", "pp.scale", "utils.cluster"]
+)
 def plot_pca_variance_ratio(
     adata,
     use_rep='scaled|original|pca_var_ratios',

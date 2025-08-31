@@ -198,6 +198,31 @@ def factorize_mp_signature(args):
     args[2].factorize(worker_i=args[0],  total_workers=args[1])
 
 
+from ...utils.registry import register_function
+
+@register_function(
+    aliases=["共识非负矩阵分解", "cNMF", "consensus_nmf", "cNMF聚类", "共识NMF"],
+    category="single",
+    description="Consensus Non-negative Matrix Factorization (cNMF) for robust topic modeling and clustering",
+    examples=[
+        "# Basic cNMF analysis",
+        "cnmf_obj = ov.single.cNMF(adata, components=np.arange(5,11),",
+        "                          n_iter=20, seed=14, num_highvar_genes=2000,",
+        "                          output_dir='example_dg1/cNMF', name='dg_cNMF')",
+        "# Run factorization",
+        "cnmf_obj.factorize(worker_i=0, total_workers=4)",
+        "cnmf_obj.combine(skip_missing_files=True)",
+        "# K selection and consensus",
+        "selected_K = 7",
+        "density_threshold = 2.00",
+        "cnmf_obj.consensus(k=selected_K, density_threshold=density_threshold)",
+        "result_dict = cnmf_obj.load_results(K=selected_K, density_threshold=density_threshold)",
+        "cnmf_obj.get_results(adata, result_dict)",
+        "# Advanced classification with Random Forest",
+        "cnmf_obj.get_results_rfc(adata, result_dict, cNMF_threshold=0.5)"
+    ],
+    related=["utils.LDA_topic", "utils.cluster", "pl.embedding"]
+)
 class cNMF():
 
 

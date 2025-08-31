@@ -11,7 +11,25 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     torch = None
 from scipy.sparse import spmatrix
+from .registry import register_function
 
+@register_function(
+    aliases=["MDE降维", "mde", "minimum_distortion_embedding", "MDE嵌入", "最小失真嵌入"],
+    category="utils", 
+    description="Minimum Distortion Embedding (MDE) for 2D visualization with GPU acceleration",
+    examples=[
+        "# Basic MDE embedding", 
+        "X_mde = ov.utils.mde(adata.obsm['X_pca'])",
+        "adata.obsm['X_mde'] = X_mde",
+        "# GPU-accelerated MDE",
+        "X_mde = ov.utils.mde(adata.obsm['X_pca'], device='cuda')",
+        "# Custom embedding dimension",
+        "X_mde = ov.utils.mde(adata.obsm['X_pca'], embedding_dim=3)",
+        "# Use with visualization",
+        "ov.utils.embedding(adata, basis='X_mde', color='leiden')"
+    ],
+    related=["pp.pca", "utils.embedding", "pl.umap", "pl.tsne"]
+)
 def mde(
     data: Union[np.ndarray, pd.DataFrame, spmatrix, torch.Tensor],
     device: Optional[Literal["cpu", "cuda"]] = None,

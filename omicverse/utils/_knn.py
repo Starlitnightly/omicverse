@@ -4,9 +4,30 @@ import os
 import numpy as np
 import anndata
 from sklearn.neighbors import KNeighborsTransformer
+from .registry import register_function
 
 #These function were created by Lisa Sikemma in scArches
 
+@register_function(
+    aliases=["KNN训练器", "weighted_knn_trainer", "knn_trainer", "细胞类型迁移训练", "跨模态训练器"],
+    category="utils",
+    description="Train weighted KNN classifier for cross-modal cell type annotation transfer",
+    examples=[
+        "# Train KNN classifier from RNA-seq data",
+        "knn_model = ov.utils.weighted_knn_trainer(",
+        "    train_adata=rna_adata, train_adata_emb='X_glue', n_neighbors=15)",
+        "# Use with high-dimensional embeddings",
+        "knn_model = ov.utils.weighted_knn_trainer(",
+        "    train_adata=ref_adata, train_adata_emb='X_scvi', n_neighbors=30)",
+        "# Use raw expression data",
+        "knn_model = ov.utils.weighted_knn_trainer(",
+        "    train_adata=ref_adata, train_adata_emb='X', n_neighbors=20)",
+        "# Transfer to target modality",
+        "labels, uncert = ov.utils.weighted_knn_transfer(",
+        "    query_adata=atac_adata, knn_model=knn_model)"
+    ],
+    related=["utils.weighted_knn_transfer", "single.batch_correction", "utils.mde"]
+)
 def weighted_knn_trainer(train_adata:anndata.AnnData, 
                          train_adata_emb:str, 
                          n_neighbors:int=50)->KNeighborsTransformer:
@@ -43,6 +64,29 @@ def weighted_knn_trainer(train_adata:anndata.AnnData,
     k_neighbors_transformer.fit(train_emb)
     return k_neighbors_transformer    
 
+@register_function(
+    aliases=["KNN标签迁移", "weighted_knn_transfer", "knn_transfer", "细胞类型迁移", "跨模态标签迁移"],
+    category="utils",
+    description="Transfer cell type annotations across modalities using trained weighted KNN classifier",
+    examples=[
+        "# Basic cross-modal annotation transfer",
+        "labels, uncert = ov.utils.weighted_knn_transfer(",
+        "    query_adata=atac_adata, query_adata_emb='X_glue',",
+        "    label_keys='celltype', knn_model=knn_model,",
+        "    ref_adata_obs=rna_adata.obs)",
+        "# Transfer with uncertainty thresholding",
+        "labels, uncert = ov.utils.weighted_knn_transfer(",
+        "    query_adata=query_adata, query_adata_emb='X_scvi',",
+        "    label_keys='major_celltype', knn_model=trained_knn,",
+        "    ref_adata_obs=ref_adata.obs, threshold=0.7, pred_unknown=True)",
+        "# Add results to query data",
+        "query_adata.obs['transferred_celltype'] = labels.loc[query_adata.obs.index, 'celltype']",
+        "query_adata.obs['transfer_uncertainty'] = uncert.loc[query_adata.obs.index, 'celltype']",
+        "# Visualize transfer results",
+        "ov.utils.embedding(query_adata, color=['transferred_celltype', 'transfer_uncertainty'])"
+    ],
+    related=["utils.weighted_knn_trainer", "single.pySCSA", "utils.embedding"]
+)
 def weighted_knn_transfer(
     query_adata:anndata.AnnData,
     query_adata_emb:str,

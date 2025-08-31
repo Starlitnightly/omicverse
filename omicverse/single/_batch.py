@@ -3,7 +3,29 @@ import scanpy as sc
 import numpy as np
 import anndata
 from .._settings import add_reference,settings
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["批次校正", "batch_correction", "batch_correct", "数据整合", "去批次效应"],
+    category="single",
+    description="Comprehensive batch effect correction using multiple methods including Harmony, Combat, Scanorama, scVI, and CellANOVA",
+    examples=[
+        "# Harmony batch correction (recommended for most cases)",
+        "ov.single.batch_correction(adata, batch_key='batch', methods='harmony')",
+        "# Combat batch correction",
+        "ov.single.batch_correction(adata, batch_key='batch', methods='combat')",
+        "# Scanorama integration",
+        "ov.single.batch_correction(adata, batch_key='batch', methods='scanorama')",
+        "# GPU-accelerated scVI (requires GPU)",
+        "model = ov.single.batch_correction(adata, batch_key='batch',",
+        "                                   methods='scVI', n_layers=2, n_latent=30)",
+        "# CellANOVA with control samples",
+        "control_dict = {'pool1': ['batch1', 'batch2']}",
+        "ov.single.batch_correction(adata, batch_key='batch', methods='CellANOVA',",
+        "                           control_dict=control_dict)"
+    ],
+    related=["pp.preprocess", "utils.mde", "utils.embedding"]
+)
 def batch_correction(adata:anndata.AnnData,batch_key:str,
                      use_rep='scaled|original|X_pca',
                      methods:str='harmony',n_pcs:int=50,**kwargs)->anndata.AnnData:

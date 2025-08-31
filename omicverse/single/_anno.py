@@ -13,6 +13,7 @@ from ..pp._preprocess import scale
 from ..utils import gen_mpl_labels
 
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
@@ -268,6 +269,27 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
     sc.tl.umap(adata, init_pos='paga')
     return adata
 
+@register_function(
+    aliases=["字典注释", "scanpy_cellanno_from_dict", "manual_annotation", "手动注释", "字典映射注释"],
+    category="single",
+    description="Manual cell type annotation from cluster-to-celltype dictionary mapping",
+    examples=[
+        "# Basic manual annotation from dictionary",
+        "cluster2annotation = {",
+        "    '0': 'T cell', '1': 'B cell', '2': 'Monocyte',",
+        "    '3': 'NK cell', '4': 'Dendritic cell'",
+        "}",
+        "ov.single.scanpy_cellanno_from_dict(adata, anno_dict=cluster2annotation,",
+        "                                    clustertype='leiden')",
+        "# Custom annotation key",
+        "ov.single.scanpy_cellanno_from_dict(adata, anno_dict=cluster2annotation,",
+        "                                    clustertype='leiden',",
+        "                                    key_added='manual_celltype')",
+        "# Compare with automatic annotation",
+        "ov.utils.embedding(adata, color=['manual_celltype', 'scsa_celltype'])"
+    ],
+    related=["single.pySCSA", "single.get_celltype_marker", "utils.embedding"]
+)
 def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                anno_dict:dict,
                                anno_name:str='major',
@@ -288,6 +310,26 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
     adata.obs[anno_name+'_celltype'] = adata.obs[clustertype].map(anno_dict).astype('category')
     print('...cell type added to {}_celltype on obs of anndata'.format(anno_name))
 
+@register_function(
+    aliases=["细胞类型标记基因", "get_celltype_marker", "celltype_markers", "标记基因", "差异基因"],
+    category="single",
+    description="Extract cell type-specific marker genes from differential expression analysis",
+    examples=[
+        "# Get markers for all cell types",
+        "marker_dict = ov.single.get_celltype_marker(adata,",
+        "                                           clustertype='leiden')",
+        "print(marker_dict.keys())  # Show available cell types",
+        "# Get markers for specific cell type annotation",
+        "marker_dict = ov.single.get_celltype_marker(adata,",
+        "                                           clustertype='scsa_celltype')",
+        "# View markers for specific cell type",
+        "b_cell_markers = marker_dict['B cell']",
+        "print(b_cell_markers[:10])  # Top 10 markers",
+        "# Use with plotting",
+        "sc.pl.dotplot(adata, marker_dict, groupby='leiden')"
+    ],
+    related=["single.pySCSA", "single.scanpy_cellanno_from_dict", "pl.dotplot"]
+)
 def get_celltype_marker(adata:anndata.AnnData,
                             clustertype:str='leiden',
                             log2fc_min:int=2,scores_type='scores',
@@ -351,6 +393,28 @@ def get_celltype_marker(adata:anndata.AnnData,
 
 
 
+@register_function(
+    aliases=["单细胞注释", "pySCSA", "cell_annotation", "细胞类型注释", "自动注释"],
+    category="single",
+    description="Automated cell type annotation using SCSA (Single Cell Signature Analysis) with multiple databases",
+    examples=[
+        "# Basic SCSA annotation with CellMarker database",
+        "scsa = ov.single.pySCSA(adata, foldchange=1.5, pvalue=0.01,",
+        "                        celltype='normal', target='cellmarker')",
+        "anno = scsa.cell_anno(clustertype='leiden', cluster='all')",
+        "scsa.cell_auto_anno(adata, key='scsa_celltype_cellmarker')",
+        "# Using PanglaoDB database",
+        "scsa = ov.single.pySCSA(adata, target='panglaodb', tissue='All')",
+        "anno = scsa.cell_anno(clustertype='leiden', cluster='all')",
+        "# Cancer cell annotation",
+        "scsa = ov.single.pySCSA(adata, celltype='cancer', target='cancersea')",
+        "anno = scsa.cell_anno(clustertype='leiden', cluster='all')",
+        "# Specific tissue annotation",
+        "scsa = ov.single.pySCSA(adata, tissue='Blood', target='cellmarker')",
+        "available_tissues = scsa.get_model_tissue()"
+    ],
+    related=["single.scanpy_cellanno_from_dict", "single.get_celltype_marker", "utils.embedding"]
+)
 class pySCSA(object):
 
     def __init__(self,adata:anndata.AnnData,

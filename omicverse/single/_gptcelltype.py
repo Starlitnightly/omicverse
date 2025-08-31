@@ -2,7 +2,33 @@ import requests
 import os
 import numpy as np
 import pandas as pd
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["GPT细胞类型注释", "gptcelltype", "ai_celltype", "GPT注释", "AI细胞注释"],
+    category="single",
+    description="AI-powered cell type annotation using GPT-4, Qwen, Kimi, and other large language models",
+    examples=[
+        "# Basic GPT annotation with Qwen",
+        "os.environ['AGI_API_KEY'] = 'your-api-key'",
+        "markers = ov.single.get_celltype_marker(adata, clustertype='leiden')",
+        "result = ov.single.gptcelltype(markers, tissuename='PBMC',", 
+        "                               speciename='human', provider='qwen')",
+        "# Using OpenAI GPT-4",
+        "result = ov.single.gptcelltype(markers, tissuename='Brain',",
+        "                               provider='openai', model='gpt-4o')",
+        "# Using Kimi (Moonshot)",
+        "result = ov.single.gptcelltype(markers, tissuename='Blood',",
+        "                               provider='kimi', model='moonshot-v1-8k')",
+        "# Custom model with base_url",
+        "result = ov.single.gptcelltype(markers, tissuename='Liver',",
+        "                               model='custom-model',",
+        "                               base_url='https://api.example.com/v1')",
+        "# Apply results to AnnData",
+        "adata.obs['gpt_celltype'] = adata.obs['leiden'].map(result)"
+    ],
+    related=["single.get_celltype_marker", "single.gptcelltype_local", "single.pySCSA"]
+)
 def gptcelltype(input, tissuename=None, speciename='human',
                 provider='qwen',model='qwen-plus', topgenenumber=10,
                 base_url=None):

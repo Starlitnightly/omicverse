@@ -1,4 +1,5 @@
 
+from .utils.registry import register_function
 
 class omicverseConfig:
 
@@ -9,6 +10,22 @@ class omicverseConfig:
         test_id_full = f"FULL-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
         send_analytics_full_silent(test_id_full)
 
+    @register_function(
+        aliases=["GPU初始化", "gpu_init", "gpu_mode", "GPU模式", "rapids_init"],
+        category="utils",
+        description="Initialize GPU mode with RAPIDS for accelerated single-cell analysis",
+        examples=[
+            "# Initialize GPU mode with default settings",
+            "ov.settings.gpu_init()",
+            "# Custom GPU initialization",
+            "ov.settings.gpu_init(managed_memory=False, pool_allocator=True)",
+            "# Use specific GPU device", 
+            "ov.settings.gpu_init(devices=1)",
+            "# Check current mode",
+            "print(f'Current mode: {ov.settings.mode}')"
+        ],
+        related=["settings.cpu_init", "settings.cpu_gpu_mixed_init", "pp.anndata_to_GPU"]
+    )
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):
         
         import scanpy as sc
@@ -33,6 +50,21 @@ class omicverseConfig:
         print('CPU mode activated')
         self.mode = 'cpu'
     
+    @register_function(
+        aliases=["CPU-GPU混合模式", "cpu_gpu_mixed_init", "mixed_mode", "GPU混合模式", "mixed_init"],
+        category="utils",
+        description="Initialize CPU-GPU mixed mode for accelerated single-cell analysis",
+        examples=[
+            "# Initialize mixed mode for better performance", 
+            "ov.settings.cpu_gpu_mixed_init()",
+            "# Use mixed mode with preprocessing",
+            "ov.settings.cpu_gpu_mixed_init()",
+            "adata = ov.pp.qc(adata)  # Automatically uses mixed mode",
+            "# Check current mode",
+            "print(f'Current mode: {ov.settings.mode}')"
+        ],
+        related=["settings.gpu_init", "settings.cpu_init", "pp.qc", "pp.preprocess"]
+    )
     def cpu_gpu_mixed_init(self):
         print('CPU-GPU mixed mode activated')
         self.mode = 'cpu-gpu-mixed'
