@@ -5,10 +5,34 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from anndata import AnnData
 import numpy as np
+from .registry import register_function
 
 
 
 
+@register_function(
+    aliases=["观察预期比", "roe", "observed_expected_ratio", "细胞富集分析", "组织偏好性"],
+    category="utils",
+    description="Calculate ratio of observed to expected cell numbers (Ro/e) for tissue preference analysis",
+    examples=[
+        "# Basic Ro/e analysis",
+        "roe_result = ov.utils.roe(adata, sample_key='batch',",
+        "                          cell_type_key='celltype')",
+        "# Custom threshold analysis",
+        "roe_result = ov.utils.roe(adata, sample_key='tissue',",
+        "                          cell_type_key='scsa_celltype',",
+        "                          pval_threshold=0.01)",
+        "# Visualize with heatmap",
+        "import seaborn as sns",
+        "transformed_roe = roe_result.applymap(",
+        "    lambda x: '+++' if x >= 2 else ('++' if x >= 1.5 else '+/-'))",
+        "sns.heatmap(roe_result, annot=transformed_roe, cmap='RdBu_r')",
+        "# Statistical significance testing",
+        "roe_result = ov.utils.roe(adata, sample_key='condition',",
+        "                          cell_type_key='leiden')"
+    ],
+    related=["single.pySCSA", "utils.plot_cellproportion", "utils.embedding"]
+)
 def roe(
         adata: AnnData,
         sample_key: str,

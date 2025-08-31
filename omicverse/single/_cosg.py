@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import sparse
 from typing import Iterable, Union, Optional
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 
 ### Refer to: https://github.com/theislab/scanpy/blob/5533b644e796379fd146bf8e659fd49f92f718cd/scanpy/_compat.py
@@ -327,6 +328,26 @@ class _RankGenes:
                 del X_rest
 
         
+@register_function(
+    aliases=["COSG分析", "cosg", "marker_genes", "标记基因", "cluster_markers"],
+    category="single",
+    description="Identify cluster-specific marker genes using COSG (COSine similarity-based Gene set scoring)",
+    examples=[
+        "# Basic COSG marker gene identification",
+        "cosg_results = ov.single.cosg(adata, groupby='leiden', n_genes_user=50)",
+        "# Custom cell type grouping",
+        "cosg_results = ov.single.cosg(adata, groupby='celltype', groups=['T cells', 'B cells'])",
+        "# With low expression filtering",
+        "cosg_results = ov.single.cosg(adata, groupby='leiden',",
+        "                             remove_lowly_expressed=True, expressed_pct=0.2)",
+        "# Access results",
+        "top_genes = adata.uns['cosg']['0']  # Top genes for cluster 0",
+        "# Compute fold changes",
+        "ov.single.cosg(adata, groupby='leiden', calculate_logfoldchanges=True)",
+        "logfc_df = adata.uns['cosg_logfoldchanges']"
+    ],
+    related=["pp.highly_variable_genes", "pl.marker_gene_overlap", "bulk.get_deg"]
+)
 def cosg(
     adata,
     groupby='CellTypes',

@@ -734,13 +734,40 @@ def anndata_sparse(adata):
     adata.X=x
     return adata
 
+@register_function(
+    aliases=["存储层数据", "store_layers", "save_layers", "层数据存储", "保存层"],
+    category="utils",
+    description="Store the X matrix of AnnData in adata.uns for later retrieval",
+    examples=[
+        "# Store current X matrix as 'counts'",
+        "ov.utils.store_layers(adata, layers='counts')",
+        "# Store normalized data",
+        "ov.utils.store_layers(adata, layers='normalized')",
+        "# Use with preprocessing pipeline",
+        "ov.utils.store_layers(adata, layers='raw')",
+        "adata = ov.pp.preprocess(adata)",
+        "ov.utils.retrieve_layers(adata, layers='raw')"
+    ],
+    related=["utils.retrieve_layers", "pp.preprocess", "pp.scale"]
+)
 def store_layers(adata,layers='counts'):
-    """
-    Store the X of adata in adata.uns['layers_{}'.format(layers)]
+    """Store the X matrix of AnnData in adata.uns for later retrieval.
 
     Arguments:
-        adata: AnnData
-        layers: the layers name to store, default 'counts'
+        adata: AnnData object containing single-cell data.
+        layers: The layers name to store. Default: 'counts'.
+
+    Returns:
+        None: The function modifies adata.uns in place by storing the X matrix.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Store original counts before preprocessing
+        >>> ov.utils.store_layers(adata, layers='raw_counts')
+        >>> # Apply preprocessing
+        >>> adata = ov.pp.preprocess(adata)
+        >>> # Retrieve original data if needed
+        >>> ov.utils.retrieve_layers(adata, layers='raw_counts')
     """
 
 
@@ -758,14 +785,40 @@ def store_layers(adata,layers='counts'):
                                           var=pd.DataFrame(index=adata.var.index),)
     print('......The X of adata have been stored in {}'.format(layers))
 
+@register_function(
+    aliases=["检索层数据", "retrieve_layers", "get_layers", "层数据检索", "获取层"],
+    category="utils",
+    description="Retrieve previously stored X matrix from adata.uns and restore to adata.X",
+    examples=[
+        "# Retrieve stored counts data",
+        "ov.utils.retrieve_layers(adata, layers='counts')",
+        "# Retrieve raw data after preprocessing",
+        "ov.utils.retrieve_layers(adata, layers='raw')",
+        "# Complete workflow example",
+        "ov.utils.store_layers(adata, layers='original')",
+        "adata = ov.pp.preprocess(adata)",
+        "ov.utils.retrieve_layers(adata, layers='original')"
+    ],
+    related=["utils.store_layers", "pp.preprocess", "pp.scale"]
+)
 def retrieve_layers(adata,layers='counts'):
-    """
-    Retrieve the X of adata from adata.uns['layers_{}'.format(layers)]
+    """Retrieve previously stored X matrix from adata.uns and restore to adata.X.
 
     Arguments:
-        adata: AnnData
-        layers: the layers name to retrieve, default 'counts'
-    
+        adata: AnnData object containing single-cell data.
+        layers: The layers name to retrieve. Default: 'counts'.
+
+    Returns:
+        None: The function modifies adata.X in place by restoring the stored matrix.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Store original data before preprocessing
+        >>> ov.utils.store_layers(adata, layers='raw_counts')
+        >>> # Apply preprocessing
+        >>> adata = ov.pp.preprocess(adata)
+        >>> # Retrieve original data
+        >>> ov.utils.retrieve_layers(adata, layers='raw_counts')
     """
 
     adata_test=adata.uns['layers_{}'.format(layers)].copy()

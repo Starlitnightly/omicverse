@@ -81,6 +81,27 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
     return adata
 
 
+@register_function(
+    aliases=["聚类", "cluster", "clustering", "细胞聚类", "单细胞聚类"],
+    category="utils",
+    description="Perform clustering using various algorithms including Leiden, Louvain, GMM, K-means, and scICE",
+    examples=[
+        "# Leiden clustering (recommended)",
+        "sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50)",
+        "ov.utils.cluster(adata, method='leiden', resolution=1.0)",
+        "# Gaussian Mixture Model clustering",
+        "ov.utils.cluster(adata, method='GMM', n_components=10,",
+        "                 use_rep='X_pca', covariance_type='full')",
+        "# scICE ensemble clustering with stability analysis",
+        "model = ov.utils.cluster(adata, method='scICE',",
+        "                         resolution_range=(5,20), n_boot=50)",
+        "# K-means clustering",
+        "ov.utils.cluster(adata, method='kmeans', n_components=8)",
+        "# Louvain clustering", 
+        "ov.utils.cluster(adata, method='louvain', resolution=0.8)"
+    ],
+    related=["pp.neighbors", "pl.embedding", "utils.refine_label"]
+)
 def cluster(adata:anndata.AnnData,method:str='leiden',
             use_rep:str='X_pca',random_state:int=1024,
             n_components=None, **kwargs):
@@ -226,6 +247,28 @@ def filtered(adata:anndata.AnnData,
     print(f"""filtered {new_num} clusters and changed the cluster labels to '-1'(adata.obs, categorical)""")
 
 
+@register_function(
+    aliases=["LDA主题模型", "LDA_topic", "topic_model", "主题建模", "潜在狄利克雷分配"],
+    category="utils", 
+    description="Latent Dirichlet Allocation (LDA) topic modeling for single-cell data using MIRA",
+    examples=[
+        "# Basic LDA topic modeling",
+        "LDA_obj = ov.utils.LDA_topic(adata, feature_type='expression',",
+        "                           highly_variable_key='highly_variable_features',",
+        "                           layers='counts')",
+        "# Determine optimal number of topics",
+        "LDA_obj.plot_topic_contributions(6)",
+        "# Fit model and predict topics",
+        "LDA_obj.predicted(13)",
+        "# Advanced classification with Random Forest",
+        "LDA_obj.get_results_rfc(adata, use_rep='X_pca',",
+        "                        LDA_threshold=0.4, num_topics=13)",
+        "# Plot topic compositions on embedding",
+        "ov.pl.embedding(adata, basis='X_umap', color=LDA_obj.model.topic_cols,",
+        "                cmap='BuPu', ncols=4)"
+    ],
+    related=["utils.cluster", "single.cNMF", "pl.embedding"]
+)
 class LDA_topic(object):
 
     def _apply_torch_compatibility_fix(self):

@@ -1,5 +1,28 @@
 
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["本地GPT注释", "gptcelltype_local", "local_ai_celltype", "本地AI注释", "离线细胞注释"],
+    category="single",
+    description="Local LLM-powered cell type annotation using Hugging Face models without API requirements",
+    examples=[
+        "# Basic local LLM annotation",
+        "markers = ov.single.get_celltype_marker(adata, clustertype='leiden')",
+        "result = ov.single.gptcelltype_local(markers, tissuename='PBMC',",
+        "                                     model_name='Qwen/Qwen2-7B-Instruct')",
+        "# Using different local model",
+        "result = ov.single.gptcelltype_local(markers, tissuename='Brain',",
+        "                                     model_name='microsoft/DialoGPT-medium')",
+        "# Custom top genes and species",
+        "result = ov.single.gptcelltype_local(markers, tissuename='Liver',",
+        "                                     speciename='mouse', topgenenumber=5)",
+        "# Apply results to AnnData",
+        "adata.obs['local_gpt_celltype'] = adata.obs['leiden'].map(result)",
+        "# Compare with online GPT results",
+        "ov.utils.embedding(adata, color=['local_gpt_celltype', 'gpt_celltype'])"
+    ],
+    related=["single.gptcelltype", "single.get_celltype_marker", "single.pySCSA"]
+)
 def gptcelltype_local(input, tissuename=None, speciename='human',
                 model_name='Qwen/Qwen2-7B-Instruct', topgenenumber=10):
     """

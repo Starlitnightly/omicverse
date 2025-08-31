@@ -8,6 +8,7 @@ import json
 from scipy.sparse import csr_matrix, isspmatrix_csr, issparse
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from ..utils.registry import register_function
 
 # Small number for checking integer values in presence of floating point error
 EPSILON = 1e-10
@@ -15,6 +16,23 @@ EPSILON = 1e-10
 # Maximum default size-factor search range
 MAX_RANGE = 1e5
 
+@register_function(
+    aliases=["恢复计数", "recover_counts", "reverse_log", "反归一化", "计数恢复"],
+    category="preprocessing",
+    description="Recover raw read/UMI counts from log-normalized expression data by inferring size factors",
+    examples=[
+        "# Basic count recovery from log-normalized data",
+        "X_recovered, size_factors = ov.pp.recover_counts(adata.X, 50*1e4, 50*1e5)",
+        "adata.layers['recovered_counts'] = X_recovered",
+        "# Recovery with custom parameters", 
+        "X_recovered, size_factors = ov.pp.recover_counts(",
+        "    adata.X, mult_value=1e4, max_range=1e5, chunk_size=5000)",
+        "# Verify recovery accuracy",
+        "print(f'Original counts: {adata.layers[\"counts\"][:5,:5].toarray()}')",
+        "print(f'Recovered counts: {X_recovered[:5,:5]}')"
+    ],
+    related=["pp.preprocess", "pp.normalize_total", "utils.store_layers"]
+)
 def recover_counts(X, mult_value, max_range, log_base=None, chunk_size=1000):
     """
     Given log-normalized gene expression data, recover the raw read/UMI counts by

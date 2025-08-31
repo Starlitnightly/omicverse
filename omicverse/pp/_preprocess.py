@@ -376,20 +376,87 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
 
 from sklearn.cluster import KMeans  
 
+@register_function(
+    aliases=["数据转GPU", "anndata_to_GPU", "to_gpu", "GPU转换", "move_to_gpu"],
+    category="preprocessing",
+    description="Migrate AnnData objects to GPU memory for accelerated processing with RAPIDS",
+    examples=[
+        "# Move data to GPU for processing",
+        "ov.pp.anndata_to_GPU(adata)",
+        "# After analysis, move back to CPU",
+        "ov.pp.anndata_to_CPU(adata)",
+        "# Use with GPU preprocessing pipeline",
+        "ov.settings.gpu_init()",
+        "ov.pp.anndata_to_GPU(adata)",
+        "adata = ov.pp.qc(adata)  # GPU-accelerated QC"
+    ],
+    related=["pp.anndata_to_CPU", "settings.gpu_init", "pp.qc", "pp.preprocess"]
+)
 def anndata_to_GPU(adata,**kwargs):
-    '''
-    Migrate the data of AnnData objects to the GPU for processing
-    '''
+    """Migrate AnnData objects to GPU memory for accelerated processing.
+
+    Arguments:
+        adata: AnnData object containing single-cell data.
+        **kwargs: Additional arguments passed to rapids_singlecell.get.anndata_to_GPU.
+
+    Returns:
+        None: The function modifies adata in place by moving data to GPU memory.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Initialize GPU mode
+        >>> ov.settings.gpu_init()
+        >>> # Move data to GPU
+        >>> ov.pp.anndata_to_GPU(adata)
+        >>> # Perform GPU-accelerated analysis
+        >>> adata = ov.pp.qc(adata)
+        >>> # Move back to CPU when done
+        >>> ov.pp.anndata_to_CPU(adata)
+    """
     import rapids_singlecell as rsc
     rsc.get.anndata_to_GPU(adata,**kwargs)
     print('Data has been moved to GPU')
     print('Don`t forget to move it back to CPU after analysis is done')
     print('Use `ov.pp.anndata_to_CPU(adata)`')
 
+@register_function(
+    aliases=["数据转CPU", "anndata_to_CPU", "to_cpu", "CPU转换", "move_to_cpu"],
+    category="preprocessing",
+    description="Migrate AnnData objects from GPU back to CPU memory after analysis",
+    examples=[
+        "# Move data back to CPU after GPU processing",
+        "ov.pp.anndata_to_CPU(adata)",
+        "# Convert specific layer only",
+        "ov.pp.anndata_to_CPU(adata, layer='scaled')",
+        "# Convert with copy",
+        "ov.pp.anndata_to_CPU(adata, convert_all=True, copy=True)",
+        "# Complete GPU-CPU workflow",
+        "ov.settings.gpu_init()",
+        "ov.pp.anndata_to_GPU(adata)",
+        "adata = ov.pp.qc(adata)  # GPU processing",
+        "ov.pp.anndata_to_CPU(adata)  # Back to CPU"
+    ],
+    related=["pp.anndata_to_GPU", "settings.gpu_init", "pp.qc", "pp.preprocess"]
+)
 def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
-    '''
-    Migrate the data of AnnData objects to the CPU for processing
-    '''
+    """Migrate AnnData objects from GPU back to CPU memory after analysis.
+
+    Arguments:
+        adata: AnnData object containing single-cell data on GPU.
+        layer: Specific layer to convert back to CPU. Default: None (all layers).
+        convert_all: Whether to convert all arrays to CPU. Default: True.
+        copy: Whether to create a copy during conversion. Default: False.
+
+    Returns:
+        None: The function modifies adata in place by moving data from GPU to CPU memory.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # After GPU processing, move back to CPU
+        >>> ov.pp.anndata_to_CPU(adata)
+        >>> # Convert only specific layer
+        >>> ov.pp.anndata_to_CPU(adata, layer='scaled', convert_all=False)
+    """
     import rapids_singlecell as rsc
     rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
@@ -989,16 +1056,42 @@ def leiden(adata, **kwargs):
         add_reference(adata,'leiden','Leiden clustering with RAPIDS')
 
 
+@register_function(
+    aliases=["细胞周期评分", "score_genes_cell_cycle", "cell_cycle", "细胞周期", "cc_score"],
+    category="preprocessing",
+    description="Score cell cycle phases (S and G2M) using predefined gene sets",
+    examples=[
+        "# Basic cell cycle scoring for human data",
+        "ov.pp.score_genes_cell_cycle(adata, species='human')",
+        "# Mouse cell cycle scoring",
+        "ov.pp.score_genes_cell_cycle(adata, species='mouse')",
+        "# Custom gene lists",
+        "s_genes = ['MCM5', 'PCNA', 'TYMS']",
+        "g2m_genes = ['HMGB2', 'CDK1', 'NUSAP1']",
+        "ov.pp.score_genes_cell_cycle(adata, s_genes=s_genes, g2m_genes=g2m_genes)",
+        "# Visualize cell cycle phases",
+        "ov.pl.embedding(adata, basis='X_umap', color='phase')"
+    ],
+    related=["pp.preprocess", "pl.embedding", "utils.embedding"]
+)
 def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
-    """
-    Score cell cycle .
+    """Score cell cycle phases using predefined or custom gene sets.
 
     Arguments:
         adata: Annotated data matrix with rows for cells and columns for genes.
-        species: The species of the data. It can be either 'human' or 'mouse'.
-        s_genes: The list of genes that are specific to the S phase of the cell cycle.
-        g2m_genes: The list of genes that are specific to the G2/M phase of the cell cycle.
-    
+        species: The species of the data ('human' or 'mouse'). Default: 'human'.
+        s_genes: Custom list of S phase genes. Default: None (uses predefined).
+        g2m_genes: Custom list of G2M phase genes. Default: None (uses predefined).
+
+    Returns:
+        None: Updates adata.obs with 'S_score', 'G2M_score', and 'phase' columns.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Score cell cycle for human data
+        >>> ov.pp.score_genes_cell_cycle(adata, species='human')
+        >>> # Check results
+        >>> print(adata.obs[['S_score', 'G2M_score', 'phase']].head())
     """
     if s_genes is None:
         if species=='human':

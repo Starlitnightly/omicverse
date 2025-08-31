@@ -13,7 +13,35 @@ from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tqdm import tqdm
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["细胞本体映射", "CellOntologyMapper", "cellontology_mapper", "细胞本体注释", "本体映射器"],
+    category="single",
+    description="Comprehensive cell ontology mapping using Cell Ontology and Cell Taxonomy with AI-powered abbreviation expansion",
+    examples=[
+        "# Basic Cell Ontology mapping",
+        "mapper = ov.single.CellOntologyMapper(",
+        "    cl_obo_file='cl.json',",
+        "    model_name='sentence-transformers/all-MiniLM-L6-v2')",
+        "# Map cell types to ontology",
+        "results = mapper.map_adata(adata, cell_name_col='celltype')",
+        "# Setup LLM for abbreviation expansion",
+        "mapper.setup_llm_expansion(api_type='openai', api_key='sk-***',",
+        "                           tissue_context='Brain', species='mouse')",
+        "# Enhanced mapping with LLM expansion",
+        "results = mapper.map_adata_with_expansion(adata, cell_name_col='celltype',",
+        "                                         expand_abbreviations=True)",
+        "# Load Cell Taxonomy for enhanced annotations",
+        "mapper.load_cell_taxonomy_resource('Cell_Taxonomy_resource.txt')",
+        "results = mapper.map_adata_with_taxonomy(adata, cell_name_col='celltype',",
+        "                                        use_taxonomy=True, species='Homo sapiens')",
+        "# Query specific cell types",
+        "similar = mapper.find_similar_cells('T helper cell', top_k=5)",
+        "info = mapper.get_cell_info('regulatory T cell')"
+    ],
+    related=["single.download_cl", "single.pySCSA", "single.gptcelltype"]
+)
 class CellOntologyMapper:
     """
     🧬 Cell ontology mapping class using NLP
@@ -3662,6 +3690,25 @@ def majority_count(x):
     a, b = np.unique(x, return_counts=True)
     return np.max(b)
 
+@register_function(
+    aliases=["下载细胞本体", "download_cl", "download_cell_ontology", "下载CL", "细胞本体下载"],
+    category="single", 
+    description="Download Cell Ontology (CL) JSON file from multiple reliable sources with automatic fallback",
+    examples=[
+        "# Basic download to default directory",
+        "ov.single.download_cl()",
+        "# Custom directory and filename", 
+        "ov.single.download_cl(output_dir='data', filename='cell_ontology.json')",
+        "# Use with CellOntologyMapper",
+        "ov.single.download_cl(output_dir='ontology_data')",
+        "mapper = ov.single.CellOntologyMapper(cl_obo_file='ontology_data/cl.json')",
+        "# Alternative download sources available:",
+        "# - Official OBO Library (primary)",
+        "# - Google Drive (fallback)",
+        "# - Lanzou Cloud/蓝奏云 (China fallback)"
+    ],
+    related=["single.CellOntologyMapper", "single.pySCSA", "single.gptcelltype"]
+)
 def download_cl(output_dir="new_ontology", filename="cl.json"):
     """
     📥 Download Cell Ontology file from multiple sources with automatic fallback
