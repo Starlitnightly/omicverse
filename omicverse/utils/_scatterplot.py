@@ -52,6 +52,17 @@ from scanpy import logging as logg
 from scanpy._settings import settings
 from scanpy._utils import sanitize_anndata, _doc_params, Empty, _empty
 
+def _get_vector_friendly():
+    """Get the vector_friendly setting from omicverse plot settings."""
+    try:
+        from ._plot import _vector_friendly
+        return _vector_friendly
+    except ImportError:
+        try:
+            return settings._vector_friendly
+        except AttributeError:
+            return True  # Default fallback
+
 
 @register_function(
     aliases=["嵌入可视化", "embedding", "scatter_plot", "嵌入绘图", "降维可视化"],
@@ -436,7 +447,7 @@ def embedding(
                 coords[:, 1],
                 coords[:, 2],
                 c=color_vector,
-                rasterized=settings._vector_friendly,
+                rasterized=_get_vector_friendly(),
                 norm=normalize,
                 marker=marker[count],
                 **kwargs,
@@ -480,7 +491,7 @@ def embedding(
                     coords[:, 1],
                     s=bg_size,
                     c=bg_color,
-                    rasterized=settings._vector_friendly,
+                    rasterized=_get_vector_friendly(),
                     norm=normalize,
                     marker=marker[count],
                     **kwargs,
@@ -490,7 +501,7 @@ def embedding(
                     coords[:, 1],
                     s=gap_size,
                     c=gap_color,
-                    rasterized=settings._vector_friendly,
+                    rasterized=_get_vector_friendly(),
                     norm=normalize,
                     marker=marker[count],
                     **kwargs,
@@ -502,7 +513,7 @@ def embedding(
                 coords[:, 0],
                 coords[:, 1],
                 c=color_vector,
-                rasterized=settings._vector_friendly,
+                rasterized=_get_vector_friendly(),
                 norm=normalize,
                 marker=marker[count],
                 **kwargs,

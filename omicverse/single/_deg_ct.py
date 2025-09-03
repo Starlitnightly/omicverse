@@ -6,7 +6,33 @@ from scipy.sparse import issparse
 import pandas as pd
 
 from .._settings import EMOJI,add_reference
+from ..utils.registry import register_function
 
+@register_function(
+    aliases=["差异组成分析", "DCT", "differential_abundance", "差异丰度分析", "细胞组成分析"],
+    category="single",
+    description="Differential cell type composition analysis using scCODA or Milo methods for abundance testing",
+    examples=[
+        "# Initialize DCT with scCODA",
+        "dct_obj = ov.single.DCT(adata, condition='treatment', ctrl_group='Control',",
+        "                        test_group='Treatment', cell_type_key='cell_type', method='sccoda')",
+        "# Run scCODA analysis",
+        "dct_obj.run(num_samples=5000, num_warmup=500)",
+        "# Get results",
+        "results = dct_obj.get_results()",
+        "# Set FDR threshold",
+        "dct_obj.model.set_fdr(dct_obj.sccoda_data, modality_key='coda', est_fdr=0.4)",
+        "# Initialize DCT with Milo",
+        "dct_obj = ov.single.DCT(adata, condition='condition', ctrl_group='Control',", 
+        "                        test_group='Disease', cell_type_key='celltype',",
+        "                        method='milo', use_rep='X_pca')",
+        "# Run Milo analysis",
+        "dct_obj.run()",
+        "# Get Milo results with mixing threshold",
+        "milo_results = dct_obj.get_results(mix_threshold=0.6)"
+    ],
+    related=["single.DEG", "external.pertpy", "pp.neighbors"]
+)
 class DCT:
     def __init__(self, 
                  adata: AnnData, 
@@ -130,6 +156,32 @@ class DCT:
         
             
 
+@register_function(
+    aliases=["差异表达分析", "DEG", "differential_expression", "差异基因分析", "单细胞差异表达"],
+    category="single",
+    description="Differential gene expression analysis for single-cell data using Wilcoxon, t-test, or memento methods",
+    examples=[
+        "# Initialize DEG with Wilcoxon test",
+        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',",
+        "                        test_group='Treatment', method='wilcoxon')",
+        "# Run DEG analysis for specific cell types",
+        "deg_obj.run(celltype_key='cell_label', celltype_group=['T_cells', 'B_cells'])",
+        "# Get results",
+        "results = deg_obj.get_results()",
+        "# Initialize with t-test method",
+        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',", 
+        "                        test_group='Disease', method='t-test')",
+        "# Run for all cell types",
+        "deg_obj.run(celltype_key='celltype', celltype_group=None)",
+        "# Initialize with memento method",
+        "deg_obj = ov.single.DEG(adata, condition='status', ctrl_group='healthy',",
+        "                        test_group='diseased', method='memento-de')",
+        "# Run memento analysis",
+        "deg_obj.run(celltype_key='cell_type', celltype_group=['neurons'],",
+        "           capture_rate=0.07, num_cpus=8, num_boot=5000)"
+    ],
+    related=["single.DCT", "bulk.pyDEG", "tl.rank_genes_groups"]
+)
 class DEG:
     def __init__(self,
                  adata: AnnData,

@@ -1,7 +1,33 @@
 
 import requests
+from ..utils.registry import register_function
 
 
+@register_function(
+    aliases=["细胞投票", "CellVote", "cellvote", "细胞类型投票", "集成注释"],
+    category="single",
+    description="Multi-method cell type annotation consensus using ensemble voting with LLM arbitration",
+    examples=[
+        "# Initialize CellVote",
+        "cv = ov.single.CellVote(adata)",
+        "# Get cluster markers first", 
+        "markers = ov.single.get_celltype_marker(adata, clustertype='leiden')",
+        "# Vote using multiple annotation methods",
+        "result = cv.vote(clusters_key='leiden', cluster_markers=markers,",
+        "                 celltype_keys=['scsa_annotation', 'gpt_celltype'])",
+        "# Use SCSA annotation",
+        "scsa_result = cv.scsa_anno()",
+        "# Use GPT annotation", 
+        "gpt_result = cv.gpt_anno()",
+        "# Use GPTBioInsightor annotation",
+        "gbi_result = cv.gbi_anno()",
+        "# Use scMulan annotation",
+        "scmulan_result = cv.scMulan_anno()",
+        "# Use PopV annotation",
+        "popv_result = cv.popv_anno(ref_adata, 'celltype', 'batch')"
+    ],
+    related=["single.get_celltype_marker", "single.gptcelltype", "single.pySCSA"]
+)
 class CellVote(object):
 
     def __init__(self, adata) -> None:
@@ -173,28 +199,33 @@ class CellVote(object):
         provider="openai",
         result_key="CellVote_celltype",
     ):
-        """
-        Vote the Best celltype from scRNA-seq
+        r"""Vote for the best cell type annotation from multiple annotation methods.
 
         Arguments:
-            clusters_key: str, the clusters key for annotation, such as leiden, louvain
-            cluster_markers: dict, the markers of cluster, we can use `ov.single.get_celltype_marker` to obtain.
-            celltype_keys: list, the celltype annotation columns stored in adata.obs, such as ['scsa_annotation','scMulan_anno']
-            model: str, the LLM we used to identify the best matched cells in clusters.
-            base_url: str, the LLM api url.
-            species: str, the species of scRNA-seq,
-            organization: str, the organization of scRNA-seq
-            provider: str, if `base_url` is None, we can use default provider.
+            clusters_key: Clusters key for annotation such as leiden or louvain. Default: None.
+            cluster_markers: Dictionary of cluster markers obtained from get_celltype_marker. Default: None.
+            celltype_keys: List of celltype annotation columns in adata.obs. Default: [].
+            model: LLM model used to identify best matched cells in clusters. Default: 'gpt-3.5-turbo'.
+            base_url: LLM API base URL. Default: None.
+            species: Species of scRNA-seq data. Default: 'human'.
+            organization: Organization/tissue type of scRNA-seq data. Default: 'stomach'.
+            provider: API provider when base_url is None. Default: 'openai'.
+            result_key: Column name to store results in adata.obs. Default: 'CellVote_celltype'.
 
-        Example:
-        ```
-        vote_obj=CellVote(adata)
-        vote_obj.vote('leiden',marker_dict,
-                        celltype_keys=['scsa_annotation','scMulan_anno'],
-                        )
-        ```
-        You can found the result in adata.obs['CellVote_celltype']
+        Returns:
+            dict: Mapping of cluster IDs to voted cell types.
 
+        Examples:
+            >>> import omicverse as ov
+            >>> # Initialize CellVote
+            >>> vote_obj = ov.single.CellVote(adata)
+            >>> # Get cluster markers
+            >>> markers = ov.single.get_celltype_marker(adata, clustertype='leiden')
+            >>> # Vote with multiple annotation methods
+            >>> result = vote_obj.vote('leiden', markers,
+            ...                        celltype_keys=['scsa_annotation', 'scMulan_anno'])
+            >>> # Result stored in adata.obs['CellVote_celltype']
+            >>> print(adata.obs['CellVote_celltype'].value_counts())
         """
 
         cluster_celltypes = {}
@@ -230,6 +261,27 @@ class CellVote(object):
         return result
 
 
+@register_function(
+    aliases=["获取集群细胞类型", "get_cluster_celltype", "cluster_celltype", "集群类型获取", "LLM细胞注释"],
+    category="single",
+    description="LLM-powered cluster cell type determination with retry mechanism and error handling",
+    examples=[
+        "# Basic cluster cell type determination",
+        "cluster_celltypes = {'0': ['T cell', 'B cell'], '1': ['NK', 'T cell']}",
+        "cluster_markers = {'0': ['CD3D', 'IL7R'], '1': ['NKG7', 'GNLY']}",
+        "result = ov.single.get_cluster_celltype(cluster_celltypes, cluster_markers,",
+        "                                        'human', 'PBMC', 'gpt-4', None, 'openai')",
+        "# With custom API settings",
+        "result = ov.single.get_cluster_celltype(cluster_celltypes, cluster_markers,",
+        "                                        'mouse', 'Brain', 'qwen-plus',", 
+        "                                        'https://custom.api.com/v1', 'qwen')",
+        "# With retry configuration",
+        "result = ov.single.get_cluster_celltype(cluster_celltypes, cluster_markers,",
+        "                                        'human', 'Liver', 'gpt-3.5-turbo',",
+        "                                        None, 'openai', timeout=60, max_retries=5)"
+    ],
+    related=["single.CellVote", "single.gptcelltype", "single.get_celltype_marker"]
+)
 def get_cluster_celltype(
     cluster_celltypes,
     cluster_markers,

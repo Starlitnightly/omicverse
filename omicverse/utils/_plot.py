@@ -29,6 +29,9 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     torch = None
 
+# Global variable to control vector-friendly rasterization
+_vector_friendly = True
+
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', 
  '#FCBC10', '#EF7B77', '#279AD7','#F0EEF0',
@@ -168,7 +171,8 @@ EMOJI = {
     examples=[
         "ov.utils.ov_plot_set()",
         "ov.utils.plot_set(dpi=100, figsize=6)",
-        "ov.utils.plot_set(scanpy=False, fontsize=12)"
+        "ov.utils.plot_set(scanpy=False, fontsize=12)",
+        "ov.utils.plot_set(vector_friendly=True)"
     ],
     related=["pl.embedding", "pl.volcano", "utils.palette"]
 )
@@ -182,6 +186,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              fontsize: int = 14,
              color_map: Union[str, None] = None,
              figsize: Union[int, None] = None,
+             vector_friendly: bool = True,
              ):
     r"""Configure plotting settings for OmicVerse.
     
@@ -197,6 +202,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         fontsize: Default font size for plots. Default: 14.
         color_map: Default color map for plots. Default: None.
         figsize: Default figure size. Default: None.
+        vector_friendly: Control rasterization for vector-friendly plots. Default: True.
         
     Returns:
         None: The function configures global plotting settings and displays initialization information.
@@ -234,6 +240,10 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
     if figsize is not None:
         rcParams["figure.figsize"] = figsize
+    
+    # Set global vector_friendly setting
+    global _vector_friendly
+    _vector_friendly = vector_friendly
     #print(f"{EMOJI['done']} Settings applied")
 
     # 3) Custom font setup
