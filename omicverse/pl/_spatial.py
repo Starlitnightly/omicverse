@@ -36,8 +36,16 @@ from scanpy import logging as logg
 from scanpy._settings import settings as sc_settings
 from scanpy.plotting._tools.scatterplots import _add_categorical_legend
 
-
-
+def _get_vector_friendly():
+    """Get the vector_friendly setting from omicverse plot settings."""
+    try:
+        from ..utils._plot import _vector_friendly
+        return _vector_friendly
+    except ImportError:
+        try:
+            return sc_settings._vector_friendly
+        except AttributeError:
+            return True  # Default fallback
 
 
 import itertools
@@ -614,7 +622,7 @@ def _plot_edges(
         ax=ax,
         **kwargs,
     )
-    edge_collection.set_rasterized(sc_settings._vector_friendly)
+    edge_collection.set_rasterized(_get_vector_friendly())
     ax.add_collection(edge_collection)
 
 
@@ -1083,7 +1091,7 @@ def _plot_scatter(
             coords[:, 1],
             s=outline_params.bg_size,
             c=outline_params.bg_color,
-            rasterized=sc_settings._vector_friendly,
+            rasterized=_get_vector_friendly(),
             cmap=cmap_params.cmap,
             norm=norm,
             **kwargs,
@@ -1094,7 +1102,7 @@ def _plot_scatter(
             coords[:, 1],
             s=outline_params.gap_size,
             c=outline_params.gap_color,
-            rasterized=sc_settings._vector_friendly,
+            rasterized=_get_vector_friendly(),
             cmap=cmap_params.cmap,
             norm=norm,
             **kwargs,
@@ -1105,7 +1113,7 @@ def _plot_scatter(
         coords[:, 1],
         c=np.array(color_vector),
         s=size,
-        rasterized=sc_settings._vector_friendly,
+        rasterized=_get_vector_friendly(),
         cmap=cmap_params.cmap,
         norm=norm,
         **kwargs,

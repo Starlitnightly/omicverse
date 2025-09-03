@@ -1,9 +1,35 @@
 from ..external.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
 from ..external.SEACells import compute_celltype_purity,separation,compactness
 from .._settings import add_reference
+from ..utils.registry import register_function
 import pandas as pd
 
 
+@register_function(
+    aliases=["元细胞", "MetaCell", "metacell", "元细胞构建", "SEA细胞"],
+    category="single",
+    description="Construct metacells from single-cell data using SEACells algorithm for dimensionality reduction and noise reduction",
+    examples=[
+        "# Initialize MetaCell",
+        "meta_obj = ov.single.MetaCell(adata, use_rep='X_pca', n_metacells=150)",
+        "# Initialize archetypes",
+        "meta_obj.initialize_archetypes()",
+        "# Train the model",
+        "meta_obj.train(min_iter=10, max_iter=50)",
+        "# Generate metacells",
+        "metacell_adata = meta_obj.predicted(method='soft', celltype_label='clusters')",
+        "# Save and load model",
+        "meta_obj.save('seacells/model.pkl')",
+        "meta_obj.load('seacells/model.pkl')",
+        "# Additional training steps",
+        "meta_obj.step(n_steps=5)",
+        "# Quality metrics",
+        "purity = meta_obj.compute_celltype_purity(celltype_label='clusters')",
+        "sep = meta_obj.separation(use_rep='X_pca')",
+        "comp = meta_obj.compactness(use_rep='X_pca')"
+    ],
+    related=["single.get_obs_value", "single.plot_metacells", "pp.scale"]
+)
 class MetaCell(object):
 
     def __init__(self,adata,use_rep,
@@ -166,6 +192,22 @@ class MetaCell(object):
                                            use_rep,**kwargs)
 
 
+@register_function(
+    aliases=["绘制元细胞", "plot_metacells", "metacell_plot", "元细胞绘图", "可视化元细胞"],
+    category="single",
+    description="Plot metacells on existing axis with customizable visualization parameters",
+    examples=[
+        "# Basic metacell plotting",
+        "import matplotlib.pyplot as plt",
+        "fig, ax = plt.subplots(figsize=(6, 6))",
+        "ov.single.plot_metacells(ax, adata, use_rep='X_umap')",
+        "# Custom colors and sizes",
+        "ov.single.plot_metacells(ax, adata, color='red', size=20, alpha=0.8)",
+        "# With edge styling",
+        "ov.single.plot_metacells(ax, adata, edgecolors='black', linewidths=1.0)"
+    ],
+    related=["single.MetaCell", "utils.embedding", "pl.embedding"]
+)
 def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
                    size=15,
                    edgecolors='b',linewidths=0.6,alpha=1,**kwargs,):
@@ -194,6 +236,20 @@ def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
           alpha=alpha,**kwargs)
     return ax
 
+@register_function(
+    aliases=["获取观测值", "get_obs_value", "transfer_obs", "观测值转移", "元细胞注释转移"],
+    category="single",
+    description="Transfer observation values from single-cell to metacell data with various aggregation methods",
+    examples=[
+        "# Transfer cell type annotations",
+        "ov.single.get_obs_value(metacell_adata, original_adata, 'celltype', type='str')",
+        "# Transfer numeric values with mean aggregation",
+        "ov.single.get_obs_value(metacell_adata, original_adata, 'score', type='mean')",
+        "# Transfer with maximum aggregation",
+        "ov.single.get_obs_value(metacell_adata, original_adata, 'batch', type='max')"
+    ],
+    related=["single.MetaCell", "single.plot_metacells", "utils.transfer_obs"]
+)
 def get_obs_value(ad,adata,groupby,type='int'):
     r"""Transfer observation values from single-cell to metacell data.
     
