@@ -1024,6 +1024,7 @@ class CellChatVizPlus:
                 high_mark = mp.MarkerMesh(
                     high_expression_mask, 
                     color="#DB4D6D", 
+                    edgecolor="#DB4D6D",
                     label="High Expression"
                 )
                 h.add_layer(high_mark)
