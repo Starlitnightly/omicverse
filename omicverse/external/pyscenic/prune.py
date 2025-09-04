@@ -17,8 +17,8 @@ import pandas as pd
 from boltons.iterutils import chunked_iter
 #from ctxcore.genesig import GeneSignature, Regulon
 #from ctxcore.rnkdb import MemoryDecorator, RankingDatabase
-from multiprocessing_on_dill.connection import Pipe
-from multiprocessing_on_dill.context import Process
+from multiprocess.connection import Pipe
+from multiprocess.context import Process
 
 from .log import create_logging_handler
 from .transform import (
