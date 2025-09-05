@@ -55,6 +55,7 @@ class EmbedWebRetriever:
         chunk_overlap: int = 200,
         top_k: int = 5,
         max_concurrency: int = 4,
+        abstracts_only_for_pubmed: bool = True,
     ) -> None:
         from .web_store import WebRetrieverStore
 
@@ -73,6 +74,7 @@ class EmbedWebRetriever:
         self.top_k = top_k
         self.max_concurrency = max(1, min(16, max_concurrency))
         self.session = getattr(self.web, "session", None)
+        self.abstracts_only_for_pubmed = abstracts_only_for_pubmed
 
     # ------------------------------------------------------------------
     def search(self, query: str) -> Sequence[PassageDoc]:
@@ -92,6 +94,7 @@ class EmbedWebRetriever:
                 url = r.metadata.get("url") if hasattr(r, "metadata") else None
                 snippet = r.metadata.get("snippet") if hasattr(r, "metadata") else ""
                 title = r.metadata.get("title") if hasattr(r, "metadata") else None
+                backend = r.metadata.get("backend") if hasattr(r, "metadata") else None
                 if not url:
                     text = getattr(r, "text", "") or snippet
                     for j, ch in enumerate(self._chunk(text)):
@@ -100,6 +103,18 @@ class EmbedWebRetriever:
                                 id=f"passage:{idx}:{j}",
                                 text=ch,
                                 metadata={"url": None, "title": title or r.metadata.get("title", ""), "source_index": idx},
+                            )
+                        )
+                    continue
+                # Avoid HTML fetching for PubMed when abstracts-only mode is enabled
+                if self.abstracts_only_for_pubmed and backend == "pubmed":
+                    text = getattr(r, "text", "") or snippet
+                    for j, ch in enumerate(self._chunk(text)):
+                        passages.append(
+                            PassageDoc(
+                                id=f"passage:{idx}:{j}",
+                                text=ch,
+                                metadata={"url": url, "title": title or r.metadata.get("title", ""), "source_index": idx},
                             )
                         )
                     continue
