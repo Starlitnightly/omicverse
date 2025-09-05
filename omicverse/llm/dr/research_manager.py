@@ -75,7 +75,7 @@ class ResearchManager:
         vs = vector_store
         if isinstance(vs, str):
             vs_flag = vs.lower().strip()
-            if vs_flag in {"web", "web:tavily", "web:duckduckgo", "web:brave", "web:embed", "web:embed:tavily", "web:embed:duckduckgo", "web:embed:brave"}:
+            if vs_flag in {"web", "web:tavily", "web:duckduckgo", "web:brave", "web:pubmed", "web:embed", "web:embed:tavily", "web:embed:duckduckgo", "web:embed:brave", "web:embed:pubmed"}:
                 from .retrievers.web_store import WebRetrieverStore
                 try:
                     from .retrievers.embed_web import EmbedWebRetriever
@@ -83,11 +83,17 @@ class ResearchManager:
                     EmbedWebRetriever = None  # type: ignore
 
                 if vs_flag == "web":
-                    backend = "tavily" if os.getenv("TAVILY_API_KEY") else ("brave" if os.getenv("BRAVE_API_KEY") else "duckduckgo")
+                    backend = (
+                        "tavily"
+                        if os.getenv("TAVILY_API_KEY")
+                        else ("brave" if os.getenv("BRAVE_API_KEY") else "duckduckgo")
+                    )
                 elif vs_flag in {"web:tavily", "web:embed:tavily"}:
                     backend = "tavily"
                 elif vs_flag in {"web:brave", "web:embed:brave"}:
                     backend = "brave"
+                elif vs_flag in {"web:pubmed", "web:embed:pubmed"}:
+                    backend = "pubmed"
                 else:
                     backend = "duckduckgo"
                 cache_enabled = cache if cache is not None else bool(os.getenv("OV_DR_CACHE"))
@@ -200,13 +206,10 @@ class ResearchManager:
         self._status(MessageStandards.EMBEDDING_COMPLETE)
         return report
 
-    def write(self, brief: ProjectBrief, findings: Sequence[Finding]) -> str:
-        """Compose a comprehensive report from ``findings`` informed by ``brief``.
+    def compose_sections(self, brief: ProjectBrief, findings: Sequence[Finding]) -> Sequence[Section]:
+        """Build report sections (synthesis + per-topic) with citations.
 
-        This method first synthesizes a top-level report body using the configured
-        synthesizer (defaults to an offline simple synthesizer), then appends
-        per-topic sections for transparency, and finally formats the document
-        with citations using :class:`ReportWriter`.
+        Separates composition from rendering to allow metadata access by callers.
         """
 
         validate_query(brief.title)
@@ -242,7 +245,16 @@ class ResearchManager:
         for f in findings:
             sections.append(Section(title=f.topic, text=f.text, citations=f.sources))
 
-        # 3) Render
+        return sections
+
+    def write(self, brief: ProjectBrief, findings: Sequence[Finding]) -> str:
+        """Compose a comprehensive report from ``findings`` informed by ``brief``.
+
+        Uses :meth:`compose_sections` to build sections, then renders using
+        :class:`ReportWriter` with citations and references.
+        """
+
+        sections = self.compose_sections(brief, findings)
         # Convert to cacheable tuple key
         sections_key = tuple(
             (
@@ -268,3 +280,32 @@ class ResearchManager:
         brief = self.scope(request)
         findings = self.research(brief)
         return self.write(brief, findings)
+
+    # ------------------------------------------------------------------
+    def run_with_meta(self, request: str) -> tuple[str, Sequence[Section]]:
+        """Execute full pipeline and also return composed sections.
+
+        Returns a tuple of (report, sections) so callers can inspect citations
+        and their metadata (e.g., open-access, proxy suggestions, paywall flags).
+        """
+        brief = self.scope(request)
+        findings = self.research(brief)
+        sections = self.compose_sections(brief, findings)
+        report = self._write_cached(
+            tuple(
+                (
+                    s.title,
+                    s.text,
+                    tuple(
+                        (
+                            c.source_id,
+                            c.content,
+                            tuple(sorted(c.metadata.items())) if c.metadata else None,
+                        )
+                        for c in s.citations
+                    ),
+                )
+                for s in sections
+            )
+        )
+        return report, sections
