@@ -12,6 +12,7 @@ import scanpy as sc
 
 
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 from ..external.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *
@@ -123,6 +124,25 @@ def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_pa
     return pred_cores_to_use, smooth_cores_to_use
 
 
+@register_function(
+    aliases=["细胞潜能预测", "cytotrace2", "cell_potency", "发育潜能", "CytoTRACE2"],
+    category="single",
+    description="CytoTRACE 2: Deep learning-based cell potency prediction from single-cell RNA-seq data",
+    examples=[
+        "# Basic CytoTRACE2 analysis",
+        "results = ov.single.cytotrace2(adata, use_model_dir='models/5_models_weights')",
+        "# Mouse data with custom parameters", 
+        "results = ov.single.cytotrace2(adata, use_model_dir='models/',",
+        "                               species='mouse', batch_size=5000)",
+        "# Human data analysis",
+        "results = ov.single.cytotrace2(adata, use_model_dir='models/',",
+        "                               species='human', max_pcs=100, seed=42)",
+        "# Disable parallelization for small datasets",
+        "results = ov.single.cytotrace2(adata, use_model_dir='models/',",
+        "                               disable_parallelization=True)"
+    ],
+    related=["single.TrajInfer", "single.pyVIA", "pp.preprocess"]
+)
 def cytotrace2(
                adata,
                use_model_dir,

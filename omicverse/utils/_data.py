@@ -20,6 +20,24 @@ from .._settings import Colors  # Import Colors from settings
 from .registry import register_function
 
 
+@register_function(
+    aliases=["读取数据", "read", "load_data", "数据读取", "file_reader"],
+    category="utils",
+    description="Universal file reader for common bioinformatics data formats including h5ad, csv, tsv, txt, and gzipped files",
+    examples=[
+        "# Read AnnData file",
+        "adata = ov.read('data.h5ad')",
+        "# Read CSV file",
+        "df = ov.read('data.csv')",
+        "# Read TSV file",
+        "df = ov.read('data.tsv')",
+        "# Read compressed file",
+        "df = ov.read('data.csv.gz')",
+        "# Pass additional parameters",
+        "df = ov.read('data.csv', index_col=0, header=0)"
+    ],
+    related=["utils.read_csv", "utils.read_h5ad", "pp.preprocess"]
+)
 def read(path,**kwargs):
     if path.split('.')[-1]=='h5ad':
         return sc.read(path,**kwargs)

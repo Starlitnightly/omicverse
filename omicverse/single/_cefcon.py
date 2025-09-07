@@ -19,6 +19,7 @@ import scanpy as sc
 import zipfile
 from ..external.CEFCON.cell_lineage_GRN import NetModel
 from ..external.CEFCON.utils import data_preparation
+from ..utils.registry import register_function
 
 biomart_install = False
 ctxcore_install = False
@@ -33,6 +34,20 @@ def check_ctxcore():
             'Please install the ctxcore: `pip install ctxcore`.'
         )
     
+@register_function(
+    aliases=["小鼠造血干细胞数据集", "mouse_hsc", "nestorowa16", "造血数据", "HSC数据集"],
+    category="single",
+    description="Load mouse hematopoietic stem cell dataset from Nestorowa et al. (2016) with lineage information for CEFCON analysis",
+    examples=[
+        "# Load mouse HSC dataset (default v0)",
+        "adata = ov.single.mouse_hsc_nestorowa16()",
+        "# Load specific version",
+        "adata = ov.single.mouse_hsc_nestorowa16(version='v0')",
+        "# Custom file path",
+        "adata = ov.single.mouse_hsc_nestorowa16(fpath='./my_data/hsc_data.h5ad')"
+    ],
+    related=["single.pyCEFCON", "single.load_human_prior_interaction_network", "pp.preprocess"]
+)
 def mouse_hsc_nestorowa16(fpath: Optional[str] = './data_cache/mouse_hsc_nestorowa16_v0.h5ad', version: Optional[str] = 'v0'):
     if version=='v0':
         fpath = './data_cache/mouse_hsc_nestorowa16_v0.h5ad'
@@ -79,6 +94,22 @@ def _download_from_url(file_url: str, save_path: Path):
     print(f'Ths data has been downloaded to `{save_path}`.')
 
 
+@register_function(
+    aliases=["人类先验网络", "load_prior_network", "human_network", "基因调控网络", "prior_interaction_network"],
+    category="single",
+    description="Load human prior gene interaction network datasets for CEFCON analysis",
+    examples=[
+        "# Load default NicheNet network",
+        "network = ov.single.load_human_prior_interaction_network()",
+        "# Load PathwayCommons network",
+        "network = ov.single.load_human_prior_interaction_network(dataset='pathwaycommons')",
+        "# Load InBioMap network",
+        "network = ov.single.load_human_prior_interaction_network(dataset='inbiomap')",
+        "# Force download even if file exists",
+        "network = ov.single.load_human_prior_interaction_network(force_download=True)"
+    ],
+    related=["single.convert_human_to_mouse_network", "single.pyCEFCON", "single.mouse_hsc_nestorowa16"]
+)
 def load_human_prior_interaction_network(dataset: str = 'nichenet',
                                          only_directed: bool = False,
                                          force_download: bool = False):
@@ -169,6 +200,20 @@ def load_human_prior_interaction_network(dataset: str = 'nichenet',
     return prior_net
 
 
+@register_function(
+    aliases=["人类小鼠网络转换", "convert_network", "human_to_mouse", "基因符号转换", "species_conversion"],
+    category="single",
+    description="Convert human gene symbols in prior interaction network to mouse gene symbols using biomart",
+    examples=[
+        "# Convert human network to mouse with default server",
+        "mouse_network = ov.single.convert_human_to_mouse_network(human_network)",
+        "# Use European server",
+        "mouse_network = ov.single.convert_human_to_mouse_network(human_network, server_name='europe')",
+        "# Use US server",
+        "mouse_network = ov.single.convert_human_to_mouse_network(human_network, server_name='useast')"
+    ],
+    related=["single.load_human_prior_interaction_network", "single.pyCEFCON", "single.mouse_hsc_nestorowa16"]
+)
 def convert_human_to_mouse_network(net: pd.DataFrame,server_name='asia'):
     global biomart_install
     try:
@@ -281,6 +326,24 @@ def convert_human_to_mouse_network(net: pd.DataFrame,server_name='asia'):
 
     return prior_net_converted
 
+@register_function(
+    aliases=["CEFCON分析", "pyCEFCON", "driver_regulators", "细胞命运调控", "gene_regulatory_network"],
+    category="single",
+    description="CEFCON: Computational tool for deciphering driver regulators of cell fate decisions from single-cell RNA-seq data",
+    examples=[
+        "# Initialize CEFCON with basic parameters",
+        "cefcon = ov.single.pyCEFCON(adata, prior_network)",
+        "# CEFCON with custom parameters and GUROBI solver",
+        "cefcon = ov.single.pyCEFCON(adata, prior_network, repeats=5, solver='GUROBI')",
+        "# Run complete CEFCON analysis",
+        "cefcon = ov.single.pyCEFCON(adata, network)",
+        "cefcon.preprocess()",
+        "cefcon.train()",
+        "cefcon.predicted_driver_regulators()",
+        "cefcon.predicted_RGM()"
+    ],
+    related=["single.mouse_hsc_nestorowa16", "single.load_human_prior_interaction_network", "single.convert_human_to_mouse_network"]
+)
 class pyCEFCON(object):
 
     def __init__(self,
