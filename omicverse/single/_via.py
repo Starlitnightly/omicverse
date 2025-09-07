@@ -16,11 +16,68 @@ from typing import Union,Tuple
 from ..external.VIA.utils_via import *
 from ..external.VIA.plotting_via import *
 from .._settings import add_reference
+from ..utils.registry import register_function
 #from ..via.utils_via import sc_loc_ofsuperCluster_PCAspace,compute_velocity_on_grid
 
+@register_function(
+    aliases=["造血数据集", "hematopoiesis", "scRNA_hematopoiesis", "造血发育数据", "血细胞发育"],
+    category="single",
+    description="Load scRNA-seq hematopoiesis dataset for trajectory inference and developmental analysis",
+    examples=[
+        "# Load hematopoiesis dataset",
+        "adata = ov.single.scRNA_hematopoiesis()",
+        "# Alternative way to load",
+        "adata = ov.single.hematopoiesis()",
+        "# Check dataset structure",
+        "print(adata.obs.columns)",
+        "print(adata.obsm.keys())"
+    ],
+    related=["single.pyVIA", "single.TrajInfer", "pp.preprocess"]
+)
 def hematopoiesis()->anndata.AnnData:
+    r"""Load scRNA-seq hematopoiesis dataset for trajectory inference.
+    
+    Returns:
+        AnnData: Preprocessed hematopoiesis dataset with embeddings and annotations.
+    
+    Examples:
+        >>> import omicverse as ov
+        >>> # Load the dataset
+        >>> adata = ov.single.scRNA_hematopoiesis()
+        >>> print(adata.shape)
+    """
     return scRNA_hematopoiesis()
 
+@register_function(
+    aliases=["VIA轨迹推断", "pyVIA", "via_analysis", "VIA算法", "轨迹拓扑分析"],
+    category="single",
+    description="VIA (Velocity and Topology Inference Algorithm) for single-cell trajectory inference with automated terminal state prediction",
+    examples=[
+        "# Initialize pyVIA",
+        "v0 = ov.single.pyVIA(adata=adata, adata_key='X_pca', adata_ncomps=80,",
+        "                     basis='tsne', clusters='label', knn=30, random_seed=4)",
+        "# Set root cell if known",
+        "v0 = ov.single.pyVIA(adata=adata, adata_key='X_pca', basis='umap',",
+        "                     clusters='celltype', root_user=[1234])",
+        "# Run VIA analysis",
+        "v0.run()",
+        "# Get pseudotime",
+        "v0.get_pseudotime(adata)",
+        "# Plot piechart graph",
+        "fig, ax, ax1 = v0.plot_piechart_graph(clusters='label', cmap='Reds')",
+        "# Plot gene trends",
+        "fig, axs = v0.plot_gene_trend(gene_list=['gene1', 'gene2'], figsize=(8,6))",
+        "# Plot trajectory projection",
+        "fig, ax1, ax2 = v0.plot_trajectory_gams(basis='umap', clusters='celltype')",
+        "# Plot stream plot",
+        "fig, ax = v0.plot_stream(basis='umap', clusters='celltype', density_grid=0.8)",
+        "# Plot lineage probabilities", 
+        "fig, axs = v0.plot_lineage_probability(figsize=(8,4))",
+        "# Plot clustergraph with genes",
+        "fig, axs = v0.plot_clustergraph(gene_list=['CD34', 'GATA1'], figsize=(12,3))"
+    ],
+    related=["single.TrajInfer", "single.scRNA_hematopoiesis", "pp.neighbors", "utils.embedding"]
+)
 class pyVIA(object):
 
     def __init__(self,adata:anndata.AnnData,adata_key:str='X_pca',adata_ncomps:int=80,basis:str='X_umap',

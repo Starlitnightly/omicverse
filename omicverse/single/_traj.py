@@ -11,6 +11,7 @@ from tqdm import tqdm
 import sys
 from ..utils._neighboors import update_rep, eff_n_jobs,neighbors,W_from_rep
 from .._settings import add_reference
+from ..utils.registry import register_function
 
 from ._cosg import cosg
 from ..external.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
@@ -19,6 +20,34 @@ from ..external.palantir.core import run_palantir
 from ..external.palantir.presults import select_branch_cells,compute_gene_trends
 
 
+@register_function(
+    aliases=["轨迹推断", "TrajInfer", "trajectory_inference", "轨迹分析", "发育轨迹"],
+    category="single",
+    description="Comprehensive trajectory inference for single-cell data using multiple algorithms including Palantir, diffusion maps, and Slingshot",
+    examples=[
+        "# Initialize TrajInfer",
+        "traj = ov.single.TrajInfer(adata, basis='X_umap', groupby='clusters',",
+        "                           use_rep='X_pca', n_comps=50)",
+        "# Set origin and terminal cells",
+        "traj.set_origin_cells('stem_cells')",
+        "traj.set_terminal_cells(['differentiated_A', 'differentiated_B'])",
+        "# Diffusion map trajectory inference",
+        "traj.inference(method='diffusion_map')",
+        "# Slingshot trajectory inference", 
+        "traj.inference(method='slingshot', num_epochs=1)",
+        "# Palantir trajectory inference",
+        "traj.inference(method='palantir', num_waypoints=500)",
+        "# Visualize Palantir results",
+        "traj.palantir_plot_pseudotime(embedding_basis='X_umap', cmap='RdBu_r')",
+        "# Calculate branch probabilities",
+        "traj.palantir_cal_branch(eps=0)",
+        "# Compute gene expression trends",
+        "gene_trends = traj.palantir_cal_gene_trends(layers='MAGIC_imputed_data')",
+        "# Plot gene trends along trajectories",
+        "traj.palantir_plot_gene_trends(['gene1', 'gene2', 'gene3'])"
+    ],
+    related=["utils.cal_paga", "utils.plot_paga", "pp.neighbors", "external.palantir"]
+)
 class TrajInfer(object):
     r"""Trajectory inference class for single-cell data analysis.
     

@@ -8,6 +8,7 @@ import anndata
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import torch
+from ..utils.registry import register_function
 
 class PyTorchRidge: # 保持不变， 不需要修改
     def __init__(self, alpha=1.0, device='cpu'):
@@ -62,6 +63,25 @@ def augment_gene_expression_noise(X_train, noise_std=0.01):
     noise = np.random.normal(0, noise_std, size=X_train.shape)
     return X_train + noise
 
+@register_function(
+    aliases=["细胞命运预测", "Fate", "time_fate_kernel", "TimeFateKernel", "时间命运核"],
+    category="single",
+    description="TimeFateKernel: Adaptive ridge regression model to identify timing-associated genes in single-cell pseudotime analysis",
+    examples=[
+        "# Initialize Fate analysis",
+        "fate_obj = ov.single.Fate(adata, pseudotime='palantir_pseudotime')",
+        "# Initialize model and run ATR",
+        "fate_obj.model_init()",
+        "fate_obj.ATR(stop=500)",
+        "# Fit the model",
+        "result = fate_obj.model_fit()",
+        "# Plot filtering results",
+        "fig, ax = fate_obj.plot_filtering()",
+        "# Calculate lineage scores",
+        "fate_obj.lineage_score(cluster_key='leiden', lineage=['0', '1'])"
+    ],
+    related=["pp.leiden", "utils.plot_heatmap", "pl.embedding"]
+)
 class Fate(object):
 
     def __init__(self,adata:anndata.AnnData,pseudotime:str):
