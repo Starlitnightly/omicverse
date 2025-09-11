@@ -1209,7 +1209,7 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
 
     # Determine device based on available accelerators
     import torch
-    from ._settings import get_optimal_device, prepare_data_for_device
+    from .._settings import get_optimal_device, prepare_data_for_device
     device = get_optimal_device(prefer_gpu=True, verbose=True)
     
     # Convert device to string for PyMDE compatibility
