@@ -116,8 +116,11 @@ def sude(
     >>> ov.pp.sude(adata)
     >>> ov.pl.sude(adata, color='leiden')
     """
-    print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running SUDE in '{settings.mode}' mode...")
-    print(f"{Colors.CYAN}Computing SUDE dimensionality reduction{Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} SUDE Dimensionality Reduction:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Components: {Colors.BOLD}{no_dims}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Landmarks (k1): {Colors.BOLD}{k1 if k1 > 0 else 'all points'}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Initialization: {Colors.BOLD}{initialize}{Colors.ENDC}")
     
     adata = adata.copy() if copy else adata
     X = _choose_representation(adata, use_rep=use_rep, n_pcs=n_pcs)
@@ -125,8 +128,7 @@ def sude(
     # Validate parameters
     n_obs = X.shape[0]
     if k1 >= n_obs and k1 > 0:
-        print(f"{EMOJI['warning']} {Colors.WARNING}k1 ({k1}) is larger than or equal to the number of observations ({n_obs}).{Colors.ENDC}")
-        print(f"{Colors.WARNING}    Setting k1 to 0 to use all points as landmarks.{Colors.ENDC}")
+        print(f"   {EMOJI['warning']} {Colors.WARNING}k1 ({Colors.BOLD}{k1}{Colors.ENDC}{Colors.WARNING}) ≥ observations ({Colors.BOLD}{n_obs}{Colors.ENDC}{Colors.WARNING}), using all points as landmarks{Colors.ENDC}")
         k1 = 0
     
     if initialize not in ['le', 'pca', 'mds']:
@@ -139,9 +141,14 @@ def sude(
         raise ValueError(f"T_epoch must be positive, got {T_epoch}")
     
     # Run SUDE
-    print(f"{Colors.BLUE}    Using SUDE dimensionality reduction{Colors.ENDC}")
-    print(f"{Colors.GREEN}    Parameters: dims={no_dims}, k1={k1}, normalize={normalize}, large={large}{Colors.ENDC}")
-    print(f"{Colors.GREEN}    Initialize={initialize}, agg_coef={agg_coef}, T_epoch={T_epoch}{Colors.ENDC}")
+    print(f"   {Colors.GREEN}{EMOJI['start']} Computing SUDE embedding...{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Parameters:{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Dimensions: {Colors.BOLD}{no_dims}{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• K1 landmarks: {Colors.BOLD}{k1}{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Normalize: {Colors.BOLD}{normalize}{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Large scale: {Colors.BOLD}{large}{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Aggregation coef: {Colors.BOLD}{agg_coef}{Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Max epochs: {Colors.BOLD}{T_epoch}{Colors.ENDC}")
     
     try:
         X_sude = sude_py(
@@ -155,7 +162,7 @@ def sude(
             T_epoch=T_epoch,
         )
     except Exception as e:
-        print(f"{EMOJI['error']} {Colors.FAIL}SUDE failed: {e}{Colors.ENDC}")
+        print(f"   {EMOJI['error']} {Colors.FAIL}SUDE computation failed: {Colors.BOLD}{str(e)}{Colors.ENDC}")
         raise
 
     # Update AnnData instance
@@ -173,9 +180,10 @@ def sude(
     adata.obsm[key_obsm] = X_sude  # annotate samples with SUDE coordinates
     adata.uns[key_uns] = dict(params={k: v for k, v in params.items() if v is not None})
 
-    print(f"{EMOJI['done']} SUDE completed successfully.")
-    print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
-    print(f"{Colors.CYAN}        {key_obsm!r}, SUDE coordinates (adata.obsm){Colors.ENDC}")
-    print(f"{Colors.CYAN}        {key_uns!r}, SUDE parameters (adata.uns){Colors.ENDC}")
+    print(f"\n{Colors.GREEN}{EMOJI['done']} SUDE Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{X_sude.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{X_sude.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_obsm}': {Colors.BOLD}SUDE coordinates{Colors.ENDC}{Colors.CYAN} (adata.obsm){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_uns}': {Colors.BOLD}SUDE parameters{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
 
     return adata if copy else None

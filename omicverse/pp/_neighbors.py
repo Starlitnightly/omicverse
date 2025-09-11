@@ -35,6 +35,8 @@ from scanpy import logging as logg
 from scanpy._compat import  old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView, _doc_params, get_literal_vals
+
+from .._settings import EMOJI, Colors, settings as ov_settings
 from scanpy.neighbors import _connectivity
 from scanpy.neighbors._common import (
     _get_indices_distances_from_sparse_matrix,
@@ -202,6 +204,19 @@ def neighbors(  # noqa: PLR0913
     :doc:`/how-to/knn-transformers`
 
     """
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} K-Nearest Neighbors Graph Construction:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{ov_settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Neighbors: {Colors.BOLD}{n_neighbors}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Method: {Colors.BOLD}{method}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Metric: {Colors.BOLD}{metric}{Colors.ENDC}")
+    if transformer is not None:
+        transformer_name = transformer if isinstance(transformer, str) else type(transformer).__name__
+        print(f"   {Colors.CYAN}Transformer: {Colors.BOLD}{transformer_name}{Colors.ENDC}")
+    if use_rep is not None:
+        print(f"   {Colors.CYAN}Representation: {Colors.BOLD}{use_rep}{Colors.ENDC}")
+    if n_pcs is not None:
+        print(f"   {Colors.CYAN}PCs used: {Colors.BOLD}{n_pcs}{Colors.ENDC}")
+    
     start = logg.info("computing neighbors")
     adata = adata.copy() if copy else adata
     if adata.is_view:  # we shouldn't need this here...
@@ -252,6 +267,14 @@ def neighbors(  # noqa: PLR0913
 
     if neighbors.rp_forest is not None:
         neighbors_dict["rp_forest"] = neighbors.rp_forest
+    print(f"\n{Colors.GREEN}{EMOJI['done']} KNN Graph Construction Completed Successfully!{Colors.ENDC}")
+    n_cells = adata.shape[0]
+    print(f"   {Colors.GREEN}✓ Processed: {Colors.BOLD}{n_cells:,}{Colors.ENDC}{Colors.GREEN} cells with {Colors.BOLD}{neighbors.n_neighbors}{Colors.ENDC}{Colors.GREEN} neighbors each{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_added}': {Colors.BOLD}Neighbors metadata{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{dists_key}': {Colors.BOLD}Distance matrix{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{conns_key}': {Colors.BOLD}Connectivity matrix{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
+    
     logg.info(
         "    finished",
         time=start,
@@ -575,11 +598,13 @@ class Neighbors:
         """
         from scanpy.tools._utils import _choose_representation
 
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing neighbor distances...{Colors.ENDC}")
         start_neighbors = logg.debug("computing neighbors")
         if transformer is not None and not isinstance(transformer, str):
             n_neighbors = transformer.get_params()["n_neighbors"]
         elif n_neighbors > self._adata.shape[0]:  # very small datasets
             n_neighbors = 1 + int(0.5 * self._adata.shape[0])
+            print(f"   {EMOJI['warning']} {Colors.WARNING}Dataset too small: adjusting to {Colors.BOLD}{n_neighbors}{Colors.ENDC}{Colors.WARNING} neighbors{Colors.ENDC}")
             logg.warning(f"n_obs too small: adjusting to `n_neighbors = {n_neighbors}`")
 
         # default keyword arguments when `transformer` is not an instance
@@ -594,6 +619,7 @@ class Neighbors:
         )
 
         if self._adata.shape[0] >= 10000 and not knn:
+            print(f"   {EMOJI['warning']} {Colors.WARNING}Large dataset without knn=True may require significant memory{Colors.ENDC}")
             logg.warning("Using high n_obs without `knn=True` takes a lot of memory...")
         # do not use the cached rp_forest
         self._rp_forest = None
@@ -622,8 +648,13 @@ class Neighbors:
                 with contextlib.suppress(Exception):
                     self._rp_forest = _make_forest_dict(index)
         start_connect = logg.debug("computed neighbors", time=start_neighbors)
-        print(f"method: {method}")
-        method = "torch"
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing connectivity matrix...{Colors.ENDC}")
+        if method == "torch":
+            print(f"   {Colors.CYAN}💡 Using GPU-optimized connectivity computation{Colors.ENDC}")
+        elif method == "umap":
+            print(f"   {Colors.CYAN}💡 Using UMAP-style connectivity{Colors.ENDC}")
+        elif method == "gauss":
+            print(f"   {Colors.CYAN}💡 Using Gaussian kernel connectivity{Colors.ENDC}")
 
         if method == "umap":
             from ._connectivity import umap
@@ -642,6 +673,7 @@ class Neighbors:
             import torch
             from ._connectivity import umap_gpu_optimized
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
             self._connectivities = umap_gpu_optimized(
                 knn_indices,
                 knn_distances,
@@ -659,6 +691,10 @@ class Neighbors:
             self._connected_components = connected_components(self._connectivities)
             self._number_connected_components = self._connected_components[0]
         if method is not None:
+            if self._number_connected_components > 1:
+                print(f"   {EMOJI['warning']} {Colors.WARNING}Found {Colors.BOLD}{self._number_connected_components}{Colors.ENDC}{Colors.WARNING} disconnected components in the graph{Colors.ENDC}")
+            else:
+                print(f"   {Colors.GREEN}✓ Graph is fully connected{Colors.ENDC}")
             logg.debug("computed connectivities", time=start_connect)
 
     def _handle_transformer(
@@ -772,6 +808,9 @@ class Neighbors:
         Makes attributes `.transitions_sym` and `.transitions` available.
 
         """
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing transition matrix...{Colors.ENDC}")
+        if density_normalize:
+            print(f"   {Colors.CYAN}Density normalization: {Colors.BOLD}enabled{Colors.ENDC}")
         start = logg.info("computing transitions")
         W = self._connectivities
         # density normalization as of Coifman et al. (2005)
@@ -795,6 +834,7 @@ class Neighbors:
         else:
             self.Z = sparse.spdiags(1.0 / z, 0, K.shape[0], K.shape[0])
         self._transitions_sym = self.Z @ K @ self.Z
+        print(f"   {Colors.GREEN}✓ Transition matrix computed successfully{Colors.ENDC}")
         logg.info("    finished", time=start)
 
     def compute_eigen(
@@ -858,8 +898,11 @@ class Neighbors:
         if sort == "decrease":
             evals = evals[::-1]
             evecs = evecs[:, ::-1]
+        print(f"   {Colors.GREEN}✓ Computed {Colors.BOLD}{len(evals)}{Colors.ENDC}{Colors.GREEN} eigenvalues/eigenvectors{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Top eigenvalues: {Colors.BOLD}{evals[:min(5, len(evals))]}{Colors.ENDC}")
         logg.info(f"    eigenvalues of transition matrix\n{indent(str(evals), '    ')}")
         if self._number_connected_components > len(evals) / 2:
+            print(f"   {EMOJI['warning']} {Colors.WARNING}Transition matrix has many disconnected components!{Colors.ENDC}")
             logg.warning("Transition matrix has many disconnected components!")
         self._eigen_values = evals
         self._eigen_basis = evecs
@@ -869,9 +912,10 @@ class Neighbors:
         # set iroot directly
         if "iroot" in self._adata.uns:
             if self._adata.uns["iroot"] >= self._adata.n_obs:
+                print(f"   {EMOJI['warning']} {Colors.WARNING}Root cell index {Colors.BOLD}{self._adata.uns['iroot']}{Colors.ENDC}{Colors.WARNING} does not exist for {Colors.BOLD}{self._adata.n_obs}{Colors.ENDC}{Colors.WARNING} samples, ignoring{Colors.ENDC}")
                 msg = (
                     f"Root cell index {self._adata.uns['iroot']} does not "
-                    f"exist for {self._adata.n_obs} samples. It’s ignored."
+                    f"exist for {self._adata.n_obs} samples. It's ignored."
                 )
                 logg.warning(msg)
             else:
@@ -951,5 +995,6 @@ class Neighbors:
                     break
         logg.debug(f"setting root index to {iroot}")
         if self.iroot is not None and iroot != self.iroot:
+            print(f"   {EMOJI['warning']} {Colors.WARNING}Changing root index from {Colors.BOLD}{self.iroot}{Colors.ENDC}{Colors.WARNING} to {Colors.BOLD}{iroot}{Colors.ENDC}")
             logg.warning(f"Changing index of iroot from {self.iroot} to {iroot}.")
         self.iroot = iroot

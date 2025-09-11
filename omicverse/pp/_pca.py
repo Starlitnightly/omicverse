@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload, get_args, get_origin
+from typing import Union as LegacyUnionType
 from warnings import warn
+from functools import reduce
+from operator import or_
 
 import anndata as ad
 import numpy as np
@@ -17,11 +20,78 @@ from .._settings import EMOJI
 from scanpy import logging as logg
 from scanpy._compat import DaskArray, pkg_version
 from scanpy._settings import settings
-from scanpy._utils import _doc_params, _empty, get_literal_vals, is_backed_type
+from scanpy._utils import _doc_params, _empty, is_backed_type
 from scanpy.get import _check_mask, _get_obs_rep
 from scanpy.preprocessing._docs import doc_mask_var_hvg
 from scanpy.preprocessing._pca._compat import _pca_compat_sparse
 from scipy import sparse
+
+# Handle Union types for different Python versions
+try:
+    from types import UnionType
+except ImportError:
+    # Python < 3.10
+    UnionType = type(None)
+
+def get_literal_vals(typ):
+    """Get all literal values from a Literal or Union of ... of Literal type.
+    
+    This is a custom implementation based on scanpy's original function.
+    
+    Parameters
+    ----------
+    typ : type
+        A Literal type or Union of Literal types
+        
+    Returns
+    -------
+    KeysView
+        Keys view of all literal values from the type
+    """
+    # Get the origin and args of the type
+    origin = get_origin(typ)
+    args = get_args(typ)
+    
+    # Handle Union types (both typing.Union and | syntax)
+    if origin is LegacyUnionType:
+        return reduce(
+            or_, (dict.fromkeys(get_literal_vals(t)) for t in args)
+        ).keys()
+    
+    # Handle new Python 3.10+ Union syntax (X | Y)
+    # For | syntax, origin might be None but __class__ could be UnionType
+    try:
+        if hasattr(typ, '__class__') and typ.__class__.__name__ == 'UnionType':
+            return reduce(
+                or_, (dict.fromkeys(get_literal_vals(t)) for t in args)
+            ).keys()
+    except (NameError, AttributeError):
+        pass
+    
+    # Additional check for Union-like structures
+    if hasattr(typ, '__origin__') and typ.__origin__ is LegacyUnionType:
+        return reduce(
+            or_, (dict.fromkeys(get_literal_vals(t)) for t in get_args(typ))
+        ).keys()
+    
+    # Handle | syntax by checking for args when origin is None
+    if origin is None and args and len(args) > 1:
+        # This might be a | union
+        try:
+            return reduce(
+                or_, (dict.fromkeys(get_literal_vals(t)) for t in args)
+            ).keys()
+        except (TypeError, RecursionError):
+            pass
+    
+    # Handle Literal types
+    if origin is Literal:
+        return dict.fromkeys(args).keys()
+    
+    # If it's not a Literal or Union, raise an error
+    msg = f"{typ} is not a valid Literal"
+    raise TypeError(msg)
+
 
 if TYPE_CHECKING:
     from collections.abc import Container

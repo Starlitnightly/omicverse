@@ -14,7 +14,10 @@ import time
 from scipy.sparse import issparse, csr_matrix
 from ..utils import load_signatures_from_file,predefined_signatures
 from ..utils.registry import register_function
-from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference
+from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
+
+
+from ._normalization import normalize_total
 from datetime import datetime
 
 
@@ -50,8 +53,8 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
     data.var["highly_variable_features"] = data.var["robust"]  
     # default all robust genes are "highly" variable
-    print(f"After filtration, {data.shape[1]}/{prior_n} genes are kept. \
-    Among {data.shape[1]} genes, {data.var['robust'].sum()} genes are robust.")
+    print(f"{Colors.BLUE}    After filtration, {data.shape[1]}/{prior_n} genes are kept.{Colors.ENDC}")
+    print(f"{Colors.BLUE}    Among {data.shape[1]} genes, {data.var['robust'].sum()} genes are robust.{Colors.ENDC}")
 
 def calc_mean_and_var(X: Union[csr_matrix, np.ndarray], axis: int) -> Tuple[np.ndarray, np.ndarray]:
     if issparse(X):
@@ -498,16 +501,17 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
 
     # Log-normalization, HVGs identification
     adata.layers['counts'] = adata.X.copy()
-    print('Begin robust gene identification')
+    print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
+    print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
     identify_robust_genes(adata, percent_cells=0.05)
     adata = adata[:, adata.var['robust']]
-    print('End of robust gene identification.')
+    print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
-    print(f'Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
+    print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
     if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         data_load_start = time.time()
         if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
-            sc.pp.normalize_total(
+            normalize_total(
                 adata,
                 target_sum=target_sum,
                 exclude_highly_expressed=True,
@@ -517,10 +521,12 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             
         elif method_list[0] == 'pearson':
             # Perason residuals workflow
-            sc.experimental.pp.normalize_pearson_residuals(adata)
+            from .experimental import normalize_pearson_residuals
+            normalize_pearson_residuals(adata)
 
         if method_list[1] == 'pearson': # Size normalization + scanpy batch aware HVGs selection
-            sc.experimental.pp.highly_variable_genes(
+            from .experimental import highly_variable_genes
+            highly_variable_genes(
                 adata,
                 flavor="pearson_residuals",
                 layer='counts',
@@ -530,7 +536,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             if no_cc:
                 remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
         elif method_list[1] == 'seurat':
-            sc.pp.highly_variable_genes(
+            highly_variable_genes(
                 adata,
                 flavor="seurat_v3",
                 layer='counts',
@@ -540,7 +546,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
             if no_cc:
                 remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
         data_load_end = time.time()
-        print(f'Time to analyze data in cpu: {data_load_end - data_load_start} seconds.')
+        print(f"{Colors.BLUE}    Time to analyze data in cpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
     else:
         import rapids_singlecell as rsc
         data_load_start = time.time()
@@ -567,14 +573,21 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
                 batch_key=batch_key,
             )
         data_load_end = time.time()
-        print(f'Time to analyze data in gpu: {data_load_end - data_load_start} seconds.')
+        print(f"{Colors.BLUE}    Time to analyze data in gpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
 
 
     adata.var = adata.var.drop(columns=['highly_variable_features'])
     adata.var['highly_variable_features'] = adata.var['highly_variable']
     adata.var = adata.var.drop(columns=['highly_variable'])
     #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
-    print(f'End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}')
+    print(f"{EMOJI['done']} Preprocessing completed successfully.")
+    print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
+    print(f"{Colors.CYAN}        'highly_variable_features', boolean vector (adata.var){Colors.ENDC}")
+    print(f"{Colors.CYAN}        'means', float vector (adata.var){Colors.ENDC}")
+    print(f"{Colors.CYAN}        'variances', float vector (adata.var){Colors.ENDC}")
+    print(f"{Colors.CYAN}        'residual_variances', float vector (adata.var){Colors.ENDC}")
+    print(f"{Colors.CYAN}        'counts', raw counts layer (adata.layers){Colors.ENDC}")
+    print(f"{Colors.BLUE}    End of size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
 
     if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
@@ -964,7 +977,8 @@ def neighbors(
     """
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
-        sc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
+        from ._neighbors import neighbors as _neighbors
+        _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,method=method,metric=metric,
                          metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy)
@@ -994,7 +1008,8 @@ def umap(adata, **kwargs):
     try:
         if settings.mode == 'cpu':
             print(f"{EMOJI['cpu']} Using Scanpy CPU UMAP...")
-            sc.tl.umap(adata, **kwargs)
+            from ._umap import umap as _umap
+            _umap(adata, **kwargs)
             add_reference(adata,'umap','UMAP with scanpy')
 
         elif settings.mode == 'cpu-gpu-mixed':
@@ -1177,21 +1192,35 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     # 记录开始时间
     start_time = time.time()
 
-    print("computing neighbors")
+    print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} MDE Dimensionality Reduction:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Embedding dimensions: {Colors.BOLD}{embedding_dim}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Neighbors: {Colors.BOLD}{n_neighbors}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Repulsive fraction: {Colors.BOLD}{repulsive_fraction}{Colors.ENDC}")
+    
     if use_rep is None:
         use_rep='X_pca'
+    print(f"   {Colors.CYAN}Using representation: {Colors.BOLD}{use_rep}{Colors.ENDC}")
     data=adata.obsm[use_rep]
     if n_pcs is None:
         n_pcs=50
+    print(f"   {Colors.CYAN}Principal components: {Colors.BOLD}{n_pcs}{Colors.ENDC}")
     data=data[:,:n_pcs]
 
+    # Determine device based on CUDA availability
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
+    
+    print(f"   {Colors.GREEN}{EMOJI['start']} Computing k-nearest neighbors graph...{Colors.ENDC}")
+    
     if constraint is None:
         _kwargs = {
         "embedding_dim": embedding_dim,
         "constraint": pymde.Standardized(),
         "repulsive_fraction": repulsive_fraction,
         "verbose": verbose,
-        "device": 'cuda',
+        "device": device,
         "n_neighbors": n_neighbors,
     }
     else:
@@ -1200,15 +1229,16 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
         "constraint": constraint,
         "repulsive_fraction": repulsive_fraction,
         "verbose": verbose,
-        "device": 'cuda',
+        "device": device,
         "n_neighbors": n_neighbors,
     }
     #_kwargs.update(kwargs)
     
     gr=pymde.preprocess.k_nearest_neighbors(data,k=n_neighbors)
-
+    
+    print(f"   {Colors.GREEN}{EMOJI['start']} Creating MDE embedding...{Colors.ENDC}")
     mde = pymde.preserve_neighbors(data, **_kwargs)
-    import torch
+    print(f"   {Colors.GREEN}{EMOJI['start']} Optimizing embedding...{Colors.ENDC}")
     emb=mde.embed(verbose=_kwargs["verbose"])
 
     if isinstance(emb, torch.Tensor):
@@ -1263,20 +1293,20 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     adata.obsp[dists_key] = sparse_distance_matrix
     adata.obsp[conns_key] = gr.adjacency_matrix
     adata.obsm[basis]=emb
+    
     # 记录结束时间
     end_time = time.time()
     elapsed_time = end_time - start_time
+    print(f"\n")
+    print(f"{Colors.GREEN}{EMOJI['done']} MDE Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{emb.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{emb.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Runtime: {Colors.BOLD}{elapsed_time:.2f}s{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{basis}': {Colors.BOLD}MDE coordinates{Colors.ENDC}{Colors.CYAN} (adata.obsm){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_added}': {Colors.BOLD}Neighbors metadata{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{dists_key}': {Colors.BOLD}Distance matrix{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{conns_key}': {Colors.BOLD}Connectivity matrix{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
 
-    # 打印结果和日志信息
-    print("    finished: added to `.uns['neighbors']`")
-    print(f"    `.obsm['{basis}']`, MDE coordinates")
-    if key_added is None:
-        print("    `.obsp['distances']`, distances for each pair of neighbors")
-        print("    `.obsp['connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(int(elapsed_time // 60), int(elapsed_time % 60)))
-
-    else:
-        print(f"    `.obsp['{key_added}_distances']`, distances for each pair of neighbors")
-        print("    `.obsp['{}_connectivities']`, weighted adjacency matrix (0:{:02}:{:02})".format(key_added,int(elapsed_time // 60), int(elapsed_time % 60)))
     add_reference(adata,'pymde','MDE with pymde')
     #return emb
 

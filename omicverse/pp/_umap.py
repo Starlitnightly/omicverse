@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING
+from datetime import datetime
 
 import numpy as np
 from sklearn.utils import check_array, check_random_state
@@ -11,15 +12,7 @@ from scanpy._compat import old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView
 from scanpy.tools._utils import _choose_representation, get_init_pos_from_paga
-#from .._settings import EMOJI
-
-EMOJI = {
-    "start": "🚀",
-    "done": "✅",
-    "error": "❌",
-    "warning": "⚠️",
-    "info": "ℹ️",
-}
+from .._settings import EMOJI, Colors, settings as ov_settings
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -104,14 +97,16 @@ def umap(  # noqa: PLR0913, PLR0915
         msg = f"Did not find .uns[{neighbors_key!r}]. Run `sc.pp.neighbors` first."
         raise ValueError(msg)
 
-    start = logg.info(f"computing UMAP{EMOJI['start']}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} UMAP Dimensionality Reduction:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{ov_settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Method: {Colors.BOLD}{method}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Components: {Colors.BOLD}{n_components}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Min distance: {Colors.BOLD}{min_dist}{Colors.ENDC}")
 
     neighbors = NeighborsView(adata, neighbors_key)
 
     if "params" not in neighbors or neighbors["params"]["method"] != "umap":
-        logg.warning(
-            f'.obsp["{neighbors["connectivities_key"]}"] have not been computed using umap'
-        )
+        print(f"   {EMOJI['warning']} {Colors.WARNING}Connectivities matrix was not computed with UMAP method{Colors.ENDC}")
 
     with warnings.catch_warnings():
         # umap 0.5.0
@@ -120,6 +115,11 @@ def umap(  # noqa: PLR0913, PLR0915
 
     from umap.umap_ import find_ab_params, simplicial_set_embedding
 
+    print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP parameters...{Colors.ENDC}")
+    
+    # Convert random_state to proper RandomState object for UMAP and other scanpy functions
+    random_state_processed = check_random_state(random_state)
+    
     if a is None or b is None:
         a, b = find_ab_params(spread, min_dist)
     adata.uns[key_uns] = dict(params=dict(a=a, b=b))
@@ -127,7 +127,7 @@ def umap(  # noqa: PLR0913, PLR0915
         init_coords = adata.obsm[init_pos]
     elif isinstance(init_pos, str) and init_pos == "paga":
         init_coords = get_init_pos_from_paga(
-            adata, random_state=random_state, neighbors_key=neighbors_key
+            adata, random_state=random_state_processed, neighbors_key=neighbors_key
         )
     else:
         init_coords = init_pos  # Let umap handle it
@@ -136,7 +136,6 @@ def umap(  # noqa: PLR0913, PLR0915
 
     if random_state != 0:
         adata.uns[key_uns]["params"]["random_state"] = random_state
-    #random_state = check_random_state(random_state)
 
     neigh_params = neighbors["params"]
     X = _choose_representation(
@@ -146,6 +145,7 @@ def umap(  # noqa: PLR0913, PLR0915
         silent=True,
     )
     if method == "umap":
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (classic method)...{Colors.ENDC}")
         # the data matrix X is really only used for determining the number of connected components
         # for the init condition in the UMAP embedding
         default_epochs = 500 if neighbors["connectivities"].shape[0] <= 10000 else 200
@@ -161,7 +161,7 @@ def umap(  # noqa: PLR0913, PLR0915
             negative_sample_rate=negative_sample_rate,
             n_epochs=n_epochs,
             init=init_coords,
-            random_state=random_state,
+            random_state=random_state_processed,
             metric=neigh_params.get("metric", "euclidean"),
             metric_kwds=neigh_params.get("metric_kwds", {}),
             densmap=False,
@@ -170,9 +170,11 @@ def umap(  # noqa: PLR0913, PLR0915
             verbose=settings.verbosity > 3,
         )
     elif method == "torchdr":
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (TorchDR GPU method)...{Colors.ENDC}")
         from torchdr import UMAP
         import torch
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
         n_neighbors = neighbors["params"]["n_neighbors"]
         n_epochs = (
             500 if maxiter is None else maxiter
@@ -200,6 +202,7 @@ def umap(  # noqa: PLR0913, PLR0915
         gc.collect()
 
     elif method == "mde":
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (MDE method)...{Colors.ENDC}")
         try:
             from pymde import MDE, constraints, penalties, preprocess
             import torch
@@ -207,6 +210,7 @@ def umap(  # noqa: PLR0913, PLR0915
             raise ImportError("Please install pymde package via `pip install pymde`") from err
             
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
         
         # Convert random_state to torch seed
         import pymde
@@ -265,7 +269,7 @@ def umap(  # noqa: PLR0913, PLR0915
             
         except Exception as e:
             # Fallback to simple quadratic penalty if dissimilar edges fail
-            logg.warning(f"Failed to generate dissimilar edges: {str(e)}. Using quadratic penalty instead.")
+            print(f"   {EMOJI['warning']} {Colors.WARNING}Failed to generate dissimilar edges, using quadratic penalty{Colors.ENDC}")
             distortion_function = penalties.Quadratic(weights)
             edges_to_use = edges
         
@@ -347,15 +351,11 @@ def umap(  # noqa: PLR0913, PLR0915
         )
         X_umap = umap.fit_transform(X_contiguous)
     adata.obsm[key_obsm] = X_umap  # annotate samples with UMAP coordinates
-    logg.info(
-        f"    finished {EMOJI['done']}",
-        time=start,
-        deep=(
-            "added\n"
-            f"    {key_obsm!r}, UMAP coordinates (adata.obsm)\n"
-            f"    {key_uns!r}, UMAP parameters (adata.uns)"
-        ),
-    )
+    print(f"\n{Colors.GREEN}{EMOJI['done']} UMAP Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{X_umap.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{X_umap.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_obsm}': {Colors.BOLD}UMAP coordinates{Colors.ENDC}{Colors.CYAN} (adata.obsm){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_uns}': {Colors.BOLD}UMAP parameters{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
     return adata if copy else None
 
 

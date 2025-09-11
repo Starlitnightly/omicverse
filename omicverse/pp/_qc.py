@@ -24,6 +24,8 @@ from ..utils.registry import register_function
 
 
 
+
+
 def mads(meta, cov, nmads=5, lt=None, batch_key=None):
     """
     Calculate Median Absolute Deviation (MAD) thresholds.
@@ -509,11 +511,12 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
         if doublets_method=='scrublet':
+            from ._scrublet import scrublet
             # Post doublets removal QC plot
             print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is too old and may not work properly{Colors.ENDC}")
             print(f"   {Colors.CYAN}💡 Consider using 'doublets_method=sccomposite' for better results{Colors.ENDC}")
             print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
-            sc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
+            scrublet(adata, random_state=1234,batch_key=batch_key)
 
             adata_remove = adata[adata.obs['predicted_doublet'], :]
             removed_cells.extend(list(adata_remove.obs_names))

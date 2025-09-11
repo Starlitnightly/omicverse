@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING
+from datetime import datetime
 
 from packaging.version import Version
 
@@ -11,7 +12,7 @@ from scanpy._settings import settings
 from scanpy._utils import _doc_params, raise_not_implemented_error_if_backed_type
 from scanpy.neighbors._doc import doc_n_pcs, doc_use_rep
 from scanpy.tools._utils import _choose_representation
-from .._settings import EMOJI
+from .._settings import EMOJI, Colors, settings as ov_settings
 
 if TYPE_CHECKING:
     from anndata import AnnData
@@ -118,7 +119,13 @@ def tsne(  # noqa: PLR0913
     """
     import sklearn
 
-    start = logg.info(f"computing tSNE{EMOJI['start']}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} t-SNE Dimensionality Reduction:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{ov_settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Components: {Colors.BOLD}{n_components}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Perplexity: {Colors.BOLD}{perplexity}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Learning rate: {Colors.BOLD}{learning_rate}{Colors.ENDC}")
+    if use_gpu:
+        print(f"   {Colors.CYAN}GPU acceleration: {Colors.BOLD}Enabled{Colors.ENDC}")
     adata = adata.copy() if copy else adata
     X = _choose_representation(adata, use_rep=use_rep, n_pcs=n_pcs)
     raise_not_implemented_error_if_backed_type(X, "tsne")
@@ -158,10 +165,11 @@ def tsne(  # noqa: PLR0913
     # deal with different tSNE implementations
     if use_fast_tsne:
         try:
+            print(f"   {Colors.GREEN}{EMOJI['start']} Computing t-SNE with MulticoreTSNE...{Colors.ENDC}")
             from MulticoreTSNE import MulticoreTSNE as TSNE
 
             tsne = TSNE(**params_sklearn)
-            logg.info("    using the 'MulticoreTSNE' package by Ulyanov (2017)")
+            print(f"   {Colors.CYAN}💡 Using MulticoreTSNE package by Ulyanov (2017){Colors.ENDC}")
             # need to transform to float64 for MulticoreTSNE...
             X_tsne = tsne.fit_transform(X.astype("float64"))
         except ImportError:
@@ -173,6 +181,7 @@ def tsne(  # noqa: PLR0913
             )
     if use_fast_tsne is False:  # In case MultiCore failed to import
         if use_gpu:
+            print(f"   {Colors.GREEN}{EMOJI['start']} Computing t-SNE with GPU acceleration...{Colors.ENDC}")
             from torchdr import TSNE
             import torch
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -185,18 +194,19 @@ def tsne(  # noqa: PLR0913
                 device=device,
             )
             X_tsne = tsne.fit_transform(X)
-            logg.info("    using torchdr.TSNE")
+            print(f"   {Colors.CYAN}💡 Using TorchDR GPU-accelerated t-SNE{Colors.ENDC}")
             del tsne
             import gc
             torch.cuda.empty_cache()
             gc.collect()
         else:
+            print(f"   {Colors.GREEN}{EMOJI['start']} Computing t-SNE with scikit-learn...{Colors.ENDC}")
             from sklearn.manifold import TSNE
 
             # unfortunately, sklearn does not allow to set a minimum number
             # of iterations for barnes-hut tSNE
             tsne = TSNE(**params_sklearn)
-            logg.info("    using sklearn.manifold.TSNE")
+            print(f"   {Colors.CYAN}💡 Using scikit-learn TSNE implementation{Colors.ENDC}")
             X_tsne = tsne.fit_transform(X)
 
     # update AnnData instance
@@ -213,14 +223,10 @@ def tsne(  # noqa: PLR0913
     adata.obsm[key_obsm] = X_tsne  # annotate samples with tSNE coordinates
     adata.uns[key_uns] = dict(params={k: v for k, v in params.items() if v is not None})
 
-    logg.info(
-        f"    finished {EMOJI['done']}",
-        time=start,
-        deep=(
-            f"added\n"
-            f"    {key_obsm!r}, tSNE coordinates (adata.obsm)\n"
-            f"    {key_uns!r}, tSNE parameters (adata.uns)"
-        ),
-    )
+    print(f"\n{Colors.GREEN}{EMOJI['done']} t-SNE Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{X_tsne.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{X_tsne.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_obsm}': {Colors.BOLD}t-SNE coordinates{Colors.ENDC}{Colors.CYAN} (adata.obsm){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• '{key_uns}': {Colors.BOLD}t-SNE parameters{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
 
     return adata if copy else None
