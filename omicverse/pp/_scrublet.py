@@ -18,7 +18,8 @@ from scanpy._compat import old_positionals
 from scanpy.get import _get_obs_rep
 from scanpy.preprocessing._scrublet import pipeline
 from scanpy.preprocessing._scrublet.core import Scrublet
-from .._settings import EMOJI
+from .._settings import EMOJI, Colors, settings
+from datetime import datetime
 
 
 from importlib.util import find_spec
@@ -37,9 +38,12 @@ from scanpy.preprocessing._scrublet import pipeline
 from scanpy.preprocessing._scrublet.core import Scrublet
 
 if TYPE_CHECKING:
+    from typing import Literal
     from scanpy._compat import _LegacyRandom
     from scanpy.neighbors import _Metric, _MetricFn
 
+from ._normalization import normalize_total
+from ._highly_variable_genes import highly_variable_genes
 
 @old_positionals(
     "batch_key",
@@ -123,7 +127,9 @@ def scrublet(
     if copy:
         adata = adata.copy()
 
-    start = logg.info(f"Running Scrublet{EMOJI['start']}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Running Scrublet Doublet Detection:{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{settings.mode}{Colors.ENDC}")
+    print(f"   {Colors.CYAN}Computing doublet prediction using Scrublet algorithm{Colors.ENDC}")
 
     adata_obs = adata.copy()
 
@@ -132,6 +138,7 @@ def scrublet(
         # counts and simulating doublets
 
         if ad_sim is None:
+            print(f"   {Colors.GREEN}{EMOJI['start']} Filtering genes and cells...{Colors.ENDC}")
             pp.filter_genes(ad_obs, min_cells=3)
             pp.filter_cells(ad_obs, min_genes=3)
 
@@ -139,19 +146,21 @@ def scrublet(
             # selection of genes following normalisation and variability filtering. So
             # we need to save the raw and subset at the same time.
 
+            print(f"   {Colors.GREEN}{EMOJI['start']} Normalizing data and selecting highly variable genes...{Colors.ENDC}")
             ad_obs.layers["raw"] = ad_obs.X.copy()
-            pp.normalize_total(ad_obs)
+            normalize_total(ad_obs)
 
             # HVG process needs log'd data.
             ad_obs.layers["log1p"] = ad_obs.X.copy()
             pp.log1p(ad_obs, layer="log1p")
-            pp.highly_variable_genes(ad_obs, layer="log1p")
+            highly_variable_genes(ad_obs, layer="log1p")
             del ad_obs.layers["log1p"]
             ad_obs = ad_obs[:, ad_obs.var["highly_variable"]].copy()
 
             # Simulate the doublets based on the raw expressions from the normalised
             # and filtered object.
 
+            print(f"   {Colors.GREEN}{EMOJI['start']} Simulating synthetic doublets...{Colors.ENDC}")
             ad_sim = scrublet_simulate_doublets(
                 ad_obs,
                 layer="raw",
@@ -166,8 +175,9 @@ def scrublet(
 
             # Now normalise simulated and observed in the same way
 
-            pp.normalize_total(ad_obs, target_sum=1e6)
-            pp.normalize_total(ad_sim, target_sum=1e6)
+            print(f"   {Colors.GREEN}{EMOJI['start']} Normalizing observed and simulated data...{Colors.ENDC}")
+            normalize_total(ad_obs, target_sum=1e6)
+            normalize_total(ad_sim, target_sum=1e6)
 
         ad_obs = _scrublet_call_doublets(
             adata_obs=ad_obs,
@@ -235,7 +245,11 @@ def scrublet(
         adata.obs["predicted_doublet"] = scrubbed["obs"]["predicted_doublet"]
         adata.uns["scrublet"] = scrubbed["uns"]
 
-    logg.info(f"    Scrublet finished{EMOJI['done']}", time=start)
+    print(f"\n{Colors.GREEN}{EMOJI['done']} Scrublet Analysis Completed Successfully!{Colors.ENDC}")
+    print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
+    print(f"     {Colors.CYAN}• 'doublet_score': {Colors.BOLD}Doublet scores{Colors.ENDC}{Colors.CYAN} (adata.obs){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• 'predicted_doublet': {Colors.BOLD}Boolean predictions{Colors.ENDC}{Colors.CYAN} (adata.obs){Colors.ENDC}")
+    print(f"     {Colors.CYAN}• 'scrublet': {Colors.BOLD}Parameters and metadata{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
 
     return adata if copy else None
 
@@ -377,17 +391,17 @@ def _scrublet_call_doublets(
     # than trying to use Scanpy's PCA wrapper of the same functions.
 
     if mean_center:
-        logg.info("Embedding transcriptomes using PCA...")
+        print(f"   {Colors.GREEN}{EMOJI['start']} Embedding transcriptomes using PCA...{Colors.ENDC}")
         pca_torch(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state,use_gpu=use_gpu)
         #pipeline.pca(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state)
     else:
-        logg.info("Embedding transcriptomes using Truncated SVD...")
+        print(f"   {Colors.GREEN}{EMOJI['start']} Embedding transcriptomes using Truncated SVD...{Colors.ENDC}")
         pipeline.truncated_svd(
             scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state
         )
 
     # Score the doublets
-
+    print(f"   {Colors.GREEN}{EMOJI['start']} Calculating doublet scores...{Colors.ENDC}")
     scrub.calculate_doublet_scores(
         use_approx_neighbors=use_approx_neighbors,
         distance_metric=knn_dist_metric,
@@ -395,8 +409,32 @@ def _scrublet_call_doublets(
     )
 
     # Actually call doublets
-
-    scrub.call_doublets(threshold=threshold, verbose=verbose)
+    print(f"   {Colors.GREEN}{EMOJI['start']} Calling doublets with threshold detection...{Colors.ENDC}")
+    scrub.call_doublets(threshold=threshold, verbose=False)  # Suppress scrublet's output
+    
+    # Display formatted scrublet results
+    if hasattr(scrub, 'threshold_'):
+        print(f"   {Colors.CYAN}📊 Automatic threshold: {Colors.BOLD}{scrub.threshold_:.3f}{Colors.ENDC}")
+        
+        # Calculate statistics
+        n_doublets_detected = sum(scrub.predicted_doublets_)
+        detection_rate = n_doublets_detected / len(scrub.predicted_doublets_) * 100
+        print(f"   {Colors.CYAN}📈 Detected doublet rate: {Colors.BOLD}{detection_rate:.1f}%{Colors.ENDC}")
+        
+        # Show expected vs estimated
+        expected_rate = expected_doublet_rate * 100
+        if hasattr(scrub, 'doublet_scores_sim_') and len(scrub.doublet_scores_sim_) > 0:
+            # Estimate detectable fraction (simplified calculation)
+            sim_scores_above_threshold = sum(scrub.doublet_scores_sim_ > scrub.threshold_)
+            detectable_fraction = sim_scores_above_threshold / len(scrub.doublet_scores_sim_) * 100
+            estimated_rate = detection_rate / (detectable_fraction / 100) if detectable_fraction > 0 else detection_rate
+            
+            print(f"   {Colors.CYAN}🔍 Detectable doublet fraction: {Colors.BOLD}{detectable_fraction:.1f}%{Colors.ENDC}")
+            print(f"   {Colors.BLUE}📊 Overall doublet rate comparison:{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Expected: {Colors.BOLD}{expected_rate:.1f}%{Colors.ENDC}")
+            print(f"     {Colors.CYAN}• Estimated: {Colors.BOLD}{estimated_rate:.1f}%{Colors.ENDC}")
+    else:
+        print(f"   {Colors.WARNING}⚠️ Could not determine automatic threshold - manual threshold may be needed{Colors.ENDC}")
 
     # Store results in AnnData for return
 
