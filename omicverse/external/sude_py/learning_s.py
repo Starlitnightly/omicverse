@@ -9,6 +9,8 @@ from .mds import mds
 import numpy as np
 from tqdm import tqdm
 
+from scipy.sparse.linalg import eigsh, LinearOperator
+
 
 def learning_s(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch):
     """
@@ -62,15 +64,40 @@ def learning_s(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef,
     P = (P + P.transpose()) / 2
 
     # Initialize embedding Y of landmarks
+
+    # Initialize embedding Y of landmarks
     if initialize == 'le':
-        Dg = diags(np.array(np.sum(P, axis=0)))
-        L = np.sqrt(Dg) @ (Dg - P) @ np.sqrt(Dg)
-        eigenvalues, eigenvectors = eigs(L, k=no_dims + 1, which='SM')
-        smallest_indices = np.argsort(np.abs(eigenvalues))
-        Y = np.real(eigenvectors[:, smallest_indices[1:]])
-        del Dg, L
+        # 归一化图拉普拉斯：L = I - D^{-1/2} P D^{-1/2}
+        # 注：若 P 对称，axis=0/1 求和等价；此处沿用你原实现的 axis=0。
+        deg = np.asarray(P.sum(axis=0)).ravel()
+
+        # 避免度为0导致的除零
+        d_inv_sqrt = np.zeros_like(deg, dtype=float)
+        nz = deg > 0
+        d_inv_sqrt[nz] = 1.0 / np.sqrt(deg[nz])
+
+        n = P.shape[0]
+
+        # 通过 LinearOperator 隐式实现 L 的 matvec，避免显式构造大矩阵
+        def matvec(x):
+            # y = D^{-1/2} P D^{-1/2} x
+            y = P @ (d_inv_sqrt * x)
+            y = d_inv_sqrt * y
+            return x - y  # (I - D^{-1/2} P D^{-1/2}) x
+
+        Lop = LinearOperator((n, n), matvec=matvec, dtype=float)
+
+        # 取最小的 k 个特征对（含零特征值），丢掉首个零特征向量
+        k = min(no_dims + 1, max(2, n - 1))
+        vals, vecs = eigsh(Lop, k=k, which='SM')
+
+        # 保险起见按特征值从小到大排序后丢第一列
+        order = np.argsort(vals)
+        Y = np.ascontiguousarray(vecs[:, order[1:no_dims+1]])
+
     elif initialize == 'pca':
         Y = pca(X_samp, no_dims)
+
     elif initialize == 'mds':
         Y = mds(X_samp, no_dims)
 

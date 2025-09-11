@@ -25,10 +25,13 @@ def pca(X, no_dims, use_gpu=True, verbose=False):
     """
     # Detect optimal device and PCA backend
     device_info = _detect_optimal_pca_backend(use_gpu, verbose)
+
+    from ..._settings import settings
+    omicverse_mode = getattr(settings, 'mode', 'cpu')
     
-    if device_info['backend'] == 'mlx' and device_info['device'] == 'mps':
+    if device_info['backend'] == 'mlx' and device_info['device'] == 'mps' and omicverse_mode != 'cpu':
         return _pca_mlx(X, no_dims, verbose)
-    elif device_info['backend'] == 'torchdr' and device_info['device'] == 'cuda':
+    elif device_info['backend'] == 'torchdr' and device_info['device'] == 'cuda' and omicverse_mode != 'cpu':
         return _pca_torchdr(X, no_dims, verbose)
     else:
         # Fallback to CPU implementation
@@ -69,7 +72,7 @@ def _detect_optimal_pca_backend(use_gpu=True, verbose=False):
         else:
             device_type = str(device)
             
-        if device_type == 'mps' and use_gpu:
+        if device_type == 'mps' and use_gpu and omicverse_mode != 'cpu':
             # Try MLX for Apple Silicon
             try:
                 import mlx.core as mx
@@ -78,7 +81,7 @@ def _detect_optimal_pca_backend(use_gpu=True, verbose=False):
             except ImportError:
                 pass
                 
-        elif device_type == 'cuda' and use_gpu:
+        elif device_type == 'cuda' and use_gpu and omicverse_mode != 'cpu':
             # Try TorchDR for CUDA
             try:
                 import torchdr
