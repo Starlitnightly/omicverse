@@ -1207,10 +1207,19 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
     print(f"   {Colors.CYAN}Principal components: {Colors.BOLD}{n_pcs}{Colors.ENDC}")
     data=data[:,:n_pcs]
 
-    # Determine device based on CUDA availability
+    # Determine device based on available accelerators
     import torch
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
+    from ._settings import get_optimal_device, prepare_data_for_device
+    device = get_optimal_device(prefer_gpu=True, verbose=True)
+    
+    # Convert device to string for PyMDE compatibility
+    if hasattr(device, 'type'):
+        device_str = device.type
+    else:
+        device_str = str(device)
+    
+    # Prepare data for MPS compatibility (float32 requirement)
+    data = prepare_data_for_device(data, device, verbose=True)
     
     print(f"   {Colors.GREEN}{EMOJI['start']} Computing k-nearest neighbors graph...{Colors.ENDC}")
     
@@ -1220,7 +1229,7 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
         "constraint": pymde.Standardized(),
         "repulsive_fraction": repulsive_fraction,
         "verbose": verbose,
-        "device": device,
+        "device": device_str,
         "n_neighbors": n_neighbors,
     }
     else:
@@ -1229,7 +1238,7 @@ def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=
         "constraint": constraint,
         "repulsive_fraction": repulsive_fraction,
         "verbose": verbose,
-        "device": device,
+        "device": device_str,
         "n_neighbors": n_neighbors,
     }
     #_kwargs.update(kwargs)

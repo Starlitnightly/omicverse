@@ -184,7 +184,13 @@ def tsne(  # noqa: PLR0913
             print(f"   {Colors.GREEN}{EMOJI['start']} Computing t-SNE with GPU acceleration...{Colors.ENDC}")
             from torchdr import TSNE
             import torch
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            from .._settings import get_optimal_device, prepare_data_for_device
+            
+            device = get_optimal_device(prefer_gpu=True, verbose=True)
+            
+            # Prepare data for MPS compatibility (float32 requirement)
+            X = prepare_data_for_device(X, device, verbose=True)
+            
             tsne = TSNE(
                 perplexity=perplexity,
                 random_state=random_state,
@@ -194,10 +200,13 @@ def tsne(  # noqa: PLR0913
                 device=device,
             )
             X_tsne = tsne.fit_transform(X)
-            print(f"   {Colors.CYAN}💡 Using TorchDR GPU-accelerated t-SNE{Colors.ENDC}")
+            print(f"   {Colors.CYAN}💡 Using TorchDR GPU-accelerated t-SNE on {device}{Colors.ENDC}")
             del tsne
             import gc
-            torch.cuda.empty_cache()
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()
+            elif device.type == 'mps':
+                torch.mps.empty_cache()
             gc.collect()
         else:
             print(f"   {Colors.GREEN}{EMOJI['start']} Computing t-SNE with scikit-learn...{Colors.ENDC}")

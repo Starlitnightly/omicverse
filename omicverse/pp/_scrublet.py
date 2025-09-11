@@ -538,17 +538,58 @@ def pca_torch(
     if use_gpu:
         if svd_solver == "auto":
             svd_solver = "gesvd"
-        try:
-            from torchdr import PCA
-        except ImportError:
-            raise ImportError("torchdr is not installed. Please install it using `pip install torchdr`.")
+        
         import torch
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        from .._settings import get_optimal_device, prepare_data_for_device
+        device = get_optimal_device(prefer_gpu=True, verbose=True)
+        
+        # Use MLX for MPS devices (Apple Silicon optimization)
+        if device.type == 'mps':
+            try:
+                from ._pca_mlx import MLXPCA, MockPCA
+                print(f"   {Colors.GREEN}{EMOJI['gpu']} Using MLX PCA for Apple Silicon MPS acceleration in scrublet{Colors.ENDC}")
+                print(f"   {Colors.GREEN}{EMOJI['gpu']} MLX PCA backend: Apple Silicon GPU acceleration (scrublet){Colors.ENDC}")
+                
+                # Create MLX PCA instance (use "metal" for MLX)
+                mlx_pca = MLXPCA(n_components=n_prin_comps, device="metal")
+                
+                # Fit and transform
+                X_obs_transformed = mlx_pca.fit_transform(X_obs)
+                X_sim_transformed = mlx_pca.transform(X_sim)
+                
+                # Create a mock PCA object with sklearn-compatible interface
+                pca = MockPCA(mlx_pca)
+                # Set manifold directly since we already have transformed data
+                self.set_manifold(X_obs_transformed, X_sim_transformed)
+                
+            except (ImportError, Exception) as e:
+                print(f"   {EMOJI['warning']} {Colors.WARNING}MLX PCA failed in scrublet ({str(e)}), falling back to sklearn for MPS device{Colors.ENDC}")
+                print(f"   {EMOJI['warning']} {Colors.WARNING}sklearn PCA backend: MPS device fallback (scrublet){Colors.ENDC}")
+                # For MPS devices, fall back to sklearn instead of TorchDR
+                from sklearn.decomposition import PCA
+                
+                pca = PCA(
+                    n_components=n_prin_comps, random_state=random_state, svd_solver="arpack",
+                ).fit(X_obs)
+                self.set_manifold(pca.transform(X_obs), pca.transform(X_sim))
+        else:
+            # Use TorchDR for non-MPS GPU devices (CUDA, etc.)
+            print(f"   {Colors.GREEN}{EMOJI['gpu']} Using TorchDR PCA for {device.type.upper()} GPU acceleration in scrublet{Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['gpu']} TorchDR PCA backend: {device.type.upper()} GPU acceleration (scrublet){Colors.ENDC}")
+            
+            try:
+                from torchdr import PCA
+            except ImportError:
+                raise ImportError("torchdr is not installed. Please install it using `pip install torchdr`.")
+            
+            # Prepare data for GPU compatibility (float32 requirement)
+            X_obs = prepare_data_for_device(X_obs, device, verbose=True)
 
-        pca = PCA(
-            n_components=n_prin_comps, random_state=None, svd_driver=svd_solver,
-            device=device,
-        ).fit(X_obs)
+            pca = PCA(
+                n_components=n_prin_comps, random_state=None, svd_driver=svd_solver,
+                device=device,
+            ).fit(X_obs)
+            self.set_manifold(pca.transform(X_obs), pca.transform(X_sim))
     else:
         from sklearn.decomposition import PCA
         if svd_solver == "auto":
@@ -556,5 +597,5 @@ def pca_torch(
         pca = PCA(
             n_components=n_prin_comps, random_state=random_state, svd_solver=svd_solver,
         ).fit(X_obs)
-    self.set_manifold(pca.transform(X_obs), pca.transform(X_sim))
+        self.set_manifold(pca.transform(X_obs), pca.transform(X_sim))
 

@@ -311,18 +311,56 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
     #print(f"{EMOJI['done']} Warnings suppressed")
 
     # 5) GPU detection
-    print(f"{EMOJI['gpu']} Detecting CUDA devices…")
-    if torch is None or not torch.cuda.is_available():
-        print(f"{EMOJI['warnings']} No CUDA devices found")
-    else:
+    print(f"{EMOJI['gpu']} Detecting GPU devices…")
+    gpu_found = False
+    
+    # Check CUDA devices
+    if torch is not None and torch.cuda.is_available():
         try:
-            for idx in range(torch.cuda.device_count()):
+            cuda_count = torch.cuda.device_count()
+            print(f"{EMOJI['done']} NVIDIA CUDA GPUs detected: {cuda_count}")
+            for idx in range(cuda_count):
                 props = torch.cuda.get_device_properties(idx)
-                print(f"{EMOJI['done']} [GPU {idx}] {props.name}")
-                print(f"    • Total memory: {props.total_memory/1024**3:.1f} GB")
-                print(f"    • Compute capability: {props.major}.{props.minor}")
+                print(f"    • [CUDA {idx}] {props.name}")
+                print(f"      Memory: {props.total_memory/1024**3:.1f} GB | Compute: {props.major}.{props.minor}")
+            gpu_found = True
         except Exception as e:
-            print(f"{EMOJI['warnings']} GPU detection failed: {e}")
+            print(f"{EMOJI['warnings']} CUDA detection failed: {e}")
+    
+    # Check Apple Silicon MPS
+    if torch is not None and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        try:
+            print(f"{EMOJI['done']} Apple Silicon MPS detected")
+            print(f"    • [MPS] Apple Silicon GPU - Metal Performance Shaders available")
+            gpu_found = True
+        except Exception as e:
+            print(f"{EMOJI['warnings']} MPS detection failed: {e}")
+    
+    # Check AMD ROCm
+    if torch is not None and hasattr(torch.version, 'hip') and torch.version.hip is not None:
+        try:
+            print(f"{EMOJI['done']} AMD ROCm GPU detected")
+            print(f"    • [ROCm] AMD GPU - HIP version: {torch.version.hip}")
+            gpu_found = True
+        except Exception as e:
+            print(f"{EMOJI['warnings']} ROCm detection failed: {e}")
+    
+    # Check Intel XPU
+    if torch is not None and hasattr(torch, 'xpu') and torch.xpu.is_available():
+        try:
+            xpu_count = torch.xpu.device_count()
+            print(f"{EMOJI['done']} Intel XPU detected: {xpu_count}")
+            for idx in range(xpu_count):
+                print(f"    • [XPU {idx}] Intel GPU")
+            gpu_found = True
+        except Exception as e:
+            print(f"{EMOJI['warnings']} Intel XPU detection failed: {e}")
+    
+    if not gpu_found:
+        if torch is None:
+            print(f"{EMOJI['warnings']} PyTorch not available - GPU detection skipped")
+        else:
+            print(f"{EMOJI['warnings']} No GPU devices found (CUDA/MPS/ROCm/XPU)")
 
     # 6) print logo & version only once
     if not _has_printed_logo:

@@ -13,7 +13,7 @@ from anndata import AnnData
 from packaging.version import Version
 from sklearn.utils import check_random_state
 
-from .._settings import EMOJI
+from .._settings import EMOJI, Colors
 
 
 
@@ -352,23 +352,89 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
         incremental_pca_kwargs = dict()
         if use_gpu and not isinstance(X, DaskArray):
-            from torchdr import IncrementalPCA
             from numpy import zeros
             import torch
             import gc
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            X_pca = zeros((X.shape[0], n_comps), X.dtype)
-            torch.cuda.reset_peak_memory_stats(device)
-            pca_ = IncrementalPCA(n_components=n_comps, device=device, 
-                                  batch_size=chunk_size,
-                                  **incremental_pca_kwargs)
-            pca_.fit(X, check_input=True)
-            X_pca = pca_.transform(X)
-            # Reset GPU memory stats before fitting.
+            from .._settings import get_optimal_device, prepare_data_for_device
+            device = get_optimal_device(prefer_gpu=True, verbose=True)
             
-            del pca_
-            torch.cuda.empty_cache()
-            gc.collect()
+            
+            # For MPS devices, use MLX PCA instead of TorchDR
+            if device.type == 'mps':
+                try:
+                    from ._pca_mlx import MLXPCA, MockPCA
+                    logg.info(f"   {EMOJI['gpu']} Using MLX PCA for MPS device (chunked)")
+                    print(f"   {Colors.GREEN}{EMOJI['gpu']} MLX PCA backend: Apple Silicon GPU chunked computation{Colors.ENDC}")
+                    
+                    # For chunked computation, we need to fit on all data first
+                    # Collect all chunks and fit MLX PCA
+                    all_chunks = []
+                    for chunk, _, _ in adata_comp.chunked_X(chunk_size):
+                        chunk_dense = chunk.toarray() if isinstance(chunk, CSBase) else chunk
+                        all_chunks.append(chunk_dense)
+                    
+                    # Concatenate all chunks
+                    X_full = np.vstack(all_chunks)
+                    
+                    # Fit MLX PCA
+                    mlx_pca = MLXPCA(n_components=n_comps, device="metal")
+                    mlx_pca.fit(X_full)
+                    
+                    # Transform each chunk
+                    X_pca = zeros((X.shape[0], n_comps), X.dtype)
+                    start_idx = 0
+                    for chunk, _, _ in adata_comp.chunked_X(chunk_size):
+                        chunk_dense = chunk.toarray() if isinstance(chunk, CSBase) else chunk
+                        end_idx = start_idx + chunk_dense.shape[0]
+                        X_pca[start_idx:end_idx] = mlx_pca.transform(chunk_dense)
+                        start_idx = end_idx
+                    
+                    # Create a mock PCA object with sklearn-compatible interface
+                    pca_ = MockPCA(mlx_pca)
+                    
+                except (ImportError, Exception) as e:
+                    logg.info(f"   {EMOJI['warning']} MLX PCA failed ({str(e)}), falling back to sklearn for MPS device (chunked)")
+                    print(f"   {EMOJI['warning']} {Colors.WARNING}MLX PCA failed, using sklearn IncrementalPCA backend for MPS device{Colors.ENDC}")
+                    
+                    from sklearn.decomposition import IncrementalPCA
+                    X_pca = zeros((X.shape[0], n_comps), X.dtype)
+                    
+                    pca_ = IncrementalPCA(n_components=n_comps, **incremental_pca_kwargs)
+                    
+                    for chunk, _, _ in adata_comp.chunked_X(chunk_size):
+                        chunk_dense = chunk.toarray() if isinstance(chunk, CSBase) else chunk
+                        pca_.partial_fit(chunk_dense)
+
+                    for chunk, start, end in adata_comp.chunked_X(chunk_size):
+                        chunk_dense = chunk.toarray() if isinstance(chunk, CSBase) else chunk
+                        X_pca[start:end] = pca_.transform(chunk_dense)
+            else:
+                # Use TorchDR for non-MPS GPU devices (CUDA, etc.)
+                logg.info(f"   {EMOJI['gpu']} Using TorchDR IncrementalPCA for {device.type.upper()} GPU (chunked)")
+                print(f"   {EMOJI['gpu']} TorchDR IncrementalPCA backend: {device.type.upper()} GPU chunked computation")
+                
+                from torchdr import IncrementalPCA
+                
+                # Prepare data for GPU compatibility (float32 requirement)
+                X = prepare_data_for_device(X, device, verbose=True)
+                X_pca = zeros((X.shape[0], n_comps), X.dtype)
+                
+                # Reset memory stats only for CUDA devices
+                if device.type == 'cuda':
+                    torch.cuda.reset_peak_memory_stats(device)
+                
+                pca_ = IncrementalPCA(n_components=n_comps, device=device, 
+                                      batch_size=chunk_size,
+                                      **incremental_pca_kwargs)
+                pca_.fit(X, check_input=True)
+                X_pca = pca_.transform(X)
+                
+                del pca_
+                gc.collect()
+                
+                # Clear cache based on device type
+                if device.type == 'cuda':
+                    torch.cuda.empty_cache()
 
         else:
             if isinstance(X, DaskArray):
@@ -419,29 +485,77 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         else:
             if not isinstance(X, DaskArray):
                 if use_gpu:
-                    if svd_solver == "auto":
-                        svd_solver = "gesvd"
-                    if svd_solver not in ["gesvd", "gesvdj", "gesvda"]:
-                        svd_solver = "gesvd"
-                    from torchdr import  PCA
-                    import torch
-                    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                    from .._settings import get_optimal_device, prepare_data_for_device
+                    device = get_optimal_device(prefer_gpu=True, verbose=True)
+                    
+                    # Use MLX for MPS devices (Apple Silicon optimization)
+                    if device.type == 'mps':
+                        try:
+                            from ._pca_mlx import MLXPCA, MockPCA
+                            logg.info(f"   {EMOJI['gpu']} Using MLX PCA for Apple Silicon MPS acceleration")
+                            print(f"   {Colors.GREEN}{EMOJI['gpu']} MLX PCA backend: Apple Silicon GPU acceleration{Colors.ENDC}")
+                            
+                            # Create MLX PCA instance (use "metal" for MLX)
+                            mlx_pca = MLXPCA(n_components=n_comps, device="metal")
+                            
+                            # Fit and transform
+                            X_pca = mlx_pca.fit_transform(X)
+                            
+                            # Create a mock PCA object with sklearn-compatible interface
+                            pca_ = MockPCA(mlx_pca)
+                            
+                        except (ImportError, Exception) as e:
+                            logg.info(f"   {EMOJI['warning']} MLX PCA failed ({str(e)}), falling back to sklearn for MPS device")
+                            print(f"   {EMOJI['warning']} {Colors.WARNING}MLX PCA failed, using sklearn backend for MPS device{Colors.ENDC}")
+                            # For MPS devices, fall back to sklearn instead of TorchDR
+                            from sklearn.decomposition import PCA
+                            
+                            svd_solver = _handle_sklearn_args(
+                                svd_solver, PCA, sparse=isinstance(X, CSBase)
+                            )
+                            pca_ = PCA(
+                                n_components=n_comps,
+                                svd_solver=svd_solver,
+                                random_state=random_state,
+                            )
+                            X_pca = pca_.fit_transform(X)
+                    else:
+                        # Use TorchDR for non-MPS GPU devices (CUDA, etc.)
+                        logg.info(f"   {EMOJI['gpu']} Using TorchDR PCA for {device.type.upper()} GPU acceleration")
+                        print(f"   {Colors.GREEN}{EMOJI['gpu']} TorchDR PCA backend: {device.type.upper()} GPU acceleration{Colors.ENDC}")
+                        
+                        if svd_solver == "auto":
+                            svd_solver = "gesvd"
+                        if svd_solver not in ["gesvd", "gesvdj", "gesvda"]:
+                            svd_solver = "gesvd"
+                        from torchdr import  PCA
+                        import torch
+                        
+                        # Prepare data for GPU compatibility (float32 requirement)
+                        X = prepare_data_for_device(X, device, verbose=True)
+                        
+                        pca_ = PCA(
+                            n_components=n_comps,
+                            device=device,
+                            svd_driver=svd_solver,
+                            random_state=random_state,
+                        )
+                        X_pca = pca_.fit_transform(X)
+                else:
+                    logg.info(f"   {EMOJI['cpu']} Using sklearn PCA for CPU computation")
+                    print(f"   {Colors.CYAN}{EMOJI['cpu']} sklearn PCA backend: CPU computation{Colors.ENDC}")
+                    
+                    from sklearn.decomposition import PCA
+
+                    svd_solver = _handle_sklearn_args(
+                        svd_solver, PCA, sparse=isinstance(X, CSBase)
+                    )
                     pca_ = PCA(
                         n_components=n_comps,
-                        device=device,
-                        svd_driver=svd_solver,
+                        svd_solver=svd_solver,
                         random_state=random_state,
                     )
-                from sklearn.decomposition import PCA
-
-                svd_solver = _handle_sklearn_args(
-                    svd_solver, PCA, sparse=isinstance(X, CSBase)
-                )
-                pca_ = PCA(
-                    n_components=n_comps,
-                    svd_solver=svd_solver,
-                    random_state=random_state,
-                )
+                    X_pca = pca_.fit_transform(X)
             elif isinstance(X._meta, CSBase) or svd_solver == "covariance_eigh":
                 from ._dask import PCAEighDask
 
@@ -592,16 +706,16 @@ def _handle_dask_ml_args(svd_solver: str | None, method: MethodDaskML) -> SvdSol
 
     args: AbstractSet[SvdSolvDaskML]
     default: SvdSolvDaskML
-    match method:
-        case dmld.PCA | dmld.IncrementalPCA:
-            args = get_literal_vals(SvdSolvPCADaskML)
-            default = "auto"
-        case dmld.TruncatedSVD:
-            args = get_literal_vals(SvdSolvTruncatedSVDDaskML)
-            default = "tsqr"
-        case _:
-            msg = f"Unknown {method=} in _handle_dask_ml_args"
-            raise ValueError(msg)
+    
+    if method in (dmld.PCA, dmld.IncrementalPCA):
+        args = get_literal_vals(SvdSolvPCADaskML)
+        default = "auto"
+    elif method == dmld.TruncatedSVD:
+        args = get_literal_vals(SvdSolvTruncatedSVDDaskML)
+        default = "tsqr"
+    else:
+        msg = f"Unknown {method=} in _handle_dask_ml_args"
+        raise ValueError(msg)
     return _handle_x_args(svd_solver, method, args, default)
 
 
