@@ -7,6 +7,7 @@ from .init_pca import init_pca
 from .pca import pca
 from .mds import mds
 import numpy as np
+from tqdm import tqdm
 
 
 def learning_s(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch):
@@ -81,8 +82,9 @@ def learning_s(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef,
     min_alpha = 2 * N
     warm_step = 10
     preGrad = np.zeros((N, no_dims))
-    epoch = 1
-    while epoch <= T_epoch:
+    
+    # Use tqdm for epoch progress tracking
+    for epoch in tqdm(range(1, T_epoch + 1), desc="Training epochs", unit="epoch"):
         # Update learning rate
         if epoch <= warm_step:
             alpha = max_alpha
@@ -101,7 +103,6 @@ def learning_s(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef,
         Y = Y - alpha * (grad + (epoch - 1) / (epoch + 2) * preGrad)
         preGrad = grad
         # Compute KLD cost
-        epoch = epoch + 1
 
-    print(str(epoch - 1) + ' epochs have been computed!')
+    #print(str(epoch - 1) + ' epochs have been computed!')
     return Y, k2
