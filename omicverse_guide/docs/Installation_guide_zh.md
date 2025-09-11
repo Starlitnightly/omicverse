@@ -221,3 +221,32 @@ OmicVerse 可以通过 conda 或 pip 安装，但首先需要安装 `PyTorch`。
     ```shell
     brew install --cask mambaforge
     ```
+
+!!! info "MacOS `Omp_set_nested` 段错误"
+
+    这通常是由于torch的安装和numpy等冲突了:
+
+    在 conda-forge 上：
+    - macOS：libopenblas=*=*openmp
+    - Linux：libopenblas=*=*pthreads
+
+    ```shell
+    # 1) 先卸载 pip 轮子（关键）
+    pip uninstall -y numpy scipy scikit-learn threadpoolctl torch torchvision torchaudio pytorch-lightning
+
+    # 2) 用 conda-forge 安装干净的 LP64 + OpenBLAS(openmp) 数值栈
+    mamba install -c conda-forge \
+      "numpy>=1.26,<2" "scipy>=1.11,<2" anndata "scanpy>=1.10" pandas \
+      scikit-learn numexpr threadpoolctl \
+      "libblas=*=*openblas" "libopenblas=*=*openmp" libomp
+
+    # 3| Install pytorch with conda
+    mamba install -c pytorch -c conda-forge pytorch torchvision torchaudio
+
+    ```
+
+    ILP64 NumPy（openblas64_）用 64 位整数作为 BLAS 下标；很多 Python 扩展（特别是 SciPy/稀疏/包装层）假定 LP64。一旦混到 LP64/ILP64 交叉调用，很容易崩。
+
+    两个 libomp.dylib 同时加载（来自 torch 和 sklearn 的 pip wheels 的私有 .dylibs）会造成 OpenMP runtime 重复初始化/符号冲突。
+
+    pip + conda 混装使得链接目标不一致：conda 走 OpenBLAS(pthreads)，pip 轮子各自携带 OMP/BLAS 或用 Accelerate，彼此不见得 ABI 兼容。

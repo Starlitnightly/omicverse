@@ -94,13 +94,144 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     torch = None
 
+def check_acceleration_packages():
+    """
+    Check which acceleration packages are installed and provide installation guidance.
+    
+    Returns
+    -------
+    dict
+        Dictionary containing installation status and recommendations
+    """
+    status = {
+        'torchdr': {'installed': False, 'recommended': False, 'device': 'cuda'},
+        'mlx': {'installed': False, 'recommended': False, 'device': 'mps'},
+        'torch': {'installed': False, 'recommended': False, 'device': 'any'}
+    }
+    
+    # Check PyTorch
+    try:
+        import torch
+        status['torch']['installed'] = True
+        status['torch']['recommended'] = True
+    except ImportError:
+        pass
+    
+    # Check TorchDR
+    try:
+        import torchdr
+        status['torchdr']['installed'] = True
+        status['torchdr']['recommended'] = True
+    except ImportError:
+        if torch is not None and torch.cuda.is_available():
+            status['torchdr']['recommended'] = True
+    
+    # Check MLX
+    try:
+        import mlx.core as mx
+        status['mlx']['installed'] = True
+        if mx.metal.is_available():
+            status['mlx']['recommended'] = True
+    except ImportError:
+        if torch is not None and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            status['mlx']['recommended'] = True
+    
+    return status
+
+
+def print_acceleration_status(verbose=True):
+    """
+    Print the current acceleration package status and installation recommendations.
+    
+    Parameters
+    ----------
+    verbose : bool
+        Whether to print detailed information
+    """
+    status = check_acceleration_packages()
+    
+    print(f"{Colors.BLUE}🚀 Omicverse Acceleration Status:{Colors.ENDC}")
+    print("=" * 50)
+    
+    # PyTorch status
+    if status['torch']['installed']:
+        print(f"{Colors.GREEN}✅ PyTorch: Installed{Colors.ENDC}")
+        if verbose:
+            try:
+                import torch
+                print(f"   Version: {torch.__version__}")
+                if torch.cuda.is_available():
+                    print(f"   CUDA: Available ({torch.cuda.device_count()} device(s))")
+                if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                    print(f"   MPS: Available (Apple Silicon)")
+            except:
+                pass
+    else:
+        print(f"{Colors.WARNING}⚠️ PyTorch: Not installed{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Install with: pip install torch{Colors.ENDC}")
+    
+    # TorchDR status
+    if status['torchdr']['installed']:
+        print(f"{Colors.GREEN}✅ TorchDR: Installed{Colors.ENDC}")
+        if verbose:
+            try:
+                import torchdr
+                print(f"   Version: {torchdr.__version__}")
+            except:
+                pass
+    elif status['torchdr']['recommended']:
+        print(f"{Colors.WARNING}⚠️ TorchDR: Not installed (Recommended for CUDA){Colors.ENDC}")
+        print(f"   {Colors.CYAN}Install with: pip install torchdr{Colors.ENDC}")
+        print(f"   {Colors.CYAN}For GPU-accelerated dimensionality reduction{Colors.ENDC}")
+    else:
+        print(f"{Colors.FAIL}❌ TorchDR: Not installed{Colors.ENDC}")
+    
+    # MLX status
+    if status['mlx']['installed']:
+        print(f"{Colors.GREEN}✅ MLX: Installed{Colors.ENDC}")
+        if verbose:
+            try:
+                import mlx.core as mx
+                if mx.metal.is_available():
+                    print(f"   Metal: Available (Apple Silicon GPU)")
+                else:
+                    print(f"   Metal: Not available")
+            except:
+                pass
+    elif status['mlx']['recommended']:
+        print(f"{Colors.WARNING}⚠️ MLX: Not installed (Recommended for Apple Silicon){Colors.ENDC}")
+        print(f"   {Colors.CYAN}Install with: pip install mlx{Colors.ENDC}")
+        print(f"   {Colors.CYAN}For Apple Silicon GPU acceleration{Colors.ENDC}")
+    else:
+        print(f"{Colors.FAIL}❌ MLX: Not installed{Colors.ENDC}")
+    
+    print("=" * 50)
+    
+    # Recommendations
+    recommendations = []
+    if not status['torch']['installed']:
+        recommendations.append("Install PyTorch for basic GPU support")
+    if status['torchdr']['recommended'] and not status['torchdr']['installed']:
+        recommendations.append("Install TorchDR for CUDA-accelerated PCA")
+    if status['mlx']['recommended'] and not status['mlx']['installed']:
+        recommendations.append("Install MLX for Apple Silicon GPU acceleration")
+    
+    if recommendations:
+        print(f"{Colors.CYAN}💡 Recommendations:{Colors.ENDC}")
+        for i, rec in enumerate(recommendations, 1):
+            print(f"   {i}. {rec}")
+    else:
+        print(f"{Colors.GREEN}🎉 All recommended packages are installed!{Colors.ENDC}")
+
+
 def get_optimal_device(prefer_gpu=True, verbose=False):
     """
     Get the optimal PyTorch device based on available hardware.
+    Now includes acceleration package status checking.
     
     Priority order:
-    1. CUDA (NVIDIA GPUs)
-    2. MPS (Apple Silicon)
+    1. CUDA (NVIDIA GPUs) - requires TorchDR for optimal performance
+    2. MPS (Apple Silicon) - requires MLX for optimal performance
     3. ROCm (AMD GPUs) 
     4. XPU (Intel GPUs)
     5. CPU (fallback)
@@ -110,7 +241,7 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
     prefer_gpu : bool
         Whether to prefer GPU over CPU when available
     verbose : bool
-        Whether to print device selection information
+        Whether to print device selection information and acceleration status
         
     Returns
     -------
@@ -120,6 +251,7 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
     if torch is None:
         if verbose:
             print("PyTorch not available, using CPU")
+            print(f"{Colors.WARNING}💡 Install PyTorch for GPU support: pip install torch{Colors.ENDC}")
         return "cpu"
     
     if not prefer_gpu:
@@ -127,17 +259,37 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
             print("GPU preference disabled, using CPU")
         return torch.device("cpu")
     
+    # Check acceleration packages if verbose
+    if verbose:
+        print_acceleration_status(verbose=True)
+        print()  # Add spacing
+    
     # Check devices in priority order
     if torch.cuda.is_available():
         device = torch.device("cuda")
         if verbose:
             print(f"Using CUDA device: {torch.cuda.get_device_name()}")
+            # Check if TorchDR is available for optimal performance
+            try:
+                import torchdr
+                print(f"{Colors.GREEN}✅ TorchDR available for GPU-accelerated PCA{Colors.ENDC}")
+            except ImportError:
+                print(f"{Colors.WARNING}⚠️ TorchDR not installed - install with: pip install torchdr{Colors.ENDC}")
         return device
     
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         device = torch.device("mps")
         if verbose:
             print("Using Apple Silicon MPS device (note: float32 required)")
+            # Check if MLX is available for optimal performance
+            try:
+                import mlx.core as mx
+                if mx.metal.is_available():
+                    print(f"{Colors.GREEN}✅ MLX available for Apple Silicon GPU acceleration{Colors.ENDC}")
+                else:
+                    print(f"{Colors.WARNING}⚠️ MLX Metal not available{Colors.ENDC}")
+            except ImportError:
+                print(f"{Colors.WARNING}⚠️ MLX not installed - install with: pip install mlx{Colors.ENDC}")
         return device
     
     if hasattr(torch.version, 'hip') and torch.version.hip is not None:
@@ -157,6 +309,7 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
     device = torch.device("cpu")
     if verbose:
         print("No GPU available, using CPU")
+        print(f"{Colors.CYAN}💡 For GPU acceleration, ensure PyTorch is installed with GPU support{Colors.ENDC}")
     return device
 
 def prepare_data_for_device(X, device, verbose=False):
@@ -591,6 +744,28 @@ class Colors:
     ENDC = '\033[0m'        # Reset
     BOLD = '\033[1m'        # Bold
     UNDERLINE = '\033[4m'   # Underline
+
+# Convenience function for users to check acceleration status
+def check_gpu_acceleration():
+    """
+    Convenience function to check GPU acceleration status and get installation recommendations.
+    
+    This function provides a user-friendly way to check which acceleration packages
+    are installed and get recommendations for optimal performance.
+    
+    Examples
+    --------
+    >>> import omicverse as ov
+    >>> ov.settings.check_gpu_acceleration()
+    
+    Returns
+    -------
+    dict
+        Dictionary containing installation status and recommendations
+    """
+    print_acceleration_status(verbose=True)
+    return check_acceleration_packages()
+
 
 settings = omicverseConfig()
         

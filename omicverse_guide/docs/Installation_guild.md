@@ -33,6 +33,7 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
     **Important for Apple Silicon Macs:** OmicVerse requires a native version of Python. Install a native Apple Silicon version of mambaforge using Homebrew: `brew install --cask mambaforge`.
 
 
+
 ## 🚀 Installation Methods
 
 === "Quick Installation (Recommended)"
@@ -92,7 +93,7 @@ OmicVerse can be installed via conda or pip, but you must install `PyTorch` firs
             ```shell
             pip install uv
             ```
-        2. **Install PyTorch**:
+        2. **Install PyTorch (Installing with pip on macOS may encounter some issues.)**:
             ```shell
             uv pip install torch torchvision torchaudio
             ```
@@ -216,4 +217,22 @@ Pre-built Docker images are available on [Docker Hub](https://hub.docker.com/r/s
     **Important:** OmicVerse requires a native version of Python on Apple Silicon Macs. Make sure to install a native Apple Silicon version of mambaforge using Homebrew:
     ```shell
     brew install --cask mambaforge
+    ```
+
+!!! info "MacOS `Omp_set_nested` routine deprecated"
+
+    For Apple Silicon Mac users experiencing issues:
+    ```shell
+    # 1| First uninstall pip wheels (important)
+    pip uninstall -y numpy scipy scikit-learn threadpoolctl torch torchvision torchaudio pytorch-lightning
+
+    # 2| Install clean LP64 + OpenBLAS(openmp) numerical stack from conda-forge
+    mamba install -c conda-forge \
+      "numpy>=1.26,<2" "scipy>=1.11,<2" anndata "scanpy>=1.10" pandas \
+      scikit-learn numexpr threadpoolctl \
+      "libblas=*=*openblas" "libopenblas=*=*openmp" libomp
+
+    # 3| Install pytorch with conda
+    mamba install -c pytorch -c conda-forge pytorch torchvision torchaudio
+
     ```

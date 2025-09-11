@@ -148,12 +148,32 @@ omicverse는 다음 네 가지 데이터 구조를 기반으로 한 인프라로
   </tr>
 
   <tr>
-    <td align="center">inmoose<br><a href="https://github.com/epigenelabs/inmoose">📦</a> <a href="">📖</a></td>
+    <td align="center">inmoose<br><a href="https://github.com/epigenelabs/inmoose">📦</a> <a href="https://www.nature.com/articles/s41598-025-03376-y">📖</a></td>
     <td align="center">memento<br><a href="https://github.com/yelabucsf/scrna-parameter-estimation">📦</a> <a href="https://www.cell.com/cell/fulltext/S0092-8674(24)01144-9">📖</a></td>
     <td align="center">GSEApy<br><a href="https://github.com/zqfang/GSEApy">📦</a> <a href="https://academic.oup.com/bioinformatics/article-abstract/39/1/btac757/6847088">📖</a></td>
+    <td align="center">marsilea<br><a href="https://github.com/Marsilea-viz/marsilea/">📦</a> <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-024-03469-3">📖</a></td>
+    <td align="center">scICE<br><a href="https://github.com/Mathbiomed/scICE">📦</a> <a href="https://www.nature.com/articles/s41467-025-60702-8">📖</a></td>
+    <td align="center">sude<br><a href="https://github.com/ZPGuiGroupWhu/sude">📦</a> <a href="https://www.nature.com/articles/s42256-025-01112-9">📖</a></td>
+  </tr>
+
+  <tr>
+    <td align="center">GeneFromer<br><a href="https://huggingface.co/ctheodoris/Geneformer">📦</a> <a href="https://www.nature.com/articles/s41586-023-06139-9">📖</a></td>
+    <td align="center">scGPT<br><a href="https://github.com/bowang-lab/scGPT">📦</a> <a href="https://www.nature.com/articles/s41592-024-02201-0">📖</a></td>
+    <td align="center">scFoundation<br><a href="https://github.com/biomap-research/scFoundation">📦</a> <a href="https://www.nature.com/articles/s41592-024-02305-7">📖</a></td>
+    <td align="center">UCE<br><a href="https://github.com/snap-stanford/UCE">📦</a> <a href="https://www.biorxiv.org/content/10.1101/2023.11.28.568918v1.full.pdf">📖</a></td>
+    <td align="center">CellPLM<br><a href="https://github.com/OmicsML/CellPLM">📦</a> <a href="https://www.biorxiv.org/content/10.1101/2023.10.03.560734v1">📖</a></td>
+
   </tr>
 </table>
 </div>
+
+---
+
+**포함된 패키지가 게시되지 않았거나 프리프린트**
+
+- [1] [Cellula](https://github.com/andrecossa5/Cellula/)는 scRNA-seq 탐색을 위한 도구 키트를 제공합니다. 이러한 도구들은 일반적인 단일 세포 분석 작업을 수행합니다
+- [2] [pegasus](https://github.com/lilab-bcb/pegasus/)는 수백만 개의 단일 세포의 전사체를 분석하는 도구입니다. 이는 명령줄 도구, python 패키지 및 클라우드 기반 분석 워크플로우의 기반입니다.
+- [3] [cNMF](https://github.com/dylkot/cNMF)는 단일 세포 RNA-Seq (scRNA-Seq) 데이터에서 유전자 발현 프로그램을 추론하기 위한 분석 파이프라인입니다.
 
 ## `5` [연락처](#)
 
@@ -185,6 +205,14 @@ omicverse에 기여하고 싶으시면, [개발자 문서](https://omicverse.rea
 > Zeng, Z., Ma, Y., Hu, L. et al.
 >
 > _Nature Communication_ 2024년 7월 16일. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
+
+다른 관련 패키지들도 있습니다. 사용하시면 언제든지 참조해 주세요!
+
+> **CellOntologyMapper: Consensus mapping of cell type annotation**
+>
+> Zeng, Z., Wang, X., Du, H.
+>
+> _bioRxiv_ 2025년 6월 20일. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
 
 ## `8` [기타](#)
 

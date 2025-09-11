@@ -148,12 +148,32 @@ Die Tabelle enthält die veröffentlichten Tools
   </tr>
 
   <tr>
-    <td align="center">inmoose<br><a href="https://github.com/epigenelabs/inmoose">📦</a> <a href="">📖</a></td>
+    <td align="center">inmoose<br><a href="https://github.com/epigenelabs/inmoose">📦</a> <a href="https://www.nature.com/articles/s41598-025-03376-y">📖</a></td>
     <td align="center">memento<br><a href="https://github.com/yelabucsf/scrna-parameter-estimation">📦</a> <a href="https://www.cell.com/cell/fulltext/S0092-8674(24)01144-9">📖</a></td>
     <td align="center">GSEApy<br><a href="https://github.com/zqfang/GSEApy">📦</a> <a href="https://academic.oup.com/bioinformatics/article-abstract/39/1/btac757/6847088">📖</a></td>
+    <td align="center">marsilea<br><a href="https://github.com/Marsilea-viz/marsilea/">📦</a> <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-024-03469-3">📖</a></td>
+    <td align="center">scICE<br><a href="https://github.com/Mathbiomed/scICE">📦</a> <a href="https://www.nature.com/articles/s41467-025-60702-8">📖</a></td>
+    <td align="center">sude<br><a href="https://github.com/ZPGuiGroupWhu/sude">📦</a> <a href="https://www.nature.com/articles/s42256-025-01112-9">📖</a></td>
+  </tr>
+
+  <tr>
+    <td align="center">GeneFromer<br><a href="https://huggingface.co/ctheodoris/Geneformer">📦</a> <a href="https://www.nature.com/articles/s41586-023-06139-9">📖</a></td>
+    <td align="center">scGPT<br><a href="https://github.com/bowang-lab/scGPT">📦</a> <a href="https://www.nature.com/articles/s41592-024-02201-0">📖</a></td>
+    <td align="center">scFoundation<br><a href="https://github.com/biomap-research/scFoundation">📦</a> <a href="https://www.nature.com/articles/s41592-024-02305-7">📖</a></td>
+    <td align="center">UCE<br><a href="https://github.com/snap-stanford/UCE">📦</a> <a href="https://www.biorxiv.org/content/10.1101/2023.11.28.568918v1.full.pdf">📖</a></td>
+    <td align="center">CellPLM<br><a href="https://github.com/OmicsML/CellPLM">📦</a> <a href="https://www.biorxiv.org/content/10.1101/2023.10.03.560734v1">📖</a></td>
+
   </tr>
 </table>
 </div>
+
+---
+
+**Enthaltene Pakete nicht veröffentlicht oder Preprint**
+
+- [1] [Cellula](https://github.com/andrecossa5/Cellula/) ist ein Toolkit für die Erkundung von scRNA-seq. Diese Tools führen häufige Einzelzell-Analyseaufgaben durch
+- [2] [pegasus](https://github.com/lilab-bcb/pegasus/) ist ein Tool zur Analyse von Transkriptomen von Millionen von Einzelzellen. Es ist ein Kommandozeilen-Tool, ein Python-Paket und eine Basis für Cloud-basierte Analyse-Workflows.
+- [3] [cNMF](https://github.com/dylkot/cNMF) ist eine Analyse-Pipeline zur Ableitung von Genexpressionsprogrammen aus Einzelzell-RNA-Seq (scRNA-Seq)-Daten.
 
 ## `5` [Kontakt](#)
 
@@ -185,6 +205,14 @@ Wenn Sie `omicverse` in Ihrer Arbeit verwenden, zitieren Sie bitte die `omicvers
 > Zeng, Z., Ma, Y., Hu, L. et al.
 >
 > _Nature Communication_ 16. Juli 2024. doi: [10.1038/s41467-024-50194-3](https://doi.org/10.1038/s41467-024-50194-3).
+
+Hier sind einige andere verwandte Pakete, die Sie gerne referenzieren können, wenn Sie sie verwenden!
+
+> **CellOntologyMapper: Consensus mapping of cell type annotation**
+>
+> Zeng, Z., Wang, X., Du, H.
+>
+> _bioRxiv_ 20. Juni 2025. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
 
 ## `8` [Sonstiges](#)
 
