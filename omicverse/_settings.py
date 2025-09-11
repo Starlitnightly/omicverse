@@ -261,7 +261,7 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
     
     # Check acceleration packages if verbose
     if verbose:
-        print_acceleration_status(verbose=True)
+        #print_acceleration_status(verbose=True)
         print()  # Add spacing
     
     # Check devices in priority order

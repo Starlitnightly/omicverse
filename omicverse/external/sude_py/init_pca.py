@@ -27,10 +27,13 @@ def init_pca(X, no_dims, contri, use_gpu=True, verbose=False):
     """
     # Detect optimal device and PCA backend
     device_info = _detect_optimal_pca_backend(use_gpu, verbose)
-    
-    if device_info['backend'] == 'mlx' and device_info['device'] == 'mps':
+
+    from ..._settings import settings
+    omicverse_mode = getattr(settings, 'mode', 'cpu')
+
+    if device_info['backend'] == 'mlx' and device_info['device'] == 'mps' and omicverse_mode != 'cpu':
         return _init_pca_mlx(X, no_dims, contri, verbose)
-    elif device_info['backend'] == 'torchdr' and device_info['device'] == 'cuda':
+    elif device_info['backend'] == 'torchdr' and device_info['device'] == 'cuda' and omicverse_mode != 'cpu':
         return _init_pca_torchdr(X, no_dims, contri, verbose)
     else:
         # Fallback to CPU implementation
