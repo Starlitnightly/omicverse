@@ -47,42 +47,24 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
     print(f'...Begin using {methods} to correct batch effect')
 
     if methods=='harmony':
-        try:
-            import harmonypy
-            #print('mofax have been install version:',mfx.__version__)
-        except ImportError:
-            raise ImportError(
-                'Please install the harmonypy: `pip install harmonypy`.'
-            )
+        from ..external.harmony import harmonypy
         
-        # Try to use direct harmony library first
-        try:
-            from harmony import harmonize
-            use_direct_harmony = True
-        except ImportError:
-            use_direct_harmony = False
-            
         adata3=adata.copy()
-        if sc.__version__>='1.11.0':
-            if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
-                scale(adata3)
-                pca(adata3,layer='scaled',n_pcs=n_pcs)
-        else:
-            if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
-                scale(adata3)
-                sc.pp.pca(adata3,layer='scaled',n_comps=n_pcs)
-                adata3.obsm['scaled|original|X_pca'] = adata3.obsm['X_pca'].copy()
+        if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
+            scale(adata3)
+            pca(adata3,layer='scaled',n_pcs=n_pcs)
+        
         
         if settings.mode == 'cpu':
             # Use scanpy's external harmony integration for CPU mode
-            sc.external.pp.harmony_integrate(adata3, batch_key, basis=use_rep, **kwargs)
-        elif settings.mode in ['cpu-gpu-mixed', 'gpu'] and use_direct_harmony:
-            # Use direct harmony library for mixed/GPU modes
-            Z = harmonize(adata3.obsm['X_pca'], adata3.obs, batch_key=batch_key, **kwargs)
-            adata3.obsm['X_pca_harmony'] = Z
+            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
+        elif settings.mode in ['cpu-gpu-mixed', 'gpu']:
+            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
         else:
-            # Fall back to scanpy's external harmony integration
-            sc.external.pp.harmony_integrate(adata3, batch_key, basis=use_rep, **kwargs)
+            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
         
         adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
         del adata3
