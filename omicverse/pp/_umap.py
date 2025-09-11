@@ -173,8 +173,13 @@ def umap(  # noqa: PLR0913, PLR0915
         print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (TorchDR GPU method)...{Colors.ENDC}")
         from torchdr import UMAP
         import torch
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
+        from .._settings import get_optimal_device, prepare_data_for_device
+        
+        device = get_optimal_device(prefer_gpu=True, verbose=True)
+        
+        # Prepare data for MPS compatibility (float32 requirement)
+        X = prepare_data_for_device(X, device, verbose=True)
+        
         n_neighbors = neighbors["params"]["n_neighbors"]
         n_epochs = (
             500 if maxiter is None else maxiter
@@ -194,11 +199,14 @@ def umap(  # noqa: PLR0913, PLR0915
             random_state=random_state,
         )
         X_umap = umap.fit(X_contiguous).embedding_.detach().cpu().numpy()
-
+        print(f"   {Colors.CYAN}💡 Using TorchDR UMAP on {device}{Colors.ENDC}")
         
         del umap
         import gc
-        torch.cuda.empty_cache()
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+        elif device.type == 'mps':
+            torch.mps.empty_cache()
         gc.collect()
 
     elif method == "mde":

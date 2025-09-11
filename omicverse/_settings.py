@@ -67,6 +67,24 @@ class omicverseConfig:
     )
     def cpu_gpu_mixed_init(self):
         print('CPU-GPU mixed mode activated')
+        
+        # Detect available GPU accelerators for mixed mode
+        if torch is not None:
+            available_devices = []
+            if torch.cuda.is_available():
+                available_devices.append("CUDA")
+            if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                available_devices.append("MPS")
+            if hasattr(torch.version, 'hip') and torch.version.hip is not None:
+                available_devices.append("ROCm")
+            if hasattr(torch, 'xpu') and torch.xpu.is_available():
+                available_devices.append("XPU")
+            
+            if available_devices:
+                print(f'Available GPU accelerators: {", ".join(available_devices)}')
+            else:
+                print('No GPU accelerators detected - fallback to CPU')
+        
         self.mode = 'cpu-gpu-mixed'
 
 
@@ -75,6 +93,124 @@ try:
     import torch  # Optional GPU dependency
 except ImportError:  # pragma: no cover - optional dependency
     torch = None
+
+def get_optimal_device(prefer_gpu=True, verbose=False):
+    """
+    Get the optimal PyTorch device based on available hardware.
+    
+    Priority order:
+    1. CUDA (NVIDIA GPUs)
+    2. MPS (Apple Silicon)
+    3. ROCm (AMD GPUs) 
+    4. XPU (Intel GPUs)
+    5. CPU (fallback)
+    
+    Parameters
+    ----------
+    prefer_gpu : bool
+        Whether to prefer GPU over CPU when available
+    verbose : bool
+        Whether to print device selection information
+        
+    Returns
+    -------
+    torch.device
+        The optimal device for computation
+    """
+    if torch is None:
+        if verbose:
+            print("PyTorch not available, using CPU")
+        return "cpu"
+    
+    if not prefer_gpu:
+        if verbose:
+            print("GPU preference disabled, using CPU")
+        return torch.device("cpu")
+    
+    # Check devices in priority order
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        if verbose:
+            print(f"Using CUDA device: {torch.cuda.get_device_name()}")
+        return device
+    
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        device = torch.device("mps")
+        if verbose:
+            print("Using Apple Silicon MPS device (note: float32 required)")
+        return device
+    
+    if hasattr(torch.version, 'hip') and torch.version.hip is not None:
+        # ROCm available
+        device = torch.device("cuda")  # ROCm uses cuda interface
+        if verbose:
+            print("Using AMD ROCm device")
+        return device
+    
+    if hasattr(torch, 'xpu') and torch.xpu.is_available():
+        device = torch.device("xpu")
+        if verbose:
+            print("Using Intel XPU device")
+        return device
+    
+    # Fallback to CPU
+    device = torch.device("cpu")
+    if verbose:
+        print("No GPU available, using CPU")
+    return device
+
+def prepare_data_for_device(X, device, verbose=False):
+    """
+    Prepare data for a specific device, handling device-specific requirements.
+    
+    Parameters
+    ----------
+    X : array-like
+        Input data (numpy array, sparse matrix, or other array-like)
+    device : torch.device
+        Target device
+    verbose : bool
+        Whether to print conversion information
+        
+    Returns
+    -------
+    X_prepared : array-like
+        Data prepared for the target device
+    """
+    import numpy as np
+    from scipy import sparse
+    
+    # Handle MPS float64 limitation
+    if hasattr(device, 'type') and device.type == 'mps':
+        # Handle numpy arrays
+        if hasattr(X, 'dtype') and X.dtype == np.float64:
+            if verbose:
+                print("   Converting float64 to float32 for MPS compatibility")
+            X = X.astype(np.float32)
+        
+        # Handle sparse matrices
+        elif sparse.issparse(X) and X.dtype == np.float64:
+            if verbose:
+                print("   Converting sparse matrix float64 to float32 for MPS compatibility")
+            X = X.astype(np.float32)
+        
+        # Handle AnnData objects
+        elif hasattr(X, 'X'):
+            if hasattr(X.X, 'dtype') and X.X.dtype == np.float64:
+                if verbose:
+                    print("   Converting AnnData.X float64 to float32 for MPS compatibility")
+                if sparse.issparse(X.X):
+                    X.X = X.X.astype(np.float32)
+                else:
+                    X.X = X.X.astype(np.float32)
+        
+        # Handle other array-like objects with dtype
+        elif hasattr(X, 'astype') and hasattr(X, 'dtype') and X.dtype == np.float64:
+            if verbose:
+                print("   Converting array float64 to float32 for MPS compatibility")
+            X = X.astype(np.float32)
+    
+    return X
 
 def check_reference_key(adata):
     if 'REFERENCE_MANU' not in adata.uns.keys():
