@@ -63,7 +63,7 @@ from . import (scSLAT,CEFCON,mofapy2,GNTD,spaceflow,STT,
                tosica,STAGATE_pyG,STAligner,spatrio,PROST,cytotrace2,
                GraphST,commot,cnmf,starfysh,scMulan,flowsig,PyWGCNA,
                CAST,scanorama,scdiffusion,BINARY,cellanova,VIA,gaston,pyscenic,
-                bin2cell,sude_py
+                bin2cell,sude_py,harmony
                )
 __all__ = [
     'scSLAT',
@@ -94,4 +94,6 @@ __all__ = [
     'gaston',
     'pyscenic',
     'bin2cell',
+    'sude_py',
+    'harmony',
 ]
