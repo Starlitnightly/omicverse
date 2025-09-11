@@ -140,7 +140,7 @@ def sude(
     if T_epoch <= 0:
         raise ValueError(f"T_epoch must be positive, got {T_epoch}")
     
-    # Run SUDE
+    # Run SUDE and compute neighborhood graph
     print(f"   {Colors.GREEN}{EMOJI['start']} Computing SUDE embedding...{Colors.ENDC}")
     print(f"   {Colors.CYAN}Parameters:{Colors.ENDC}")
     print(f"     {Colors.BLUE}• Dimensions: {Colors.BOLD}{no_dims}{Colors.ENDC}")
@@ -151,7 +151,8 @@ def sude(
     print(f"     {Colors.BLUE}• Max epochs: {Colors.BOLD}{T_epoch}{Colors.ENDC}")
     
     try:
-        X_sude = sude_py(
+        # Use return_neighbors=True to get neighborhood graph information
+        result = sude_py(
             X,
             no_dims=no_dims,
             k1=k1,
@@ -160,7 +161,15 @@ def sude(
             initialize=initialize,
             agg_coef=agg_coef,
             T_epoch=T_epoch,
+            return_neighbors=True if k1 > 0 else False,  # Only return neighbors if landmarks are used
         )
+        
+        if k1 > 0 and isinstance(result, tuple) and len(result) == 3:
+            X_sude, connectivities, distances = result
+        else:
+            X_sude = result
+            connectivities, distances = None, None
+            
     except Exception as e:
         print(f"   {EMOJI['error']} {Colors.FAIL}SUDE computation failed: {Colors.BOLD}{str(e)}{Colors.ENDC}")
         raise
@@ -177,13 +186,31 @@ def sude(
         use_rep=use_rep,
     )
     key_uns, key_obsm = ("sude", "X_sude") if key_added is None else [key_added] * 2
+    key_obsp_conn = f"{key_added}_connectivities" if key_added else "connectivities"
+    key_obsp_dist = f"{key_added}_distances" if key_added else "distances"
+    
     adata.obsm[key_obsm] = X_sude  # annotate samples with SUDE coordinates
     adata.uns[key_uns] = dict(params={k: v for k, v in params.items() if v is not None})
+    
+    # Store neighborhood graph information
+    if connectivities is not None:
+        adata.obsp[key_obsp_conn] = connectivities
+        print(f"   {Colors.GREEN}✓ Neighborhood connectivities stored in adata.obsp['{key_obsp_conn}']{Colors.ENDC}")
+    
+    if distances is not None:
+        adata.obsp[key_obsp_dist] = distances
+        print(f"   {Colors.GREEN}✓ Neighborhood distances stored in adata.obsp['{key_obsp_dist}']{Colors.ENDC}")
 
     print(f"\n{Colors.GREEN}{EMOJI['done']} SUDE Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
     print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{X_sude.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{X_sude.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")
     print(f"   {Colors.GREEN}✓ Results added to AnnData object:{Colors.ENDC}")
     print(f"     {Colors.CYAN}• '{key_obsm}': {Colors.BOLD}SUDE coordinates{Colors.ENDC}{Colors.CYAN} (adata.obsm){Colors.ENDC}")
     print(f"     {Colors.CYAN}• '{key_uns}': {Colors.BOLD}SUDE parameters{Colors.ENDC}{Colors.CYAN} (adata.uns){Colors.ENDC}")
+    if connectivities is not None:
+        print(f"     {Colors.CYAN}• '{key_obsp_conn}': {Colors.BOLD}Neighborhood connectivities{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
+    if distances is not None:
+        print(f"     {Colors.CYAN}• '{key_obsp_dist}': {Colors.BOLD}Neighborhood distances{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
 
     return adata if copy else None
+
+
