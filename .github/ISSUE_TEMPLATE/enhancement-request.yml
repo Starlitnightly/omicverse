@@ -1,7 +1,7 @@
 name: Enhancement request
 description: Anything you’d like to see in scanpy?
 #title: ...
-type: Enhancement
+#type: Enhancement
 labels:
 - Triage 🩺
 #assignees: []
