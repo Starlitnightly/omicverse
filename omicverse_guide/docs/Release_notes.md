@@ -597,40 +597,37 @@ Optimated the plot effect of `ov.pl.violin`
 
 ## v 1.7.8
 
+Implemented lazy loading system that reduces `import omicverse` time by **40%** (from ~7.8s to ~4.7s).
+Added GPU-accelerated PCA support for Apple Silicon (MLX) and CUDA (TorchDR) devices.
+Introduced Smart Agent System with natural language processing for 50+ AI models from 8 providers.
+
+### PP Module
+- Added GPU-accelerated PCA in `ov.pp.pca()` with MLX support for Apple Silicon MPS devices
+- Added TorchDR-based PCA acceleration in `ov.pp.pca()` for NVIDIA CUDA devices
+- Added smart device detection and automatic backend selection in `init_pca()` and `pca()` functions
+- Added graceful fallback to CPU implementation when GPU acceleration fails
+- Added enhanced verbose output with device selection information and emoji indicators
+- Added optimal component determination based on variance contribution thresholds in `init_pca()`
+- Added GPU-accelerated SUDE dimensionality reduction in `ov.pp.sude()` with MLX/CUDA support
+
+### Datasets Module
+- Complete elimination of scanpy dependencies for faster loading
+- Added dynamo-style dataset framework with comprehensive collection
+- Added robust download system with progress tracking and caching
+- Added enhanced mock data generation with realistic structure
+- Added support for h5ad, loom, xlsx, and compressed formats
+
+### Agent Module
+- Added multi-provider LLM support (OpenAI, Anthropic, Google, DeepSeek, Qwen, Moonshot, Grok, Zhipu AI)
+- Added natural language processing for both English and Chinese
+- Added code generation architecture with local execution
+- Added function registry system with multi-language aliases
+- Added smart API key management and provider-specific configuration
+
 ### Performance Optimization
-- **Major Import Speed Improvement**: Implemented lazy loading system that reduces `import omicverse` time by **40%** (from ~7.8s to ~4.7s)
-  - Added `/omicverse/_lazy_loader.py` with `LazyLoader` and `LazyAttribute` classes for deferred module loading
-  - All heavy submodules (`bulk`, `single`, `pl`, `llm`, etc.) now load only when first accessed  
-  - Heavy libraries (`matplotlib.pyplot`, `numpy`, `pandas`) are now lazy-loaded
-  - Maintained full backward compatibility - all existing code continues to work unchanged
-  - First access to modules triggers actual loading, subsequent access is instant
-
-### Datasets Module - Complete Rewrite
-- **Complete elimination of scanpy dependencies**: The `datasets` module now operates entirely independently without any `scanpy.datasets` imports, ensuring faster loading and reduced conflicts
-- **Dynamo-style dataset framework**: Rebuilt following `dynamo-release` pattern with comprehensive dataset collection:
-  - **Real datasets**: `hematopoiesis()`, `paul15()`, `moignard15()`, `pbmc3k()`, `pbmc68k_reduced()`, `zebrafish()`, `bone_marrow()`, `dentate_gyrus()`, and 15+ more
-  - **Simulations**: `blobs()`, `toggleswitch()`, `krumsiek11()` with configurable parameters
-  - **Multi-omics**: `multi_brain_5k()` for ATAC + Gene expression analysis
-- **Robust download system**: 
-  - Smart URL-based downloading with progress tracking via `tqdm`
-  - Automatic caching to `./data/` with corruption detection and recovery
-  - Support for h5ad, loom, xlsx, and compressed formats
-  - Fallback to mock data generation when URLs fail
-- **Enhanced mock data generation**: Rich synthetic datasets with realistic structure, cell types, and optional preprocessing (PCA, UMAP, clustering)
-
-### Smart Agent System - Revolutionary Natural Language Interface
-- **Multi-provider LLM support**: Integration with 50+ AI models from 8 providers:
-  - **OpenAI**: GPT-5, GPT-4.1, o1/o3 series, GPT-4o variants
-  - **Anthropic**: Claude 4 Opus/Sonnet, Claude 3.7 Sonnet, Claude 3.5 Haiku  
-  - **Google**: Gemini 2.5 Pro/Flash, Gemini 2.0 series
-  - **DeepSeek**: DeepSeek Chat/Reasoner
-  - **Qwen/Alibaba**: QwQ Plus, Qwen Max/Plus/Turbo (2025 series)
-  - **Moonshot/Kimi**: K2 series, Auto Context models
-  - **Grok/xAI**: Grok 2/Beta
-  - **Zhipu AI**: GLM-4.5 series, GLM-4 variants
-- **Natural language processing**: `agent.run("quality control with nUMI>500, mito<0.2", adata)` - supports both English and Chinese
-- **Code generation architecture**: Agent generates executable Python code and runs it locally (no data serialization issues)
-- **Function registry system**: Dynamic discovery of OmicVerse functions with multi-language aliases and intelligent parameter extraction
-- **Smart API key management**: Automatic environment variable setup and provider-specific endpoint configuration
+- Added lazy loading system with `LazyLoader` and `LazyAttribute` classes
+- Added deferred loading for heavy submodules (`bulk`, `single`, `pl`, `llm`, etc.)
+- Added lazy loading for heavy libraries (`matplotlib.pyplot`, `numpy`, `pandas`)
+- Maintained full backward compatibility with existing code
 
 
