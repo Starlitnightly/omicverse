@@ -17,6 +17,7 @@ Dimensionality reduction:
     mde: Minimum distortion embedding
     tsne: t-SNE embedding
     umap: UMAP embedding
+    sude: SUDE (Scalable Unsupervised Dimensionality reduction via Embedding)
     
 Neighborhood analysis:
     neighbors: Compute neighborhood graph
@@ -66,6 +67,8 @@ from ._preprocess import (identify_robust_genes,
                           pca,score_genes_cell_cycle,
                           leiden,umap,louvain,anndata_to_GPU,anndata_to_CPU,mde,tsne)
 
+from ._sude import sude
+
 from ._qc import qc,filter_cells,filter_genes
 from ._recover import recover_counts,binary_search
 
@@ -87,6 +90,7 @@ __all__ = [
     'mde',
     'tsne',
     'umap',
+    'sude',
     
     # Neighborhood and clustering
     'neighbors',
