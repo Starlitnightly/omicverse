@@ -2,25 +2,12 @@ from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING
+from datetime import datetime
 
 import numpy as np
 from anndata import AnnData
 
-# Simple logging setup
-class SimpleLogger:
-    def info(self, msg, time=None, deep=None):
-        print(msg)
-
-logg = SimpleLogger()
-
-# Simple EMOJI setup
-EMOJI = {
-    "start": "🚀",
-    "done": "✅",
-    "error": "❌",
-    "warning": "⚠️",
-    "info": "ℹ️",
-}
+from .._settings import settings, EMOJI, Colors
 
 from ..external.sude_py import sude as sude_py
 
@@ -129,19 +116,17 @@ def sude(
     >>> ov.pp.sude(adata)
     >>> ov.pl.sude(adata, color='leiden')
     """
-    start = logg.info(f"computing SUDE{EMOJI['start']}")
+    print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running SUDE in '{settings.mode}' mode...")
+    print(f"{Colors.CYAN}Computing SUDE dimensionality reduction{Colors.ENDC}")
+    
     adata = adata.copy() if copy else adata
     X = _choose_representation(adata, use_rep=use_rep, n_pcs=n_pcs)
     
     # Validate parameters
     n_obs = X.shape[0]
     if k1 >= n_obs and k1 > 0:
-        warnings.warn(
-            f"k1 ({k1}) is larger than or equal to the number of observations ({n_obs}). "
-            "Setting k1 to 0 to use all points as landmarks.",
-            UserWarning,
-            stacklevel=2,
-        )
+        print(f"{EMOJI['warning']} {Colors.WARNING}k1 ({k1}) is larger than or equal to the number of observations ({n_obs}).{Colors.ENDC}")
+        print(f"{Colors.WARNING}    Setting k1 to 0 to use all points as landmarks.{Colors.ENDC}")
         k1 = 0
     
     if initialize not in ['le', 'pca', 'mds']:
@@ -154,17 +139,24 @@ def sude(
         raise ValueError(f"T_epoch must be positive, got {T_epoch}")
     
     # Run SUDE
-    logg.info("    using SUDE dimensionality reduction")
-    X_sude = sude_py(
-        X,
-        no_dims=no_dims,
-        k1=k1,
-        normalize=normalize,
-        large=large,
-        initialize=initialize,
-        agg_coef=agg_coef,
-        T_epoch=T_epoch,
-    )
+    print(f"{Colors.BLUE}    Using SUDE dimensionality reduction{Colors.ENDC}")
+    print(f"{Colors.GREEN}    Parameters: dims={no_dims}, k1={k1}, normalize={normalize}, large={large}{Colors.ENDC}")
+    print(f"{Colors.GREEN}    Initialize={initialize}, agg_coef={agg_coef}, T_epoch={T_epoch}{Colors.ENDC}")
+    
+    try:
+        X_sude = sude_py(
+            X,
+            no_dims=no_dims,
+            k1=k1,
+            normalize=normalize,
+            large=large,
+            initialize=initialize,
+            agg_coef=agg_coef,
+            T_epoch=T_epoch,
+        )
+    except Exception as e:
+        print(f"{EMOJI['error']} {Colors.FAIL}SUDE failed: {e}{Colors.ENDC}")
+        raise
 
     # Update AnnData instance
     params = dict(
@@ -181,14 +173,9 @@ def sude(
     adata.obsm[key_obsm] = X_sude  # annotate samples with SUDE coordinates
     adata.uns[key_uns] = dict(params={k: v for k, v in params.items() if v is not None})
 
-    logg.info(
-        f"    finished {EMOJI['done']}",
-        time=start,
-        deep=(
-            f"added\n"
-            f"    {key_obsm!r}, SUDE coordinates (adata.obsm)\n"
-            f"    {key_uns!r}, SUDE parameters (adata.uns)"
-        ),
-    )
+    print(f"{EMOJI['done']} SUDE completed successfully.")
+    print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
+    print(f"{Colors.CYAN}        {key_obsm!r}, SUDE coordinates (adata.obsm){Colors.ENDC}")
+    print(f"{Colors.CYAN}        {key_uns!r}, SUDE parameters (adata.uns){Colors.ENDC}")
 
     return adata if copy else None
