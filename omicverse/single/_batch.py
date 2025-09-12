@@ -55,16 +55,8 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             pca(adata3,layer='scaled',n_pcs=n_pcs)
         
         
-        if settings.mode == 'cpu':
-            # Use scanpy's external harmony integration for CPU mode
-            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.result()
-        elif settings.mode in ['cpu-gpu-mixed', 'gpu']:
-            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.result()
-        else:
-            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.result()
+        harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+        adata.obsm['X_pca_harmony'] = harmony_out.result()
         
         add_reference(adata,'Harmony','batch correction with Harmony')
         
