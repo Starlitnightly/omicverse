@@ -185,55 +185,50 @@ def _mds_mlx(X, no_dims, verbose=False):
     if verbose:
         print(f"   🚀 Using MLX MDS for Apple Silicon MPS acceleration")
     
-    try:
-        import mlx.core as mx
+    import mlx.core as mx
         
-        # Convert to MLX array
-        X_mx = mx.array(np.asarray(X, dtype=np.float32))
-        n = X_mx.shape[0]
+    # Convert to MLX array
+    X_mx = mx.array(np.asarray(X, dtype=np.float32))
+    n = X_mx.shape[0]
+    
+    # Compute squared distance matrix
+    D = _compute_distance_matrix_mlx(X_mx)
+    
+    # Compute row and overall means
+    sumd = mx.mean(D, axis=1)
+    sumD = mx.mean(sumd)
+    
+    # Compute centering matrix B
+    B = mx.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            B = B.at[i, j].set(-0.5 * (D[i, j] - sumd[i] - sumd[j] + sumD))
+    
+    # Eigendecomposition
+    eigenvalues, eigenvectors = mx.linalg.eig(B)
+    
+    # Sort eigenvalues and eigenvectors in descending order
+    sorted_indices = mx.argsort(-mx.real(eigenvalues))
+    eigenvalues = eigenvalues[sorted_indices]
+    eigenvectors = eigenvectors[:, sorted_indices]
+    
+    # Take the first no_dims components
+    selected_eigenvalues = eigenvalues[:no_dims]
+    selected_eigenvectors = eigenvectors[:, :no_dims]
+    
+    # Compute embedding
+    sqrt_eigenvalues = mx.sqrt(mx.abs(mx.real(selected_eigenvalues)))
+    embedX = mx.real(selected_eigenvectors) @ mx.diag(sqrt_eigenvalues)
+    
+    # Convert back to numpy
+    result = np.array(embedX)
+    
+    if verbose:
+        print(f"   ✅ MLX MDS completed: {X.shape} -> {result.shape}")
         
-        # Compute squared distance matrix
-        D = _compute_distance_matrix_mlx(X_mx)
+    return result
         
-        # Compute row and overall means
-        sumd = mx.mean(D, axis=1)
-        sumD = mx.mean(sumd)
-        
-        # Compute centering matrix B
-        B = mx.zeros((n, n))
-        for i in range(n):
-            for j in range(n):
-                B = B.at[i, j].set(-0.5 * (D[i, j] - sumd[i] - sumd[j] + sumD))
-        
-        # Eigendecomposition
-        eigenvalues, eigenvectors = mx.linalg.eig(B)
-        
-        # Sort eigenvalues and eigenvectors in descending order
-        sorted_indices = mx.argsort(-mx.real(eigenvalues))
-        eigenvalues = eigenvalues[sorted_indices]
-        eigenvectors = eigenvectors[:, sorted_indices]
-        
-        # Take the first no_dims components
-        selected_eigenvalues = eigenvalues[:no_dims]
-        selected_eigenvectors = eigenvectors[:, :no_dims]
-        
-        # Compute embedding
-        sqrt_eigenvalues = mx.sqrt(mx.abs(mx.real(selected_eigenvalues)))
-        embedX = mx.real(selected_eigenvectors) @ mx.diag(sqrt_eigenvalues)
-        
-        # Convert back to numpy
-        result = np.array(embedX)
-        
-        if verbose:
-            print(f"   ✅ MLX MDS completed: {X.shape} -> {result.shape}")
-            
-        return result
-        
-    except Exception as e:
-        if verbose:
-            print(f"   ⚠️ MLX MDS failed ({str(e)}), falling back to CPU")
-        return _mds_cpu(X, no_dims, verbose)
-
+ 
 
 def _mds_torch(X, no_dims, device='cpu', verbose=False):
     """
