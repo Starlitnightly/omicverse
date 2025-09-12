@@ -213,9 +213,12 @@ def _opt_scale_mlx(X, Y, k_num, verbose=False):
         # Get KNN indices for point i
         knn_indices = get_knn[i]
         
+        # Convert indices to MLX array for proper indexing
+        knn_indices_mx = mx.array(knn_indices)
+        
         # Extract KNN points
-        X_knn = X_mx[knn_indices]
-        Y_knn = Y_mx[knn_indices]
+        X_knn = X_mx[knn_indices_mx]
+        Y_knn = Y_mx[knn_indices_mx]
         
         # Compute pairwise distances
         X_dis = _compute_pairwise_distances_mlx(X_knn)
@@ -224,7 +227,8 @@ def _opt_scale_mlx(X, Y, k_num, verbose=False):
         # Compute scale
         numerator = mx.sum(X_dis * Y_dis)
         denominator = mx.maximum(mx.sum(X_dis ** 2), 1e-16)  # Equivalent to np.finfo(float).tiny
-        scale = scale.at[i, 0].set(numerator / denominator)
+        # Use proper MLX .at[] syntax for updates
+        scale = scale.at[i, 0].add((numerator / denominator) - scale[i, 0])
     
     # Convert back to numpy
     result = np.array(scale)
