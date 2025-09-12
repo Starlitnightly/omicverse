@@ -83,6 +83,7 @@ nav:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
         - Color system: Tutorials-plotting/t_visualize_colorsystem.ipynb
+- GPU Support: GPU_supported_registry_functions.md
 - API documentation: api/index.md
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
