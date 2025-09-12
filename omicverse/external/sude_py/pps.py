@@ -40,6 +40,7 @@ def pps(knn, rnn, order, use_gpu=True, verbose=True):
 
     if device_info['backend'] == 'mlx' and device_info['device'] == 'mps' and omicverse_mode != 'cpu':
         return _pps_mlx(knn, rnn, order, verbose)
+        #return _pps_torch(knn, rnn, order, 'cpu', verbose)
     elif device_info['backend'] == 'torch' and device_info['device'] in ['cuda', 'cpu'] and omicverse_mode != 'cpu':
         return _pps_torch(knn, rnn, order, device_info['device'], verbose)
     else:
@@ -243,6 +244,12 @@ def _pps_torch(knn, rnn, order, device='cpu', verbose=False):
         cpu_sorted = sorted(range(len(rnn_np)), key=lambda k: rnn_np[k], reverse=True)
         sorted_indices = torch.tensor(cpu_sorted, device=device)
     id_sort_torch = sorted_indices
+
+    from tqdm import tqdm
+    
+    total_points = int(id_sort_torch.numel())
+    pbar = tqdm(total=total_points, desc="   PPS Progress", disable=not verbose)
+    
     
     while id_sort_torch.numel() > 0:
         # Get the first element (highest rnn value)
@@ -274,6 +281,8 @@ def _pps_torch(knn, rnn, order, device='cpu', verbose=False):
             id_sort_torch = id_sort_torch[keep_mask]
         else:
             break
+        pbar.update(1)
+    pbar.close()
     
     if verbose:
         print(f"   ✅ Torch PPS completed: {len(id_samp)} landmarks selected")
