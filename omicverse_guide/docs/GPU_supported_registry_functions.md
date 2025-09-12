@@ -36,7 +36,7 @@
 ## Utils (ov.utils)
 - [x] `ov.utils.mde`: Minimum Distortion Embedding (<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]).
 - [ ] `ov.utils.cluster`: Multi-algorithm clustering (per algorithm below).
-    - [ ] Leiden (Scanpy, CPU).
+    - [x] Leiden (<span class="tag tag-mixed">cpu</span>[<span class="tag tag-torch">igraph</span>]<span class="tag tag-mixed">cpu-gpu-mixed</span>[<span class="tag tag-torch">pyg</span>]).
     - [ ] Louvain (Scanpy, CPU).
     - [ ] KMeans (scikit-learn, CPU).
     - [ ] GMM/mclust (scikit-learn, CPU).

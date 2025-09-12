@@ -1057,7 +1057,7 @@ def louvain(adata, **kwargs):
 )
 def leiden(
     adata, resolution=1.0, random_state=0, 
-    key_added='leiden', local_iterations=10, max_levels=10, device='cpu',**kwargs):
+    key_added='leiden', local_iterations=100, max_levels=10, device='cpu',**kwargs):
     '''
     leiden clustering
     '''
