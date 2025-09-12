@@ -61,6 +61,7 @@ def learning_l(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef,
     
     if device_info['backend'] == 'mlx' and device_info['device'] == 'mps' and omicverse_mode != 'cpu':
         return _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch, verbose)
+        #return _learning_l_torch(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch, device_info['device'], verbose)
     elif device_info['backend'] == 'torch' and device_info['device'] in ['cuda', 'cpu'] and omicverse_mode != 'cpu':
         return _learning_l_torch(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch, device_info['device'], verbose)
     else:
@@ -342,9 +343,10 @@ def _compute_pairwise_distances_torch(Y_subset, Y_full, device):
 def _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_coef, T_epoch, verbose=False):
     """
     MLX-based learning_l implementation for Apple Silicon MPS devices.
+    Optimized to minimize CPU-GPU transfers by keeping all computations on GPU.
     """
     if verbose:
-        print(f"   🚀 Using MLX learning_l for Apple Silicon MPS acceleration")
+        print(f"   🚀 Using MLX learning_l for Apple Silicon MPS acceleration (Optimized)")
     
     import mlx.core as mx
         
@@ -369,7 +371,7 @@ def _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_
         col = []
         Pval = []
         knn_rnn_mat = rnn[get_knn[id_samp]]
-        for i in range(N):
+        for i in tqdm(range(N), desc="Computing P matrix"):
             snn_id = np.isin(get_knn[id_samp], get_knn[id_samp[i]]).astype(int)
             nn_id = np.where(np.max(snn_id, axis=1) == 1)[0]
             snn = np.zeros((1, N))
@@ -418,7 +420,7 @@ def _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_
     elif initialize == 'mds':
         Y = mds(X_samp, no_dims, use_gpu=True, verbose=False).astype(np.float32)
 
-    # Convert to MLX arrays for GPU computation
+    # Convert to MLX arrays for GPU computation and keep everything on GPU
     Y_mx = mx.array(Y)
     P = P / (np.sum(P) - N)
 
@@ -428,30 +430,36 @@ def _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_
     for i in range(no_blocks):
         mark[i, :] = [i * math.ceil(N / no_blocks), min((i + 1) * math.ceil(N / no_blocks) - 1, N - 1)]
 
-    # Training loop with GPU acceleration
+    # Training loop with fully GPU-accelerated computation
     max_alpha = 2.5 * N
     min_alpha = 2 * N
     warm_step = 10
     preGrad_mx = mx.zeros((N, no_dims))
     
-    for epoch in tqdm(range(1, T_epoch + 1), desc="Training epochs (MLX)", unit="epoch"):
+    # Pre-allocate MLX arrays for gradients to avoid repeated allocations
+    Pgrad_mx = mx.zeros((N, no_dims))
+    Qgrad_mx = mx.zeros((N, no_dims))
+    
+    for epoch in tqdm(range(1, T_epoch + 1), desc="Training epochs (MLX-Optimized)", unit="epoch"):
         if epoch <= warm_step:
             alpha = max_alpha
         else:
             alpha = min_alpha + 0.5 * (max_alpha - min_alpha) * (
                         1 + np.cos(np.pi * ((epoch - warm_step) / (T_epoch - warm_step))))
         
-        # Use numpy arrays for gradient accumulation to avoid MLX indexing issues
-        Pgrad_np = np.zeros((N, no_dims), dtype=np.float32)
-        Qgrad_np = np.zeros((N, no_dims), dtype=np.float32)
-        sumQ = 0
+        # Reset gradients on GPU
+        Pgrad_mx = mx.zeros((N, no_dims))
+        Qgrad_mx = mx.zeros((N, no_dims))
+        sumQ = 0.0
         
         for i in range(no_blocks):
-            idx = [j for j in range(int(mark[i, 0]), int(mark[i, 1]) + 1)]
-            idx_mx = mx.array(idx)
+            start_idx = int(mark[i, 0])
+            end_idx = int(mark[i, 1]) + 1
+            idx = list(range(start_idx, end_idx))
+            len_blk = len(idx)
             
             # GPU-accelerated distance computation
-            Y_subset = Y_mx[idx_mx]
+            Y_subset = Y_mx[start_idx:end_idx]
             D_squared = _compute_pairwise_distances_mlx(Y_subset, Y_mx)
             
             # GPU-accelerated element-wise operations
@@ -463,43 +471,38 @@ def _learning_l_mlx(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, agg_
             Pmat = -4 * P_block * Q1 * QQ1
             Qmat = -4 * Q1 ** 2 * QQ1
             
-            # Convert to numpy for diagonal correction and indexing operations
-            Pmat_np = np.array(Pmat)
-            Qmat_np = np.array(Qmat)
+            # GPU-based diagonal correction using MLX operations
+            # Compute row sums on GPU
+            Pmat_row_sums = mx.sum(Pmat, axis=1)
+            Qmat_row_sums = mx.sum(Qmat, axis=1)
             
-            # Diagonal correction
-            len_blk = len(idx)
-            idPQ = np.column_stack((np.array(range(len_blk)), idx[0] + np.array(range(len_blk))))
-            Pmat_np[idPQ[:, 0], idPQ[:, 1]] = Pmat_np[idPQ[:, 0], idPQ[:, 1]] - np.sum(Pmat_np, axis=1)
-            Qmat_np[idPQ[:, 0], idPQ[:, 1]] = Qmat_np[idPQ[:, 0], idPQ[:, 1]] - np.sum(Qmat_np, axis=1)
+            # Apply diagonal correction efficiently on GPU using proper MLX syntax
+            for j in range(len_blk):
+                diag_col = start_idx + j
+                Pmat = Pmat.at[j, diag_col].add(-Pmat_row_sums[j])
+                Qmat = Qmat.at[j, diag_col].add(-Qmat_row_sums[j])
             
-            # Convert back to MLX for GPU matrix multiplication
-            Pmat = mx.array(Pmat_np)
-            Qmat = mx.array(Qmat_np)
-            Y_mx_np = np.array(Y_mx)
+            # GPU-accelerated matrix multiplication - keep everything on GPU
+            Pgrad_block = Pmat @ Y_mx
+            Qgrad_block = Qmat @ Y_mx
             
-            # GPU-accelerated matrix multiplication
-            Pgrad_block = np.array(Pmat @ mx.array(Y_mx_np))
-            Qgrad_block = np.array(Qmat @ mx.array(Y_mx_np))
+            # Update gradients directly on GPU using proper MLX indexing
+            Pgrad_mx = Pgrad_mx.at[start_idx:end_idx].add(Pgrad_block - Pgrad_mx[start_idx:end_idx])
+            Qgrad_mx = Qgrad_mx.at[start_idx:end_idx].add(Qgrad_block - Qgrad_mx[start_idx:end_idx])
             
-            # Update gradients using numpy indexing
-            Pgrad_np[idx] = Pgrad_block
-            Qgrad_np[idx] = Qgrad_block
-            
+            # Accumulate sumQ on GPU
             sumQ += float(mx.sum(Q1))
         
-        # Update embedding - convert gradients back to MLX
-        Pgrad_mx = mx.array(Pgrad_np)
-        Qgrad_mx = mx.array(Qgrad_np)
+        # Update embedding - all operations stay on GPU
         grad_update = Pgrad_mx - Qgrad_mx / (sumQ - N) + (epoch - 1) / (epoch + 2) * preGrad_mx
         Y_mx = Y_mx - alpha * grad_update
         preGrad_mx = Pgrad_mx - Qgrad_mx / (sumQ - N)
     
-    # Convert back to numpy
+    # Final conversion back to numpy only at the end
     Y_result = np.array(Y_mx)
     
     if verbose:
-        print(f"   ✅ MLX learning_l completed: {X_samp.shape} -> {Y_result.shape}")
+        print(f"   ✅ MLX learning_l completed (GPU-optimized): {X_samp.shape} -> {Y_result.shape}")
     
     return Y_result, k2
         
