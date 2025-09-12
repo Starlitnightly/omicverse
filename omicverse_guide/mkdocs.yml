@@ -139,6 +139,9 @@ markdown_extensions:
   - md_in_html
   - toc:
       permalink: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: false
 
   - pymdownx.arithmatex:
       generic: true
