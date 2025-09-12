@@ -47,7 +47,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
     print(f'...Begin using {methods} to correct batch effect')
 
     if methods=='harmony':
-        from ..external.harmony import harmonypy
+        from ..external.harmony import run_harmony
         
         adata3=adata.copy()
         if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
@@ -57,17 +57,15 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         
         if settings.mode == 'cpu':
             # Use scanpy's external harmony integration for CPU mode
-            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
+            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.result()
         elif settings.mode in ['cpu-gpu-mixed', 'gpu']:
-            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
+            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.result()
         else:
-            harmony_out = harmonypy.run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
-            adata.obsm['X_pca_harmony'] = harmony_out.Z_corr.T
+            harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+            adata.obsm['X_pca_harmony'] = harmony_out.result()
         
-        adata.obsm['X_harmony']=adata3.obsm['X_pca_harmony'].copy()
-        del adata3
         add_reference(adata,'Harmony','batch correction with Harmony')
         
     elif methods=='combat':
