@@ -631,8 +631,27 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         if layer is not None:
             params["layer"] = layer
         # Handle CUDA tensors for variance and variance_ratio
-        variance = pca_.explained_variance_
-        variance_ratio = pca_.explained_variance_ratio_
+        # Check if attributes exist (some PCA implementations like TorchDR may not have them)
+        if hasattr(pca_, 'explained_variance_'):
+            variance = pca_.explained_variance_
+        elif hasattr(pca_, 'singular_values_'):
+            # Calculate explained variance from singular values if available
+            variance = (pca_.singular_values_ ** 2) / (pca_.n_samples_ - 1) if hasattr(pca_, 'n_samples_') else (pca_.singular_values_ ** 2) / (n_comps - 1)
+        else:
+            # Fallback: provide zeros if no variance information is available
+            variance = np.zeros(n_comps)
+            logg.warning(f"   {EMOJI['warning']} PCA object missing explained_variance_ attribute, using zeros")
+        
+        if hasattr(pca_, 'explained_variance_ratio_'):
+            variance_ratio = pca_.explained_variance_ratio_
+        elif hasattr(pca_, 'singular_values_'):
+            # Calculate explained variance ratio from singular values if available
+            total_var = np.sum(variance) if isinstance(variance, np.ndarray) else variance.sum()
+            variance_ratio = variance / total_var if total_var > 0 else np.zeros(n_comps)
+        else:
+            # Fallback: provide zeros if no variance ratio information is available
+            variance_ratio = np.zeros(n_comps)
+            logg.warning(f"   {EMOJI['warning']} PCA object missing explained_variance_ratio_ attribute, using zeros")
         
         if hasattr(variance, 'cpu'):  # Check if it's a torch tensor
             variance = variance.cpu().numpy()
@@ -659,8 +678,28 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         if return_info:
             # Handle CUDA tensors for return values
             components = pca_.components_
-            variance_ratio = pca_.explained_variance_ratio_
-            variance = pca_.explained_variance_
+            
+            # Check if attributes exist (some PCA implementations like TorchDR may not have them)
+            if hasattr(pca_, 'explained_variance_'):
+                variance = pca_.explained_variance_
+            elif hasattr(pca_, 'singular_values_'):
+                # Calculate explained variance from singular values if available
+                variance = (pca_.singular_values_ ** 2) / (pca_.n_samples_ - 1) if hasattr(pca_, 'n_samples_') else (pca_.singular_values_ ** 2) / (n_comps - 1)
+            else:
+                # Fallback: provide zeros if no variance information is available
+                variance = np.zeros(n_comps)
+                logg.warning(f"   {EMOJI['warning']} PCA object missing explained_variance_ attribute, using zeros")
+            
+            if hasattr(pca_, 'explained_variance_ratio_'):
+                variance_ratio = pca_.explained_variance_ratio_
+            elif hasattr(pca_, 'singular_values_'):
+                # Calculate explained variance ratio from singular values if available
+                total_var = np.sum(variance) if isinstance(variance, np.ndarray) else variance.sum()
+                variance_ratio = variance / total_var if total_var > 0 else np.zeros(n_comps)
+            else:
+                # Fallback: provide zeros if no variance ratio information is available
+                variance_ratio = np.zeros(n_comps)
+                logg.warning(f"   {EMOJI['warning']} PCA object missing explained_variance_ratio_ attribute, using zeros")
             
             if hasattr(components, 'cpu'):  # Check if it's a torch tensor
                 components = components.cpu().numpy()
