@@ -196,51 +196,45 @@ def _opt_scale_mlx(X, Y, k_num, verbose=False):
     if verbose:
         print(f"   🚀 Using MLX opt_scale for Apple Silicon MPS acceleration")
     
-    try:
-        import mlx.core as mx
+    import mlx.core as mx
+    
+    # Convert to MLX arrays
+    X_mx = mx.array(np.asarray(X, dtype=np.float32))
+    Y_mx = mx.array(np.asarray(Y, dtype=np.float32))
+    
+    n = X_mx.shape[0]
+    
+    # Find KNN using sklearn (CPU-based, but fast for small k_num)
+    get_knn = NearestNeighbors(n_neighbors=k_num + 1).fit(np.array(Y_mx)).kneighbors(np.array(Y_mx), return_distance=False)
+    
+    scale = mx.zeros((n, 1))
+    
+    for i in range(n):
+        # Get KNN indices for point i
+        knn_indices = get_knn[i]
         
-        # Convert to MLX arrays
-        X_mx = mx.array(np.asarray(X, dtype=np.float32))
-        Y_mx = mx.array(np.asarray(Y, dtype=np.float32))
+        # Extract KNN points
+        X_knn = X_mx[knn_indices]
+        Y_knn = Y_mx[knn_indices]
         
-        n = X_mx.shape[0]
+        # Compute pairwise distances
+        X_dis = _compute_pairwise_distances_mlx(X_knn)
+        Y_dis = _compute_pairwise_distances_mlx(Y_knn)
         
-        # Find KNN using sklearn (CPU-based, but fast for small k_num)
-        get_knn = NearestNeighbors(n_neighbors=k_num + 1).fit(np.array(Y_mx)).kneighbors(np.array(Y_mx), return_distance=False)
+        # Compute scale
+        numerator = mx.sum(X_dis * Y_dis)
+        denominator = mx.maximum(mx.sum(X_dis ** 2), 1e-16)  # Equivalent to np.finfo(float).tiny
+        scale = scale.at[i, 0].set(numerator / denominator)
+    
+    # Convert back to numpy
+    result = np.array(scale)
+    
+    if verbose:
+        print(f"   ✅ MLX opt_scale completed")
         
-        scale = mx.zeros((n, 1))
+    return result
         
-        for i in range(n):
-            # Get KNN indices for point i
-            knn_indices = get_knn[i]
-            
-            # Extract KNN points
-            X_knn = X_mx[knn_indices]
-            Y_knn = Y_mx[knn_indices]
-            
-            # Compute pairwise distances
-            X_dis = _compute_pairwise_distances_mlx(X_knn)
-            Y_dis = _compute_pairwise_distances_mlx(Y_knn)
-            
-            # Compute scale
-            numerator = mx.sum(X_dis * Y_dis)
-            denominator = mx.maximum(mx.sum(X_dis ** 2), 1e-16)  # Equivalent to np.finfo(float).tiny
-            scale = scale.at[i, 0].set(numerator / denominator)
-        
-        # Convert back to numpy
-        result = np.array(scale)
-        
-        if verbose:
-            print(f"   ✅ MLX opt_scale completed")
-            
-        return result
-        
-    except Exception as e:
-        if verbose:
-            print(f"   ⚠️ MLX opt_scale failed ({str(e)}), falling back to CPU")
-        return _opt_scale_cpu(X, Y, k_num, verbose)
-
-
+    
 def _opt_scale_torch(X, Y, k_num, device='cpu', verbose=False):
     """
     Torch-based opt_scale implementation for CUDA/CPU devices.
@@ -266,50 +260,45 @@ def _opt_scale_torch(X, Y, k_num, device='cpu', verbose=False):
     if verbose:
         print(f"   🚀 Using Torch opt_scale for {device.upper()} acceleration")
     
-    try:
-        import torch
+    import torch
+    
+    # Convert to torch tensors
+    X_torch = torch.tensor(np.asarray(X, dtype=np.float32), device=device)
+    Y_torch = torch.tensor(np.asarray(Y, dtype=np.float32), device=device)
+    
+    n = X_torch.shape[0]
+    
+    # Find KNN using sklearn (CPU-based, but fast for small k_num)
+    get_knn = NearestNeighbors(n_neighbors=k_num + 1).fit(Y_torch.cpu().numpy()).kneighbors(Y_torch.cpu().numpy(), return_distance=False)
+    
+    scale = torch.zeros((n, 1), device=device)
+    
+    for i in range(n):
+        # Get KNN indices for point i
+        knn_indices = get_knn[i]
         
-        # Convert to torch tensors
-        X_torch = torch.tensor(np.asarray(X, dtype=np.float32), device=device)
-        Y_torch = torch.tensor(np.asarray(Y, dtype=np.float32), device=device)
+        # Extract KNN points
+        X_knn = X_torch[knn_indices]
+        Y_knn = Y_torch[knn_indices]
         
-        n = X_torch.shape[0]
+        # Compute pairwise distances
+        X_dis = _compute_pairwise_distances_torch(X_knn, device)
+        Y_dis = _compute_pairwise_distances_torch(Y_knn, device)
         
-        # Find KNN using sklearn (CPU-based, but fast for small k_num)
-        get_knn = NearestNeighbors(n_neighbors=k_num + 1).fit(Y_torch.cpu().numpy()).kneighbors(Y_torch.cpu().numpy(), return_distance=False)
+        # Compute scale
+        numerator = torch.sum(X_dis * Y_dis)
+        denominator = torch.clamp(torch.sum(X_dis ** 2), min=torch.finfo(torch.float32).tiny)
+        scale[i, 0] = numerator / denominator
+    
+    # Convert back to numpy
+    result = scale.cpu().numpy()
+    
+    if verbose:
+        print(f"   ✅ Torch opt_scale completed")
         
-        scale = torch.zeros((n, 1), device=device)
+    return result
         
-        for i in range(n):
-            # Get KNN indices for point i
-            knn_indices = get_knn[i]
-            
-            # Extract KNN points
-            X_knn = X_torch[knn_indices]
-            Y_knn = Y_torch[knn_indices]
-            
-            # Compute pairwise distances
-            X_dis = _compute_pairwise_distances_torch(X_knn, device)
-            Y_dis = _compute_pairwise_distances_torch(Y_knn, device)
-            
-            # Compute scale
-            numerator = torch.sum(X_dis * Y_dis)
-            denominator = torch.clamp(torch.sum(X_dis ** 2), min=torch.finfo(torch.float32).tiny)
-            scale[i, 0] = numerator / denominator
-        
-        # Convert back to numpy
-        result = scale.cpu().numpy()
-        
-        if verbose:
-            print(f"   ✅ Torch opt_scale completed")
-            
-        return result
-        
-    except Exception as e:
-        if verbose:
-            print(f"   ⚠️ Torch opt_scale failed ({str(e)}), falling back to CPU")
-        return _opt_scale_cpu(X, Y, k_num, verbose)
-
+    
 
 def _opt_scale_cpu(X, Y, k_num, verbose=False):
     """

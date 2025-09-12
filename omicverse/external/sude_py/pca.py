@@ -120,30 +120,24 @@ def _pca_mlx(X, no_dims, verbose=False):
     if verbose:
         print(f"   🚀 Using MLX PCA for Apple Silicon MPS acceleration")
     
-    try:
-        from ...pp._pca_mlx import MLXPCA
+    from ...pp._pca_mlx import MLXPCA
+    
+    # Convert to numpy if needed
+    if hasattr(X, 'toarray'):
+        X = X.toarray()
+    X = np.asarray(X, dtype=np.float32)
+    
+    # Create MLX PCA instance
+    mlx_pca = MLXPCA(n_components=no_dims, device="metal")
+    
+    # Fit and transform
+    mappedX = mlx_pca.fit_transform(X)
+    
+    if verbose:
+        print(f"   ✅ MLX PCA completed: {X.shape} -> {mappedX.shape}")
         
-        # Convert to numpy if needed
-        if hasattr(X, 'toarray'):
-            X = X.toarray()
-        X = np.asarray(X, dtype=np.float32)
+    return mappedX
         
-        # Create MLX PCA instance
-        mlx_pca = MLXPCA(n_components=no_dims, device="metal")
-        
-        # Fit and transform
-        mappedX = mlx_pca.fit_transform(X)
-        
-        if verbose:
-            print(f"   ✅ MLX PCA completed: {X.shape} -> {mappedX.shape}")
-            
-        return mappedX
-        
-    except Exception as e:
-        if verbose:
-            print(f"   ⚠️ MLX PCA failed ({str(e)}), falling back to CPU")
-        return _pca_cpu(X, no_dims, verbose)
-
 
 def _pca_torchdr(X, no_dims, verbose=False):
     """
@@ -166,34 +160,29 @@ def _pca_torchdr(X, no_dims, verbose=False):
     if verbose:
         print(f"   🚀 Using TorchDR PCA for CUDA acceleration")
     
-    try:
-        import torch
-        import torchdr
+    import torch
+    import torchdr
+    
+    # Convert to torch tensor
+    if hasattr(X, 'toarray'):
+        X = X.toarray()
+    X_tensor = torch.tensor(X, dtype=torch.float32, device='cuda')
+    
+    # Create TorchDR PCA
+    pca = torchdr.MLXPCA(n_components=no_dims)
+    
+    # Fit and transform
+    mappedX_tensor = pca.fit_transform(X_tensor)
+    
+    # Convert back to numpy
+    mappedX = mappedX_tensor.cpu().numpy()
+    
+    if verbose:
+        print(f"   ✅ TorchDR PCA completed: {X.shape} -> {mappedX.shape}")
         
-        # Convert to torch tensor
-        if hasattr(X, 'toarray'):
-            X = X.toarray()
-        X_tensor = torch.tensor(X, dtype=torch.float32, device='cuda')
+    return mappedX
         
-        # Create TorchDR PCA
-        pca = torchdr.MLXPCA(n_components=no_dims)
-        
-        # Fit and transform
-        mappedX_tensor = pca.fit_transform(X_tensor)
-        
-        # Convert back to numpy
-        mappedX = mappedX_tensor.cpu().numpy()
-        
-        if verbose:
-            print(f"   ✅ TorchDR PCA completed: {X.shape} -> {mappedX.shape}")
-            
-        return mappedX
-        
-    except Exception as e:
-        if verbose:
-            print(f"   ⚠️ TorchDR PCA failed ({str(e)}), falling back to CPU")
-        return _pca_cpu(X, no_dims, verbose)
-
+    
 
 def _pca_cpu(X, no_dims, verbose=False):
     """
