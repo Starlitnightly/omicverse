@@ -1514,14 +1514,14 @@ def set_rcParams_defaults():
     rcParams.update(mpl.rcParamsDefault)
 
 
-omics="""
+omics=r"""
    ____            _     _    __                  
   / __ \____ ___  (_)___| |  / /__  _____________ 
  / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
 / /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
 \____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
 """
-days_christmas="""
+days_christmas=r"""
       .
    __/ \__
    \     /

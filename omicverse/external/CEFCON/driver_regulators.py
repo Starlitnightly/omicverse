@@ -29,7 +29,7 @@ def _end_nodes(directed_graph: nx.DiGraph):
 """
 MDS control for a directed network.
 Use efficient graph reduction and then solve the ILP problem using gurobi.
-A set S \subset V of nodes in a graph G=(V,E) is a dominating set if every node v \in V is either an element of S 
+A set S \\subset V of nodes in a graph G=(V,E) is a dominating set if every node v \\in V is either an element of S 
 or adjacent to an element of S.
 Refs: [1] Dominating scale-free networks with variable scaling exponent: heterogeneous networks are not difficult to control.
       New Journal of Physics, 2012.
@@ -146,7 +146,7 @@ def MDScontrol(directed_graph: nx.DiGraph, solver='GUROBI'):
 """
 FVS control for a directed network.
 Use efficient graph reduction and then solve the ILP problem using gurobi. 
-A set S \subset V of nodes in a graph G=(V,E) is a feedback vertex set if the removal of these nodes leaves the graph
+A set S \\subset V of nodes in a graph G=(V,E) is a feedback vertex set if the removal of these nodes leaves the graph
 without feedback loops.
 Refs: [1] Structure-based control of complex networks with nonlinear dynamics.
       Proceedings of the National Academy of Sciences, 2017
