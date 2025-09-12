@@ -13,29 +13,29 @@
 ## Preprocessing（ov.pp）
 - [x] `ov.pp.anndata_to_GPU`：将 AnnData 数据迁移到 GPU（RAPIDS）
 - [ ] `ov.pp.anndata_to_CPU`：将数据迁回 CPU
-- [x] `ov.pp.preprocess`：预处理（GPU 模式走 RAPIDS 流程）
+- [x] `ov.pp.preprocess`：预处理（gpu <span class="tag tag-rapids">rapids</span>）
   - 子流程：`mode='shiftlog|pearson'`
-    - [x] normalize_total/log1p（GPU 模式 RAPIDS）
-    - [x] HVGs=pearson_residuals（GPU 模式 RAPIDS）
+    - [x] normalize_total/log1p（gpu <span class="tag tag-rapids">rapids</span>）
+    - [x] HVGs=pearson_residuals（gpu <span class="tag tag-rapids">rapids</span>）
   - 子流程：`mode='pearson|pearson'`
-    - [x] normalize_pearson_residuals（GPU 模式 RAPIDS）
-    - [x] HVGs=pearson_residuals（GPU 模式 RAPIDS）
-- [x] `ov.pp.scale`：标准化（GPU 模式走 RAPIDS）
-- [x] `ov.pp.pca`：PCA（GPU 模式 RAPIDS；混合模式基于 torch）
+    - [x] normalize_pearson_residuals（gpu <span class="tag tag-rapids">rapids</span>）
+    - [x] HVGs=pearson_residuals（gpu <span class="tag tag-rapids">rapids</span>）
+- [x] `ov.pp.scale`：标准化（gpu <span class="tag tag-rapids">rapids</span>）
+- [x] `ov.pp.pca`：PCA（gpu <span class="tag tag-rapids">rapids</span> | <span class="tag tag-mixed">cpu-gpu-mixed</span>[<span class="tag tag-torch">torch</span>|<span class="tag tag-mlx">mlx</span>]）
 - `ov.pp.neighbors`：邻居图（按 method 标注）
   - [ ] method='umap'（UMAP 邻接估计，CPU）
   - [ ] method='gauss'（高斯核，CPU）
-  - [x] method='rapids'（RAPIDS UMAP 邻接，GPU）
+  - [x] method='rapids'（gpu <span class="tag tag-rapids">rapids</span>）
 - `ov.pp.umap`：UMAP（按实现标注）
   - [ ] Scanpy UMAP（settings.mode='cpu'）
-  - [x] RAPIDS UMAP（settings.mode='gpu'）
-  - [x] PyMDE/torch 路径（settings.mode='cpu-gpu-mixed'）
-- [x] `ov.pp.qc`：质控（GPU 与混合模式均支持）
+  - [x] RAPIDS UMAP（settings.mode='gpu'，gpu <span class="tag tag-rapids">rapids</span>）
+  - [x] PyMDE/torch 路径（settings.mode='cpu-gpu-mixed'，<span class="tag tag-mixed">cpu-gpu-mixed</span>[<span class="tag tag-torch">torch</span>]）
+- [x] `ov.pp.qc`：质控（gpu <span class="tag tag-rapids">rapids</span> | <span class="tag tag-mixed">cpu-gpu-mixed</span>[<span class="tag tag-torch">torch</span>]）
 - [ ] `ov.pp.score_genes_cell_cycle`：细胞周期评分
 - [ ] `ov.pp.sude`：SUDE 降维（CPU 实现）
 
 ## Utils（ov.utils）
-- [x] `ov.utils.mde`：MDE 最小失真嵌入（`device='cuda'` 可用）
+- [x] `ov.utils.mde`：MDE 最小失真嵌入（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - `ov.utils.cluster`：多算法聚类（逐项标注如下）
   - [ ] Leiden（Scanpy 实现，CPU）
   - [ ] Louvain（Scanpy 实现，CPU）
@@ -75,25 +75,25 @@
 - [ ] `ov.single.convert_human_to_mouse_network`：物种基因符号转换
 
 ## Spatial（ov.space）
-- [x] `ov.space.pySTAGATE`：STAGATE 空间聚类（`device='cuda:0'`）
+- [x] `ov.space.pySTAGATE`：STAGATE 空间聚类（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - `ov.space.clusters`：多方法空间聚类（按方法标注）
-  - [x] STAGATE（PyTorch，`device`）
-  - [x] GraphST（PyTorch，`device`）
-  - [x] CAST（PyTorch，`device/gpu_t`）
-  - [x] BINARY（PyTorch，`device`）
+  - [x] STAGATE（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
+  - [x] GraphST（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
+  - [x] CAST（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
+  - [x] BINARY（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - [ ] `ov.space.merge_cluster`：类群合并
 - [ ] `ov.space.Cal_Spatial_Net`：空间邻域网络构建
-- [x] `ov.space.pySTAligner`：STAligner 空间整合（自动/可设 GPU）
-- [x] `ov.space.pySpaceFlow`：SpaceFlow 空间表征（`gpu` 选择设备）
+- [x] `ov.space.pySTAligner`：STAligner 空间整合（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
+- [x] `ov.space.pySpaceFlow`：SpaceFlow 空间表征（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - `ov.space.Tangram`：Tangram 空间解卷积（按模式标注）
-  - [x] mode='clusters'（GPU 可用）
-  - [x] mode='cells'（GPU 可用）
+  - [x] mode='clusters'（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
+  - [x] mode='cells'（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - [ ] `ov.space.svg`：空间变异基因（依赖预处理/统计，非显式 GPU）
-- [x] `ov.space.CAST`：CAST 融合（`device/gpu_t`）
+- [x] `ov.space.CAST`：CAST 融合（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
 - [ ] `ov.space.crop_space_visium`：裁剪图像/坐标
 - [ ] `ov.space.rotate_space_visium`：旋转图像/坐标
 - `ov.space.map_spatial_auto`：自动空间映射（按方法标注）
-  - [x] method='torch'（PyTorch 相位相关，GPU 可用）
+  - [x] method='torch'（<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]）
   - [ ] method='phase'（NumPy/CPU）
   - [ ] method='feature'（特征点匹配，CPU）
   - [ ] method='hybrid'（混合管线，CPU）
