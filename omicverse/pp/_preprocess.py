@@ -1055,21 +1055,40 @@ def louvain(adata, **kwargs):
     examples=["ov.pp.leiden(adata, resolution=1.0)"],
     related=["louvain", "neighbors"]
 )
-def leiden(adata, **kwargs):
+def leiden(
+    adata, resolution=1.0, random_state=0, 
+    key_added='leiden', local_iterations=10, max_levels=10, device='cpu',**kwargs):
     '''
     leiden clustering
     '''
 
-    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
+    if settings.mode =='cpu':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Leiden...")
         #sc.tl.leiden(adata, **kwargs)
         from ._leiden import leiden as _leiden
-        _leiden(adata, **kwargs)
+        _leiden(adata, resolution=resolution, random_state=random_state, 
+            key_added=key_added,**kwargs)
         add_reference(adata,'leiden','Leiden clustering with scanpy')
+    elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate Leiden...")
+        print_gpu_usage_color()
+        from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
+        _leiden(
+            adata,
+            resolution=resolution,
+            random_state=random_state,
+            key_added=key_added,
+            # your API uses these names:
+            local_iterations=local_iterations,
+            max_levels=max_levels,
+            device=device,  # None -> auto-pick
+        )
+        add_reference(adata,'leiden','Leiden clustering with omicverse')
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Leiden...")
         import rapids_singlecell as rsc
-        rsc.tl.leiden(adata, **kwargs)
+        rsc.tl.leiden(adata, resolution=resolution, random_state=random_state, 
+            key_added=key_added,**kwargs)
         add_reference(adata,'leiden','Leiden clustering with RAPIDS')
 
 
