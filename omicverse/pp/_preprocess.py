@@ -1062,7 +1062,9 @@ def leiden(adata, **kwargs):
 
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Leiden...")
-        sc.tl.leiden(adata, **kwargs)
+        #sc.tl.leiden(adata, **kwargs)
+        from ._leiden import leiden as _leiden
+        _leiden(adata, **kwargs)
         add_reference(adata,'leiden','Leiden clustering with scanpy')
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate Leiden...")
