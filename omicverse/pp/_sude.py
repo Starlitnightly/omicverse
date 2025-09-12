@@ -8,6 +8,7 @@ import numpy as np
 from anndata import AnnData
 
 from .._settings import settings, EMOJI, Colors
+from ..utils.registry import register_function
 
 from ..external.sude_py import sude as sude_py
 
@@ -35,6 +36,18 @@ def _choose_representation(adata, use_rep=None, n_pcs=None):
     return X
 
 
+@register_function(
+    aliases=["SUDE降维", "sude", "SUDE", "sude_embedding", "SUDE嵌入"],
+    category="preprocessing",
+    description="SUDE dimensionality reduction for scalable single-cell visualization (CPU implementation).",
+    examples=[
+        "# Compute SUDE embedding",
+        "ov.pp.sude(adata, n_pcs=50, no_dims=2, k1=20)",
+        "# Use a precomputed representation",
+        "ov.pp.sude(adata, use_rep='X_pca', no_dims=2)"
+    ],
+    related=["pp.pca", "pp.umap", "utils.mde", "pp.neighbors"]
+)
 def sude(
     adata: AnnData,
     n_pcs: int | None = None,
@@ -212,5 +225,4 @@ def sude(
         print(f"     {Colors.CYAN}• '{key_obsp_dist}': {Colors.BOLD}Neighborhood distances{Colors.ENDC}{Colors.CYAN} (adata.obsp){Colors.ENDC}")
 
     return adata if copy else None
-
 
