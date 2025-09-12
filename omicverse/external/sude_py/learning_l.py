@@ -539,7 +539,7 @@ def _learning_l_torch(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, ag
         col = []
         Pval = []
         knn_rnn_mat = rnn[get_knn[id_samp]]
-        for i in range(N):
+        for i in tqdm(range(N), desc="Computing P matrix"):
             snn_id = np.isin(get_knn[id_samp], get_knn[id_samp[i]]).astype(int)
             nn_id = np.where(np.max(snn_id, axis=1) == 1)[0]
             snn = np.zeros((1, N))
@@ -591,7 +591,12 @@ def _learning_l_torch(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, ag
     # Convert to torch tensors for GPU computation
     Y_torch = torch.tensor(Y, device=device)
     P = P / (np.sum(P) - N)
-
+    
+    # Convert P matrix to dense tensor on GPU for faster access
+    if verbose:
+        print(f"   Converting sparse P matrix to dense GPU tensor: {P.shape}")
+    P_dense = torch.tensor(P.toarray().astype(np.float32), device=device)
+    
     # Compute data blocks
     no_blocks = math.ceil(N / 3000)
     mark = np.zeros((no_blocks, 2))
@@ -616,37 +621,45 @@ def _learning_l_torch(X_samp, k1, get_knn, rnn, id_samp, no_dims, initialize, ag
         sumQ = 0
         
         for i in range(no_blocks):
-            idx = list(range(int(mark[i, 0]), int(mark[i, 1]) + 1))
-            idx_tensor = torch.tensor(idx, device=device)
+            start_idx = int(mark[i, 0])
+            end_idx = int(mark[i, 1]) + 1
             
             # GPU-accelerated distance computation
-            Y_subset = Y_torch[idx_tensor]
+            Y_subset = Y_torch[start_idx:end_idx]
             D_squared = _compute_pairwise_distances_torch(Y_subset, Y_torch, device)
             
             # GPU-accelerated element-wise operations
             Q1 = 1 / (1 + torch.log(1 + D_squared))
             QQ1 = 1 / (1 + D_squared)
             
-            # Convert sparse matrix operations to dense for GPU
-            P_block = torch.tensor(P[idx, :].toarray().astype(np.float32), device=device)
+            # Use pre-loaded dense P matrix on GPU
+            P_block = P_dense[start_idx:end_idx]
             Pmat = -4 * P_block * Q1 * QQ1
             Qmat = -4 * Q1 ** 2 * QQ1
             
-            # Diagonal correction
-            len_blk = len(idx)
-            for j in range(len_blk):
-                row_sum_P = torch.sum(Pmat[j])
-                row_sum_Q = torch.sum(Qmat[j])
-                Pmat[j, idx[0] + j] = Pmat[j, idx[0] + j] - row_sum_P
-                Qmat[j, idx[0] + j] = Qmat[j, idx[0] + j] - row_sum_Q
+            # GPU-based diagonal correction using vectorized operations
+            len_blk = end_idx - start_idx
+            
+            # Compute row sums on GPU
+            Pmat_row_sums = torch.sum(Pmat, dim=1, keepdim=True)
+            Qmat_row_sums = torch.sum(Qmat, dim=1, keepdim=True)
+            
+            # Create diagonal mask and apply correction on GPU
+            diag_indices = torch.arange(len_blk, device=device) + start_idx
+            diag_mask = torch.zeros_like(Pmat, dtype=torch.bool, device=device)
+            diag_mask[torch.arange(len_blk, device=device), diag_indices] = True
+            
+            # Apply diagonal correction
+            Pmat = Pmat - Pmat_row_sums * diag_mask
+            Qmat = Qmat - Qmat_row_sums * diag_mask
             
             # GPU-accelerated matrix multiplication
             Pgrad_block = Pmat @ Y_torch
             Qgrad_block = Qmat @ Y_torch
             
-            # Update gradients
-            Pgrad_torch[idx_tensor] = Pgrad_block
-            Qgrad_torch[idx_tensor] = Qgrad_block
+            # Update gradients directly on GPU
+            Pgrad_torch[start_idx:end_idx] = Pgrad_block
+            Qgrad_torch[start_idx:end_idx] = Qgrad_block
             
             sumQ += torch.sum(Q1)
         
