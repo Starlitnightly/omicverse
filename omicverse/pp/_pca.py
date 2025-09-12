@@ -611,9 +611,17 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
         if mask_var is not None:
             adata.varm[key_varm] = np.zeros(shape=(adata.n_vars, n_comps))
-            adata.varm[key_varm][mask_var] = pca_.components_.T
+            # Handle CUDA tensors by converting to CPU first
+            components = pca_.components_
+            if hasattr(components, 'cpu'):  # Check if it's a torch tensor
+                components = components.cpu().numpy()
+            adata.varm[key_varm][mask_var] = components.T
         else:
-            adata.varm[key_varm] = pca_.components_.T
+            # Handle CUDA tensors by converting to CPU first
+            components = pca_.components_
+            if hasattr(components, 'cpu'):  # Check if it's a torch tensor
+                components = components.cpu().numpy()
+            adata.varm[key_varm] = components.T
 
         params = dict(
             zero_center=zero_center,
@@ -622,10 +630,19 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         )
         if layer is not None:
             params["layer"] = layer
+        # Handle CUDA tensors for variance and variance_ratio
+        variance = pca_.explained_variance_
+        variance_ratio = pca_.explained_variance_ratio_
+        
+        if hasattr(variance, 'cpu'):  # Check if it's a torch tensor
+            variance = variance.cpu().numpy()
+        if hasattr(variance_ratio, 'cpu'):  # Check if it's a torch tensor
+            variance_ratio = variance_ratio.cpu().numpy()
+            
         adata.uns[key_uns] = dict(
             params=params,
-            variance=pca_.explained_variance_,
-            variance_ratio=pca_.explained_variance_ratio_,
+            variance=variance,
+            variance_ratio=variance_ratio,
         )
 
         logg.info(f"    finished{EMOJI['done']}", time=logg_start)
@@ -640,11 +657,23 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     else:
         logg.info(f"    finished{EMOJI['done']}", time=logg_start)
         if return_info:
+            # Handle CUDA tensors for return values
+            components = pca_.components_
+            variance_ratio = pca_.explained_variance_ratio_
+            variance = pca_.explained_variance_
+            
+            if hasattr(components, 'cpu'):  # Check if it's a torch tensor
+                components = components.cpu().numpy()
+            if hasattr(variance_ratio, 'cpu'):  # Check if it's a torch tensor
+                variance_ratio = variance_ratio.cpu().numpy()
+            if hasattr(variance, 'cpu'):  # Check if it's a torch tensor
+                variance = variance.cpu().numpy()
+                
             return (
                 X_pca,
-                pca_.components_,
-                pca_.explained_variance_ratio_,
-                pca_.explained_variance_,
+                components,
+                variance_ratio,
+                variance,
             )
         else:
             return X_pca
