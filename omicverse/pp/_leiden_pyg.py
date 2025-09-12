@@ -69,11 +69,15 @@ def _build_sparse_ic(src_nodes, dst_nodes, weights, communities, n_nodes, n_comm
 
 # ---------- 本地移动（local move）阶段（稀疏 + γ 在期望项） ----------
 def _local_move_gpu_sparse(A: SparseTensor, resolution: float, n_iterations: int,
-                           random_state: int = 0, log_prefix: str = "") -> torch.Tensor:
+                           random_state: int = 0, log_prefix: str = "", two_m: float = None) -> torch.Tensor:
     torch.manual_seed(random_state)
     n = A.sparse_size(0)
     deg = A.sum(dim=1).to_dense()            # (n,)
-    two_m = A.sum().item()
+    
+    # Use passed two_m if provided (for correct modularity calculation), otherwise compute from A
+    if two_m is None:
+        two_m = A.sum().item()
+    
     if two_m <= 0:
         raise ValueError("Graph has no edges (2m == 0).")
 
@@ -107,7 +111,10 @@ def _local_move_gpu_sparse(A: SparseTensor, resolution: float, n_iterations: int
             stay_gain = torch.full((n,), float("-inf"), device=deg.device, dtype=gains.dtype)
             stay_gain.scatter_reduce_(0, rows, stay_entries, reduce="amax", include_self=False)
 
-        improve = best_gain > (stay_gain + 1e-12)
+        # Only move if the best gain is positive AND better than staying
+        positive_gain = best_gain > 1e-12  # Gain must be positive (improves modularity)
+        better_than_stay = best_gain > (stay_gain + 1e-12)  # Must be better than staying
+        improve = positive_gain & better_than_stay
         new_comm = torch.where(improve, best_c, comm)
 
         moved = int((new_comm != comm).sum().item())
@@ -192,15 +199,23 @@ def leiden_gpu_sparse_multilevel(
     Aj = torch.cat([col, row], dim=0)
     Aw = torch.cat([val, val], dim=0)
     A = SparseTensor(row=Ai, col=Aj, value=Aw, sparse_sizes=(n0, n0)).coalesce()
+    
+    # Store the original 2m value before symmetrization for correct modularity calculation
+    # After symmetrization, A.sum() = 4 * original_edge_sum, but we need 2 * original_edge_sum
+    original_edge_sum = val.sum().item()
+    correct_two_m = 2.0 * original_edge_sum
 
     # 层级循环
-    labels = None  # 原始节点到“当前层社区”的复合映射
+    labels = None  # 原始节点到"当前层社区"的复合映射
     n_nodes = n0
+    current_two_m = correct_two_m  # Start with the original graph's 2m
+    
     for level in range(max_levels):
         logg.info(f"level {level}: nodes={n_nodes}")
         comm_l = _local_move_gpu_sparse(
             A, resolution=resolution, n_iterations=local_iterations,
-            random_state=random_state + level, log_prefix=f"  L{level}"
+            random_state=random_state + level, log_prefix=f"  L{level}",
+            two_m=current_two_m  # Use the correct 2m value for current level
         )
         n_comms = int(comm_l.max().item()) + 1
 
@@ -218,6 +233,8 @@ def leiden_gpu_sparse_multilevel(
         # 收缩社区为超节点图，进入下一层
         A = _contract_graph_sparse(A, comm_l)
         n_nodes = n_comms
+        # Note: current_two_m remains the same across levels because
+        # graph contraction preserves total edge weight
 
     # 连续化 & 回写
     labels, _ = _relabel_contiguous(labels)
