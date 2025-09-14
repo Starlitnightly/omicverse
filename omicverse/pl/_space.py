@@ -599,3 +599,271 @@ def spatial_value(adata,color,library_id,
                                             **colorbar_label_kw})
 
     return ax
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib.patches import Wedge
+import scanpy as sc
+
+def _make_color_dict(cell_type_columns, colors):
+    """统一生成颜色字典"""
+    if colors is None:
+        pal = plt.cm.Set3(np.linspace(0, 1, len(cell_type_columns)))
+        return {ct: pal[i] for i, ct in enumerate(cell_type_columns)}
+    if isinstance(colors, list):
+        assert len(colors) >= len(cell_type_columns), "colors 列表长度不足"
+        return {ct: colors[i] for i, ct in enumerate(cell_type_columns)}
+    # dict
+    return colors
+
+def _draw_pie(ax, x, y, fracs, cols, radius, start_angle=90, alpha=0.8, zorder=5):
+    """在 (x,y) 处画一个半径为 radius 的饼图（数据坐标单位）"""
+    if len(fracs) == 0:
+        return
+    theta = start_angle
+    for f, c in zip(fracs, cols):
+        if f <= 0:
+            continue
+        dtheta = 360.0 * float(f)
+        w = Wedge((x, y), r=radius, theta1=theta, theta2=theta + dtheta,
+                  facecolor=c, edgecolor="none", linewidth=0, alpha=alpha, zorder=zorder)
+        ax.add_patch(w)
+        theta += dtheta
+
+def add_pie_charts_to_spatial(
+    adata,
+    cell_type_columns,
+    ax,
+    spatial_coords=None,
+    pie_radius=15,
+    pie_radius_px=None,      # 新增：按像素指定半径
+    min_proportion=0.01,
+    colors=None,
+    alpha=0.8,
+    add_gray_remainder=True,
+    renormalize_if_sum_gt1=True,
+    zorder=50,               # 提高层级，确保盖住散点
+):
+    """
+    在现有 spatial 图上叠加细胞比例饼图（高效 & 兼容）
+    """
+    if 'spatial' not in adata.obsm:
+        raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
+
+    # 坐标与比例矩阵
+    if spatial_coords is None:
+        spatial_coords = np.asarray(adata.obsm['spatial'])
+        if spatial_coords.shape[0] != adata.n_obs:
+            raise ValueError("spatial 坐标与 obs 数量不一致")
+
+    # 提前把比例列转数值，NaN->0
+    miss = [c for c in cell_type_columns if c not in adata.obs.columns]
+    if len(miss) > 0:
+        raise KeyError(f"以下列在 adata.obs 中不存在：{miss}")
+
+    props_df = (
+        adata.obs[cell_type_columns]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0.0)
+        .astype(float)
+    )
+    props = props_df.to_numpy(copy=False)  # (n_obs, n_types)
+
+    # 颜色映射
+    color_dict = _make_color_dict(cell_type_columns, colors)
+
+    #xlim = ax.get_xlim(); ylim = ax.get_ylim()
+    #ax.set_autoscale_on(False)
+
+    # 逐点绘制（Wedge 高效、不会触发轴自动重算）
+    from tqdm import tqdm
+    for i in tqdm(range(adata.n_obs)):
+        x, y = spatial_coords[i, 0], spatial_coords[i, 1]
+        p = props[i]
+
+        # 过滤小于阈值的类别
+        keep_mask = p >= float(min_proportion)
+        kept_vals = p[keep_mask]
+        kept_cols = [color_dict[cell_type_columns[j]] for j in np.nonzero(keep_mask)[0]]
+
+        total = float(kept_vals.sum())
+
+        # 没有任何类别超过阈值则跳过
+        if total <= 0:
+            continue
+
+        fracs = kept_vals.copy()
+
+        # 总和 > 1 时可选重标（更稳健）
+        if total > 1.0 and renormalize_if_sum_gt1:
+            fracs = fracs / total
+            total = 1.0
+
+        # 总和 < 1 时可选补灰色剩余
+        cols_list = kept_cols
+        if add_gray_remainder and total < 0.999:
+            fracs = np.append(fracs, 1.0 - total)
+            cols_list = cols_list + ['lightgray']
+
+        radius_data = _data_radius_from_pixels(ax, pie_radius_px) if pie_radius_px is not None else pie_radius
+
+        _draw_pie(ax, x, y, fracs, cols_list, radius=radius_data, alpha=alpha, zorder=zorder)
+
+
+        #_draw_pie(ax, x, y, fracs, cols_list, radius=pie_radius, alpha=alpha, zorder=zorder)
+
+    return ax
+
+from matplotlib.patches import Wedge
+
+def _data_radius_from_pixels(ax, r_px: float) -> float:
+    fig = ax.figure
+    fig.canvas.draw()
+    inv = ax.transData.inverted()
+    p0 = inv.transform((0, 0))
+    p1 = inv.transform((1, 1))
+    dx = abs(p1[0] - p0[0]); dy = abs(p1[1] - p0[1])
+    return r_px * min(dx, dy)
+
+def add_pie2spatial(
+    adata,
+    cell_type_columns,
+    ax,
+    pie_radius=15,
+    img_key='hires',
+    spatial_coords=None,
+    pie_radius_px=None,          # 可选：按像素给半径
+    min_proportion=0.01,
+    colors=None,
+    alpha=0.9,
+    remainder='gap',             # ★ 新增：'gap' | 'gray' | 'outline'
+    remainder_color='lightgray',
+    remainder_alpha=0.5,
+    renormalize_if_sum_gt1=True,
+    zorder=80,
+    legend_loc=(1.05, 1.0),
+    ncols=3,
+):
+    if 'spatial' not in adata.obsm:
+        raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
+
+    # 坐标与比例矩阵
+    if spatial_coords is None:
+        spatial_coords = np.asarray(adata.obsm['spatial'])
+        if spatial_coords.shape[0] != adata.n_obs:
+            raise ValueError("spatial 坐标与 obs 数量不一致")
+        
+        spatial_key=list(adata.uns['spatial'].keys())[0]
+        spatial_coords=spatial_coords*adata.uns['spatial'][spatial_key]['scalefactors'][f'tissue_{img_key}_scalef']
+
+
+    props = (
+        adata.obs[cell_type_columns]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0.0)
+        .to_numpy(dtype=float, copy=False)
+    )
+
+    # 准备颜色
+    if colors is None:
+        pal = plt.cm.Set3(np.linspace(0, 1, len(cell_type_columns)))
+        color_dict = {ct: pal[i] for i, ct in enumerate(cell_type_columns)}
+    elif isinstance(colors, list):
+        color_dict = {ct: colors[i] for i, ct in enumerate(cell_type_columns)}
+    else:
+        color_dict = colors
+
+    # 冻结范围，计算一次数据半径
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    ax.set_autoscale_on(False)
+    radius_data = _data_radius_from_pixels(ax, pie_radius_px) if pie_radius_px is not None else pie_radius
+
+    from tqdm import trange
+    for i in trange(adata.n_obs):
+        x, y = spatial_coords[i, 0], spatial_coords[i, 1]
+        p = props[i]
+
+        # 过滤阈值以下的类别
+        keep = p >= float(min_proportion)
+        vals = p[keep]
+        cols = [color_dict[cell_type_columns[j]] for j in np.nonzero(keep)[0]]
+
+        total = float(vals.sum())
+        if total <= 0:
+            continue
+
+        fracs = vals.copy()
+        if total > 1.0 and renormalize_if_sum_gt1:
+            fracs = fracs / total
+            total = 1.0
+
+        # 画已选类别
+        theta = 90.0
+        for f, c in zip(fracs, cols):
+            if f <= 0:
+                continue
+            dtheta = 360.0 * float(f)
+            ax.add_patch(Wedge((x, y), radius_data, theta, theta + dtheta,
+                               facecolor=c, edgecolor='none', linewidth=0,
+                               alpha=alpha, zorder=zorder, clip_on=False))
+            theta += dtheta
+
+        # 处理“剩余比例” → 缺口/灰块/描边
+        remain = max(0.0, 1.0 - total)
+        if remain > 1e-6:
+            if remainder == 'gray':
+                dtheta = 360.0 * remain
+                ax.add_patch(Wedge((x, y), radius_data, theta, theta + dtheta,
+                                   facecolor=remainder_color, edgecolor='none',
+                                   linewidth=0, alpha=remainder_alpha,
+                                   zorder=zorder, clip_on=False))
+                # theta += dtheta  # 不需要继续了
+            elif remainder == 'outline':
+                dtheta = 360.0 * remain
+                ax.add_patch(Wedge((x, y), radius_data, theta, theta + dtheta,
+                                   facecolor='none', edgecolor=remainder_color,
+                                   linewidth=0.8, alpha=1.0,
+                                   zorder=zorder, clip_on=False))
+                # 'gap' 模式就是不画，让背景露出来
+
+    ax.set_xlim(xlim); ax.set_ylim(ylim)
+    # 图例（与饼图颜色一致）
+    #color_dict = _make_color_dict(cell_type_columns, pie_kwargs.get("colors", None) if pie_kwargs else None)
+    legend_elements = [
+        plt.Line2D([0], [0], marker='o', color='w',
+                   markerfacecolor=colors[ct], markersize=10, label=ct)
+        for ct in cell_type_columns
+    ]
+    ax.legend(handles=legend_elements, bbox_to_anchor=legend_loc, loc='lower center',ncols=ncols,)
+
+    return ax
+
+from matplotlib.patches import Wedge
+
+def _data_radius_from_pixels(ax, r_px: float) -> float:
+    """把屏幕上的像素半径换算成数据坐标半径（取 x/y 两个方向的最小值以保持近似圆形）"""
+    # 轴的可视范围（数据单位）
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    # 轴在屏幕上的宽高（像素）
+    bbox = ax.get_window_extent()
+    w_px = bbox.width
+    h_px = bbox.height
+    # 每像素对应的数据单位
+    rx = abs(x1 - x0) / max(w_px, 1e-9)
+    ry = abs(y1 - y0) / max(h_px, 1e-9)
+    return r_px * min(rx, ry)
+
+def _draw_pie(ax, x, y, fracs, cols, radius, start_angle=90, alpha=0.8, zorder=50):
+    theta = start_angle
+    for f, c in zip(fracs, cols):
+        if f <= 0:
+            continue
+        dtheta = 360.0 * float(f)
+        w = Wedge((x, y), r=radius, theta1=theta, theta2=theta + dtheta,
+                  facecolor=c, edgecolor="none", linewidth=0,
+                  alpha=alpha, zorder=zorder, clip_on=False)  # 关键：clip_on=False
+        ax.add_patch(w)
+        theta += dtheta
