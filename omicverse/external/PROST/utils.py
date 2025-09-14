@@ -266,7 +266,7 @@ def pre_process(adata, percentage = 0.1, var_stabilization = True):
         Expression matrix of genes that `percentage` greater than threshold.
     """     
     if sp.issparse(adata.X):
-        rawcount = adata.X.A.T
+        rawcount = adata.X.toarray().T
     else:
         rawcount = adata.X.T
         
@@ -309,7 +309,7 @@ def refine_clusters(result, adj, p=0.5):
     Check post_processed cluster label.
     """
     if sp.issparse(adj):
-        adj = adj.A
+        adj = adj.toarray()
 
     pred_after = []  
     for i in tqdm(range(result.shape[0])):
@@ -604,12 +604,12 @@ def spatial_autocorrelation(adata, layer='counts',
 
     if layer=='X' or layer=='raw':
         if sp.issparse(adata.X):
-            genes_exp = adata.X.A
+            genes_exp = adata.X.toarray()
         else:
             genes_exp = adata.X     
     else:
         if sp.issparse(adata.layers[layer]):
-            genes_exp = adata.layers[layer].A
+            genes_exp = adata.layers[layer].toarray()
         else:
             genes_exp = adata.layers[layer]
     spatial = adata.obsm['spatial'] 
@@ -807,7 +807,7 @@ def simulateH5Data(adata, rr=0.0, mu=0.0, sigma=1.0, alpha=1.0):
     # get expression matrix
     issparse = 0
     if sp.issparse(adata.X):
-        data_ori_dense = adata.X.A
+        data_ori_dense = adata.X.toarray()
         issparse = 1
     else:
         data_ori_dense = adata.X
