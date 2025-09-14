@@ -11,7 +11,7 @@ import gzip
 import os
 
 import numpy as np
-from numpy import asfarray,arange,minimum,abs,mat,sum,power,mean,array,std,log2,log10
+from numpy import asarray,arange,minimum,abs,mat,sum,power,mean,array,std,log2,log10
 import pandas as pd
 from pandas import DataFrame,read_csv,ExcelWriter
 from pickle import dump,load
@@ -99,7 +99,7 @@ class Annotator(object):
     @staticmethod
     def p_adjust_bh(p):
         """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
-        p = asfarray(p)
+        p = asarray(p, dtype=float)
         by_descend = p.argsort()[::-1]
         by_orig = by_descend.argsort()
         steps = float(len(p)) / arange(len(p), 0, -1)
