@@ -15,7 +15,7 @@ import math
 def plot_gene(adata, platform="visium", sorted_by='PI', input_data=None, size=2, 
               top_n=25, ncols_each_sheet=5, nrows_each_sheet=5,save_path=None):
     if sp.issparse(adata.X):
-        gene_data = adata.X.A.T
+        gene_data = adata.X.toarray().T
     else:
         gene_data = adata.X.T
     if platform=="visium":

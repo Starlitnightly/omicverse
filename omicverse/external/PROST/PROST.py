@@ -115,8 +115,8 @@ def run_PNN(adata, SEED, platform=None, init="leiden", n_clusters=5, res=0.2,
     pca = PCA(n_components=num_pcs)
     print("\nRunning PCA ...")
     if sp.issparse(adata.X):
-        pca.fit(adata.X.A)
-        embed=pca.transform(adata.X.A)
+        pca.fit(adata.X.toarray())
+        embed=pca.transform(adata.X.toarray())
     else:
         pca.fit(adata.X)
         embed=pca.transform(adata.X)
@@ -207,8 +207,8 @@ def run_PNN_sparse(adata, SEED, init="leiden", n_clusters=5, res=0.5,
     pca = PCA(n_components=num_pcs)
     print("\nRunning PCA ...")
     if sp.issparse(adata.X):
-        pca.fit(adata.X.A)
-        embed=pca.transform(adata.X.A)
+        pca.fit(adata.X.toarray())
+        embed=pca.transform(adata.X.toarray())
     else:
         pca.fit(adata.X)
         embed=pca.transform(adata.X)
