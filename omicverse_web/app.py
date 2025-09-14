@@ -609,7 +609,7 @@ def run_tool(tool):
                 n_prin_comps=int(params.get('n_prin_comps', 30))
             )
             try:
-                sc.tl.scrublet(current_adata, batch_key=batch_key, **scrublet_kwargs)
+                sc.pp.scrublet(current_adata, batch_key=batch_key, **scrublet_kwargs)
             except Exception as e:
                 return jsonify({'error': f'Scrublet 执行失败: {e}'}), 400
 
@@ -630,6 +630,17 @@ def run_tool(tool):
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
 
+        # Sync adaptor with modified AnnData so plot endpoints can see new embeddings
+        try:
+            if current_adaptor is not None:
+                current_adaptor.adata = current_adata
+                current_adaptor.n_obs = current_adata.n_obs
+                current_adaptor.n_vars = current_adata.n_vars
+                # Rebuild indexes/embeddings list
+                current_adaptor._build_indexes()
+        except Exception:
+            pass
+
         # Return updated info
         info = {
             'filename': current_filename,
@@ -643,7 +654,11 @@ def run_tool(tool):
         return jsonify(info)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Provide more helpful message if scrublet missing
+        msg = str(e)
+        if 'scrublet' in msg.lower():
+            msg = '需要安装 scrublet 包才能运行双细胞检测（pip install scrublet）'
+        return jsonify({'error': msg}), 500
 
 def get_discrete_colors(n_categories):
     """获取离散分类颜色"""

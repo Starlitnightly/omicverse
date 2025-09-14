@@ -286,3 +286,12 @@ html.app-skin-dark .file-upload-area:hover {
 }
 .nxl-navigation .nxl-link .nxl-micon i { transition: color .2s ease; }
 .nxl-navigation .nxl-link:hover .nxl-micon i { color: var(--ov-primary) !important; }
+
+/* Ensure parameter switches stack vertically (one per line) */
+#parameter-content .form-check.form-switch {
+  display: block !important;
+  width: 100% !important;
+}
+#parameter-content .form-check.form-switch + .form-check.form-switch {
+  margin-top: 0.5rem !important;
+}
