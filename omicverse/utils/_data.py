@@ -20,6 +20,8 @@ from .._settings import Colors  # Import Colors from settings
 from .registry import register_function
 
 
+
+
 @register_function(
     aliases=["读取数据", "read", "load_data", "数据读取", "file_reader"],
     category="utils",
@@ -38,9 +40,18 @@ from .registry import register_function
     ],
     related=["utils.read_csv", "utils.read_h5ad", "pp.preprocess"]
 )
-def read(path,**kwargs):
+def read(path,backend='python',**kwargs):
     if path.split('.')[-1]=='h5ad':
-        return sc.read(path,**kwargs)
+        if backend=='python':
+            return sc.read_h5ad(path,**kwargs)
+        elif backend=='rust':
+            try:
+                import snapatac2 as snap
+            except ImportError:
+                raise ImportError('snapatac2 is not installed. Please install it with `pip install snapatac2`')
+            print(f'{Colors.GREEN}Using snapatac2 to read h5ad file{Colors.ENDC}')
+            print(f'{Colors.WARNING}You should run adata.close() after analysis{Colors.ENDC}')
+            return snap.read(path,**kwargs)
     elif path.split('.')[-1]=='csv':
         return pd.read_csv(path,**kwargs)
     elif path.split('.')[-1]=='tsv' or path.split('.')[-1]=='txt':
