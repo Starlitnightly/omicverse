@@ -45,12 +45,12 @@ def prepare_for_PI(adata, grid_size=20, percentage=0.1, platform="visium"):
 def minmax_scaler(adata,layer='counts'):
     if layer=='X' or layer=='raw':
         if sp.issparse(adata.X):
-            data = adata.X.A.T
+            data = adata.X.toarray().T
         else:
             data = adata.X.T      
     else:
         if sp.issparse(adata.layers[layer]):
-            data = adata.layers[layer].A.T
+            data = adata.layers[layer].toarray().T
         else:
             data = adata.layers[layer].T   
 
@@ -169,7 +169,7 @@ def _iget_binary(arglists):
 def get_binary(adata, platform="visium", method = "iterative", multiprocess=False):
     gene_data = adata.uns['gau_fea']
     if sp.issparse(adata.X):
-        raw_gene_data = adata.X.A.T
+        raw_gene_data = adata.X.toarray().T
     else:
         raw_gene_data = adata.X.T
 
