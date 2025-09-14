@@ -306,6 +306,7 @@ class SingleCellAnalysis {
     }
 
     createNewPlot(embedding, colorBy) {
+        this.currentEmbedding = this.currentEmbedding;
         this.showStatus('正在生成图表...', true);
 
         fetch('/api/plot', {
@@ -985,6 +986,7 @@ class SingleCellAnalysis {
     }
 
     selectAnalysisCategory(category) {
+        this.currentCategory = category;
         const parameterContent = document.getElementById('parameter-content');
         
         // Clear previous content
@@ -992,17 +994,29 @@ class SingleCellAnalysis {
         
         // Generate category-specific tools
         const categoryTools = {
+            // 预处理：归一化、对数化、缩放
             'preprocessing': [
-                { id: 'normalize', name: '标准化', icon: 'fas fa-balance-scale', desc: '细胞总数标准化' },
-                { id: 'log1p', name: '对数转换', icon: 'fas fa-calculator', desc: 'Log1p转换' },
-                { id: 'scale', name: '数据缩放', icon: 'fas fa-expand-arrows-alt', desc: 'Z-score标准化' },
+                { id: 'normalize', name: '归一化', icon: 'fas fa-balance-scale', desc: 'Total-count 归一化' },
+                { id: 'log1p', name: '对数转换', icon: 'fas fa-calculator', desc: '自然对数 log1p' },
+                { id: 'scale', name: '数据缩放', icon: 'fas fa-expand-arrows-alt', desc: 'Z-score 标准化' }
+            ],
+            // 质量控制：过滤细胞、过滤基因、去除双细胞
+            'qc': [
+                { id: 'filter_cells', name: '过滤细胞', icon: 'fas fa-filter', desc: '按基因数/UMI/线粒体比例过滤' },
+                { id: 'filter_genes', name: '过滤基因', icon: 'fas fa-tasks', desc: '按表达细胞数/均值过滤' },
+                { id: 'doublets', name: '去除双细胞', icon: 'fas fa-user-times', desc: '识别并去除潜在双细胞' }
+            ],
+            // 特征选择：高变基因
+            'feature': [
                 { id: 'hvg', name: '高变基因', icon: 'fas fa-dna', desc: '选择高变基因' }
             ],
+            // 降维
             'dimreduction': [
                 { id: 'pca', name: 'PCA分析', icon: 'fas fa-chart-line', desc: '主成分分析' },
                 { id: 'umap', name: 'UMAP降维', icon: 'fas fa-map', desc: '统一流形近似投影' },
                 { id: 'tsne', name: 't-SNE降维', icon: 'fas fa-dot-circle', desc: 't-分布随机邻域嵌入' }
             ],
+            // 聚类
             'clustering': [
                 { id: 'neighbors', name: '邻域计算', icon: 'fas fa-network-wired', desc: 'K近邻图构建' },
                 { id: 'leiden', name: 'Leiden聚类', icon: 'fas fa-object-group', desc: '高质量社区检测' },
@@ -1020,17 +1034,21 @@ class SingleCellAnalysis {
         
         tools.forEach(tool => {
             const toolDiv = document.createElement('div');
-            toolDiv.className = 'mb-3 p-3 border rounded fade-in';
+            toolDiv.className = 'mb-3 p-3 border rounded fade-in c-pointer';
             toolDiv.innerHTML = `
                 <div class="d-flex align-items-center mb-2">
                     <i class="${tool.icon} me-2 text-primary"></i>
                     <strong>${tool.name}</strong>
                 </div>
-                <p class="text-muted small mb-2">${tool.desc}</p>
-                <button class="btn btn-sm btn-primary w-100" onclick="${tool.id === 'coming_soon' ? 'singleCellApp.showComingSoon()' : (tool.id === 'log1p' ? `singleCellApp.runTool('${tool.id}')` : `singleCellApp.showParameterDialog('${tool.id}')`)}" ${!this.currentData && tool.id !== 'coming_soon' ? 'disabled' : ''}>
-                    ${tool.id === 'coming_soon' ? '敬请期待' : '设置参数'}
-                </button>
-            `;
+                <p class="text-muted small mb-0">${tool.desc}</p>`;
+            if (tool.id === 'coming_soon') {
+                toolDiv.onclick = () => this.showComingSoon();
+            } else if (this.currentData) {
+                toolDiv.onclick = () => this.renderParameterForm(tool.id, tool.name, tool.desc, category);
+            } else {
+                toolDiv.style.opacity = 0.6;
+                toolDiv.title = '请先上传数据';
+            }
             parameterContent.appendChild(toolDiv);
         });
         
@@ -1047,12 +1065,11 @@ class SingleCellAnalysis {
         return names[category] || category;
     }
 
-    showParameterDialog(tool) {
-        this.currentTool = tool;
-        const modal = new bootstrap.Modal(document.getElementById('parameterModal'));
-        const title = document.getElementById('parameterModalTitle');
-        const body = document.getElementById('parameterModalBody');
+    showParameterDialog(tool) { this.renderParameterForm(tool); }
 
+    renderParameterForm(tool, toolName = '', toolDesc = '') {
+        this.currentTool = tool;
+        const parameterContent = document.getElementById('parameter-content');
         const toolNames = {
             'normalize': '标准化',
             'scale': '数据缩放',
@@ -1062,16 +1079,73 @@ class SingleCellAnalysis {
             'tsne': 't-SNE降维',
             'neighbors': '邻域计算',
             'leiden': 'Leiden聚类',
-            'louvain': 'Louvain聚类'
+            'louvain': 'Louvain聚类',
+            'log1p': '对数转换'
         };
+        const title = toolName || toolNames[tool] || '参数设置';
+        const desc = toolDesc || '';
 
-        title.textContent = toolNames[tool] + ' - 参数设置';
-        body.innerHTML = this.getParameterHTML(tool);
-        modal.show();
+        const formHTML = `
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                        <h6 class="mb-1"><i class="fas fa-sliders-h me-2 text-primary"></i>${title}</h6>
+                        ${desc ? `<small class="text-muted">${desc}</small>` : ''}
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.selectAnalysisCategory('${singleCellApp.currentCategory || 'preprocessing'}')">返回工具列表</button>
+                </div>
+                <div class="border rounded p-3">
+                    ${this.getParameterHTML(tool)}
+                    <div class="d-grid mt-3">
+                        <button class="btn btn-primary" id="inlineRunBtn">运行</button>
+                    </div>
+                </div>
+            </div>`;
+        parameterContent.innerHTML = formHTML;
+
+        const runBtn = document.getElementById('inlineRunBtn');
+        if (runBtn) {
+            runBtn.onclick = () => {
+                const params = {};
+                const inputs = parameterContent.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    if (input.type === 'number') params[input.id] = parseFloat(input.value);
+                    else params[input.id] = input.value;
+                });
+                this.runTool(tool, params);
+            };
+        }
     }
 
     getParameterHTML(tool) {
         const parameters = {
+            'filter_cells': `
+                <div class="parameter-input">
+                    <label>最小基因数(min_genes)</label>
+                    <input type="number" class="form-control" id="min_genes" value="200" min="0" max="10000">
+                </div>
+                <div class="parameter-input">
+                    <label>最小UMI数(min_counts)</label>
+                    <input type="number" class="form-control" id="min_counts" value="0" min="0" max="1000000">
+                </div>
+                <div class="parameter-input">
+                    <label>最大线粒体比例(%)</label>
+                    <input type="number" class="form-control" id="max_mt_percent" value="20" min="0" max="100">
+                </div>
+            `,
+            'filter_genes': `
+                <div class="parameter-input">
+                    <label>最少表达细胞数(min_cells)</label>
+                    <input type="number" class="form-control" id="min_cells" value="3" min="0" max="100000">
+                </div>
+                <div class="parameter-input">
+                    <label>最小均值(min_mean)</label>
+                    <input type="number" class="form-control" id="min_mean" value="0" min="0" step="0.01">
+                </div>
+            `,
+            'doublets': `
+                <div class="alert alert-warning">双细胞去除暂未实现，敬请期待。</div>
+            `,
             'normalize': `
                 <div class="parameter-input">
                     <label>目标总数</label>
@@ -1621,6 +1695,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global functions for HTML onclick handlers
 function selectAnalysisCategory(category) {
+        this.currentCategory = category;
     singleCellApp.selectAnalysisCategory(category);
 }
 

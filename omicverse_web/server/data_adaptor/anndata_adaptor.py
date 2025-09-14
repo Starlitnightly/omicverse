@@ -158,12 +158,14 @@ class HighPerformanceAnndataAdaptor:
 
     def get_embedding_fbs(self, embedding_name: str) -> bytes:
         """Get embedding coordinates as FlatBuffers"""
-        embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
-
-        if embedding_key not in self.adata.obsm:
-            raise KeyError(f"Embedding '{embedding_name}' not found")
-
-        coords = self.adata.obsm[embedding_key]
+        # Support synthetic random embedding when no embedding available or explicitly requested
+        if embedding_name == 'random' or embedding_name == 'X_random':
+            coords = self._get_random_embedding()
+        else:
+            embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+            if embedding_key not in self.adata.obsm:
+                raise KeyError(f"Embedding '{embedding_name}' not found")
+            coords = self.adata.obsm[embedding_key]
 
         # Convert to DataFrame for consistent serialization
         df = pd.DataFrame(
@@ -291,8 +293,12 @@ class HighPerformanceAnndataAdaptor:
 
         if data_type == 'embedding':
             embedding_name = kwargs.get('embedding_name')
-            embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
-            coords = self.adata.obsm[embedding_key][chunk_start:chunk_end]
+            if embedding_name == 'random' or embedding_name == 'X_random':
+                coords_full = self._get_random_embedding()
+                coords = coords_full[chunk_start:chunk_end]
+            else:
+                embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+                coords = self.adata.obsm[embedding_key][chunk_start:chunk_end]
 
             df = pd.DataFrame(
                 coords[:, :2],
@@ -331,3 +337,14 @@ class HighPerformanceAnndataAdaptor:
         self._expression_cache.clear()
         self._embedding_cache.clear()
         logger.info("Data adaptor closed")
+
+    def _get_random_embedding(self):
+        """Generate or return cached random 2D embedding for fallback visualization."""
+        if 'X_random' in self._embedding_cache:
+            return self._embedding_cache['X_random']
+        # Seed based on dataset path for determinism
+        seed = abs(hash(self.data_path)) % (2**32 - 1)
+        rng = np.random.RandomState(seed)
+        coords = rng.rand(self.n_obs, 2)
+        self._embedding_cache['X_random'] = coords
+        return coords

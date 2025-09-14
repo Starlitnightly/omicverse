@@ -91,6 +91,10 @@ def upload_file():
             'success': True
         }
 
+        # If no embeddings available, provide a synthetic 'random' embedding to avoid empty canvas
+        if not response_data['embeddings']:
+            response_data['embeddings'] = ['random']
+
         return jsonify(response_data)
 
     except Exception as e:
@@ -152,18 +156,40 @@ def get_embedding_data(embedding_name):
 
     try:
         chunk_index = request.args.get('chunk', 0, type=int)
+        out_format = request.args.get('format', 'fbs')
 
         if chunk_index > 0:
-            # Chunked data request
-            fbs_data = current_adaptor.get_chunked_data('embedding', chunk_index, embedding_name=embedding_name)
+            if out_format == 'json':
+                # JSON slice response
+                if embedding_name == 'random' or embedding_name == 'X_random':
+                    coords = current_adaptor._get_random_embedding()
+                else:
+                    embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+                    coords = current_adaptor.adata.obsm[embedding_key]
+                start = chunk_index * current_adaptor.chunk_size
+                end = min(start + current_adaptor.chunk_size, current_adaptor.n_obs)
+                return jsonify({'x': coords[start:end, 0].tolist(), 'y': coords[start:end, 1].tolist()})
+            else:
+                # FBS slice
+                fbs_data = current_adaptor.get_chunked_data('embedding', chunk_index, embedding_name=embedding_name)
+                response = make_response(fbs_data)
+                response.headers['Content-Type'] = 'application/octet-stream'
+                response.headers['Cache-Control'] = 'public, max-age=3600'
+                return response
         else:
-            # Full data request
-            fbs_data = current_adaptor.get_embedding_fbs(embedding_name)
-
-        response = make_response(fbs_data)
-        response.headers['Content-Type'] = 'application/octet-stream'
-        response.headers['Cache-Control'] = 'public, max-age=3600'
-        return response
+            if out_format == 'json':
+                if embedding_name == 'random' or embedding_name == 'X_random':
+                    coords = current_adaptor._get_random_embedding()
+                else:
+                    embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+                    coords = current_adaptor.adata.obsm[embedding_key]
+                return jsonify({'x': coords[:, 0].tolist(), 'y': coords[:, 1].tolist()})
+            else:
+                fbs_data = current_adaptor.get_embedding_fbs(embedding_name)
+                response = make_response(fbs_data)
+                response.headers['Content-Type'] = 'application/octet-stream'
+                response.headers['Cache-Control'] = 'public, max-age=3600'
+                return response
 
     except KeyError as e:
         return jsonify({'error': f'Embedding not found: {embedding_name}'}), 404
@@ -413,6 +439,43 @@ def run_tool(tool):
                 sc.pp.neighbors(current_adata)
 
             sc.tl.louvain(current_adata, resolution=resolution)
+
+        elif tool == 'filter_cells':
+            # Quality control: filter cells by gene counts/UMI/mt% if available
+            min_genes = params.get('min_genes', None)
+            min_counts = params.get('min_counts', None)
+            max_mt_percent = params.get('max_mt_percent', None)
+            if min_genes is not None:
+                sc.pp.filter_cells(current_adata, min_genes=int(min_genes))
+            if min_counts is not None and min_counts > 0:
+                sc.pp.filter_cells(current_adata, min_counts=int(min_counts))
+            # Remove cells by mitochondrial percent if present
+            if max_mt_percent is not None:
+                mt_col = None
+                for c in current_adata.obs.columns:
+                    lc = c.lower()
+                    if 'mt' in lc and '%' in lc or 'pct_counts_mt' in lc or 'percent_mt' in lc:
+                        mt_col = c
+                        break
+                if mt_col is not None:
+                    keep = current_adata.obs[mt_col] <= float(max_mt_percent)
+                    current_adata._inplace_subset_obs(keep.values)
+
+        elif tool == 'filter_genes':
+            min_cells = params.get('min_cells', None)
+            if min_cells is not None:
+                sc.pp.filter_genes(current_adata, min_cells=int(min_cells))
+            # Optional min_mean filter
+            min_mean = params.get('min_mean', None)
+            if min_mean is not None and hasattr(current_adata, 'X'):
+                import numpy as _np
+                X = current_adata.X.toarray() if hasattr(current_adata.X, 'toarray') else current_adata.X
+                gene_means = _np.asarray(X).mean(axis=0).A1 if hasattr(_np.asarray(X), 'A1') else _np.asarray(X).mean(axis=0)
+                keep = gene_means >= float(min_mean)
+                current_adata._inplace_subset_var(keep)
+
+        elif tool == 'doublets':
+            return jsonify({'error': 'Doublet removal not implemented yet'}), 400
 
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
