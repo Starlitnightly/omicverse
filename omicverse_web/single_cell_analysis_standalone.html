@@ -23,6 +23,9 @@
     <link rel="stylesheet" href="static/css/single-cell-fixed.css">
     <!-- Plotly.js for visualization -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- High-performance visualization dependencies -->
+    <script src="node_modules/regl/dist/regl.js"></script>
+    <script src="node_modules/gl-matrix/gl-matrix.js"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Feather图标替换为Font Awesome图标 -->
@@ -505,6 +508,14 @@
     <script src="static/js/vendors.min.js"></script>
     <script src="static/js/common-init.min.js"></script>
     <!-- Single Cell Analysis JavaScript -->
+    <!-- High-performance visualization modules -->
+    <script src="static/js/dataManager.js"></script>
+    <script src="static/js/streamingDataLoader.js"></script>
+    <script src="static/js/performanceMonitor.js"></script>
+    <script src="static/js/util/typedCrossfilter/index.js" type="module"></script>
+    <script src="static/js/components/scatterplot/scatterplot.js" type="module"></script>
+
+    <!-- Main application -->
     <script src="static/js/single-cell.js"></script>
 </body>
 </html>

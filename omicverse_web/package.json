@@ -1,0 +1,18 @@
+{
+  "name": "omicverse_web",
+  "version": "1.0.0",
+  "description": "基于Web的单细胞数据分析平台，提供直观的可视化界面和强大的分析功能。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "gl-matrix": "^3.4.4",
+    "regl": "^2.1.1",
+    "regl-scatterplot": "^1.14.1"
+  }
+}

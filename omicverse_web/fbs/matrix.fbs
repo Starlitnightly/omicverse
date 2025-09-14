@@ -1,0 +1,45 @@
+// FlatBuffer schema for matrix data serialization
+// Based on CellxGene's NetEncoding schema
+
+namespace NetEncoding;
+
+union TypedArray {
+  Int32Array,
+  Uint32Array,
+  Float32Array,
+  Float64Array,
+  JSONEncodedArray
+}
+
+table Int32Array {
+  data: [int32];
+}
+
+table Uint32Array {
+  data: [uint32];
+}
+
+table Float32Array {
+  data: [float32];
+}
+
+table Float64Array {
+  data: [float64];
+}
+
+table JSONEncodedArray {
+  data: [uint8];
+}
+
+table Column {
+  u: TypedArray;
+}
+
+table Matrix {
+  n_rows: uint32;
+  n_cols: uint32;
+  columns: [Column];
+  col_index: TypedArray;
+}
+
+root_type Matrix;

@@ -7,6 +7,11 @@ class SingleCellAnalysis {
         this.currentData = null;
         this.currentTool = null;
         this.currentTheme = 'light';
+
+        // Initialize high-performance components
+        this.dataManager = new DataManager();
+        this.webglScatterplot = null;
+
         this.init();
     }
 
@@ -560,7 +565,7 @@ class SingleCellAnalysis {
                 x: frameX,
                 y: frameY,
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl',
                 marker: {
                     color: 'rgba(31, 119, 180, 0.6)', // 临时颜色
                     size: data.size || 3,
@@ -684,7 +689,7 @@ class SingleCellAnalysis {
                             x: categoryX,
                             y: categoryY,
                             mode: 'markers',
-                            type: 'scatter',
+                            type: 'scattergl',
                             name: category, // 设置trace名称，这将显示在legend中
                             marker: {
                                 color: color,
@@ -710,7 +715,7 @@ class SingleCellAnalysis {
                     x: data.x,
                     y: data.y,
                     mode: 'markers',
-                    type: 'scatter',
+                    type: 'scattergl',
                     marker: markerConfig,
                     text: data.hover_text,
                     hovertemplate: '%{text}<extra></extra>',
@@ -728,7 +733,7 @@ class SingleCellAnalysis {
                 x: data.x,
                 y: data.y,
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl',
                 marker: markerConfig,
                 text: data.hover_text,
                 hovertemplate: '%{text}<extra></extra>',
@@ -753,7 +758,7 @@ class SingleCellAnalysis {
                 x: data.x || [],
                 y: data.y || [],
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl',
                 marker: {
                     color: 'blue',
                     size: data.size || 3,
@@ -1376,7 +1381,7 @@ class SingleCellAnalysis {
             x: [1, 2, 3, 4, 5],
             y: [1, 2, 3, 4, 5],
             mode: 'markers',
-            type: 'scatter',
+            type: 'scattergl',
             marker: {color: 'red', size: 10}
         }];
         

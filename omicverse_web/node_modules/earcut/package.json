@@ -1,0 +1,40 @@
+{
+  "name": "earcut",
+  "version": "3.0.2",
+  "description": "The fastest and smallest JavaScript polygon triangulation library for your WebGL apps",
+  "main": "src/earcut.js",
+  "type": "module",
+  "exports": "./src/earcut.js",
+  "files": [
+    "src/earcut.js",
+    "dist/earcut.min.js",
+    "dist/earcut.dev.js"
+  ],
+  "scripts": {
+    "pretest": "eslint src test/test.js bench/*.js viz/viz.js",
+    "test": "node --test",
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build",
+    "cov": "node --test --experimental-test-coverage"
+  },
+  "author": "Vladimir Agafonkin",
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "benchmark": "^2.1.4",
+    "eslint": "^9.31.0",
+    "eslint-config-mourner": "^4.1.0",
+    "rollup": "^4.45.1"
+  },
+  "eslintConfig": {
+    "extends": "mourner",
+    "parserOptions": {
+      "sourceType": "module",
+      "ecmaVersion": 2020
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mapbox/earcut.git"
+  }
+}

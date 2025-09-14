@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file, send_from_directory, make_response
 from flask_cors import CORS
 import scanpy as sc
 import numpy as np
@@ -8,6 +8,12 @@ import tempfile
 from werkzeug.utils import secure_filename
 import warnings
 import json
+import logging
+from http import HTTPStatus
+from concurrent.futures import ThreadPoolExecutor
+
+# Import our high-performance data adaptor
+from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
 
 
 
@@ -20,13 +26,15 @@ CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
 
-# Global variable to store current AnnData object
+# Global variables to store current data and adaptor
+current_adaptor = None
 current_adata = None
 current_filename = None
+thread_pool = ThreadPoolExecutor(max_workers=4)
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
-    global current_adata, current_filename
+    global current_adaptor, current_adata, current_filename
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -44,39 +52,201 @@ def upload_file():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # Load AnnData
-        current_adata = sc.read_h5ad(filepath)
+        # Create high-performance data adaptor
+        current_adaptor = HighPerformanceAnndataAdaptor(filepath)
+        # Expose underlying AnnData for tool endpoints
+        current_adata = current_adaptor.adata
         current_filename = filename
 
-        # Get basic info
-        info = {
+        # Get schema and summary
+        schema = current_adaptor.get_schema()
+        summary = current_adaptor.get_data_summary()
+        chunk_info = current_adaptor.get_chunk_info()
+
+        # Build response compatible with legacy UI expectations
+        response_data = {
             'filename': filename,
-            'n_cells': current_adata.n_obs,
-            'n_genes': current_adata.n_vars,
-            'embeddings': list(current_adata.obsm.keys()) if current_adata.obsm else [],
-            'obs_columns': list(current_adata.obs.columns),
-            'var_columns': list(current_adata.var.columns)
+            # Legacy/UI fields used by single-cell.js
+            'n_cells': summary.get('n_obs', current_adaptor.n_obs),
+            'n_genes': summary.get('n_vars', current_adaptor.n_vars),
+            'embeddings': summary.get('embeddings', []),
+            'obs_columns': list(current_adaptor.adata.obs.columns),
+            'var_columns': list(current_adaptor.adata.var.columns),
+            # New high-performance metadata
+            'schema': schema,
+            'chunk_info': chunk_info,
+            'summary': summary,
+            'success': True
         }
 
-        # If no embeddings, create random positions
-        if not info['embeddings']:
-            np.random.seed(42)
-            current_adata.obsm['X_random'] = np.random.randn(current_adata.n_obs, 2)
-            info['embeddings'] = ['X_random']
-
-        # Clean embeddings list (remove 'X_' prefix for display)
-        info['embeddings'] = [emb.replace('X_', '') for emb in info['embeddings']]
-
-        return jsonify(info)
+        return jsonify(response_data)
 
     except Exception as e:
+        logging.error(f"Upload failed: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/plot', methods=['POST'])
-def plot_data():
-    global current_adata
+# New high-performance data endpoints using FlatBuffers
 
-    if current_adata is None:
+@app.route('/api/schema', methods=['GET'])
+def get_schema():
+    """Get data schema"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        schema = current_adaptor.get_schema()
+        return jsonify({'schema': schema})
+    except Exception as e:
+        logging.error(f"Schema retrieval failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/obs', methods=['GET'])
+def get_obs_data():
+    """Get observation annotations as FlatBuffers"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        columns = request.args.getlist('columns')
+        chunk_index = request.args.get('chunk', 0, type=int)
+
+        if chunk_index > 0:
+            # Chunked data request
+            fbs_data = current_adaptor.get_chunked_data('obs', chunk_index, columns=columns if columns else None)
+        else:
+            # Full data request
+            fbs_data = current_adaptor.get_obs_fbs(columns if columns else None)
+
+        response = make_response(fbs_data)
+        response.headers['Content-Type'] = 'application/octet-stream'
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
+
+    except Exception as e:
+        logging.error(f"Obs data retrieval failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/embedding/<embedding_name>', methods=['GET'])
+def get_embedding_data(embedding_name):
+    """Get embedding coordinates as FlatBuffers"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        chunk_index = request.args.get('chunk', 0, type=int)
+
+        if chunk_index > 0:
+            # Chunked data request
+            fbs_data = current_adaptor.get_chunked_data('embedding', chunk_index, embedding_name=embedding_name)
+        else:
+            # Full data request
+            fbs_data = current_adaptor.get_embedding_fbs(embedding_name)
+
+        response = make_response(fbs_data)
+        response.headers['Content-Type'] = 'application/octet-stream'
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
+
+    except KeyError as e:
+        return jsonify({'error': f'Embedding not found: {embedding_name}'}), 404
+    except Exception as e:
+        logging.error(f"Embedding data retrieval failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/expression', methods=['POST'])
+def get_expression_data():
+    """Get gene expression data as FlatBuffers"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        data = request.json
+        gene_names = data.get('genes', [])
+        cell_indices = data.get('cell_indices', None)
+
+        if not gene_names:
+            return jsonify({'error': 'No genes specified'}), 400
+
+        fbs_data = current_adaptor.get_expression_fbs(gene_names, cell_indices)
+
+        response = make_response(fbs_data)
+        response.headers['Content-Type'] = 'application/octet-stream'
+        return response
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logging.error(f"Expression data retrieval failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/filter', methods=['POST'])
+def filter_cells():
+    """Filter cells based on criteria"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        filters = request.json
+        indices = current_adaptor.filter_cells(filters)
+
+        return jsonify({
+            'filtered_indices': indices,
+            'count': len(indices)
+        })
+
+    except Exception as e:
+        logging.error(f"Cell filtering failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/differential_expression', methods=['POST'])
+def compute_differential_expression():
+    """Compute differential expression between groups"""
+    global current_adaptor
+
+    if current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        data = request.json
+        group1_indices = data.get('group1_indices', [])
+        group2_indices = data.get('group2_indices', [])
+        method = data.get('method', 'wilcoxon')
+        n_genes = data.get('n_genes', 100)
+
+        if not group1_indices or not group2_indices:
+            return jsonify({'error': 'Both groups must have cells'}), 400
+
+        # Run in thread pool to avoid blocking
+        future = thread_pool.submit(
+            current_adaptor.get_differential_expression,
+            group1_indices, group2_indices, method, n_genes
+        )
+
+        result = future.result(timeout=30)  # 30 second timeout
+
+        return jsonify(result)
+
+    except Exception as e:
+        logging.error(f"Differential expression failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Legacy endpoint for backward compatibility
+@app.route('/api/plot', methods=['POST'])
+def plot_data_legacy():
+    """Legacy plot endpoint - returns JSON data for Plotly"""
+    global current_adaptor
+
+    if current_adaptor is None:
         return jsonify({'error': 'No data loaded'}), 400
 
     try:
@@ -87,75 +257,66 @@ def plot_data():
         if not embedding:
             return jsonify({'error': 'No embedding specified'}), 400
 
+        # For legacy compatibility, convert FlatBuffers data to JSON
+        from server.common.fbs.matrix import decode_matrix_fbs
+
         # Get embedding data
-        embedding_key = f'X_{embedding}' if not embedding.startswith('X_') else embedding
+        fbs_data = current_adaptor.get_embedding_fbs(embedding)
+        coords_df = decode_matrix_fbs(fbs_data)
 
-        if embedding_key not in current_adata.obsm:
-            return jsonify({'error': f'Embedding {embedding} not found'}), 404
-
-        coords = current_adata.obsm[embedding_key]
-
-        # Prepare plot data
         plot_data = {
-            'x': coords[:, 0].tolist(),
-            'y': coords[:, 1].tolist(),
-            'hover_text': [f'Cell {i}' for i in range(len(coords))]
+            'x': coords_df['x'].tolist(),
+            'y': coords_df['y'].tolist(),
+            'hover_text': [f'Cell {i}' for i in range(len(coords_df))]
         }
 
-        # Handle coloring
+        # Handle coloring if requested
         if color_by:
             if color_by.startswith('obs:'):
-                # Color by observation column
                 col_name = color_by.replace('obs:', '')
-                if col_name in current_adata.obs.columns:
-                    values = current_adata.obs[col_name]
+                obs_fbs = current_adaptor.get_obs_fbs([col_name])
+                obs_df = decode_matrix_fbs(obs_fbs)
 
+                if col_name in obs_df.columns:
+                    values = obs_df[col_name]
                     if pd.api.types.is_numeric_dtype(values):
                         plot_data['colors'] = values.tolist()
                         plot_data['colorscale'] = 'Viridis'
                         plot_data['color_label'] = col_name
                     else:
-                        # Categorical data - 自动转换字符串为category
-                        if values.dtype == 'object' or values.dtype.name == 'string':
-                            # 字符串类型自动转换为category
-                            categories = values.astype('category')
+                        # Categorical handling
+                        if pd.api.types.is_categorical_dtype(values):
+                            categories = values
                         else:
                             categories = values.astype('category')
-                        
+
                         plot_data['color_label'] = col_name
-                        # 为分类数据提供类别信息
                         plot_data['category_labels'] = categories.cat.categories.tolist()
                         plot_data['category_codes'] = categories.cat.codes.tolist()
-                        
-                        # 为分类数据使用离散颜色数组而不是colorscale
+
                         n_categories = len(categories.cat.categories)
                         discrete_colors = get_discrete_colors(n_categories)
                         plot_data['colors'] = [discrete_colors[code] for code in categories.cat.codes]
                         plot_data['discrete_colors'] = discrete_colors
 
-                    plot_data['hover_text'] = [f'Cell {i}<br>{col_name}: {v}'
-                                              for i, v in enumerate(values)]
-
             elif color_by.startswith('gene:'):
-                # Color by gene expression
                 gene_name = color_by.replace('gene:', '')
-                if gene_name in current_adata.var_names:
-                    gene_idx = current_adata.var_names.get_loc(gene_name)
+                try:
+                    expr_fbs = current_adaptor.get_expression_fbs([gene_name])
+                    expr_df = decode_matrix_fbs(expr_fbs)
 
-                    if hasattr(current_adata.X, 'toarray'):
-                        expression = current_adata.X[:, gene_idx].toarray().flatten()
-                    else:
-                        expression = current_adata.X[:, gene_idx].flatten()
-
-                    plot_data['colors'] = expression.tolist()
-                    plot_data['colorscale'] = 'Viridis'
-                    plot_data['color_label'] = f'{gene_name} expression'
-                    plot_data['hover_text'] = [f'Cell {i}<br>{gene_name}: {v:.2f}'
-                                              for i, v in enumerate(expression)]
+                    if gene_name in expr_df.columns:
+                        expression = expr_df[gene_name]
+                        plot_data['colors'] = expression.tolist()
+                        plot_data['colorscale'] = 'Viridis'
+                        plot_data['color_label'] = f'{gene_name} expression'
+                except Exception as e:
+                    logging.warning(f"Gene expression retrieval failed for {gene_name}: {e}")
 
         return jsonify(plot_data)
 
     except Exception as e:
+        logging.error(f"Legacy plot failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tools/<tool>', methods=['POST'])
