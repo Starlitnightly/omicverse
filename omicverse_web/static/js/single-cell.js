@@ -330,7 +330,7 @@ class SingleCellAnalysis {
                 this.addToLog('绘图错误: ' + data.error, 'error');
                 this.showStatus('绘图失败: ' + data.error, false);
             } else {
-                this.animatePlotTransition(data);
+                this.animatePlotTransition(data); // 使用动画过渡
                 this.showStatus('降维方法切换完成', false);
             }
         })
@@ -344,118 +344,249 @@ class SingleCellAnalysis {
     animatePlotTransition(data) {
         const plotDiv = document.getElementById('plotly-div');
         
-        // 获取当前图表的数据和布局
-        const currentData = plotDiv.data[0];
-        const currentLayout = plotDiv.layout;
-        const currentX = currentData.x;
-        const currentY = currentData.y;
+        // 检查是否需要动画过渡
+        if (!plotDiv || !plotDiv.data || plotDiv.data.length === 0) {
+            this.plotData(data);
+            return;
+        }
+        
+        // 检查当前图表类型和新数据类型
+        const currentIsMultiTrace = plotDiv.data.length > 1;
+        const newIsMultiTrace = data.category_labels && data.category_codes;
+        
+        // 获取所有当前数据点的坐标（合并多个trace）
+        let currentX = [];
+        let currentY = [];
+        
+        if (currentIsMultiTrace) {
+            // 合并多个trace的数据
+            for (let trace of plotDiv.data) {
+                if (trace.x && trace.y) {
+                    currentX = currentX.concat(trace.x);
+                    currentY = currentY.concat(trace.y);
+                }
+            }
+        } else {
+            // 单个trace
+            const currentData = plotDiv.data[0];
+            if (!currentData || !currentData.x || !currentData.y) {
+                this.plotData(data);
+                return;
+            }
+            currentX = currentData.x;
+            currentY = currentData.y;
+        }
+        
         const newX = data.x;
         const newY = data.y;
         
         // 确保数据长度一致
         const minLength = Math.min(currentX.length, newX.length);
-        const currentXTrimmed = currentX.slice(0, minLength);
-        const currentYTrimmed = currentY.slice(0, minLength);
-        const newXTrimmed = newX.slice(0, minLength);
-        const newYTrimmed = newY.slice(0, minLength);
+        if (minLength === 0) {
+            this.plotData(data);
+            return;
+        }
         
-        // 计算当前和新的坐标轴范围
-        const currentXMin = Math.min(...currentXTrimmed);
-        const currentXMax = Math.max(...currentXTrimmed);
-        const currentYMin = Math.min(...currentYTrimmed);
-        const currentYMax = Math.max(...currentYTrimmed);
+        // 检查坐标是否相同（只是着色变化）
+        const coordsChanged = this.checkCoordsChanged(currentX, currentY, newX, newY, minLength);
         
-        const newXMin = Math.min(...newXTrimmed);
-        const newXMax = Math.max(...newXTrimmed);
-        const newYMin = Math.min(...newYTrimmed);
-        const newYMax = Math.max(...newYTrimmed);
+        if (!coordsChanged) {
+            // 坐标没变，只是着色变化
+            if (newIsMultiTrace || currentIsMultiTrace) {
+                // 如果涉及分类数据，直接重绘保证legend正确
+                this.plotData(data);
+            } else {
+                // 数值数据使用快速颜色更新
+                this.updateColorsOnly(data);
+            }
+            return;
+        }
         
-        // 添加边距
-        const currentXMargin = (currentXMax - currentXMin) * 0.1;
-        const currentYMargin = (currentYMax - currentYMin) * 0.1;
-        const newXMargin = (newXMax - newXMin) * 0.1;
-        const newYMargin = (newYMax - newYMin) * 0.1;
+        // 坐标变化了，使用位置动画（无论是否分类数据）
+        this.animatePositionTransitionForAnyData(currentX, currentY, data, minLength);
+    }
+    
+    checkCoordsChanged(currentX, currentY, newX, newY, length) {
+        const tolerance = 1e-10; // 浮点数比较容差
+        for (let i = 0; i < Math.min(length, 100); i++) { // 只检查前100个点以提高性能
+            if (Math.abs(currentX[i] - newX[i]) > tolerance || 
+                Math.abs(currentY[i] - newY[i]) > tolerance) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    updateColorsOnly(data) {
+        // 只更新颜色，保持位置不变
+        let markerConfig = {
+            size: data.size || 3,
+            opacity: 0.7
+        };
         
-        const currentXRange = [currentXMin - currentXMargin, currentXMax + currentXMargin];
-        const currentYRange = [currentYMin - currentYMargin, currentYMax + currentYMargin];
-        const newXRange = [newXMin - newXMargin, newXMax + newXMargin];
-        const newYRange = [newYMin - newYMargin, newYMax + newYMargin];
+        if (data.colors) {
+            markerConfig.color = data.colors;
+            markerConfig.colorscale = data.colorscale || 'Viridis';
+            markerConfig.showscale = true;
+            markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
+        } else {
+            markerConfig.color = 'blue';
+            markerConfig.showscale = false;
+        }
         
-        // 创建中间帧数据
-        const frames = [];
-        const frameCount = 15; // 减少帧数提高性能
+        // 使用平滑的颜色过渡
+        const duration = 300;
+        const steps = 15;
+        let currentStep = 0;
         
-        for (let i = 0; i <= frameCount; i++) {
-            const progress = i / frameCount;
+        const animateColors = () => {
+            const progress = currentStep / steps;
             const easedProgress = this.easeInOutCubic(progress);
             
-            // 计算当前帧的位置
-            const frameX = currentXTrimmed.map((x, idx) => 
-                x + (newXTrimmed[idx] - x) * easedProgress
-            );
-            const frameY = currentYTrimmed.map((y, idx) => 
-                y + (newYTrimmed[idx] - y) * easedProgress
-            );
+            // 更新marker配置，逐步改变透明度营造过渡效果
+            const currentMarkerConfig = {
+                ...markerConfig,
+                opacity: 0.3 + (0.4 * easedProgress) // 从0.3过渡到0.7
+            };
             
-            // 计算当前帧的坐标轴范围
-            const frameXRange = [
-                currentXRange[0] + (newXRange[0] - currentXRange[0]) * easedProgress,
-                currentXRange[1] + (newXRange[1] - currentXRange[1]) * easedProgress
-            ];
-            const frameYRange = [
-                currentYRange[0] + (newYRange[0] - currentYRange[0]) * easedProgress,
-                currentYRange[1] + (newYRange[1] - currentYRange[1]) * easedProgress
-            ];
+            const update = {
+                marker: [currentMarkerConfig],
+                text: [data.hover_text]
+            };
             
-            // 处理颜色数据，保持原始颜色信息
+            Plotly.restyle('plotly-div', update, [0]);
+            
+            currentStep++;
+            
+            if (currentStep <= steps) {
+                setTimeout(animateColors, duration / steps);
+            } else {
+                // 最终确保状态正确
+                const finalUpdate = {
+                    marker: [markerConfig],
+                    text: [data.hover_text]
+                };
+                Plotly.restyle('plotly-div', finalUpdate, [0]);
+            }
+        };
+        
+        animateColors();
+    }
+    
+    animatePositionTransition(currentData, data, minLength) {
+        const currentX = currentData.x;
+        const currentY = currentData.y;
+        const newX = data.x;
+        const newY = data.y;
+        
+        // 创建位置过渡动画
+        const duration = 500; // 动画持续时间
+        const steps = 20; // 动画步数
+        let currentStep = 0;
+        
+        const animate = () => {
+            const progress = currentStep / steps;
+            const easedProgress = this.easeInOutCubic(progress);
+            
+            // 计算当前帧的坐标
+            const frameX = [];
+            const frameY = [];
+            
+            for (let i = 0; i < minLength; i++) {
+                frameX[i] = currentX[i] + (newX[i] - currentX[i]) * easedProgress;
+                frameY[i] = currentY[i] + (newY[i] - currentY[i]) * easedProgress;
+            }
+            
+            // 准备marker配置
             let markerConfig = {
                 size: data.size || 3,
                 opacity: 0.7
             };
             
-            // 如果新数据有颜色信息，使用新颜色；否则保持当前颜色
             if (data.colors) {
-                // 处理分类数据的颜色条
-                if (data.category_labels && data.category_codes) {
-                    // 分类数据：使用离散颜色数组，不显示colorbar
-                    markerConfig.color = data.colors;
-                    markerConfig.showscale = false; // 分类数据不显示colorbar
-                    markerConfig.showlegend = true; // 显示legend
-                } else {
-                    // 数值数据：使用连续颜色映射
-                    markerConfig.color = data.colors;
-                    markerConfig.colorscale = data.colorscale || 'Viridis';
-                    markerConfig.showscale = true;
-                    markerConfig.showlegend = false; // 数值数据不显示legend
-                    markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
-                }
+                markerConfig.color = data.colors;
+                markerConfig.colorscale = data.colorscale || 'Viridis';
+                markerConfig.showscale = true;
+                markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
             } else {
-                // 保持当前颜色配置
-                markerConfig.color = currentData.marker.color;
-                markerConfig.colorscale = currentData.marker.colorscale;
-                markerConfig.showscale = currentData.marker.showscale || false;
-                markerConfig.colorbar = currentData.marker.colorbar;
+                markerConfig.color = currentData.marker.color || 'blue';
             }
             
-            frames.push({
-                data: [{
-                    x: frameX,
-                    y: frameY,
-                    mode: 'markers',
-                    type: 'scatter',
-                    marker: markerConfig,
-                    text: data.hover_text || currentData.text,
-                    hovertemplate: '%{text}<extra></extra>'
-                }],
-                layout: {
-                    xaxis: { range: frameXRange },
-                    yaxis: { range: frameYRange }
-                }
-            });
-        }
+            // 更新图表
+            const update = {
+                x: [frameX],
+                y: [frameY],
+                marker: [markerConfig],
+                text: [data.hover_text]
+            };
+            
+            Plotly.restyle('plotly-div', update, [0]);
+            
+            currentStep++;
+            
+            if (currentStep <= steps) {
+                setTimeout(animate, duration / steps);
+            }
+        };
         
-        // 使用requestAnimationFrame实现更流畅的动画
-        this.smoothAnimate(frames);
+        // 开始动画
+        animate();
+    }
+    
+    animatePositionTransitionForAnyData(currentX, currentY, data, minLength) {
+        // 创建位置过渡动画，适用于任何数据类型
+        const duration = 500; // 动画持续时间
+        const steps = 20; // 动画步数
+        let currentStep = 0;
+        
+        const newX = data.x;
+        const newY = data.y;
+        
+        const animate = () => {
+            const progress = currentStep / steps;
+            const easedProgress = this.easeInOutCubic(progress);
+            
+            // 计算当前帧的坐标
+            const frameX = [];
+            const frameY = [];
+            
+            for (let i = 0; i < minLength; i++) {
+                frameX[i] = currentX[i] + (newX[i] - currentX[i]) * easedProgress;
+                frameY[i] = currentY[i] + (newY[i] - currentY[i]) * easedProgress;
+            }
+            
+            // 创建临时的单一trace进行动画
+            const tempTrace = {
+                x: frameX,
+                y: frameY,
+                mode: 'markers',
+                type: 'scatter',
+                marker: {
+                    color: 'rgba(31, 119, 180, 0.6)', // 临时颜色
+                    size: data.size || 3,
+                    opacity: 0.6
+                },
+                showlegend: false
+            };
+            
+            const layout = this.getPlotlyLayout();
+            layout.annotations = []; // 清除annotations
+            
+            // 使用react更新图表
+            Plotly.react('plotly-div', [tempTrace], layout, {responsive: true});
+            
+            currentStep++;
+            
+            if (currentStep <= steps) {
+                setTimeout(animate, duration / steps);
+            } else {
+                // 动画完成，显示最终的正确图表
+                this.plotData(data);
+            }
+        };
+        
+        // 开始动画
+        animate();
     }
     
     // 缓动函数：三次贝塞尔曲线
@@ -519,106 +650,131 @@ class SingleCellAnalysis {
             opacity: 0.7
         };
         
+        let traces = [];
+        
         if (data.colors) {
             // 处理分类数据的颜色条
             if (data.category_labels && data.category_codes) {
-                // 分类数据：使用离散颜色数组，不显示colorbar
-                markerConfig.color = data.colors;
-                markerConfig.showscale = false; // 分类数据不显示colorbar
-                markerConfig.showlegend = false; // 单个trace不显示legend
+                // 分类数据：为每个类别创建单独的trace，使用plotly默认legend
+                const uniqueCategories = data.category_labels;
+                const uniqueColors = data.discrete_colors;
+                
+                for (let i = 0; i < uniqueCategories.length; i++) {
+                    const category = uniqueCategories[i];
+                    const color = uniqueColors[i];
+                    
+                    // 找到属于当前类别的点
+                    const categoryIndices = [];
+                    const categoryX = [];
+                    const categoryY = [];
+                    const categoryText = [];
+                    
+                    for (let j = 0; j < data.category_codes.length; j++) {
+                        if (data.category_codes[j] === i) {
+                            categoryIndices.push(j);
+                            categoryX.push(data.x[j]);
+                            categoryY.push(data.y[j]);
+                            categoryText.push(data.hover_text[j]);
+                        }
+                    }
+                    
+                    // 只有当该类别有数据点时才创建trace
+                    if (categoryX.length > 0) {
+                        const trace = {
+                            x: categoryX,
+                            y: categoryY,
+                            mode: 'markers',
+                            type: 'scatter',
+                            name: category, // 设置trace名称，这将显示在legend中
+                            marker: {
+                                color: color,
+                                size: data.size || 3,
+                                opacity: 0.7
+                            },
+                            text: categoryText,
+                            hovertemplate: '%{text}<extra></extra>',
+                            showlegend: true // 启用legend显示
+                        };
+                        
+                        traces.push(trace);
+                    }
+                }
             } else {
                 // 数值数据：使用连续颜色映射
                 markerConfig.color = data.colors;
                 markerConfig.colorscale = data.colorscale || 'Viridis';
                 markerConfig.showscale = true;
-                markerConfig.showlegend = false; // 数值数据不显示legend
                 markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
+                
+                const trace = {
+                    x: data.x,
+                    y: data.y,
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: markerConfig,
+                    text: data.hover_text,
+                    hovertemplate: '%{text}<extra></extra>',
+                    showlegend: false // 数值数据不显示legend
+                };
+                
+                traces.push(trace);
             }
         } else {
             // 没有颜色数据时使用默认颜色
             markerConfig.color = 'blue';
             markerConfig.showscale = false;
-            markerConfig.showlegend = false;
+            
+            const trace = {
+                x: data.x,
+                y: data.y,
+                mode: 'markers',
+                type: 'scatter',
+                marker: markerConfig,
+                text: data.hover_text,
+                hovertemplate: '%{text}<extra></extra>',
+                showlegend: false
+            };
+            
+            traces.push(trace);
         }
-        
-        // 始终创建单个trace，保持所有点
-        const trace = {
-            x: data.x,
-            y: data.y,
-            mode: 'markers',
-            type: 'scatter',
-            marker: markerConfig,
-            text: data.hover_text,
-            hovertemplate: '%{text}<extra></extra>'
-        };
 
         const layout = this.getPlotlyLayout();
         
-        // 为分类数据添加自定义legend
-        console.log('检查数据:', data);
-        console.log('category_labels存在:', !!data.category_labels);
-        console.log('category_codes存在:', !!data.category_codes);
-        
-        if (data.category_labels && data.category_codes) {
-            console.log('开始创建分类legend...');
-            console.log('类别标签:', data.category_labels);
-            console.log('离散颜色:', data.discrete_colors);
-            
-            // 检查主题
-            const isDark = document.documentElement.classList.contains('app-skin-dark');
-            console.log('当前主题:', isDark ? '深色' : '浅色');
-            
-            // 创建自定义legend
-            const legendItems = [];
-            for (let i = 0; i < data.category_labels.length; i++) {
-                const category = data.category_labels[i];
-                const color = data.discrete_colors[i];
-                
-                const legendItem = {
-                    x: 0.98,
-                    y: 0.95 - i * 0.08,
-                    xref: 'paper',
-                    yref: 'paper',
-                    text: `● ${category}`,
-                    showarrow: false,
-                    font: {size: 14, color: color},
-                    align: 'right',
-                    bgcolor: isDark ? 'rgba(31,41,55,0.8)' : 'rgba(255,255,255,0.8)',
-                    bordercolor: isDark ? 'rgba(75,85,99,0.3)' : 'rgba(0,0,0,0.1)',
-                    borderwidth: 1,
-                    borderpad: 6,
-                    width: 120,
-                    height: 30
-                };
-                
-                legendItems.push(legendItem);
-                console.log(`Legend项目 ${i}:`, legendItem);
-            }
-            
-            layout.annotations = legendItems;
-            this.currentAnnotations = legendItems; // 保存annotations供动画使用
-            console.log('✅ 创建自定义legend完成:', legendItems.length, '个类别');
-            console.log('Layout annotations:', layout.annotations);
-        } else {
-            // 非分类数据时清除annotations
-            layout.annotations = [];
-            this.currentAnnotations = null; // 清除保存的annotations
-            console.log('❌ 清除legend (非分类数据)');
-        }
+        // 清除自定义annotations，使用plotly默认legend
+        layout.annotations = [];
+        this.currentAnnotations = null;
         
         const config = {responsive: true};
 
-        // 检查是否已经有图表存在，如果有则使用动画更新
-        const plotDiv = document.getElementById('plotly-div');
-        const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
-
-        if (hasExistingPlot) {
-            // 使用逐点动画更新
-            this.animatePlotTransition(data);
-        } else {
-            // 创建新图表
-            Plotly.newPlot('plotly-div', [trace], layout, config);
+        // 确保至少有一个trace
+        if (traces.length === 0) {
+            console.warn('No traces to plot, creating default trace');
+            const defaultTrace = {
+                x: data.x || [],
+                y: data.y || [],
+                mode: 'markers',
+                type: 'scatter',
+                marker: {
+                    color: 'blue',
+                    size: data.size || 3,
+                    opacity: 0.7
+                },
+                text: data.hover_text || [],
+                hovertemplate: '%{text}<extra></extra>',
+                showlegend: false
+            };
+            traces.push(defaultTrace);
         }
+        
+        console.log('Plotting traces:', traces.length, 'traces');
+        console.log('First trace sample:', traces[0] ? {
+            x_length: traces[0].x ? traces[0].x.length : 0,
+            y_length: traces[0].y ? traces[0].y.length : 0,
+            marker: traces[0].marker
+        } : 'no traces');
+
+        // 直接使用 Plotly.react 来确保legend正确更新
+        Plotly.react('plotly-div', traces, layout, config);
     }
 
     getPlotlyLayout() {
@@ -642,8 +798,21 @@ class SingleCellAnalysis {
                 linecolor: isDark ? '#4b5563' : '#d1d5db'
             },
             hovermode: 'closest',
-            showlegend: false, // 禁用默认legend，使用自定义annotations
-            margin: {l: 50, r: 200, t: 50, b: 50} // 增加右边距为legend留空间
+            showlegend: true, // 启用plotly默认legend
+            legend: {
+                x: 1.02, // 将legend放在图表右侧
+                y: 1,
+                xanchor: 'left',
+                yanchor: 'top',
+                bgcolor: isDark ? 'rgba(31,41,55,0.8)' : 'rgba(255,255,255,0.8)',
+                bordercolor: isDark ? 'rgba(75,85,99,0.3)' : 'rgba(0,0,0,0.1)',
+                borderwidth: 1,
+                font: {
+                    color: isDark ? '#e5e7eb' : '#283c50',
+                    size: 12
+                }
+            },
+            margin: {l: 50, r: 150, t: 50, b: 50} // 为legend留出空间
         };
 
         if (isDark) {

@@ -25,6 +25,42 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Feather图标替换为Font Awesome图标 -->
+    <style>
+        /* 使用Font Awesome图标替换Feather图标 */
+        .feather-filter:before { content: "\f0b0"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-chevron-right:before { content: "\f054"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-layers:before { content: "\f5fd"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-grid:before { content: "\f009"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-dna:before { content: "\f471"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-align-left:before { content: "\f036"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-arrow-right:before { content: "\f061"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-search:before { content: "\f002"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-maximize:before { content: "\f31e"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-minimize:before { content: "\f2d1"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-moon:before { content: "\f186"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-sun:before { content: "\f185"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-bell:before { content: "\f0f3"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-check:before { content: "\f00c"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-check-circle:before { content: "\f058"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-x:before { content: "\f00d"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-user:before { content: "\f007"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-settings:before { content: "\f013"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-help-circle:before { content: "\f059"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-log-out:before { content: "\f2f5"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        
+        /* 确保图标样式正确 */
+        [class^="feather-"], [class*=" feather-"] {
+            speak: none;
+            font-style: normal;
+            font-weight: normal;
+            font-variant: normal;
+            text-transform: none;
+            line-height: 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
 </head>
 
 <body>
