@@ -187,7 +187,29 @@ class SingleCellAnalysis {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(async response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                let text = '';
+                try { text = await response.text(); } catch (e) {}
+                // Try JSON
+                try {
+                    const js = JSON.parse(text);
+                    throw new Error(js.error || text || `HTTP ${response.status}`);
+                } catch (e) {
+                    if (text && text.trim().startsWith('<!DOCTYPE')) {
+                        throw new Error(`服务器返回HTML错误页面 (HTTP ${response.status})`);
+                    }
+                    throw new Error(text || `HTTP ${response.status}`);
+                }
+            }
+            if (contentType.includes('application/json')) {
+                return response.json();
+            }
+            // Fallback: try parse text as JSON
+            const text = await response.text();
+            try { return JSON.parse(text); } catch (e) { throw new Error('服务器返回非JSON'); }
+        })
         .then(data => {
             this.hideStatus();
             if (data.error) {
@@ -304,6 +326,7 @@ class SingleCellAnalysis {
                 this.showStatus('绘图失败: ' + data.error, false);
             } else {
                 this.plotData(data);
+                this.currentEmbedding = embedding;
                 this.showStatus('图表生成完成', false);
             }
         })
@@ -315,8 +338,8 @@ class SingleCellAnalysis {
     }
 
     updatePlotWithAnimation(embedding, colorBy) {
-        // 显示状态栏而不是加载圆圈
-        this.showStatus('正在切换降维方法...', true);
+        const isEmbeddingChange = (this.currentEmbedding !== embedding);
+        this.showStatus(isEmbeddingChange ? '正在切换降维方法...' : '正在更新着色...', true);
 
         fetch('/api/plot', {
             method: 'POST',
@@ -335,8 +358,44 @@ class SingleCellAnalysis {
                 this.addToLog('绘图错误: ' + data.error, 'error');
                 this.showStatus('绘图失败: ' + data.error, false);
             } else {
-                this.animatePlotTransition(data); // 使用动画过渡
-                this.showStatus('降维方法切换完成', false);
+                if (!isEmbeddingChange) {
+                    // 仅着色变化：不做位置动画
+                    if (data.category_labels && data.category_codes) {
+                        // 分类型：重绘为多trace，显示legend
+                        this.plotData(data);
+                    } else {
+                        // 数值型：若当前是多trace（分类残留），需要重绘为单trace；否则仅restyle
+                        const plotDiv = document.getElementById('plotly-div');
+                        const isMulti = plotDiv && plotDiv.data && plotDiv.data.length > 1;
+                        if (isMulti) {
+                            this.plotData(data);
+                        } else {
+                            this.updateColorsOnly(data);
+                        }
+                    }
+                    this.showStatus('着色更新完成', false);
+                } else {
+                    const plotDiv = document.getElementById('plotly-div');
+                    let curX = [], curY = [];
+                    if (plotDiv && plotDiv.data && plotDiv.data.length > 0) {
+                        if (plotDiv.data.length > 1) {
+                            // 合并多trace为单数组
+                            for (let tr of plotDiv.data) {
+                                if (tr && tr.x && tr.y) {
+                                    curX = curX.concat(tr.x);
+                                    curY = curY.concat(tr.y);
+                                }
+                            }
+                        } else {
+                            curX = (plotDiv.data[0].x || []).slice();
+                            curY = (plotDiv.data[0].y || []).slice();
+                        }
+                    }
+                    const minLen = Math.min(curX.length, (data.x||[]).length);
+                    this.animatePositionTransitionForAnyData(curX, curY, data, minLen);
+                    this.currentEmbedding = embedding;
+                    this.showStatus('降维方法切换完成', false);
+                }
             }
         })
         .catch(error => {
@@ -539,58 +598,93 @@ class SingleCellAnalysis {
     }
     
     animatePositionTransitionForAnyData(currentX, currentY, data, minLength) {
-        // 创建位置过渡动画，适用于任何数据类型
-        const duration = 500; // 动画持续时间
-        const steps = 20; // 动画步数
+        // 逐点位置过渡 + 轴范围插值（仅嵌入切换使用）
+        const plotDiv = document.getElementById('plotly-div');
+        const duration = 600;
+        const steps = 24;
         let currentStep = 0;
-        
+
         const newX = data.x;
         const newY = data.y;
-        
-        const animate = () => {
-            const progress = currentStep / steps;
-            const easedProgress = this.easeInOutCubic(progress);
-            
-            // 计算当前帧的坐标
-            const frameX = [];
-            const frameY = [];
-            
-            for (let i = 0; i < minLength; i++) {
-                frameX[i] = currentX[i] + (newX[i] - currentX[i]) * easedProgress;
-                frameY[i] = currentY[i] + (newY[i] - currentY[i]) * easedProgress;
-            }
-            
-            // 创建临时的单一trace进行动画
-            const tempTrace = {
-                x: frameX,
-                y: frameY,
+
+        // Ensure we animate a single trace during transition
+        const isMulti = plotDiv && plotDiv.data && plotDiv.data.length > 1;
+
+        // Capture current layout and ranges
+        let layout = plotDiv && plotDiv.layout ? JSON.parse(JSON.stringify(plotDiv.layout)) : this.getPlotlyLayout();
+        // Determine start ranges
+        const startXRange = (layout && layout.xaxis && layout.xaxis.range) ? layout.xaxis.range.slice() : [Math.min(...currentX), Math.max(...currentX)];
+        const startYRange = (layout && layout.yaxis && layout.yaxis.range) ? layout.yaxis.range.slice() : [Math.min(...currentY), Math.max(...currentY)];
+        // Determine final ranges
+        const endXRange = [Math.min(...newX), Math.max(...newX)];
+        const endYRange = [Math.min(...newY), Math.max(...newY)];
+
+        // If multiple traces, replace with a single anim trace once (preserve ranges)
+        if (isMulti || !plotDiv || !plotDiv.data || plotDiv.data.length === 0) {
+            // Build NaN arrays to hide unsampled points initially
+            const initX = new Array(minLength).fill(NaN);
+            const initY = new Array(minLength).fill(NaN);
+            // We don't have sampleIdx yet here; we will fill in first animation frame
+            const animTrace = {
+                x: initX,
+                y: initY,
                 mode: 'markers',
                 type: 'scattergl',
                 marker: {
-                    color: 'rgba(31, 119, 180, 0.6)', // 临时颜色
                     size: data.size || 3,
-                    opacity: 0.6
+                    opacity: 0.7
                 },
                 showlegend: false
             };
-            
-            const layout = this.getPlotlyLayout();
-            layout.annotations = []; // 清除annotations
-            
-            // 使用react更新图表
-            Plotly.react('plotly-div', [tempTrace], layout, {responsive: true});
-            
+            layout = this.getPlotlyLayout();
+            layout.xaxis = layout.xaxis || {};
+            layout.yaxis = layout.yaxis || {};
+            layout.xaxis.autorange = false;
+            layout.yaxis.autorange = false;
+            layout.xaxis.range = startXRange;
+            layout.yaxis.range = startYRange;
+            Plotly.react('plotly-div', [animTrace], layout, {responsive: true});
+        }
+
+        // Precompute a representative sample of indices for animation across全体
+        const sampleCount = Math.min(8000, minLength);
+        const sampleIdx = [];
+        if (minLength > 0) {
+            const step = Math.max(1, Math.floor(minLength / sampleCount));
+            for (let i = 0; i < minLength; i += step) sampleIdx.push(i);
+            // ensure last index included
+            if (sampleIdx[sampleIdx.length - 1] !== minLength - 1) sampleIdx.push(minLength - 1);
+        }
+
+        const animate = () => {
+            const t = currentStep / steps;
+            const eased = this.easeInOutCubic(t);
+            // Interpolate positions (only for sampled indices; others NaN -> hidden)
+            const frameX = new Array(minLength).fill(NaN);
+            const frameY = new Array(minLength).fill(NaN);
+            for (let k = 0; k < sampleIdx.length; k++) {
+                const i = sampleIdx[k];
+                frameX[i] = currentX[i] + (newX[i] - currentX[i]) * eased;
+                frameY[i] = currentY[i] + (newY[i] - currentY[i]) * eased;
+            }
+            // Interpolate axis ranges
+            const xr0 = startXRange[0] + (endXRange[0] - startXRange[0]) * eased;
+            const xr1 = startXRange[1] + (endXRange[1] - startXRange[1]) * eased;
+            const yr0 = startYRange[0] + (endYRange[0] - startYRange[0]) * eased;
+            const yr1 = startYRange[1] + (endYRange[1] - startYRange[1]) * eased;
+
+            Plotly.restyle('plotly-div', { x: [frameX], y: [frameY] }, [0]);
+            Plotly.relayout('plotly-div', { 'xaxis.autorange': false, 'yaxis.autorange': false, 'xaxis.range': [xr0, xr1], 'yaxis.range': [yr0, yr1] });
+
             currentStep++;
-            
             if (currentStep <= steps) {
                 setTimeout(animate, duration / steps);
             } else {
-                // 动画完成，显示最终的正确图表
+                // Finalize
                 this.plotData(data);
             }
         };
-        
-        // 开始动画
+
         animate();
     }
     

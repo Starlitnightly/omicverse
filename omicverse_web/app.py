@@ -11,6 +11,7 @@ import json
 import logging
 from http import HTTPStatus
 from concurrent.futures import ThreadPoolExecutor
+from werkzeug.exceptions import RequestEntityTooLarge
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -23,7 +24,8 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
 # Configuration
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
+# No upload size limit - explicitly set to None to satisfy Flask's accessor
+app.config['MAX_CONTENT_LENGTH'] = None
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
 
 # Global variables to store current data and adaptor
@@ -31,6 +33,16 @@ current_adaptor = None
 current_adata = None
 current_filename = None
 thread_pool = ThreadPoolExecutor(max_workers=4)
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    max_bytes = app.config.get('MAX_CONTENT_LENGTH')
+    max_mb = int(max_bytes / (1024 * 1024)) if isinstance(max_bytes, (int, float)) and max_bytes else None
+    payload = {'error': 'File too large'}
+    if max_mb:
+        payload['max_size_mb'] = max_mb
+    return jsonify(payload), 413
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
