@@ -225,6 +225,33 @@ def get_expression_data():
         logging.error(f"Expression data retrieval failed: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/qc_prefixes', methods=['GET'])
+def get_qc_prefixes():
+    """Detect common QC gene prefixes (e.g., mitochondrial) from var_names."""
+    global current_adata
+    if current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import re
+        var_names = current_adata.var_names.astype(str)
+        prefixes = set()
+        # Detect typical mt prefixes
+        for name in var_names[: min(10000, len(var_names))]:  # sample to be safe
+            if len(name) < 3:
+                continue
+            if re.match(r'^(mt|MT|Mt|mT)+', name):
+                prefixes.add(name[:3])  # e.g., 'MT-' or 'mt-'
+        # If underscore variants like 'mt_' present
+        for name in var_names[: min(60000, len(var_names))]:
+            if name.lower().startswith('mt'):
+                prefixes.add(name[:3])
+        # Fallback to common defaults
+        if not prefixes:
+            prefixes.update(['MT-', 'mt-'])
+        return jsonify({'mt_prefixes': sorted(prefixes)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/filter', methods=['POST'])
 def filter_cells():
     """Filter cells based on criteria"""
@@ -441,42 +468,165 @@ def run_tool(tool):
             sc.tl.louvain(current_adata, resolution=resolution)
 
         elif tool == 'filter_cells':
-            # Quality control: filter cells by gene counts/UMI/mt% if available
-            min_genes = params.get('min_genes', None)
-            min_counts = params.get('min_counts', None)
-            max_mt_percent = params.get('max_mt_percent', None)
-            if min_genes is not None:
-                sc.pp.filter_cells(current_adata, min_genes=int(min_genes))
-            if min_counts is not None and min_counts > 0:
-                sc.pp.filter_cells(current_adata, min_counts=int(min_counts))
-            # Remove cells by mitochondrial percent if present
-            if max_mt_percent is not None:
-                mt_col = None
-                for c in current_adata.obs.columns:
-                    lc = c.lower()
-                    if 'mt' in lc and '%' in lc or 'pct_counts_mt' in lc or 'percent_mt' in lc:
-                        mt_col = c
-                        break
-                if mt_col is not None:
-                    keep = current_adata.obs[mt_col] <= float(max_mt_percent)
-                    current_adata._inplace_subset_obs(keep.values)
+            # Apply thresholds sequentially; Scanpy only accepts one per call
+            for key in ('min_counts', 'min_genes', 'max_counts', 'max_genes'):
+                v = params.get(key, None)
+                if v is None or v == "":
+                    continue
+                try:
+                    v = int(v)
+                except Exception:
+                    continue
+                if key == 'min_counts':
+                    sc.pp.filter_cells(current_adata, min_counts=v)
+                elif key == 'min_genes':
+                    sc.pp.filter_cells(current_adata, min_genes=v)
+                elif key == 'max_counts':
+                    sc.pp.filter_cells(current_adata, max_counts=v)
+                elif key == 'max_genes':
+                    sc.pp.filter_cells(current_adata, max_genes=v)
 
         elif tool == 'filter_genes':
+            # Sequentially apply lower thresholds
             min_cells = params.get('min_cells', None)
-            if min_cells is not None:
-                sc.pp.filter_genes(current_adata, min_cells=int(min_cells))
-            # Optional min_mean filter
-            min_mean = params.get('min_mean', None)
-            if min_mean is not None and hasattr(current_adata, 'X'):
-                import numpy as _np
+            g_min_counts = params.get('min_counts', params.get('g_min_counts', None))
+            max_cells = params.get('max_cells', None)
+            g_max_counts = params.get('max_counts', params.get('g_max_counts', None))
+            if g_min_counts is not None and g_min_counts != "":
+                try:
+                    sc.pp.filter_genes(current_adata, min_counts=int(g_min_counts))
+                except Exception:
+                    pass
+            if min_cells is not None and min_cells != "":
+                try:
+                    sc.pp.filter_genes(current_adata, min_cells=int(min_cells))
+                except Exception:
+                    pass
+            import numpy as _np
+            X = current_adata.X.toarray() if hasattr(current_adata.X, 'toarray') else current_adata.X
+            if max_cells is not None:
+                expr_cells = (X > 0).sum(axis=0)
+                expr_cells = _np.asarray(expr_cells).A1 if hasattr(expr_cells, 'A1') else _np.asarray(expr_cells)
+                keep = expr_cells <= int(max_cells)
+                current_adata._inplace_subset_var(keep)
                 X = current_adata.X.toarray() if hasattr(current_adata.X, 'toarray') else current_adata.X
-                gene_means = _np.asarray(X).mean(axis=0).A1 if hasattr(_np.asarray(X), 'A1') else _np.asarray(X).mean(axis=0)
-                keep = gene_means >= float(min_mean)
+            if g_max_counts is not None:
+                sums = _np.asarray(X).sum(axis=0)
+                sums = sums.A1 if hasattr(sums, 'A1') else sums
+                keep = sums <= float(g_max_counts)
                 current_adata._inplace_subset_var(keep)
 
-        elif tool == 'doublets':
-            return jsonify({'error': 'Doublet removal not implemented yet'}), 400
+        elif tool == 'filter_outliers':
+            # Compute QC metrics if not present and filter by mitochondrial percentage
+            import numpy as _np
+            # Determine mt prefixes from params or detection
+            req_prefixes = params.get('mt_prefixes')
+            if req_prefixes:
+                mt_prefixes = [p.strip() for p in str(req_prefixes).split(',') if p.strip()]
+            else:
+                # Detect typical prefixes from var_names
+                import re
+                mt_prefixes = []
+                for name in current_adata.var_names.astype(str):
+                    if re.match(r'^(mt|MT|Mt|mT)[-_].+', name):
+                        mt_prefixes = list({name[:3] for name in current_adata.var_names.astype(str) if len(name) >= 3})
+                        break
+                if not mt_prefixes:
+                    mt_prefixes = ['MT-', 'mt-']
+            # Annotate mt mask
+            lname = _np.array([str(x) for x in current_adata.var_names])
+            mt_mask = _np.zeros(lname.shape[0], dtype=bool)
+            for pref in mt_prefixes:
+                try:
+                    mt_mask |= _np.char.startswith(lname, pref)
+                except Exception:
+                    pass
+            current_adata.var['mt'] = mt_mask
+            # Annotate ribosomal genes (RPS/RPL)
+            upper_names = _np.char.upper(lname)
+            ribo_mask = _np.char.startswith(upper_names, 'RPS') | _np.char.startswith(upper_names, 'RPL')
+            current_adata.var['ribo'] = ribo_mask
+            # Annotate hemoglobin genes (HB but not HBP)
+            import re as _re
+            hb_mask = _np.array([bool(_re.search(r'^(HB(?!P))', nm, flags=_re.I)) for nm in lname])
+            current_adata.var['hb'] = hb_mask
+            # Calculate QC metrics
+            sc.pp.calculate_qc_metrics(current_adata, qc_vars=['mt', 'ribo', 'hb'], inplace=True, log1p=True)
+            # Build a combined keep mask
+            keep = _np.ones(current_adata.n_obs, dtype=bool)
+            # Apply mt threshold
+            max_mt_percent = params.get('max_mt_percent', None)
+            if max_mt_percent is not None:
+                pct_col = None
+                for c in current_adata.obs.columns:
+                    lc = str(c).lower()
+                    if 'pct' in lc and 'mt' in lc:
+                        pct_col = c; break
+                if pct_col is None and 'pct_counts_mt' in current_adata.obs.columns:
+                    pct_col = 'pct_counts_mt'
+                if pct_col is not None:
+                    keep &= (current_adata.obs[pct_col].astype(float) <= float(max_mt_percent)).values
+            # Apply ribo threshold
+            max_ribo_percent = params.get('max_ribo_percent', None)
+            if max_ribo_percent is not None:
+                pct_col = None
+                for c in current_adata.obs.columns:
+                    lc = str(c).lower()
+                    if 'pct' in lc and ('ribo' in lc or 'rps' in lc or 'rpl' in lc):
+                        pct_col = c; break
+                if pct_col is None and 'pct_counts_ribo' in current_adata.obs.columns:
+                    pct_col = 'pct_counts_ribo'
+                if pct_col is not None:
+                    keep &= (current_adata.obs[pct_col].astype(float) <= float(max_ribo_percent)).values
+            # Apply hemoglobin threshold
+            max_hb_percent = params.get('max_hb_percent', None)
+            if max_hb_percent is not None:
+                pct_col = None
+                for c in current_adata.obs.columns:
+                    lc = str(c).lower()
+                    if 'pct' in lc and 'hb' in lc:
+                        pct_col = c; break
+                if pct_col is None and 'pct_counts_hb' in current_adata.obs.columns:
+                    pct_col = 'pct_counts_hb'
+                if pct_col is not None:
+                    keep &= (current_adata.obs[pct_col].astype(float) <= float(max_hb_percent)).values
+            # Subset if any threshold applied
+            if keep.sum() != current_adata.n_obs:
+                current_adata._inplace_subset_obs(keep)
 
+        elif tool == 'doublets':
+            # Use Scanpy's integrated Scrublet wrapper
+            batch_key = params.get('batch_key') or None
+            scrublet_kwargs = dict(
+                sim_doublet_ratio=float(params.get('sim_doublet_ratio', 2.0)),
+                expected_doublet_rate=float(params.get('expected_doublet_rate', 0.05)),
+                stdev_doublet_rate=float(params.get('stdev_doublet_rate', 0.02)),
+                synthetic_doublet_umi_subsampling=float(params.get('synthetic_doublet_umi_subsampling', 1.0)),
+                knn_dist_metric=params.get('knn_dist_metric', 'euclidean'),
+                normalize_variance=bool(params.get('normalize_variance', True)),
+                log_transform=bool(params.get('log_transform', False)),
+                mean_center=bool(params.get('mean_center', True)),
+                n_prin_comps=int(params.get('n_prin_comps', 30))
+            )
+            try:
+                sc.tl.scrublet(current_adata, batch_key=batch_key, **scrublet_kwargs)
+            except Exception as e:
+                return jsonify({'error': f'Scrublet 执行失败: {e}'}), 400
+
+            # Try common column names written by scanpy scrublet
+            pred_col = None
+            for c in ('predicted_doublet', 'predicted_doublets'):
+                if c in current_adata.obs.columns:
+                    pred_col = c; break
+            score_col = None
+            for c in ('doublet_score', 'doublet_scores'):
+                if c in current_adata.obs.columns:
+                    score_col = c; break
+            # If predicted flags present, filter out doublets
+            if pred_col is not None:
+                keep = ~current_adata.obs[pred_col].astype(bool)
+                current_adata._inplace_subset_obs(keep.values)
+        
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
 

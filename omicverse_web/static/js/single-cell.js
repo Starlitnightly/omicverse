@@ -1000,11 +1000,12 @@ class SingleCellAnalysis {
                 { id: 'log1p', name: '对数转换', icon: 'fas fa-calculator', desc: '自然对数 log1p' },
                 { id: 'scale', name: '数据缩放', icon: 'fas fa-expand-arrows-alt', desc: 'Z-score 标准化' }
             ],
-            // 质量控制：过滤细胞、过滤基因、去除双细胞
+            // 质量控制：过滤细胞、过滤基因、过滤异常细胞、去除双细胞
             'qc': [
-                { id: 'filter_cells', name: '过滤细胞', icon: 'fas fa-filter', desc: '按基因数/UMI/线粒体比例过滤' },
-                { id: 'filter_genes', name: '过滤基因', icon: 'fas fa-tasks', desc: '按表达细胞数/均值过滤' },
-                { id: 'doublets', name: '去除双细胞', icon: 'fas fa-user-times', desc: '识别并去除潜在双细胞' }
+                { id: 'filter_cells', name: '过滤细胞', icon: 'fas fa-filter', desc: '按UMI/基因数上下限过滤' },
+                { id: 'filter_genes', name: '过滤基因', icon: 'fas fa-tasks', desc: '按表达细胞数/UMI上下限过滤' },
+                { id: 'filter_outliers', name: '过滤异常细胞', icon: 'fas fa-exclamation-triangle', desc: '先计算QC，再按线粒体比例等过滤' },
+                { id: 'doublets', name: '去除双细胞', icon: 'fas fa-user-times', desc: '识别并去除潜在双细胞（Scrublet）' }
             ],
             // 特征选择：高变基因
             'feature': [
@@ -1109,40 +1110,147 @@ class SingleCellAnalysis {
                 const params = {};
                 const inputs = parameterContent.querySelectorAll('input, select');
                 inputs.forEach(input => {
-                    if (input.type === 'number') params[input.id] = parseFloat(input.value);
-                    else params[input.id] = input.value;
+                    if (input.type === 'number') {
+                        if (input.value !== '') params[input.id] = parseFloat(input.value);
+                    } else if (input.type === 'checkbox') {
+                        params[input.id] = input.checked;
+                    } else {
+                        if (input.value !== '') params[input.id] = input.value;
+                    }
                 });
                 this.runTool(tool, params);
             };
+        }
+
+        // Auto-detect mt prefixes for filter_outliers
+        if (tool === 'filter_outliers') {
+            const mtInput = document.getElementById('mt_prefixes');
+            if (mtInput) {
+                fetch('/api/qc_prefixes')
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d && d.mt_prefixes && !mtInput.value) {
+                            mtInput.value = d.mt_prefixes.join(',');
+                        }
+                    })
+                    .catch(() => {});
+            }
         }
     }
 
     getParameterHTML(tool) {
         const parameters = {
             'filter_cells': `
-                <div class="parameter-input">
-                    <label>最小基因数(min_genes)</label>
-                    <input type="number" class="form-control" id="min_genes" value="200" min="0" max="10000">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">最小UMI数 (min_counts)</label>
+                        <input type="number" class="form-control" id="min_counts" value="500" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最小基因数 (min_genes)</label>
+                        <input type="number" class="form-control" id="min_genes" value="200" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最大UMI数 (max_counts)</label>
+                        <input type="number" class="form-control" id="max_counts" placeholder="可留空" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最大基因数 (max_genes)</label>
+                        <input type="number" class="form-control" id="max_genes" placeholder="可留空" min="0" step="1">
+                    </div>
                 </div>
-                <div class="parameter-input">
-                    <label>最小UMI数(min_counts)</label>
-                    <input type="number" class="form-control" id="min_counts" value="0" min="0" max="1000000">
-                </div>
-                <div class="parameter-input">
-                    <label>最大线粒体比例(%)</label>
-                    <input type="number" class="form-control" id="max_mt_percent" value="20" min="0" max="100">
-                </div>
+                <small class="text-muted d-block mt-2">留空表示不限制。仅填写需要的阈值即可。</small>
             `,
             'filter_genes': `
-                <div class="parameter-input">
-                    <label>最少表达细胞数(min_cells)</label>
-                    <input type="number" class="form-control" id="min_cells" value="3" min="0" max="100000">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">最少表达细胞数 (min_cells)</label>
+                        <input type="number" class="form-control" id="min_cells" value="3" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最小UMI数 (min_counts)</label>
+                        <input type="number" class="form-control" id="g_min_counts" placeholder="可留空" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最多表达细胞数 (max_cells)</label>
+                        <input type="number" class="form-control" id="max_cells" placeholder="可留空" min="0" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最大UMI数 (max_counts)</label>
+                        <input type="number" class="form-control" id="g_max_counts" placeholder="可留空" min="0" step="1">
+                    </div>
                 </div>
-                <div class="parameter-input">
-                    <label>最小均值(min_mean)</label>
-                    <input type="number" class="form-control" id="min_mean" value="0" min="0" step="0.01">
-                </div>
+                <small class="text-muted d-block mt-2">可选：设置上下限阈值，未填表示不限制。</small>
             `,
+            'filter_outliers': `
+                <div class="mb-2"><small class="text-muted">将先计算线粒体/核糖体/血红蛋白等QC指标，再按阈值过滤。</small></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">最大线粒体比例 (百分比)</label>
+                        <input type="number" class="form-control" id="max_mt_percent" value="20" min="0" max="100" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">线粒体基因前缀 (自动检测)</label>
+                        <input type="text" class="form-control" id="mt_prefixes" placeholder="例如: MT-,mt-">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最大核糖体基因比例 (百分比)</label>
+                        <input type="number" class="form-control" id="max_ribo_percent" placeholder="可留空" min="0" max="100" step="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">最大血红蛋白基因比例 (百分比)</label>
+                        <input type="number" class="form-control" id="max_hb_percent" placeholder="可留空" min="0" max="100" step="1">
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">未填写的阈值不生效；线粒体前缀自动检测可编辑。</small>
+            `,
+            'doublets': (() => {
+                const cols = (this.currentData && this.currentData.obs_columns) ? this.currentData.obs_columns : [];
+                const opts = ['<option value="">无</option>'].concat(cols.map(c => `<option value="${c}">${c}</option>`)).join('');
+                return `
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">批次列 (batch_key)</label>
+                        <select class="form-select" id="batch_key">${opts}</select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">模拟双细胞比 (sim_doublet_ratio)</label>
+                        <input type="number" class="form-control" id="sim_doublet_ratio" value="2" step="0.1" min="0.1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">期望双细胞率 (expected_doublet_rate)</label>
+                        <input type="number" class="form-control" id="expected_doublet_rate" value="0.05" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">双细胞率标准差 (stdev_doublet_rate)</label>
+                        <input type="number" class="form-control" id="stdev_doublet_rate" value="0.02" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">UMI子采样 (synthetic_doublet_umi_subsampling)</label>
+                        <input type="number" class="form-control" id="synthetic_doublet_umi_subsampling" value="1" step="0.05" min="0" max="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">KNN距离度量 (knn_dist_metric)</label>
+                        <input type="text" class="form-control" id="knn_dist_metric" value="euclidean">
+                    </div>
+                    <div class="col-md-3 form-check form-switch mt-3 ms-2">
+                        <input class="form-check-input" type="checkbox" id="normalize_variance" checked>
+                        <label class="form-check-label" for="normalize_variance">normalize_variance</label>
+                    </div>
+                    <div class="col-md-3 form-check form-switch mt-3 ms-2">
+                        <input class="form-check-input" type="checkbox" id="log_transform">
+                        <label class="form-check-label" for="log_transform">log_transform</label>
+                    </div>
+                    <div class="col-md-3 form-check form-switch mt-3 ms-2">
+                        <input class="form-check-input" type="checkbox" id="mean_center" checked>
+                        <label class="form-check-label" for="mean_center">mean_center</label>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">PCA主成分数 (n_prin_comps)</label>
+                        <input type="number" class="form-control" id="n_prin_comps" value="30" min="2" max="200">
+                    </div>
+                </div>`;
+            })(),
             'doublets': `
                 <div class="alert alert-warning">双细胞去除暂未实现，敬请期待。</div>
             `,
