@@ -78,6 +78,9 @@ def crop_space_visium(adata, crop_loc, crop_area,
         ...     scale=1.0
         ... )
     """
+    # Configure dask to use query-planning before importing squidpy
+    import dask
+    dask.config.set({"dataframe.query-planning": True})
     import squidpy as sq
     adata1 = adata.copy()
     img = sq.im.ImageContainer(
