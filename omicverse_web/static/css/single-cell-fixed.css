@@ -1,0 +1,420 @@
+/* OmicVerse Single Cell Analysis Platform - Fixed Styles */
+/* 移除与模板冲突的布局CSS，只保留单细胞分析特定样式 */
+
+/* File Upload Styles */
+.file-upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-upload-area:hover {
+    border-color: #007bff;
+    background: #e3f2fd;
+}
+
+.file-upload-area.dragover {
+    border-color: #007bff;
+    background: #e3f2fd;
+    transform: scale(1.02);
+}
+
+/* Data Status Styles */
+.status-info {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+/* Control Panel Styles */
+.control-panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Visualization Panel Styles */
+.visualization-panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    min-height: 500px;
+    position: relative;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 8px;
+}
+
+.spinner-border-custom {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Parameter Section Styles */
+.parameter-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.parameter-section h6 {
+    color: #283c50;
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Analysis Log Section Styles */
+.analysis-log-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.analysis-log-section h6 {
+    color: #283c50;
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.analysis-log {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* Tool Parameter Styles */
+.tool-parameter {
+    margin-bottom: 15px;
+}
+
+.tool-parameter label {
+    font-weight: 500;
+    color: #283c50;
+    margin-bottom: 5px;
+}
+
+.tool-parameter .form-control,
+.tool-parameter .form-select {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.tool-parameter .form-control:focus,
+.tool-parameter .form-select:focus {
+    border-color: #3454d1;
+    box-shadow: 0 0 0 0.2rem rgba(52, 84, 209, 0.25);
+}
+
+/* Button Styles */
+.btn-run-tool {
+    background: linear-gradient(135deg, #3454d1 0%, #283c50 100%);
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-run-tool:hover {
+    background: linear-gradient(135deg, #283c50 0%, #3454d1 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(52, 84, 209, 0.3);
+}
+
+.btn-run-tool:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Logo Circle Styles */
+.logo-circle {
+    width: 40px;
+    height: 40px;
+}
+
+/* Dark Mode Support - Based on moban7855 template */
+html.app-skin-dark {
+    /* Body and main background */
+    background-color: #1a1a1a !important;
+}
+
+html.app-skin-dark body {
+    background-color: #1a1a1a !important;
+    color: #e5e7eb !important;
+}
+
+/* Navigation */
+html.app-skin-dark .nxl-navigation {
+    background: #1f2937 !important;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.app-skin-dark .nxl-header {
+    background: #1f2937 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Main content area */
+html.app-skin-dark .nxl-content {
+    background-color: #1a1a1a !important;
+}
+
+html.app-skin-dark .main-content {
+    background-color: #1a1a1a !important;
+}
+
+/* Panels and cards */
+html.app-skin-dark .status-info,
+html.app-skin-dark .control-panel,
+html.app-skin-dark .visualization-panel,
+html.app-skin-dark .parameter-section,
+html.app-skin-dark .analysis-log-section {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb !important;
+}
+
+/* File upload area */
+html.app-skin-dark .file-upload-area {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .file-upload-area:hover {
+    background: #374151 !important;
+    border-color: #3454d1 !important;
+}
+
+/* Form elements */
+html.app-skin-dark .form-control,
+html.app-skin-dark .form-select {
+    background: #374151 !important;
+    border-color: #4b5563 !important;
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .form-control:focus,
+html.app-skin-dark .form-select:focus {
+    background: #374151 !important;
+    border-color: #3454d1 !important;
+    box-shadow: 0 0 0 0.2rem rgba(52, 84, 209, 0.25) !important;
+}
+
+html.app-skin-dark .form-control::placeholder {
+    color: #9ca3af !important;
+}
+
+/* Buttons */
+html.app-skin-dark .btn-primary {
+    background: #3454d1 !important;
+    border-color: #3454d1 !important;
+}
+
+html.app-skin-dark .btn-primary:hover {
+    background: #283c50 !important;
+    border-color: #283c50 !important;
+}
+
+html.app-skin-dark .btn-secondary {
+    background: #374151 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .btn-secondary:hover {
+    background: #4b5563 !important;
+    border-color: #4b5563 !important;
+}
+
+html.app-skin-dark .btn-success {
+    background: #059669 !important;
+    border-color: #059669 !important;
+}
+
+html.app-skin-dark .btn-success:hover {
+    background: #047857 !important;
+    border-color: #047857 !important;
+}
+
+/* Text colors */
+html.app-skin-dark h1,
+html.app-skin-dark h2,
+html.app-skin-dark h3,
+html.app-skin-dark h4,
+html.app-skin-dark h5,
+html.app-skin-dark h6 {
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .text-muted {
+    color: #9ca3af !important;
+}
+
+html.app-skin-dark .text-dark {
+    color: #e5e7eb !important;
+}
+
+/* Analysis log */
+html.app-skin-dark .analysis-log {
+    background: #111827 !important;
+    color: #e5e7eb !important;
+    border-color: #374151 !important;
+}
+
+/* Modal */
+html.app-skin-dark .modal-content {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+html.app-skin-dark .modal-header {
+    border-color: #374151 !important;
+}
+
+html.app-skin-dark .modal-footer {
+    border-color: #374151 !important;
+}
+
+html.app-skin-dark .modal-title {
+    color: #e5e7eb !important;
+}
+
+/* Dropdown */
+html.app-skin-dark .dropdown-menu {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+html.app-skin-dark .dropdown-item {
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .dropdown-item:hover {
+    background: #374151 !important;
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .dropdown-divider {
+    border-color: #374151 !important;
+}
+
+/* Badge */
+html.app-skin-dark .badge {
+    color: #fff !important;
+}
+
+/* Breadcrumb */
+html.app-skin-dark .breadcrumb {
+    background: transparent !important;
+}
+
+html.app-skin-dark .breadcrumb-item a {
+    color: #9ca3af !important;
+}
+
+html.app-skin-dark .breadcrumb-item.active {
+    color: #e5e7eb !important;
+}
+
+/* Page header */
+html.app-skin-dark .page-header {
+    background: #1a1a1a !important;
+}
+
+html.app-skin-dark .page-header-title h5 {
+    color: #e5e7eb !important;
+}
+
+/* Loading overlay */
+html.app-skin-dark .loading-overlay {
+    background: rgba(31, 41, 55, 0.9) !important;
+}
+
+/* Tool parameter labels */
+html.app-skin-dark .tool-parameter label {
+    color: #e5e7eb !important;
+}
+
+/* Logo circle */
+html.app-skin-dark .logo-circle {
+    background: #3454d1 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .file-upload-area {
+        padding: 20px;
+    }
+    
+    .control-panel,
+    .visualization-panel,
+    .parameter-section,
+    .analysis-log-section {
+        padding: 15px;
+    }
+    
+    .analysis-log {
+        max-height: 200px;
+    }
+}
+
+/* Animation for smooth transitions */
+* {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ensure proper z-index for overlays */
+.loading-overlay {
+    z-index: 1050;
+}
+
+/* Fix for Plotly dark mode */
+html.app-skin-dark .plotly .modebar {
+    background: #1f2937 !important;
+}
+
+html.app-skin-dark .plotly .modebar-btn {
+    color: #e5e7eb !important;
+}
+
+html.app-skin-dark .plotly .modebar-btn:hover {
+    background: #374151 !important;
+}

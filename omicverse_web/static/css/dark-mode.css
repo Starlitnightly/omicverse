@@ -1,0 +1,451 @@
+/* 
+ * OmicVerse Single Cell Analysis Platform - Dark Mode Styles
+ * Based on moban7855 template dark theme
+ */
+
+/* Dark Mode Root Variables */
+.app-skin-dark {
+    /* Primary Colors */
+    --nxl-primary: #3454d1;
+    --nxl-primary-rgb: 52, 84, 209;
+    
+    /* Background Colors */
+    --nxl-body-bg: #1a1c20;
+    --nxl-body-bg-rgb: 26, 28, 32;
+    --nxl-body-color: #e5e7eb;
+    --nxl-body-color-rgb: 229, 231, 235;
+    
+    /* Surface Colors */
+    --nxl-white: #252830;
+    --nxl-white-rgb: 37, 40, 48;
+    --nxl-gray-100: #2a2d36;
+    --nxl-gray-200: #323640;
+    --nxl-gray-300: #3a3e4a;
+    --nxl-gray-400: #4a505e;
+    --nxl-gray-500: #5a6172;
+    --nxl-gray-600: #6a7286;
+    --nxl-gray-700: #7a839a;
+    --nxl-gray-800: #8a94ae;
+    --nxl-gray-900: #9aa5c2;
+    
+    /* Text Colors */
+    --nxl-dark: #e5e7eb;
+    --nxl-dark-rgb: 229, 231, 235;
+    --nxl-muted: #9ca3af;
+    --nxl-muted-rgb: 156, 163, 175;
+    
+    /* Border Colors */
+    --nxl-border-color: #374151;
+    --nxl-border-color-rgb: 55, 65, 81;
+}
+
+/* Dark Mode Global Styles */
+.app-skin-dark {
+    background-color: var(--nxl-body-bg) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Body */
+.app-skin-dark body {
+    background-color: var(--nxl-body-bg) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Header */
+.app-skin-dark .nxl-header {
+    background-color: var(--nxl-white) !important;
+    border-bottom: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .nxl-head-link {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .nxl-head-link:hover {
+    background-color: var(--nxl-gray-200) !important;
+    color: var(--nxl-primary) !important;
+}
+
+/* Dark Mode Navigation */
+.app-skin-dark .nxl-navigation {
+    background-color: var(--nxl-white) !important;
+    border-right: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .nxl-navigation .navbar-brand {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .nxl-lavel {
+    color: var(--nxl-muted) !important;
+}
+
+.app-skin-dark .nxl-menu-item > .nxl-menu-link {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .nxl-menu-item > .nxl-menu-link:hover {
+    background-color: var(--nxl-gray-200) !important;
+    color: var(--nxl-primary) !important;
+}
+
+.app-skin-dark .nxl-menu-item.current-page > .nxl-menu-link,
+.app-skin-dark .nxl-menu-item.open > .nxl-menu-link {
+    background-color: var(--nxl-primary) !important;
+    color: #ffffff !important;
+}
+
+.app-skin-dark .nxl-menu-sub {
+    background-color: var(--nxl-gray-100) !important;
+}
+
+.app-skin-dark .nxl-menu-sub .nxl-menu-item > .nxl-menu-link {
+    color: var(--nxl-muted) !important;
+}
+
+.app-skin-dark .nxl-menu-sub .nxl-menu-item > .nxl-menu-link:hover {
+    color: var(--nxl-primary) !important;
+}
+
+/* Dark Mode Content */
+.app-skin-dark .nxl-content {
+    background-color: var(--nxl-body-bg) !important;
+}
+
+.app-skin-dark .content-area-wrapper {
+    background-color: var(--nxl-body-bg) !important;
+}
+
+.app-skin-dark .content-area {
+    background-color: var(--nxl-body-bg) !important;
+}
+
+/* Dark Mode Cards */
+.app-skin-dark .card {
+    background-color: var(--nxl-white) !important;
+    border: 1px solid var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .card-header {
+    background-color: var(--nxl-gray-100) !important;
+    border-bottom: 1px solid var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .card-footer {
+    background-color: var(--nxl-gray-100) !important;
+    border-top: 1px solid var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Buttons */
+.app-skin-dark .btn-light {
+    background-color: var(--nxl-gray-200) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .btn-light:hover {
+    background-color: var(--nxl-gray-300) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .btn-outline-secondary {
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .btn-outline-secondary:hover {
+    background-color: var(--nxl-gray-200) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Forms */
+.app-skin-dark .form-control {
+    background-color: var(--nxl-gray-100) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .form-control:focus {
+    background-color: var(--nxl-gray-100) !important;
+    border-color: var(--nxl-primary) !important;
+    color: var(--nxl-body-color) !important;
+    box-shadow: 0 0 0 0.2rem rgba(var(--nxl-primary-rgb), 0.25) !important;
+}
+
+.app-skin-dark .form-select {
+    background-color: var(--nxl-gray-100) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e5e7eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e") !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .form-label {
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Tables */
+.app-skin-dark .table {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .table-striped > tbody > tr:nth-of-type(odd) > td,
+.app-skin-dark .table-striped > tbody > tr:nth-of-type(odd) > th {
+    background-color: var(--nxl-gray-100) !important;
+}
+
+.app-skin-dark .table th,
+.app-skin-dark .table td {
+    border-color: var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Modals */
+.app-skin-dark .modal-content {
+    background-color: var(--nxl-white) !important;
+    border: 1px solid var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .modal-header {
+    border-bottom: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .modal-footer {
+    border-top: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .modal-title {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Dark Mode Dropdowns */
+.app-skin-dark .dropdown-menu {
+    background-color: var(--nxl-white) !important;
+    border: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .dropdown-item {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .dropdown-item:hover,
+.app-skin-dark .dropdown-item:focus {
+    background-color: var(--nxl-gray-200) !important;
+    color: var(--nxl-primary) !important;
+}
+
+.app-skin-dark .dropdown-divider {
+    border-color: var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Badges */
+.app-skin-dark .badge.bg-secondary {
+    background-color: var(--nxl-gray-500) !important;
+}
+
+.app-skin-dark .badge.bg-light {
+    background-color: var(--nxl-gray-300) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Alerts */
+.app-skin-dark .alert {
+    border-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .alert-light {
+    background-color: var(--nxl-gray-200) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Progress */
+.app-skin-dark .progress {
+    background-color: var(--nxl-gray-200) !important;
+}
+
+/* Dark Mode List Groups */
+.app-skin-dark .list-group-item {
+    background-color: var(--nxl-white) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .list-group-item:hover {
+    background-color: var(--nxl-gray-200) !important;
+}
+
+/* Dark Mode Page Header */
+.app-skin-dark .page-header {
+    background-color: var(--nxl-white) !important;
+    border-bottom: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .page-header-left h3,
+.app-skin-dark .page-header-left h4,
+.app-skin-dark .page-header-left h5 {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .breadcrumb-item {
+    color: var(--nxl-muted) !important;
+}
+
+.app-skin-dark .breadcrumb-item.active {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .breadcrumb-item + .breadcrumb-item::before {
+    color: var(--nxl-muted) !important;
+}
+
+/* Dark Mode Upload Zone */
+.app-skin-dark .upload-zone {
+    background-color: var(--nxl-gray-100) !important;
+    border: 2px dashed var(--nxl-border-color) !important;
+    color: var(--nxl-muted) !important;
+}
+
+.app-skin-dark .upload-zone.dragover {
+    border-color: var(--nxl-primary) !important;
+    background-color: rgba(var(--nxl-primary-rgb), 0.1) !important;
+}
+
+.app-skin-dark .upload-zone i {
+    color: var(--nxl-muted) !important;
+}
+
+/* Dark Mode Status Panel */
+.app-skin-dark .status-panel {
+    background-color: var(--nxl-white) !important;
+    border: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .status-item {
+    border-bottom: 1px solid var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .status-item:last-child {
+    border-bottom: none !important;
+}
+
+/* Dark Mode Visualization */
+.app-skin-dark .visualization-container {
+    background-color: var(--nxl-white) !important;
+    border: 1px solid var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Sidebar */
+.app-skin-dark .sidebar {
+    background-color: var(--nxl-white) !important;
+    border-right: 1px solid var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Text Colors */
+.app-skin-dark .text-muted {
+    color: var(--nxl-muted) !important;
+}
+
+.app-skin-dark .text-dark {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .text-secondary {
+    color: var(--nxl-muted) !important;
+}
+
+/* Dark Mode Borders */
+.app-skin-dark .border {
+    border-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .border-top {
+    border-top-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .border-bottom {
+    border-bottom-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .border-left {
+    border-left-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark .border-right {
+    border-right-color: var(--nxl-border-color) !important;
+}
+
+/* Dark Mode Background Colors */
+.app-skin-dark .bg-light {
+    background-color: var(--nxl-gray-200) !important;
+}
+
+.app-skin-dark .bg-white {
+    background-color: var(--nxl-white) !important;
+}
+
+.app-skin-dark .bg-secondary {
+    background-color: var(--nxl-gray-500) !important;
+}
+
+/* Dark Mode Hover Effects */
+.app-skin-dark .hover-primary:hover {
+    color: var(--nxl-primary) !important;
+}
+
+/* Dark Mode Navigation Mini Mode */
+.app-skin-dark .nxl-navigation.mini .nxl-menu-text {
+    color: var(--nxl-body-color) !important;
+}
+
+/* Dark Mode Theme Toggle */
+.app-skin-dark .dark-light-theme .light-button {
+    display: block !important;
+}
+
+.app-skin-dark .dark-light-theme .dark-button {
+    display: none !important;
+}
+
+/* Dark Mode Plotly Container */
+.app-skin-dark #plotly-div {
+    background-color: var(--nxl-white) !important;
+}
+
+/* Dark Mode Scrollbars */
+.app-skin-dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.app-skin-dark ::-webkit-scrollbar-track {
+    background: var(--nxl-gray-100);
+}
+
+.app-skin-dark ::-webkit-scrollbar-thumb {
+    background: var(--nxl-gray-500);
+    border-radius: 4px;
+}
+
+.app-skin-dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--nxl-gray-600);
+}
+
+/* Dark Mode Transitions */
+.app-skin-dark * {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* Dark Mode Media Queries */
+@media (max-width: 768px) {
+    .app-skin-dark .nxl-navigation {
+        background-color: var(--nxl-white) !important;
+    }
+}

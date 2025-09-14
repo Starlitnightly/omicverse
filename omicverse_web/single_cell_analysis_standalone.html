@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="OmicVerse Single Cell Analysis Platform">
+    <meta name="keyword" content="single cell, analysis, omicverse, scanpy">
+    <meta name="author" content="OmicVerse Team">
+    <title>OmicVerse || 单细胞分析平台</title>
+    
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" type="text/css" href="static/css/bootstrap.min.css">
+    <!-- Vendors CSS -->
+    <link rel="stylesheet" type="text/css" href="static/css/vendors.min.css">
+    <link rel="stylesheet" type="text/css" href="static/css/daterangepicker.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" type="text/css" href="static/css/theme.min.css">
+    <!-- Dark Mode CSS -->
+    <link rel="stylesheet" type="text/css" href="static/css/dark-mode.css">
+    <!-- Single Cell Analysis CSS - Fixed Version -->
+    <link rel="stylesheet" href="static/css/single-cell-fixed.css">
+    <!-- Plotly.js for visualization -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- Navigation Menu -->
+    <nav class="nxl-navigation">
+        <div class="navbar-wrapper">
+            <div class="m-header">
+                <a href="index.html" class="b-brand">
+                    <!-- OmicVerse Logo -->
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2 logo-circle">
+                            <i class="fas fa-dna text-white"></i>
+                        </div>
+                        <div class="d-none d-lg-block">
+                            <h6 class="mb-0 text-primary">OmicVerse</h6>
+                            <small class="text-muted">单细胞分析</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="navbar-content">
+                <ul class="nxl-navbar">
+                    <li class="nxl-item nxl-caption">
+                        <label>单细胞分析</label>
+                    </li>
+                    
+                    <!-- 数据预处理 -->
+                    <li class="nxl-item nxl-hasmenu">
+                        <a href="javascript:void(0);" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-filter"></i></span>
+                            <span class="nxl-mtext">数据预处理</span>
+                            <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
+                        </a>
+                        <ul class="nxl-submenu">
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('preprocessing')" title="选择数据预处理工具">标准化处理</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('preprocessing')" title="选择质量控制工具">质量控制</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('preprocessing')" title="选择特征选择工具">特征选择</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 降维分析 -->
+                    <li class="nxl-item nxl-hasmenu">
+                        <a href="javascript:void(0);" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-layers"></i></span>
+                            <span class="nxl-mtext">降维分析</span>
+                            <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
+                        </a>
+                        <ul class="nxl-submenu">
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择线性降维工具">线性降维</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择非线性降维工具">非线性降维</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择可视化工具">可视化</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 聚类分析 -->
+                    <li class="nxl-item nxl-hasmenu">
+                        <a href="javascript:void(0);" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-grid"></i></span>
+                            <span class="nxl-mtext">聚类分析</span>
+                            <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
+                        </a>
+                        <ul class="nxl-submenu">
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择社区检测工具">社区检测</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择细胞类型识别工具">细胞类型识别</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择聚类验证工具">聚类验证</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- OmicVerse工具 -->
+                    <li class="nxl-item nxl-hasmenu">
+                        <a href="javascript:void(0);" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-dna"></i></span>
+                            <span class="nxl-mtext">OmicVerse</span>
+                            <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
+                        </a>
+                        <ul class="nxl-submenu">
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择细胞注释工具">细胞注释</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择轨迹分析工具">轨迹分析</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择差异分析工具">差异分析</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择功能富集工具">功能富集</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="nxl-header">
+        <div class="header-wrapper">
+            <!-- Header Left -->
+            <div class="header-left d-flex align-items-center gap-4">
+                <!-- Mobile Toggler -->
+                <a href="javascript:void(0);" class="nxl-head-mobile-toggler" id="mobile-collapse">
+                    <div class="hamburger hamburger--arrowturn">
+                        <div class="hamburger-box">
+                            <div class="hamburger-inner"></div>
+                        </div>
+                    </div>
+                </a>
+                <!-- Navigation Toggle -->
+                <div class="nxl-navigation-toggle">
+                    <a href="javascript:void(0);" id="menu-mini-button">
+                        <i class="feather-align-left"></i>
+                    </a>
+                    <a href="javascript:void(0);" id="menu-expend-button" style="display: none">
+                        <i class="feather-arrow-right"></i>
+                    </a>
+                </div>
+                <!-- Mega Menu Toggle -->
+                <div class="nxl-lavel-mega-menu-toggle d-flex d-lg-none">
+                    <a href="javascript:void(0);" id="nxl-lavel-mega-menu-open">
+                        <i class="feather-align-left"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Header Right -->
+            <div class="header-right ms-auto">
+                <div class="d-flex align-items-center">
+                    <!-- Search -->
+                    <div class="dropdown nxl-h-item nxl-header-search">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i class="feather-search"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-search-dropdown">
+                            <div class="input-group search-form">
+                                <span class="input-group-text">
+                                    <i class="feather-search fs-6 text-muted"></i>
+                                </span>
+                                <input type="text" class="form-control search-input-field" placeholder="搜索基因、细胞类型...">
+                                <span class="input-group-text">
+                                    <button type="button" class="btn-close"></button>
+                                </span>
+                            </div>
+                            <div class="dropdown-divider mt-0"></div>
+                            <div class="search-items-wrapper">
+                                <div class="searching-for px-4 py-2">
+                                    <p class="fs-11 fw-medium text-muted">搜索内容...</p>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">基因</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">细胞类型</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">通路</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">分析</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Full Screen -->
+                    <div class="nxl-h-item d-none d-sm-flex">
+                        <div class="full-screen-switcher">
+                            <a href="javascript:void(0);" class="nxl-head-link me-0" onclick="$('body').fullScreenHelper('toggle');">
+                                <i class="feather-maximize maximize"></i>
+                                <i class="feather-minimize minimize"></i>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Theme Toggle -->
+                    <div class="nxl-h-item dark-light-theme">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button" id="dark-button">
+                            <i class="feather-moon"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" id="light-button" style="display: none">
+                            <i class="feather-sun"></i>
+                        </a>
+                    </div>
+                    
+                    <!-- Notifications -->
+                    <div class="dropdown nxl-h-item">
+                        <a class="nxl-head-link me-3" data-bs-toggle="dropdown" href="#" role="button" data-bs-auto-close="outside">
+                            <i class="feather-bell"></i>
+                            <span class="badge bg-danger nxl-h-badge">3</span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-notifications-menu">
+                            <div class="d-flex justify-content-between align-items-center notifications-head">
+                                <h6 class="fw-bold text-dark mb-0">分析通知</h6>
+                                <a href="javascript:void(0);" class="fs-11 text-success text-end ms-auto" data-bs-toggle="tooltip" title="标记为已读">
+                                    <i class="feather-check"></i>
+                                    <span>标记为已读</span>
+                                </a>
+                            </div>
+                            <div class="notifications-item">
+                                <div class="avatar-text rounded me-3 border">
+                                    <i class="feather-check-circle"></i>
+                                </div>
+                                <div class="notifications-desc">
+                                    <a href="javascript:void(0);" class="font-body text-truncate-2-line"> <span class="fw-semibold text-dark">数据预处理</span> 已完成标准化处理</a>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="notifications-date text-muted border-bottom border-bottom-dashed">2分钟前</div>
+                                        <div class="d-flex align-items-center float-end gap-2">
+                                            <a href="javascript:void(0);" class="d-block wd-8 ht-8 rounded-circle bg-gray-300" data-bs-toggle="tooltip" title="标记为已读"></a>
+                                            <a href="javascript:void(0);" class="text-danger" data-bs-toggle="tooltip" title="删除">
+                                                <i class="feather-x fs-12"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center notifications-footer">
+                                <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">所有通知</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Profile -->
+                    <div class="dropdown nxl-h-item">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <div class="avatar-image avatar-sm">
+                                <img src="static/picture/1.png" alt="" class="img-fluid">
+                            </div>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-menu">
+                            <div class="d-flex justify-content-between align-items-center user-head">
+                                <h6 class="fw-bold text-dark mb-0">用户菜单</h6>
+                            </div>
+                            <div class="user-body">
+                                <a href="javascript:void(0);" class="dropdown-item">
+                                    <i class="feather-user me-3"></i>
+                                    <span>个人资料</span>
+                                </a>
+                                <a href="javascript:void(0);" class="dropdown-item">
+                                    <i class="feather-settings me-3"></i>
+                                    <span>设置</span>
+                                </a>
+                                <a href="javascript:void(0);" class="dropdown-item">
+                                    <i class="feather-help-circle me-3"></i>
+                                    <span>帮助</span>
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="javascript:void(0);" class="dropdown-item">
+                                    <i class="feather-log-out me-3"></i>
+                                    <span>退出</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="nxl-container">
+        <div class="nxl-content">
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="page-header-left d-flex align-items-center">
+                    <div class="page-header-title">
+                        <h5 class="m-b-10">单细胞分析</h5>
+                    </div>
+                    <ul class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="index.html">主页</a></li>
+                        <li class="breadcrumb-item">单细胞分析</li>
+                    </ul>
+                </div>
+                <div class="page-header-right ms-auto">
+                    <div class="page-header-right-items">
+                        <div class="d-flex align-items-center gap-2 page-header-right-items-wrapper">
+                            <div id="reportrange" class="reportrange-picker d-flex align-items-center">
+                                <span class="reportrange-picker-field">今天</span>
+                            </div>
+                            <div class="dropdown filter-dropdown">
+                                <a class="btn btn-md btn-light-brand" data-bs-toggle="dropdown" data-bs-offset="0, 10" data-bs-auto-close="outside">
+                                    <i class="feather-filter me-2"></i>
+                                    <span>分析工具</span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a href="javascript:selectAnalysisCategory('preprocessing')" class="dropdown-item">
+                                        <i class="feather-filter me-3"></i>
+                                        <span>数据预处理</span>
+                                    </a>
+                                    <a href="javascript:selectAnalysisCategory('dimreduction')" class="dropdown-item">
+                                        <i class="feather-layers me-3"></i>
+                                        <span>降维分析</span>
+                                    </a>
+                                    <a href="javascript:selectAnalysisCategory('clustering')" class="dropdown-item">
+                                        <i class="feather-grid me-3"></i>
+                                        <span>聚类分析</span>
+                                    </a>
+                                    <a href="javascript:selectAnalysisCategory('omicverse')" class="dropdown-item">
+                                        <i class="feather-dna me-3"></i>
+                                        <span>OmicVerse工具</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <div class="row">
+                    <!-- Main Analysis Panel -->
+                    <div class="col-lg-8 col-xl-9">
+                        <!-- File Upload Area -->
+                        <div id="upload-section" class="mb-4">
+                            <div class="file-upload-area" id="dropZone">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <h5>上传H5AD文件</h5>
+                                <p class="text-muted">拖拽文件到此处或点击选择文件</p>
+                                <input type="file" id="fileInput" accept=".h5ad" style="display: none;">
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                    <i class="fas fa-folder-open me-2"></i>选择文件
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Data Status -->
+                        <div id="data-status" class="status-info d-none">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1" id="filename-display">文件名</h6>
+                                    <small class="text-muted">
+                                        <span id="cell-count">0</span> 细胞 •
+                                        <span id="gene-count">0</span> 基因
+                                    </small>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-success me-2" onclick="saveData()">
+                                        <i class="fas fa-download me-1"></i>保存
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="resetData()">
+                                        <i class="fas fa-refresh me-1"></i>重置
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Controls -->
+                        <div id="viz-controls" class="control-panel" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="embedding-select" class="form-label">降维方法</label>
+                                    <select class="form-select" id="embedding-select" onchange="updatePlot()">
+                                        <option value="">选择降维方法</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="color-select" class="form-label">着色方式</label>
+                                    <select class="form-select" id="color-select" onchange="updatePlot()">
+                                        <option value="">无着色</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="gene-input" class="form-label">基因表达</label>
+                                    <input type="text" class="form-control" id="gene-input" placeholder="输入基因名" onchange="colorByGene()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Panel -->
+                        <div id="viz-panel" class="visualization-panel" style="display: none;">
+                            <div class="position-relative">
+                                <div id="loading-overlay" class="loading-overlay" style="display: none;">
+                                    <div class="text-center">
+                                        <div class="spinner-border spinner-border-custom text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted" id="loading-text">正在处理数据...</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="plotly-div"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Toolbar -->
+                    <div class="col-lg-4 col-xl-3">
+                        <!-- Parameter Settings Section -->
+                        <div class="parameter-section" id="parameter-panel">
+                            <h6>
+                                <i class="fas fa-cog"></i>参数设置
+                            </h6>
+                            <div id="parameter-content">
+                                <div class="text-muted text-center py-4">
+                                    <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
+                                    <p>请从左侧菜单选择分析类型</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Status Section -->
+                        <div class="analysis-log-section">
+                            <h6>
+                                <i class="fas fa-info-circle"></i>分析状态
+                            </h6>
+                            <div id="analysis-log" class="bg-light p-3 rounded analysis-log">
+                                <div class="text-muted">等待上传数据...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Fixed Status Bar -->
+    <div class="fixed-bottom border-top shadow-sm" id="status-bar" style="display: none;">
+        <div class="container-fluid">
+            <div class="row align-items-center py-2">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status" id="status-spinner" style="display: none;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span id="status-text">就绪</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <small class="text-muted" id="status-time"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parameter Dialog Modal -->
+    <div class="modal fade" id="parameterModal" tabindex="-1" aria-labelledby="parameterModalTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="parameterModalTitle">参数设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body" id="parameterModalBody">
+                    <!-- Dynamic parameter inputs will be inserted here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="runToolBtn">运行</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="static/js/vendors.min.js"></script>
+    <script src="static/js/common-init.min.js"></script>
+    <!-- Single Cell Analysis JavaScript -->
+    <script src="static/js/single-cell.js"></script>
+</body>
+</html>
