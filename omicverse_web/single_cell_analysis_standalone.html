@@ -21,6 +21,8 @@
     <link rel="stylesheet" type="text/css" href="static/css/dark-mode.css">
     <!-- Single Cell Analysis CSS - Fixed Version -->
     <link rel="stylesheet" href="static/css/single-cell-fixed.css">
+    <!-- Custom deep-green theme overrides -->
+    <link rel="stylesheet" href="static/css/custom-theme.css">
     <!-- Plotly.js for visualization -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <!-- High-performance visualization dependencies -->
@@ -71,17 +73,8 @@
     <nav class="nxl-navigation">
         <div class="navbar-wrapper">
             <div class="m-header">
-                <a href="index.html" class="b-brand">
-                    <!-- OmicVerse Logo -->
-                    <div class="d-flex align-items-center">
-                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2 logo-circle">
-                            <i class="fas fa-dna text-white"></i>
-                        </div>
-                        <div class="d-none d-lg-block">
-                            <h6 class="mb-0 text-primary">OmicVerse</h6>
-                            <small class="text-muted">单细胞分析</small>
-                        </div>
-                    </div>
+                <a href="index.html" class="b-brand d-flex align-items-center">
+                    <img src="static/picture/logo.png" alt="OmicVerse" class="brand-logo-left"/>
                 </a>
             </div>
             <div class="navbar-content">
@@ -184,6 +177,8 @@
             <!-- Header Right -->
             <div class="header-right ms-auto">
                 <div class="d-flex align-items-center">
+                    <!-- Brand Logo (top-right) -->
+                    
                     <!-- Search -->
                     <div class="dropdown nxl-h-item nxl-header-search">
                         <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" data-bs-auto-close="outside">

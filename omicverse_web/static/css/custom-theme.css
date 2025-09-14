@@ -1,0 +1,288 @@
+/* Custom deep-green theme overrides for OmicVerse */
+
+/* Primary palette */
+:root {
+  --ov-primary: #0b7a27; /* deep green */
+  --ov-primary-dark: #096a22;
+  --ov-primary-contrast: #ffffff;
+  /* Bootstrap v5 variables (if present) */
+  --bs-primary: var(--ov-primary);
+  --bs-primary-rgb: 11, 122, 39;
+}
+
+/* Basic utility overrides */
+.text-primary { color: var(--ov-primary) !important; }
+.bg-primary { background-color: var(--ov-primary) !important; }
+.border-primary { border-color: var(--ov-primary) !important; }
+a { color: var(--ov-primary); }
+a:hover { color: var(--ov-primary-dark); }
+
+/* Buttons */
+.btn-primary {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary-dark) !important;
+  border-color: var(--ov-primary-dark) !important;
+}
+.btn.btn-primary { background-color: var(--ov-primary) !important; border-color: var(--ov-primary) !important; }
+.btn.btn-primary:hover { background-color: var(--ov-primary-dark) !important; border-color: var(--ov-primary-dark) !important; }
+.btn-outline-primary {
+  color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.btn-outline-primary:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+
+/* Badges, links, nav active, etc. */
+.badge.bg-primary { background-color: var(--ov-primary) !important; }
+.nav-link.active,
+.nxl-link.active,
+.nxl-link:focus { color: var(--ov-primary) !important; }
+
+/* Spinner, toggles */
+.text-primary { color: var(--ov-primary) !important; }
+
+/* Top-right brand logo */
+.brand-logo-top {
+  height: 28px;
+  display: inline-block;
+}
+
+.brand-logo-left { height: 32px; display: inline-block; }
+
+/* Make left brand logo scale with navigation width and keep tone consistent */
+.nxl-navigation .m-header { padding: 0 !important; background-color: inherit !important; }
+.nxl-navigation .m-header .b-brand { display: block; width: 100%; padding: 8px 12px; }
+.nxl-navigation .m-header .brand-logo-left {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 56px; /* fits typical header height */
+  object-fit: contain;
+  background: transparent; /* let nav background show through */
+  display: block;
+}
+.nxl-navigation.mini .m-header .brand-logo-left {
+  max-height: 48px;
+}
+/* For non-transparent logo assets in dark mode, blend slightly to match tone */
+html.app-skin-dark .nxl-navigation .m-header .brand-logo-left { mix-blend-mode: multiply; }
+
+/* Dark mode adjustments */
+.app-skin-dark .brand-logo-top,
+.app-skin-dark .brand-logo-left { filter: brightness(1.05) contrast(1.05); }
+.app-skin-dark {
+  /* Override template dark primary to deep green */
+  --nxl-primary: var(--ov-primary);
+  --nxl-primary-rgb: 11, 122, 39;
+}
+.app-skin-dark a { color: var(--ov-primary) !important; }
+.app-skin-dark a:hover { color: var(--ov-primary-dark) !important; }
+/* Ensure primary text/icon color in dark mode is deep green, even inside header links */
+html.app-skin-dark .text-primary,
+html.app-skin-dark i.text-primary,
+html.app-skin-dark .nxl-head-link .text-primary,
+html.app-skin-dark .nxl-head-link i.text-primary,
+html.app-skin-dark .nxl-link .text-primary,
+html.app-skin-dark .nxl-link i.text-primary {
+  color: var(--ov-primary) !important;
+}
+
+/* Dark mode buttons to deep green (all variants) */
+.app-skin-dark .btn-primary,
+.app-skin-dark .btn-success,
+.app-skin-dark .btn-secondary,
+.app-skin-dark .btn-info,
+.app-skin-dark .btn-warning,
+.app-skin-dark .btn-danger,
+.app-skin-dark .btn-dark,
+.app-skin-dark .btn-light,
+.app-skin-dark .btn-primary:focus,
+.app-skin-dark .btn-success:focus,
+.app-skin-dark .btn-secondary:focus,
+.app-skin-dark .btn-info:focus,
+.app-skin-dark .btn-warning:focus,
+.app-skin-dark .btn-danger:focus,
+.app-skin-dark .btn-dark:focus,
+.app-skin-dark .btn-light:focus {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.app-skin-dark .btn-primary:hover,
+.app-skin-dark .btn-success:hover,
+.app-skin-dark .btn-secondary:hover,
+.app-skin-dark .btn-info:hover,
+.app-skin-dark .btn-warning:hover,
+.app-skin-dark .btn-danger:hover,
+.app-skin-dark .btn-dark:hover,
+.app-skin-dark .btn-light:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary-dark) !important;
+  border-color: var(--ov-primary-dark) !important;
+}
+.app-skin-dark .btn-outline-primary,
+.app-skin-dark .btn-outline-success,
+.app-skin-dark .btn-outline-secondary,
+.app-skin-dark .btn-outline-info,
+.app-skin-dark .btn-outline-warning,
+.app-skin-dark .btn-outline-danger,
+.app-skin-dark .btn-outline-dark,
+.app-skin-dark .btn-outline-light {
+  color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.app-skin-dark .btn-outline-primary:hover,
+.app-skin-dark .btn-outline-success:hover,
+.app-skin-dark .btn-outline-secondary:hover,
+.app-skin-dark .btn-outline-info:hover,
+.app-skin-dark .btn-outline-warning:hover,
+.app-skin-dark .btn-outline-danger:hover,
+.app-skin-dark .btn-outline-dark:hover,
+.app-skin-dark .btn-outline-light:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+
+/* Dark mode badges and text */
+.app-skin-dark .badge.bg-primary,
+.app-skin-dark .badge.bg-success { background-color: var(--ov-primary) !important; }
+.app-skin-dark .text-primary { color: var(--ov-primary) !important; }
+.app-skin-dark .bg-primary { background-color: var(--ov-primary) !important; }
+
+/* Dark mode sidebar active/highlight */
+.app-skin-dark .nxl-navigation .nxl-link:hover,
+.app-skin-dark .nxl-navigation .nxl-link:focus,
+.app-skin-dark .nxl-navigation .nxl-link.active {
+  color: var(--ov-primary) !important;
+  background: rgba(25, 161, 68, 0.15) !important; /* slightly brighter in dark */
+}
+.app-skin-dark .nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link,
+.app-skin-dark .nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link .nxl-mtext,
+.app-skin-dark .nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link .nxl-micon i {
+  color: var(--ov-primary) !important;
+}
+.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link.active,
+.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link:hover {
+  color: var(--ov-primary) !important;
+  background: rgba(25, 161, 68, 0.15) !important;
+}
+
+/* File upload accent */
+.file-upload-area .btn.btn-primary { background-color: var(--ov-primary); border-color: var(--ov-primary); }
+.file-upload-area .btn.btn-primary:hover { background-color: var(--ov-primary-dark); border-color: var(--ov-primary-dark); }
+
+/* Strong overrides for dark mode with higher specificity than fixed CSS */
+html.app-skin-dark .btn-primary,
+html.app-skin-dark .btn-success,
+html.app-skin-dark .btn-secondary,
+html.app-skin-dark .btn-info,
+html.app-skin-dark .btn-warning,
+html.app-skin-dark .btn-danger,
+html.app-skin-dark .btn-dark,
+html.app-skin-dark .btn-light {
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+  color: var(--ov-primary-contrast) !important;
+}
+html.app-skin-dark .btn-primary:hover,
+html.app-skin-dark .btn-success:hover,
+html.app-skin-dark .btn-secondary:hover,
+html.app-skin-dark .btn-info:hover,
+html.app-skin-dark .btn-warning:hover,
+html.app-skin-dark .btn-danger:hover,
+html.app-skin-dark .btn-dark:hover,
+html.app-skin-dark .btn-light:hover {
+  background-color: var(--ov-primary-dark) !important;
+  border-color: var(--ov-primary-dark) !important;
+}
+html.app-skin-dark .btn-outline-primary,
+html.app-skin-dark .btn-outline-success,
+html.app-skin-dark .btn-outline-secondary,
+html.app-skin-dark .btn-outline-info,
+html.app-skin-dark .btn-outline-warning,
+html.app-skin-dark .btn-outline-danger,
+html.app-skin-dark .btn-outline-dark,
+html.app-skin-dark .btn-outline-light {
+  color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+html.app-skin-dark .btn-outline-primary:hover,
+html.app-skin-dark .btn-outline-success:hover,
+html.app-skin-dark .btn-outline-secondary:hover,
+html.app-skin-dark .btn-outline-info:hover,
+html.app-skin-dark .btn-outline-warning:hover,
+html.app-skin-dark .btn-outline-danger:hover,
+html.app-skin-dark .btn-outline-dark:hover,
+html.app-skin-dark .btn-outline-light:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+
+/* Dark mode inputs focus ring and upload hover border to deep green */
+html.app-skin-dark .form-control:focus,
+html.app-skin-dark .form-select:focus {
+  border-color: var(--ov-primary) !important;
+  box-shadow: 0 0 0 0.2rem rgba(11,122,39,0.25) !important;
+}
+html.app-skin-dark .file-upload-area:hover {
+  border-color: var(--ov-primary) !important;
+}
+
+/* Unify success/secondary buttons to deep green */
+.btn-success,
+.btn-secondary,
+.btn-success:focus,
+.btn-secondary:focus {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.btn-success:hover,
+.btn-secondary:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary-dark) !important;
+  border-color: var(--ov-primary-dark) !important;
+}
+.btn-outline-success,
+.btn-outline-secondary {
+  color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.btn-outline-success:hover,
+.btn-outline-secondary:hover {
+  color: var(--ov-primary-contrast) !important;
+  background-color: var(--ov-primary) !important;
+  border-color: var(--ov-primary) !important;
+}
+.badge.bg-success { background-color: var(--ov-primary) !important; }
+
+/* Sidebar active/highlight styles */
+.nxl-navigation .nxl-link:hover,
+.nxl-navigation .nxl-link:focus,
+.nxl-navigation .nxl-link.active {
+  color: var(--ov-primary) !important;
+  background: rgba(11, 122, 39, 0.08) !important;
+}
+.nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link,
+.nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link .nxl-mtext,
+.nxl-navigation .nxl-item.nxl-hasmenu.open > .nxl-link .nxl-micon i {
+  color: var(--ov-primary) !important;
+}
+.nxl-navigation .nxl-submenu .nxl-link.active,
+.nxl-navigation .nxl-submenu .nxl-link:hover {
+  color: var(--ov-primary) !important;
+  background: rgba(11, 122, 39, 0.08) !important;
+}
+.nxl-navigation .nxl-link .nxl-micon i { transition: color .2s ease; }
+.nxl-navigation .nxl-link:hover .nxl-micon i { color: var(--ov-primary) !important; }
