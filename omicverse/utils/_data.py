@@ -89,6 +89,7 @@ def _patch_ann_compat(adata):
     - obsm_keys()/varm_keys()（返回键列表）
     - raw (property, None)  —— 只在确实缺失时补
     - strings_to_categoricals(df=None) / _sanitize() —— 兼容 pandas/Polars
+    - obs/var 的表格显示补丁
     """
     import numpy as np
     from types import MethodType
@@ -365,6 +366,234 @@ def _patch_ann_compat(adata):
     if not ok4 and not hasattr(adata, "obs_names_make_unique"):
         adata.obs_names_make_unique = MethodType(obs_names_make_unique, adata)
 
+    # 6) 为 obs 和 var 添加表格显示补丁
+    def _patch_dataframe_display(df_obj):
+        """为 Rust PyDataFrameElem 添加表格显示功能"""
+        if pd is None:
+            return
+
+        # 检查是否是 Rust 的 PyDataFrameElem (不是标准的 pandas DataFrame)
+        if not hasattr(df_obj, '__class__'):
+            return
+
+        df_cls = df_obj.__class__
+        module_name = getattr(df_cls, '__module__', '')
+
+        # 如果已经是 pandas DataFrame，不需要补丁
+        if module_name.startswith('pandas'):
+            return
+
+        # 检查是否是 anndata-rs 的 PyDataFrameElem
+        if 'PyDataFrameElem' in df_cls.__name__ or 'anndata_rs' in module_name:
+            # 为该类添加 to_pandas 方法（如果不存在）
+            def _to_pandas(self):
+                """Convert PyDataFrameElem to pandas DataFrame"""
+                return convert_to_pandas(self)
+
+            # 存储父 adata 对象的引用以便获取正确的索引
+            if not hasattr(df_obj, '_adata_parent'):
+                try:
+                    df_obj._adata_parent = adata
+                    df_obj._data_type = 'obs' if hasattr(adata, 'obs') and adata.obs is df_obj else 'var'
+                except:
+                    pass
+
+            # 添加 pandas DataFrame 常用方法和属性
+            def _add_pandas_methods(obj):
+                """为 PyDataFrameElem 添加 pandas DataFrame 的常用方法"""
+
+                def _get_pandas_with_index(self):
+                    """获取 pandas DataFrame 并设置正确的索引"""
+                    # 先获取基础的 pandas DataFrame - 避免调用我们自己添加的 to_pandas 方法
+                    pdf = None
+
+                    try:
+                        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
+                        import polars as pl
+                        df_slice = self[:]
+
+                        # 检查返回的是否是 polars DataFrame
+                        if hasattr(df_slice, 'to_pandas'):
+                            pdf = df_slice.to_pandas()
+                        elif isinstance(df_slice, pl.DataFrame):
+                            pdf = df_slice.to_pandas()
+                        else:
+                            # 已经是 pandas DataFrame
+                            pdf = df_slice
+                    except Exception:
+                        pass
+
+                    if pdf is None:
+                        try:
+                            # 方法2: 通过列名构建 DataFrame
+                            if hasattr(self, '__getitem__'):
+                                import polars as pl
+                                import pandas as pd
+                                data = {}
+                                # 尝试获取列名
+                                if hasattr(self, 'columns'):
+                                    columns = self.columns
+                                else:
+                                    return pd.DataFrame()
+
+                                for col in columns:
+                                    try:
+                                        series = self[col]
+                                        # 检查是否是 polars Series
+                                        if hasattr(series, 'to_pandas'):
+                                            data[col] = series.to_pandas()
+                                        elif isinstance(series, pl.Series):
+                                            data[col] = series.to_pandas()
+                                        else:
+                                            data[col] = series
+                                    except:
+                                        pass
+
+                                if data:
+                                    pdf = pd.DataFrame(data)
+                                else:
+                                    pdf = pd.DataFrame()
+                        except Exception:
+                            import pandas as pd
+                            pdf = pd.DataFrame()
+
+                    # 设置正确的索引
+                    if hasattr(self, '_adata_parent') and self._adata_parent is not None:
+                        try:
+                            parent_adata = self._adata_parent
+                            data_type = getattr(self, '_data_type', 'obs')
+
+                            if data_type == 'obs' and hasattr(parent_adata, 'obs_names'):
+                                obs_names = parent_adata.obs_names
+                                if hasattr(obs_names, 'to_list'):
+                                    pdf.index = pd.Index(obs_names.to_list(), name='obs_names')
+                                elif hasattr(obs_names, '__iter__'):
+                                    pdf.index = pd.Index(list(obs_names), name='obs_names')
+                            elif data_type == 'var' and hasattr(parent_adata, 'var_names'):
+                                var_names = parent_adata.var_names
+                                if hasattr(var_names, 'to_list'):
+                                    pdf.index = pd.Index(var_names.to_list(), name='var_names')
+                                elif hasattr(var_names, '__iter__'):
+                                    pdf.index = pd.Index(list(var_names), name='var_names')
+                        except Exception:
+                            pass
+
+                    return pdf
+
+                # 添加 to_pandas 方法
+                def to_pandas_method(self):
+                    return _get_pandas_with_index(self)
+
+                # 添加 head 方法
+                def head_method(self, n=5):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.head(n)
+
+                # 添加 tail 方法
+                def tail_method(self, n=5):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.tail(n)
+
+                # 不要覆盖已有的属性，只添加方法
+
+                # 添加 info 方法
+                def info_method(self, *args, **kwargs):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.info(*args, **kwargs)
+
+                # 添加 describe 方法
+                def describe_method(self, *args, **kwargs):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.describe(*args, **kwargs)
+
+                # 尝试添加这些方法到对象
+                methods_to_add = {
+                    'to_pandas': to_pandas_method,
+                    'head': head_method,
+                    'tail': tail_method,
+                    'info': info_method,
+                    'describe': describe_method,
+                }
+
+                added_methods = []
+
+                # 添加方法
+                for method_name, method_func in methods_to_add.items():
+                    if not hasattr(obj, method_name):
+                        try:
+                            setattr(obj, method_name, MethodType(method_func, obj))
+                            added_methods.append(method_name)
+                            print(f"   {Colors.GREEN}✅ Successfully added method: {method_name}{Colors.ENDC}")
+                        except (AttributeError, TypeError) as e:
+                            print(f"   {Colors.WARNING}⚠️  Failed to add method {method_name}: {e}{Colors.ENDC}")
+                            # 尝试设置到类上
+                            try:
+                                setattr(obj.__class__, method_name, method_func)
+                                added_methods.append(method_name)
+                                print(f"   {Colors.GREEN}✅ Successfully added method {method_name} to class{Colors.ENDC}")
+                            except Exception as e2:
+                                print(f"   {Colors.WARNING}⚠️  Failed to add method {method_name} to class: {e2}{Colors.ENDC}")
+                    else:
+                        print(f"   {Colors.BLUE}ℹ️  Method {method_name} already exists{Colors.ENDC}")
+
+                return added_methods, []
+
+            # 尝试添加方法和属性
+            added_methods, added_properties = _add_pandas_methods(df_obj)
+
+            if added_methods:
+                print(f"   {Colors.GREEN}✅ Added methods: {', '.join(added_methods)}{Colors.ENDC}")
+            if added_properties:
+                print(f"   {Colors.GREEN}✅ Added properties: {', '.join(added_properties)}{Colors.ENDC}")
+
+            # 为该类添加更好的 __repr__ 方法
+            def _dataframe_repr(self):
+                try:
+                    # 首先尝试使用已有的 to_pandas 方法
+                    if hasattr(self, 'to_pandas'):
+                        pdf = self.to_pandas()
+                        return repr(pdf)
+                    else:
+                        # 如果没有 to_pandas 方法，直接调用我们的转换函数
+                        pdf = _to_pandas(self)
+                        return repr(pdf)
+                except Exception as e:
+                    # 备用方案：显示基本信息
+                    try:
+                        n_rows = len(self) if hasattr(self, '__len__') else 'unknown'
+                        return f"<{df_cls.__name__} with {n_rows} rows>"
+                    except:
+                        return f"<{df_cls.__name__}>"
+
+            def _dataframe_str(self):
+                return _dataframe_repr(self)
+
+            # 尝试设置到类上
+            try:
+                if not hasattr(df_cls, '__repr__') or 'show' in str(getattr(df_cls, '__repr__', '')):
+                    setattr(df_cls, '__repr__', _dataframe_repr)
+                    setattr(df_cls, '__str__', _dataframe_str)
+                    print(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} display methods{Colors.ENDC}")
+            except Exception as e:
+                # 如果类不可写，设置到实例上
+                try:
+                    df_obj.__repr__ = MethodType(_dataframe_repr, df_obj)
+                    df_obj.__str__ = MethodType(_dataframe_str, df_obj)
+                    print(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} instance methods{Colors.ENDC}")
+                except Exception as e2:
+                    print(f"   {Colors.WARNING}⚠️  Failed to patch {df_cls.__name__}: {e2}{Colors.ENDC}")
+                    print(f"   {Colors.CYAN}💡 Use ov.utils.convert_to_pandas() to convert manually{Colors.ENDC}")
+
+    # 对 obs 和 var 应用补丁
+    if hasattr(adata, 'obs'):
+        print(f"   {Colors.BLUE}🔧 Patching obs display...{Colors.ENDC}")
+        _patch_dataframe_display(adata.obs)
+    if hasattr(adata, 'var'):
+        print(f"   {Colors.BLUE}🔧 Patching var display...{Colors.ENDC}")
+        _patch_dataframe_display(adata.var)
+
+    print(f"   {Colors.CYAN}💡 If display doesn't work, use: ov.utils.convert_to_pandas(adata.obs){Colors.ENDC}")
+
 
 def _patch_vector_api(adata):
     import numpy as np, warnings
@@ -535,6 +764,305 @@ def _series_to_arraylike(s):
         if hasattr(s, attr):
             return np.asarray(getattr(s, attr)())
     return np.asarray(s)
+
+
+@register_function(
+    aliases=["转换为pandas", "convert_to_pandas", "to_pandas", "DataFrame转换", "rust_to_pandas"],
+    category="utils",
+    description="Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame",
+    examples=[
+        "# Convert Rust backend obs to pandas",
+        "adata = ov.read('data.h5ad', backend='rust')",
+        "obs_df = ov.utils.convert_to_pandas(adata.obs)",
+        "print(obs_df)  # Displays as pandas DataFrame",
+        "# Convert Rust backend var to pandas",
+        "var_df = ov.utils.convert_to_pandas(adata.var)",
+        "# Now you can use pandas methods",
+        "filtered = obs_df[obs_df['n_genes'] > 1000]"
+    ],
+    related=["utils.read", "pp.preprocess", "utils.store_layers"]
+)
+def convert_to_pandas(df_obj):
+    """
+    Convert PyDataFrameElem or similar objects to pandas DataFrame.
+
+    This is a utility function to convert Rust-based DataFrame objects
+    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
+
+    Arguments:
+        df_obj: PyDataFrameElem or similar DataFrame-like object
+
+    Returns:
+        pandas.DataFrame: Converted DataFrame
+
+    Examples:
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
+        >>> print(obs_df)  # Now displays as pandas DataFrame
+    """
+    import pandas as pd
+
+    try:
+        # 如果对象已经有 to_pandas 方法，直接使用
+        if hasattr(df_obj, 'to_pandas'):
+            return df_obj.to_pandas()
+    except Exception:
+        pass
+
+    try:
+        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
+        import polars as pl
+        df_slice = df_obj[:]
+
+        # 检查返回的是否是 polars DataFrame
+        if hasattr(df_slice, 'to_pandas'):
+            return df_slice.to_pandas()
+        elif isinstance(df_slice, pl.DataFrame):
+            return df_slice.to_pandas()
+        else:
+            # 已经是 pandas DataFrame
+            return df_slice
+    except Exception:
+        pass
+
+    try:
+        # 方法2: 通过列名构建 DataFrame
+        if hasattr(df_obj, '__getitem__'):
+            import polars as pl
+            data = {}
+            # 尝试获取列名
+            if hasattr(df_obj, 'columns'):
+                columns = df_obj.columns
+            else:
+                return pd.DataFrame()
+
+            for col in columns:
+                try:
+                    series = df_obj[col]
+                    # 检查是否是 polars Series
+                    if hasattr(series, 'to_pandas'):
+                        data[col] = series.to_pandas()
+                    elif isinstance(series, pl.Series):
+                        data[col] = series.to_pandas()
+                    else:
+                        data[col] = series
+                except:
+                    pass
+
+            if data:
+                return pd.DataFrame(data)
+    except Exception:
+        pass
+
+    # 如果都失败了，返回空 DataFrame
+    return pd.DataFrame()
+
+
+class PyDataFrameElemWrapper:
+    """
+    A wrapper class that provides pandas DataFrame-like interface for PyDataFrameElem.
+
+    This class wraps PyDataFrameElem objects and provides familiar pandas methods
+    like head(), tail(), shape, columns, index, etc.
+    """
+
+    def __init__(self, df_obj):
+        self._df_obj = df_obj
+        self._pandas_cache = None
+
+    def _get_pandas(self):
+        """Get pandas DataFrame, with caching."""
+        if self._pandas_cache is None:
+            self._pandas_cache = convert_to_pandas(self._df_obj)
+        return self._pandas_cache
+
+    def head(self, n=5):
+        """Return first n rows."""
+        return self._get_pandas().head(n)
+
+    def tail(self, n=5):
+        """Return last n rows."""
+        return self._get_pandas().tail(n)
+
+    @property
+    def shape(self):
+        """Return shape of DataFrame."""
+        return self._get_pandas().shape
+
+    @property
+    def columns(self):
+        """Return column labels."""
+        return self._get_pandas().columns
+
+    @property
+    def index(self):
+        """Return row index."""
+        return self._get_pandas().index
+
+    @property
+    def dtypes(self):
+        """Return data types."""
+        return self._get_pandas().dtypes
+
+    def info(self, *args, **kwargs):
+        """Print info about DataFrame."""
+        return self._get_pandas().info(*args, **kwargs)
+
+    def describe(self, *args, **kwargs):
+        """Generate descriptive statistics."""
+        return self._get_pandas().describe(*args, **kwargs)
+
+    def to_pandas(self):
+        """Convert to pandas DataFrame."""
+        return self._get_pandas()
+
+    def __getitem__(self, key):
+        """Support indexing like df['column'] or df[0:5]."""
+        return self._get_pandas()[key]
+
+    def __repr__(self):
+        """Display as pandas DataFrame."""
+        return repr(self._get_pandas())
+
+    def __str__(self):
+        """Display as pandas DataFrame."""
+        return str(self._get_pandas())
+
+    def __len__(self):
+        """Return number of rows."""
+        return len(self._get_pandas())
+
+    # Delegate attribute access to the original object
+    def __getattr__(self, name):
+        return getattr(self._df_obj, name)
+
+
+@register_function(
+    aliases=["包装PyDataFrame", "wrap_dataframe", "pandas_wrapper", "DataFrame包装器"],
+    category="utils",
+    description="Wrap PyDataFrameElem to provide pandas DataFrame-like interface",
+    examples=[
+        "# Wrap PyDataFrameElem for pandas-like usage",
+        "adata = ov.read('data.h5ad', backend='rust')",
+        "obs_wrapper = ov.utils.wrap_dataframe(adata.obs)",
+        "print(obs_wrapper.head())",
+        "print(obs_wrapper.shape)",
+        "print(obs_wrapper.columns)"
+    ],
+    related=["utils.convert_to_pandas", "utils.read"]
+)
+def wrap_dataframe(df_obj):
+    """
+    Wrap PyDataFrameElem to provide pandas DataFrame-like interface.
+
+    Arguments:
+        df_obj: PyDataFrameElem or similar DataFrame-like object
+
+    Returns:
+        PyDataFrameElemWrapper: Wrapped object with pandas-like methods
+
+    Examples:
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs = ov.utils.wrap_dataframe(adata.obs)
+        >>> print(obs.head())
+        >>> print(obs.shape)
+    """
+    return PyDataFrameElemWrapper(df_obj)
+
+
+@register_function(
+    aliases=["转换为pandas", "convert_to_pandas", "to_pandas", "DataFrame转换", "rust_to_pandas"],
+    category="utils",
+    description="Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame",
+    examples=[
+        "# Convert Rust backend obs to pandas",
+        "adata = ov.read('data.h5ad', backend='rust')",
+        "obs_df = ov.utils.convert_to_pandas(adata.obs)",
+        "print(obs_df)  # Displays as pandas DataFrame",
+        "# Convert Rust backend var to pandas",
+        "var_df = ov.utils.convert_to_pandas(adata.var)",
+        "# Now you can use pandas methods",
+        "filtered = obs_df[obs_df['n_genes'] > 1000]"
+    ],
+    related=["utils.read", "pp.preprocess", "utils.store_layers"]
+)
+def convert_to_pandas(df_obj):
+    """
+    Convert PyDataFrameElem or similar objects to pandas DataFrame.
+
+    This is a utility function to convert Rust-based DataFrame objects
+    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
+
+    Arguments:
+        df_obj: PyDataFrameElem or similar DataFrame-like object
+
+    Returns:
+        pandas.DataFrame: Converted DataFrame
+
+    Examples:
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
+        >>> print(obs_df)  # Now displays as pandas DataFrame
+    """
+    import pandas as pd
+
+    try:
+        # 如果对象已经有 to_pandas 方法，直接使用
+        if hasattr(df_obj, 'to_pandas'):
+            return df_obj.to_pandas()
+    except Exception:
+        pass
+
+    try:
+        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
+        import polars as pl
+        df_slice = df_obj[:]
+
+        # 检查返回的是否是 polars DataFrame
+        if hasattr(df_slice, 'to_pandas'):
+            return df_slice.to_pandas()
+        elif isinstance(df_slice, pl.DataFrame):
+            return df_slice.to_pandas()
+        else:
+            # 已经是 pandas DataFrame
+            return df_slice
+    except Exception:
+        pass
+
+    try:
+        # 方法2: 通过列名构建 DataFrame
+        if hasattr(df_obj, '__getitem__'):
+            import polars as pl
+            data = {}
+            # 尝试获取列名
+            if hasattr(df_obj, 'columns'):
+                columns = df_obj.columns
+            else:
+                return pd.DataFrame()
+
+            for col in columns:
+                try:
+                    series = df_obj[col]
+                    # 检查是否是 polars Series
+                    if hasattr(series, 'to_pandas'):
+                        data[col] = series.to_pandas()
+                    elif isinstance(series, pl.Series):
+                        data[col] = series.to_pandas()
+                    else:
+                        data[col] = series
+                except:
+                    pass
+
+            if data:
+                return pd.DataFrame(data)
+    except Exception:
+        pass
+
+    # 如果都失败了，返回空 DataFrame
+    return pd.DataFrame()
 
 
 # 替换 get_vector 内 in_col 分支那一行：
