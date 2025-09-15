@@ -22,6 +22,8 @@ from scanpy.get import _get_obs_rep
 from scanpy.preprocessing._distributed import materialize_as_ndarray
 from scanpy.preprocessing._utils import _get_mean_var
 
+from .._qc import _is_rust_backend
+
 if TYPE_CHECKING:
     from typing import Literal
 
@@ -142,6 +144,9 @@ def _highly_variable_pearson_residuals(
 ) -> pd.DataFrame | None:
     view_to_actual(adata)
     X = _get_obs_rep(adata, layer=layer)
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        X = X[:]
     computed_on = layer if layer else "adata.X"
 
     # Check for raw counts
@@ -167,15 +172,21 @@ def _highly_variable_pearson_residuals(
     # Get pearson residuals for each batch separately
     residual_gene_vars = []
     for batch in np.unique(batch_info):
-        adata_subset_prefilter = adata[batch_info == batch]
+        if is_rust:
+            adata_subset_prefilter = adata.subset(obs_indices=np.where(batch_info == batch)[0],inplace=False)
+        else:
+            adata_subset_prefilter = adata[batch_info == batch]
+        #  adata_subset_prefilter = adata[batch_info == batch]
         X_batch_prefilter = _get_obs_rep(adata_subset_prefilter, layer=layer)
-
+        if is_rust:
+            X_batch_prefilter = X_batch_prefilter[:]
         # Filter out zero genes
         with settings.verbosity.override(Verbosity.error):
             nonzero_genes = np.ravel(X_batch_prefilter.sum(axis=0)) != 0
         adata_subset = adata_subset_prefilter[:, nonzero_genes]
         X_batch = _get_obs_rep(adata_subset, layer=layer)
-
+        if is_rust:
+            X_batch = X_batch[:]
         # Prepare clipping
         if clip is None:
             n = X_batch.shape[0]
@@ -233,6 +244,7 @@ def _highly_variable_pearson_residuals(
     medianrank_residual_var = np.ma.median(ranks_masked_array, axis=0).filled(np.nan)
 
     means, variances = materialize_as_ndarray(_get_mean_var(X))
+    
     df = pd.DataFrame.from_dict(
         dict(
             means=means,
@@ -243,7 +255,8 @@ def _highly_variable_pearson_residuals(
             highly_variable_intersection=highly_variable_nbatches == n_batches,
         )
     )
-    df = df.set_index(adata.var_names)
+    df.index = adata.var_names
+    #df = df.set_index(adata.var_names)
 
     # Sort genes by how often they selected as hvg within each batch and
     # break ties with median rank of residual variance across batches
@@ -376,12 +389,13 @@ def highly_variable_genes(
     if clip is not None:
         print(f"   {Colors.CYAN}Clipping value: {Colors.BOLD}{clip}{Colors.ENDC}")
 
-    if not isinstance(adata, AnnData):
-        msg = (
-            "`pp.highly_variable_genes` expects an `AnnData` argument, "
-            "pass `inplace=False` if you want to return a `pd.DataFrame`."
-        )
-        raise ValueError(msg)
+
+    #if not isinstance(adata, AnnData):
+    #    msg = (
+    #        "`pp.highly_variable_genes` expects an `AnnData` argument, "
+    #        "pass `inplace=False` if you want to return a `pd.DataFrame`."
+    #    )
+    #    raise ValueError(msg)
 
     if flavor == "pearson_residuals":
         if n_top_genes is None:

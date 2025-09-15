@@ -104,6 +104,7 @@ def umap(  # noqa: PLR0913, PLR0915
     print(f"   {Colors.CYAN}Min distance: {Colors.BOLD}{min_dist}{Colors.ENDC}")
 
     neighbors = NeighborsView(adata, neighbors_key)
+    print(neighbors["params"])
 
     if "params" not in neighbors or neighbors["params"]["method"] != "umap":
         print(f"   {EMOJI['warning']} {Colors.WARNING}Connectivities matrix was not computed with UMAP method{Colors.ENDC}")
@@ -136,7 +137,7 @@ def umap(  # noqa: PLR0913, PLR0915
 
     if random_state != 0:
         adata.uns[key_uns]["params"]["random_state"] = random_state
-
+    #print(neighbors.keys())
     neigh_params = neighbors["params"]
     X = _choose_representation(
         adata,

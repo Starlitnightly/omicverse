@@ -11,7 +11,7 @@ import numpy as np
 
 from .._settings import settings, EMOJI, Colors
 from scanpy._compat import CSBase, CSCBase, CSRBase, DaskArray, old_positionals
-from scanpy._utils import axis_mul_or_truediv, dematrix, view_to_actual, axis_sum
+from scanpy._utils import axis_mul_or_truediv, dematrix, view_to_actual, axis_sum,is_backed_type,_check_array_function_arguments
 from scanpy.get import _get_obs_rep, _set_obs_rep
 
 try:
@@ -272,6 +272,10 @@ def normalize_total(  # noqa: PLR0912
     if x is None:
         msg = f"Layer {layer!r} not found in adata."
         raise ValueError(msg)
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        x=x[:]
     if isinstance(x, CSCBase):
         x = x.tocsr()
     if not inplace:
@@ -297,7 +301,11 @@ def normalize_total(  # noqa: PLR0912
         n_excluded = (~gene_subset).sum()
         print(f"   {EMOJI['warning']} {Colors.WARNING}Excluding {Colors.BOLD}{n_excluded:,}{Colors.ENDC}{Colors.WARNING} highly-expressed genes from normalization computation{Colors.ENDC}")
         if n_excluded <= 10:  # Only show gene names if not too many
-            print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
+            if not is_rust:
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
+            else:
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{np.array(adata.var_names)[gene_subset]}{Colors.ENDC}")
+            #print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
 
     cell_subset = counts_per_cell > 0
     if not isinstance(cell_subset, DaskArray) and not np.all(cell_subset):
@@ -327,3 +335,121 @@ def normalize_total(  # noqa: PLR0912
         return dat
     return None
     
+
+def _log1p(
+    data: AnnData | np.ndarray | CSBase,
+    *,
+    base: Number | None = None,
+    copy: bool = False,
+    chunked: bool | None = None,
+    chunk_size: int | None = None,
+    layer: str | None = None,
+    obsm: str | None = None,
+) -> AnnData | np.ndarray | CSBase | None:
+    r"""Logarithmize the data matrix.
+
+    Computes :math:`X = \log(X + 1)`,
+    where :math:`log` denotes the natural logarithm unless a different base is given.
+
+    Parameters
+    ----------
+    data
+        The (annotated) data matrix of shape `n_obs` × `n_vars`.
+        Rows correspond to cells and columns to genes.
+    base
+        Base of the logarithm. Natural logarithm is used by default.
+    copy
+        If an :class:`~anndata.AnnData` is passed, determines whether a copy
+        is returned.
+    chunked
+        Process the data matrix in chunks, which will save memory.
+        Applies only to :class:`~anndata.AnnData`.
+    chunk_size
+        `n_obs` of the chunks to process the data in.
+    layer
+        Entry of layers to transform.
+    obsm
+        Entry of obsm to transform.
+
+    Returns
+    -------
+    Returns or updates `data`, depending on `copy`.
+
+    """
+    _check_array_function_arguments(
+        chunked=chunked, chunk_size=chunk_size, layer=layer, obsm=obsm
+    )
+    return log1p_array(data, copy=copy, base=base)
+
+
+
+def log1p_sparse(x: CSBase, *, base: Number | None = None, copy: bool = False):
+    x = check_array(
+        x, accept_sparse=("csr", "csc"), dtype=(np.float64, np.float32), copy=copy
+    )
+    x.data = _log1p(x.data, copy=False, base=base)
+    return x
+
+
+
+def log1p_array(x: np.ndarray, *, base: Number | None = None, copy: bool = False):
+    # Can force arrays to be np.ndarrays, but would be useful to not
+    # X = check_array(X, dtype=(np.float64, np.float32), ensure_2d=False, copy=copy)
+    
+    if copy:
+        x = x.astype(float) if not np.issubdtype(x.dtype, np.floating) else x.copy()
+    elif not (np.issubdtype(x.dtype, np.floating) or np.issubdtype(x.dtype, complex)):
+        x = x.astype(float)
+    x=np.log1p(x)
+    if base is not None:
+        x=np.divide(x, np.log(base))
+    return x
+
+def log1p(
+    adata: AnnData,
+    *,
+    base: Number | None = None,
+    copy: bool = False,
+    chunked: bool = False,
+    chunk_size: int | None = None,
+    layer: str | None = None,
+    obsm: str | None = None,
+) -> AnnData | None:
+    if "log1p" in adata.uns:
+        print(f"{Colors.WARNING}adata.X seems to be already log-transformed.{Colors.ENDC}")
+
+    adata = adata.copy() if copy else adata
+    view_to_actual(adata)
+
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
+    
+    if chunked:
+        if (layer is not None) or (obsm is not None):
+            msg = (
+                "Currently cannot perform chunked operations on arrays not stored in X."
+            )
+            raise NotImplementedError(msg)
+        if adata.isbacked and adata.file._filemode != "r+":
+            msg = "log1p is not implemented for backed AnnData with backed mode not r+"
+            raise NotImplementedError(msg)
+        for chunk, start, end in adata.chunked_X(chunk_size):
+            adata.X[start:end] = log1p(chunk, base=base, copy=False)
+    else:
+        x = _get_obs_rep(adata, layer=layer, obsm=obsm)
+        if is_rust:
+            x = x[:]
+        if is_backed_type(x):
+            msg = f"log1p is not implemented for matrices of type {type(x)}"
+            if layer is not None:
+                msg = f"{msg} from layers"
+                raise NotImplementedError(msg)
+            msg = f"{msg} without `chunked=True`"
+            raise NotImplementedError(msg)
+        x = _log1p(x, copy=False, base=base)
+        _set_obs_rep(adata, x, layer=layer, obsm=obsm)
+    if base == None:
+        base = np.e
+    adata.uns["log1p"] = {"base": base}
+    if copy:
+        return adata

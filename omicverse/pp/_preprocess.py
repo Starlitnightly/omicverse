@@ -12,13 +12,38 @@ import scanpy as sc
 import time 
 
 from scipy.sparse import issparse, csr_matrix
+
+from omicverse.pp._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from ..utils.registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
 
 
-from ._normalization import normalize_total
+from ._normalization import normalize_total,log1p
 from datetime import datetime
+
+
+# Helper functions for Rust anndata compatibility
+def _safe_copy(arr):
+    """Safely copy array data, compatible with both numpy and Rust backends."""
+    try:
+        # Try the standard copy method first
+        return arr.copy()
+    except AttributeError:
+        # For Rust backends that don't have copy method
+        return np.array(arr, copy=True)
+
+def _safe_to_df_copy(arr):
+    """Safely convert to DataFrame and copy, compatible with both numpy and Rust backends."""
+    try:
+        # Try the standard to_df().copy() first
+        return arr.to_df().copy()
+    except AttributeError:
+        # For Rust backends, convert to numpy first, then to DataFrame
+        if hasattr(arr, 'to_numpy'):
+            return pd.DataFrame(arr.to_numpy()).copy()
+        else:
+            return pd.DataFrame(np.array(arr)).copy()
 
 
 
@@ -43,9 +68,17 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
     prior_n = data.shape[1]
 
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(data)
+
     if issparse(data.X):
         data.var["n_cells"] = data.X.getnnz(axis=0)
         data._inplace_subset_var(data.var["n_cells"] > 0)
+        data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
+        data.var["robust"] = data.var["percent_cells"] >= percent_cells
+    elif is_rust:
+        data.var["n_cells"] =data.X[:].getnnz(axis=0)
+        data.subset(var_indices=np.where(data.var["n_cells"]>0)[0])
         data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
         data.var["robust"] = data.var["percent_cells"] >= percent_cells
     else:
@@ -500,11 +533,21 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     """
 
     # Log-normalization, HVGs identification
-    adata.layers['counts'] = adata.X.copy()
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        adata.layers['counts'] = adata.X[:]
+    else:
+        adata.layers['counts'] = adata.X.copy()
+    
+    
     print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
     print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
     identify_robust_genes(adata, percent_cells=0.05)
-    adata = adata[:, adata.var['robust']]
+    if not is_rust:
+        adata = adata[:, adata.var['robust']]
+    else:
+        adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
     print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
     print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
@@ -517,7 +560,7 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
                 exclude_highly_expressed=True,
                 max_fraction=0.2,
             )
-            sc.pp.log1p(adata)
+            log1p(adata)
             
         elif method_list[0] == 'pearson':
             # Perason residuals workflow
@@ -575,10 +618,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data in gpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
 
-
-    adata.var = adata.var.drop(columns=['highly_variable_features'])
-    adata.var['highly_variable_features'] = adata.var['highly_variable']
-    adata.var = adata.var.drop(columns=['highly_variable'])
+    if not is_rust:
+        adata.var = adata.var.drop(columns=['highly_variable_features'])
+        adata.var['highly_variable_features'] = adata.var['highly_variable']
+        adata.var = adata.var.drop(columns=['highly_variable'])
+    else:
+        #adata.var = adata.var.drop(columns=['highly_variable_features'])
+        adata.var['highly_variable_features'] = adata.var['highly_variable']
+        #adata.var = adata.var.drop(columns=['highly_variable'])
     #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
     print(f"{EMOJI['done']} Preprocessing completed successfully.")
     print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
@@ -637,8 +684,12 @@ def scale(adata,max_value=10,layers_add='scaled',**kwargs):
 
     """
     if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
-        adata_mock = sc.pp.scale(adata, copy=True,max_value=max_value,**kwargs)
-        adata.layers[layers_add] = adata_mock.X.copy()
+        from ._scale import scale_anndata as scale
+        adata_mock = scale(adata, copy=True,max_value=max_value,**kwargs)
+        if _is_rust_backend(adata_mock):
+            adata.layers[layers_add] = adata_mock.X[:]
+        else:
+            adata.layers[layers_add] = adata_mock.X.copy()
         del adata_mock
     else:
         import rapids_singlecell as rsc
@@ -773,6 +824,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         else:
             from ._pca import pca as _pca
             _pca(adata, layer=layer,n_comps=n_pcs,use_gpu=False,**kwargs)
+            #print(res)
             adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
             adata.varm[key + '|pca_loadings'] = adata.varm['PCs']
             adata.uns[key + '|pca_var_ratios'] = adata.uns['pca']['variance_ratio']
@@ -837,14 +889,14 @@ def counts_store(adata,layers):
     '''
     counts store
     '''
-    adata.uns[layers] = adata.X.to_df().copy()
+    adata.uns[layers] = _safe_to_df_copy(adata.X)
 
 def counts_retrieve(adata,layers):
     '''
     counts retrieve
     '''
     cell_idx=adata.obs.index
-    adata.uns['raw_store'] = adata.X.to_df().copy()
+    adata.uns['raw_store'] = _safe_to_df_copy(adata.X)
     adata.X=adata.uns[layers].loc[cell_idx,:].values
 
 from scipy.stats import median_abs_deviation

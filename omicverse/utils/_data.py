@@ -8,6 +8,7 @@ import requests
 import os
 import pandas as pd
 import scanpy as sc
+from pathlib import Path
 from ._genomics import read_gtf,Gtf
 import anndata
 import numpy as np
@@ -40,29 +41,508 @@ from .registry import register_function
     ],
     related=["utils.read_csv", "utils.read_h5ad", "pp.preprocess"]
 )
-def read(path,backend='python',**kwargs):
-    if path.split('.')[-1]=='h5ad':
-        if backend=='python':
-            return sc.read_h5ad(path,**kwargs)
-        elif backend=='rust':
+def read(path, backend='python', **kwargs):
+    r"""
+    Arguments:
+        path: The path of the file to read
+        backend: 'python' | 'rust'
+    Returns:
+        AnnData-like object
+    """
+    ext = Path(path).suffix.lower()
+
+    if ext == '.h5ad':
+        if backend == 'python':
+            return sc.read_h5ad(path, **kwargs)
+
+        elif backend == 'rust':
             try:
                 import snapatac2 as snap
             except ImportError:
-                raise ImportError('snapatac2 is not installed. Please install it with `pip install snapatac2`')
+                raise ImportError('snapatac2 is not installed. `pip install snapatac2`')
+
             print(f'{Colors.GREEN}Using snapatac2 to read h5ad file{Colors.ENDC}')
             print(f'{Colors.WARNING}You should run adata.close() after analysis{Colors.ENDC}')
-            return snap.read(path,**kwargs)
-    elif path.split('.')[-1]=='csv':
-        return pd.read_csv(path,**kwargs)
-    elif path.split('.')[-1]=='tsv' or path.split('.')[-1]=='txt':
-        return pd.read_csv(path,sep='\t',**kwargs)
-    elif path.split('.')[-1]=='gz':
-        if path.split('.')[-2]=='csv':
-            return pd.read_csv(path,**kwargs)
-        elif path.split('.')[-2]=='tsv' or path.split('.')[-2]=='txt':
-            return pd.read_csv(path,sep='\t',**kwargs)
-    else:
-        raise ValueError('The type is not supported.')
+            print(f'{Colors.WARNING}Not all function support Rust backend{Colors.ENDC}')
+            adata = snap.read(path, **kwargs)
+            _patch_ann_compat(adata)  # ← 关键：一次性猴子补丁
+            _patch_vector_api(adata)
+            return adata
+
+        else:
+            raise ValueError("backend must be 'python' or 'rust'")
+
+    # 其它纯表格：pandas 会自动识别 gz 压缩，不必手动区分
+    if ext in {'.csv', '.tsv', '.txt', '.gz'}:
+        sep = '\t' if ext in {'.tsv', '.txt'} or path.endswith(('.tsv.gz', '.txt.gz')) else ','
+        return pd.read_csv(path, sep=sep, **kwargs)
+
+    raise ValueError('The type is not supported.')
+
+
+# ------------------ 兼容补丁 ------------------
+
+def _patch_ann_compat(adata):
+    """
+    给 SnapATAC2(Rust) AnnData 类/实例补齐：
+    - is_view (property, False)
+    - obsm_keys()/varm_keys()（返回键列表）
+    - raw (property, None)  —— 只在确实缺失时补
+    - strings_to_categoricals(df=None) / _sanitize() —— 兼容 pandas/Polars
+    """
+    import numpy as np
+    from types import MethodType
+    try:
+        import pandas as pd
+        from pandas.api.types import infer_dtype
+    except Exception:
+        pd, infer_dtype = None, None
+    try:
+        import polars as pl
+    except Exception:
+        pl = None
+    try:
+        from natsort import natsorted
+    except Exception:
+        natsorted = sorted
+
+    cls = type(adata)
+
+    def _try_set_class_attr(name, value):
+        try:
+            if not hasattr(cls, name):
+                setattr(cls, name, value)
+            return True
+        except Exception:
+            return False
+
+    # 1) is_view → property(False)
+    _try_set_class_attr("is_view", property(lambda self: False))
+
+    # 2) obsm_keys / varm_keys
+    def _obsm_keys(self):
+        o = getattr(self, "obsm", None)
+        if o is None:
+            return []
+        return list(o.keys()) if hasattr(o, "keys") else list(o)
+
+    def _varm_keys(self):
+        o = getattr(self, "varm", None)
+        if o is None:
+            return []
+        return list(o.keys()) if hasattr(o, "keys") else list(o)
+
+    if not _try_set_class_attr("obsm_keys", _obsm_keys):
+        if not hasattr(adata, "obsm_keys"):
+            adata.obsm_keys = MethodType(_obsm_keys, adata)
+
+    if not _try_set_class_attr("varm_keys", _varm_keys):
+        if not hasattr(adata, "varm_keys"):
+            adata.varm_keys = MethodType(_varm_keys, adata)
+
+    # 3) raw → property(None)（只有缺失时才补；避免覆盖已有实现）
+    if not hasattr(adata, "raw"):
+        _try_set_class_attr("raw", property(lambda self: None))
+        # 类不可写就算了，访问 getattr(adata,"raw",None) 做兜底
+
+    # 4) strings_to_categoricals / _sanitize（pandas/Polars 兼容）
+    def _strings_to_categoricals(self, df=None):
+        dont_modify = False
+        if df is None:
+            dfs = [self.obs, self.var]
+            if getattr(self, "is_view", False) and getattr(self, "isbacked", False):
+                dont_modify = True
+        else:
+            dfs = [df]
+
+        for _df in dfs:
+            mod = type(_df).__module__
+            # pandas DataFrame
+            if pd is not None and mod.startswith("pandas"):
+                string_cols = [
+                    k for k in _df.columns
+                    if (infer_dtype(_df[k]) in ("string", "unicode")) or (_df[k].dtype == "object")
+                ]
+                for key in string_cols:
+                    c = pd.Categorical(_df[key])
+                    # 仅当类别数 < 行数时才转分类（与 anndata 行为一致）
+                    if len(c.categories) >= len(c):
+                        continue
+                    cats_sorted = list(natsorted(list(c.categories)))
+                    if dont_modify:
+                        raise RuntimeError(
+                            "Please call `.strings_to_categoricals()` on full AnnData, not on a backed view."
+                        )
+                    if list(c.categories) != cats_sorted:
+                        c = c.reorder_categories(cats_sorted)
+                    _df[key] = c
+
+            # polars DataFrame
+            elif pl is not None and mod.startswith("polars"):
+                string_cols = [k for k, dt in _df.schema.items() if dt == pl.Utf8]
+                for key in string_cols:
+                    s = _df[key]
+                    # 与 pandas 近似：当存在重复（n_unique < n_rows）才转分类
+                    try:
+                        n_null = s.is_null().sum()
+                    except Exception:
+                        n_null = s.null_count()
+                    if dont_modify:
+                        raise RuntimeError(
+                            "Call `.strings_to_categoricals()` on full AnnData, not on a backed view."
+                        )
+                    if s.n_unique(approx=False) < s.len():
+                        _df[key] = s.cast(pl.Categorical)
+
+            # 其它 DataFrame 实现：跳过
+        return None
+
+    # 尝试挂到类
+    ok1 = _try_set_class_attr("strings_to_categoricals", _strings_to_categoricals)
+    ok2 = _try_set_class_attr("_sanitize", _strings_to_categoricals)
+
+    # 类不可写则绑定到实例
+    if not ok1 and not hasattr(adata, "strings_to_categoricals"):
+        adata.strings_to_categoricals = MethodType(_strings_to_categoricals, adata)
+    if not ok2 and not hasattr(adata, "_sanitize"):
+        # 与 anndata 旧 API 对齐
+        adata._sanitize = adata.strings_to_categoricals
+
+    # 5) var_names_make_unique / obs_names_make_unique 方法补丁
+    def _safe_get_index(df):
+        """Safely get index from both pandas DataFrame and Rust PyDataFrameElem."""
+        if hasattr(df, 'index'):
+            # pandas DataFrame
+            return df.index
+        else:
+            # Rust PyDataFrameElem - try different methods to get the index
+            try:
+                # Method 1: Try to get index names directly
+                if hasattr(df, 'index_names') and df.index_names:
+                    return pd.Index(df.index_names)
+                # Method 2: Try to get the first column if it's the index
+                if hasattr(df, 'columns') and hasattr(df, '__getitem__'):
+                    # This is a fallback - we'll use var_names/obs_names from the parent object
+                    return None
+                # Method 3: Convert to pandas and get index
+                if hasattr(df, 'to_pandas'):
+                    return df.to_pandas().index
+            except Exception:
+                pass
+            return None
+
+    def _safe_set_names(adata, attr_name, new_names):
+        """Safely set var_names or obs_names for both pandas and Rust backends."""
+        if hasattr(adata, attr_name):
+            setattr(adata, attr_name, new_names)
+        else:
+            # Fallback for Rust backends
+            if attr_name == 'var_names' and hasattr(adata, 'var'):
+                # Try to set the index of the var dataframe
+                try:
+                    if hasattr(adata.var, 'index'):
+                        adata.var.index = new_names
+                except Exception:
+                    pass
+            elif attr_name == 'obs_names' and hasattr(adata, 'obs'):
+                # Try to set the index of the obs dataframe
+                try:
+                    if hasattr(adata.obs, 'index'):
+                        adata.obs.index = new_names
+                except Exception:
+                    pass
+
+    def make_index_unique(index_or_names, join: str = "-"):
+        """
+        Makes the index unique by appending a number string to each duplicate index element:
+        '1', '2', etc.
+
+        If a tentative name created by the algorithm already exists in the index, it tries
+        the next integer in the sequence.
+
+        The first occurrence of a non-unique value is ignored.
+
+        Parameters
+        ----------
+        index_or_names
+             A pandas Index object or array-like of names
+        join
+             The connecting string between name and integer.
+        """
+        # Convert to pandas Index if needed
+        if not hasattr(index_or_names, 'is_unique'):
+            index_or_names = pd.Index(index_or_names)
+            
+        if index_or_names.is_unique:
+            return index_or_names
+            
+        from collections import Counter
+        import warnings
+
+        values = index_or_names.values.copy()
+        indices_dup = index_or_names.duplicated(keep="first")
+        values_dup = values[indices_dup]
+        values_set = set(values)
+        counter = Counter()
+        issue_interpretation_warning = False
+        example_colliding_values = []
+        for i, v in enumerate(values_dup):
+            while True:
+                counter[v] += 1
+                tentative_new_name = v + join + str(counter[v])
+                if tentative_new_name not in values_set:
+                    values_set.add(tentative_new_name)
+                    values_dup[i] = tentative_new_name
+                    break
+                issue_interpretation_warning = True
+                if len(example_colliding_values) < 5:
+                    example_colliding_values.append(tentative_new_name)
+
+        if issue_interpretation_warning:
+            msg = (
+                f"Suffix used ({join}[0-9]+) to deduplicate index values may make index values difficult to interpret. "
+                "There values with a similar suffixes in the index. "
+                "Consider using a different delimiter by passing `join={delimiter}`. "
+                "Example key collisions generated by the make_index_unique algorithm: "
+                f"{example_colliding_values}"
+            )
+            warnings.warn(msg, UserWarning, stacklevel=3)
+        values[indices_dup] = values_dup
+        index = pd.Index(values, name=getattr(index_or_names, 'name', None))
+        return index
+
+    def var_names_make_unique(self, join: str = "-"):
+        """Make variable names unique by appending numbers to duplicates."""
+        # Get current var_names safely
+        current_names = getattr(self, 'var_names', None)
+        if current_names is None:
+            # Try to get from var.index
+            var_index = _safe_get_index(self.var)
+            if var_index is not None:
+                current_names = var_index
+            else:
+                # Last resort - get from var_names attribute or create default
+                try:
+                    current_names = list(range(self.n_vars))
+                except:
+                    return  # Can't proceed without names
+        
+        # Make unique
+        new_names = make_index_unique(current_names, join)
+        
+        # Set the new names safely
+        _safe_set_names(self, 'var_names', new_names)
+
+    def obs_names_make_unique(self, join: str = "-"):
+        """Make observation names unique by appending numbers to duplicates."""
+        # Get current obs_names safely
+        current_names = getattr(self, 'obs_names', None)
+        if current_names is None:
+            # Try to get from obs.index
+            obs_index = _safe_get_index(self.obs)
+            if obs_index is not None:
+                current_names = obs_index
+            else:
+                # Last resort - get from obs_names attribute or create default
+                try:
+                    current_names = list(range(self.n_obs))
+                except:
+                    return  # Can't proceed without names
+        
+        # Make unique
+        new_names = make_index_unique(current_names, join)
+        
+        # Set the new names safely
+        _safe_set_names(self, 'obs_names', new_names)
+
+    # 尝试挂到类
+    ok3 = _try_set_class_attr("var_names_make_unique", var_names_make_unique)
+    ok4 = _try_set_class_attr("obs_names_make_unique", obs_names_make_unique)
+
+    # 类不可写则绑定到实例
+    if not ok3 and not hasattr(adata, "var_names_make_unique"):
+        adata.var_names_make_unique = MethodType(var_names_make_unique, adata)
+    if not ok4 and not hasattr(adata, "obs_names_make_unique"):
+        adata.obs_names_make_unique = MethodType(obs_names_make_unique, adata)
+
+
+def _patch_vector_api(adata):
+    import numpy as np, warnings
+    from types import MethodType
+    try:
+        import scipy.sparse as sp
+        _issparse = sp.issparse
+    except Exception:
+        _issparse = lambda x: False
+
+    cls = type(adata)
+
+    # ---------- helpers ----------
+    def _ensure_list_names(names):
+        try:
+            return names.tolist()
+        except Exception:
+            return list(names)
+
+    def _find_pos(names, key):
+        try:
+            return int(names.get_loc(key))
+        except Exception:
+            seq = _ensure_list_names(names)
+            try:
+                return seq.index(key)
+            except ValueError:
+                for i, v in enumerate(seq):
+                    if str(v) == str(key):
+                        return i
+                raise
+
+    def _try_get_column(df, key):
+        """同时兼容 pandas/Polars/代理对象；返回 (found, series/array-like)。"""
+        # 1) 最常见：支持 df[key]
+        try:
+            s = df[key]
+            return True, s
+        except Exception:
+            pass
+        # 2) Polars: get_column
+        if hasattr(df, "get_column"):
+            try:
+                return True, df.get_column(key)
+            except Exception:
+                pass
+        # 3) Polars: select 返回 DataFrame，再取第一列
+        if hasattr(df, "select"):
+            try:
+                tmp = df.select(key)
+                # polars 0.20+: tmp is DataFrame
+                if hasattr(tmp, "to_series"):
+                    return True, tmp.to_series()  # type: ignore[attr-defined]
+                # 兜底：取第一列
+                if hasattr(tmp, "columns") and tmp.columns:
+                    return True, tmp[tmp.columns[0]]
+            except Exception:
+                pass
+        return False, None
+
+    def _series_to_np(s):
+        for attr in ("to_numpy", "to_ndarray", "to_list"):
+            if hasattr(s, attr):
+                arr = getattr(s, attr)()
+                return np.asarray(arr)
+        return np.asarray(s)
+
+    # ---------- _get_X ----------
+    def _get_X(self, layer=None):
+        if layer is None:
+            return self.X
+        if layer == "X":
+            try:
+                if "X" in self.layers:
+                    return self.layers["X"]
+            except Exception:
+                pass
+            warnings.warn(
+                "In a future AnnData, `layer='X'` will be removed; use layer=None.",
+                FutureWarning, stacklevel=2,
+            )
+            return self.X
+        return self.layers[layer]
+
+    # ---------- _make_slice / _normalize_indices ----------
+    def _make_slice(self, key, selected_dim):
+        if selected_dim == 1:  # along var
+            j = _find_pos(self.var_names, key)
+            return (slice(None), [j])
+        else:                  # along obs
+            i = _find_pos(self.obs_names, key)
+            return ([i], slice(None))
+
+    def _normalize_indices(self, idx):
+        return idx  # 我们生成的已可直接用于 numpy/scipy
+
+    # ---------- get_vector：不再依赖 .columns ----------
+    def _get_vector(self, k, coldim, idxdim, layer=None):
+        dims = ("obs", "var")
+        obj = getattr(self, coldim)
+        idx_names = getattr(self, f"{idxdim}_names")
+
+        in_col, col_series = _try_get_column(obj, k)
+        in_idx = (k in idx_names)
+
+        if (in_col + in_idx) == 2:
+            raise ValueError(f"Key {k} could be found in both .{idxdim}_names and .{coldim}.columns")
+        elif (in_col + in_idx) == 0:
+            raise KeyError(f"Could not find key {k} in .{idxdim}_names or .{coldim}.columns.")
+        elif in_col:
+            return _series_to_arraylike(col_series)
+        else:
+            selected_dim = dims.index(idxdim)
+            idx = self._normalize_indices(_make_slice(self, k, selected_dim))
+            a = self._get_X(layer=layer)[idx]
+            if _issparse(a):
+                a = a.toarray()
+            return np.ravel(a)
+
+    def _obs_vector(self, k, *, layer=None):
+        return _get_vector(self, k, "obs", "var", layer=layer)
+
+    def _var_vector(self, k, *, layer=None):
+        return _get_vector(self, k, "var", "obs", layer=layer)
+
+    # ---------- bind ----------
+    def _set_cls(name, obj):
+        try:
+            if not hasattr(cls, name):
+                setattr(cls, name, obj)
+            return True
+        except Exception:
+            return False
+
+    if not _set_cls("_get_X", _get_X):
+        if not hasattr(adata, "_get_X"):
+            adata._get_X = MethodType(_get_X, adata)
+    if not _set_cls("_normalize_indices", _normalize_indices):
+        if not hasattr(adata, "_normalize_indices"):
+            adata._normalize_indices = MethodType(_normalize_indices, adata)
+    if not _set_cls("get_vector", _get_vector):
+        if not hasattr(adata, "get_vector"):
+            adata.get_vector = MethodType(_get_vector, adata)
+    if not _set_cls("obs_vector", _obs_vector):
+        if not hasattr(adata, "obs_vector"):
+            adata.obs_vector = MethodType(_obs_vector, adata)
+    if not _set_cls("var_vector", _var_vector):
+        if not hasattr(adata, "var_vector"):
+            adata.var_vector = MethodType(_var_vector, adata)
+
+def _series_to_arraylike(s):
+    import numpy as np
+    try:
+        import pandas as pd
+        if s.__class__.__module__.startswith("pandas"):
+            return s.values   # 分类列会得到 pandas.Categorical
+    except Exception:
+        pass
+    try:
+        import polars as pl, pandas as pd
+        if isinstance(s, pl.Series):
+            if s.dtype == pl.Categorical:
+                return pd.Categorical(s.to_list())
+            return np.asarray(s.to_list())
+    except Exception:
+        pass
+    for attr in ("to_numpy", "to_ndarray", "to_list"):
+        if hasattr(s, attr):
+            return np.asarray(getattr(s, attr)())
+    return np.asarray(s)
+
+
+# 替换 get_vector 内 in_col 分支那一行：
+# 旧：return _series_to_np(col_series)
+# 新：
+
+
+
     
 def read_csv(**kwargs):
     return pd.read_csv(**kwargs)

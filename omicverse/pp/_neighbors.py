@@ -262,8 +262,22 @@ def neighbors(  # noqa: PLR0913
     if n_pcs is not None:
         neighbors_dict["params"]["n_pcs"] = n_pcs
 
-    adata.obsp[dists_key] = neighbors.distances
-    adata.obsp[conns_key] = neighbors.connectivities
+    # 关键：先规范化再写入 obsp
+    D = _to_sorted_csr(neighbors.distances)
+    C = _to_sorted_csr(neighbors.connectivities)
+
+    # （可选）确保形状一致
+    n = adata.n_obs
+    if D is not None and D.shape != (n, n):
+        raise ValueError(f"distances shape {D.shape} != ({n},{n})")
+    if C is not None and C.shape != (n, n):
+        raise ValueError(f"connectivities shape {C.shape} != ({n},{n})")
+
+    adata.obsp[dists_key] = D
+    adata.obsp[conns_key] = C
+
+    # adata.obsp[dists_key] = neighbors.distances
+    # adata.obsp[conns_key] = neighbors.connectivities
 
     if neighbors.rp_forest is not None:
         neighbors_dict["rp_forest"] = neighbors.rp_forest
@@ -284,6 +298,7 @@ def neighbors(  # noqa: PLR0913
             f"    `.obsp[{conns_key!r}]`, weighted adjacency matrix"
         ),
     )
+    adata.uns[key_added]=neighbors_dict
     return adata if copy else None
 
 
@@ -332,6 +347,20 @@ def _make_forest_dict(forest):
         d[prop]["data"] = dat
     return d
 
+def _to_sorted_csr(X):
+    import scipy.sparse as sp
+    if X is None:
+        return None
+    if not sp.issparse(X):
+        raise TypeError("neighbors.* must be a scipy.sparse matrix")
+    X = X.tocsr(copy=True)        # 转 CSR
+    X.sum_duplicates()            # 合并重复 (i,j)
+    X.sort_indices()              # 行内列索引递增
+    # 可选：清理 NaN/Inf，避免写盘后再炸
+    if np.isnan(X.data).any() or np.isinf(X.data).any():
+        X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
+        X.eliminate_zeros()
+    return X
 
 class OnFlySymMatrix:
     """Emulate a matrix where elements are calculated on the fly."""
