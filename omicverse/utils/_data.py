@@ -21,6 +21,25 @@ from .._settings import Colors  # Import Colors from settings
 from .registry import register_function
 
 
+# Internal debug logger (opt-in via env OV_DEBUG/OMICVERSE_DEBUG)
+def _ov_debug_enabled():
+    try:
+        val = os.environ.get("OV_DEBUG") or os.environ.get("OMICVERSE_DEBUG")
+        if val is None:
+            return False
+        return str(val).strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        return False
+
+
+def _dbg(msg):
+    try:
+        if _ov_debug_enabled():
+            print(msg)
+    except Exception:
+        pass
+
+
 
 
 @register_function(
@@ -52,8 +71,234 @@ def read(path, backend='python', **kwargs):
     ext = Path(path).suffix.lower()
 
     if ext == '.h5ad':
+        def _sync_obs_index_to_names(adata_obj):
+            """Best‑effort: make obs index show obs_names for display.
+
+            - For pandas obs: set `obs.index = obs_names` directly.
+            - For Rust/Polars obs: override display helpers so head(), to_pandas(),
+              and .index reflect `obs_names`. Only affects display, not storage.
+            """
+            try:
+                names = getattr(adata_obj, 'obs_names', None)
+                if names is None:
+                    return adata_obj
+                try:
+                    # Normalize to list
+                    try:
+                        names_list = list(names) if not hasattr(names, 'to_list') else names.to_list()
+                    except Exception:
+                        names_list = list(names)
+
+                    # Case 1: pandas DataFrame
+                    import pandas as pd  # noqa: F401
+                    if hasattr(adata_obj, 'obs') and hasattr(adata_obj.obs, 'index') and adata_obj.obs.__class__.__module__.startswith('pandas'):
+                        try:
+                            adata_obj.obs.index = pd.Index(names_list, name='obs_names')
+                            return adata_obj
+                        except Exception:
+                            pass
+
+                    # Case 2: Non-pandas (e.g., anndata-rs PyDataFrameElem)
+                    obs_obj = getattr(adata_obj, 'obs', None)
+                    if obs_obj is None:
+                        return adata_obj
+
+                    # Store parent mapping for later lookup
+                    try:
+                        _DATAFRAME_PARENT_MAP[id(obs_obj)] = {'adata': adata_obj, 'data_type': 'obs'}
+                    except Exception:
+                        pass
+
+                    # Define helpers that always produce a pandas.DataFrame with correct index
+                    def _obs_to_pandas(self):
+                        # Build pandas DataFrame without calling convert_to_pandas()
+                        # to avoid recursion after monkey patching.
+                        import pandas as pd
+                        pdf = None
+                        # Try slice access (SnapATAC2/anndata-rs)
+                        try:
+                            import polars as pl  # type: ignore
+                            df_slice = self[:]
+                            if hasattr(df_slice, 'to_pandas'):
+                                pdf = df_slice.to_pandas()
+                            elif isinstance(df_slice, pl.DataFrame):
+                                pdf = df_slice.to_pandas()
+                            else:
+                                pdf = df_slice  # already pandas
+                        except Exception:
+                            pdf = None
+
+                        # Fallback: construct from columns
+                        if pdf is None:
+                            try:
+                                import polars as pl  # type: ignore
+                                if hasattr(self, 'columns'):
+                                    cols = self.columns
+                                else:
+                                    cols = []
+                                data = {}
+                                for c in cols:
+                                    try:
+                                        s = self[c]
+                                        if hasattr(s, 'to_pandas'):
+                                            data[c] = s.to_pandas()
+                                        elif isinstance(s, pl.Series):
+                                            data[c] = s.to_pandas()
+                                        else:
+                                            data[c] = s
+                                    except Exception:
+                                        pass
+                                pdf = pd.DataFrame(data)
+                            except Exception:
+                                pdf = pd.DataFrame()
+
+                        # Set correct index for display
+                        try:
+                            pdf.index = pd.Index(names_list, name='obs_names')
+                        except Exception:
+                            pass
+                        return pdf
+
+                    def _obs_head(self, n=5):
+                        return _obs_to_pandas(self).head(n)
+
+                    # Unconditionally override to improve display consistency
+                    try:
+                        from types import MethodType
+                        # Prefer binding on the instance; fall back to class
+                        try:
+                            setattr(obs_obj, 'to_pandas', MethodType(_obs_to_pandas, obs_obj))
+                            setattr(obs_obj, 'head', MethodType(_obs_head, obs_obj))
+                        except Exception:
+                            obs_cls = obs_obj.__class__
+                            setattr(obs_cls, 'to_pandas', _obs_to_pandas)
+                            setattr(obs_cls, 'head', _obs_head)
+
+                        # Provide an .index property that mirrors obs_names for display
+                        try:
+                            import pandas as pd
+                            def _index_property(self):
+                                return pd.Index(names_list, name='obs_names')
+                            try:
+                                # Class-level property override
+                                obs_obj.__class__.index = property(_index_property)
+                            except Exception:
+                                # Instance-level fallback via attribute
+                                setattr(obs_obj, 'index', pd.Index(names_list, name='obs_names'))
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            
+            # Also sync var.index with var_names for display
+            try:
+                vnames = getattr(adata_obj, 'var_names', None)
+                if vnames is None:
+                    return adata_obj
+                try:
+                    try:
+                        vnames_list = list(vnames) if not hasattr(vnames, 'to_list') else vnames.to_list()
+                    except Exception:
+                        vnames_list = list(vnames)
+
+                    import pandas as pd  # noqa: F401
+                    if hasattr(adata_obj, 'var') and hasattr(adata_obj.var, 'index') and adata_obj.var.__class__.__module__.startswith('pandas'):
+                        try:
+                            adata_obj.var.index = pd.Index(vnames_list, name='var_names')
+                            return adata_obj
+                        except Exception:
+                            pass
+
+                    var_obj = getattr(adata_obj, 'var', None)
+                    if var_obj is None:
+                        return adata_obj
+
+                    try:
+                        _DATAFRAME_PARENT_MAP[id(var_obj)] = {'adata': adata_obj, 'data_type': 'var'}
+                    except Exception:
+                        pass
+
+                    def _var_to_pandas(self):
+                        import pandas as pd
+                        pdf = None
+                        try:
+                            import polars as pl  # type: ignore
+                            df_slice = self[:]
+                            if hasattr(df_slice, 'to_pandas'):
+                                pdf = df_slice.to_pandas()
+                            elif isinstance(df_slice, pl.DataFrame):
+                                pdf = df_slice.to_pandas()
+                            else:
+                                pdf = df_slice
+                        except Exception:
+                            pdf = None
+
+                        if pdf is None:
+                            try:
+                                import polars as pl  # type: ignore
+                                cols = self.columns if hasattr(self, 'columns') else []
+                                data = {}
+                                for c in cols:
+                                    try:
+                                        s = self[c]
+                                        if hasattr(s, 'to_pandas'):
+                                            data[c] = s.to_pandas()
+                                        elif isinstance(s, pl.Series):
+                                            data[c] = s.to_pandas()
+                                        else:
+                                            data[c] = s
+                                    except Exception:
+                                        pass
+                                pdf = pd.DataFrame(data)
+                            except Exception:
+                                pdf = pd.DataFrame()
+
+                        try:
+                            pdf.index = pd.Index(vnames_list, name='var_names')
+                        except Exception:
+                            pass
+                        return pdf
+
+                    def _var_head(self, n=5):
+                        return _var_to_pandas(self).head(n)
+
+                    try:
+                        from types import MethodType
+                        try:
+                            setattr(var_obj, 'to_pandas', MethodType(_var_to_pandas, var_obj))
+                            setattr(var_obj, 'head', MethodType(_var_head, var_obj))
+                        except Exception:
+                            var_cls = var_obj.__class__
+                            setattr(var_cls, 'to_pandas', _var_to_pandas)
+                            setattr(var_cls, 'head', _var_head)
+
+                        try:
+                            import pandas as pd
+                            def _vindex_property(self):
+                                return pd.Index(vnames_list, name='var_names')
+                            try:
+                                var_obj.__class__.index = property(_vindex_property)
+                            except Exception:
+                                setattr(var_obj, 'index', pd.Index(vnames_list, name='var_names'))
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            return adata_obj
+
         if backend == 'python':
-            return sc.read_h5ad(path, **kwargs)
+            adata = sc.read_h5ad(path, **kwargs)
+            # Ensure pandas obs index matches obs_names
+            
+            return adata
 
         elif backend == 'rust':
             try:
@@ -61,12 +306,17 @@ def read(path, backend='python', **kwargs):
             except ImportError:
                 raise ImportError('snapatac2 is not installed. `pip install snapatac2`')
 
-            print(f'{Colors.GREEN}Using snapatac2 to read h5ad file{Colors.ENDC}')
+            print(f'{Colors.GREEN}Using anndata-rs to read h5ad file{Colors.ENDC}')
             print(f'{Colors.WARNING}You should run adata.close() after analysis{Colors.ENDC}')
             print(f'{Colors.WARNING}Not all function support Rust backend{Colors.ENDC}')
             adata = snap.read(path, **kwargs)
-            _patch_ann_compat(adata)  # ← 关键：一次性猴子补丁
+            _patch_ann_compat(adata)  # 兼容补丁
             _patch_vector_api(adata)
+            # Force display alignment: obs.index mirrors obs_names
+            try:
+                _sync_obs_index_to_names(adata)
+            except Exception:
+                pass
             return adata
 
         else:
@@ -81,6 +331,9 @@ def read(path, backend='python', **kwargs):
 
 
 # ------------------ 兼容补丁 ------------------
+
+# 全局映射：存储 PyDataFrameElem 对象到其父 AnnData 的映射
+_DATAFRAME_PARENT_MAP = {}
 
 def _patch_ann_compat(adata):
     """
@@ -367,7 +620,7 @@ def _patch_ann_compat(adata):
         adata.obs_names_make_unique = MethodType(obs_names_make_unique, adata)
 
     # 6) 为 obs 和 var 添加表格显示补丁
-    def _patch_dataframe_display(df_obj):
+    def _patch_dataframe_display(df_obj, data_type=None):
         """为 Rust PyDataFrameElem 添加表格显示功能"""
         if pd is None:
             return
@@ -384,19 +637,32 @@ def _patch_ann_compat(adata):
             return
 
         # 检查是否是 anndata-rs 的 PyDataFrameElem
-        if 'PyDataFrameElem' in df_cls.__name__ or 'anndata_rs' in module_name:
+        _dbg(f"   {Colors.CYAN}📋 Checking: {df_cls.__name__} from {module_name}{Colors.ENDC}")
+
+        if 'PyDataFrameElem' in df_cls.__name__ or 'anndata_rs' in module_name or module_name == 'builtins':
             # 为该类添加 to_pandas 方法（如果不存在）
             def _to_pandas(self):
                 """Convert PyDataFrameElem to pandas DataFrame"""
                 return convert_to_pandas(self)
 
-            # 存储父 adata 对象的引用以便获取正确的索引
-            if not hasattr(df_obj, '_adata_parent'):
-                try:
-                    df_obj._adata_parent = adata
-                    df_obj._data_type = 'obs' if hasattr(adata, 'obs') and adata.obs is df_obj else 'var'
-                except:
-                    pass
+            # 存储父 adata 对象的引用到全局映射
+            df_obj_id = id(df_obj)
+
+            # 使用传入的 data_type 参数
+            if data_type is None:
+                # 备用方法：直接比较对象
+                if hasattr(adata, 'obs') and id(adata.obs) == df_obj_id:
+                    data_type = 'obs'
+                elif hasattr(adata, 'var') and id(adata.var) == df_obj_id:
+                    data_type = 'var'
+                else:
+                    data_type = 'obs'  # 默认假设是 obs
+
+            _DATAFRAME_PARENT_MAP[df_obj_id] = {
+                'adata': adata,
+                'data_type': data_type
+            }
+            _dbg(f"   {Colors.GREEN}✅ Stored parent mapping for {data_type} (id: {df_obj_id}){Colors.ENDC}")
 
             # 添加 pandas DataFrame 常用方法和属性
             def _add_pandas_methods(obj):
@@ -404,7 +670,7 @@ def _patch_ann_compat(adata):
 
                 def _get_pandas_with_index(self):
                     """获取 pandas DataFrame 并设置正确的索引"""
-                    # 先获取基础的 pandas DataFrame - 避免调用我们自己添加的 to_pandas 方法
+                    # 先获取基础的 pandas DataFrame
                     pdf = None
 
                     try:
@@ -457,26 +723,52 @@ def _patch_ann_compat(adata):
                             import pandas as pd
                             pdf = pd.DataFrame()
 
-                    # 设置正确的索引
-                    if hasattr(self, '_adata_parent') and self._adata_parent is not None:
-                        try:
-                            parent_adata = self._adata_parent
-                            data_type = getattr(self, '_data_type', 'obs')
+                    # 简单直接：从全局映射获取正确的索引并设置
+                    try:
+                        import pandas as pd  # 确保导入 pandas
+                        obj_id = id(self)
+                        _dbg(f"   {Colors.CYAN}🔍 Looking for obj_id {obj_id} in mapping...{Colors.ENDC}")
+                        _dbg(f"   {Colors.CYAN}📋 Current mapping keys: {list(_DATAFRAME_PARENT_MAP.keys())}{Colors.ENDC}")
+
+                        if obj_id in _DATAFRAME_PARENT_MAP:
+                            parent_info = _DATAFRAME_PARENT_MAP[obj_id]
+                            parent_adata = parent_info['adata']
+                            data_type = parent_info['data_type']
+                            _dbg(f"   {Colors.GREEN}✅ Found mapping for {data_type}{Colors.ENDC}")
 
                             if data_type == 'obs' and hasattr(parent_adata, 'obs_names'):
                                 obs_names = parent_adata.obs_names
-                                if hasattr(obs_names, 'to_list'):
-                                    pdf.index = pd.Index(obs_names.to_list(), name='obs_names')
-                                elif hasattr(obs_names, '__iter__'):
-                                    pdf.index = pd.Index(list(obs_names), name='obs_names')
+                                if isinstance(obs_names, list):
+                                    pdf.index = pd.Index(obs_names, name='obs_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from list: {obs_names[:3]}{Colors.ENDC}")
+                                elif hasattr(obs_names, 'to_list'):
+                                    names_list = obs_names.to_list()
+                                    pdf.index = pd.Index(names_list, name='obs_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from to_list(): {names_list[:3]}{Colors.ENDC}")
+                                else:
+                                    names_list = list(obs_names)
+                                    pdf.index = pd.Index(names_list, name='obs_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from list(): {names_list[:3]}{Colors.ENDC}")
+
                             elif data_type == 'var' and hasattr(parent_adata, 'var_names'):
                                 var_names = parent_adata.var_names
-                                if hasattr(var_names, 'to_list'):
-                                    pdf.index = pd.Index(var_names.to_list(), name='var_names')
-                                elif hasattr(var_names, '__iter__'):
-                                    pdf.index = pd.Index(list(var_names), name='var_names')
-                        except Exception:
-                            pass
+                                if isinstance(var_names, list):
+                                    pdf.index = pd.Index(var_names, name='var_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set var index from list: {var_names[:3]}{Colors.ENDC}")
+                                elif hasattr(var_names, 'to_list'):
+                                    names_list = var_names.to_list()
+                                    pdf.index = pd.Index(names_list, name='var_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set var index from to_list(): {names_list[:3]}{Colors.ENDC}")
+                                else:
+                                    names_list = list(var_names)
+                                    pdf.index = pd.Index(names_list, name='var_names')
+                                    _dbg(f"   {Colors.GREEN}✅ Set var index from list(): {names_list[:3]}{Colors.ENDC}")
+                        else:
+                            _dbg(f"   {Colors.WARNING}⚠️  obj_id {obj_id} not found in mapping{Colors.ENDC}")
+                    except Exception as e:
+                        _dbg(f"   {Colors.WARNING}⚠️  Exception in index setting: {e}{Colors.ENDC}")
+                        # 索引设置失败就保持原样
+                        pass
 
                     return pdf
 
@@ -494,7 +786,50 @@ def _patch_ann_compat(adata):
                     pdf = _get_pandas_with_index(self)
                     return pdf.tail(n)
 
-                # 不要覆盖已有的属性，只添加方法
+                # 添加 shape 和 columns 属性
+                @property
+                def shape_property(self):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.shape
+
+                @property
+                def columns_property(self):
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.columns
+
+                # 添加 index 属性 - 直接返回正确的 obs_names 或 var_names
+                @property
+                def index_property(self):
+                    try:
+                        obj_id = id(self)
+                        if obj_id in _DATAFRAME_PARENT_MAP:
+                            parent_info = _DATAFRAME_PARENT_MAP[obj_id]
+                            parent_adata = parent_info['adata']
+                            data_type = parent_info['data_type']
+
+                            if data_type == 'obs' and hasattr(parent_adata, 'obs_names'):
+                                obs_names = parent_adata.obs_names
+                                if isinstance(obs_names, list):
+                                    return pd.Index(obs_names, name='obs_names')
+                                elif hasattr(obs_names, 'to_list'):
+                                    return pd.Index(obs_names.to_list(), name='obs_names')
+                                else:
+                                    return pd.Index(list(obs_names), name='obs_names')
+
+                            elif data_type == 'var' and hasattr(parent_adata, 'var_names'):
+                                var_names = parent_adata.var_names
+                                if isinstance(var_names, list):
+                                    return pd.Index(var_names, name='var_names')
+                                elif hasattr(var_names, 'to_list'):
+                                    return pd.Index(var_names.to_list(), name='var_names')
+                                else:
+                                    return pd.Index(list(var_names), name='var_names')
+                    except Exception:
+                        pass
+
+                    # 备用方案：使用转换后的 DataFrame 的索引
+                    pdf = _get_pandas_with_index(self)
+                    return pdf.index
 
                 # 添加 info 方法
                 def info_method(self, *args, **kwargs):
@@ -506,13 +841,19 @@ def _patch_ann_compat(adata):
                     pdf = _get_pandas_with_index(self)
                     return pdf.describe(*args, **kwargs)
 
-                # 尝试添加这些方法到对象
+                # 尝试添加这些方法和属性到对象
                 methods_to_add = {
                     'to_pandas': to_pandas_method,
                     'head': head_method,
                     'tail': tail_method,
                     'info': info_method,
                     'describe': describe_method,
+                }
+
+                properties_to_add = {
+                    'shape': shape_property,
+                    'columns': columns_property,
+                    'index': index_property,
                 }
 
                 added_methods = []
@@ -523,18 +864,30 @@ def _patch_ann_compat(adata):
                         try:
                             setattr(obj, method_name, MethodType(method_func, obj))
                             added_methods.append(method_name)
-                            print(f"   {Colors.GREEN}✅ Successfully added method: {method_name}{Colors.ENDC}")
+                            _dbg(f"   {Colors.GREEN}✅ Successfully added method: {method_name}{Colors.ENDC}")
                         except (AttributeError, TypeError) as e:
-                            print(f"   {Colors.WARNING}⚠️  Failed to add method {method_name}: {e}{Colors.ENDC}")
+                            _dbg(f"   {Colors.WARNING}⚠️  Failed to add method {method_name}: {e}{Colors.ENDC}")
                             # 尝试设置到类上
                             try:
                                 setattr(obj.__class__, method_name, method_func)
                                 added_methods.append(method_name)
-                                print(f"   {Colors.GREEN}✅ Successfully added method {method_name} to class{Colors.ENDC}")
+                                _dbg(f"   {Colors.GREEN}✅ Successfully added method {method_name} to class{Colors.ENDC}")
                             except Exception as e2:
-                                print(f"   {Colors.WARNING}⚠️  Failed to add method {method_name} to class: {e2}{Colors.ENDC}")
+                                _dbg(f"   {Colors.WARNING}⚠️  Failed to add method {method_name} to class: {e2}{Colors.ENDC}")
                     else:
-                        print(f"   {Colors.BLUE}ℹ️  Method {method_name} already exists{Colors.ENDC}")
+                        _dbg(f"   {Colors.BLUE}ℹ️  Method {method_name} already exists{Colors.ENDC}")
+
+                # 添加属性
+                for prop_name, prop_func in properties_to_add.items():
+                    if not hasattr(obj, prop_name):
+                        try:
+                            setattr(obj.__class__, prop_name, prop_func)
+                            added_methods.append(prop_name)
+                            _dbg(f"   {Colors.GREEN}✅ Successfully added property: {prop_name}{Colors.ENDC}")
+                        except Exception as e:
+                            _dbg(f"   {Colors.WARNING}⚠️  Failed to add property {prop_name}: {e}{Colors.ENDC}")
+                    else:
+                        _dbg(f"   {Colors.BLUE}ℹ️  Property {prop_name} already exists{Colors.ENDC}")
 
                 return added_methods, []
 
@@ -542,9 +895,9 @@ def _patch_ann_compat(adata):
             added_methods, added_properties = _add_pandas_methods(df_obj)
 
             if added_methods:
-                print(f"   {Colors.GREEN}✅ Added methods: {', '.join(added_methods)}{Colors.ENDC}")
+                _dbg(f"   {Colors.GREEN}✅ Added methods: {', '.join(added_methods)}{Colors.ENDC}")
             if added_properties:
-                print(f"   {Colors.GREEN}✅ Added properties: {', '.join(added_properties)}{Colors.ENDC}")
+                _dbg(f"   {Colors.GREEN}✅ Added properties: {', '.join(added_properties)}{Colors.ENDC}")
 
             # 为该类添加更好的 __repr__ 方法
             def _dataframe_repr(self):
@@ -573,26 +926,30 @@ def _patch_ann_compat(adata):
                 if not hasattr(df_cls, '__repr__') or 'show' in str(getattr(df_cls, '__repr__', '')):
                     setattr(df_cls, '__repr__', _dataframe_repr)
                     setattr(df_cls, '__str__', _dataframe_str)
-                    print(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} display methods{Colors.ENDC}")
+                    _dbg(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} display methods{Colors.ENDC}")
             except Exception as e:
                 # 如果类不可写，设置到实例上
                 try:
                     df_obj.__repr__ = MethodType(_dataframe_repr, df_obj)
                     df_obj.__str__ = MethodType(_dataframe_str, df_obj)
-                    print(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} instance methods{Colors.ENDC}")
+                    _dbg(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} instance methods{Colors.ENDC}")
                 except Exception as e2:
-                    print(f"   {Colors.WARNING}⚠️  Failed to patch {df_cls.__name__}: {e2}{Colors.ENDC}")
-                    print(f"   {Colors.CYAN}💡 Use ov.utils.convert_to_pandas() to convert manually{Colors.ENDC}")
+                    _dbg(f"   {Colors.WARNING}⚠️  Failed to patch {df_cls.__name__}: {e2}{Colors.ENDC}")
+                    _dbg(f"   {Colors.CYAN}💡 Use ov.utils.convert_to_pandas() to convert manually{Colors.ENDC}")
 
     # 对 obs 和 var 应用补丁
     if hasattr(adata, 'obs'):
-        print(f"   {Colors.BLUE}🔧 Patching obs display...{Colors.ENDC}")
-        _patch_dataframe_display(adata.obs)
+        _dbg(f"   {Colors.BLUE}🔧 Patching obs display...{Colors.ENDC}")
+        _dbg(f"   {Colors.CYAN}📋 adata.obs type: {type(adata.obs)}{Colors.ENDC}")
+        _dbg(f"   {Colors.CYAN}📋 adata.obs module: {type(adata.obs).__module__}{Colors.ENDC}")
+        _patch_dataframe_display(adata.obs, data_type='obs')
     if hasattr(adata, 'var'):
-        print(f"   {Colors.BLUE}🔧 Patching var display...{Colors.ENDC}")
-        _patch_dataframe_display(adata.var)
+        _dbg(f"   {Colors.BLUE}🔧 Patching var display...{Colors.ENDC}")
+        _dbg(f"   {Colors.CYAN}📋 adata.var type: {type(adata.var)}{Colors.ENDC}")
+        _dbg(f"   {Colors.CYAN}📋 adata.var module: {type(adata.var).__module__}{Colors.ENDC}")
+        _patch_dataframe_display(adata.var, data_type='var')
 
-    print(f"   {Colors.CYAN}💡 If display doesn't work, use: ov.utils.convert_to_pandas(adata.obs){Colors.ENDC}")
+    _dbg(f"   {Colors.CYAN}💡 If display doesn't work, use: ov.utils.convert_to_pandas(adata.obs){Colors.ENDC}")
 
 
 def _patch_vector_api(adata):
@@ -1975,5 +2332,3 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
         raise
 
     return file_path
-
-
