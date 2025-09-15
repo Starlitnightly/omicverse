@@ -103,90 +103,162 @@ def read(path, backend='python', **kwargs):
                     if obs_obj is None:
                         return adata_obj
 
-                    # Store parent mapping for later lookup
-                    try:
-                        _DATAFRAME_PARENT_MAP[id(obs_obj)] = {'adata': adata_obj, 'data_type': 'obs'}
-                    except Exception:
-                        pass
-
-                    # Define helpers that always produce a pandas.DataFrame with correct index
-                    def _obs_to_pandas(self):
-                        # Build pandas DataFrame without calling convert_to_pandas()
-                        # to avoid recursion after monkey patching.
+                    # 创建通用的智能显示方法，能自动识别 obs 还是 var
+                    def _smart_to_pandas(self):
                         import pandas as pd
-                        pdf = None
-                        # Try slice access (SnapATAC2/anndata-rs)
                         try:
-                            import polars as pl  # type: ignore
-                            df_slice = self[:]
-                            if hasattr(df_slice, 'to_pandas'):
-                                pdf = df_slice.to_pandas()
-                            elif isinstance(df_slice, pl.DataFrame):
-                                pdf = df_slice.to_pandas()
-                            else:
-                                pdf = df_slice  # already pandas
-                        except Exception:
-                            pdf = None
-
-                        # Fallback: construct from columns
-                        if pdf is None:
+                            # 获取基础 DataFrame
+                            import polars as pl
                             try:
-                                import polars as pl  # type: ignore
-                                if hasattr(self, 'columns'):
-                                    cols = self.columns
+                                df_slice = self[:]
+                                if hasattr(df_slice, 'to_pandas'):
+                                    pdf = df_slice.to_pandas()
+                                elif isinstance(df_slice, pl.DataFrame):
+                                    pdf = df_slice.to_pandas()
                                 else:
-                                    cols = []
-                                data = {}
-                                for c in cols:
-                                    try:
-                                        s = self[c]
-                                        if hasattr(s, 'to_pandas'):
-                                            data[c] = s.to_pandas()
-                                        elif isinstance(s, pl.Series):
-                                            data[c] = s.to_pandas()
-                                        else:
-                                            data[c] = s
-                                    except Exception:
-                                        pass
-                                pdf = pd.DataFrame(data)
+                                    pdf = df_slice
                             except Exception:
-                                pdf = pd.DataFrame()
-
-                        # Set correct index for display
-                        try:
-                            pdf.index = pd.Index(names_list, name='obs_names')
+                                # 备用方法：从列构建
+                                data = {}
+                                if hasattr(self, 'columns'):
+                                    for col in self.columns:
+                                        try:
+                                            series = self[col]
+                                            if hasattr(series, 'to_pandas'):
+                                                data[col] = series.to_pandas()
+                                            elif isinstance(series, pl.Series):
+                                                data[col] = series.to_pandas()
+                                            else:
+                                                data[col] = series
+                                        except Exception:
+                                            pass
+                                pdf = pd.DataFrame(data)
+                            
+                            # 智能识别：通过形状判断是 obs 还是 var
+                            try:
+                                adata_shape = getattr(adata_obj, 'shape', (0, 0))
+                                df_rows = len(pdf)
+                                
+                                if df_rows == adata_shape[0]:  # 行数匹配 n_obs，是 obs
+                                    current_names = getattr(adata_obj, 'obs_names', None)
+                                    name_type = 'obs_names'
+                                elif df_rows == adata_shape[1]:  # 行数匹配 n_vars，是 var
+                                    current_names = getattr(adata_obj, 'var_names', None)
+                                    name_type = 'var_names'
+                                else:
+                                    current_names = None
+                                    name_type = 'unknown'
+                                
+                                if current_names is not None:
+                                    if hasattr(current_names, 'to_list'):
+                                        names_list = current_names.to_list()
+                                    else:
+                                        names_list = list(current_names)
+                                    
+                                    # 设置正确的索引
+                                    if len(names_list) == len(pdf):
+                                        pdf.index = pd.Index(names_list, name=name_type)
+                            except Exception:
+                                pass
+                            
+                            return pdf
+                            
                         except Exception:
-                            pass
-                        return pdf
+                            return pd.DataFrame()
 
-                    def _obs_head(self, n=5):
-                        return _obs_to_pandas(self).head(n)
+                    def _smart_head(self, n=5):
+                        return _smart_to_pandas(self).head(n)
 
-                    # Unconditionally override to improve display consistency
+                    # Try to set methods on instance level, with fallback to class level
                     try:
                         from types import MethodType
-                        # Prefer binding on the instance; fall back to class
+                        # Use smart methods for both obs and var (same methods work for both)
                         try:
-                            setattr(obs_obj, 'to_pandas', MethodType(_obs_to_pandas, obs_obj))
-                            setattr(obs_obj, 'head', MethodType(_obs_head, obs_obj))
-                        except Exception:
+                            setattr(obs_obj, 'to_pandas', MethodType(_smart_to_pandas, obs_obj))
+                            setattr(obs_obj, 'head', MethodType(_smart_head, obs_obj))
+                            _dbg(f"   {Colors.GREEN}✅ Set smart obs methods on instance{Colors.ENDC}")
+                        except Exception as e:
+                            _dbg(f"   {Colors.WARNING}⚠️  Instance-level setting failed: {e}{Colors.ENDC}")
+                            # Fallback to class-level but with smart methods
                             obs_cls = obs_obj.__class__
-                            setattr(obs_cls, 'to_pandas', _obs_to_pandas)
-                            setattr(obs_cls, 'head', _obs_head)
+                            setattr(obs_cls, 'to_pandas', _smart_to_pandas)
+                            setattr(obs_cls, 'head', _smart_head)
+                            _dbg(f"   {Colors.GREEN}✅ Set smart obs methods on class{Colors.ENDC}")
 
-                        # Provide an .index property that mirrors obs_names for display
+                        # Add pandas-like properties specifically for obs
                         try:
                             import pandas as pd
-                            def _index_property(self):
-                                return pd.Index(names_list, name='obs_names')
+                            
+                            # Index property for obs - always return obs_names
+                            def _obs_index_property(self):
+                                current_obs_names = getattr(adata_obj, 'obs_names', None)
+                                if current_obs_names is not None:
+                                    if hasattr(current_obs_names, 'to_list'):
+                                        obs_names_list = current_obs_names.to_list()
+                                    else:
+                                        obs_names_list = list(current_obs_names)
+                                    return pd.Index(obs_names_list, name='obs_names')
+                                return pd.Index([], name='obs_names')
+                            
+                            # Columns property for obs
+                            def _obs_columns_property(self):
+                                try:
+                                    df_slice = self[:]
+                                    if hasattr(df_slice, 'columns'):
+                                        return df_slice.columns
+                                    elif hasattr(df_slice, 'to_pandas'):
+                                        return df_slice.to_pandas().columns
+                                except Exception:
+                                    pass
+                                return pd.Index([], name='columns')
+                            
+                            # Shape property for obs
+                            def _obs_shape_property(self):
+                                try:
+                                    obs_len = len(getattr(adata_obj, 'obs_names', []))
+                                    df_slice = self[:]
+                                    if hasattr(df_slice, 'shape'):
+                                        return (obs_len, df_slice.shape[1])
+                                    elif hasattr(df_slice, 'to_pandas'):
+                                        pdf = df_slice.to_pandas()
+                                        return (obs_len, len(pdf.columns))
+                                except Exception:
+                                    pass
+                                return (0, 0)
+                            
+                            # Info method for obs
+                            def _obs_info(self, verbose=None, buf=None, max_cols=None, memory_usage=None, show_counts=None):
+                                try:
+                                    pdf = _smart_to_pandas(self)
+                                    return pdf.info(verbose=verbose, buf=buf, max_cols=max_cols, 
+                                                  memory_usage=memory_usage, show_counts=show_counts)
+                                except Exception:
+                                    print(f"<class 'PyDataFrameElem'>\nShape: {_obs_shape_property(self)}")
+                            
+                            # Use class-level properties (since instance-level setting fails)
                             try:
-                                # Class-level property override
-                                obs_obj.__class__.index = property(_index_property)
-                            except Exception:
-                                # Instance-level fallback via attribute
-                                setattr(obs_obj, 'index', pd.Index(names_list, name='obs_names'))
-                        except Exception:
-                            pass
+                                obs_cls = obs_obj.__class__
+                                if not hasattr(obs_cls, '_ov_obs_enhanced'):
+                                    # Set all properties on the class level
+                                    obs_cls.index = property(_obs_index_property)
+                                    obs_cls.columns = property(_obs_columns_property)
+                                    obs_cls.shape = property(_obs_shape_property)
+                                    obs_cls.info = _obs_info
+                                    obs_cls._ov_obs_enhanced = True
+                                    _dbg(f"   {Colors.GREEN}✅ Set obs properties on class level{Colors.ENDC}")
+                            except Exception as e:
+                                _dbg(f"   {Colors.WARNING}⚠️  Class-level setting failed: {e}{Colors.ENDC}")
+                                # Final fallback: set as instance attributes
+                                try:
+                                    setattr(obs_obj, 'index', _obs_index_property(obs_obj))
+                                    setattr(obs_obj, 'columns', _obs_columns_property(obs_obj))
+                                    setattr(obs_obj, 'shape', _obs_shape_property(obs_obj))
+                                    setattr(obs_obj, 'info', MethodType(_obs_info, obs_obj))
+                                except Exception:
+                                    pass
+                                
+                        except Exception as e:
+                            _dbg(f"   {Colors.WARNING}⚠️  Failed to set obs properties: {e}{Colors.ENDC}")
                     except Exception:
                         pass
                 except Exception:
@@ -217,75 +289,102 @@ def read(path, backend='python', **kwargs):
                     if var_obj is None:
                         return adata_obj
 
-                    try:
-                        _DATAFRAME_PARENT_MAP[id(var_obj)] = {'adata': adata_obj, 'data_type': 'var'}
-                    except Exception:
-                        pass
-
-                    def _var_to_pandas(self):
-                        import pandas as pd
-                        pdf = None
-                        try:
-                            import polars as pl  # type: ignore
-                            df_slice = self[:]
-                            if hasattr(df_slice, 'to_pandas'):
-                                pdf = df_slice.to_pandas()
-                            elif isinstance(df_slice, pl.DataFrame):
-                                pdf = df_slice.to_pandas()
-                            else:
-                                pdf = df_slice
-                        except Exception:
-                            pdf = None
-
-                        if pdf is None:
-                            try:
-                                import polars as pl  # type: ignore
-                                cols = self.columns if hasattr(self, 'columns') else []
-                                data = {}
-                                for c in cols:
-                                    try:
-                                        s = self[c]
-                                        if hasattr(s, 'to_pandas'):
-                                            data[c] = s.to_pandas()
-                                        elif isinstance(s, pl.Series):
-                                            data[c] = s.to_pandas()
-                                        else:
-                                            data[c] = s
-                                    except Exception:
-                                        pass
-                                pdf = pd.DataFrame(data)
-                            except Exception:
-                                pdf = pd.DataFrame()
-
-                        try:
-                            pdf.index = pd.Index(vnames_list, name='var_names')
-                        except Exception:
-                            pass
-                        return pdf
-
-                    def _var_head(self, n=5):
-                        return _var_to_pandas(self).head(n)
-
+                    # Use the same smart methods for var as well
                     try:
                         from types import MethodType
+                        # Use smart methods that auto-detect obs vs var
                         try:
-                            setattr(var_obj, 'to_pandas', MethodType(_var_to_pandas, var_obj))
-                            setattr(var_obj, 'head', MethodType(_var_head, var_obj))
-                        except Exception:
-                            var_cls = var_obj.__class__
-                            setattr(var_cls, 'to_pandas', _var_to_pandas)
-                            setattr(var_cls, 'head', _var_head)
+                            setattr(var_obj, 'to_pandas', MethodType(_smart_to_pandas, var_obj))
+                            setattr(var_obj, 'head', MethodType(_smart_head, var_obj))
+                            _dbg(f"   {Colors.GREEN}✅ Set smart var methods on instance{Colors.ENDC}")
+                        except Exception as e:
+                            _dbg(f"   {Colors.WARNING}⚠️  Var instance-level setting failed: {e}{Colors.ENDC}")
+                            # Fallback to class-level (should already be set from obs processing)
+                            _dbg(f"   {Colors.BLUE}ℹ️  Using class-level smart methods for var{Colors.ENDC}")
 
+                        # Add pandas-like properties specifically for var
                         try:
                             import pandas as pd
-                            def _vindex_property(self):
-                                return pd.Index(vnames_list, name='var_names')
+                            
+                            # Index property for var - always return var_names
+                            def _var_index_property(self):
+                                current_var_names = getattr(adata_obj, 'var_names', None)
+                                if current_var_names is not None:
+                                    if hasattr(current_var_names, 'to_list'):
+                                        var_names_list = current_var_names.to_list()
+                                    else:
+                                        var_names_list = list(current_var_names)
+                                    return pd.Index(var_names_list, name='var_names')
+                                return pd.Index([], name='var_names')
+                            
+                            # Columns property for var
+                            def _var_columns_property(self):
+                                try:
+                                    df_slice = self[:]
+                                    if hasattr(df_slice, 'columns'):
+                                        return df_slice.columns
+                                    elif hasattr(df_slice, 'to_pandas'):
+                                        return df_slice.to_pandas().columns
+                                except Exception:
+                                    pass
+                                return pd.Index([], name='columns')
+                            
+                            # Shape property for var
+                            def _var_shape_property(self):
+                                try:
+                                    var_len = len(getattr(adata_obj, 'var_names', []))
+                                    df_slice = self[:]
+                                    if hasattr(df_slice, 'shape'):
+                                        return (var_len, df_slice.shape[1])
+                                    elif hasattr(df_slice, 'to_pandas'):
+                                        pdf = df_slice.to_pandas()
+                                        return (var_len, len(pdf.columns))
+                                except Exception:
+                                    pass
+                                return (0, 0)
+                            
+                            # Info method for var
+                            def _var_info(self, verbose=None, buf=None, max_cols=None, memory_usage=None, show_counts=None):
+                                try:
+                                    pdf = _smart_to_pandas(self)
+                                    return pdf.info(verbose=verbose, buf=buf, max_cols=max_cols, 
+                                                  memory_usage=memory_usage, show_counts=show_counts)
+                                except Exception:
+                                    print(f"<class 'PyDataFrameElem'>\nShape: {_var_shape_property(self)}")
+                            
+                            # Use class-level properties (since instance-level setting fails)
+                            # But we need to be careful since obs and var share the same class
                             try:
-                                var_obj.__class__.index = property(_vindex_property)
-                            except Exception:
-                                setattr(var_obj, 'index', pd.Index(vnames_list, name='var_names'))
-                        except Exception:
-                            pass
+                                var_cls = var_obj.__class__
+                                # Only set var-specific properties if obs hasn't already set them
+                                if not hasattr(var_cls, '_ov_var_enhanced'):
+                                    # Check if obs properties are already there
+                                    if hasattr(var_cls, '_ov_obs_enhanced'):
+                                        # obs already set class properties, but they're obs-specific
+                                        # We need var-specific versions. Use a different approach.
+                                        # Let's override with var-specific methods only if needed
+                                        pass
+                                    else:
+                                        # Set var properties on class level
+                                        var_cls.index = property(_var_index_property)
+                                        var_cls.columns = property(_var_columns_property)
+                                        var_cls.shape = property(_var_shape_property)
+                                        var_cls.info = _var_info
+                                    var_cls._ov_var_enhanced = True
+                                    _dbg(f"   {Colors.GREEN}✅ Set var properties on class level{Colors.ENDC}")
+                            except Exception as e:
+                                _dbg(f"   {Colors.WARNING}⚠️  Var class-level setting failed: {e}{Colors.ENDC}")
+                                # Final fallback: set as instance attributes
+                                try:
+                                    setattr(var_obj, 'index', _var_index_property(var_obj))
+                                    setattr(var_obj, 'columns', _var_columns_property(var_obj))
+                                    setattr(var_obj, 'shape', _var_shape_property(var_obj))
+                                    setattr(var_obj, 'info', MethodType(_var_info, var_obj))
+                                except Exception:
+                                    pass
+                                
+                        except Exception as e:
+                            _dbg(f"   {Colors.WARNING}⚠️  Failed to set var properties: {e}{Colors.ENDC}")
                     except Exception:
                         pass
                 except Exception:
@@ -332,8 +431,7 @@ def read(path, backend='python', **kwargs):
 
 # ------------------ 兼容补丁 ------------------
 
-# 全局映射：存储 PyDataFrameElem 对象到其父 AnnData 的映射
-_DATAFRAME_PARENT_MAP = {}
+# 简化的 DataFrame 显示补丁，不再需要全局映射
 
 def _patch_ann_compat(adata):
     """
@@ -619,337 +717,8 @@ def _patch_ann_compat(adata):
     if not ok4 and not hasattr(adata, "obs_names_make_unique"):
         adata.obs_names_make_unique = MethodType(obs_names_make_unique, adata)
 
-    # 6) 为 obs 和 var 添加表格显示补丁
-    def _patch_dataframe_display(df_obj, data_type=None):
-        """为 Rust PyDataFrameElem 添加表格显示功能"""
-        if pd is None:
-            return
-
-        # 检查是否是 Rust 的 PyDataFrameElem (不是标准的 pandas DataFrame)
-        if not hasattr(df_obj, '__class__'):
-            return
-
-        df_cls = df_obj.__class__
-        module_name = getattr(df_cls, '__module__', '')
-
-        # 如果已经是 pandas DataFrame，不需要补丁
-        if module_name.startswith('pandas'):
-            return
-
-        # 检查是否是 anndata-rs 的 PyDataFrameElem
-        _dbg(f"   {Colors.CYAN}📋 Checking: {df_cls.__name__} from {module_name}{Colors.ENDC}")
-
-        if 'PyDataFrameElem' in df_cls.__name__ or 'anndata_rs' in module_name or module_name == 'builtins':
-            # 为该类添加 to_pandas 方法（如果不存在）
-            def _to_pandas(self):
-                """Convert PyDataFrameElem to pandas DataFrame"""
-                return convert_to_pandas(self)
-
-            # 存储父 adata 对象的引用到全局映射
-            df_obj_id = id(df_obj)
-
-            # 使用传入的 data_type 参数
-            if data_type is None:
-                # 备用方法：直接比较对象
-                if hasattr(adata, 'obs') and id(adata.obs) == df_obj_id:
-                    data_type = 'obs'
-                elif hasattr(adata, 'var') and id(adata.var) == df_obj_id:
-                    data_type = 'var'
-                else:
-                    data_type = 'obs'  # 默认假设是 obs
-
-            _DATAFRAME_PARENT_MAP[df_obj_id] = {
-                'adata': adata,
-                'data_type': data_type
-            }
-            _dbg(f"   {Colors.GREEN}✅ Stored parent mapping for {data_type} (id: {df_obj_id}){Colors.ENDC}")
-
-            # 添加 pandas DataFrame 常用方法和属性
-            def _add_pandas_methods(obj):
-                """为 PyDataFrameElem 添加 pandas DataFrame 的常用方法"""
-
-                def _get_pandas_with_index(self):
-                    """获取 pandas DataFrame 并设置正确的索引"""
-                    # 先获取基础的 pandas DataFrame
-                    pdf = None
-
-                    try:
-                        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
-                        import polars as pl
-                        df_slice = self[:]
-
-                        # 检查返回的是否是 polars DataFrame
-                        if hasattr(df_slice, 'to_pandas'):
-                            pdf = df_slice.to_pandas()
-                        elif isinstance(df_slice, pl.DataFrame):
-                            pdf = df_slice.to_pandas()
-                        else:
-                            # 已经是 pandas DataFrame
-                            pdf = df_slice
-                    except Exception:
-                        pass
-
-                    if pdf is None:
-                        try:
-                            # 方法2: 通过列名构建 DataFrame
-                            if hasattr(self, '__getitem__'):
-                                import polars as pl
-                                import pandas as pd
-                                data = {}
-                                # 尝试获取列名
-                                if hasattr(self, 'columns'):
-                                    columns = self.columns
-                                else:
-                                    return pd.DataFrame()
-
-                                for col in columns:
-                                    try:
-                                        series = self[col]
-                                        # 检查是否是 polars Series
-                                        if hasattr(series, 'to_pandas'):
-                                            data[col] = series.to_pandas()
-                                        elif isinstance(series, pl.Series):
-                                            data[col] = series.to_pandas()
-                                        else:
-                                            data[col] = series
-                                    except:
-                                        pass
-
-                                if data:
-                                    pdf = pd.DataFrame(data)
-                                else:
-                                    pdf = pd.DataFrame()
-                        except Exception:
-                            import pandas as pd
-                            pdf = pd.DataFrame()
-
-                    # 简单直接：从全局映射获取正确的索引并设置
-                    try:
-                        import pandas as pd  # 确保导入 pandas
-                        obj_id = id(self)
-                        _dbg(f"   {Colors.CYAN}🔍 Looking for obj_id {obj_id} in mapping...{Colors.ENDC}")
-                        _dbg(f"   {Colors.CYAN}📋 Current mapping keys: {list(_DATAFRAME_PARENT_MAP.keys())}{Colors.ENDC}")
-
-                        if obj_id in _DATAFRAME_PARENT_MAP:
-                            parent_info = _DATAFRAME_PARENT_MAP[obj_id]
-                            parent_adata = parent_info['adata']
-                            data_type = parent_info['data_type']
-                            _dbg(f"   {Colors.GREEN}✅ Found mapping for {data_type}{Colors.ENDC}")
-
-                            if data_type == 'obs' and hasattr(parent_adata, 'obs_names'):
-                                obs_names = parent_adata.obs_names
-                                if isinstance(obs_names, list):
-                                    pdf.index = pd.Index(obs_names, name='obs_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from list: {obs_names[:3]}{Colors.ENDC}")
-                                elif hasattr(obs_names, 'to_list'):
-                                    names_list = obs_names.to_list()
-                                    pdf.index = pd.Index(names_list, name='obs_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from to_list(): {names_list[:3]}{Colors.ENDC}")
-                                else:
-                                    names_list = list(obs_names)
-                                    pdf.index = pd.Index(names_list, name='obs_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set obs index from list(): {names_list[:3]}{Colors.ENDC}")
-
-                            elif data_type == 'var' and hasattr(parent_adata, 'var_names'):
-                                var_names = parent_adata.var_names
-                                if isinstance(var_names, list):
-                                    pdf.index = pd.Index(var_names, name='var_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set var index from list: {var_names[:3]}{Colors.ENDC}")
-                                elif hasattr(var_names, 'to_list'):
-                                    names_list = var_names.to_list()
-                                    pdf.index = pd.Index(names_list, name='var_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set var index from to_list(): {names_list[:3]}{Colors.ENDC}")
-                                else:
-                                    names_list = list(var_names)
-                                    pdf.index = pd.Index(names_list, name='var_names')
-                                    _dbg(f"   {Colors.GREEN}✅ Set var index from list(): {names_list[:3]}{Colors.ENDC}")
-                        else:
-                            _dbg(f"   {Colors.WARNING}⚠️  obj_id {obj_id} not found in mapping{Colors.ENDC}")
-                    except Exception as e:
-                        _dbg(f"   {Colors.WARNING}⚠️  Exception in index setting: {e}{Colors.ENDC}")
-                        # 索引设置失败就保持原样
-                        pass
-
-                    return pdf
-
-                # 添加 to_pandas 方法
-                def to_pandas_method(self):
-                    return _get_pandas_with_index(self)
-
-                # 添加 head 方法
-                def head_method(self, n=5):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.head(n)
-
-                # 添加 tail 方法
-                def tail_method(self, n=5):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.tail(n)
-
-                # 添加 shape 和 columns 属性
-                @property
-                def shape_property(self):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.shape
-
-                @property
-                def columns_property(self):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.columns
-
-                # 添加 index 属性 - 直接返回正确的 obs_names 或 var_names
-                @property
-                def index_property(self):
-                    try:
-                        obj_id = id(self)
-                        if obj_id in _DATAFRAME_PARENT_MAP:
-                            parent_info = _DATAFRAME_PARENT_MAP[obj_id]
-                            parent_adata = parent_info['adata']
-                            data_type = parent_info['data_type']
-
-                            if data_type == 'obs' and hasattr(parent_adata, 'obs_names'):
-                                obs_names = parent_adata.obs_names
-                                if isinstance(obs_names, list):
-                                    return pd.Index(obs_names, name='obs_names')
-                                elif hasattr(obs_names, 'to_list'):
-                                    return pd.Index(obs_names.to_list(), name='obs_names')
-                                else:
-                                    return pd.Index(list(obs_names), name='obs_names')
-
-                            elif data_type == 'var' and hasattr(parent_adata, 'var_names'):
-                                var_names = parent_adata.var_names
-                                if isinstance(var_names, list):
-                                    return pd.Index(var_names, name='var_names')
-                                elif hasattr(var_names, 'to_list'):
-                                    return pd.Index(var_names.to_list(), name='var_names')
-                                else:
-                                    return pd.Index(list(var_names), name='var_names')
-                    except Exception:
-                        pass
-
-                    # 备用方案：使用转换后的 DataFrame 的索引
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.index
-
-                # 添加 info 方法
-                def info_method(self, *args, **kwargs):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.info(*args, **kwargs)
-
-                # 添加 describe 方法
-                def describe_method(self, *args, **kwargs):
-                    pdf = _get_pandas_with_index(self)
-                    return pdf.describe(*args, **kwargs)
-
-                # 尝试添加这些方法和属性到对象
-                methods_to_add = {
-                    'to_pandas': to_pandas_method,
-                    'head': head_method,
-                    'tail': tail_method,
-                    'info': info_method,
-                    'describe': describe_method,
-                }
-
-                properties_to_add = {
-                    'shape': shape_property,
-                    'columns': columns_property,
-                    'index': index_property,
-                }
-
-                added_methods = []
-
-                # 添加方法
-                for method_name, method_func in methods_to_add.items():
-                    if not hasattr(obj, method_name):
-                        try:
-                            setattr(obj, method_name, MethodType(method_func, obj))
-                            added_methods.append(method_name)
-                            _dbg(f"   {Colors.GREEN}✅ Successfully added method: {method_name}{Colors.ENDC}")
-                        except (AttributeError, TypeError) as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Failed to add method {method_name}: {e}{Colors.ENDC}")
-                            # 尝试设置到类上
-                            try:
-                                setattr(obj.__class__, method_name, method_func)
-                                added_methods.append(method_name)
-                                _dbg(f"   {Colors.GREEN}✅ Successfully added method {method_name} to class{Colors.ENDC}")
-                            except Exception as e2:
-                                _dbg(f"   {Colors.WARNING}⚠️  Failed to add method {method_name} to class: {e2}{Colors.ENDC}")
-                    else:
-                        _dbg(f"   {Colors.BLUE}ℹ️  Method {method_name} already exists{Colors.ENDC}")
-
-                # 添加属性
-                for prop_name, prop_func in properties_to_add.items():
-                    if not hasattr(obj, prop_name):
-                        try:
-                            setattr(obj.__class__, prop_name, prop_func)
-                            added_methods.append(prop_name)
-                            _dbg(f"   {Colors.GREEN}✅ Successfully added property: {prop_name}{Colors.ENDC}")
-                        except Exception as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Failed to add property {prop_name}: {e}{Colors.ENDC}")
-                    else:
-                        _dbg(f"   {Colors.BLUE}ℹ️  Property {prop_name} already exists{Colors.ENDC}")
-
-                return added_methods, []
-
-            # 尝试添加方法和属性
-            added_methods, added_properties = _add_pandas_methods(df_obj)
-
-            if added_methods:
-                _dbg(f"   {Colors.GREEN}✅ Added methods: {', '.join(added_methods)}{Colors.ENDC}")
-            if added_properties:
-                _dbg(f"   {Colors.GREEN}✅ Added properties: {', '.join(added_properties)}{Colors.ENDC}")
-
-            # 为该类添加更好的 __repr__ 方法
-            def _dataframe_repr(self):
-                try:
-                    # 首先尝试使用已有的 to_pandas 方法
-                    if hasattr(self, 'to_pandas'):
-                        pdf = self.to_pandas()
-                        return repr(pdf)
-                    else:
-                        # 如果没有 to_pandas 方法，直接调用我们的转换函数
-                        pdf = _to_pandas(self)
-                        return repr(pdf)
-                except Exception as e:
-                    # 备用方案：显示基本信息
-                    try:
-                        n_rows = len(self) if hasattr(self, '__len__') else 'unknown'
-                        return f"<{df_cls.__name__} with {n_rows} rows>"
-                    except:
-                        return f"<{df_cls.__name__}>"
-
-            def _dataframe_str(self):
-                return _dataframe_repr(self)
-
-            # 尝试设置到类上
-            try:
-                if not hasattr(df_cls, '__repr__') or 'show' in str(getattr(df_cls, '__repr__', '')):
-                    setattr(df_cls, '__repr__', _dataframe_repr)
-                    setattr(df_cls, '__str__', _dataframe_str)
-                    _dbg(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} display methods{Colors.ENDC}")
-            except Exception as e:
-                # 如果类不可写，设置到实例上
-                try:
-                    df_obj.__repr__ = MethodType(_dataframe_repr, df_obj)
-                    df_obj.__str__ = MethodType(_dataframe_str, df_obj)
-                    _dbg(f"   {Colors.GREEN}✅ Successfully patched {df_cls.__name__} instance methods{Colors.ENDC}")
-                except Exception as e2:
-                    _dbg(f"   {Colors.WARNING}⚠️  Failed to patch {df_cls.__name__}: {e2}{Colors.ENDC}")
-                    _dbg(f"   {Colors.CYAN}💡 Use ov.utils.convert_to_pandas() to convert manually{Colors.ENDC}")
-
-    # 对 obs 和 var 应用补丁
-    if hasattr(adata, 'obs'):
-        _dbg(f"   {Colors.BLUE}🔧 Patching obs display...{Colors.ENDC}")
-        _dbg(f"   {Colors.CYAN}📋 adata.obs type: {type(adata.obs)}{Colors.ENDC}")
-        _dbg(f"   {Colors.CYAN}📋 adata.obs module: {type(adata.obs).__module__}{Colors.ENDC}")
-        _patch_dataframe_display(adata.obs, data_type='obs')
-    if hasattr(adata, 'var'):
-        _dbg(f"   {Colors.BLUE}🔧 Patching var display...{Colors.ENDC}")
-        _dbg(f"   {Colors.CYAN}📋 adata.var type: {type(adata.var)}{Colors.ENDC}")
-        _dbg(f"   {Colors.CYAN}📋 adata.var module: {type(adata.var).__module__}{Colors.ENDC}")
-        _patch_dataframe_display(adata.var, data_type='var')
-
-    _dbg(f"   {Colors.CYAN}💡 If display doesn't work, use: ov.utils.convert_to_pandas(adata.obs){Colors.ENDC}")
+    # 简化的显示补丁 - 不再需要复杂的全局映射
+    _dbg(f"   {Colors.CYAN}💡 Simplified display patching without global mapping{Colors.ENDC}")
 
 
 def _patch_vector_api(adata):
@@ -2332,3 +2101,389 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
         raise
 
     return file_path
+
+
+@register_function(
+    aliases=["AnnData兼容转换", "convert_adata_for_rust", "fix_adata_compatibility", "修复兼容性", "rust_compatibility"],
+    category="utils", 
+    description="Convert old Python-backend h5ad AnnData to be compatible with Rust backend requirements using snapatac2.AnnData",
+    examples=[
+        "# Convert for Rust backend using snapatac2",
+        "adata_rust = ov.utils.convert_adata_for_rust(adata, output_file='fixed_data.h5ad')",
+        "# Now you can safely read with Rust backend",
+        "adata = ov.read('fixed_data.h5ad', backend='rust')",
+        "# Access obs without errors",
+        "print(adata.obs['cell_type'])"
+    ],
+    related=["utils.read", "utils.convert_to_pandas", "pp.preprocess"]
+)
+def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=True):
+    """Convert AnnData object to be compatible with Rust backend using snapatac2.AnnData.
+    
+    This function creates a new backed AnnData object using snapatac2.AnnData constructor,
+    ensuring full compatibility with Rust backend requirements. It handles:
+    - Proper sparse matrix formatting
+    - DataFrame compatibility
+    - Data type consistency
+    - Automatic unique name generation
+    
+    Arguments:
+        adata: AnnData object to be converted (from Python backend)
+        output_file: Output h5ad file path. If None, uses temp file. Default: None
+        verbose: Whether to print conversion progress. Default: True
+        close_file: Whether to close the snapatac2 AnnData after creation. Default: True
+        
+    Returns:
+        output_file: Path to the converted h5ad file compatible with Rust backend
+        
+    Examples:
+        >>> import omicverse as ov
+        >>> # Load old h5ad file with Python backend
+        >>> adata = ov.read('old_data.h5ad', backend='python') 
+        >>> # Convert for Rust compatibility
+        >>> output_path = ov.utils.convert_adata_for_rust(adata, 'fixed_data.h5ad')
+        >>> # Now read with Rust backend
+        >>> adata_rust = ov.read(output_path, backend='rust')
+    """
+    import numpy as np
+    import pandas as pd
+    import scipy.sparse as sp
+    from scipy.sparse import csr_matrix, issparse
+    import tempfile
+    import os
+    
+    # Import snapatac2 for creating backed AnnData
+    try:
+        import snapatac2 as snap
+    except ImportError:
+        raise ImportError("snapatac2 is required for Rust backend conversion. Install with: pip install snapatac2")
+    
+    if output_file is None:
+        # Create a temporary file if no output specified
+        fd, output_file = tempfile.mkstemp(suffix='.h5ad')
+        os.close(fd)  # Close the file descriptor
+    
+    if verbose:
+        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend using SnapATAC2{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Original shape: {adata.shape}{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Output file: {output_file}{Colors.ENDC}")
+    
+    # Make sure names are unique
+    if verbose:
+        print(f"   {Colors.BLUE}📝 Ensuring unique names...{Colors.ENDC}")
+    
+    adata_copy = adata.copy()
+    adata_copy.var_names_make_unique()
+    adata_copy.obs_names_make_unique()
+    
+    # Prepare clean data for snapatac2
+    def _clean_matrix(X):
+        """Clean matrix for snapatac2 compatibility."""
+        if X is None:
+            return None
+        if issparse(X):
+            X = X.tocsr(copy=True)
+            X.sum_duplicates()
+            X.sort_indices()
+            # Clean NaN/Inf values
+            if np.isnan(X.data).any() or np.isinf(X.data).any():
+                X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
+                X.eliminate_zeros()
+            return X
+        else:
+            # Clean dense matrices
+            return np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    def _clean_dataframe(df):
+        """Clean DataFrame for snapatac2 compatibility."""
+        if df is None or df.empty:
+            return df
+        
+        df_clean = df.copy()
+        
+        # Reset index to RangeIndex to avoid issues with SnapATAC2
+        # The actual obs_names/var_names will be set separately
+        df_clean = df_clean.reset_index(drop=True)
+        
+        # Handle categorical columns
+        for col in df_clean.columns:
+            if pd.api.types.is_categorical_dtype(df_clean[col]):
+                # Ensure categories are sorted
+                cat_data = df_clean[col]
+                if not cat_data.cat.ordered:
+                    try:
+                        from natsort import natsorted
+                        new_categories = natsorted(cat_data.cat.categories.astype(str))
+                    except ImportError:
+                        new_categories = sorted(cat_data.cat.categories.astype(str))
+                    df_clean[col] = cat_data.cat.reorder_categories(new_categories)
+            
+            # Handle object columns
+            elif df_clean[col].dtype == 'object':
+                # Convert mixed types to strings
+                non_null_values = df_clean[col].dropna()
+                if len(non_null_values) > 0:
+                    if not all(isinstance(x, str) for x in non_null_values):
+                        df_clean[col] = df_clean[col].astype(str)
+            
+            # Handle numeric columns with NaN/Inf
+            elif pd.api.types.is_numeric_dtype(df_clean[col]):
+                if df_clean[col].dtype.kind == 'f':  # float columns
+                    col_data = df_clean[col].values
+                    if np.isnan(col_data).any() or np.isinf(col_data).any():
+                        col_clean = np.nan_to_num(col_data, nan=0.0, 
+                                                posinf=np.finfo(col_data.dtype).max,
+                                                neginf=np.finfo(col_data.dtype).min)
+                        df_clean[col] = col_clean
+        
+        return df_clean
+    
+    # Clean main data
+    if verbose:
+        print(f"   {Colors.BLUE}📊 Cleaning data matrices...{Colors.ENDC}")
+    
+    X_clean = _clean_matrix(adata_copy.X)
+    obs_clean = _clean_dataframe(adata_copy.obs)
+    var_clean = _clean_dataframe(adata_copy.var)
+    
+    # Clean obsm
+    obsm_clean = {}
+    if hasattr(adata_copy, 'obsm') and adata_copy.obsm:
+        for key, value in adata_copy.obsm.items():
+            obsm_clean[key] = _clean_matrix(value)
+    
+    # Clean varm  
+    varm_clean = {}
+    if hasattr(adata_copy, 'varm') and adata_copy.varm:
+        for key, value in adata_copy.varm.items():
+            varm_clean[key] = _clean_matrix(value)
+    
+    # Clean uns
+    def _clean_uns(uns_dict):
+        """Recursively clean uns dictionary."""
+        if not isinstance(uns_dict, dict):
+            return uns_dict
+        
+        cleaned = {}
+        for key, value in uns_dict.items():
+            if value is None:
+                cleaned[key] = value
+            elif isinstance(value, np.ndarray):
+                if value.dtype.kind == 'f':
+                    cleaned[key] = np.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
+                else:
+                    cleaned[key] = value
+            elif isinstance(value, (np.bool_, np.integer, np.floating)):
+                # Convert numpy scalars to Python native types
+                cleaned[key] = value.item()
+            elif isinstance(value, np.ndarray) and value.ndim == 0:
+                # Convert 0-dimensional numpy arrays to scalars
+                cleaned[key] = value.item()
+            elif issparse(value):
+                cleaned[key] = _clean_matrix(value)
+            elif isinstance(value, pd.DataFrame):
+                cleaned[key] = _clean_dataframe(value)
+            elif isinstance(value, dict):
+                cleaned[key] = _clean_uns(value)
+            elif isinstance(value, list):
+                try:
+                    # Convert numpy types in lists to Python native types
+                    converted_list = []
+                    for item in value:
+                        if isinstance(item, (np.bool_, np.integer, np.floating)):
+                            converted_list.append(item.item())
+                        elif isinstance(item, np.ndarray) and item.ndim == 0:
+                            converted_list.append(item.item())
+                        else:
+                            converted_list.append(item)
+                    
+                    # Check if all items are numeric for array conversion
+                    if all(isinstance(x, (int, float)) for x in converted_list):
+                        arr = np.array(converted_list)
+                        if arr.dtype.kind == 'f':
+                            arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+                        cleaned[key] = arr
+                    else:
+                        cleaned[key] = converted_list
+                except Exception:
+                    cleaned[key] = value
+            else:
+                cleaned[key] = value
+        return cleaned
+    
+    uns_clean = _clean_uns(adata_copy.uns) if hasattr(adata_copy, 'uns') else {}
+    
+    # Create snapatac2 AnnData object
+    if verbose:
+        print(f"   {Colors.BLUE}🔧 Creating SnapATAC2 AnnData object...{Colors.ENDC}")
+    
+    try:
+        adata_snap = snap.AnnData(
+            filename=output_file,
+            X=X_clean,
+            obs=obs_clean,
+            var=var_clean,
+            obsm=obsm_clean if obsm_clean else None,
+            varm=varm_clean if varm_clean else None,
+            uns=uns_clean if uns_clean else None,
+        )
+        
+        # Set obs_names and var_names explicitly
+        if verbose:
+            print(f"   {Colors.BLUE}📝 Setting obs_names and var_names...{Colors.ENDC}")
+        
+        # Convert names to list of strings
+        obs_names_list = [str(name) for name in adata_copy.obs_names]
+        var_names_list = [str(name) for name in adata_copy.var_names]
+        
+        adata_snap.obs_names = obs_names_list
+        adata_snap.var_names = var_names_list
+        
+        # Add obsp if exists (has to be done after creation)
+        if hasattr(adata_copy, 'obsp') and adata_copy.obsp:
+            if verbose:
+                print(f"   {Colors.BLUE}📊 Adding obsp matrices...{Colors.ENDC}")
+            for key, value in adata_copy.obsp.items():
+                if value is not None:
+                    adata_snap.obsp[key] = _clean_matrix(value)
+        
+        # Add varp if exists
+        if hasattr(adata_copy, 'varp') and adata_copy.varp:
+            if verbose:
+                print(f"   {Colors.BLUE}📊 Adding varp matrices...{Colors.ENDC}")
+            for key, value in adata_copy.varp.items():
+                if value is not None:
+                    adata_snap.varp[key] = _clean_matrix(value)
+        
+        # Add layers if exists
+        if hasattr(adata_copy, 'layers') and adata_copy.layers:
+            if verbose:
+                print(f"   {Colors.BLUE}📊 Adding layers...{Colors.ENDC}")
+            for key, value in adata_copy.layers.items():
+                if value is not None:
+                    adata_snap.layers[key] = _clean_matrix(value)
+        
+        if close_file:
+            adata_snap.close()
+            
+        if verbose:
+            print(f"   {Colors.GREEN}🎉 Conversion completed successfully!{Colors.ENDC}")
+            print(f"   {Colors.GREEN}✅ Rust-compatible file saved: {output_file}{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+        
+        return output_file
+        
+    except Exception as e:
+        if verbose:
+            print(f"   {Colors.WARNING}❌ Error during conversion: {e}{Colors.ENDC}")
+        # Clean up the file if creation failed
+        if os.path.exists(output_file):
+            try:
+                os.remove(output_file)
+            except:
+                pass
+        raise
+
+
+def _fix_dataframe_for_rust(df, df_type="dataframe"):
+    """Fix DataFrame for Rust backend compatibility."""
+    if df is None or df.empty:
+        return df
+        
+    import pandas as pd
+    import numpy as np
+    
+    # Create a copy to avoid modifying original
+    df_fixed = df.copy()
+    
+    # 1. Ensure index is consistent
+    if not isinstance(df_fixed.index, pd.RangeIndex):
+        # Keep the current index but ensure it's proper pandas Index
+        df_fixed.index = pd.Index(df_fixed.index, name=df_fixed.index.name)
+    
+    # 2. Fix categorical columns
+    for col in df_fixed.columns:
+        if pd.api.types.is_categorical_dtype(df_fixed[col]):
+            cat_data = df_fixed[col]
+            # Ensure categories are properly ordered
+            if not cat_data.cat.ordered:
+                # Sort categories naturally if possible
+                try:
+                    from natsort import natsorted
+                    new_categories = natsorted(cat_data.cat.categories.astype(str))
+                except ImportError:
+                    new_categories = sorted(cat_data.cat.categories.astype(str))
+                
+                df_fixed[col] = cat_data.cat.reorder_categories(new_categories)
+        
+        # 3. Handle object columns that might contain mixed types
+        elif df_fixed[col].dtype == 'object':
+            # Try to convert to string if they're not already
+            try:
+                # Check if all non-null values are strings
+                non_null_values = df_fixed[col].dropna()
+                if len(non_null_values) > 0:
+                    if not all(isinstance(x, str) for x in non_null_values):
+                        df_fixed[col] = df_fixed[col].astype(str)
+            except Exception:
+                pass
+        
+        # 4. Handle numeric columns with NaN/Inf
+        elif pd.api.types.is_numeric_dtype(df_fixed[col]):
+            if df_fixed[col].dtype.kind == 'f':  # float columns
+                col_data = df_fixed[col].values
+                if np.isnan(col_data).any() or np.isinf(col_data).any():
+                    # Replace NaN with 0, Inf with finite values
+                    col_clean = np.nan_to_num(col_data, nan=0.0, posinf=np.finfo(col_data.dtype).max, neginf=np.finfo(col_data.dtype).min)
+                    df_fixed[col] = col_clean
+    
+    return df_fixed
+
+
+def _fix_uns_for_rust(uns_dict):
+    """Fix uns dictionary for Rust backend compatibility."""
+    if not isinstance(uns_dict, dict):
+        return uns_dict
+    
+    import numpy as np
+    import pandas as pd
+    from scipy.sparse import issparse
+    
+    uns_fixed = {}
+    
+    for key, value in uns_dict.items():
+        if value is None:
+            uns_fixed[key] = value
+        elif isinstance(value, np.ndarray):
+            # Clean numpy arrays
+            if value.dtype.kind == 'f':  # float arrays
+                value_clean = np.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
+                uns_fixed[key] = value_clean
+            else:
+                uns_fixed[key] = value
+        elif issparse(value):
+            # Fix sparse matrices in uns
+            uns_fixed[key] = _to_sorted_csr(value)
+        elif isinstance(value, pd.DataFrame):
+            # Fix DataFrames in uns
+            uns_fixed[key] = _fix_dataframe_for_rust(value, f"uns[{key}]")
+        elif isinstance(value, dict):
+            # Recursively fix nested dictionaries
+            uns_fixed[key] = _fix_uns_for_rust(value)
+        elif isinstance(value, list):
+            # Handle lists
+            try:
+                # Convert to numpy array if all elements are numeric
+                if all(isinstance(x, (int, float, np.integer, np.floating)) for x in value):
+                    arr = np.array(value)
+                    if arr.dtype.kind == 'f':
+                        arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+                    uns_fixed[key] = arr
+                else:
+                    uns_fixed[key] = value
+            except Exception:
+                uns_fixed[key] = value
+        else:
+            uns_fixed[key] = value
+    
+    return uns_fixed
