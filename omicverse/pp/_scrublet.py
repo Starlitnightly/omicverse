@@ -130,8 +130,13 @@ def scrublet(
     print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Running Scrublet Doublet Detection:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{settings.mode}{Colors.ENDC}")
     print(f"   {Colors.CYAN}Computing doublet prediction using Scrublet algorithm{Colors.ENDC}")
-
-    adata_obs = adata.copy()
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        adata_obs = adata.to_memory()
+    else:
+        adata_obs = adata.copy()
+    #adata_obs = adata.copy()
 
     def _run_scrublet(ad_obs: AnnData, ad_sim: AnnData | None = None):
         # With no adata_sim we assume the regular use case, starting with raw

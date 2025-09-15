@@ -21,7 +21,7 @@ from scanpy import logging as logg
 from scanpy._compat import DaskArray, pkg_version
 from scanpy._settings import settings
 from scanpy._utils import _doc_params, _empty, is_backed_type
-from scanpy.get import _check_mask, _get_obs_rep
+from scanpy.get import  _get_obs_rep
 from scanpy.preprocessing._docs import doc_mask_var_hvg
 from scanpy.preprocessing._pca._compat import _pca_compat_sparse
 from scipy import sparse
@@ -295,20 +295,35 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             "reproducible across different computational platforms. For exact "
             "reproducibility, choose `svd_solver='arpack'`."
         )
-    if return_anndata := isinstance(data, AnnData):
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(data)
+
+    if isinstance(data, AnnData):
         if layer is None and not chunked and is_backed_type(data.X):
             msg = f"PCA is not implemented for matrices of type {type(data.X)} with chunked as False"
             raise NotImplementedError(msg)
         adata = data.copy() if copy else data
+        return_anndata = True
+    elif is_rust:
+        adata = data
+        return_anndata = True
     elif pkg_version("anndata") < Version("0.8.0rc1"):
         adata = AnnData(data, dtype=data.dtype)
+        return_anndata = False
     else:
         adata = AnnData(data)
+        return_anndata = False
 
     # Unify new mask argument and deprecated use_highly_varible argument
     mask_var_param, mask_var = _handle_mask_var(adata, mask_var, use_highly_variable)
     del use_highly_variable
-    adata_comp = adata[:, mask_var] if mask_var is not None else adata
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
+    if not is_rust:
+        adata_comp = adata[:, mask_var] if mask_var is not None else adata
+    else:
+        adata_comp = adata.subset(var_indices=np.array(adata.var_names)[mask_var],inplace=False)
+        #print(np.array(adata.var_names)[mask_var])
 
     if n_comps is None:
         min_dim = min(adata_comp.n_vars, adata_comp.n_obs)
@@ -657,7 +672,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             variance = variance.cpu().numpy()
         if hasattr(variance_ratio, 'cpu'):  # Check if it's a torch tensor
             variance_ratio = variance_ratio.cpu().numpy()
-            
+        #print(adata)
         adata.uns[key_uns] = dict(
             params=params,
             variance=variance,
@@ -728,6 +743,8 @@ def _handle_mask_var(
     Returns both the normalized mask parameter and the validated mask array.
     """
     # First, verify and possibly warn
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(adata)
     if use_highly_variable is not None:
         hint = (
             'Use_highly_variable=True can be called through mask_var="highly_variable". '
@@ -740,25 +757,113 @@ def _handle_mask_var(
             raise ValueError(msg)
 
     # Handle default case and explicit use_highly_variable=True
-    if use_highly_variable or (
-        use_highly_variable is None
-        and mask_var is _empty
-        and "highly_variable" in adata.var.columns
-    ):
-        mask_var = "highly_variable"
+    if not is_rust:
+        if use_highly_variable or (
+            use_highly_variable is None
+            and mask_var is _empty
+            and "highly_variable" in adata.var.columns
+        ):
+            mask_var = "highly_variable"
+        
+            # Handle default case and explicit use_highly_variable=True
+        if use_highly_variable or (
+            use_highly_variable is None
+            and mask_var is _empty
+            and "highly_variable_features" in adata.var.columns
+        ):
+            mask_var = "highly_variable_features"
+    else:
+        if use_highly_variable or (
+            use_highly_variable is None
+            and mask_var is _empty
+            and "highly_variable" in adata.var
+        ):
+            mask_var = "highly_variable"
 
-    # Handle default case and explicit use_highly_variable=True
-    if use_highly_variable or (
-        use_highly_variable is None
-        and mask_var is _empty
-        and "highly_variable_features" in adata.var.columns
-    ):
-        mask_var = "highly_variable_features"
+        # Handle default case and explicit use_highly_variable=True
+        if use_highly_variable or (
+            use_highly_variable is None
+            and mask_var is _empty
+            and "highly_variable_features" in adata.var
+        ):
+            mask_var = "highly_variable_features"
 
     # Without highly variable genes, we don’t use a mask by default
     if mask_var is _empty or mask_var is None:
         return None, None
     return mask_var, _check_mask(adata, mask_var, "var")
+
+def _check_mask(
+    data: AnnData | np.ndarray | CSBase | DaskArray,
+    mask: str | M,
+    dim: Literal["obs", "var"],
+    *,
+    allow_probabilities: bool = False,
+) -> M:  # Could also be a series, but should be one or the other
+    """Validate mask argument.
+
+    Params
+    ------
+    data
+        Annotated data matrix or numpy array.
+    mask
+        Mask (or probabilities if `allow_probabilities=True`).
+        Either an appropriatley sized array, or name of a column.
+    dim
+        The dimension being masked.
+    allow_probabilities
+        Whether to allow probabilities as `mask`
+    """
+    if mask is None:
+        return mask
+    desc = "mask/probabilities" if allow_probabilities else "mask"
+    from ._qc import _is_rust_backend
+    is_rust = _is_rust_backend(data)
+    if isinstance(mask, str):
+        if not isinstance(data, AnnData):
+            msg = f"Cannot refer to {desc} with string without providing anndata object as argument"
+            #raise ValueError(msg)
+        elif is_rust:
+            pass
+
+        annot: pd.DataFrame = getattr(data, dim)
+
+        if is_rust:
+            if mask not in annot:
+                msg = (
+                    f"Did not find `adata.{dim}[{mask!r}]`. "
+                    f"Either add the {desc} first to `adata.{dim}`"
+                    f"or consider using the {desc} argument with an array."
+                )
+                raise ValueError(msg)
+            mask_array = annot[mask].to_numpy()
+        else:
+            if mask not in annot.columns:
+                msg = (
+                    f"Did not find `adata.{dim}[{mask!r}]`. "
+                    f"Either add the {desc} first to `adata.{dim}`"
+                    f"or consider using the {desc} argument with an array."
+                )
+                raise ValueError(msg)
+            mask_array = annot[mask].to_numpy()
+    else:
+        if len(mask) != data.shape[0 if dim == "obs" else 1]:
+            msg = f"The shape of the {desc} do not match the data."
+            raise ValueError(msg)
+        mask_array = mask
+    import pandas as pd
+    is_bool = pd.api.types.is_bool_dtype(mask_array.dtype)
+    if not allow_probabilities and not is_bool:
+        msg = "Mask array must be boolean."
+        raise ValueError(msg)
+    elif allow_probabilities and not (
+        is_bool or pd.api.types.is_float_dtype(mask_array.dtype)
+    ):
+        msg = f"{desc} array must be boolean or floating point."
+        raise ValueError(msg)
+
+    return mask_array
+
 
 
 @overload

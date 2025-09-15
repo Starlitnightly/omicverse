@@ -363,14 +363,18 @@ def embedding(
             palette=palette,
             na_color=na_color,
         )
+        def _is_numeric_array(x):
+            arr = np.asarray(x)
+            return np.issubdtype(arr.dtype, np.number)
 
         # Order points
         order = slice(None)
-        if sort_order is True and value_to_plot is not None and categorical is False:
-            # Higher values plotted on top, null values on bottom
-            order = np.argsort(-color_vector, kind="stable")[::-1]
-        elif sort_order and categorical:
-            # Null points go on bottom
+        if sort_order is True and value_to_plot is not None and (categorical is False) and _is_numeric_array(color_vector):
+            # 连续数值：数值高的点盖在上面
+            arr = np.asarray(color_vector)
+            order = np.argsort(-arr, kind="stable")[::-1]
+        elif sort_order and (categorical or not _is_numeric_array(color_vector)):
+            # 分类型或非数值（字符串/颜色）：空值下沉
             order = np.argsort(~pd.isnull(color_source_vector), kind="stable")
         # Set orders
         if isinstance(size, np.ndarray):
@@ -1124,13 +1128,21 @@ def _add_categorical_legend(
             raise NotImplementedError(
                 "No fallback for null labels has been defined if NA already in categories."
             )
+        # Ensure color_source_vector is categorical before adding categories
+        if not hasattr(color_source_vector, 'add_categories'):
+            color_source_vector = pd.Categorical(color_source_vector)
         color_source_vector = color_source_vector.add_categories("NA").fillna("NA")
         palette = palette.copy()
         palette["NA"] = na_color
     if color_source_vector.dtype == bool:
         cats = pd.Categorical(color_source_vector.astype(str)).categories
     else:
-        cats = color_source_vector.categories
+        # Safely get categories - handle both Categorical and Series objects
+        if hasattr(color_source_vector, 'categories'):
+            cats = color_source_vector.categories
+        else:
+            # Convert to categorical if it's not already
+            cats = pd.Categorical(color_source_vector).categories
 
     if multi_panel is True:
         # Shrink current axis by 10% to fit legend and match
@@ -1184,11 +1196,44 @@ def _get_basis(adata: AnnData, basis: str) -> np.ndarray:
         raise KeyError(f"Could not find '{basis}' or 'X_{basis}' in .obsm")
 
 
+def _safe_check_obs_columns(adata, key):
+    """Safely check if a key exists in adata.obs, compatible with both pandas and Rust backends."""
+    try:
+        # For pandas DataFrame
+        if hasattr(adata.obs, 'columns'):
+            return key in adata.obs.columns
+        # For Rust/Polars backends that don't have .columns attribute
+        else:
+            # Try to access the column directly - if it exists, this won't raise an error
+            try:
+                _ = adata.obs[key]
+                return True
+            except (KeyError, IndexError):
+                return False
+    except Exception:
+        return False
+
+def _safe_check_var_names(adata, key):
+    """Safely check if a key exists in adata.var_names, compatible with both pandas and Rust backends."""
+    try:
+        return key in adata.var_names
+    except Exception:
+        # Fallback for Rust backends
+        try:
+            if hasattr(adata.var_names, '__contains__'):
+                return key in adata.var_names
+            else:
+                # Convert to list and check
+                return key in list(adata.var_names)
+        except Exception:
+            return False
+
 def _get_color_source_vector(
     adata, value_to_plot, use_raw=False, gene_symbols=None, layer=None, groups=None
 ):
     """
     Get array from adata that colors will be based on.
+    Compatible with both pandas and Rust/Polars anndata backends.
     """
     if value_to_plot is None:
         # Points will be plotted with `na_color`. Ideally this would work
@@ -1196,65 +1241,240 @@ def _get_color_source_vector(
         # _color_vector handles this.
         # https://github.com/matplotlib/matplotlib/issues/18294
         return np.broadcast_to(np.nan, adata.n_obs)
+    
+    # Safe checks for obs and var
+    in_obs = _safe_check_obs_columns(adata, value_to_plot)
+    in_var = _safe_check_var_names(adata, value_to_plot)
+    
+    # Handle gene symbols - convert to actual gene names if needed
     if (
         gene_symbols is not None
-        and value_to_plot not in adata.obs.columns
-        and value_to_plot not in adata.var_names
+        and not in_obs
+        and not in_var
     ):
         # We should probably just make an index for this, and share it over runs
-        value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][
-            0
-        ]  # TODO: Throw helpful error if this doesn't work
-    if use_raw and value_to_plot not in adata.obs.columns:
+        try:
+            value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][0]
+            in_var = _safe_check_var_names(adata, value_to_plot)  # Update after conversion
+        except (IndexError, KeyError):
+            pass  # Will be handled in the error case below
+    
+    # Determine the source of the data
+    if in_obs:
+        # Data is in adata.obs (metadata)
+        values = adata.obs[value_to_plot]
+    elif use_raw and in_var:
+        # Data is gene expression from raw
         values = adata.raw.obs_vector(value_to_plot)
-    else:
+    elif in_var:
+        # Data is gene expression from processed data
         values = adata.obs_vector(value_to_plot, layer=layer)
+    else:
+        # Last resort - try obs_vector which might handle other cases
+        try:
+            values = adata.obs_vector(value_to_plot, layer=layer)
+        except (KeyError, AttributeError):
+            raise KeyError(f"Could not find '{value_to_plot}' in adata.obs or adata.var_names")
+
+    # 🔧 修改：只对真正的字符串/对象数据转为分类，避免误转数值型基因表达数据
+    if not is_categorical_dtype(values):
+        arr = np.asarray(values)
+        # 只有当数据是字符串类型且有重复值时才转为分类
+        if arr.dtype.kind in ("U", "S", "O"):                  # 字符串/对象
+            # 只在确实是"类别"而非全唯一时才转
+            if pd.unique(arr).size < arr.size:
+                values = pd.Categorical(arr)
+        # 对于数值型数据（基因表达），保持原样不转为分类
+            
     if groups and is_categorical_dtype(values):
         values = values.remove_categories(values.categories.difference(groups))
     return values
 
 
 def _get_palette(adata, values_key: str, palette=None):
+    """
+    返回 {category -> hex}。
+    - Python anndata：优先读 uns['<key>_colors']，不足/缺失再读 '<key>_colors_rgba'。
+    - Rust/Polars：只读 uns['<key>_colors_rgba']（避免读取字符串数组触发 PanicException）。
+    - 若都没有或长度不足，按默认规则生成，并写回：
+        * Rust/Polars：只写 '<key>_colors_rgba' (float32 RGBA)
+        * Python anndata：同时写 '<key>_colors' (unicode) 和 '<key>_colors_rgba'
+    """
+    import numpy as np
+    import pandas as pd
+    import matplotlib as mpl
+    from matplotlib import rcParams
+    from matplotlib.colors import to_hex, to_rgba, is_color_like
+    from cycler import Cycler
+
     color_key = f"{values_key}_colors"
-    if adata.obs[values_key].dtype == bool:
-        values = pd.Categorical(adata.obs[values_key].astype(str))
+    color_key_rgba = f"{values_key}_colors_rgba"
+
+    # --------- 判断是否 Rust/Polars 后端（完全避开读取字符串数组） ---------
+    def _is_rust_backend():
+        try:
+            if type(adata.obs).__name__.endswith("PyDataFrameElem"):  # 你前面贴过
+                return True
+        except Exception:
+            pass
+        try:
+            if type(adata.uns).__name__.endswith("PyElemCollection"):
+                return True
+        except Exception:
+            pass
+        # 兜底：模块名里出现 snapatac2 / pyanndata 也算
+        m = type(adata).__module__
+        return ("snapatac2" in m) or ("pyanndata" in m)
+
+    IS_RUST = _is_rust_backend()
+
+    # --------- 把 obs 列转成 pandas.Categorical，并拿到有序类别 ---------
+    def _obs_to_categorical(adata, key):
+        s = adata.obs[key]
+        try:
+            import polars as pl
+        except Exception:
+            pl = None
+
+        if s.__class__.__module__.startswith("pandas"):
+            if pd.api.types.is_categorical_dtype(s):
+                cats = [str(x) for x in s.cat.categories]
+                return pd.Categorical(pd.Series(s).astype(str), categories=cats)
+            if getattr(s, "dtype", None) == bool:
+                return pd.Categorical(pd.Series(s).astype(str))
+            return pd.Categorical(pd.Series(s, dtype="string"))
+
+        if pl is not None and isinstance(s, pl.Series):
+            if s.dtype == pl.Boolean:
+                return pd.Categorical(pd.Series(s.to_list()).astype(str), categories=["False", "True"])
+            if s.dtype == pl.Categorical and hasattr(s.cat, "get_categories"):
+                cats = [str(x) for x in s.cat.get_categories().to_list()]
+                return pd.Categorical(pd.Series(s.to_list()).astype(str), categories=cats)
+            arr = [str(x) for x in s.cast(pl.Utf8).to_list()]
+            try:
+                from natsort import natsorted
+                cats = natsorted(pd.unique(pd.Series(arr)).tolist())
+            except Exception:
+                cats = sorted(pd.unique(pd.Series(arr)).tolist(), key=str)
+            return pd.Categorical(arr, categories=cats)
+
+        # 兜底
+        arr = np.asarray(s, dtype=object)
+        if arr.size and isinstance(arr.flat[0], (np.bool_, bool)):
+            return pd.Categorical(pd.Series(arr).astype(str))
+        return pd.Categorical([str(x) for x in arr])
+
+    values = _obs_to_categorical(adata, values_key)
+    cats = list(values.categories)
+    n_cat = len(cats)
+
+    # --------- 写颜色（双轨：Rust 仅 RGBA；Python 字符串+RGBA） ---------
+    def _write_colors(hex_list):
+        rgba = np.asarray([to_rgba(h) for h in hex_list], dtype=np.float32)
+        adata.uns[color_key_rgba] = rgba
+        if not IS_RUST:
+            adata.uns[color_key] = np.asarray(hex_list, dtype="U16")
+
+    # --------- 处理用户传入的 palette ---------
+    if palette is not None:
+        if isinstance(palette, dict):
+            hex_list = [to_hex(palette.get(cat, "#808080"), keep_alpha=True) for cat in cats]
+            _write_colors(hex_list)
+            return dict(zip(cats, hex_list))
+
+        if isinstance(palette, str) and (palette in mpl.colormaps):
+            cmap = mpl.colormaps[palette]
+            denom = max(n_cat - 1, 1)
+            hex_list = [to_hex(cmap(i/denom), keep_alpha=True) for i in range(n_cat)]
+            _write_colors(hex_list)
+            return dict(zip(cats, hex_list))
+
+        if isinstance(palette, (list, tuple)):
+            try:
+                from scanpy.plotting._utils import additional_colors
+            except Exception:
+                additional_colors = {}
+            try:
+                seq = [(c if is_color_like(c) else additional_colors[c]) for c in palette]
+            except Exception as e:
+                raise ValueError(f"Invalid color in palette: {e}") from None
+            hex_list = [to_hex(seq[i % len(seq)], keep_alpha=True) for i in range(n_cat)]
+            _write_colors(hex_list)
+            return dict(zip(cats, hex_list))
+
+        if isinstance(palette, Cycler):
+            cc = palette()
+            hex_list = [to_hex(next(cc)["color"], keep_alpha=True) for _ in range(n_cat)]
+            _write_colors(hex_list)
+            return dict(zip(cats, hex_list))
+
+        raise ValueError(
+            "palette must be a matplotlib colormap name, a sequence of colors, "
+            "a dict {category: color}, or a cycler(color=...)."
+        )
+
+    # --------- 未传 palette：尝试读取现存颜色 ---------
+    hex_list = None
+    if IS_RUST:
+        # Rust：只读 RGBA；不要碰 '<key>_colors'，哪怕加 try 也会冒泡
+        try:
+            v = adata.uns[color_key_rgba]
+            arr = v.to_numpy() if hasattr(v, "to_numpy") else np.asarray(v)
+            if arr.ndim == 2 and arr.shape[1] in (3,4):
+                hex_list = [to_hex(tuple(row), keep_alpha=True) for row in arr]
+        except BaseException:  # 注意：PanicException 可能不是 Exception
+            hex_list = None
     else:
-        values = pd.Categorical(adata.obs[values_key])
-    if palette:
-        _utils._set_colors_for_categorical_obs(adata, values_key, palette)
-    elif color_key not in adata.uns or len(adata.uns[color_key]) < len(
-        values.categories
-    ):
-        #  set a default palette in case that no colors or few colors are found
-        if adata.obs[values_key].dtype == bool:
-            categories = (
-                adata.obs[values_key].astype(str).astype("category").cat.categories
-            )
-        else:
-            categories = adata.obs[values_key].cat.categories
-        from ..pl._palette import sc_color,palette_28,palette_56,palette_112
-        length = len(categories)
-        if len(rcParams["axes.prop_cycle"].by_key()["color"]) >= length:
+        # Python：优先读字符串数组
+        try:
+            v = adata.uns[color_key]
+            if hasattr(v, "to_list"):
+                v = v.to_list()
+            arr = np.asarray(v)
+            if arr.dtype.kind in ("U","S","O"):
+                hex_list = [str(x) for x in (arr.tolist() if isinstance(arr, np.ndarray) else list(arr))]
+        except Exception:
+            hex_list = None
+        # 再读 RGBA 兜底
+        if hex_list is None:
+            try:
+                v = adata.uns[color_key_rgba]
+                arr = v.to_numpy() if hasattr(v, "to_numpy") else np.asarray(v)
+                if arr.ndim == 2 and arr.shape[1] in (3,4):
+                    hex_list = [to_hex(tuple(row), keep_alpha=True) for row in arr]
+            except Exception:
+                hex_list = None
+
+    # --------- 若仍无/长度不足：生成默认并写回 ---------
+    if (hex_list is None) or (len(hex_list) < n_cat):
+        base = rcParams["axes.prop_cycle"].by_key().get("color", [])
+        if len(base) >= n_cat:
             cc = rcParams["axes.prop_cycle"]()
-            palette = [next(cc)["color"] for _ in range(length)]
-
-        elif length <= 28:
-            palette = sc_color
-        elif length <= 56:
-            palette = palette_56
-        elif length <= 112:
-            palette = palette_112
+            hex_list = [to_hex(next(cc)["color"], keep_alpha=True) for _ in range(n_cat)]
         else:
-            palette = ["grey" for _ in range(length)]
-            logg.info(
-                f"the obs value {values_key!r} has more than 103 categories. Uniform "
-                "'grey' color will be used for all categories."
-            )
+            try:
+                from ..pl._palette import sc_color, palette_56, palette_112
+            except Exception:
+                sc_color = palette_56 = palette_112 = None
+            if sc_color is not None and n_cat <= len(sc_color):
+                hex_list = [to_hex(c, keep_alpha=True) for c in sc_color[:n_cat]]
+            elif palette_56 is not None and n_cat <= 56:
+                hex_list = [to_hex(c, keep_alpha=True) for c in palette_56[:n_cat]]
+            elif palette_112 is not None and n_cat <= 112:
+                hex_list = [to_hex(c, keep_alpha=True) for c in palette_112[:n_cat]]
+            else:
+                hex_list = ["#808080"] * n_cat
+                try:
+                    from scanpy import logging as logg
+                    logg.info(
+                        f"the obs value {values_key!r} has many categories; using uniform grey."
+                    )
+                except Exception:
+                    pass
+        _write_colors(hex_list)
 
-        _utils._set_colors_for_categorical_obs(adata, values_key, palette[:length])
-    else:
-        _utils._validate_palette(adata, values_key)
-    return dict(zip(values.categories, adata.uns[color_key]))
+    return dict(zip(cats, hex_list))
+
 
 
 def _color_vector(
@@ -1510,3 +1730,222 @@ def _embedding(
                        outline_color=outline_color, ncols=ncols, hspace=hspace,
                          wspace=wspace, title=title, show=show, save=save, ax=ax,
                            return_fig=return_fig, marker=marker, **kwargs)
+
+
+# === drop-in replacement: pandas / polars compatible ===
+
+
+import numpy as np
+import pandas as pd
+from typing import Mapping, Sequence
+from cycler import Cycler
+import matplotlib as mpl
+from matplotlib.colors import is_color_like, to_hex
+from natsort import natsorted
+
+# 可选：与 scanpy 的 warning 接口对齐
+try:
+    from scanpy import logging as logg
+except Exception:
+    class _LogStub:
+        def warning(self, *a, **k): pass
+    logg = _LogStub()
+
+# 可选：scanpy 自带的颜色名扩展（没有也不影响）
+try:
+    from scanpy.plotting._utils import additional_colors  # type: ignore
+except Exception:
+    additional_colors: Mapping[str, str] = {}
+
+def _obs_series(adata, key):
+    """兼容 pandas/Polars 的 obs 列取值。"""
+    try:
+        return adata.obs[key]
+    except Exception as e:
+        raise KeyError(f"obs does not contain column {key!r}") from e
+
+def _obs_categories_ordered(adata, key) -> list[str]:
+    """获取分类类别（按已有顺序）；若不是分类，则取唯一值并自然排序。"""
+    s = _obs_series(adata, key)
+
+    # pandas.Series
+    if s.__class__.__module__.startswith("pandas"):
+        if pd.api.types.is_categorical_dtype(s):
+            cats = list(s.cat.categories)
+        else:
+            cats = list(pd.unique(pd.Series(s, dtype="string")))
+            cats = [str(x) for x in cats]
+            cats = natsorted(cats)
+        return [str(x) for x in cats]
+
+    # Polars.Series
+    import polars as pl
+    if pl is not None and isinstance(s, pl.Series):
+        if s.dtype == pl.Boolean:
+            return ["False", "True"]  # 与 pandas.bool -> str 后一样的顺序
+        if s.dtype == pl.Categorical and hasattr(s.cat, "get_categories"):
+            cats = s.cat.get_categories().to_list()
+        else:
+            # 非分类列：取唯一字符串并自然排序
+            cats = s.cast(pl.Utf8).unique().to_list()
+            cats = natsorted([str(x) for x in cats])
+        return [str(x) for x in cats]
+
+    # 兜底：任何 array-like
+    arr = np.asarray(s, dtype=object)
+    arr = arr[~pd.isnull(arr)]
+    return [str(x) for x in natsorted(np.unique(arr))]
+
+def _set_colors_for_categorical_obs(
+    adata, value_to_plot: str, palette: str | Sequence[str] | Cycler | Mapping[str, str]
+):
+    """Set `adata.uns[f'{value_to_plot}_colors']` according to the given palette.
+    兼容 pandas/Polars；若 palette 是 dict，会按类别键匹配。
+    """
+    cats = _obs_categories_ordered(adata, value_to_plot)
+    n = len(cats)
+    color_key = f"{value_to_plot}_colors"
+
+    # 1) 处理不同类型的 palette，生成长度为 n 的颜色列表
+    if isinstance(palette, Mapping):
+        # dict: {category: color}
+        # 缺失的类别用默认色补齐
+        base_cycle = mpl.rcParams["axes.prop_cycle"].by_key().get("color", None) or [
+            to_hex(mpl.colormaps["tab20"](i / 19)) for i in range(20)
+        ]
+        colors_list = []
+        for i, cat in enumerate(cats):
+            c = palette.get(cat, base_cycle[i % len(base_cycle)])
+            colors_list.append(c)
+
+    elif isinstance(palette, str) and (palette in mpl.colormaps):
+        cmap = mpl.colormaps[palette]
+        denom = max(n - 1, 1)
+        colors_list = [to_hex(cmap(i / denom), keep_alpha=True) for i in range(n)]
+
+    else:
+        # Sequence 或 Cycler
+        if isinstance(palette, Sequence) and not isinstance(palette, str):
+            # 校验颜色合法性，并转为 Cycler
+            try:
+                _color_list = [
+                    (color if is_color_like(color) else additional_colors[color])
+                    for color in palette
+                ]
+            except KeyError as e:
+                raise ValueError(
+                    f"The following color value of the given palette is not valid: {e.args[0]!r}"
+                ) from None
+            if len(_color_list) < n:
+                logg.warning(
+                    "Length of palette colors is smaller than the number of categories "
+                    f"(palette length: {len(_color_list)}, categories length: {n}). "
+                    "Some categories will have the same color."
+                )
+            from cycler import Cycler, cycler
+            palette = cycler(color=_color_list)
+
+        if not isinstance(palette, Cycler):
+            raise ValueError(
+                "Please check that 'palette' is a valid matplotlib colormap name, "
+                "a list/tuple of colors, or a cycler with key='color'."
+            )
+        if "color" not in palette.keys:
+            raise ValueError("Please set the palette key 'color'.")
+
+        cc = palette()
+        colors_list = [to_hex(next(cc)["color"], keep_alpha=True) for _ in range(n)]
+
+    # 2) 统一为 hex 并写入 adata.uns
+    #adata.uns[color_key] = [to_hex(c, keep_alpha=True) for c in colors_list]
+
+    _uns_put_colors_dual(adata, color_key, [to_hex(c, keep_alpha=True) for c in colors_list])
+
+import numpy as np
+from matplotlib.colors import to_hex
+
+def _uns_put_colors(adata, key, colors_list):
+    """
+    兼容 anndata(pandas) 与 SnapATAC2(Rust) 的 .uns 颜色写入：
+    - 优先写入 NumPy Unicode 定型数组（<U…）
+    - 若仍不行，再尝试写入 Polars Series[Utf8]
+    - 最后兜底回 Python list（给纯 anndata 用）
+    """
+    # 统一成 hex 字符串
+    colors_list = [
+        (c if isinstance(c, str) and c.startswith("#") else to_hex(c, keep_alpha=True))
+        for c in colors_list
+    ]
+    # ① Rust 端最友好：定长 Unicode 数组（长度给宽一点）
+    arr = np.asarray(colors_list, dtype="U16")
+    try:
+        adata.uns[key] = arr
+        return
+    except TypeError:
+        pass
+
+    # ② 尝试 Polars Series[Utf8]
+    try:
+        import polars as pl
+        adata.uns[key] = pl.Series(name=key, values=colors_list, dtype=pl.Utf8)
+        return
+    except Exception:
+        pass
+
+    # ③ 兜底：Python 列表（纯 Python anndata 没问题）
+    adata.uns[key] = list(colors_list)
+
+
+import numpy as np
+from matplotlib.colors import to_hex, to_rgba
+
+def _uns_supports_str_array(uns) -> bool:
+    """检测 .uns 是否能安全读回“字符串数组”。Rust 端通常 False。"""
+    try:
+        uns["_ov_probe"] = np.asarray(["#000000"], dtype="U9")
+        _ = uns["_ov_probe"]        # 读一遍
+        del uns["_ov_probe"]
+        return True
+    except Exception:
+        try: del uns["_ov_probe"]
+        except Exception: pass
+        return False
+
+def _uns_put_colors_dual(adata, name: str, colors_list):
+    """
+    双轨写入：
+    - 一定写: {name}_colors_rgba -> (n,4) float32  RGBA  (Rust 端稳定可读)
+    - 能写就写: {name}_colors -> <U… 字符串数组（Python anndata 友好）
+    """
+    # 统一成 hex
+    hex_list = [
+        c if (isinstance(c, str) and c.startswith("#")) else to_hex(c, keep_alpha=True)
+        for c in colors_list
+    ]
+    # ① RGBA 始终写（Rust/pyanndata 最稳）
+    rgba = np.asarray([to_rgba(h) for h in hex_list], dtype=np.float32)
+    adata.uns[f"{name}_colors_rgba"] = rgba
+
+    # ② 若支持字符串数组读取，再额外写 …_colors
+    adata.uns[f"{name}_colors"] = np.asarray(hex_list, dtype="U16")
+
+def _uns_read_colors_dual(adata, name: str):
+    """
+    读颜色：先试 …_colors（字符串），失败则用 …_colors_rgba（float32）并转回 hex。
+    返回 List[str]（#RRGGBB(AA)）
+    """
+    # 先试字符串数组（Python anndata 情况）
+    try:
+        v = adata.uns[f"{name}_colors"]
+        if hasattr(v, "to_list"):      # Polars Series
+            v = v.to_list()
+        arr = np.asarray(v)
+        if arr.dtype.kind in ("U", "S", "O"):
+            return [str(x) for x in (arr.tolist() if isinstance(arr, np.ndarray) else list(arr))]
+    except Exception:
+        pass  # Rust 端可能抛 PanicException 或 TypeError
+
+    # 降级到 RGBA
+    v = adata.uns[f"{name}_colors_rgba"]
+    arr = v.to_numpy() if hasattr(v, "to_numpy") else np.asarray(v)
+    return [to_hex(tuple(row), keep_alpha=True) for row in arr]

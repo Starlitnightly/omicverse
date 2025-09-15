@@ -239,8 +239,12 @@ def leiden_gpu_sparse_multilevel(
     # 连续化 & 回写
     labels, _ = _relabel_contiguous(labels)
     lab_np = labels.detach().to("cpu").numpy()
+    labels = lab_np.astype("U")             # → 字符串数组
     cats = natsorted(map(str, np.unique(lab_np)))
-    ad.obs[key_added] = pd.Categorical(values=lab_np.astype("U"), categories=cats)
+    try:
+        ad.obs[key_added] = pd.Categorical(values=lab_np.astype("U"), categories=cats)
+    except Exception:
+        ad.obs[key_added] = labels
     ad.uns[key_added] = {"params": dict(
         resolution=resolution,
         random_state=random_state,

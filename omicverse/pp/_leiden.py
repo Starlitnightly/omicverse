@@ -245,10 +245,14 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
             restrict_indices=restrict_indices,
             groups=groups,
         )
-    adata.obs[key_added] = pd.Categorical(
-        values=groups.astype("U"),
-        categories=natsorted(map(str, np.unique(groups))),
-    )
+    labels = groups.astype("U")
+    lab_np = np.asarray(labels)
+    cats = natsorted(map(str, np.unique(lab_np)))
+    try:
+        adata.obs[key_added] = pd.Categorical(values=lab_np.astype("U"), categories=cats)
+    except Exception:
+        adata.obs[key_added] = labels
+
     # store information on the clustering parameters
     adata.uns[key_added] = {}
     adata.uns[key_added]["params"] = dict(

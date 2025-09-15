@@ -204,15 +204,36 @@ def sude(
     
     adata.obsm[key_obsm] = X_sude  # annotate samples with SUDE coordinates
     adata.uns[key_uns] = dict(params={k: v for k, v in params.items() if v is not None})
+
+    if key_added is None:
+        key_added = "neighbors"
+        conns_key = "connectivities"
+        dists_key = "distances"
+    else:
+        conns_key = key_added + "_connectivities"
+        dists_key = key_added + "_distances"
+
     
+
     # Store neighborhood graph information
     if connectivities is not None:
-        adata.obsp[key_obsp_conn] = connectivities
+        from ..pp._neighbors import _to_sorted_csr
+        C = _to_sorted_csr(connectivities)
+        adata.obsp[key_obsp_conn] = C
         print(f"   {Colors.GREEN}✓ Neighborhood connectivities stored in adata.obsp['{key_obsp_conn}']{Colors.ENDC}")
     
     if distances is not None:
-        adata.obsp[key_obsp_dist] = distances
+        from ..pp._neighbors import _to_sorted_csr
+        D = _to_sorted_csr(distances)
+        adata.obsp[key_obsp_dist] = D
         print(f"   {Colors.GREEN}✓ Neighborhood distances stored in adata.obsp['{key_obsp_dist}']{Colors.ENDC}")
+
+    adata.uns[key_added] = {}
+
+    neighbors_dict = adata.uns[key_added]
+
+    neighbors_dict["connectivities_key"] = key_obsp_conn
+    neighbors_dict["distances_key"] = key_obsp_dist
 
     print(f"\n{Colors.GREEN}{EMOJI['done']} SUDE Dimensionality Reduction Completed Successfully!{Colors.ENDC}")
     print(f"   {Colors.GREEN}✓ Embedding shape: {Colors.BOLD}{X_sude.shape[0]:,}{Colors.ENDC}{Colors.GREEN} cells × {Colors.BOLD}{X_sude.shape[1]}{Colors.ENDC}{Colors.GREEN} dimensions{Colors.ENDC}")

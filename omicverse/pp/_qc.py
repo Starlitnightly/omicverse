@@ -23,6 +23,25 @@ from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Color
 from ..utils.registry import register_function
 
 
+# Helper function to detect Rust backend
+def _is_rust_backend(adata):
+    """Detect if the adata object is from Rust backend (like snapatac2)."""
+    # Check if it's a Rust/snapatac2 backend
+    try:
+        # Check class type
+        if type(adata.obs).__name__.endswith("PyDataFrameElem"):
+            return True
+        if type(adata.X).__name__.endswith("PyArrayElem"):
+            return True
+        # Check module name
+        module = type(adata).__module__
+        if "snapatac2" in module or "pyanndata" in module:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 
 
 
@@ -205,16 +224,35 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         mt_genes_found = sum(adata.var['mt'])
         print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
-        adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["mt"] = var_names.str.startswith(mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
         print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    
+    # Check if it's a Rust backend
+    is_rust = _is_rust_backend(adata)
     
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
+    elif is_rust:
+        # For Rust backend (snapatac2) - use adata.X[:] and subset method
+        adata.obs['nUMIs'] = np.array(adata.X[:].sum(axis=1)).reshape(-1)
+        # Use subset method for Rust backend slicing
+        mt_indices = np.where(adata.var["mt"])[0]
+        if len(mt_indices) > 0:
+            #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
+            adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+        else:
+            adata.obs['mito_perc'] = np.zeros(adata.n_obs)
+        adata.obs['detected_genes'] = adata.X[:].getnnz(axis=1)
     else:
+        # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
         adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
@@ -247,9 +285,9 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
 
     # Report
     n1 = adata.shape[0]
-    mt_failed = n1-np.sum(adata.obs["passing_mt"])
-    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
-    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    mt_failed = n1-adata.obs["passing_mt"].sum()
+    umis_failed = n1-adata.obs["passing_nUMIs"].sum()
+    genes_failed = n1-adata.obs["passing_ngenes"].sum()
     
     if mode == 'seurat':
         print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
@@ -266,10 +304,16 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-    removed = QC_test.loc[lambda x : x == False]
-    removed_cells.extend(list(removed.index.values))
-    total_qc_failed = n1-np.sum(QC_test)
-    adata = adata[QC_test, :]
+    adata.obs['passing_qc_step1']=QC_test
+    removed = list(np.array(adata.obs_names)[np.where(adata.obs["passing_qc_step1"]==False)[0]])
+    keeped=list(np.array(adata.obs_names)[np.where(adata.obs["passing_qc_step1"]==True)[0]])
+
+    removed_cells+=removed
+    total_qc_failed = n1-len(removed)
+    if is_rust:
+        adata.subset(obs_indices=keeped)
+    else:
+        adata = adata[QC_test, :]
     n2 = adata.shape[0]
     
     print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
@@ -282,10 +326,25 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     cells_before_final = adata.shape[0]
     genes_before_final = adata.shape[1]
     
-    sc.pp.filter_cells(adata, min_genes=min_genes)
-    sc.pp.filter_genes(adata, min_cells=min_cells)
-    sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
-    sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+    if not is_rust:
+        sc.pp.filter_cells(adata, min_genes=min_genes)
+        sc.pp.filter_genes(adata, min_cells=min_cells)
+        sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
+        sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+    else:
+        selected_cells = True
+        if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
+        if max_genes_ratio: selected_cells &= adata.obs["detected_genes"] <= max_genes_ratio*adata.shape[1]
+        selected_cells = np.flatnonzero(selected_cells)
+        adata.subset(obs_indices=selected_cells)
+
+        selected_genes = True
+        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
+        if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
+        selected_genes = np.flatnonzero(selected_genes)
+        adata.subset(var_indices=selected_genes)
+
     
     cells_final_filtered = cells_before_final - adata.shape[0]
     genes_final_filtered = genes_before_final - adata.shape[1]
@@ -303,15 +362,21 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
             from ._scrublet import scrublet
             scrublet(adata, random_state=1234,batch_key=batch_key,use_gpu=use_gpu)
-
-            adata_remove = adata[adata.obs['predicted_doublet'], :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[~adata.obs['predicted_doublet'], :]
+            if is_rust:
+                removed=list(np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==True)[0]])
+                removed_cells.extend(removed)
+                adata.subset(obs_indices=np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==False)[0]])
+            else:
+                adata_remove = adata[adata.obs['predicted_doublet'], :]
+                removed_cells.extend(list(adata_remove.obs_names))
+                adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
             doublets_removed = n_after_final_filt-n1
             print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
             
         elif doublets_method=='sccomposite':
+            if is_rust:
+                adata=adata.to_memory()
             print(f"   {Colors.WARNING}⚠️  Note: 'sccomposite' typically removes more cells than 'scrublet'{Colors.ENDC}")
             print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
             adata.obs['sccomposite_doublet']=0
@@ -417,16 +482,35 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         mt_genes_found = sum(adata.var['mt'])
         print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
-        adata.var["mt"] = adata.var_names.str.startswith(mt_startswith)
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["mt"] = var_names.str.startswith(mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
         print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    
+    # Check if it's a Rust backend
+    is_rust = _is_rust_backend(adata)
     
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
+    elif is_rust:
+        # For Rust backend (snapatac2) - use adata.X[:] and subset method
+        adata.obs['nUMIs'] = np.array(adata.X[:].sum(axis=1)).reshape(-1)
+        # Use subset method for Rust backend slicing
+        mt_indices = np.where(adata.var["mt"])[0]
+        if len(mt_indices) > 0:
+            #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
+            adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+        else:
+            adata.obs['mito_perc'] = np.zeros(adata.n_obs)
+        adata.obs['detected_genes'] = adata.X[:].getnnz(axis=1)
     else:
+        # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
         adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
@@ -460,9 +544,9 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
 
     # Report
     n1 = adata.shape[0]
-    mt_failed = n1-np.sum(adata.obs["passing_mt"])
-    umis_failed = n1-np.sum(adata.obs["passing_nUMIs"])
-    genes_failed = n1-np.sum(adata.obs["passing_ngenes"])
+    mt_failed = n1-adata.obs["passing_mt"].sum()
+    umis_failed = n1-adata.obs["passing_nUMIs"].sum()
+    genes_failed = n1-adata.obs["passing_ngenes"].sum()
     
     if mode == 'seurat':
         print(f"   {Colors.BLUE}📊 Seurat Filter Results:{Colors.ENDC}")
@@ -480,10 +564,18 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
 
     # QC plot
     QC_test = (adata.obs['passing_mt']) & (adata.obs['passing_nUMIs']) & (adata.obs['passing_ngenes'])
-    removed = QC_test.loc[lambda x : x == False]
-    removed_cells.extend(list(removed.index.values))
-    total_qc_failed = n1-np.sum(QC_test)
-    adata = adata[QC_test, :]
+    if is_rust:
+        removed = list(np.array(adata.obs_names)[np.where(QC_test==False)[0]])
+        removed_cells.extend(removed)
+        total_qc_failed = n1-len(removed)
+        adata.subset(obs_indices=np.array(adata.obs_names)[np.where(QC_test==True)[0]])
+    else:
+        removed = QC_test.loc[lambda x : x == False]
+        removed_cells.extend(list(removed.index.values))
+        total_qc_failed = n1-np.sum(QC_test)
+        adata = adata[QC_test, :]
+    
+    
     n2 = adata.shape[0]
     
     print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
@@ -495,11 +587,24 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     
     cells_before_final = adata.shape[0]
     genes_before_final = adata.shape[1]
-    
-    sc.pp.filter_cells(adata, min_genes=min_genes)
-    sc.pp.filter_genes(adata, min_cells=min_cells)
-    sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
-    sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+
+    if not is_rust:
+        sc.pp.filter_cells(adata, min_genes=min_genes)
+        sc.pp.filter_genes(adata, min_cells=min_cells)
+        sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
+        sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+    else:
+        selected_cells = True
+        if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
+        if max_genes_ratio: selected_cells &= adata.obs["detected_genes"] <= max_genes_ratio*adata.shape[1]
+        selected_cells = np.flatnonzero(selected_cells)
+        adata.subset(obs_indices=selected_cells)
+        selected_genes = True
+        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
+        if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
+        selected_genes = np.flatnonzero(selected_genes)
+        adata.subset(var_indices=selected_genes)
     
     cells_final_filtered = cells_before_final - adata.shape[0]
     genes_final_filtered = genes_before_final - adata.shape[1]
@@ -518,14 +623,21 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
             print(f"   {Colors.GREEN}{EMOJI['start']} Running scrublet doublet detection...{Colors.ENDC}")
             scrublet(adata, random_state=1234,batch_key=batch_key)
 
-            adata_remove = adata[adata.obs['predicted_doublet'], :]
-            removed_cells.extend(list(adata_remove.obs_names))
-            adata = adata[~adata.obs['predicted_doublet'], :]
+            if is_rust:
+                removed=list(np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==True)[0]])
+                removed_cells.extend(removed)
+                adata.subset(obs_indices=np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==False)[0]])
+            else:
+                adata_remove = adata[adata.obs['predicted_doublet'], :]
+                removed_cells.extend(list(adata_remove.obs_names))
+                adata = adata[~adata.obs['predicted_doublet'], :]
             n1 = adata.shape[0]
             doublets_removed = n_after_final_filt-n1
             print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
             
         elif doublets_method=='sccomposite':
+            if is_rust:
+                adata = adata.to_memory()
             print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")
             print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
             adata.obs['sccomposite_doublet']=0
