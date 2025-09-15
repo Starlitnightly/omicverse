@@ -435,7 +435,7 @@ def read(path, backend='python', **kwargs):
 
 def _patch_ann_compat(adata):
     """
-    给 SnapATAC2(Rust) AnnData 类/实例补齐：
+    给 anndata-rs(Rust) AnnData 类/实例补齐：
     - is_view (property, False)
     - obsm_keys()/varm_keys()（返回键列表）
     - raw (property, None)  —— 只在确实缺失时补
@@ -2164,7 +2164,7 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
         os.close(fd)  # Close the file descriptor
     
     if verbose:
-        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend using SnapATAC2{Colors.ENDC}")
+        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend using anndata-rs{Colors.ENDC}")
         print(f"   {Colors.CYAN}Original shape: {adata.shape}{Colors.ENDC}")
         print(f"   {Colors.CYAN}Output file: {output_file}{Colors.ENDC}")
     
@@ -2381,12 +2381,12 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
     
     # Create snapatac2 AnnData object
     if verbose:
-        print(f"   {Colors.BLUE}🔧 Creating SnapATAC2 AnnData object...{Colors.ENDC}")
+        print(f"   {Colors.BLUE}🔧 Creating anndata-rs AnnData object...{Colors.ENDC}")
     
     try:
         # Log the cleaned data types for debugging
         if verbose:
-            print(f"   {Colors.BLUE}📋 Data summary before SnapATAC2 creation:{Colors.ENDC}")
+            print(f"   {Colors.BLUE}📋 Data summary before anndata-rs creation:{Colors.ENDC}")
             print(f"      X: {type(X_clean)} {X_clean.shape if X_clean is not None else 'None'}")
             print(f"      obs: {type(obs_clean)} {obs_clean.shape if obs_clean is not None else 'None'}")
             print(f"      var: {type(var_clean)} {var_clean.shape if var_clean is not None else 'None'}")
@@ -2400,7 +2400,7 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
         # Create SnapATAC2 AnnData step by step to isolate issues
         # First create with minimal data, then add others
         if verbose:
-            print(f"   {Colors.BLUE}🔧 Creating SnapATAC2 with basic data first...{Colors.ENDC}")
+            print(f"   {Colors.BLUE}🔧 Creating anndata-rs with basic data first...{Colors.ENDC}")
         
         # Create with minimal required data first
         adata_snap = snap.AnnData(
@@ -2419,7 +2419,7 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
                 elif pd.api.types.is_categorical_dtype(obs_clean[col]):
                     # Convert categorical to string to avoid issues
                     obs_clean[col] = obs_clean[col].astype(str)
-            # Create new SnapATAC2 with obs data
+            # Create new anndata-rs with obs data
             adata_snap.close()
             adata_snap = snap.AnnData(
                 filename=output_file,
