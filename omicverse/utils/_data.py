@@ -2191,8 +2191,28 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
                 X.eliminate_zeros()
             return X
         else:
-            # Clean dense matrices
-            return np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+            # Clean dense matrices and ensure compatible dtype
+            X_clean = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+            
+            # Ensure the matrix has a SnapATAC2-compatible dtype
+            if X_clean.dtype.kind == 'V':  # structured/void arrays not supported
+                if verbose:
+                    print(f"   {Colors.WARNING}⚠️  Converting void array to float32{Colors.ENDC}")
+                X_clean = X_clean.astype(np.float32)
+            elif X_clean.dtype == np.float64:
+                # Convert float64 to float32 for efficiency
+                X_clean = X_clean.astype(np.float32)
+            elif X_clean.dtype.kind in ['U', 'S']:  # string arrays
+                if verbose:
+                    print(f"   {Colors.WARNING}⚠️  Converting string array to float32{Colors.ENDC}")
+                # Try to convert strings to numbers, fallback to zeros
+                try:
+                    X_clean = pd.to_numeric(X_clean.flatten(), errors='coerce').values.reshape(X_clean.shape).astype(np.float32)
+                    X_clean = np.nan_to_num(X_clean, nan=0.0)
+                except:
+                    X_clean = np.zeros(X_clean.shape, dtype=np.float32)
+            
+            return X_clean
     
     def _clean_dataframe(df):
         """Clean DataFrame for snapatac2 compatibility."""
@@ -2205,36 +2225,82 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
         # The actual obs_names/var_names will be set separately
         df_clean = df_clean.reset_index(drop=True)
         
-        # Handle categorical columns
+        # Remove any columns that are completely empty or problematic
+        cols_to_drop = []
         for col in df_clean.columns:
+            # Check for completely empty columns
+            if df_clean[col].isna().all():
+                cols_to_drop.append(col)
+                continue
+                
+            # Handle categorical columns
             if pd.api.types.is_categorical_dtype(df_clean[col]):
-                # Ensure categories are sorted
-                cat_data = df_clean[col]
-                if not cat_data.cat.ordered:
-                    try:
-                        from natsort import natsorted
-                        new_categories = natsorted(cat_data.cat.categories.astype(str))
-                    except ImportError:
-                        new_categories = sorted(cat_data.cat.categories.astype(str))
-                    df_clean[col] = cat_data.cat.reorder_categories(new_categories)
+                try:
+                    # Ensure categories are sorted and handle empty categories
+                    cat_data = df_clean[col]
+                    if len(cat_data.cat.categories) == 0:
+                        # Convert empty categorical to string
+                        df_clean[col] = df_clean[col].astype(str)
+                    elif not cat_data.cat.ordered:
+                        try:
+                            from natsort import natsorted
+                            new_categories = natsorted(cat_data.cat.categories.astype(str))
+                        except ImportError:
+                            new_categories = sorted(cat_data.cat.categories.astype(str))
+                        df_clean[col] = cat_data.cat.reorder_categories(new_categories)
+                except Exception:
+                    # If categorical handling fails, convert to string
+                    df_clean[col] = df_clean[col].astype(str)
             
             # Handle object columns
             elif df_clean[col].dtype == 'object':
-                # Convert mixed types to strings
-                non_null_values = df_clean[col].dropna()
-                if len(non_null_values) > 0:
-                    if not all(isinstance(x, str) for x in non_null_values):
-                        df_clean[col] = df_clean[col].astype(str)
+                try:
+                    # Fill NaN values with empty string first
+                    df_clean[col] = df_clean[col].fillna('')
+                    # Convert all to string to ensure consistency
+                    df_clean[col] = df_clean[col].astype(str)
+                except Exception:
+                    # If conversion fails, drop the column
+                    cols_to_drop.append(col)
+                    continue
             
             # Handle numeric columns with NaN/Inf
             elif pd.api.types.is_numeric_dtype(df_clean[col]):
-                if df_clean[col].dtype.kind == 'f':  # float columns
-                    col_data = df_clean[col].values
-                    if np.isnan(col_data).any() or np.isinf(col_data).any():
-                        col_clean = np.nan_to_num(col_data, nan=0.0, 
-                                                posinf=np.finfo(col_data.dtype).max,
-                                                neginf=np.finfo(col_data.dtype).min)
-                        df_clean[col] = col_clean
+                try:
+                    if df_clean[col].dtype.kind == 'f':  # float columns
+                        col_data = df_clean[col].values
+                        if np.isnan(col_data).any() or np.isinf(col_data).any():
+                            col_clean = np.nan_to_num(col_data, nan=0.0, 
+                                                    posinf=np.finfo(col_data.dtype).max,
+                                                    neginf=np.finfo(col_data.dtype).min)
+                            df_clean[col] = col_clean
+                    elif df_clean[col].dtype.kind in ['i', 'u']:  # integer columns
+                        # Fill NaN in integer columns with 0
+                        if df_clean[col].isna().any():
+                            df_clean[col] = df_clean[col].fillna(0).astype(df_clean[col].dtype)
+                except Exception:
+                    # If numeric processing fails, try to convert to float
+                    try:
+                        df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0.0)
+                    except Exception:
+                        cols_to_drop.append(col)
+                        continue
+            
+            # Handle boolean columns
+            elif df_clean[col].dtype == 'bool':
+                # Fill NaN boolean values with False
+                df_clean[col] = df_clean[col].fillna(False)
+        
+        # Drop problematic columns
+        if cols_to_drop:
+            if verbose:
+                print(f"   {Colors.WARNING}⚠️  Dropping problematic columns: {cols_to_drop}{Colors.ENDC}")
+            df_clean = df_clean.drop(columns=cols_to_drop)
+        
+        # Ensure the DataFrame is not empty after cleaning
+        if df_clean.empty:
+            # Create a minimal DataFrame with at least one column
+            df_clean = pd.DataFrame({'placeholder': [''] * len(df)})
         
         return df_clean
     
@@ -2318,15 +2384,66 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
         print(f"   {Colors.BLUE}🔧 Creating SnapATAC2 AnnData object...{Colors.ENDC}")
     
     try:
+        # Log the cleaned data types for debugging
+        if verbose:
+            print(f"   {Colors.BLUE}📋 Data summary before SnapATAC2 creation:{Colors.ENDC}")
+            print(f"      X: {type(X_clean)} {X_clean.shape if X_clean is not None else 'None'}")
+            print(f"      obs: {type(obs_clean)} {obs_clean.shape if obs_clean is not None else 'None'}")
+            print(f"      var: {type(var_clean)} {var_clean.shape if var_clean is not None else 'None'}")
+            if obs_clean is not None and not obs_clean.empty:
+                print(f"      obs columns: {list(obs_clean.columns)}")
+                print(f"      obs dtypes: {dict(obs_clean.dtypes)}")
+            if var_clean is not None and not var_clean.empty:
+                print(f"      var columns: {list(var_clean.columns)}")
+                print(f"      var dtypes: {dict(var_clean.dtypes)}")
+        
+        # Create SnapATAC2 AnnData step by step to isolate issues
+        # First create with minimal data, then add others
+        if verbose:
+            print(f"   {Colors.BLUE}🔧 Creating SnapATAC2 with basic data first...{Colors.ENDC}")
+        
+        # Create with minimal required data first
         adata_snap = snap.AnnData(
             filename=output_file,
             X=X_clean,
-            obs=obs_clean,
-            var=var_clean,
-            obsm=obsm_clean if obsm_clean else None,
-            varm=varm_clean if varm_clean else None,
-            uns=uns_clean if uns_clean else None,
         )
+        
+        # Add obs and var separately if they exist
+        if obs_clean is not None and not obs_clean.empty:
+            if verbose:
+                print(f"   {Colors.BLUE}📊 Adding obs data...{Colors.ENDC}")
+            # Make sure obs data is completely clean
+            for col in obs_clean.columns:
+                if obs_clean[col].dtype == 'object':
+                    obs_clean[col] = obs_clean[col].astype(str)
+                elif pd.api.types.is_categorical_dtype(obs_clean[col]):
+                    # Convert categorical to string to avoid issues
+                    obs_clean[col] = obs_clean[col].astype(str)
+            # Create new SnapATAC2 with obs data
+            adata_snap.close()
+            adata_snap = snap.AnnData(
+                filename=output_file,
+                X=X_clean,
+                obs=obs_clean,
+            )
+        
+        if var_clean is not None and not var_clean.empty:
+            if verbose:
+                print(f"   {Colors.BLUE}📊 Adding var data...{Colors.ENDC}")
+            # Make sure var data is completely clean
+            for col in var_clean.columns:
+                if var_clean[col].dtype == 'object':
+                    var_clean[col] = var_clean[col].astype(str)
+                elif pd.api.types.is_categorical_dtype(var_clean[col]):
+                    var_clean[col] = var_clean[col].astype(str)
+            # Recreate with both obs and var
+            adata_snap.close()
+            adata_snap = snap.AnnData(
+                filename=output_file,
+                X=X_clean,
+                obs=obs_clean,
+                var=var_clean,
+            )
         
         # Set obs_names and var_names explicitly
         if verbose:
