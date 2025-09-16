@@ -939,7 +939,7 @@ def plot_link(ad, ymat, old_id, basis='tsne', ax=None, line_color='#ffa500', lin
                     fontsize=legend_fontsize)
 
     df = ymat.copy()
-    df = df.where(np.triu(np.ones(df.shape)).astype(np.bool))
+    df = df.where(np.triu(np.ones(df.shape)).astype(bool))
     df = df.stack().reset_index()
     df.columns = ['i', 'j', 'val']
     for k in np.arange(df.shape[0]):
