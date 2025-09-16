@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 try:
     from . import build_graph
+from .core import summarize_by_soft_SEACell, summarize_by_SEACell
 except ImportError:
     import build_graph
 
@@ -764,3 +765,35 @@ class SEACellsCPU:
         labels = self.get_hard_assignments()
         labels.to_csv(outdir + "/SEACells.csv")
         return None
+
+    def predicted(self, method='soft', celltype_label='celltype',
+                  summarize_layer='raw', minimum_weight=0.05):
+        """Generate metacell summary from trained SEACells model.
+        
+        Arguments:
+            method (str): Summarization method - 'soft' or 'hard' (default: 'soft')
+            celltype_label (str): Key in adata.obs containing cell type information (default: 'celltype')
+            summarize_layer (str): Layer to summarize for gene expression (default: 'raw')
+            minimum_weight (float): Minimum weight threshold for soft assignment (default: 0.05)
+            
+        Returns:
+            AnnData: Metacell AnnData object with summarized gene expression
+        """
+        if method == 'soft':
+            if not hasattr(self, 'A_') or self.A_ is None:
+                raise RuntimeError("Model has not been fitted. Run .fit() first.")
+            ad = summarize_by_soft_SEACell(self.ad, self.A_, 
+                                          celltype_label=celltype_label,
+                                          summarize_layer=summarize_layer, 
+                                          minimum_weight=minimum_weight)
+        elif method == 'hard':
+            if 'SEACell' not in self.ad.obs.columns:
+                raise RuntimeError("SEACell assignments not found. Run .fit() first.")
+            ad = summarize_by_SEACell(self.ad, 
+                                    SEACells_label='SEACell', 
+                                    summarize_layer=summarize_layer,
+                                    celltype_label=celltype_label)
+        else:
+            raise ValueError(f"Method must be 'soft' or 'hard', not {method}")
+        
+        return ad
