@@ -79,7 +79,7 @@ def embedding_atlas(adata,basis,color,
         img = tf.shade(tf.spread(agg,px=0),color_key=[color_key[i] for i in df['label'].cat.categories], 
                        how='eq_hist')
     elif (type(labels[0]) is int) or (type(labels[0]) is float) or (type(labels[0]) is np.float32)\
-    or (type(labels[0]) is np.float64) or (type(labels[0]) is np.int):
+    or (type(labels[0]) is np.float64) or (type(labels[0]) is np.int64):
         # 聚合数据
         agg = cvs.points(df, 'x', 'y',ds.mean('label'),
                         )

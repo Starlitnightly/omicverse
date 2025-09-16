@@ -134,7 +134,7 @@ def adjacency_split_naive(A, p_val, neg_mul=1, max_num_val=None):
     candidate_zeros = np.random.choice(np.arange(num_nodes, dtype=np.int32),
                                        size=(2 * num_val_nonedges, 2), replace=True)
     cne1, cne2 = candidate_zeros[:, 0], candidate_zeros[:, 1]
-    to_keep = (1 - A[cne1, cne2]).astype(np.bool).A1
+    to_keep = (1 - A[cne1, cne2]).astype(bool).A1
     val_zeros = candidate_zeros[to_keep][:num_val_nonedges]
     if to_keep.sum() < num_val_nonedges:
         raise ValueError("Couldn't produce enough non-edges")
