@@ -188,7 +188,7 @@ class GASTON(object):
             sc.pp.normalize_total(adata, inplace=False)["X"]
         )
 
-        theta=np.Inf
+        theta=np.inf
         sc.experimental.pp.normalize_pearson_residuals(adata, clip=clip, theta=theta)
         sc.pp.pca(adata, n_comps=num_dims)
         A=adata.obsm['X_pca']

@@ -8,7 +8,7 @@ import torch.nn as nn
 from .neural_net import get_loss
 
 # def process_files(output_folder):
-#     smallest_loss = np.Inf
+#     smallest_loss = np.inf
 #     best_model_folder_path = None
 #     best_mod=None
 
