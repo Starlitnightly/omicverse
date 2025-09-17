@@ -11,7 +11,7 @@ import gzip
 import os
 
 import numpy as np
-from numpy import asarray,arange,minimum,abs,mat,sum,power,mean,array,std,log2,log10
+from numpy import asarray,arange,minimum,abs,sum,power,mean,array,std,log2,log10
 import pandas as pd
 from pandas import DataFrame,read_csv,ExcelWriter
 from pickle import dump,load
@@ -848,6 +848,7 @@ class Annotator(object):
         """format the cell_deg_matrix and calculate the zscore of certain cell types."""
 
         #filter gene expressed matrix according to the markers
+        from numpy import mat
         gene_exps = exps.loc[:,[fid,ltitle]][exps[fid].isin(colnames)]
 
         gene_matrix = mat(gene_exps.sort_values(fid)[ltitle]).T

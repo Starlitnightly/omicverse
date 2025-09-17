@@ -624,7 +624,7 @@ class Sigma_Node_base(Node):
         # optimise hyperparamters of GP
         for k in range(K):
             best_zeta = -1
-            best_elbo = -np.Inf
+            best_elbo = -np.inf
 
             # set initial values for optimization
             if self.model_groups:
@@ -1193,7 +1193,7 @@ class Sigma_Node_warping(Sigma_Node_base):
 #
 #                 best_i = -1
 #                 best_zeta = -1
-#                 best_elbo = -np.Inf
+#                 best_elbo = -np.inf
 #
 #                 # set initial values for optimization
 #                 ZE = copy.deepcopy(var.getExpectation())

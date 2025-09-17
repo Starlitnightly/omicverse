@@ -2,7 +2,7 @@ import numpy as np
 
 
 def uot(mu, nu, c, epsilon,
-         niter=50, tau=-0.5, verb = 1, rho = np.Inf, stopThr= 1E-7):
+         niter=50, tau=-0.5, verb = 1, rho = np.inf, stopThr= 1E-7):
 
     lmbda = rho / ( rho + epsilon )
     if np.isinf(rho): lmbda = 1
@@ -46,7 +46,7 @@ def uot(mu, nu, c, epsilon,
     return gamma
 
 def usot(mu, nu, c, c1, c2, alpha, epsilon = 0.1,
-         niter = 10, gw_loss = 'square', rho = np.Inf):
+         niter = 10, gw_loss = 'square', rho = np.inf):
     import ot
     mu = np.asarray(mu, float).reshape(-1,1)
     nu = np.asarray(nu, float).reshape(-1,1)
@@ -105,7 +105,7 @@ def M(u,v,H1,H2,c,epsilon):
 
 
 def main():
-    print(uot([0.5,0.5],[0.5,0.5],np.array([[0.0,1.0],[1.0,0.0]]),0.1,rho=np.Inf))
+    print(uot([0.5,0.5],[0.5,0.5],np.array([[0.0,1.0],[1.0,0.0]]),0.1,rho=np.inf))
     a = np.ones(3)/3.0; b = a
     c = np.array([[1,4,4],[4,1,4],[4,4,1]], float)
     c1 = np.array([[0,10,0],[10,0,1],[0,1,0]], float)

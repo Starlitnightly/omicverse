@@ -1059,7 +1059,7 @@ def make_heap(n_points, size):
         (3, int(n_points), int(size)), dtype=np.float64
     )
     result[0] = -1
-    result[1] = np.infty
+    result[1] = np.inf
     result[2] = 0
 
     return result

@@ -161,7 +161,7 @@ class GNTD():
         
         pbar = tqdm(range(self.max_epoch))
         
-        best_mse = np.Inf
+        best_mse = np.inf
         for epoch in pbar:
             
             pbar.set_description(f"epoch {epoch+1}")

@@ -46,7 +46,7 @@ def get_top_pearson_residuals(num_pcs, counts_mat, coords_mat, gene_labels=None,
         sc.pp.normalize_total(adata, inplace=False)["X"]
     )
     
-    theta=np.Inf
+    theta=np.inf
     sc.experimental.pp.normalize_pearson_residuals(adata, clip=clip, theta=theta)
     sc.pp.pca(adata, n_comps=num_pcs)
     return adata.obsm['X_pca']
