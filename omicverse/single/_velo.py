@@ -49,12 +49,14 @@ class Velo:
         else:
             raise ValueError(f"Backend {backend} not supported")
     
+    
     def cal_velocity(
         self,
         method='dynamo',
         batch_key=None,
         celltype_key=None,
         velocity_key='velocity_S',
+        n_jobs=1,
         n_top_genes=2000,
         param_name_key='tmp/latentvelo_params',
         latentvelo_VAE_kwargs={},
@@ -70,64 +72,166 @@ class Velo:
             import scvelo as scv 
             scv.tl.velocity(self.adata,**kwargs)
             self.adata.layers[velocity_key] = self.adata.layers['velocity']
+            self.adata.var[f'{velocity_key}_genes']=self.adata.var['velocity_genes']
 
         elif method == 'latentvelo':
-            import os
-            os.makedirs(param_name_key, exist_ok=True)
-            # latentvelo
-            from ..external.latentvelo.models.vae_model import VAE
-            from ..external.latentvelo.models.annot_vae_model import AnnotVAE
-            from ..external.latentvelo.train import train
-            from ..external.latentvelo.utils import standard_clean_recipe, anvi_clean_recipe
-            # Optional device override for latentvelo stack
-            device_override = kwargs.pop('device', None)
-            if device_override is not None:
-                from ..external.latentvelo import trainer as lv_trainer
-                from ..external.latentvelo import trainer_anvi as lv_trainer_anvi
-                from ..external.latentvelo import trainer_atac as lv_trainer_atac
-                from ..external.latentvelo import output_results as lv_out_mod
-                from ..external.latentvelo import utils as lv_utils
-                for m in (lv_trainer, lv_trainer_anvi, lv_trainer_atac, lv_out_mod, lv_utils):
-                    if hasattr(m, 'set_device'):
-                        m.set_device(device_override)
+            self._latentvelo_cal(
+                velocity_key=velocity_key,
+                celltype_key=celltype_key,
+                batch_key=batch_key,
+                latentvelo_VAE_kwargs=latentvelo_VAE_kwargs,
+                param_name_key=param_name_key,
+                **kwargs
+            )
+        elif method == 'graphvelo':
+            dynamo_flag = False
+            try:
+                import dynamo as dyn 
+                dyn.tl.neighbors(self.adata)
+                dyn.tl.cell_velocities(self.adata,**kwargs)
+                #self.adata.var[f'{velocity_key}_genes']=self.adata.var['use_for_transition']
+                self._graphvelo_cal(backend='dynamo',xkey='Ms',vkey='velocity_S',n_jobs=n_jobs,**kwargs)
+                dynamo_flag = True
+            except:
+                print(f"{Colors.WARNING}dynamo run failed.{Colors.ENDC}")
+            if dynamo_flag==False:
+                try:
+                    import scvelo as scv
+                    scv.tl.velocity(self.adata,**kwargs)
+                    #self.adata.layers[velocity_key] = self.adata.layers['velocity']
+                    #self.adata.var[f'{velocity_key}_genes']=self.adata.var['velocity_genes']
 
-            # Shared preprocessing
-            if celltype_key == None:
-                self.adata = standard_clean_recipe(self.adata, batch_key=batch_key, 
-                            celltype_key=celltype_key, r2_adjust=True,)
-
-                self.model = VAE(**latentvelo_VAE_kwargs)
-                epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
-            else:
-                self.adata=anvi_clean_recipe(self.adata, celltype_key=celltype_key,
-                            batch_key=batch_key,r2_adjust=True,)
-                self.model = AnnotVAE(**latentvelo_VAE_kwargs)
-                epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
-            self.adata.uns['latentvelo_train_params'] = {
-                        'epochs': epochs,
-                        'vae': vae,
-                        'val_traj': val_traj
-                    }
-            from ..external.latentvelo.output_results import output_results as lv_output
-            latent_data, adta = lv_output(self.model,self.adata,gene_velocity=True,)
-            self.adata.var[f'{velocity_key}_genes'] = self.adata.var['velocity_genes']
-            #covert to csr
-            import scipy as sp
-            if not issparse(adta.layers['velo_s']):
-                self.adata.layers['velocity_S'] = sp.sparse.csr_matrix(adta.layers['velo_s'])
-            else:
-                self.adata.layers['velocity_S'] = adta.layers['velo_s']
-            if not issparse(adta.layers['velo_u']):
-                self.adata.layers['velocity_U'] = sp.sparse.csr_matrix(adta.layers['velo_u'])
-            else:
-                self.adata.layers['velocity_U'] = adta.layers['velo_u']
-            self.adata.obsm['X_latentvelo'] = latent_data.X
-            self.adata.obsm['X_latentvelo_velo_s'] = latent_data.layers['spliced_velocity']
-            self.adata.obsm['X_latentvelo_velo_u'] = latent_data.layers['unspliced_velocity']
+                    self._graphvelo_cal(backend='scvelo',xkey='Ms',vkey='velocity',
+                    n_jobs=n_jobs,**kwargs)
+                except:
+                    print(f"{Colors.WARNING}scvelo run failed.{Colors.ENDC}")
+                    raise ValueError("scvelo also run failed.")
+            
+            
 
 
         else:
             raise ValueError(f"Method {method} not supported")
+
+    def graphvelo(
+        self,xkey='Ms',vkey='velocity_S',
+        n_jobs=1,
+        basis_keys=['X_umap','X_pca'],
+        gene_subset=None,
+        **kwargs
+    ):
+        from ..external.graphvelo.graph_velocity import GraphVelo
+        from ..external.graphvelo.utils import adj_to_knn
+        indices, _ = adj_to_knn(self.adata.obsp['connectivities'])
+        self.adata.uns['neighbors']['indices'] = indices
+        gv=GraphVelo(self.adata, xkey=xkey, vkey=vkey,gene_subset=gene_subset,**kwargs)
+        gv.train(n_jobs=n_jobs)
+        self.adata.layers['velocity_gv'] = gv.project_velocity(self.adata.layers[xkey])
+
+        self.adata.var['velocity_gv_genes']=False
+        self.adata.var['velocity_gv_genes']=self.adata.var.loc[gene_subset,'velocity_gv_genes']=True
+        if issparse(self.adata.layers['velocity_gv']):
+            self.adata.layers['velocity_gv'] = self.adata.layers['velocity_gv'].toarray()
+        for basis_key in basis_keys:
+            self.adata.obsm[f'gv_{basis_key}'] = gv.project_velocity(self.adata.obsm[basis_key])
+
+
+
+    def velocity_graph(self,basis='umap',vkey='velocity_S',**kwargs):
+        import scvelo as scv
+        scv.tl.velocity_graph(self.adata, vkey=vkey, **kwargs)
+    
+    def velocity_embedding(self,basis='umap',vkey='velocity_S',**kwargs):   
+        import scvelo as scv
+        scv.tl.velocity_embedding(self.adata, basis=basis, vkey=vkey, **kwargs)
+        #return self.adata
+
+
+    def _graphvelo_cal(self,backend='dynamo',xkey='Ms',vkey='velocity_S',n_jobs=1,**kwargs):
+        from ..external.graphvelo.graph_velocity import GraphVelo
+        from ..external.graphvelo.utils import mack_score, adj_to_knn
+        if backend == 'dynamo':
+            gv=GraphVelo(self.adata, xkey=xkey, vkey=vkey,**kwargs)
+            gv.train(n_jobs=n_jobs)
+        elif backend == 'scvelo':
+            indices, _ = adj_to_knn(self.adata.obsp['connectivities'])
+            self.adata.uns['neighbors']['indices'] = indices
+            gene_subset=self.adata.var.loc[self.adata.var['velocity_genes']].index.tolist()
+            gv=GraphVelo(self.adata, xkey=xkey, vkey=vkey,gene_subset=gene_subset,**kwargs)
+            gv.train(n_jobs=n_jobs)
+        else:
+            raise ValueError(f"Backend {backend} not supported")
+        
+        self.adata.layers[vkey] = gv.project_velocity(self.adata.layers['M_s'])
+        self.adata.obsm['gv_pca'] = gv.project_velocity(self.adata.obsm['X_pca'])
+        self.adata.obsm['gv_umap'] = gv.project_velocity(self.adata.obsm['X_umap'])
+
+
+    def _latentvelo_cal(
+        self,param_name_key='tmp/latentvelo_params',
+        velocity_key='velocity_S',
+        celltype_key=None,
+        batch_key=None,
+        latentvelo_VAE_kwargs={},
+        **kwargs):
+        try:
+            import torchdiffeq
+        except:
+            print(f"{Colors.WARNING}torchdiffeq not installed, please install it with 'pip install torchdiffeq'.{Colors.ENDC}")
+            raise ValueError("torchdiffeq not installed")
+        import os
+        os.makedirs(param_name_key, exist_ok=True)
+        # latentvelo
+        from ..external.latentvelo.models.vae_model import VAE
+        from ..external.latentvelo.models.annot_vae_model import AnnotVAE
+        from ..external.latentvelo.train import train
+        from ..external.latentvelo.utils import standard_clean_recipe, anvi_clean_recipe
+        # Optional device override for latentvelo stack
+        device_override = kwargs.pop('device', None)
+        if device_override is not None:
+            from ..external.latentvelo import trainer as lv_trainer
+            from ..external.latentvelo import trainer_anvi as lv_trainer_anvi
+            from ..external.latentvelo import trainer_atac as lv_trainer_atac
+            from ..external.latentvelo import output_results as lv_out_mod
+            from ..external.latentvelo import utils as lv_utils
+            for m in (lv_trainer, lv_trainer_anvi, lv_trainer_atac, lv_out_mod, lv_utils):
+                if hasattr(m, 'set_device'):
+                    m.set_device(device_override)
+
+        # Shared preprocessing
+        if celltype_key == None:
+            self.adata = standard_clean_recipe(self.adata, batch_key=batch_key, 
+                        celltype_key=celltype_key, r2_adjust=True,)
+
+            self.model = VAE(**latentvelo_VAE_kwargs)
+            epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
+        else:
+            self.adata=anvi_clean_recipe(self.adata, celltype_key=celltype_key,
+                        batch_key=batch_key,r2_adjust=True,)
+            self.model = AnnotVAE(**latentvelo_VAE_kwargs)
+            epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
+        self.adata.uns['latentvelo_train_params'] = {
+                    'epochs': epochs,
+                    'vae': vae,
+                    'val_traj': val_traj
+                }
+        from ..external.latentvelo.output_results import output_results as lv_output
+        latent_data, adta = lv_output(self.model,self.adata,gene_velocity=True,)
+        self.adata.var[f'{velocity_key}_genes'] = self.adata.var['velocity_genes']
+        #covert to csr
+        import scipy as sp
+        if not issparse(adta.layers['velo_s']):
+            self.adata.layers['velocity_S'] = sp.sparse.csr_matrix(adta.layers['velo_s'])
+        else:
+            self.adata.layers['velocity_S'] = adta.layers['velo_s']
+        if not issparse(adta.layers['velo_u']):
+            self.adata.layers['velocity_U'] = sp.sparse.csr_matrix(adta.layers['velo_u'])
+        else:
+            self.adata.layers['velocity_U'] = adta.layers['velo_u']
+        self.adata.obsm['X_latentvelo'] = latent_data.X
+        self.adata.obsm['X_latentvelo_velo_s'] = latent_data.layers['spliced_velocity']
+        self.adata.obsm['X_latentvelo_velo_u'] = latent_data.layers['unspliced_velocity']
+
     
 
 

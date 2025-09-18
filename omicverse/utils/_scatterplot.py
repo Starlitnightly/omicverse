@@ -23,7 +23,8 @@ from anndata import AnnData
 from cycler import Cycler
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from pandas.api.types import is_categorical_dtype
+# Removed deprecated is_categorical_dtype import
+# Using isinstance(dtype, pd.CategoricalDtype) instead
 from matplotlib import pyplot as pl, colors, colormaps
 from matplotlib import rcParams
 from matplotlib import patheffects
@@ -1277,7 +1278,7 @@ def _get_color_source_vector(
             raise KeyError(f"Could not find '{value_to_plot}' in adata.obs or adata.var_names")
 
     # 🔧 修改：只对真正的字符串/对象数据转为分类，避免误转数值型基因表达数据
-    if not is_categorical_dtype(values):
+    if not isinstance(values.dtype, pd.CategoricalDtype):
         arr = np.asarray(values)
         # 只有当数据是字符串类型且有重复值时才转为分类
         if arr.dtype.kind in ("U", "S", "O"):                  # 字符串/对象
@@ -1286,7 +1287,7 @@ def _get_color_source_vector(
                 values = pd.Categorical(arr)
         # 对于数值型数据（基因表达），保持原样不转为分类
             
-    if groups and is_categorical_dtype(values):
+    if groups and isinstance(values.dtype, pd.CategoricalDtype):
         values = values.remove_categories(values.categories.difference(groups))
     return values
 
@@ -1337,7 +1338,7 @@ def _get_palette(adata, values_key: str, palette=None):
             pl = None
 
         if s.__class__.__module__.startswith("pandas"):
-            if pd.api.types.is_categorical_dtype(s):
+            if isinstance(s.dtype, pd.CategoricalDtype):
                 cats = [str(x) for x in s.cat.categories]
                 return pd.Categorical(pd.Series(s).astype(str), categories=cats)
             if getattr(s, "dtype", None) == bool:
@@ -1495,7 +1496,7 @@ def _color_vector(
     to_hex = partial(colors.to_hex, keep_alpha=True)
     if values_key is None:
         return np.broadcast_to(to_hex(na_color), adata.n_obs), False
-    if is_categorical_dtype(values) or values.dtype == bool:
+    if isinstance(values.dtype, pd.CategoricalDtype) or values.dtype == bool:
         if values.dtype == bool:
             values = pd.Categorical(values.astype(str))
         color_map = {
@@ -1511,7 +1512,7 @@ def _color_vector(
             color_vector = color_vector.add_categories([to_hex(na_color)])
             color_vector = color_vector.fillna(to_hex(na_color))
         return color_vector, True
-    elif not is_categorical_dtype(values):
+    elif not isinstance(values.dtype, pd.CategoricalDtype):
         return values, False
 
 
@@ -1770,7 +1771,7 @@ def _obs_categories_ordered(adata, key) -> list[str]:
 
     # pandas.Series
     if s.__class__.__module__.startswith("pandas"):
-        if pd.api.types.is_categorical_dtype(s):
+        if isinstance(s.dtype, pd.CategoricalDtype):
             cats = list(s.cat.categories)
         else:
             cats = list(pd.unique(pd.Series(s, dtype="string")))

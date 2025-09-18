@@ -71,6 +71,7 @@ from ._sude import sude
 
 from ._qc import qc,filter_cells,filter_genes
 from ._recover import recover_counts,binary_search
+from ._normalization import log1p
 
 __all__ = [
     # Core preprocessing
@@ -84,6 +85,7 @@ __all__ = [
     'scale',
     'regress',
     'regress_and_scale',
+
     
     # Dimensionality reduction
     'pca',
@@ -109,4 +111,5 @@ __all__ = [
     'anndata_to_CPU',
     'recover_counts',
     'binary_search',
+    'log1p',
 ]
