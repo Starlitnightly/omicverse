@@ -600,6 +600,7 @@ Optimated the plot effect of `ov.pl.violin`
 Implemented lazy loading system that reduces `import omicverse` time by **40%** (from ~7.8s to ~4.7s).
 Added GPU-accelerated PCA support for Apple Silicon (MLX) and CUDA (TorchDR) devices.
 Introduced Smart Agent System with natural language processing for 50+ AI models from 8 providers.
+Added and fixed the `anndata-rs` to support million size's datasets (#336)
 
 ### PP Module
 - Added GPU-accelerated PCA in `ov.pp.pca()` with MLX support for Apple Silicon MPS devices
@@ -624,10 +625,6 @@ Introduced Smart Agent System with natural language processing for 50+ AI models
 - Added function registry system with multi-language aliases
 - Added smart API key management and provider-specific configuration
 
-### Performance Optimization
-- Added lazy loading system with `LazyLoader` and `LazyAttribute` classes
-- Added deferred loading for heavy submodules (`bulk`, `single`, `pl`, `llm`, etc.)
-- Added lazy loading for heavy libraries (`matplotlib.pyplot`, `numpy`, `pandas`)
-- Maintained full backward compatibility with existing code
+
 
 

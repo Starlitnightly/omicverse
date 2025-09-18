@@ -2,7 +2,7 @@ dist
 build
 .ipynb_checkpoints
 tutorial
-models
+#models
 .DS_Store
 omicverse.egg-info
 aliyun_analytics_server/
