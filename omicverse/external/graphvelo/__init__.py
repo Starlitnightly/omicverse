@@ -5,4 +5,4 @@ from .gam import *
 from .plot import *
 from .utils import *
 
-import graphvelo.plot as pl
+#import graphvelo.plot as pl

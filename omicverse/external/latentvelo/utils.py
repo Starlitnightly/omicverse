@@ -10,6 +10,10 @@ import anndata as ad
 import gc
 from .velocity_genes import compute_velocity_genes
 
+from ...pp import umap,pca,neighbors,scale
+
+from ...pp._normalization import log1p
+
 # Detect device - use CUDA if available, otherwise use CPU
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
@@ -264,9 +268,10 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
         adata.layers['mask_unspliced'] = ((np.array(U) > 0) | (np.array(S) > 0)).astype(np.int8)
     
     if log:
-        scv.pp.log1p(adata)
+        log1p(adata)
     
-    sc.pp.pca(adata)
+    scale(adata)
+    pca(adata,layer='scaled')
     
     adata.layers['spliced'] = adata.layers[spliced_key]
     adata.layers['unspliced'] = adata.layers[unspliced_key]
@@ -275,7 +280,7 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
     #    import scanpy.external as sce
     #    sce.pp.bbknn(adata, batch_key=batch_key, local_connectivity=6)
     #else:
-    scv.pp.neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
+    neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
     scv.pp.moments(adata, n_pcs=None, n_neighbors=None)
     adata.obsp['adj'] = adata.obsp['connectivities']
     
@@ -283,7 +288,7 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
     
     if umap:
         print('computing UMAP')
-        sc.tl.umap(adata)
+        umap(adata)
     
     if smooth:
         # compute per-gene scales; handle sparse Ms/Mu without densifying
@@ -472,9 +477,10 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
     adata.layers['mask_unspliced'] = np.array((adata.layers[unspliced_key] > 0) + (adata.layers[spliced_key] > 0))*1 # + 
     
     if log:
-        scv.pp.log1p(adata)
+        log1p(adata)
     
-    sc.pp.pca(adata)
+    scale(adata)
+    pca(adata,layer='scaled')
     
     adata.layers['spliced'] = adata.layers[spliced_key]
     adata.layers['unspliced'] = adata.layers[unspliced_key]
@@ -483,7 +489,7 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         import scanpy.external as sce
         sce.pp.bbknn(adata, batch_key=batch_key, local_connectivity=6)
     else:
-        scv.pp.neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
+        neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
     scv.pp.moments(adata, n_pcs=None, n_neighbors=None)
     adata.obsp['adj'] = adata.obsp['connectivities']
     
@@ -491,7 +497,7 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
     
     if umap:
         print('computing UMAP')
-        sc.tl.umap(adata)
+        umap(adata)
     
     if smooth:
         adata.uns['scale_spliced'] = 4*(1+np.std(adata.layers['Ms'], axis=0)[None])
@@ -629,16 +635,17 @@ def atac_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
     adata.layers['mask_unspliced'] = ((adata.layers[unspliced_key] > 0))*1
     
     if log:
-        scv.pp.log1p(adata)
+        log1p(adata)
     
-    sc.pp.pca(adata)
+    scale(adata)
+    pca(adata,layer='scaled')
 
     adata.obsp['adj'] = adata.obsp['connectivities']
     
     adata.layers['spliced'] = adata.layers[spliced_key]
     adata.layers['unspliced'] = adata.layers[unspliced_key]
     
-    scv.pp.neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
+    neighbors(adata, n_pcs=30, n_neighbors=n_neighbors)
     if connectivities != None:
         adata.obsp['connectivities'] = connectivities
     
@@ -647,7 +654,7 @@ def atac_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
     compute_velocity_genes(adata, n_top_genes=n_top_genes)
     
     if umap:
-        sc.tl.umap(adata)
+        umap(adata)
     
     if smooth:
         adata.uns['scale_spliced'] = 4*(1+np.std(adata.layers['Ms'], axis=0)[None])
