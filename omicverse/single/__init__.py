@@ -110,6 +110,7 @@ from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
 from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulation,plot_grn
 
+from ._velo import Velo,velocity_embedding
 
 __all__ = [
     # Core analysis functions
@@ -247,5 +248,7 @@ __all__ = [
     'build_correlation_network_umap_layout',
     'add_tf_regulation',
     'plot_grn',
+    'Velo',
+    'velocity_embedding'
 ]
 
