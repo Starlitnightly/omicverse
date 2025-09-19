@@ -240,8 +240,9 @@ class Drug_Response:
 
         self.cluster_norm_exp_df = pd.DataFrame(columns=clusters, index=self.adata.raw.var.index)
         for cluster in clusters:
-            self.cluster_norm_exp_df[cluster] =  self.adata.raw.X[self.adata.obs['louvain']==cluster].mean(axis=0).T \
-                                                 if np.sum(self.adata.raw.X[self.adata.obs['louvain']==cluster]) else 0.0
+            cluster_mask = (self.adata.obs['louvain']==cluster).values
+            self.cluster_norm_exp_df[cluster] =  self.adata.raw.X[cluster_mask].mean(axis=0).T \
+                                                 if np.sum(self.adata.raw.X[cluster_mask]) else 0.0
 
     def kernel_feature_preparartion(self):
         r"""
