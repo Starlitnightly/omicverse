@@ -453,7 +453,15 @@ def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
     else:
         kwargs["coords"] = adata.obsm["spatial"]
 
-    fig = plot_spatial_general(adata,value_df=adata.obs[color], **kwargs)  # cell abundance values
+    plot_data=pd.DataFrame()
+    for ct in color:
+        if ct in adata.obs.columns:
+            plot_data[ct] = adata.obs[ct]
+        elif ct in adata.var_names:
+            plot_data[ct] = adata[:,ct].X.flatten()
+    plot_data=plot_data.fillna(0)
+
+    fig = plot_spatial_general(adata,value_df=plot_data, **kwargs)  # cell abundance values
     fig.axes[0].set_xlim(kwargs["coords"][:,0].min(),kwargs["coords"][:,0].max())
     fig.axes[0].set_ylim(kwargs["coords"][:,1].max(),kwargs["coords"][:,1].min())
 
@@ -663,8 +671,15 @@ def add_pie_charts_to_spatial(
     if len(miss) > 0:
         raise KeyError(f"以下列在 adata.obs 中不存在：{miss}")
 
+    plot_data=pd.DataFrame()
+    for ct in cell_type_columns:
+        if ct in adata.obs.columns:
+            plot_data[ct] = adata.obs[ct]
+        elif ct in adata.var_names:
+            plot_data[ct] = adata[:,ct].X.flatten()
+    plot_data=plot_data.fillna(0)
     props_df = (
-        adata.obs[cell_type_columns]
+        plot_data
         .apply(pd.to_numeric, errors="coerce")
         .fillna(0.0)
         .astype(float)
@@ -759,8 +774,15 @@ def add_pie2spatial(
         spatial_coords=spatial_coords*adata.uns['spatial'][spatial_key]['scalefactors'][f'tissue_{img_key}_scalef']
 
 
+    plot_data=pd.DataFrame()
+    for ct in cell_type_columns:
+        if ct in adata.obs.columns:
+            plot_data[ct] = adata.obs[ct]
+        elif ct in adata.var_names:
+            plot_data[ct] = adata[:,ct].X.flatten()
+    plot_data=plot_data.fillna(0)
     props = (
-        adata.obs[cell_type_columns]
+        plot_data
         .apply(pd.to_numeric, errors="coerce")
         .fillna(0.0)
         .to_numpy(dtype=float, copy=False)

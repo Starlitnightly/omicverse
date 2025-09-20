@@ -66,8 +66,8 @@ nav:
             - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
         - Deconvolution:
             - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
-            - Mapping single-cell profile onto spatial profile: Tutorials-space/t_mapping.ipynb
-            - Deconvolution spatial transcriptomic without scRNA-seq: Tutorials-space/t_starfysh.ipynb
+            - Spatial deconvolution with reference scRNA-seq: Tutorials-space/t_decov.ipynb
+            - Spatial deconvolution without reference scRNA-seq: Tutorials-space/t_starfysh.ipynb
         - Downstream:
             - Spatial transition tensor of single cells: Tutorials-space/t_stt.ipynb
             - Spatial Communication: Tutorials-space/t_commot_flowsig.ipynb
