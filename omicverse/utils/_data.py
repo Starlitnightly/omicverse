@@ -2014,11 +2014,14 @@ class easter_egg(object):
         print('尊嘟假嘟')
 
 
-def save(file, path):
+def save(file, path,):
     """Save object to file using pickle or cloudpickle."""
     print(f"{Colors.HEADER}{Colors.BOLD}💾 Save Operation:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Target path: {Colors.BOLD}{path}{Colors.ENDC}")
     print(f"   {Colors.BLUE}Object type: {Colors.BOLD}{type(file).__name__}{Colors.ENDC}")
+
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     
     try:
         import pickle
@@ -2034,29 +2037,50 @@ def save(file, path):
         print(f"   {Colors.GREEN}✅ Successfully saved using cloudpickle!{Colors.ENDC}")
     print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
-def load(path):
+def load(path,backend=None):
     """Load object from file using pickle or cloudpickle."""
     print(f"{Colors.HEADER}{Colors.BOLD}📂 Load Operation:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Source path: {Colors.BOLD}{path}{Colors.ENDC}")
-    
-    try:
-        import pickle
-        print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
-        with open(path, 'rb') as f:
-            data = pickle.load(f)
-        print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
-        print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-        return data
-    except:
-        import cloudpickle
-        print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
-        with open(path, 'rb') as f:
-            data = cloudpickle.load(f)
-        print(f"   {Colors.GREEN}✅ Successfully loaded using cloudpickle!{Colors.ENDC}")
-        print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-        return data
+    if backend is None:
+        try:
+            import pickle
+            print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
+            with open(path, 'rb') as f:
+                data = pickle.load(f)
+            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
+            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            return data
+        except:
+            import cloudpickle
+            print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
+            with open(path, 'rb') as f:
+                data = cloudpickle.load(f)
+            print(f"   {Colors.GREEN}✅ Successfully loaded using cloudpickle!{Colors.ENDC}")
+            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            return data
+    else:
+        if backend=='pickle':
+            import pickle
+            print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
+            with open(path, 'rb') as f:
+                data = pickle.load(f)
+            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
+            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            return data
+        elif backend=='cloudpickle':
+            import cloudpickle
+            print(f"   {Colors.GREEN}Using: {Colors.BOLD}cloudpickle{Colors.ENDC}")
+            with open(path, 'rb') as f:
+                data = cloudpickle.load(f)
+            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
+            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            return data
+        else:
+            raise ValueError(f"Invalid backend: {backend}")
 
 
 import os

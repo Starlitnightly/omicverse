@@ -65,6 +65,7 @@ from ._cast import CAST
 from ._tools import *
 from ._gaston import GASTON
 from ._commot import create_communication_anndata,update_classification_from_database
+from ._deconvolution import Deconvolution
 
 
 __all__ = [
@@ -94,4 +95,7 @@ __all__ = [
     # Utility functions (imported from _tools)
     'create_communication_anndata',
     'update_classification_from_database',
+
+    # Spatial deconvolution
+    'Deconvolution',
 ]

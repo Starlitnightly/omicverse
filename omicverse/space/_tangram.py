@@ -155,6 +155,7 @@ class Tangram(object):
         if tg_install==True:
             global_imports("tangram","tg")
         ad_map_dict={}
+        import tangram as tg
 
         adata_sc.uns['log1p']={}
         adata_sc.uns['log1p']['base']=None
@@ -217,6 +218,7 @@ class Tangram(object):
             - Progress is shown during training
             - GPU acceleration recommended for large datasets
         """
+        import tangram as tg
         ad_map = tg.map_cells_to_space(self.adata_sc, self.adata_sp,
             mode=mode,
             cluster_label=self.clusters,
@@ -224,6 +226,7 @@ class Tangram(object):
             device=device,
             **kwargs
         )
+        print(ad_map)
 
         tg.project_cell_annotations(ad_map, self.adata_sp, annotation=self.clusters)
         self.ad_map=ad_map
@@ -297,6 +300,8 @@ class Tangram(object):
             - Useful for analyzing spatial patterns of any gene
             - Computationally intensive for large gene sets
         """
+        import tangram as tg
+
         if ad_map is None:
             ad_map=self.ad_map
         if ad_sc is None:
