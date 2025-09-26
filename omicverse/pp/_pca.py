@@ -144,6 +144,66 @@ CSCBase = sparse.csc_matrix | sparse.csc_array  # noqa: TID251
 CSBase = _CSArray | _CSMatrix
 
 
+# Helper utilities for cross-backend dtype and array handling
+def _normalize_to_numpy_dtype(dt):
+    """Normalize a dtype-like (including torch.dtype) to a NumPy dtype.
+
+    Accepts strings, NumPy dtypes, and torch.dtypes. Falls back to float32.
+    """
+    import numpy as _np
+    try:  # Handle torch dtypes if torch is available
+        import torch as _torch  # type: ignore
+        torch_map = {
+            _torch.float32: _np.float32,
+            _torch.float64: _np.float64,
+            _torch.float16: _np.float16,
+            # Map bfloat16 to float32 for safety if NumPy bfloat16 not available
+            getattr(_torch, "bfloat16", None): getattr(_np, "bfloat16", _np.float32),
+            _torch.int64: _np.int64,
+            _torch.int32: _np.int32,
+            _torch.int16: _np.int16,
+            _torch.int8: _np.int8,
+            _torch.uint8: _np.uint8,
+            _torch.bool: _np.bool_,
+        }
+        if isinstance(dt, _torch.dtype):
+            mapped = torch_map.get(dt)
+            return _np.dtype(mapped if mapped is not None else _np.float32)
+    except Exception:
+        pass
+    # Fall back to NumPy's dtype constructor
+    try:
+        return _np.dtype(dt)
+    except Exception:
+        return _np.dtype(_np.float32)
+
+
+def _ensure_numpy_array(x):
+    """Convert known GPU/accelerator array types (torch, cupy) to NumPy.
+
+    Leaves NumPy arrays, SciPy sparse, and Dask arrays untouched.
+    """
+    # SciPy sparse should be left as-is
+    if sparse.issparse(x):
+        return x
+    # Try torch tensors
+    try:
+        import torch  # type: ignore
+        if isinstance(x, torch.Tensor):
+            return x.detach().cpu().numpy()
+    except Exception:
+        pass
+    # Try CuPy arrays
+    try:
+        import cupy as cp  # type: ignore
+        if isinstance(x, cp.ndarray):
+            return cp.asnumpy(x)
+    except Exception:
+        pass
+    # Default: return as-is
+    return x
+
+
 @_doc_params(
     mask_var_hvg=doc_mask_var_hvg,
 )
@@ -615,8 +675,14 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         )
         X_pca = pca_.fit_transform(X)
 
-    if X_pca.dtype.descr != np.dtype(dtype).descr:
-        X_pca = X_pca.astype(dtype)
+    # Ensure X_pca is a NumPy array (or sparse) before dtype checks
+    X_pca = _ensure_numpy_array(X_pca)
+
+    # Normalize target dtype and cast if needed
+    target_dtype = _normalize_to_numpy_dtype(dtype)
+    # Use np.asarray to handle cases where X_pca is array-like
+    if np.asarray(X_pca).dtype != target_dtype:
+        X_pca = np.asarray(X_pca).astype(target_dtype, copy=False)
 
     if return_anndata:
         key_obsm, key_varm, key_uns = (
