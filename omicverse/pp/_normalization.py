@@ -10,7 +10,7 @@ import numpy as np
 #from fast_array_utils import stats
 
 from .._settings import settings, EMOJI, Colors
-from scanpy._compat import CSBase, CSCBase, CSRBase, DaskArray, old_positionals
+from ._compat import CSBase, CSCBase, CSRBase, DaskArray, old_positionals
 from scanpy._utils import axis_mul_or_truediv, dematrix, view_to_actual, axis_sum,is_backed_type,_check_array_function_arguments
 from scanpy.get import _get_obs_rep, _set_obs_rep
 

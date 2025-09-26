@@ -13,7 +13,7 @@ from anndata import AnnData
 #from fast_array_utils import stats
 
 from .._settings import EMOJI, Colors, settings as ov_settings
-from scanpy._compat import CSBase, DaskArray, old_positionals
+from ._compat import CSBase, DaskArray, old_positionals
 from scanpy._settings import Verbosity, settings
 from scanpy._utils import check_nonnegative_integers, sanitize_anndata
 from scanpy.get import _get_obs_rep
