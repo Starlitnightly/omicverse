@@ -61,10 +61,13 @@ from ._single2spatial import Single2Spatial
 from ._bulktrajblend import BulkTrajBlend
 from ._utils import bulk2single_plot_cellprop,bulk2single_plot_correlation
 
+from ._scsemi import scSemiProfiler
+
 __all__ = [
     'Bulk2Single',
     'Single2Spatial',
     'BulkTrajBlend',
     'bulk2single_plot_cellprop',
     'bulk2single_plot_correlation',
+    'scSemiProfiler',
 ]
