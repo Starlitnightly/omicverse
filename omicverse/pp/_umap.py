@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.utils import check_array, check_random_state
 
 from scanpy import logging as logg
-from scanpy._compat import old_positionals
+from ._compat import old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView
 from scanpy.tools._utils import _choose_representation, get_init_pos_from_paga

@@ -14,7 +14,7 @@ from scipy import sparse
 
 from scanpy import logging as logg
 from scanpy import preprocessing as pp
-from scanpy._compat import old_positionals
+from ._compat import old_positionals
 from scanpy.get import _get_obs_rep
 from scanpy.preprocessing._scrublet import pipeline
 from scanpy.preprocessing._scrublet.core import Scrublet
@@ -30,16 +30,12 @@ import pandas as pd
 from anndata import AnnData
 from scipy import sparse
 
-from scanpy import logging as logg
-from scanpy import preprocessing as pp
-from scanpy._compat import old_positionals
-from scanpy.get import _get_obs_rep
-from scanpy.preprocessing._scrublet import pipeline
-from scanpy.preprocessing._scrublet.core import Scrublet
+
+
 
 if TYPE_CHECKING:
     from typing import Literal
-    from scanpy._compat import _LegacyRandom
+    from ._compat import _LegacyRandom
     from scanpy.neighbors import _Metric, _MetricFn
 
 from ._normalization import normalize_total

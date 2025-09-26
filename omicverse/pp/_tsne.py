@@ -7,7 +7,7 @@ from datetime import datetime
 from packaging.version import Version
 
 from scanpy import logging as logg
-from scanpy._compat import old_positionals
+from ._compat import old_positionals
 from scanpy._settings import settings
 from scanpy._utils import _doc_params, raise_not_implemented_error_if_backed_type
 from scanpy.neighbors._doc import doc_n_pcs, doc_use_rep

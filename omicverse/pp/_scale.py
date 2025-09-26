@@ -12,7 +12,7 @@ from anndata import AnnData
 from ._utils import axis_mean, sparse_mean_variance_axis,_get_mean_var
 
 from scanpy import logging as logg
-from scanpy._compat import CSBase, CSCBase, CSRBase, DaskArray, njit, old_positionals
+from ._compat import CSBase, CSCBase, CSRBase, DaskArray, njit, old_positionals
 from scanpy._utils import (
     _check_array_function_arguments,
     axis_mul_or_truediv,

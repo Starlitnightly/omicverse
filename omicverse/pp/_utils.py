@@ -8,7 +8,7 @@ import numpy as np
 from scipy import sparse
 from sklearn.random_projection import sample_without_replacement
 
-from scanpy._compat import njit
+from ._compat import njit
 from scanpy._utils import _CSMatrix, axis_sum, elem_mul
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from numpy.typing import DTypeLike, NDArray
 
-    from scanpy._compat import DaskArray, _LegacyRandom
+    from ._compat import DaskArray, _LegacyRandom
     from scanpy._utils import _SupportedArray
 
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from anndata import AnnData
     from numpy.typing import NDArray
 
-    from scanpy._compat import CSBase
+    from ._compat import CSBase
 
 
 def rename_groups(

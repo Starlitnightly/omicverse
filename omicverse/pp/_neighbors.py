@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 from scanpy import _utils
 from scanpy import logging as logg
-from scanpy._compat import  old_positionals
+from ._compat import  old_positionals
 from scanpy._settings import settings
 from scanpy._utils import NeighborsView, _doc_params, get_literal_vals
 

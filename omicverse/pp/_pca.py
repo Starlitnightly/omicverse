@@ -18,7 +18,7 @@ from .._settings import EMOJI, Colors
 
 
 from scanpy import logging as logg
-from scanpy._compat import DaskArray, pkg_version
+from ._compat import DaskArray, pkg_version
 from scanpy._settings import settings
 from scanpy._utils import _doc_params, _empty, is_backed_type
 from scanpy.get import  _get_obs_rep
