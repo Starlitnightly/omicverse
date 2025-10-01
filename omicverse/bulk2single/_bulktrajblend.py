@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import anndata
-import scanpy as sc
+
 import torch
 from typing import Union
 
@@ -113,9 +113,10 @@ class BulkTrajBlend(object):
         print("......normalize the single data")
         self.single_seq.obs_names_make_unique()
         self.single_seq.var_names_make_unique()
-        sc.pp.normalize_total(self.single_seq, target_sum=target_sum)
+        from ..pp._preprocess import normalize_total,log1p
+        normalize_total(self.single_seq, target_sum=target_sum)
         print("......log1p the single data")
-        sc.pp.log1p(self.single_seq)
+        log1p(self.single_seq)
         return None
     
     def vae_configure(self,cell_target_num=None,**kwargs):
@@ -232,6 +233,7 @@ class BulkTrajBlend(object):
         Returns:
             anndata.AnnData: Generated and filtered single-cell data
         """
+        import scanpy as sc
 
         generate_adata=self.vae_model.generate()
         self.generate_adata_raw=generate_adata.copy()

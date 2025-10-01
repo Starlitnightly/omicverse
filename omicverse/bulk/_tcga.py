@@ -1,4 +1,4 @@
-import scanpy as sc
+
 import os
 import anndata
 import numpy as np
@@ -75,7 +75,8 @@ class pyTCGA(object):
             path: Path to AnnData file
         """
         print('... anndata reading')
-        self.adata=sc.read(path)
+        import anndata as ad
+        self.adata=ad.read_h5ad(path)
         
     def adata_init(self):
         self.index_init()

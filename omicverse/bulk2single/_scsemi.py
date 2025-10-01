@@ -1,6 +1,6 @@
 import anndata
 
-import scanpy as sc
+
 import numpy as np
 import os
 from sklearn.cluster import KMeans
@@ -60,6 +60,7 @@ class scSemiProfiler:
         >>> scSemiProfiler.initsetup(name, bulk,logged,normed,geneselection,batch)
 
         """
+        import scanpy as sc
         name = self.name
         print('Start initial setup')
 
@@ -80,10 +81,12 @@ class scSemiProfiler:
             if logged == True:
                 print('Bad data preprocessing. Please normalize the library size before log-transformation.')
                 return
-            sc.pp.normalize_total(bulkdata, target_sum=1e4)
+            from ..pp._preprocess import normalize_total
+            normalize_total(bulkdata, target_sum=1e4)
         
         if logged == False:
-            sc.pp.log1p(bulkdata)
+            from ..pp._preprocess import log1p
+            log1p(bulkdata)
             
         # write sample ids
         sids = list(bulkdata.obs[sample_id])
@@ -92,7 +95,7 @@ class scSemiProfiler:
             f.write(sid+'\n')
         f.close()
         
-        
+        import scanpy as sc
         if geneselection == False:
             hvgenes = np.array(bulkdata.var.index)
         elif geneselection == True:
@@ -206,13 +209,15 @@ class scSemiProfiler:
         
         """
         from ..external.bulk2single.scSemiProfiler.singlecell_process import hamster_to_human,getGeneSetMatrix,fast_cellgraph
-        
+        import scanpy as sc
         print('Processing representative single-cell data')
         
         #scdata = anndata.read_h5ad(singlecell)
         name = self.name
         scdata = self.single_data
         sids = np.unique(scdata.obs[sample_id])
+
+        
         
         # cell filtering
         if cellfilter == True:

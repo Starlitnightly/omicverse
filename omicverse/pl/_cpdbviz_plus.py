@@ -1198,6 +1198,611 @@ class CellChatVizPlus:
             print(f"   - Color bars: None")
         
         return h
+
+    def netVisual_bubble_lr(self, sources_use=None, targets_use=None, 
+                           lr_pairs=None, pvalue_threshold=1.0, 
+                           mean_threshold=0.0, show_all_pairs=True,
+                           show_pvalue=True, show_mean=True, show_count=False,
+                           add_violin=False, add_dendrogram=False,
+                           figsize=(12, 8), title="Ligand-Receptor Communication Analysis", 
+                           remove_isolate=False, font_size=12, cmap="RdBu_r",
+                           transpose=False, scale=None,
+                           vmin=None, vmax=None, dot_size_min=None, dot_size_max=None,
+                           show_sender_colors=True, show_receiver_colors=False):
+        """
+        Create bubble plot to visualize specific ligand-receptor pairs in cell-cell communication
+        Similar to netVisual_bubble_marsilea but focuses on specific L-R pairs instead of pathways
+        
+        Key differences from netVisual_bubble_marsilea:
+        - Filters by specific ligand-receptor pairs instead of signaling pathways
+        - Allows visualization even if the specified L-R pairs have zero expression
+        - Uses more permissive default thresholds (pvalue_threshold=1.0, mean_threshold=0.0)
+        - Provides show_all_pairs option to force display of all specified pairs
+        
+        Parameters:
+        -----------
+        sources_use : str, int, list or None
+            Sender cell types. Can be:
+            - String: cell type name
+            - Integer: cell type index (starting from 0)
+            - List: multiple cell types
+            - None: all cell types as senders
+        targets_use : str, int, list or None
+            Receiver cell types. Same format as sources_use
+        lr_pairs : str, list or None
+            Specific ligand-receptor pairs to visualize. Can be:
+            - String: single L-R pair name (e.g., "TGFB1_TGFBR1")
+            - List: multiple L-R pair names
+            - None: all L-R pairs (equivalent to original function)
+        pvalue_threshold : float
+            P-value threshold (default: 1.0 to show all pairs)
+        mean_threshold : float
+            Mean expression threshold (default: 0.0 to show all pairs)
+        show_all_pairs : bool
+            If True, force display of all specified L-R pairs even if they have zero expression
+        show_pvalue : bool
+            Whether to show P-value information
+        show_mean : bool
+            Whether to show mean expression intensity
+        show_count : bool
+            Whether to show interaction count
+        add_violin : bool
+            Whether to add violin plot to show expression distribution
+        add_dendrogram : bool
+            Whether to add clustering tree
+        figsize : tuple
+            Figure size
+        title : str
+            Figure title
+        remove_isolate : bool
+            Whether to remove isolated interactions
+        font_size : int
+            Font size (default: 12)
+        cmap : str
+            Color map (default: "RdBu_r")
+        transpose : bool
+            Whether to transpose the heatmap (default: False)
+        scale : str or None
+            Scaling method for the expression data (default: None)
+            - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
+            - 'column': Scale each column (L-R pair) to have mean=0, std=1 (Z-score)
+            - 'row_minmax': Min-max scaling for each row to [0,1] range
+            - 'column_minmax': Min-max scaling for each column to [0,1] range
+            - None: No scaling (use raw expression values)
+        vmin : float or None
+            Minimum value for color scaling (default: None)
+        vmax : float or None
+            Maximum value for color scaling (default: None)
+        show_sender_colors : bool
+            Whether to show sender cell type color bar (default: True)
+        show_receiver_colors : bool
+            Whether to show receiver cell type color bar (default: False)
+            
+        Returns:
+        --------
+        h : marsilea plot object
+        """
+        try:
+            import marsilea as ma
+            import marsilea.plotter as mp
+            from matplotlib.colors import Normalize
+            from sklearn.preprocessing import normalize
+        except ImportError:
+            raise ImportError("marsilea and sklearn packages are required. Please install them: pip install marsilea scikit-learn")
+        
+        # Handle sender cell types
+        if sources_use is None:
+            source_cell_types = self.cell_types
+        else:
+            if isinstance(sources_use, (int, str)):
+                sources_use = [sources_use]
+            
+            source_cell_types = []
+            for src in sources_use:
+                if isinstance(src, int):
+                    if 0 <= src < len(self.cell_types):
+                        source_cell_types.append(self.cell_types[src])
+                    else:
+                        raise ValueError(f"Source index {src} out of range [0, {len(self.cell_types)-1}]")
+                elif isinstance(src, str):
+                    if src in self.cell_types:
+                        source_cell_types.append(src)
+                    else:
+                        raise ValueError(f"Source cell type '{src}' not found. Available: {self.cell_types}")
+        
+        # Handle receiver cell types
+        if targets_use is None:
+            target_cell_types = self.cell_types
+        else:
+            if isinstance(targets_use, (int, str)):
+                targets_use = [targets_use]
+            
+            target_cell_types = []
+            for tgt in targets_use:
+                if isinstance(tgt, int):
+                    if 0 <= tgt < len(self.cell_types):
+                        target_cell_types.append(self.cell_types[tgt])
+                    else:
+                        raise ValueError(f"Target index {tgt} out of range [0, {len(self.cell_types)-1}]")
+                elif isinstance(tgt, str):
+                    if tgt in self.cell_types:
+                        target_cell_types.append(tgt)
+                    else:
+                        raise ValueError(f"Target cell type '{tgt}' not found. Available: {self.cell_types}")
+        
+        # Handle ligand-receptor pair filtering
+        lr_indices = None
+        if lr_pairs is not None:
+            if isinstance(lr_pairs, str):
+                lr_pairs = [lr_pairs]
+            
+            # Build L-R pair names from gene_a and gene_b columns
+            if 'gene_a' in self.adata.var.columns and 'gene_b' in self.adata.var.columns:
+                # Create L-R pair names: ligand_receptor format
+                lr_names_in_data = []
+                for i in range(len(self.adata.var)):
+                    ligand = self.adata.var['gene_a'].iloc[i]
+                    receptor = self.adata.var['gene_b'].iloc[i]
+                    if not (pd.isna(ligand) or pd.isna(receptor)):
+                        lr_names_in_data.append(f"{ligand}_{receptor}")
+                    else:
+                        lr_names_in_data.append(self.adata.var.index[i])
+                
+                # Find indices for specified L-R pairs
+                lr_indices = []
+                missing_pairs = []
+                
+                for lr_pair in lr_pairs:
+                    try:
+                        # Try to find exact match
+                        idx = lr_names_in_data.index(lr_pair)
+                        lr_indices.append(idx)
+                    except ValueError:
+                        # Try to find by alternative formats
+                        found = False
+                        # Try with different separators
+                        for sep in ['_', '-', ':', ' ']:
+                            alt_name = lr_pair.replace('_', sep)
+                            if alt_name in lr_names_in_data:
+                                idx = lr_names_in_data.index(alt_name)
+                                lr_indices.append(idx)
+                                found = True
+                                break
+                        
+                        if not found:
+                            # Try to find in adata.var.index directly
+                            if lr_pair in self.adata.var.index:
+                                idx = list(self.adata.var.index).index(lr_pair)
+                                lr_indices.append(idx)
+                                found = True
+                        
+                        if not found:
+                            missing_pairs.append(lr_pair)
+                
+                if missing_pairs and not show_all_pairs:
+                    print(f"Warning: The following L-R pairs were not found: {missing_pairs}")
+                    print(f"Available L-R pairs (first 10): {lr_names_in_data[:10]}")
+                    if len(lr_indices) == 0:
+                        print(f"❌ Error: None of the specified L-R pairs exist in the data.")
+                        return None
+                
+                lr_indices = np.array(lr_indices)
+            else:
+                print("❌ Error: 'gene_a' and 'gene_b' columns not found in adata.var")
+                print("Cannot filter by L-R pairs")
+                return None
+        
+        # Collect ligand-receptor interactions (modified to be more permissive)
+        interactions_data = []
+        
+        for i, (sender, receiver) in enumerate(zip(self.adata.obs['sender'], 
+                                                  self.adata.obs['receiver'])):
+            # Check if sender and receiver meet the conditions
+            if sender not in source_cell_types or receiver not in target_cell_types:
+                continue
+            
+            # Get interaction data
+            pvals = self.adata.layers['pvalues'][i, :]
+            means = self.adata.layers['means'][i, :]
+            
+            # Apply L-R pair filtering
+            if lr_indices is not None:
+                pvals = pvals[lr_indices]
+                means = means[lr_indices]
+                var_indices = lr_indices
+            else:
+                var_indices = np.arange(len(pvals))
+            
+            # Modified filtering logic: more permissive when show_all_pairs=True
+            if show_all_pairs and lr_pairs is not None:
+                # When show_all_pairs=True, include all specified pairs regardless of significance
+                sig_mask = np.ones(len(pvals), dtype=bool)
+            else:
+                # Standard filtering
+                sig_mask = (pvals < pvalue_threshold) & (means > mean_threshold)
+            
+            # Always add interactions for specified L-R pairs when show_all_pairs=True
+            if show_all_pairs and lr_pairs is not None:
+                # Include all specified pairs
+                for idx in range(len(pvals)):
+                    original_idx = var_indices[idx]
+                    p_val = pvals[idx]
+                    mean_val = means[idx]
+                    
+                    # Get ligand-receptor pair information
+                    if 'gene_a' in self.adata.var.columns and 'gene_b' in self.adata.var.columns:
+                        ligand = self.adata.var['gene_a'].iloc[original_idx]
+                        receptor = self.adata.var['gene_b'].iloc[original_idx]
+                        if pd.isna(ligand) or pd.isna(receptor):
+                            lr_pair = self.adata.var.index[original_idx]
+                        else:
+                            lr_pair = f"{ligand}_{receptor}"
+                    else:
+                        lr_pair = self.adata.var.index[original_idx]
+                    
+                    # Get signaling pathway information
+                    if 'classification' in self.adata.var.columns:
+                        pathway = self.adata.var['classification'].iloc[original_idx]
+                    else:
+                        pathway = 'Unknown'
+                    
+                    interactions_data.append({
+                        'source': sender,
+                        'target': receiver,
+                        'lr_pair': lr_pair,
+                        'pathway': pathway,
+                        'pvalue': p_val,
+                        'mean_expression': mean_val,
+                        'interaction': f"{sender} → {receiver}"
+                    })
+            elif np.any(sig_mask):
+                # Standard processing for significant interactions
+                original_indices = var_indices[sig_mask]
+                
+                for idx, (p_val, mean_val) in enumerate(zip(pvals[sig_mask], means[sig_mask])):
+                    original_idx = original_indices[idx]
+                    
+                    # Get ligand-receptor pair information
+                    if 'gene_a' in self.adata.var.columns and 'gene_b' in self.adata.var.columns:
+                        ligand = self.adata.var['gene_a'].iloc[original_idx]
+                        receptor = self.adata.var['gene_b'].iloc[original_idx]
+                        if pd.isna(ligand) or pd.isna(receptor):
+                            lr_pair = self.adata.var.index[original_idx]
+                        else:
+                            lr_pair = f"{ligand}_{receptor}"
+                    else:
+                        lr_pair = self.adata.var.index[original_idx]
+                    
+                    # Get signaling pathway information
+                    if 'classification' in self.adata.var.columns:
+                        pathway = self.adata.var['classification'].iloc[original_idx]
+                    else:
+                        pathway = 'Unknown'
+                    
+                    interactions_data.append({
+                        'source': sender,
+                        'target': receiver,
+                        'lr_pair': lr_pair,
+                        'pathway': pathway,
+                        'pvalue': p_val,
+                        'mean_expression': mean_val,
+                        'interaction': f"{sender} → {receiver}"
+                    })
+        
+        if not interactions_data:
+            if lr_pairs is not None:
+                print(f"❌ No interactions found for the specified L-R pair(s): {lr_pairs}")
+                print(f"Current thresholds:")
+                print(f"   - pvalue_threshold: {pvalue_threshold}")
+                print(f"   - mean_threshold: {mean_threshold}")
+                print(f"   - show_all_pairs: {show_all_pairs}")
+                print(f"Try setting show_all_pairs=True to force display of all specified pairs.")
+            else:
+                print("❌ No interactions found for the specified conditions")
+                print(f"Try adjusting the thresholds:")
+                print(f"   - pvalue_threshold (current: {pvalue_threshold})")
+                print(f"   - mean_threshold (current: {mean_threshold})")
+            return None
+        
+        # Create interaction DataFrame
+        df_interactions = pd.DataFrame(interactions_data)
+        
+        # Remove isolated interactions (if needed)
+        if remove_isolate:
+            interaction_counts = df_interactions.groupby(['source', 'target']).size()
+            valid_pairs = interaction_counts[interaction_counts > 1].index
+            df_interactions = df_interactions[
+                df_interactions.apply(lambda x: (x['source'], x['target']) in valid_pairs, axis=1)
+            ]
+        
+        # Create pivot table - always group by L-R pairs for this function
+        pivot_mean = df_interactions.pivot_table(
+            values='mean_expression', 
+            index='interaction', 
+            columns='lr_pair', 
+            aggfunc='mean',
+            fill_value=0
+        )
+        pivot_pval = df_interactions.pivot_table(
+            values='pvalue', 
+            index='interaction', 
+            columns='lr_pair', 
+            aggfunc='min',
+            fill_value=1
+        )
+        
+        # Apply scaling if specified
+        if scale is not None:
+            if scale not in ['row', 'column', 'row_minmax', 'column_minmax']:
+                print(f"⚠️  Warning: Invalid scale parameter '{scale}'. Must be 'row', 'column', 'row_minmax', 'column_minmax', or None. Using no scaling.")
+                scale = None
+            
+            if scale == 'row':
+                # Scale each row (cell type pair) to have mean=0, std=1
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                pivot_mean_scaled = pd.DataFrame(
+                    scaler.fit_transform(pivot_mean),
+                    index=pivot_mean.index,
+                    columns=pivot_mean.columns
+                )
+                print(f"📊 Applied row-wise scaling (Z-score normalization)")
+                pivot_mean = pivot_mean_scaled
+                
+            elif scale == 'column':
+                # Scale each column (L-R pair) to have mean=0, std=1
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                pivot_mean_scaled = pd.DataFrame(
+                    scaler.fit_transform(pivot_mean.T).T,  # Transpose, scale, then transpose back
+                    index=pivot_mean.index,
+                    columns=pivot_mean.columns
+                )
+                print(f"📊 Applied column-wise scaling (Z-score normalization)")
+                pivot_mean = pivot_mean_scaled
+                
+            elif scale == 'row_minmax':
+                # Min-max scaling for each row (cell type pair)
+                means = pivot_mean.to_numpy()
+                means = (means - means.min(axis=1, keepdims=True)) / (means.max(axis=1, keepdims=True) - means.min(axis=1, keepdims=True))
+                pivot_mean = pd.DataFrame(means, index=pivot_mean.index, columns=pivot_mean.columns)
+                print(f"📊 Applied row-wise min-max scaling")
+                
+            elif scale == 'column_minmax':
+                # Min-max scaling for each column (L-R pair)
+                means = pivot_mean.to_numpy()
+                means = (means - means.min(axis=0)) / (means.max(axis=0) - means.min(axis=0))
+                pivot_mean = pd.DataFrame(means, index=pivot_mean.index, columns=pivot_mean.columns)
+                print(f"📊 Applied column-wise min-max scaling")
+        
+        # Normalize expression data for additional layers
+        matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
+        
+        # Prepare data for Marsilea SizedHeatmap
+        expression_matrix = pivot_mean.to_numpy()
+        pval_matrix = pivot_pval.to_numpy()
+        
+        # Color matrix: use expression
+        color_matrix = expression_matrix.copy()
+        color_matrix = np.nan_to_num(color_matrix, nan=0.0, posinf=color_matrix[np.isfinite(color_matrix)].max(), neginf=0.0)
+        
+        # Size matrix: use P-value significance
+        size_matrix = -np.log10(pval_matrix + 1e-10)
+        
+        # Normalize size matrix
+        size_min = 0.2
+        size_max = 1.0
+        
+        if size_matrix.max() > size_matrix.min():
+            size_matrix_norm = (size_matrix - size_matrix.min()) / (size_matrix.max() - size_matrix.min())
+            size_matrix = size_matrix_norm * (size_max - size_min) + size_min
+        else:
+            size_matrix = np.full_like(size_matrix, (size_min + size_max) / 2)
+        
+        # Transpose functionality
+        if transpose:
+            size_matrix = size_matrix.T
+            color_matrix = color_matrix.T
+            pivot_mean = pivot_mean.T
+            pivot_pval = pivot_pval.T
+            matrix_normalized = normalize(pivot_mean.to_numpy(), axis=0)
+        
+        # Set color legend title based on scaling
+        if scale == 'row':
+            color_legend_title = "Expression Level (Row-scaled)"
+        elif scale == 'column':
+            color_legend_title = "Expression Level (Column-scaled)"
+        elif scale == 'row_minmax':
+            color_legend_title = "Expression Level (Row-scaled Min-max)"
+        elif scale == 'column_minmax':
+            color_legend_title = "Expression Level (Column-scaled Min-max)"
+        else:
+            color_legend_title = "Expression Level"
+        
+        if dot_size_min is not None and dot_size_max is not None:
+            from matplotlib.colors import Normalize
+            size_norm = Normalize(vmin=dot_size_min, vmax=dot_size_max)
+        else:
+            size_norm = None
+        
+        # Create main SizedHeatmap
+        h = ma.SizedHeatmap(
+            size=size_matrix,
+            color=color_matrix,
+            cmap=cmap,
+            width=figsize[0] * 0.6, 
+            height=figsize[1] * 0.7,
+            legend=True,
+            size_legend_kws=dict(
+                colors="black",
+                title="",
+                labels=["p>0.05", "p<0.01"],
+                show_at=[0.01, 1.0],
+            ),
+            vmin=vmin,
+            vmax=vmax,
+            size_norm=size_norm,
+            color_legend_kws=dict(title=color_legend_title),
+        )
+        
+        # Add significance layer
+        if show_pvalue:
+            try:
+                current_pval_matrix = pivot_pval.to_numpy()
+                highly_significant_mask = current_pval_matrix < 0.01
+                if np.any(highly_significant_mask):
+                    sig_layer = mp.MarkerMesh(
+                        highly_significant_mask,
+                        color="none",
+                        edgecolor="#2E86AB",
+                        linewidth=2.0,
+                        label="P < 0.01"
+                    )
+                    h.add_layer(sig_layer)
+            except Exception as e:
+                print(f"Warning: Could not add significance layer: {e}")
+        
+        # Add high expression marker
+        if show_mean:
+            try:
+                high_expression_mask = matrix_normalized > 0.7
+                high_mark = mp.MarkerMesh(
+                    high_expression_mask, 
+                    color="#DB4D6D", 
+                    label="High Expression"
+                )
+                h.add_layer(high_mark)
+            except Exception as e:
+                print(f"Warning: Could not add high expression layer: {e}")
+        
+        # Add cell type color bars
+        cell_colors = self._get_cell_type_colors()
+        
+        # Create sender and receiver color mappings
+        sender_colors = []
+        sender_names_list = []
+        receiver_colors = []
+        receiver_names_list = []
+
+        if transpose:
+            for interaction in pivot_mean.columns:
+                if '→' in str(interaction):
+                    sender, receiver = str(interaction).split('→', 1)
+                    sender = sender.strip()
+                    receiver = receiver.strip()
+                    
+                    sender_color = cell_colors.get(sender, '#CCCCCC')
+                    receiver_color = cell_colors.get(receiver, '#CCCCCC')
+                    
+                    sender_colors.append(sender_color)
+                    sender_names_list.append(sender)
+                    receiver_colors.append(receiver_color)
+                    receiver_names_list.append(receiver)
+                else:
+                    sender_colors.append('#CCCCCC')
+                    sender_names_list.append(interaction)
+                    receiver_colors.append('#CCCCCC')
+                    receiver_names_list.append(interaction)
+
+            if show_receiver_colors:
+                receiver_palette = dict(zip(receiver_names_list, receiver_colors))
+                receiver_color_bar = mp.Colors(receiver_names_list, palette=receiver_palette)
+                h.add_bottom(receiver_color_bar, pad=0.05, size=0.15)
+            
+            if show_sender_colors:
+                sender_palette = dict(zip(sender_names_list, sender_colors))
+                sender_color_bar = mp.Colors(sender_names_list, palette=sender_palette)
+                h.add_bottom(sender_color_bar, pad=0.05, size=0.15)
+        else:
+            for interaction in pivot_mean.index:
+                if '→' in str(interaction):
+                    sender, receiver = str(interaction).split('→', 1)
+                    sender = sender.strip()
+                    receiver = receiver.strip()
+                    
+                    sender_color = cell_colors.get(sender, '#CCCCCC')
+                    receiver_color = cell_colors.get(receiver, '#CCCCCC')
+                    
+                    sender_colors.append(sender_color)
+                    sender_names_list.append(sender)
+                    receiver_colors.append(receiver_color)
+                    receiver_names_list.append(receiver)
+                else:
+                    sender_colors.append('#CCCCCC')
+                    sender_names_list.append(interaction)
+                    receiver_colors.append('#CCCCCC')
+                    receiver_names_list.append(interaction)
+            
+            if show_sender_colors:
+                sender_palette = dict(zip(sender_names_list, sender_colors))
+                sender_color_bar = mp.Colors(sender_names_list, palette=sender_palette)
+                h.add_left(sender_color_bar, size=0.15, pad=0.05)
+            
+            if show_receiver_colors:
+                receiver_palette = dict(zip(receiver_names_list, receiver_colors))
+                receiver_color_bar = mp.Colors(receiver_names_list, palette=receiver_palette)
+                h.add_left(receiver_color_bar, size=0.15, pad=0.05)
+        
+        # Add cell interaction labels
+        cell_interaction_labels = mp.Labels(
+            pivot_mean.index, 
+            align="center",
+            fontsize=font_size
+        )
+        h.add_left(cell_interaction_labels, pad=0.05)
+        
+        # Add L-R pair labels
+        lr_pair_labels = mp.Labels(
+            pivot_mean.columns,
+            fontsize=font_size
+        )
+        h.add_bottom(lr_pair_labels)
+        
+        # Add clustering dendrograms
+        if add_dendrogram:
+            try:
+                can_cluster_rows = (pivot_mean.shape[0] > 2 and 
+                                   not np.any(np.isnan(pivot_mean.values)) and 
+                                   np.var(pivot_mean.values, axis=1).sum() > 0)
+                                   
+                can_cluster_cols = (pivot_mean.shape[1] > 2 and 
+                                   not np.any(np.isnan(pivot_mean.values)) and 
+                                   np.var(pivot_mean.values, axis=0).sum() > 0)
+                
+                if can_cluster_rows:
+                    h.add_dendrogram("left", colors="#33A6B8")
+                if can_cluster_cols:
+                    h.add_dendrogram("bottom", colors="#B481BB")
+                    
+                if not can_cluster_rows and not can_cluster_cols:
+                    print("Warning: Insufficient data variability for clustering. Skipping dendrograms.")
+                    
+            except Exception as e:
+                print(f"Warning: Could not add dendrogram: {e}")
+        
+        # Add legends
+        h.add_legends()
+        
+        # Set title
+        if title:
+            h.add_title(title, fontsize=font_size + 2, pad=0.02)
+        
+        # Render figure
+        h.render()
+        
+        print(f"📊 Ligand-Receptor Visualization Statistics:")
+        print(f"   - Number of interactions displayed: {len(df_interactions)}")
+        print(f"   - Number of cell type pairs: {len(pivot_mean.index)}")
+        print(f"   - Number of L-R pairs: {len(pivot_mean.columns)}")
+        if lr_pairs:
+            print(f"   - Specified L-R pairs: {lr_pairs}")
+            print(f"   - Show all pairs (even zero): {show_all_pairs}")
+        if scale:
+            print(f"   - Data scaling: {scale}")
+        else:
+            print(f"   - Data scaling: None (raw expression values)")
+        
+        return h
     
     def netAnalysis_computeCentrality(self, signaling=None, slot_name="netP", 
                                      pvalue_threshold=0.05, use_weight=True):

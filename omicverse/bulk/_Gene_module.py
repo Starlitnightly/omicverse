@@ -11,7 +11,7 @@ import seaborn as sns
 from scipy.cluster import hierarchy   
 from sklearn import decomposition as skldec 
 from matplotlib.colors import LinearSegmentedColormap
-import scanpy as sc
+
 from typing import Union,Tuple
 import matplotlib
 
@@ -261,7 +261,9 @@ class pyWGCNA_old(object):
             ax1=plt.pcolor(plot_mod,cmap=colorlist_cmap)
         else:
             if res_len>28:
-                colorlist=sc.pl.palettes.default_102
+                from ..pl._palette import palette_112
+                colorlist=palette_112[:res_len]
+                #colorlist=sc.pl.palettes.default_102
             else:
                 colorlist=pyomic_palette()
             colorlist_cmap=LinearSegmentedColormap.from_list('Custom', colorlist[:res_len], len(colorlist[:res_len]))

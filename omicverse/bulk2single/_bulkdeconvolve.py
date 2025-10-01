@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
-import scanpy as sc
+
 import seaborn as sns
-import requests
-import io
+
 
 ucd_install=False
 
