@@ -352,26 +352,37 @@ def violin(
         )
     
     # Create single or multiple axis plots
-    if ax is None and figsize is not None:
-        fig, ax = plt.subplots(figsize=figsize)
-    elif ax is None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Apply enhanced styling
-    if enhanced_style:
-        _apply_enhanced_styling(ax, background_color, spine_color, grid_lines)
+    if len(y_cols) > 1:
+        # Multiple keys: create subplots directly
+        if ax is not None:
+            print(f"{Colors.WARNING}Warning: ax parameter ignored when plotting multiple keys{Colors.ENDC}")
+        
+        # Use user-provided figsize or calculate appropriate size
+        if figsize is not None:
+            fig, axes = plt.subplots(1, len(y_cols), figsize=figsize)
+        else:
+            # Default: width scales with number of keys
+            fig, axes = plt.subplots(1, len(y_cols), figsize=(5*len(y_cols), 6))
+        
+        # Ensure axes is always a list
+        if len(y_cols) == 1:
+            axes = [axes]
+    else:
+        # Single key: use provided ax or create new one
+        if ax is None:
+            if figsize is not None:
+                fig, ax = plt.subplots(figsize=figsize)
+            else:
+                fig, ax = plt.subplots(figsize=(10, 6))
+        axes = [ax]
     
     # Create plots for each y variable
     for i, (y_col, y_label) in enumerate(zip(y_cols, ylabel)):
-        if len(y_cols) > 1:
-            # Create subplots for multiple keys
-            if i == 0:
-                fig, axes = plt.subplots(1, len(y_cols), figsize=figsize or (5*len(y_cols), 6))
-                if len(y_cols) == 1:
-                    axes = [axes]
-            current_ax = axes[i] if len(y_cols) > 1 else ax
-        else:
-            current_ax = ax
+        current_ax = axes[i]
+        
+        # Apply enhanced styling to each subplot
+        if enhanced_style:
+            _apply_enhanced_styling(current_ax, background_color, spine_color, grid_lines)
         
         # Prepare data for current y variable
         plot_data = _prepare_plot_data(obs_tidy, x_col, y_col, group_categories, order)
@@ -406,24 +417,28 @@ def violin(
             current_ax, group_categories, xlabel, y_label, groupby, 
             rotation, log, order
         )
+        
+        # Apply consistent styling to all subplots
         current_ax.spines['top'].set_visible(False)
         current_ax.spines['right'].set_visible(False)
         current_ax.spines['bottom'].set_visible(True)
         current_ax.spines['left'].set_visible(True)
         current_ax.spines['left'].set_position(('outward', 10))
         current_ax.spines['bottom'].set_position(('outward', 10))
-        if ticks_fontsize==None:
-            ticks_fontsize=fontsize-1
+        
+        # Set font sizes
+        if ticks_fontsize is None:
+            ticks_fontsize = fontsize - 1
     
-        current_ax.set_xticklabels(current_ax.get_xticklabels(),fontsize=ticks_fontsize,rotation=rotation)
-        current_ax.set_yticklabels(current_ax.get_yticklabels(),fontsize=ticks_fontsize)
-        current_ax.set_xlabel(groupby,fontsize=fontsize)
-        current_ax.set_ylabel(y_label,fontsize=fontsize)
-        #print(y_label)
-    
-    #plt.tight_layout()
-    
+        current_ax.set_xticklabels(current_ax.get_xticklabels(), fontsize=ticks_fontsize, rotation=rotation)
+        current_ax.set_yticklabels(current_ax.get_yticklabels(), fontsize=ticks_fontsize)
+        current_ax.set_xlabel(groupby, fontsize=fontsize)
+        current_ax.set_ylabel(y_label, fontsize=fontsize)
         current_ax.grid(False)
+    
+    # Apply tight layout for better spacing
+    if len(y_cols) > 1:
+        plt.tight_layout()
     
 
     
@@ -437,7 +452,11 @@ def violin(
         plt.show()
         return None
     
-    return ax
+    # Return appropriate object based on number of subplots
+    if len(y_cols) > 1:
+        return axes
+    else:
+        return axes[0]
 
 def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
     r"""
