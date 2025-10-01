@@ -541,6 +541,8 @@ def embedding(
             ax.set_zlabel(axis_labels[2], labelpad=-7)
         ax.autoscale_view()
 
+        # 画散点后
+
         if edges:
             _utils.plot_edges(ax, adata, basis, edges_width, edges_color, neighbors_key)
         if arrows:
@@ -576,15 +578,24 @@ def embedding(
         elif colorbar_loc is not None:
 
             if frameon=='small' or frameon==False:
+                
                 from matplotlib.ticker import MaxNLocator
-                from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-                labelsize = legend_fontsize * 0.75 if legend_fontsize is not None else None
-                cax1 = inset_axes(ax, width="2%", height="30%", loc=4, borderpad=0)
-                cb = pl.colorbar(cax, orientation="vertical", cax=cax1)
-                cb.set_alpha(1)
-                cb.ax.tick_params(labelsize=labelsize)
+
+                # 获取主轴的位置
+                pos = ax.get_position()
+                
+                # 计算colorbar的高度（主轴高度的30%）
+                cb_height = pos.height * 0.3
+                # colorbar垂直居中
+                cb_bottom = pos.y0 
+                
+                # 手动创建colorbar轴：[left, bottom, width, height]
+                cax1 = pl.gcf().add_axes([pos.x1 + 0.02, cb_bottom, 0.02, cb_height])
+                
+                cb = pl.colorbar(cax, cax=cax1, orientation="vertical")
                 cb.locator = MaxNLocator(nbins=3, integer=True)
                 cb.update_ticks()
+
             else:
                 pl.colorbar(
                     cax, ax=ax, pad=0.01, fraction=0.08, aspect=30, location=colorbar_loc
