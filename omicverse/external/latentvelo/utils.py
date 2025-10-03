@@ -220,6 +220,9 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
         
         adata.layers[spliced_key] = adata.layers[spliced_key]/spliced_all_size_factors
         adata.layers[unspliced_key] = adata.layers[unspliced_key]/unspliced_all_size_factors
+
+        #adata.layers[spliced_key] = adata.layers[spliced_key].tocsr()
+        #adata.layers[unspliced_key] = adata.layers[unspliced_key].tocsr()
         
         adata.obs['spliced_size_factor'] = spliced_library_sizes #spliced_all_size_factors
         adata.obs['unspliced_size_factor'] = unspliced_library_sizes #unspliced_all_size_factors
@@ -365,7 +368,7 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
         try:
             onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         except TypeError:
-            onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+            onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
         
     else:
@@ -378,7 +381,7 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
         try:
             onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         except TypeError:
-            onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+            onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
     if celltype_key != None:
         label_encoder = LabelEncoder()
@@ -450,23 +453,33 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
     if n_top_genes != None:
         scv.pp.filter_genes_dispersion(adata, n_top_genes = n_top_genes, subset=False)
 
+        # Convert COO matrices to CSR before subsetting (COO doesn't support indexing)
+        for layer_key in [spliced_key, unspliced_key]:
+            if layer_key in adata.layers and scp.sparse.isspmatrix_coo(adata.layers[layer_key]):
+                adata.layers[layer_key] = adata.layers[layer_key].tocsr()
+
         if retain_genes == None and 'highly_variable' in adata.var.columns.values:
-            adata = adata[:, adata.var.highly_variable==True]
+            adata = adata[:, adata.var.highly_variable==True].copy()
             print('Choosing top '+str(n_top_genes) + ' genes')
         elif retain_genes != None and 'highly_variable' in adata.var.columns.values:
             print('retaining specific genes')
-            adata = adata[:, (adata.var.highly_variable==True) | (adata.var.index.isin(retain_genes))]
+            adata = adata[:, (adata.var.highly_variable==True) | (adata.var.index.isin(retain_genes))].copy()
         else:
             print('using all genes')
-    
+
     if scp.sparse.issparse(adata.layers[spliced_key]):
+        # Convert COO to CSR if needed (COO doesn't support indexing after subsetting)
+        if scp.sparse.isspmatrix_coo(adata.layers[spliced_key]):
+            adata.layers[spliced_key] = adata.layers[spliced_key].tocsr()
+        if scp.sparse.isspmatrix_coo(adata.layers[unspliced_key]):
+            adata.layers[unspliced_key] = adata.layers[unspliced_key].tocsr()
         adata.layers[spliced_key] = adata.layers[spliced_key].todense()
         adata.layers[unspliced_key] = adata.layers[unspliced_key].todense()
-        
+
     else:
         adata.layers[spliced_key] = scp.sparse.csr_matrix(adata.layers[spliced_key]).todense()
         adata.layers[unspliced_key] = scp.sparse.csr_matrix(adata.layers[unspliced_key]).todense()
-    
+
     # include raw counts
     adata.layers['spliced_counts'] = np.array(adata.layers[spliced_key])
     adata.layers['unspliced_counts'] = np.array(adata.layers[unspliced_key])
@@ -536,7 +549,7 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         batch_id = label_encoder.fit_transform(adata.obs[batch_key])
         adata.obs['batch_id'] = batch_id
 
-        onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+        onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
         
     else:
@@ -546,14 +559,14 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         batch_id = label_encoder.fit_transform(adata.obs[batch_key])
         adata.obs['batch_id'] = batch_id
 
-        onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+        onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
     
     label_encoder = LabelEncoder()
     celltype = label_encoder.fit_transform(adata.obs[celltype_key])
     adata.obs['celltype'] = celltype
     
-    onehotcelltype = OneHotEncoder(sparse=False).fit_transform(celltype[:,None])
+    onehotcelltype = OneHotEncoder(sparse_output=False).fit_transform(celltype[:,None])
     adata.obsm['celltype'] = onehotcelltype
     
 
@@ -683,7 +696,7 @@ def atac_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         batch_id = label_encoder.fit_transform(adata.obs[batch_key])
         adata.obs['batch_id'] = batch_id
 
-        onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+        onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
         
     else:
@@ -693,7 +706,7 @@ def atac_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         batch_id = label_encoder.fit_transform(adata.obs[batch_key])
         adata.obs['batch_id'] = batch_id
 
-        onehotbatch = OneHotEncoder(sparse=False).fit_transform(batch_id[:,None])
+        onehotbatch = OneHotEncoder(sparse_output=False).fit_transform(batch_id[:,None])
         adata.obsm['batch_onehot'] = onehotbatch
 
     if celltype_key != None:

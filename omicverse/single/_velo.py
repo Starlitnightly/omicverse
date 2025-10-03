@@ -208,7 +208,10 @@ class Velo:
         else:
             self.adata=anvi_clean_recipe(self.adata, celltype_key=celltype_key,
                         batch_key=batch_key,r2_adjust=True,)
-            self.model = AnnotVAE(**latentvelo_VAE_kwargs)
+            # Get required parameters from adata
+            observed = self.adata.n_vars
+            celltypes = len(self.adata.obs[celltype_key].unique())
+            self.model = AnnotVAE(observed=observed, celltypes=celltypes, **latentvelo_VAE_kwargs)
             epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
         self.adata.uns['latentvelo_train_params'] = {
                     'epochs': epochs,
