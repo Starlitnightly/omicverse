@@ -138,10 +138,16 @@ def output_results(model, adata,
     latent_time = th.stack(latent_time).mean(0)
 
     # save to anndata
+    if 'X_'+embedding in adata.obsm:
+        embedding_data = {'X_'+embedding: adata.obsm['X_'+embedding],
+                          'X_pca': adata.obsm['X_pca'],
+                          'zr': z[:,2*model.latent:].cpu().numpy()}
+    else:
+        embedding_data = {'X_pca': adata.obsm['X_pca'],
+                          'zr': z[:,2*model.latent:].cpu().numpy()}
+                        
     latent_adata = ad.AnnData(z[:,:model.latent].detach().cpu().numpy(), 
-                          obsm={'X_'+embedding: adata.obsm['X_'+embedding],
-                                'X_pca': adata.obsm['X_pca'],
-                                'zr': z[:,2*model.latent:].cpu().numpy()},
+                          obsm=embedding_data,
                          layers = {'spliced': z[:,:model.latent].detach().cpu().numpy(),
                                    'spliced_traj': ztraj[:,:model.latent].detach().cpu().numpy(),
                                    'spliced_velocity': velocity[:,:model.latent].detach().cpu().numpy(),

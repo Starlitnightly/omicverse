@@ -186,21 +186,27 @@ def __cell_annotate(data,
 
 def __cell_anno_print(anno):
     r"""Print the annotation result.
-    
+
     Arguments:
         anno: The annotation result
-    
+
     Returns:
         None
     """
     for i in set(anno['Cluster']):
         test=anno.loc[anno['Cluster']==i].iloc[:2]
-        if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
-            print('Nice:Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
+        if len(test) >= 2 and pd.notna(test.iloc[0]['Z-score']) and pd.notna(test.iloc[1]['Z-score']):
+            if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
+                print('Nice:Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
+                                                            np.around(test.iloc[0]['Z-score'],3)))
+            else:
+                print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
+                                                            ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+        elif len(test) >= 1 and pd.notna(test.iloc[0]['Z-score']):
+            print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
                                                         np.around(test.iloc[0]['Z-score'],3)))
         else:
-            print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
-                                                        ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+            print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,'Unknown','NaN'))
 
 def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_doublet:bool=True,
                 n_genes_by_counts:int=4300,pct_counts_mt:int=25,
@@ -561,18 +567,24 @@ class pySCSA(object):
     
     def cell_anno_print(self)->None:
         r"""Print the annotation result.
-        
+
         Returns:
             None
         """
         for i in set(self.result['Cluster']):
             test=self.result.loc[self.result['Cluster']==i].iloc[:2]
-            if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
-                print('Nice:Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
+            if len(test) >= 2 and pd.notna(test.iloc[0]['Z-score']) and pd.notna(test.iloc[1]['Z-score']):
+                if test.iloc[0]['Z-score']>test.iloc[1]['Z-score']*2:
+                    print('Nice:Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
+                                                                np.around(test.iloc[0]['Z-score'],3)))
+                else:
+                    print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
+                                                                ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+            elif len(test) >= 1 and pd.notna(test.iloc[0]['Z-score']):
+                print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,test.iloc[0]['Cell Type'],
                                                             np.around(test.iloc[0]['Z-score'],3)))
             else:
-                print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,('|').join(test['Cell Type'].values.tolist()),
-                                                            ('|').join(np.around(test['Z-score'].values,3).astype(str).tolist())))
+                print('Cluster:{}\tCell_type:{}\tZ-score:{}'.format(i,'Unknown','NaN'))
 
     def cell_auto_anno(self,adata:anndata.AnnData,
                        clustertype:str='leiden',key='scsa_celltype')->None:

@@ -11,7 +11,7 @@ import os
 import warnings
 import matplotlib
 from typing import Union,Tuple
-import scanpy as sc
+
 warnings.filterwarnings("ignore")
 
 
@@ -206,9 +206,10 @@ class Bulk2Single:
         """
 
         print("......normalize the single data")
-        sc.pp.normalize_total(self.single_data, target_sum=target_sum)
+        from ..pp._preprocess import normalize_total,log1p
+        normalize_total(self.single_data, target_sum=target_sum)
         print("......log1p the single data")
-        sc.pp.log1p(self.single_data)
+        log1p(self.single_data)
         return None
     
     def prepare_input(self,):
@@ -442,6 +443,7 @@ class Bulk2Single:
             anndata.AnnData: Filtered single-cell data
         """
         generate_adata.raw = generate_adata
+        import scanpy as sc
         if highly_variable_genes:
             sc.pp.highly_variable_genes(generate_adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
             generate_adata = generate_adata[:, generate_adata.var.highly_variable]
