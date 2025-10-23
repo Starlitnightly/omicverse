@@ -1,0 +1,18 @@
+kb is a python package for rapidly pre-processing single-cell RNA-seq data. It is a wrapper for the methods described in [2].
+
+The goal of the wrapper is to simplify downloading and running of the kallisto [1] and bustools [2] programs. It was inspired by Sten Linnarsson’s loompy fromfq command (http://linnarssonlab.org/loompy/kallisto/index.html)
+
+The kb program consists of three parts:
+
+The `kb ref` command builds or downloads a species-specific index for pseudoalignment of reads. This command must be run prior to `kb count`, and it runs the `kallisto index` [1].
+
+The `kb count` command runs the kallisto [1] and bustools [2] programs. It can be used for pre-processing of data from a variety of single-cell RNA-seq technologies, and for a number of different workflows (e.g. production of gene count matrices, RNA velocity analyses, etc.). The output can be saved in a variety of formats including mix and loom. Examples are provided below.
+
+The `kb extract` command runs the kallisto [1] and bustools [2] programs. It pulls out the raw reads from a fastq file that align to a specified gene or transcript in the index.
+
+Examples are available at: https://www.kallistobus.tools/tutorials
+
+References
+==========
+[1] Bray, N. L., Pimentel, H., Melsted, P., & Pachter, L. (2016). Near-optimal probabilistic RNA-seq quantification. Nature biotechnology, 34(5), 525.
+[2] Melsted, P., Booeshaghi, A. S., Liu, L., Gao, F., Lu, L., Min, K. H., da Veiga Beltrame, E., Hjorleifsson, K. E., Gehring, J., & Pachter, L. (2021). Modular and efficient pre-processing of single-cell RNA-seq. Nature Biotechnology.
