@@ -1,6 +1,6 @@
 import pandas as pd
 import random
-import scanpy
+
 import numpy as np
 import torch
 #from deepforest import CascadeForestClassifier
@@ -62,10 +62,11 @@ def create_st(generate_sc_data, generate_sc_meta, spot_num, cell_num, gene_num, 
             #meta = meta.append(row, ignore_index=True)
 
     if marker_used:
-        adata = scanpy.AnnData(sc.T)
+        import scanpy as sc
+        adata = sc.AnnData(sc.T)
 
         adata.obs = sc_ct[['Cell_type']]
-        scanpy.tl.rank_genes_groups(adata, 'Cell_type', method='wilcoxon')
+        sc.tl.rank_genes_groups(adata, 'Cell_type', method='wilcoxon')
         marker_df = pd.DataFrame(adata.uns['rank_genes_groups']['names']).head(gene_num)
         marker_array = np.array(marker_df)
         marker_array = np.ravel(marker_array)
@@ -424,6 +425,7 @@ class DFRunner:
         Returns:
             None
         """
+        import scanpy as sc
 
         self.sc_test_allgene = generate_sc_data  # pandas.DataFrame, generated gene-cell expression data
         self.cell_type = generate_sc_meta  # pandas.DataFrame, cell type
@@ -443,9 +445,9 @@ class DFRunner:
         if marker_used:
             print('select top %d marker genes of each cell type...' % top_marker_num)
 
-            sc = scanpy.AnnData(self.sc_test.T)
+            sc = sc.AnnData(self.sc_test.T)
             sc.obs = self.cell_type[['Cell_type']]
-            scanpy.tl.rank_genes_groups(sc, 'Cell_type', method='wilcoxon')
+            sc.tl.rank_genes_groups(sc, 'Cell_type', method='wilcoxon')
             marker_df = pd.DataFrame(sc.uns['rank_genes_groups']['names']).head(top_marker_num)
             marker_array = np.array(marker_df)
             marker_array = np.ravel(marker_array)
