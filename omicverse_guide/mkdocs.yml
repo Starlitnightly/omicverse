@@ -17,6 +17,9 @@ nav:
         - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
         - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
+        - Alignment:
+            - Alignment of single-cell RNA-seq data: Tutorials-single/t_alignment_1k.ipynb
+            - Alignment of single-cell RNA-seq data for RNA velocity analysis: Tutorials-single/t_alignment_velocity.ipynb
         - Preprocessing:
             - Preprocessing the data of scRNA-seq[CPU]: Tutorials-single/t_preprocess_cpu.ipynb
             - Preprocessing the data of scRNA-seq[GPU]: Tutorials-single/t_preprocess_gpu.ipynb
