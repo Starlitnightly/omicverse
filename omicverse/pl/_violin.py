@@ -461,7 +461,7 @@ def violin(
 def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
     r"""
     Extract data from AnnData object for violin plotting.
-    
+
     Arguments:
         adata: AnnData object
         keys: list of str
@@ -470,24 +470,26 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
             Grouping variable
         layer: str, optional
             Layer to use for gene expression data
-        use_raw: bool
-            Whether to use raw data
-    
+        use_raw: bool, optional
+            Whether to use raw data. Defaults to True if `.raw` is present.
+
     Returns:
         dict: Dictionary containing extracted data
     """
-    # This is a simplified version - in real scanpy, this would handle
-    # raw data, layers, etc. more comprehensively
-    
+    # Default behavior: use raw if it exists and use_raw is not explicitly False
+    # This matches scanpy's behavior
+    if use_raw is None:
+        use_raw = hasattr(adata, 'raw') and adata.raw is not None
+
     data_dict = {}
-    
+
     # Handle groupby column
     if groupby is not None:
         if groupby in adata.obs.columns:
             data_dict[groupby] = adata.obs[groupby]
         else:
             raise ValueError(f"groupby '{groupby}' not found in adata.obs")
-    
+
     # Handle keys (variables)
     for key in keys:
         if key in adata.obs.columns:
@@ -496,21 +498,27 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
         elif key in adata.var_names:
             # Key is a gene/variable
             if use_raw and hasattr(adata, 'raw') and adata.raw is not None:
-                gene_idx = list(adata.raw.var_names).index(key)
-                data_dict[key] = adata.raw.X[:, gene_idx]
+                # Check if the key exists in raw.var_names
+                if key in adata.raw.var_names:
+                    gene_idx = list(adata.raw.var_names).index(key)
+                    data_dict[key] = adata.raw.X[:, gene_idx]
+                else:
+                    # Fall back to adata.X if key not in raw
+                    gene_idx = list(adata.var_names).index(key)
+                    data_dict[key] = adata.X[:, gene_idx]
             elif layer is not None and layer in adata.layers:
                 gene_idx = list(adata.var_names).index(key)
                 data_dict[key] = adata.layers[layer][:, gene_idx]
             else:
                 gene_idx = list(adata.var_names).index(key)
                 data_dict[key] = adata.X[:, gene_idx]
-                
+
             # Handle sparse matrices
             if hasattr(data_dict[key], 'toarray'):
                 data_dict[key] = data_dict[key].toarray().flatten()
         else:
             raise ValueError(f"Key '{key}' not found in adata.obs or adata.var_names")
-    
+
     return pd.DataFrame(data_dict)
 
 def _setup_colors(custom_colors, group_categories, adata, groupby):
