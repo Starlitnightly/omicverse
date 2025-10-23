@@ -44,8 +44,13 @@ from ._chm13 import get_chm13_gene,find_chm13_gene
 from ._Deseq2 import pyDEG,deseq2_normalize,estimateSizeFactors,estimateDispersions,Matrix_ID_mapping,data_drop_duplicates_index
 from ._tcga import pyTCGA
 from ._combat import batch_correction
+from ._alignment import Alignment, AlignmentConfig
 
 __all__ = [
+
+    # Alignment
+    "Alignment", "AlignmentConfig"
+
     # Gene co-expression analysis
     'pyWGCNA',
     'readWGCNA',
