@@ -534,7 +534,7 @@ def mack_score(
             nbrs_idx, _ = knn(adata.obsm[basis_for_knn], n_neighbors)
         else:
             logging.info(f"Compute knn in original basis...")
-            X_for_knn = adata.X.A if sp.issparse(adata.X) else adata.X
+            X_for_knn = adata.X.toarray() if sp.issparse(adata.X) else adata.X
             nbrs_idx, _ = knn(X_for_knn, n_neighbors)
     
     # Ensure nbrs_idx is a 2D NumPy array.
