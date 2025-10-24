@@ -502,3 +502,11 @@ def analyze_10x_v3_data(
     print(f"{Colors.GREEN}✓ Count analysis complete!{Colors.ENDC}\n") #
 
     return results
+
+import types
+single = types.SimpleNamespace()
+single.Colors = Colors
+single._import_kb_python_modules = _import_kb_python_modules
+single.ref = ref
+single.count = count
+single.analyze_10x_v3_data = analyze_10x_v3_data
