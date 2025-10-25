@@ -25,13 +25,14 @@ from langchain.text_splitter import CharacterTextSplitter
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Import the global token counter
 from token_counter import global_token_counter
 
 # Import the model selection helper from our independent script
 from model_selector import get_llm
+from skill_registry import SkillRegistry, SkillRouter, SkillMatch
 
 # --------------------------------------------------
 # Configure Gemini model if API key is available.
@@ -116,6 +117,7 @@ class PackageConfig:
     annotated_scripts_directory: str
     file_selection_model: str
     query_processing_model: str
+    skill_names: List[str] = field(default_factory=list)
 
 class CodeAwareTextSplitter(CharacterTextSplitter):
     """
@@ -272,11 +274,34 @@ class SecondStageRAG:
                 return os.path.join(root, file_name)
         return None
 
-    def answer_query_with_annotated_scripts(self, query: str, relevant_files: List[str]) -> str:
+    def answer_query_with_annotated_scripts(
+            self,
+            query: str,
+            relevant_files: List[str],
+            skill_match: Optional[SkillMatch] = None,
+    ) -> str:
         """
         Generates an answer based on the relevant annotated scripts for a given package and query.
         """
-        logger.info(f"Starting second stage with query: '{query}' and relevant files: {relevant_files}")
+        logger.info(
+            "Starting second stage with query: '%s' and relevant files: %s",
+            query,
+            relevant_files,
+        )
+        skill_section = ""
+        if skill_match:
+            logger.info(
+                "Applying skill '%s' (score=%.3f) for package '%s'",
+                skill_match.skill.name,
+                skill_match.score,
+                self.package_name,
+            )
+            skill_section = (
+                "### ACTIVATED SKILL GUIDANCE\n"
+                f"Skill: {skill_match.skill.name}\n"
+                f"Relevance score: {skill_match.score:.3f}\n\n"
+                f"{skill_match.skill.prompt_instructions()}\n\n"
+            )
         if not relevant_files:
             logger.info(f"No relevant files provided to second stage for package '{self.package_name}'. Returning fallback answer.")
             return "I could not find relevant code files for your request."
@@ -325,8 +350,9 @@ class SecondStageRAG:
         prompt_template = PromptTemplate(
             input_variables=["context", "question"],
             template=(
-                "You are an expert Python developer specializing in single-cell bioinformatics. Your task is to provide accurate, "
-                "reliable code based on the following context from single-cell analysis libraries.\n\n"
+                "You are an expert Python developer specializing in single-cell bioinformatics. Your task is to provide accurate"
+                " and reliable code based on the following context from single-cell analysis libraries.\n\n"
+                f"{skill_section}"
                 "### CONTEXT INFORMATION:\n{context}\n\n"
                 "### USER REQUEST:\n{question}\n\n"
                 "### INSTRUCTIONS:\n"
@@ -393,7 +419,9 @@ class RAGSystem:
             top_k_files: int = 5,
             top_k_chunks: int = 3,
             code_chunk_size: int = 2000,
-            code_chunk_overlap: int = 200
+            code_chunk_overlap: int = 200,
+            skill_registry: Optional[SkillRegistry] = None,
+            skill_router: Optional[SkillRouter] = None,
     ):
         logger.info("Initializing RAG System for multiple Python packages...")
         self.package_configs = package_configs
@@ -402,6 +430,8 @@ class RAGSystem:
         self.top_k_chunks = top_k_chunks
         self.code_chunk_size = code_chunk_size
         self.code_chunk_overlap = code_chunk_overlap
+        self.skill_registry = skill_registry
+        self.skill_router = skill_router or (SkillRouter(skill_registry) if skill_registry else None)
         self._validate_package_configs(package_configs)
         os.makedirs(self.persist_directory, exist_ok=True)
         self.chroma_client = chromadb.Client(
@@ -415,6 +445,10 @@ class RAGSystem:
         self.second_stages = {}
         for config in package_configs:
             logger.info(f"Setting up RAG for package: {config.name}")
+            if self.skill_registry and not config.skill_names:
+                config.skill_names.extend(
+                    [skill.name for skill in self.skill_registry.skills.values()]
+                )
             self.first_stages[config.name] = FirstStageRAG(
                 converted_jsons_directory=config.converted_jsons_directory,
                 persist_dir=self.persist_directory,
@@ -451,11 +485,23 @@ class RAGSystem:
             return []
         return self.first_stages[package_name].find_relevant_files(query)
 
-    def answer_query_with_annotated_scripts(self, package_name: str, query: str, relevant_files: List[str]) -> str:
+    def answer_query_with_annotated_scripts(
+            self,
+            package_name: str,
+            query: str,
+            relevant_files: List[str],
+            skill_match: Optional[SkillMatch] = None,
+    ) -> str:
         if package_name not in self.second_stages:
             logger.error(f"Package '{package_name}' is not supported.")
             return "Unsupported package selected."
-        return self.second_stages[package_name].answer_query_with_annotated_scripts(query, relevant_files)
+        return self.second_stages[package_name].answer_query_with_annotated_scripts(query, relevant_files, skill_match)
+
+    def select_skill(self, query: str) -> Optional[SkillMatch]:
+        if not self.skill_router:
+            return None
+        matches = self.skill_router.route(query, top_k=1)
+        return matches[0] if matches else None
 
     def generate_and_refine_code_sample(self, plot_info: dict, user_query: str) -> str:
         """
@@ -473,7 +519,12 @@ class RAGSystem:
             selected_package = list(self.second_stages.keys())[0]
         relevant_files = self.find_relevant_files(selected_package, user_query)
         logger.info(f"Relevant files for package '{selected_package}': {relevant_files}")
-        baseline_code = self.second_stages[selected_package].answer_query_with_annotated_scripts(user_query, relevant_files)
+        skill_match = self.select_skill(user_query)
+        baseline_code = self.second_stages[selected_package].answer_query_with_annotated_scripts(
+            user_query,
+            relevant_files,
+            skill_match,
+        )
         logger.info("Baseline code sample generated.")
         refined_code = refine_code_with_gemini(baseline_code, user_query)
         logger.info("Baseline code sample refined using Gemini.")
