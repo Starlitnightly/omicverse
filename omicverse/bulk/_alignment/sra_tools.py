@@ -1,8 +1,8 @@
-import os,sys,time, shutil, hashlib, subprocess, requests,argparse
+import os,sys,time, shutil, hashlib, subprocess, requests,argparse,re
 import pandas as pd
 import concurrent.futures
 from pathlib import Path
-from typing import Tuple, Optional, List, Union
+from typing import Tuple, Optional, List, Union, Dict, Any
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from math import floor
 
@@ -12,6 +12,103 @@ else:
     from tqdm import tqdm
 from filelock import FileLock
 import logging
+
+# ================= Mirror Management Functions =================
+def parse_speed_threshold(speed_str: str) -> int:
+    """Parse speed threshold string like '500KB/s' to bytes per second"""
+    if not speed_str:
+        return 0
+
+    speed_str = speed_str.strip().upper()
+    if speed_str.endswith('/S'):
+        speed_str = speed_str[:-2]
+
+    multipliers = {
+        'B': 1,
+        'KB': 1024,
+        'MB': 1024**2,
+        'GB': 1024**3,
+        'TB': 1024**4
+    }
+
+    for unit, multiplier in multipliers.items():
+        if speed_str.endswith(unit):
+            try:
+                value = float(speed_str[:-len(unit)])
+                return int(value * multiplier)
+            except (ValueError, KeyError):
+                continue
+
+    try:
+        return int(float(speed_str))
+    except ValueError:
+        return 0
+
+def select_best_mirror(mirrors: List[Dict[str, Any]], performance_history: Dict[str, float] = None) -> Dict[str, Any]:
+    """Select the best mirror based on priority and performance history"""
+    if not mirrors:
+        return None
+
+    # Sort by priority first
+    sorted_mirrors = sorted(mirrors, key=lambda x: x.get('priority', 999))
+
+    # If we have performance history, use it to adjust selection
+    if performance_history:
+        def mirror_score(mirror):
+            name = mirror.get('name', '')
+            priority = mirror.get('priority', 999)
+            perf_score = performance_history.get(name, 0)
+            # Lower score is better (priority + inverse performance)
+            return priority + (1.0 / (perf_score + 0.1))
+
+        sorted_mirrors = sorted(mirrors, key=mirror_score)
+
+    return sorted_mirrors[0] if sorted_mirrors else None
+
+def build_prefetch_command_with_mirror(srr_id: str, output_root: Path, mirror: Dict[str, Any],
+                                     transport: str = None) -> List[str]:
+    """Build prefetch command with mirror-specific parameters"""
+    cmd = ["prefetch", srr_id, "--output-directory", str(output_root)]
+
+    # Add transport if specified
+    if transport or mirror.get('transport'):
+        cmd.extend(["--transport", transport or mirror.get('transport')])
+
+    # Add location if specified
+    if mirror.get('location'):
+        cmd.extend(["--location", mirror.get('location')])
+
+    # Add URL if specified (for custom mirrors)
+    if mirror.get('url'):
+        cmd.extend(["--url", mirror.get('url')])
+
+    # Add standard options
+    cmd.extend(["--verify", "yes", "--resume", "yes", "--progress"])
+
+    return cmd
+
+def check_mirror_health(mirror: Dict[str, Any], timeout: int = 10) -> bool:
+    """Check if a mirror is healthy by attempting a connection"""
+    try:
+        # Simple health check - try to connect to common endpoints
+        if mirror.get('location') == 'ena':
+            # ENA health check - use a lighter endpoint
+            response = requests.get('https://www.ebi.ac.uk/ena/', timeout=timeout)
+            return response.status_code == 200
+        elif mirror.get('location') == 'ddbj':
+            # DDBJ health check - use main page
+            response = requests.get('https://www.ddbj.nig.ac.jp/', timeout=timeout)
+            return response.status_code == 200
+        elif mirror.get('location') == 'ncbi':
+            # NCBI health check - use main page
+            response = requests.get('https://www.ncbi.nlm.nih.gov/', timeout=timeout)
+            return response.status_code == 200
+        else:
+            # Default to True for unknown mirrors
+            return True
+    except Exception as e:
+        logging.getLogger(__name__).debug(f"Mirror health check failed for {mirror.get('name', 'unknown')}: {e}")
+        return False
 
 
 # ================= Safer single-sample worker =================
@@ -183,22 +280,102 @@ def _gzip_compress(path_fastq: str, threads: int = 4) -> str:
     return str(gz)
 
 # ================= 获取 SRA 文件元信息（大小 + MD5） =================
-def get_sra_metadata(srr_id):
-    ena_url = f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={srr_id}&result=read_run&fields=run_accession,fastq_bytes,fastq_md5"
+import os, time, re, csv, requests
+from typing import Optional
+
+_NCBI_TOOL = "omicverse-prefetch"
+_NCBI_EMAIL = os.environ.get("NCBI_EMAIL", "none@example.com")
+_NCBI_API_KEY = os.environ.get("NCBI_API_KEY")  # 可选，提高速率配额
+
+def _req(url: str, params: dict, timeout=8, max_retries=5, backoff=0.8) -> requests.Response:
+    """带 429 退避重试的请求器"""
+    params = dict(params or {})
+    params.setdefault("tool", _NCBI_TOOL)
+    params.setdefault("email", _NCBI_EMAIL)
+    if _NCBI_API_KEY:
+        params.setdefault("api_key", _NCBI_API_KEY)
+    for i in range(max_retries):
+        r = requests.get(url, params=params, timeout=timeout)
+        if r.status_code == 429 or r.status_code >= 500:
+            # 退避
+            sleep_s = backoff * (2 ** i)
+            time.sleep(sleep_s)
+            continue
+        r.raise_for_status()
+        return r
+    # 最后一轮若仍失败，抛出
+    r.raise_for_status()
+    return r  # for type hints
+
+def get_sra_metadata(srr_id: str) -> dict:
+    """
+    返回单 SRR 的估计压缩大小（字节）与 md5 列表：
+      1) esearch -> esummary(expxml) 解析 total_size(整组) 与 per-Run total_bases 比例 -> 估算本 SRR
+      2) 失败则回退 ENA submitted_bytes（更接近 .sra/.sralite）
+      3) 都失败则返回 {'size': None, 'md5s': []}
+    """
+    # ---- NCBI：先 esearch 得 UID ----
     try:
-        response = requests.get(ena_url)
-        lines = response.text.strip().split('\n')
-        if len(lines) < 2:
-            raise ValueError("返回数据格式异常")
-        data_line = lines[1]
-        cols = data_line.split('\t')
-        size_str, md5_str = cols[1], cols[2]
-        sizes = [int(x) for x in size_str.split(';') if x.isdigit()]
-        md5s = [x.strip() for x in md5_str.split(';') if x.strip()]
-        return {'size': sum(sizes), 'md5s': md5s}
+        esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        r = _req(esearch_url, {"db": "sra", "term": srr_id, "retmode": "json"})
+        idlist = r.json().get("esearchresult", {}).get("idlist", [])
+        if idlist:
+            uid = idlist[0]
+            # ---- esummary 取 expxml ----
+            esum_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+            r2 = _req(esum_url, {"db": "sra", "id": uid, "retmode": "json"})
+            js = r2.json()
+            expxml = js.get("result", {}).get(uid, {}).get("expxml", "") or ""
+            # total_size 是整个 SRX 的压缩总量
+            m_total = re.search(r'total_size="(\d+)"', expxml)
+            total_size = int(m_total.group(1)) if m_total else None
+            # 解析各 Run 的 total_bases
+            runs = re.findall(r'<Run acc="(SRR\d+)"[^>]*total_bases="(\d+)"', expxml)
+            if total_size and runs:
+                bases = {acc: int(b) for acc, b in runs}
+                sum_b = sum(bases.values()) or 1
+                if srr_id in bases:
+                    est = int(total_size * bases[srr_id] / sum_b)
+                    return {"size": est, "md5s": []}
+            # 没解析出 per-run，就退回 total_size（不理想，但总比 fastq_bytes 准）
+            if total_size:
+                return {"size": total_size/2.3, "md5s": []}
+    except requests.HTTPError as e:
+        # 显式打印 429 等情况，但不中断流程
+        print(f"[WARN] NCBI 元信息获取失败: {e}")
     except Exception as e:
-        print(f"获取SRA元信息失败: {str(e)}")
-        return {'size': None, 'md5s': []}
+        print(f"[WARN] NCBI 元信息获取失败: {e}")
+
+    # ---- ENA 回退：用 submitted_bytes / submitted_md5，更接近提交的压缩包 ----
+    try:
+        ena_url = "https://www.ebi.ac.uk/ena/portal/api/filereport"
+        params = {
+            "accession": srr_id,
+            "result": "read_run",
+            "fields": "run_accession,submitted_bytes,submitted_md5",
+        }
+        r3 = requests.get(ena_url, params=params, timeout=8)
+        r3.raise_for_status()
+        txt = r3.text.strip()
+        # 用 csv 解析，避免 split 越界
+        rows = list(csv.DictReader(txt.splitlines(), delimiter="\t"))
+        size_sum = 0
+        md5s = []
+        for row in rows:
+            bytes_val = (row.get("submitted_bytes") or "").strip()
+            md5_val = (row.get("submitted_md5") or "").strip()
+            # submitted_bytes 可能是 "123;456"、"-" 或空
+            parts = [p for p in bytes_val.split(";") if p.strip().isdigit()]
+            size_sum += sum(int(p) for p in parts)
+            if md5_val and md5_val != "-":
+                md5s.extend([x.strip() for x in md5_val.split(";") if x.strip()])
+        if size_sum > 0:
+            return {"size": size_sum, "md5s": md5s}
+    except Exception as e:
+        print(f"[WARN] ENA 元信息获取失败: {e}")
+
+    # ---- 无法取得可靠大小 ----
+    return {"size": None, "md5s": []}
 
 def calculate_md5(filepath, chunk_size=8192):
     md5 = hashlib.md5()
@@ -226,8 +403,89 @@ def estimate_remaining_time(current, total, speed):
     return time.strftime("%H:%M:%S", time.gmtime(remaining))
 
 def get_downloaded_file_size(output_root: Path, srr_id: str):
-    tmp_file = output_root / srr_id / f"{srr_id}.sra.tmp"
-    return tmp_file.stat().st_size if tmp_file.exists() else 0
+    """Get the downloaded file size by checking multiple possible file locations"""
+    output_root = Path(output_root)
+    srr_dir = output_root / srr_id
+
+    # Prefetch creates nested directory structure: output_root/srr_id/srr_id/
+    nested_srr_dir = srr_dir / srr_id
+
+    # Check for .sralite temporary file first (since we now know this is the actual format)
+    # Try nested directory first (current prefetch behavior)
+    sralite_tmp_file = nested_srr_dir / f"{srr_id}.sralite.tmp"
+    if sralite_tmp_file.exists():
+        try:
+            return sralite_tmp_file.stat().st_size
+        except OSError:
+            pass
+
+    # Try flat directory structure as fallback
+    sralite_tmp_file = srr_dir / f"{srr_id}.sralite.tmp"
+    if sralite_tmp_file.exists():
+        try:
+            return sralite_tmp_file.stat().st_size
+        except OSError:
+            pass
+
+    # Check for the final .sralite file in nested directory
+    sralite_file = nested_srr_dir / f"{srr_id}.sralite"
+    if sralite_file.exists():
+        try:
+            return sralite_file.stat().st_size
+        except OSError:
+            pass
+
+    # Try flat directory as fallback
+    sralite_file = srr_dir / f"{srr_id}.sralite"
+    if sralite_file.exists():
+        try:
+            return sralite_file.stat().st_size
+        except OSError:
+            pass
+
+    # Check for .sra temporary file in nested directory
+    sra_tmp_file = nested_srr_dir / f"{srr_id}.sra.tmp"
+    if sra_tmp_file.exists():
+        try:
+            return sra_tmp_file.stat().st_size
+        except OSError:
+            pass
+
+    # Try flat directory as fallback
+    sra_tmp_file = srr_dir / f"{srr_id}.sra.tmp"
+    if sra_tmp_file.exists():
+        try:
+            return sra_tmp_file.stat().st_size
+        except OSError:
+            pass
+
+    # Check for the final .sra file in nested directory
+    sra_file = nested_srr_dir / f"{srr_id}.sra"
+    if sra_file.exists():
+        try:
+            return sra_file.stat().st_size
+        except OSError:
+            pass
+
+    # Try flat directory as fallback
+    sra_file = srr_dir / f"{srr_id}.sra"
+    if sra_file.exists():
+        try:
+            return sra_file.stat().st_size
+        except OSError:
+            pass
+
+    # Fallback: check for any .sra or .sralite files in both directories
+    for check_dir in [nested_srr_dir, srr_dir]:
+        if check_dir.exists():
+            all_files = list(check_dir.glob("*.sra")) + list(check_dir.glob("*.sralite")) + list(check_dir.glob("*.sra.tmp")) + list(check_dir.glob("*.sralite.tmp"))
+            if all_files:
+                try:
+                    return max(f.stat().st_size for f in all_files)
+                except OSError:
+                    pass
+
+    return 0
 
 def record_to_log(srr_id: str, status: str):
     log_file = "success.log" if status == "success" else "fail.log"
@@ -252,23 +510,45 @@ def setup_logger(srr_id):
     return logger
 
 # ====================Prefetch Setting==============================
-def resolve_sra_path(srr_id: str) -> Path | None:
+def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | None:
     """
-    用 srapath 解析 SRR 对应的真实 .sra 路径（可能在 ~/.ncbi/public/sra/）。
-    返回 Path 或 None。
+    在 output_root 下为 srr_id 查找 .sra/.sralite 文件：
+    1) 先快速检查常见的 0/1 层
+    2) 再在 srr 子目录内 rglob 递归查找
+    3) 轮询等待，直到 timeout 秒或命中有效文件（非空）
     """
-    try:
-        out = subprocess.check_output(["srapath", srr_id], text=True).strip().splitlines()
-    except Exception:
-        return None
-    for line in out:
-        p = Path(line.strip())
-        if p.suffix.lower() == ".sra" and p.exists():
+    output_root = Path(output_root)
+    srr_dir = output_root / srr_id
+
+    def _ready(p: Path) -> bool:
+        try:
+            return p.exists() and p.stat().st_size > 0
+        except Exception:
+            return False
+
+    # 先快速直查
+    quick = [
+        output_root / f"{srr_id}.sra",
+        output_root / f"{srr_id}.sralite",
+        srr_dir / f"{srr_id}.sra",
+        srr_dir / f"{srr_id}.sralite",
+    ]
+    for p in quick:
+        if _ready(p):
             return p
-    for line in out:
-        p = Path(line.strip()) / f"{srr_id}.sra"
-        if p.exists():
-            return p
+
+    # 轮询 + 递归
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if srr_dir.exists():
+            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # 匹配 .sra/.sralite
+            # 选最新那个，避免抓到未完成的中间文件
+            hits = [h for h in hits if _ready(h)]
+            if hits:
+                hits.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                return hits[0]
+        time.sleep(0.5)
+
     return None
 
 def ensure_symlink(target: Path, real: Path) -> None:
@@ -331,162 +611,226 @@ def check_step_completed(step: dict, srr_id: str, logger=None) -> tuple[bool, li
 
     return done, outs
 
-def run_prefetch_with_progress(srr_id, logger, retries=3, output_root: str | Path = "sra_cache"):
+def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
+                      output_root: str | Path = "sra_cache", location: str = "ncbi") -> bool:
     """
-    稳健的 prefetch：
-      1) 目标路径：sra_cache/<SRR>/<SRR>.sra
-      2) 已存在则先 vdb-validate，通过即跳过
-      3) 使用 --verify yes --resume yes 下载
-      4) 下载结束统一 vdb-validate 作为最终校验
-    说明：ENA 的 fastq_md5 是 FASTQ 的 MD5，不适用于 .sra；因此不再用其做 .sra 校验
+    Basic prefetch without any mirror switching - uses standard prefetch with basic parameters
     """
-    # 根目录与目标路径
     output_root = Path(output_root)
     srr_dir = output_root / srr_id
     output_path = srr_dir / f"{srr_id}.sra"
+    sralite_path = srr_dir / f"{srr_id}.sralite"
     srr_dir.mkdir(exist_ok=True, parents=True)
-    # （可选）仅作显示用途的预估总大小；拿不到也不影响流程
+
+    candidates = list(srr_dir.glob(f"**/{srr_id}.sra")) + list(srr_dir.glob(f"**/{srr_id}.sralite"))
+    for path in candidates:
+        
+    # Try existing file validation first - check for both .sra and .sralite files
+    
+        try:
+            subprocess.run(["vdb-validate", str(path)],
+                          check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            logger.info(f"{path.name} 已存在且通过 vdb-validate，跳过下载")
+            record_to_log(srr_id, "success")
+            return True
+        except subprocess.CalledProcessError:
+            logger.info(f"{path.name} 存在但未通过 vdb-validate，将尝试重新下载")
+
+    # Use minimal parameters to match successful terminal usage
+    # Add --type sra to ensure we download .sra files instead of .sralite
+    cmd = [
+        "prefetch", srr_id,
+        "--output-directory", str(srr_dir),
+        "--verify", "yes",
+        "--resume", "yes",
+    ]
+
+    # Only add location if explicitly needed and not "auto"
+    if location and location != "auto":
+        cmd.extend(["--location", location])
+
+    logger.info(f"开始下载 {srr_id} (location: {location})")
+    logger.debug(f"执行命令: {' '.join(cmd)}")
+
+    # Get metadata for file size estimation
     try:
         meta = get_sra_metadata(srr_id)
         total_size = meta.get("size") if isinstance(meta, dict) else None
         if not isinstance(total_size, int) or total_size <= 0:
-            total_size = None
+            # 若没有总量，但已经开始下载一段时间了，就给个软上限，避免一直没百分比
+          if total_size is None and current_size > 0 and elapsed_time > 3:
+              # 初次设置一个软上限（当前值的 1.3 倍）
+              total_size = int(current_size * 1.3)
+              pbar.total = total_size
+              pbar.refresh()
+          # 若逼近上限，则抬高上限，避免显示 >100%
+          if total_size and current_size > total_size * 0.95:
+              total_size = int(current_size * 1.1)
+              pbar.total = total_size
+              pbar.refresh()
     except Exception:
         total_size = None
 
-    # 如果文件已存在，先做官方校验；通过就跳过
-    if output_path.exists():
-        try:
-            subprocess.run(["vdb-validate", str(output_path)],
-                           check=True,
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
-            logger.info(f"{srr_id}.sra 已存在且通过 vdb-validate，跳过下载")
-            record_to_log(srr_id, "success")
-            return True
-        except subprocess.CalledProcessError:
-            logger.info(f"{srr_id}.sra 存在但未通过 vdb-validate，将尝试重新下载")
-
-    # 进度条（拿不到 total_size 就显示为“未知总量”）
+    # Enhanced progress bar with real-time tracking
     downloaded_size = get_downloaded_file_size(output_root, srr_id)
-    bar_total = total_size if isinstance(total_size, int) and total_size > 0 else None
     pbar = tqdm(
-        desc=f"\U0001F4E5 Prefetch {srr_id}",
+        desc=f"📥 Prefetch {srr_id}",
         total=total_size,
-        initial=downloaded_size if bar_total else 0,
+        initial=downloaded_size,
         unit='B', unit_scale=True, unit_divisor=1024,
-        dynamic_ncols=True, leave=False, mininterval=0.25,
+        dynamic_ncols=True, leave=False,
+        mininterval=0.1,  # More frequent updates
+        maxinterval=0.5   # Maximum update interval
     )
 
-    last_err = None
-    for attempt in range(retries):
-        try:
-            # 清理锁文件（偶发残留）
-            ext_lock = output_path.with_suffix('.sra.lock')
-            if ext_lock.exists():
-                ext_lock.unlink()
-                logger.warning(f"清除外部锁文件: {ext_lock}")
-            inner_lock = srr_dir / f"{srr_id}.sra.lock"
-            if inner_lock.exists():
-                inner_lock.unlink()
-                logger.warning(f"清除内部锁文件: {inner_lock}")
-            
-            start_time = time.time()
-            # 启动 prefetch
-            proc = subprocess.Popen(
-                [
-                    "prefetch", srr_id,
-                    "--output-directory", str(output_root),
-                    #"--verify", "yes",     # 官方完整性校验
-                    #"--resume", "yes",     # 断点续传
-                    #"--progress"           # 控制台进度（也会写到 stdout）
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                universal_newlines=True
-            )
+    try:
+        # Start prefetch process with real-time output capture
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            universal_newlines=True
+        )
 
-            # 轮询更新进度
-            
-            while True:
-                # 读 stdout（可选：记录到 logger）
-                last_size = downloaded_size
-                prev_size = last_size
-                current_size = get_downloaded_file_size(output_root, srr_id)
-                
-                if proc.stdout:
-                    line = proc.stdout.readline()
-                    if line:
-                        logger.debug(line.strip())
+        start_time = time.time()
+        last_size = downloaded_size
+        last_update_time = start_time
+        speed_samples = []
+        no_change_count = 0
 
-                # 更新进度：读取 .tmp 文件大小（prefetch 的写入临时）
-                cur_size = current_size
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            current_size = get_downloaded_file_size(output_root, srr_id)
 
-                if cur_size > last_size:
-                    delta = cur_size - last_size
-                    pbar.update(delta)  # 没 total 时不累加 total，只显示 desc
-                    # 可选显示速度/ETA（total 不确定时仅显示速度）
-                    speed = delta / 0.25
-                    
-                    eta_str = estimate_remaining_time(cur_size, bar_total, speed) if bar_total else ""
-                    pbar.set_postfix_str(
-                        f"{human_readable_speed(speed)}" + (f" | 剩余: {eta_str}" if eta_str else "")
-                    )
-                    last_size = cur_size
+            # Read stdout for progress information - simplified approach
+            if proc.stdout:
+                line = proc.stdout.readline()
+                if line:
+                    logger.debug(line.strip())
+                    # Just log the output, don't try to parse complex progress info
+                    # The file system check will handle progress tracking
 
-                if proc.poll() is not None:
-                    break
+            # Update progress and calculate speed - more frequent updates
+            if current_size != last_size:
+                delta = current_size - last_size
+                time_delta = current_time - last_update_time
 
-                time.sleep(0.25)
+                if time_delta > 0:  # Any time difference
+                    speed = delta / time_delta if time_delta > 0 else 0
+                    speed_samples.append(speed)
+                    # Keep only recent samples
+                    if len(speed_samples) > 20:
+                        speed_samples.pop(0)
 
-            # 读取剩余输出，检查退出码
-            stdout_rest, _ = proc.communicate()
-            if proc.returncode != 0:
-                logger.error(f"prefetch 失败 (退出码 {proc.returncode})\n{stdout_rest}")
-                raise subprocess.CalledProcessError(proc.returncode, proc.args)
+                    # Update progress bar with speed and ETA
+                    avg_speed = sum(speed_samples) / len(speed_samples) if speed_samples else 0
+                    eta_str = estimate_remaining_time(current_size, total_size, avg_speed) if total_size else ""
 
-            # 至此 prefetch 正常退出，关闭进度条
-            pbar.close()
+                    # Update progress bar display
+                    if total_size:
+                        pbar.set_postfix_str(
+                            f"{human_readable_speed(avg_speed)}" + (f" | 剩余: {eta_str}" if eta_str else "")
+                        )
+                    else:
+                        pbar.set_postfix_str(f"{human_readable_speed(avg_speed)}")
 
-            # 确认目标文件存在
-            #if not output_path.exists():
-             #   logger.error(f"{srr_id}.sra 未找到：{output_path}")
-             #   last_err = FileNotFoundError(str(output_path))
-              #  continue
+                # Always update progress bar, even for small changes
+                if delta > 0:
+                    pbar.update(delta)
 
-            # 结束后统一做 vdb-validate（**你要的校验就加在这里**）
-            val = subprocess.run(["vdb-validate", str(output_path)], capture_output=True, text=True)
-            if val.returncode == 0:
-                logger.info(f"{srr_id}.sra 下载成功并通过 vdb-validate")
-                record_to_log(srr_id, "success")
-                return True
+                last_size = current_size
+                last_update_time = current_time
+                no_change_count = 0
             else:
-                logger.warning(
-                    f"{srr_id}.sra 下载完成但 vdb-validate 失败；输出：\n{val.stdout}\n{val.stderr}"
-                )
-                last_err = RuntimeError("vdb-validate failed")
-                # 失败则进入下一轮重试（如果还有）
+                # No size change - still update display periodically
+                time_delta = current_time - last_update_time
+                if time_delta > 0.5:  # Update every 0.5 seconds
+                    total_time = current_time - start_time
+                    if total_time > 0 and speed_samples:
+                        avg_speed = sum(speed_samples[-5:]) / min(len(speed_samples), 5)
+                        eta_str = estimate_remaining_time(current_size, total_size, avg_speed) if total_size else ""
+                        if total_size:
+                            pbar.set_postfix_str(
+                                f"{human_readable_speed(avg_speed)}" + (f" | 剩余: {eta_str}" if eta_str else "")
+                            )
+                        else:
+                            pbar.set_postfix_str(f"{human_readable_speed(avg_speed)}")
+                    last_update_time = current_time
 
-        except subprocess.CalledProcessError as e:
-            last_err = e
-            logger.error(f"Prefetch失败 (尝试 {attempt}/{retries}): {e}")
-            time.sleep(5)
+                no_change_count += 1
+                # Force refresh progress bar display more frequently
+                if no_change_count % 3 == 0:  # Every 0.75 seconds
+                    pbar.refresh()
 
-    # 全部重试失败
-    pbar.close()
-    logger.error(f"{srr_id} 最终失败：{last_err}")
-    record_to_log(srr_id, "fail")
-    return False
+            # Check if process finished
+            if proc.poll() is not None:
+                break
 
-COMMAND_STEPS = [
-    {
-        'name': 'prefetch',
-        'command': run_prefetch_with_progress,
-        'outputs': ['{SRR}/{SRR}.sra'],
-        'validation': lambda fs: all(os.path.getsize(f) > 1_000_000 for f in fs)
-    }
-]
+            time.sleep(0.25)
+
+        # Process finished, check exit code
+        stdout_rest, _ = proc.communicate()
+        pbar.close()
+
+        if proc.returncode == 0:
+            # Check for both .sra and .sralite files
+
+            real = find_sra_file(srr_id=srr_id, output_root=output_root, timeout=30)
+            if real:
+                # 可选：强校验
+                try:
+                    val = subprocess.run(["vdb-validate", str(real)], capture_output=True, text=True)
+                    if val.returncode == 0:
+                        logger.info(f"{Path(real).name} 下载成功并通过 vdb-validate")
+                        record_to_log(srr_id, "success")
+                        return True
+                    else:
+                        logger.warning(f"{Path(real).name} 下载完成但 vdb-validate 失败")
+                        logger.warning(f"Validation error: {val.stderr}")
+                        # vdb-validate 未通过也返回 False，让上游决定是否继续 fasterq
+                        return False
+                except Exception as e:
+                    logger.warning(f"vdb-validate 执行异常（将以已落盘为准）：{e}")
+                    return True
+            else:
+                # 这里不要报 ERROR（因为可能只是落盘/重命名延迟），交给上层 _worker 再兜底
+                logger.debug(f"Prefetch completed but file not visible yet under {output_root}/{srr_id}（延后由上层兜底解析）")
+                return False
+        else:
+            logger.error(f"Prefetch failed with exit code {proc.returncode}")
+            logger.error(f"Error output: {stdout_rest}")
+            return False
+
+    except Exception as e:
+        pbar.close()
+        logger.error(f"下载过程中发生错误: {e}")
+        return False
+
+def run_prefetch_with_progress(srr_id, logger, retries=3, output_root: str | Path = "sra_cache",
+                               prefetch_config: Optional[Dict[str, Any]] = None):
+    """
+    Simplified prefetch wrapper that uses the basic prefetch function.
+
+    Args:
+        srr_id: SRA accession ID
+        logger: Logger instance
+        retries: Number of retry attempts
+        output_root: Output directory for downloaded files
+        prefetch_config: Optional prefetch configuration
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    # Use basic prefetch function with configuration support
+    if prefetch_config and prefetch_config.get('enabled', False):
+        # Extract location from config, default to ncbi
+        location = prefetch_config.get('location', 'ncbi')
+        return run_prefetch_basic(srr_id, logger, retries, output_root, location)
+
+    # Use default settings
+    return run_prefetch_basic(srr_id, logger, retries, output_root)
 
 def process_srr(srr_id, max_retry=3):
     logger = setup_logger(srr_id)

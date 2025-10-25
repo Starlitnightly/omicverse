@@ -192,7 +192,7 @@ def make_star_step(
                 accession_for_species=accession_for_species,
             )
 
-        with ThreadPoolExecutor(max_workers=int(max_workers)) as ex:
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
             futs = {ex.submit(_worker, it): it[0] for it in clean_fastqs}
             for fut in as_completed(futs):
                 srr = futs[fut]
@@ -205,9 +205,16 @@ def make_star_step(
                         logger.error(f"[STAR] {srr} failed: {msg}")
 
         if errors:
-            # 你也可以选择继续返回成功的部分
+            # 记录错误但继续处理成功的样本
             err_msg = "; ".join([f"{s}:{m}" for s, m in errors])
-            raise RuntimeError(f"STAR failed for {len(errors)} samples: {err_msg}")
+            if logger:
+                logger.error(f"STAR failed for {len(errors)} samples: {err_msg}")
+            # 只返回成功的样本，让下游步骤可以继续处理
+            if logger:
+                logger.warning(f"Continuing with {len(products)} successful samples out of {len(clean_fastqs)}")
+            # 如果全部失败才抛出异常
+            if len(products) == 0:
+                raise RuntimeError(f"STAR failed for all samples: {err_msg}")
 
         # 保持与输入顺序一致
         order = {s: i for i, (s, _, _) in enumerate(clean_fastqs)}

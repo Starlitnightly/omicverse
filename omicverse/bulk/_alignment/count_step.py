@@ -39,16 +39,21 @@ def make_featurecounts_step(
                 f"  - FC_GTF_HINT (env): {os.environ.get('FC_GTF_HINT')}"
             )
 
-        # 调用你的批量计数函数（保持原有参数不变）
-        return feature_counts_batch(
-            bam_items=list(bam_pairs),   # [(srr, bam)]
-            out_dir=out_root,
-            gtf=gtf_use,
-            simple=simple,
-            by=by,
-            threads=threads,
-            max_workers=None,            # 如需并行可按需加
-        )
+        # 调用批量计数函数，添加错误处理
+        try:
+            return feature_counts_batch(
+                bam_items=list(bam_pairs),   # [(srr, bam)]
+                out_dir=out_root,
+                gtf=gtf_use,
+                simple=simple,
+                by=by,
+                threads=threads,
+                max_workers=None,            # 如需并行可按需加
+            )
+        except Exception as e:
+            if logger:
+                logger.error(f"[featureCounts] Batch processing failed: {e}")
+            raise RuntimeError(f"featureCounts batch processing failed: {e}") from e
 
 
     return {

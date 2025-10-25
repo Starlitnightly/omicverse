@@ -20,7 +20,12 @@ def _run_edirect(term: str, timeout: int = 240) -> str:
         raise RunInfoError("Entrez Direct not found (esearch/efetch). Add $HOME/edirect to PATH.")
     # 用 bash -lc 支持管道；对 term 加引号
     cmd = f'''{esearch} -db sra -query "{term}" | {efetch} -format runinfo'''
-    proc = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=timeout)
+    try:
+        proc = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise RunInfoError(f"EDirect timeout for {term} after {timeout}s")
+    except Exception as e:
+        raise RunInfoError(f"EDirect execution failed for {term}: {str(e)}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[:400]
         raise RunInfoError(f"EDirect failed for {term}: {err}")

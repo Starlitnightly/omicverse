@@ -1,14 +1,14 @@
 # pipeline.py
 from __future__ import annotations
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterable, Union, List
 import pandas as pd
 from .sra_prefetch import make_prefetch_step, run_prefetch_with_progress, _make_local_logger
 from .sra_fasterq import make_fasterq_step
 from .qc_fastp import make_fastp_step
 from .star_step import make_star_step
 from .count_step import make_featurecounts_step
-import .tools_check
+from . import tools_check
 import os
 
 # 1) 声明式组合步骤（可根据项目需求自由调整参数）

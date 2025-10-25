@@ -1,10 +1,69 @@
 # count_tools.py featureCounts 批量版本
 from __future__ import annotations
-import os, subprocess
+import os, subprocess, sys
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
+from datetime import datetime
 
+
+def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads: int = 8, simple: bool = True, featurecounts_path: str = None):
+    """Helper function that accepts a pre-resolved featureCounts path"""
+    if featurecounts_path is None:
+        return _feature_counts_one(bam_path, out_dir, gtf, threads, simple)
+
+    # Use the provided path directly
+    srr = Path(bam_path).stem.replace(".bam", "")
+    out_prefix = Path(out_dir) / srr
+    out_file = f"{out_prefix}.counts.txt"
+
+    if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
+        return srr, out_file
+
+    cmd = [
+        featurecounts_path,
+        "-T", str(threads),
+        "-a", gtf,
+        "-o", out_file,
+        bam_path
+    ]
+
+    # Use proper environment
+    from .tools_check import merged_env
+    env = merged_env()
+
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"[featureCounts] 无法执行 featureCounts (路径: {featurecounts_path})\n"
+            f"文件存在: {os.path.exists(featurecounts_path)}\n"
+            f"文件可执行: {os.access(featurecounts_path, os.X_OK)}\n"
+            f"原始错误: {e}"
+        ) from e
+
+    # 简化输出（自动识别计数列）
+    if simple and os.path.exists(out_file):
+        df = pd.read_csv(out_file, sep="\t", comment="#")
+        # featureCounts 的注释列
+        annot_cols = {"Geneid", "Chr", "Start", "End", "Strand", "Length"}
+        # 找出计数列（通常只有 1 列；列名是 BAM 名称/路径）
+        count_cols = [c for c in df.columns if c not in annot_cols]
+        if len(count_cols) == 0:
+            raise ValueError(f"No count columns found in {out_file}. Got columns: {list(df.columns)}")
+        if len(count_cols) > 1:
+            # 多 BAM 情况下这里按需处理；本函数是"单个 bam"，理论上==1
+            # 保险起见，取最后一列当计数列
+            counts_col = count_cols[-1]
+        else:
+            counts_col = count_cols[0]
+
+        df_simple = df[["Geneid", counts_col]].rename(
+            columns={"Geneid": "gene_id", counts_col: srr}
+        )
+        df_simple.to_csv(out_file, sep="\t", index=False)
+
+    return srr, out_file
 
 def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8, simple: bool = True):
     # -------------- 新增安全判断 --------------
@@ -16,7 +75,7 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
             "请确认 pipeline 已设置 FC_GTF_HINT 或传入 gtf 参数。"
         )
     # -----------------------------------------
-    
+
     srr = Path(bam_path).stem.replace(".bam", "")
     out_prefix = Path(out_dir) / srr
     out_file = f"{out_prefix}.counts.txt"
@@ -24,14 +83,55 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
     if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
         return srr, out_file
 
+    # -------------- 增强的 featureCounts 检测 --------------
+    from .tools_check import resolve_tool, merged_env
+    import shutil
+
+    featurecounts_path = resolve_tool("featureCounts")
+    if not featurecounts_path:
+        # 详细的环境诊断信息
+        env_path = os.environ.get("PATH", "Not set")
+        jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
+
+        raise RuntimeError(
+            f"[featureCounts] 无法找到 featureCounts 可执行文件。\n"
+            f"这可能是因为 Jupyter Lab 内核环境与系统环境不同。\n\n"
+            f"诊断信息:\n"
+            f"  - 当前 Python: {sys.executable}\n"
+            f"  - Jupyter 内核路径: {jupyter_kernel_path}\n"
+            f"  - PATH 环境变量包含 omicverse: {'omicverse' in env_path}\n"
+            f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
+            f"解决方案:\n"
+            f"  1. 在 Jupyter cell 中运行: !which featureCounts\n"
+            f"  2. 如果找不到，安装: !conda install -c bioconda subread -y\n"
+            f"  3. 或者设置环境变量: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
+            f"注意: 'No such file or directory' 指的是找不到 featureCounts 程序，\n"
+            f"      而不是目录不存在，请不要手动创建目录。"
+        )
+
+    # 使用找到的完整路径而不是依赖 PATH
     cmd = [
-        "featureCounts",
+        featurecounts_path,
         "-T", str(threads),
         "-a", gtf,
         "-o", out_file,
         bam_path
     ]
-    subprocess.run(cmd, check=True)
+
+    # Use proper environment to ensure featureCounts is found
+    env = merged_env()
+
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    except FileNotFoundError as e:
+        # 如果仍然找不到，提供更详细的错误信息
+        raise RuntimeError(
+            f"[featureCounts] 即使找到路径仍无法执行 featureCounts。\n"
+            f"尝试的路径: {featurecounts_path}\n"
+            f"文件存在: {os.path.exists(featurecounts_path)}\n"
+            f"文件可执行: {os.access(featurecounts_path, os.X_OK)}\n"
+            f"原始错误: {e}"
+        ) from e
     
     # 简化输出（自动识别计数列）
     if simple and os.path.exists(out_file):
@@ -65,7 +165,7 @@ def feature_counts_batch(
     by: str = "auto",
     threads: int = 8,
     max_workers: int | None = None
-):
+) -> dict[str, object]:
     """
     Run featureCounts on multiple BAM files.
     """
@@ -78,13 +178,45 @@ def feature_counts_batch(
             "[featureCounts_batch] GTF not provided and FC_GTF_HINT not found. "
             "请在 pipeline 推断 GTF 或手动传入。"
         )
+
+    # -------------- 增强的 featureCounts 检测 --------------
+    from .tools_check import resolve_tool, merged_env
+    import shutil
+
+    featurecounts_path = resolve_tool("featureCounts")
+    if not featurecounts_path:
+        # 详细的环境诊断信息
+        env_path = os.environ.get("PATH", "Not set")
+        jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
+
+        raise RuntimeError(
+            f"[featureCounts_batch] 无法找到 featureCounts 可执行文件。\n"
+            f"这可能是因为 Jupyter Lab 内核环境与系统环境不同。\n\n"
+            f"诊断信息:\n"
+            f"  - 当前 Python: {sys.executable}\n"
+            f"  - Jupyter 内核路径: {jupyter_kernel_path}\n"
+            f"  - PATH 环境变量包含 omicverse: {'omicverse' in env_path}\n"
+            f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
+            f"解决方案:\n"
+            f"  1. 在 Jupyter cell 中运行: !which featureCounts\n"
+            f"  2. 如果找不到，安装: !conda install -c bioconda subread -y\n"
+            f"  3. 或者设置环境变量: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
+            f"注意: 'No such file or directory' 指的是找不到 featureCounts 程序，\n"
+            f"      而不是目录不存在，请不要手动创建目录。"
+        )
     # -----------------------------------------
 
     results, errors = [], []
 
-    with ProcessPoolExecutor(max_workers=max_workers or min(8, os.cpu_count() // threads)) as ex:
+    # 计算合适的worker数量，避免资源竞争
+    if max_workers is None:
+        cpu_count = os.cpu_count() or 1
+        # 确保每个worker有足够的CPU资源
+        max_workers = min(4, cpu_count // max(1, threads // 4))
+
+    with ProcessPoolExecutor(max_workers=max_workers) as ex:
         futures = {
-            ex.submit(_feature_counts_one, bam, out_dir, gtf, threads, simple): srr
+            ex.submit(_feature_counts_one_with_path, bam, out_dir, gtf, threads, simple, featurecounts_path): srr
             for srr, bam in bam_items
         }
         for fut in as_completed(futures):
@@ -183,20 +315,20 @@ def feature_counts_batch(
 
     return {
         "tables": results,                 # 例如 [(srr, sample_table_path), ...]，按你现有结构
-        "matrix": str(out_path),
+        "matrix": str(out_path) if 'out_path' in locals() else None,
         "failed": errors if 'errors' in locals() else [],
     }
 
 def run_featurecounts_auto(
-    bam_files: List[str | Path],
+    bam_files: list[str | Path],
     index_dir: str | Path,
     out_dir: str = "results",
-    accession_id: Optional[str] = None,   # e.g. "GSE157103"
-    srr_id: Optional[str] = None,         # e.g. "SRR12544419"（单样本时）
+    accession_id: str | None = None,   # e.g. "GSE157103"
+    srr_id: str | None = None,         # e.g. "SRR12544419"（单样本时）
     threads: int = 12,
     output_csv: bool = True,
     simple: bool = True,                # ✅ 新增：是否精简输出
-    featurecounts_bin: Optional[str] = None,  # 可留空，自动用 PATH 解析
+    featurecounts_bin: str | None = None,  # 可留空，自动用 PATH 解析
 ) -> Path:
     """
     - 自动从 STAR index 定位 GTF（并在需要时解压 .gtf.gz）
@@ -234,7 +366,10 @@ def run_featurecounts_auto(
         "-o", str(out_txt),
     ] + bam_files
     print(">>", " ".join(cmd))
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    # Use proper environment to ensure featureCounts is found
+    from .tools_check import merged_env
+    env = merged_env()
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     if proc.returncode != 0:
         print(proc.stdout)
         print(proc.stderr)
