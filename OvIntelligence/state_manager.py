@@ -34,6 +34,9 @@ DEFAULT_STATE: Dict[str, Any] = {
     "paper_stage1_results": [],
     "llm_temp": 0.5,
     "llm_top_p": 0.5,
+    "available_skills": {},
+    "skill_usage_log": [],
+    "last_skill_match": None,
 }
 
 def initialize_session_state() -> None:

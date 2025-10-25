@@ -158,6 +158,17 @@ Skills are automatically discovered by Claude from three sources:
 * Project Skills: `.claude/skills/`
 * Plugin Skills: bundled with installed plugins
 
+### How the OmicVerse agent uses project skills
+
+The Streamlit assistant now builds a **skill registry** during startup. The registry loads the `name`, `description`, and leading sections of each `SKILL.md` stored under `.claude/skills/` and exposes the catalog in the configuration sidebar so operators can verify available workflows. Every validated query passes through a lightweight **skill detector**. When a high-confidence match is found, the agent injects the skill guidance into the second-stage RAG prompt and records the activation in the query history panel.
+
+**Contributor checklist:**
+
+1. Every new tutorial package or major workflow update must include an up-to-date skill directory under `.claude/skills/<skill-name>/SKILL.md` describing when to trigger the workflow.
+2. Keep the frontmatter `name` and `description` specific—the router compares the user request against these fields plus the opening section of the skill body.
+3. After editing a skill, run a representative query in Streamlit (or ADK mode) and confirm the "Skill activated" banner appears above the answer.
+4. Document any required supporting files or tool restrictions inside `SKILL.md` so the agent can surface them via progressive disclosure.
+
 **To view all available Skills**, ask Claude directly:
 
 ```
