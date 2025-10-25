@@ -66,19 +66,29 @@ def _work_one_fasterq(
     gzip_output: bool,
     retries: int = 3,
 ) -> tuple[str, Path, Path]:
-    
-    # 1) 子目录：每个 SRR 一个输出目录（更稳）
+    # 1) 输出和临时目录
     out_dir = out_root / srr
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir = tmp_root / srr
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    # Prefer local .sra if present
-    local_sra = Path("work/prefetch") / srr / f"{srr}.sra"
-    input_token = str(local_sra) if local_sra.exists() else srr
+
+    # 2) 自动推断 prefetch 目录（同级目录下）
+    prefetch_root = out_root.parent / "prefetch"
+
+    # 3) 兼容 .sra / .sralite
+    local_sra = None
+    for ext in [".sra", ".sralite"]:
+        candidate = prefetch_root / srr / f"{srr}{ext}"
+        if candidate.exists():
+            local_sra = candidate
+            break
+
+    # 4) 选择输入令牌
+    input_token = str(local_sra) if local_sra else srr
     cand_dirs = (out_dir, out_root)
     stems = {srr}
     try:
-        stems.add(Path(input_token).stem)  # 当 input_token 是 .sra 路径时，可能是 "SRR" 或 "SRR.sra"
+        stems.add(Path(input_token).stem)
     except Exception:
         pass
 
@@ -86,14 +96,12 @@ def _work_one_fasterq(
         suffix = ".fastq.gz" if ext_gz else ".fastq"
         for base in cand_dirs:
             for st in stems:
-                # 同时兼容 "SRR_1" 与 "SRR.sra_1"
                 for name1 in (f"{st}_1{suffix}", f"{st}.sra_1{suffix}"):
                     name2 = name1.replace("_1", "_2", 1)
                     a, b = base / name1, base / name2
                     if _have(a) and _have(b):
                         return a, b
         return None
-
     # ---------------- 早退 1：如果要求 gzip，且 .gz 成对已存在 -> 直接返回 ----------------
     if gzip_output:
         hit_gz = _find_pair(ext_gz=True)

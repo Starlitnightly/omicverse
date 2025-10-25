@@ -4,6 +4,8 @@ import os, time, subprocess, logging
 import threading
 from pathlib import Path
 from typing import Callable, Optional, Sequence
+import shutil  
+from typing import Dict, Any  
 try:
     from tqdm.auto import tqdm 
 except Exception:
@@ -15,40 +17,45 @@ try:
 except ImportError:
     from sra_tools import (get_sra_metadata, human_readable_speed, estimate_remaining_time, record_to_log, get_downloaded_file_size, run_prefetch_with_progress)
 # ---------- 工具函数（按你的实现/命名保留） ----------
-def find_sra_file(srr_id: str, output_root: Path) -> Path | None:
+def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | None:
     """
-    在一系列候选位置查找 {srr_id}.sra：
-      1) output_root/SRR/SRR.sra
-      2) output_root/SRR.sra
-      3) srapath 返回的缓存路径
-      4) 常见本地缓存目录 (~/.ncbi/public/sra, ~/ncbi/public/sra)
-    找到就返回 Path，否则 None。
+    在 output_root 下为 srr_id 查找 .sra/.sralite 文件：
+    1) 先快速检查常见的 0/1 层
+    2) 再在 srr 子目录内 rglob 递归查找
+    3) 轮询等待，直到 timeout 秒或命中有效文件（非空）
     """
-    candidates = [
-        output_root / srr_id / f"{srr_id}.sra",
+    output_root = Path(output_root)
+    srr_dir = output_root / srr_id
+
+    def _ready(p: Path) -> bool:
+        try:
+            return p.exists() and p.stat().st_size > 0
+        except Exception:
+            return False
+
+    # 先快速直查
+    quick = [
         output_root / f"{srr_id}.sra",
+        output_root / f"{srr_id}.sralite",
+        srr_dir / f"{srr_id}.sra",
+        srr_dir / f"{srr_id}.sralite",
     ]
-    for p in candidates:
-        if p.exists():
+    for p in quick:
+        if _ready(p):
             return p
 
-    # 3) srapath
-    try:
-        cp = subprocess.run(["srapath", srr_id],
-                            capture_output=True, text=True, check=True)
-        for line in cp.stdout.splitlines():
-            p = Path(line.strip())
-            if p.exists():
-                return p
-    except Exception:
-        pass
+    # 轮询 + 递归
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if srr_dir.exists():
+            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # 匹配 .sra/.sralite
+            # 选最新那个，避免抓到未完成的中间文件
+            hits = [h for h in hits if _ready(h)]
+            if hits:
+                hits.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                return hits[0]
+        time.sleep(0.5)
 
-    # 4) 常见缓存根
-    home = Path.home()
-    for root in [home/".ncbi/public/sra", home/"ncbi/public/sra"]:
-        p = root / f"{srr_id}.sra"
-        if p.exists():
-            return p
     return None
 def ensure_link_at(output_path: Path, real_file: Path, logger=None, prefer="symlink") -> Path:
     """
@@ -121,23 +128,24 @@ def _monitor_file_size(path: Path, pbar: tqdm, stop_event: threading.Event, inte
     pbar.close()
     
 def prefetch_batch(
-    srr_list: Sequence[str], 
-    out_root: str | Path, 
+    srr_list: Sequence[str],
+    out_root: str | Path,
     threads: int = 4, # 同时下载的 SRR 数
-    retries: int = 3, 
+    retries: int = 3,
     link_mode: str = "symlink",
     cache_root: str | Path = "sra_cache",
+    prefetch_config: Optional[Dict[str, Any]] = None,  # 基本预取配置
 ):
     """
     Adapter to integrate with Alignment.prefetch().
     For each SRR:
-      1) call run_prefetch_with_progress(srr, logger, retries, output_root="sra_cache")
+      1) call run_prefetch_with_progress(srr, logger, retries, output_root="sra_cache", prefetch_config=prefetch_config)
       2) locate the real .sra in the cache
       3) place a link/copy at <out_root>/<SRR>/<SRR>.sra
       并发下载 SRA：对 srr_list 中的样本并行执行 prefetch。
-      threads 控制“同时下载任务数”
+      threads 控制"同时下载任务数"
       下载后在 cache_root 中找到 .sra，再链接/复制到 out_root/<SRR>/<SRR>.sra
-    返回：按输入顺序对齐的目标 .sra 路径列表
+
     """
     out_root = Path(out_root)
     cache_root = out_root 
@@ -148,44 +156,32 @@ def prefetch_batch(
     def _worker(pos: int, srr: str) -> tuple[str, Path]:
         
         # 监控的目标文件（与你原函数保持一致的落盘位置）
-        srr_dir = cache_root / srr
-        srr_dir.mkdir(parents=True, exist_ok=True)
-        sra_file = srr_dir / f"{srr}.sra"
+        srr_dir = cache_root 
+        #srr_dir.mkdir(parents=True, exist_ok=True)
+        #sra_file = srr_dir / f"{srr}.sra"
 
-        '''# 尝试使用多行进度条位置；不支持时自动降级
-        pbar_kwargs = dict(
-            desc=f"📥 {srr}",
-            total=None,  # 若能拿到预估大小可替换为具体值
-            unit="B", unit_scale=True, unit_divisor=1024,
-            dynamic_ncols=True, leave=False, mininterval=0.5
-        )
-        try:
-            pbar = tqdm(position=pos, **pbar_kwargs)
-        except TypeError:
-            pbar = tqdm(**pbar_kwargs)
-            
-        stop_evt = threading.Event()
-        mon = threading.Thread(target=_monitor_file_size, args=(sra_file, pbar, stop_evt), daemon=True)
-        mon.start()
-        '''
-        # 下载
+        # 下载（使用基本预取配置）
         ok = run_prefetch_with_progress(
-            srr_id=srr, logger=logger, retries=retries, output_root=str(cache_root)
+            srr_id=srr, logger=logger, retries=retries, output_root=str(cache_root),
+            prefetch_config=prefetch_config  # 使用基本预取配置
         )
-        # 停止监控并收尾
-        #stop_evt.set()
-        #mon.join()
-        
-        if not ok:
-            raise RuntimeError(f"Prefetch failed for {srr}")
+    
+        # 下载命令成功返回后：
+        real = find_sra_file(srr_id=srr, output_root=cache_root, timeout=30)
+        if not real:
+            logger.error(f"Prefetch completed but cannot locate .sra/.sralite for {srr} under {cache_root}")
+            # 可选：调试输出 ls
+            try:
+                for p in (cache_root / srr).rglob("*"):
+                    logger.debug(f"[tree] {p}")
+            except Exception:
+                pass
+            raise RuntimeError(f"Prefetch completed but .sra/.sralite not found for {srr}")
 
-        real = find_sra_file(srr_id=srr, output_root=cache_root)
-        if not real or not Path(real).exists():
-            raise RuntimeError(f"Prefetch done but cannot locate .sra for {srr}")
-
-        dest = out_root / srr / f"{srr}.sra"
+        # 目标命名用真实后缀，避免 .sralite 被误命名为 .sra
+        dest = out_root / f"{srr}{Path(real).suffix}"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        ensure_link_at(Path(real), dest, prefer=link_mode, logger=logger)
+        ensure_link_at( Path(real), dest, prefer=link_mode, logger=logger)
         return srr, dest
 
     results_map: dict[str, Path] = {}
