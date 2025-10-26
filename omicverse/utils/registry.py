@@ -7,6 +7,7 @@ users to discover functions using natural language queries, aliases, and semanti
 
 from typing import Dict, List, Optional, Callable, Any, Union
 from functools import wraps
+from datetime import datetime, timezone
 import inspect
 from difflib import get_close_matches
 import warnings
@@ -27,7 +28,7 @@ class FunctionRegistry:
         self._function_map: Dict[Callable, str] = {}  # Maps functions to their primary keys
         self._categories: Dict[str, List[str]] = {}  # Category to function mapping
         
-    def register(self, 
+    def register(self,
                  func: Callable,
                  aliases: List[str],
                  category: str,
@@ -57,11 +58,33 @@ class FunctionRegistry:
         Callable
             The original function unchanged
         """
+        # Validate metadata completeness
+        if not aliases or not all(alias.strip() for alias in aliases):
+            raise ValueError("Function registration requires at least one non-empty alias.")
+
+        if not category or not category.strip():
+            raise ValueError("Function registration requires a category.")
+
+        if not description or not description.strip():
+            raise ValueError("Function registration requires a description.")
+
+        if examples is not None:
+            if isinstance(examples, (tuple, set)):
+                examples = list(examples)
+            elif not isinstance(examples, list):
+                raise TypeError("Examples must be provided as a list of strings when specified.")
+
+        if related is not None:
+            if isinstance(related, (tuple, set)):
+                related = list(related)
+            elif not isinstance(related, list):
+                raise TypeError("Related entries must be provided as a list of strings when specified.")
+
         # Generate function key
         module_name = func.__module__
         func_name = func.__name__
         full_name = f"{module_name}.{func_name}"
-        
+
         # Extract function signature and parameters
         try:
             sig = inspect.signature(func)
@@ -76,7 +99,13 @@ class FunctionRegistry:
                 params_info.append(param_str)
             
             # Get full docstring for help
-            docstring = inspect.getdoc(func) or "No documentation available"
+            raw_doc = inspect.getdoc(func)
+            if not raw_doc:
+                warnings.warn(
+                    f"Function '{full_name}' is missing a docstring; agent help output may be limited.",
+                    UserWarning,
+                )
+            docstring = raw_doc or "No documentation available"
             
         except Exception:
             signature = "(adata, **kwargs)"
@@ -565,7 +594,7 @@ def export_registry(filepath: Optional[str] = None,
     
     # Add metadata
     export_metadata = {
-        'exported_at': str(__import__('datetime').datetime.now()),
+        'exported_at': datetime.now(timezone.utc).isoformat(),
         'total_functions': len(export_data),
         'categories': list(_global_registry._categories.keys()),
         'omicverse_version': getattr(__import__('omicverse'), '__version__', 'unknown')
