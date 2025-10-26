@@ -61,50 +61,48 @@ def get_rag_system(config: dict):
         }
     else:
         st.session_state['available_skills'] = {}
-    package_configs = [
-        PackageConfig(
-            name="cellrank_notebooks",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/cellrank_notebooks",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/cellrank_notebooks",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-        PackageConfig(
-            name="scanpy_tutorials",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/scanpy-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/scanpy-tutorials",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-        PackageConfig(
-            name="scvi_tutorials",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/scvi-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/scvi-tutorials",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-        PackageConfig(
-            name="spateo_tutorials",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/spateo-tutorials",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/spateo-tutorials",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-        PackageConfig(
-            name="squidpy_notebooks",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/squidpy_notebooks",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/squidpy_notebooks",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-        PackageConfig(
-            name="ov_tut",
-            converted_jsons_directory="/Users/kq_m3m/PycharmProjects/SCMaster/6O_json_files/ov_tut",
-            annotated_scripts_directory="/Users/kq_m3m/PycharmProjects/SCMaster/annotated_scripts/ov_tut",
-            file_selection_model=config['file_selection_model'],
-            query_processing_model=config['query_processing_model']
-        ),
-    ]
+
+    resolved_packages, warnings = ConfigManager.resolve_package_directories(config)
+    for warning in warnings:
+        logger.warning(warning)
+
+    package_configs = []
+    available_packages = []
+    for package in resolved_packages:
+        converted_dir = package["converted_jsons_directory"]
+        annotated_dir = package["annotated_scripts_directory"]
+
+        missing_paths = [
+            str(path)
+            for path in (converted_dir, annotated_dir)
+            if not path.exists()
+        ]
+        if missing_paths:
+            logger.warning(
+                "Package '%s' skipped because the following paths are missing: %s",
+                package["name"],
+                ", ".join(missing_paths),
+            )
+            continue
+
+        package_configs.append(
+            PackageConfig(
+                name=package["name"],
+                converted_jsons_directory=str(converted_dir),
+                annotated_scripts_directory=str(annotated_dir),
+                file_selection_model=config['file_selection_model'],
+                query_processing_model=config['query_processing_model']
+            )
+        )
+        available_packages.append(package["name"])
+
+    st.session_state['available_packages'] = available_packages
+    if available_packages and st.session_state.get('selected_package') not in available_packages:
+        st.session_state['selected_package'] = available_packages[0]
+
+    if not package_configs:
+        logger.error("No valid package directories configured; unable to build RAG system.")
+        return None
     try:
         return RAGSystem(package_configs, skill_registry=skill_registry)
     except Exception as e:
@@ -346,6 +344,11 @@ def perform_online_search(query: str) -> str:
 def show_configuration(rag_system):
     with st.sidebar:
         st.header("Configuration ⚙️")
+        if not st.session_state.get('available_packages'):
+            st.warning(
+                "No document packages are configured. Update config.json or set OV_PACKAGE_BASE_DIR to point to your data."
+            )
+            return
         with st.expander("Model Settings"):
             selected_package = st.selectbox(
                 "Select Package",
@@ -439,7 +442,8 @@ def show_configuration(rag_system):
             st.session_state['config'].update({
                 'file_selection_model': file_selection_model,
                 'query_processing_model': query_processing_model,
-                'rate_limit': rate_limit
+                'rate_limit': rate_limit,
+                'selected_package': selected_package,
             })
             st.session_state['current_user'] = current_user
             ConfigManager.save_config(st.session_state['config'])
