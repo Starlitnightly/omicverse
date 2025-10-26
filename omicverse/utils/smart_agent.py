@@ -29,12 +29,6 @@ else:
 # Import registry system and model configuration
 from .registry import _global_registry
 from .model_config import ModelConfig, PROVIDER_API_KEYS, AVAILABLE_MODELS
-from .skill_registry import (
-    SkillMatch,
-    SkillRegistry,
-    SkillRouter,
-    build_skill_registry,
-)
 
 
 class OmicVerseAgent:
@@ -78,15 +72,9 @@ class OmicVerseAgent:
         self.api_key = api_key
         self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
         self.agent = None
-        self.skill_registry: Optional[SkillRegistry] = None
-        self.skill_router: Optional[SkillRouter] = None
-        self._skill_overview_text: str = ""
-
+        
         # Set up API key based on provider
         self._setup_api_keys(api_key)
-
-        # Discover project skills for progressive disclosure guidance
-        self._initialize_skill_registry()
         
         # Display model info
         provider = ModelConfig.get_provider_from_model(model)
@@ -110,27 +98,7 @@ class OmicVerseAgent:
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
             raise
-
-    def _initialize_skill_registry(self) -> None:
-        """Load the OmicVerse project skills and prepare routing helpers."""
-
-        project_root = Path(__file__).resolve().parents[2]
-        try:
-            registry = build_skill_registry(project_root)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            print(f"⚠️  Failed to load Agent Skills: {exc}")
-            registry = None
-
-        if registry and registry.skills:
-            self.skill_registry = registry
-            self.skill_router = SkillRouter(registry)
-            self._skill_overview_text = self._format_skill_overview()
-            print(f"   🧭 Loaded {len(self.skill_registry.skills)} project skills from .claude/skills")
-        else:
-            self.skill_registry = None
-            self.skill_router = None
-            self._skill_overview_text = ""
-
+    
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
         # Get all unique functions from registry
@@ -267,16 +235,6 @@ User request: "quality control with nUMI>500, mito<0.2"
 - Provide helpful feedback about what was executed
 - Handle errors gracefully and suggest alternatives if needed
 """
-
-        if self._skill_overview_text:
-            instructions += (
-                "\n\n## Project Skill Catalog\n"
-                "OmicVerse provides curated Agent Skills that capture end-to-end workflows. "
-                "Before executing complex tasks, call `_list_project_skills` to view the catalog and `_load_skill_guidance` "
-                "to read detailed instructions for relevant skills. Follow the selected skill guidance when planning code "
-                "execution.\n\n"
-                f"{self._skill_overview_text}"
-            )
         
         # Set API key as environment variable if provided
         if self.api_key:
@@ -295,9 +253,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         # Add custom tools for function discovery (no Python interpreter needed)
         self.agent.tool(self._search_functions)
         self.agent.tool(self._get_function_details)
-        if self.skill_registry:
-            self.agent.tool(self._list_project_skills)
-            self.agent.tool(self._load_skill_guidance)
     
     def _search_functions(self, query: str) -> str:
         """
@@ -343,7 +298,7 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _get_function_details(self, function_name: str) -> str:
         """
         Get detailed information about a specific function.
-
+        
         Parameters
         ----------
         function_name : str
@@ -377,48 +332,7 @@ User request: "quality control with nUMI>500, mito<0.2"
             
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
-
-    def _list_project_skills(self) -> str:
-        """Return a JSON catalog of the discovered project skills."""
-
-        if not self.skill_registry or not self.skill_registry.skills:
-            return json.dumps({"skills": [], "message": "No project skills available."}, indent=2)
-
-        skills_payload = [
-            {
-                "name": skill.name,
-                "description": skill.description,
-                "path": str(skill.path),
-                "metadata": skill.metadata,
-            }
-            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
-        ]
-        return json.dumps({"skills": skills_payload}, indent=2)
-
-    def _load_skill_guidance(self, skill_name: str) -> str:
-        """Return the detailed instructions for a requested skill."""
-
-        if not self.skill_registry or not self.skill_registry.skills:
-            return json.dumps({"error": "No project skills are available."})
-
-        if not skill_name or not skill_name.strip():
-            return json.dumps({"error": "Provide a skill name to load guidance."})
-
-        definition = self.skill_registry.skills.get(skill_name.strip().lower())
-        if not definition:
-            return json.dumps({"error": f"Skill '{skill_name}' not found."})
-
-        return json.dumps(
-            {
-                "name": definition.name,
-                "description": definition.description,
-                "instructions": definition.prompt_instructions(),
-                "path": str(definition.path),
-                "metadata": definition.metadata,
-            },
-            indent=2,
-        )
-
+    
     async def run_async(self, request: str, adata: Any) -> Any:
         """
         Process a natural language request and execute the generated code locally.
@@ -436,21 +350,6 @@ User request: "quality control with nUMI>500, mito<0.2"
             Processed adata object
         """
         
-        # Determine which project skills are relevant to this request
-        skill_matches = self._select_skill_matches(request, top_k=2)
-        if skill_matches:
-            print("\n🎯 Matched project skills:")
-            for match in skill_matches:
-                print(f"   - {match.skill.name} (score={match.score:.3f})")
-
-        skill_guidance_text = self._format_skill_guidance(skill_matches)
-        skill_guidance_section = ""
-        if skill_guidance_text:
-            skill_guidance_section = (
-                "\nRelevant project skills:\n"
-                f"{skill_guidance_text}\n"
-            )
-
         # Ask agent to generate the appropriate function call code
         code_generation_request = f'''
 Please analyze this OmicVerse request: "{request}"
@@ -464,7 +363,6 @@ Your task:
 Dataset info:
 - Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
 - Request: {request}
-{skill_guidance_section}
 
 CRITICAL INSTRUCTIONS:
 1. ALWAYS call _search_functions first to find the right function
@@ -591,43 +489,7 @@ Example workflow:
             print(f"❌ Error executing generated code: {e}")
             print(f"Code that failed: {code}")
             return adata
-
-    def _select_skill_matches(self, request: str, top_k: int = 1) -> List[SkillMatch]:
-        """Return the most relevant project skills for the request."""
-
-        if not self.skill_router:
-            return []
-        try:
-            return self.skill_router.route(request, top_k=top_k)
-        except Exception as exc:  # pragma: no cover - defensive guard
-            print(f"⚠️  Skill routing failed: {exc}")
-            return []
-
-    def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
-        """Format skill instructions for prompt injection."""
-
-        if not matches:
-            return ""
-        blocks = []
-        for match in matches:
-            instructions = match.skill.prompt_instructions(max_chars=2000)
-            blocks.append(
-                f"- {match.skill.name} (score={match.score:.3f})\n"
-                f"{instructions}"
-            )
-        return "\n\n".join(blocks)
-
-    def _format_skill_overview(self) -> str:
-        """Generate a bullet overview of available project skills."""
-
-        if not self.skill_registry or not self.skill_registry.skills:
-            return ""
-        lines = [
-            f"- **{skill.name}** — {skill.description}"
-            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
-        ]
-        return "\n".join(lines)
-
+    
     def run(self, request: str, adata: Any) -> Any:
         """
         Process a natural language request with the provided adata (main method).
@@ -719,4 +581,4 @@ def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: O
 
 
 # Export the main functions
-__all__ = ["Agent", "OmicVerseAgent", "list_supported_models"]
+__all__ = ['Agent', 'OmicVerseAgent', 'list_supported_models']
