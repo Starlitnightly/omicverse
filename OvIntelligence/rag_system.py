@@ -35,15 +35,6 @@ from model_selector import get_llm
 from skill_registry import SkillRegistry, SkillRouter, SkillMatch
 
 # --------------------------------------------------
-# Configure Gemini model if API key is available.
-# It is recommended to set the GEMINI_API_KEY in your environment variables.
-GENAI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if GENAI_API_KEY:
-    genai.configure(api_key=GENAI_API_KEY)
-else:
-    print("Warning: GEMINI_API_KEY not set. Gemini-based functions may not work properly.")
-
-# --------------------------------------------------
 def refine_code_with_gemini(baseline_code: str, user_query: str) -> str:
     """
     Given a baseline code snippet and the user query context, use the Gemini Stage2 model
@@ -106,6 +97,22 @@ def setup_logging():
     return logger
 
 logger = setup_logging()
+
+
+def configure_gemini_client() -> str | None:
+    """Configure the Gemini client using the GEMINI_API_KEY environment variable."""
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+    else:
+        logger.warning(
+            "GEMINI_API_KEY not set. Gemini-based functions may not work properly."
+        )
+    return api_key
+
+
+GEMINI_API_KEY = configure_gemini_client()
 
 @dataclass
 class PackageConfig:
