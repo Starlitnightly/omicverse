@@ -25,7 +25,6 @@ import google.generativeai as genai
 from google.ai.generativelanguage_v1beta.types import content
 
 from rag_system import RAGSystem, PackageConfig
-from skill_registry import build_skill_registry
 from config_manager import ConfigManager
 from system_monitor import SystemMonitor
 from rate_limiter import RateLimiter
@@ -49,18 +48,6 @@ initialize_session_state()
 
 @st.cache_resource(show_spinner=False, hash_funcs={dict: lambda d: str(sorted(d.items()))})
 def get_rag_system(config: dict):
-    project_root = Path(__file__).resolve().parent.parent
-    skill_registry = build_skill_registry(project_root)
-    if skill_registry and skill_registry.skills:
-        st.session_state['available_skills'] = {
-            skill.name: {
-                "description": skill.description,
-                "path": str(skill.path),
-            }
-            for skill in skill_registry.skills.values()
-        }
-    else:
-        st.session_state['available_skills'] = {}
     package_configs = [
         PackageConfig(
             name="cellrank_notebooks",
@@ -106,7 +93,7 @@ def get_rag_system(config: dict):
         ),
     ]
     try:
-        return RAGSystem(package_configs, skill_registry=skill_registry)
+        return RAGSystem(package_configs)
     except Exception as e:
         logger.error(f"Failed to initialize RAG system: {str(e)}", exc_info=True)
         return None
@@ -211,11 +198,6 @@ def show_query_history():
             with st.expander(f"Query {len(st.session_state.query_history) - idx}: {item['query'][:30]}..."):
                 st.markdown(f"**Package:** {item['package']}")
                 st.markdown(f"**Time:** {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')} UTC")
-                skill_meta = item.get('skill')
-                if skill_meta:
-                    score_value = skill_meta.get('score_float')
-                    score_display = f"{score_value:.3f}" if isinstance(score_value, (int, float)) else skill_meta.get('score')
-                    st.markdown(f"**Skill:** {skill_meta.get('name', 'Unknown')} (score {score_display})")
                 st.markdown(f"**User:** {item['user']}")
                 st.markdown(f"**Document(s):** {item['file']}")
                 st.markdown(f"**Answer:** {item['answer']}")
@@ -267,43 +249,23 @@ def process_query_with_progress(query, rag_system, selected_package, user="unkno
     try:
         logger.info(f"Processing query: {query}")
         logger.info(f"Selected package: {selected_package}")
-        status_text.text("Selecting workflow skill...")
-        skill_match = rag_system.select_skill(query)
-        progress_bar.progress(15)
-        if skill_match:
-            logger.info(
-                "Skill match: %s (score=%.3f)",
-                skill_match.skill.name,
-                skill_match.score,
-            )
-            skill_summary = skill_match.as_dict()
-            skill_summary["score_float"] = skill_match.score
-            skill_summary["timestamp"] = datetime.now(timezone.utc)
-            st.session_state['last_skill_match'] = skill_summary
-            skill_log = st.session_state.get('skill_usage_log', [])
-            skill_log.append(skill_summary)
-            st.session_state['skill_usage_log'] = skill_log[-50:]
-        else:
-            st.session_state['last_skill_match'] = None
-            logger.info("No specific skill matched; continuing with general RAG workflow.")
         status_text.text("Finding relevant documents...")
-        progress_bar.progress(40)
+        progress_bar.progress(25)
         relevant_files = rag_system.find_relevant_files(selected_package, query)
         status_text.text("Generating answer from annotated scripts...")
-        progress_bar.progress(70)
+        progress_bar.progress(50)
         answer = rag_system.answer_query_with_annotated_scripts(
-            selected_package, query, relevant_files, skill_match
+            selected_package, query, relevant_files
         )
         logger.info(f"Answer: {answer}")
         status_text.text("Updating history...")
-        progress_bar.progress(90)
+        progress_bar.progress(75)
         query_time = datetime.now(timezone.utc)
         st.session_state.query_history.append({
             'package': selected_package,
             'query': query,
             'file': relevant_files,
             'answer': answer,
-            'skill': st.session_state.get('last_skill_match'),
             'timestamp': query_time,
             'user': user
         })
@@ -417,24 +379,6 @@ def show_configuration(rag_system):
                     st.session_state['config']['computer_use_agent'] = True
                     ConfigManager.save_config(st.session_state['config'])
                     st.rerun()
-        with st.expander("Skill Routing Status"):
-            last_skill = st.session_state.get('last_skill_match')
-            if last_skill:
-                score_value = last_skill.get('score_float')
-                score_display = f"{score_value:.3f}" if isinstance(score_value, (int, float)) else last_skill.get('score')
-                st.markdown(
-                    f"**Last matched skill:** {last_skill['name']} (score {score_display})\n\n"
-                    f"_{last_skill.get('description', 'No description available.')}_"
-                )
-            else:
-                st.info("No skill has been matched yet in this session.")
-            available_skills = st.session_state.get('available_skills', {})
-            st.markdown("**Discovered skills:**")
-            if available_skills:
-                for name, meta in available_skills.items():
-                    st.markdown(f"- **{name}** — {meta.get('description', 'No description provided.')}")
-            else:
-                st.markdown("- _None discovered_.")
         if st.button("Save Configuration"):
             st.session_state['config'].update({
                 'file_selection_model': file_selection_model,
@@ -529,14 +473,6 @@ def main():
                         user=st.session_state['current_user']
                     )
                     st.success(f"📄 Selected document(s): {relevant_files}")
-                    skill_info = st.session_state.get('last_skill_match')
-                    if skill_info:
-                        score_value = skill_info.get('score_float')
-                        score_display = f"{score_value:.2f}" if isinstance(score_value, (int, float)) else skill_info.get('score')
-                        st.info(
-                            f"🧠 Skill activated: **{skill_info['name']}** (score {score_display})\n\n"
-                            f"_{skill_info.get('description', 'No description available.')}_"
-                        )
                     st.markdown("### Local RAG Answer 💡")
                     st.markdown(answer)
             except ValueError as ve:
