@@ -18,6 +18,7 @@ import inspect
 import ast
 import textwrap
 import builtins
+import warnings
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -520,7 +521,14 @@ User request: "quality control with nUMI>500, mito<0.2"
         return dedented
 
     def _execute_generated_code(self, code: str, adata: Any) -> Any:
-        """Execute generated Python code in a sandboxed namespace."""
+        """Execute generated Python code in a sandboxed namespace.
+
+        Notes
+        -----
+        The sandbox restricts available built-ins and module imports, but it is not a
+        foolproof security boundary. Only run the agent with data and environments you
+        trust, and consider additional isolation (e.g., containers) for untrusted input.
+        """
 
         compiled = compile(code, "<omicverse-agent>", "exec")
         sandbox_globals = self._build_sandbox_globals()
@@ -569,11 +577,33 @@ User request: "quality control with nUMI>500, mito<0.2"
             "TypeError",
             "KeyError",
             "AssertionError",
-            "__import__",
         ]
 
         safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
-        return {"__builtins__": safe_builtins}
+        allowed_modules = {}
+        for module_name in ("omicverse", "numpy", "pandas", "scanpy"):
+            try:
+                allowed_modules[module_name] = __import__(module_name)
+            except ImportError:
+                warnings.warn(
+                    f"Module '{module_name}' is not available inside the agent sandbox.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
+        def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
+            root_name = name.split(".")[0]
+            if root_name not in allowed_modules:
+                raise ImportError(
+                    f"Module '{name}' is not available inside the OmicVerse agent sandbox."
+                )
+            return __import__(name, globals, locals, fromlist, level)
+
+        safe_builtins["__import__"] = limited_import
+
+        sandbox_globals: Dict[str, Any] = {"__builtins__": safe_builtins}
+        sandbox_globals.update(allowed_modules)
+        return sandbox_globals
 
     async def run_async(self, request: str, adata: Any) -> Any:
         """
