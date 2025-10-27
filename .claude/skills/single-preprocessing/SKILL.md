@@ -1,5 +1,6 @@
 ---
-name: Single-cell preprocessing with omicverse
+name: single-cell-preprocessing-with-omicverse
+title: Single-cell preprocessing with omicverse
 description: Walk through omicverse's single-cell preprocessing tutorials to QC PBMC3k data, normalise counts, detect HVGs, and run PCA/embedding pipelines on CPU, CPU–GPU mixed, or GPU stacks.
 ---
 

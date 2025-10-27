@@ -1,5 +1,6 @@
 ---
-name: Spatial transcriptomics tutorials with omicverse
+name: spatial-transcriptomics-tutorials-with-omicverse
+title: Spatial transcriptomics tutorials with omicverse
 description: Guide users through omicverse's spatial transcriptomics tutorials covering preprocessing, deconvolution, and downstream modelling workflows across Visium, Visium HD, Stereo-seq, and Slide-seq datasets.
 ---
 
