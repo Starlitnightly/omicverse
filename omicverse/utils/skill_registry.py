@@ -5,7 +5,15 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# Optional YAML support for robust frontmatter parsing
+try:  # pragma: no cover - optional dependency
+    import yaml  # type: ignore
+    _YAML_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+    yaml = None
+    _YAML_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +125,33 @@ class SkillRegistry:
 
     @staticmethod
     def _parse_frontmatter(lines: Iterable[str]) -> Dict[str, str]:
+        """Parse YAML frontmatter into a simple string dictionary.
+
+        Prefers yaml.safe_load if PyYAML is available to support multiline
+        values and rich YAML constructs. Falls back to a minimal line-based
+        parser if PyYAML is not installed.
+        """
+
+        # Try robust YAML parsing first
+        if _YAML_AVAILABLE:
+            text = "\n".join(list(lines))
+            try:
+                loaded: Optional[Dict[str, Any]] = yaml.safe_load(text)  # type: ignore[attr-defined]
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning("Failed to parse YAML frontmatter with PyYAML: %s", exc)
+                loaded = None
+
+            if isinstance(loaded, dict):
+                # Coerce values to strings for SkillDefinition.metadata type
+                result: Dict[str, str] = {}
+                for k, v in loaded.items():
+                    try:
+                        result[str(k)] = v if isinstance(v, str) else ("\n".join(v) if isinstance(v, list) else str(v))
+                    except Exception:
+                        result[str(k)] = str(v)
+                return result
+
+        # Fallback: simple line-based parser (single-line key: value pairs only)
         metadata: Dict[str, str] = {}
         for raw_line in lines:
             line = raw_line.strip()
@@ -126,6 +161,8 @@ class SkillRegistry:
                 continue
             key, value = line.split(":", 1)
             metadata[key.strip()] = value.strip().strip('"')
+        if not _YAML_AVAILABLE:
+            logger.debug("PyYAML not installed; used fallback frontmatter parser.")
         return metadata
 
 
