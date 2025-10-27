@@ -1,5 +1,6 @@
 ---
-name: Single-cell multi-omics integration
+name: single-cell-multi-omics-integration
+title: Single-cell multi-omics integration
 description: Quick-reference sheet for OmicVerse tutorials spanning MOFA, GLUE pairing, SIMBA integration, TOSICA transfer, and StaVIA cartography.
 ---
 
