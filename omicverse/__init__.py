@@ -109,3 +109,9 @@ from ._settings import settings, generate_reference_table
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+# Expose agent helpers (e.g., ov.agent.seeker)
+try:
+    from . import agent  # noqa: F401
+except Exception:  # pragma: no cover - optional
+    agent = None
