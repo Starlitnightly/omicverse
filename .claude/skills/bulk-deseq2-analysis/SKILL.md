@@ -1,14 +1,13 @@
 ---
-name: Bulk RNA-seq DESeq2 analysis with omicverse
+name: bulk-rna-seq-deseq2-analysis-with-omicverse
+title: Bulk RNA-seq DESeq2 analysis with omicverse
 description: Walk Claude through PyDESeq2-based differential expression, including ID mapping, DE testing, fold-change thresholding, and enrichment visualisation.
 ---
 
 # Bulk RNA-seq DESeq2 analysis with omicverse
 
 ## Overview
-Use this skill when a user wants to reproduce the DESeq2 workflow showcased in [`t_deseq2.ipynb`](../../omicverse_guide/docs/Tu
-torials-bulk/t_deseq2.ipynb). It covers loading raw featureCounts matrices, mapping Ensembl IDs to symbols, running PyDESeq2 vi
-a `ov.bulk.pyDEG`, and exploring downstream enrichment plots.
+Use this skill when a user wants to reproduce the DESeq2 workflow showcased in [`t_deseq2.ipynb`](../../omicverse_guide/docs/Tutorials-bulk/t_deseq2.ipynb). It covers loading raw featureCounts matrices, mapping Ensembl IDs to symbols, running PyDESeq2 via `ov.bulk.pyDEG`, and exploring downstream enrichment plots.
 
 ## Instructions
 1. **Import and format the expression matrix**
@@ -25,8 +24,7 @@ a `ov.bulk.pyDEG`, and exploring downstream enrichment plots.
    - Collect sample labels into `treatment_groups` and `control_groups` lists that match column names exactly.
    - Execute `dds.deg_analysis(treatment_groups, control_groups, method='DEseq2')` to invoke PyDESeq2.
 5. **Filter and tune thresholds**
-   - Inspect result shape (`dds.result.shape`) and optionally filter low-expression genes, e.g. `dds.result.loc[dds.result['log2(B
-aseMean)'] > 1]`.
+   - Inspect result shape (`dds.result.shape`) and optionally filter low-expression genes, e.g. `dds.result.loc[dds.result['log2(BaseMean)'] > 1]`.
    - Set thresholds via `dds.foldchange_set(fc_threshold=-1, pval_threshold=0.05, logp_max=6)` to auto-pick fold-change cutoffs.
 6. **Visualise differential genes**
    - Draw volcano plots with `dds.plot_volcano(...)` and summarise key genes.

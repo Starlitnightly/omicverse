@@ -1,5 +1,6 @@
 ---
-name: Bulk RNA-seq batch correction with ComBat
+name: bulk-rna-seq-batch-correction-with-combat
+title: Bulk RNA-seq batch correction with ComBat
 description: Use omicverse's pyComBat wrapper to remove batch effects from merged bulk RNA-seq or microarray cohorts, export corrected matrices, and benchmark pre/post correction visualisations.
 ---
 
