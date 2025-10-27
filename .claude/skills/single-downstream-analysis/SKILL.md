@@ -1,5 +1,6 @@
 ---
-name: Single-cell downstream analysis
+name: single-cell-downstream-analysis
+title: Single-cell downstream analysis
 description: Checklist-style reference for OmicVerse downstream tutorials covering AUCell scoring, metacell DEG, and related exports.
 ---
 

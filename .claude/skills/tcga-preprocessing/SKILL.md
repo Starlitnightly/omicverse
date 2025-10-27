@@ -1,14 +1,13 @@
 ---
-name: TCGA bulk data preprocessing with omicverse
+name: tcga-bulk-data-preprocessing-with-omicverse
+title: TCGA bulk data preprocessing with omicverse
 description: Guide Claude through ingesting TCGA sample sheets, expression archives, and clinical carts into omicverse, initialising survival metadata, and exporting annotated AnnData files.
 ---
 
 # TCGA bulk data preprocessing with omicverse
 
 ## Overview
-Follow this skill to recreate the preprocessing routine from [`t_tcga.ipynb`](../../omicverse_guide/docs/Tutorials-bulk/t_tcga.i
-pynb). It automates loading TCGA downloads, generating raw/normalised matrices, initialising metadata, and running survival analy
-ses through `ov.bulk.pyTCGA`.
+Follow this skill to recreate the preprocessing routine from [`t_tcga.ipynb`](../../omicverse_guide/docs/Tutorials-bulk/t_tcga.ipynb). It automates loading TCGA downloads, generating raw/normalised matrices, initialising metadata, and running survival analyses through `ov.bulk.pyTCGA`.
 
 ## Instructions
 1. **Gather required downloads**
@@ -16,8 +15,7 @@ ses through `ov.bulk.pyTCGA`.
      - `gdc_sample_sheet.<date>.tsv` from the TCGA Sample Sheet export.
      - The decompressed `gdc_download_xxxxx` directory containing expression archives.
      - The `clinical.cart.<date>` directory with clinical XML/JSON files.
-   - Mention that sample data are available under [`omicverse_guide/docs/Tutorials-bulk/data/TCGA_OV/`](../../omicverse_guide/do
-cs/Tutorials-bulk/data/TCGA_OV/).
+   - Mention that sample data are available under [`omicverse_guide/docs/Tutorials-bulk/data/TCGA_OV/`](../../omicverse_guide/docs/Tutorials-bulk/data/TCGA_OV/).
 2. **Initialise the TCGA helper**
    - Import `omicverse as ov` (and `scanpy as sc` if plotting) then call `ov.plot_set()`.
    - Instantiate `aml_tcga = ov.bulk.pyTCGA(sample_sheet_path, download_dir, clinical_dir)`.
@@ -32,8 +30,7 @@ cs/Tutorials-bulk/data/TCGA_OV/).
    - Plot gene-level survival curves with `aml_tcga.survival_analysis('GENE', layer='deseq_normalize', plot=True)`.
    - To process all genes, call `aml_tcga.survial_analysis_all()`; warn that it may take time.
 6. **Export results**
-   - Save enriched metadata to a new AnnData file (`aml_tcga.adata.write_h5ad('.../ov_tcga_survial_all.h5ad', compression='gzip'
-)`).
+   - Save enriched metadata to a new AnnData file (`aml_tcga.adata.write_h5ad('.../ov_tcga_survial_all.h5ad', compression='gzip')`).
    - Suggest exporting summary tables (e.g., survival statistics) if users need to share outputs outside Python.
 7. **Troubleshooting tips**
    - Ensure TCGA archives are fully extracted; missing XML/TSV files trigger parsing errors.

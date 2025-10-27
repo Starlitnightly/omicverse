@@ -53,7 +53,8 @@ def get_rag_system(config: dict):
     skill_registry = build_skill_registry(project_root)
     if skill_registry and skill_registry.skills:
         st.session_state['available_skills'] = {
-            skill.name: {
+            skill.slug: {
+                "title": skill.name,
                 "description": skill.description,
                 "path": str(skill.path),
             }
@@ -434,8 +435,9 @@ def show_configuration(rag_system):
             available_skills = st.session_state.get('available_skills', {})
             st.markdown("**Discovered skills:**")
             if available_skills:
-                for name, meta in available_skills.items():
-                    st.markdown(f"- **{name}** — {meta.get('description', 'No description provided.')}")
+                for slug, meta in available_skills.items():
+                    title = meta.get('title') or slug
+                    st.markdown(f"- **{title}** — {meta.get('description', 'No description provided.')}")
             else:
                 st.markdown("- _None discovered_.")
         if st.button("Save Configuration"):
