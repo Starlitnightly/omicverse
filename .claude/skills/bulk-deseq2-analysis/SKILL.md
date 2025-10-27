@@ -1,7 +1,6 @@
 ---
 name: Bulk RNA-seq DESeq2 analysis with omicverse
-description: Walk Claude through PyDESeq2-based differential expression, including ID mapping, DE testing, fold-change threshold
-ing, and enrichment visualisation.
+description: Walk Claude through PyDESeq2-based differential expression, including ID mapping, DE testing, fold-change thresholding, and enrichment visualisation.
 ---
 
 # Bulk RNA-seq DESeq2 analysis with omicverse
