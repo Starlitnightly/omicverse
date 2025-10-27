@@ -1,5 +1,6 @@
 ---
-name: STRING protein interaction analysis with omicverse
+name: string-protein-interaction-analysis-with-omicverse
+title: STRING protein interaction analysis with omicverse
 description: Help Claude query STRING for protein interactions, build PPI graphs with pyPPI, and render styled network figures for bulk gene lists.
 ---
 

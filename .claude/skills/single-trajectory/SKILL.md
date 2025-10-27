@@ -1,5 +1,6 @@
 ---
-name: Single-trajectory analysis
+name: single-trajectory-analysis
+title: Single-trajectory analysis
 description: Guide to reproducing OmicVerse trajectory workflows spanning PAGA, Palantir, VIA, velocity coupling, and fate scoring notebooks.
 ---
 
