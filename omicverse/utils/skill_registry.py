@@ -20,9 +20,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SkillDefinition:
-    """Represents a single Agent Skill discovered on disk."""
+    """Represents a single Agent Skill discovered on disk.
+
+    name: display title; slug: lowercase-hyphen identifier for routing.
+    """
 
     name: str
+    slug: str
     description: str
     path: Path
     body: str
@@ -54,7 +58,8 @@ class SkillMatch:
 
     def as_dict(self) -> Dict[str, str]:
         return {
-            "name": self.skill.name,
+            "name": self.skill.name,  # display title
+            "slug": self.skill.slug,
             "score": f"{self.score:.3f}",
             "description": self.skill.description,
             "path": str(self.skill.path),
@@ -85,7 +90,7 @@ class SkillRegistry:
             definition = self._parse_skill_file(skill_file)
             if not definition:
                 continue
-            key = definition.name.lower()
+            key = definition.slug.lower()
             if key in discovered:
                 logger.warning("Duplicate skill name '%s' found; keeping first occurrence.", definition.name)
                 continue
@@ -113,15 +118,21 @@ class SkillRegistry:
 
         frontmatter_lines = lines[1:closing_index]
         metadata = self._parse_frontmatter(frontmatter_lines)
-        name = metadata.get("name")
+        raw_name = metadata.get("name")
         description = metadata.get("description")
-        if not name or not description:
-            logger.warning("Skill file %s is missing required name/description metadata.", skill_file)
+        # Determine display title and slug with backward compatibility
+        title = metadata.get("title") or metadata.get("display_title") or raw_name
+        slug_value = metadata.get("slug")
+        if not slug_value:
+            # If name is slug-like, use it; otherwise slugify the title
+            slug_value = raw_name if self._looks_like_slug(raw_name) else self._slugify(title)
+        if not (title and description and slug_value):
+            logger.warning("Skill file %s is missing required title/description/slug metadata.", skill_file)
             return None
 
         body = "\n".join(lines[closing_index + 1 :]).strip()
         skill_path = skill_file.parent
-        return SkillDefinition(name=name, description=description, path=skill_path, body=body, metadata=metadata)
+        return SkillDefinition(name=str(title), slug=str(slug_value), description=str(description), path=skill_path, body=body, metadata=metadata)
 
     @staticmethod
     def _parse_frontmatter(lines: Iterable[str]) -> Dict[str, str]:
@@ -164,6 +175,22 @@ class SkillRegistry:
         if not _YAML_AVAILABLE:
             logger.debug("PyYAML not installed; used fallback frontmatter parser.")
         return metadata
+
+    @staticmethod
+    def _looks_like_slug(value: Optional[str]) -> bool:
+        if not value or not isinstance(value, str):
+            return False
+        return re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value) is not None
+
+    @staticmethod
+    def _slugify(value: Optional[str], max_len: int = 64) -> str:
+        if not value:
+            return ""
+        slug = re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-")
+        slug = re.sub(r"-+", "-", slug)
+        if len(slug) > max_len:
+            slug = slug[:max_len].strip("-")
+        return slug
 
 
 class SkillRouter:

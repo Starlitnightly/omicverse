@@ -1,5 +1,6 @@
 ---
-name: Single-cell annotation skills with omicverse
+name: single-cell-annotation-skills-with-omicverse
+title: Single-cell annotation skills with omicverse
 description: Guide Claude through SCSA, MetaTiME, CellVote, CellMatch, GPTAnno, and weighted KNN transfer workflows for annotating single-cell modalities.
 ---
 
