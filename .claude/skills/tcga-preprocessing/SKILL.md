@@ -1,7 +1,6 @@
 ---
 name: TCGA bulk data preprocessing with omicverse
-description: Guide Claude through ingesting TCGA sample sheets, expression archives, and clinical carts into omicverse, initial
-ising survival metadata, and exporting annotated AnnData files.
+description: Guide Claude through ingesting TCGA sample sheets, expression archives, and clinical carts into omicverse, initialising survival metadata, and exporting annotated AnnData files.
 ---
 
 # TCGA bulk data preprocessing with omicverse
