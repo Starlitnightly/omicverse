@@ -34,6 +34,50 @@ utils_pkg.__spec__ = importlib.machinery.ModuleSpec(
 sys.modules["omicverse.utils"] = utils_pkg
 omicverse_pkg.utils = utils_pkg
 
+# Register ov_skill_seeker module skeletons for monkeypatch to work
+# These are minimal stubs to allow patching of builder functions
+ov_skill_seeker_pkg = types.ModuleType("omicverse.ov_skill_seeker")
+ov_skill_seeker_pkg.__path__ = [str(PACKAGE_ROOT / "ov_skill_seeker")]
+ov_skill_seeker_pkg.__spec__ = importlib.machinery.ModuleSpec(
+    "omicverse.ov_skill_seeker", loader=None, is_package=True
+)
+sys.modules["omicverse.ov_skill_seeker"] = ov_skill_seeker_pkg
+omicverse_pkg.ov_skill_seeker = ov_skill_seeker_pkg
+
+# Register link_builder submodule with stub function
+link_builder_module = types.ModuleType("omicverse.ov_skill_seeker.link_builder")
+link_builder_module.__spec__ = importlib.machinery.ModuleSpec(
+    "omicverse.ov_skill_seeker.link_builder", loader=None
+)
+# Add stub function for patching
+def build_from_link(*args, **kwargs):
+    """Stub function for patching in tests."""
+    pass
+link_builder_module.build_from_link = build_from_link  # type: ignore[attr-defined]
+sys.modules["omicverse.ov_skill_seeker.link_builder"] = link_builder_module
+
+# Register unified_builder submodule with stub function
+unified_builder_module = types.ModuleType("omicverse.ov_skill_seeker.unified_builder")
+unified_builder_module.__spec__ = importlib.machinery.ModuleSpec(
+    "omicverse.ov_skill_seeker.unified_builder", loader=None
+)
+# Add stub function for patching
+def build_from_config(*args, **kwargs):
+    """Stub function for patching in tests."""
+    pass
+unified_builder_module.build_from_config = build_from_config  # type: ignore[attr-defined]
+sys.modules["omicverse.ov_skill_seeker.unified_builder"] = unified_builder_module
+
+# Load the real agent module to provide actual _zip_dir for integration tests
+agent_spec = importlib.util.spec_from_file_location(
+    "omicverse.agent", PACKAGE_ROOT / "agent" / "__init__.py"
+)
+agent_module = importlib.util.module_from_spec(agent_spec)
+sys.modules["omicverse.agent"] = agent_module
+omicverse_pkg.agent = agent_module
+assert agent_spec.loader is not None
+agent_spec.loader.exec_module(agent_module)
+
 smart_agent_spec = importlib.util.spec_from_file_location(
     "omicverse.utils.smart_agent", PACKAGE_ROOT / "utils" / "smart_agent.py"
 )
