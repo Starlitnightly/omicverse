@@ -60,6 +60,9 @@ def seeker(
 ) -> Dict[str, str]:
     """Create a new skill from a link (or links) for quick prototyping.
 
+    .. deprecated::
+        Use ``ov.Agent.seeker()`` instead. This function will be removed in a future version.
+
     Parameters
     ----------
     links : str | list[str]
@@ -84,64 +87,25 @@ def seeker(
     dict
         Keys: slug, skill_dir, optionally zip.
     """
-    cwd = Path.cwd()
-    is_multi = isinstance(links, (list, tuple))
-    first_link = links[0] if is_multi and links else links
-    title = name or (str(first_link) if isinstance(first_link, str) else "skill")
-    slug = _slugify(title)
+    import warnings
+    warnings.warn(
+        "ov.agent.seeker is deprecated; use ov.Agent.seeker instead",
+        DeprecationWarning,
+        stacklevel=2
+    )
 
-    # Resolve base output location
-    if target == "skills":
-        base_out = cwd / ".claude" / "skills"
-    else:
-        base_out = Path(out_dir) if out_dir else (cwd / "output")
-    base_out.mkdir(parents=True, exist_ok=True)
-
-    if not is_multi and isinstance(links, str):
-        # Single-link builder
-        from omicverse.ov_skill_seeker.link_builder import build_from_link
-        skill_dir = build_from_link(
-            link=links,
-            output_root=base_out,
-            name=title,
-            description=description,
-            max_pages=max_pages,
-        )
-    else:
-        # Multi-link unified build: synthesize a minimal config
-        from omicverse.ov_skill_seeker.unified_builder import build_from_config
-        cfg = {
-            "name": title,
-            "description": description
-            or "Prototype skill from multiple links for a capability not yet in OmicVerse",
-            "sources": [
-                {"type": "documentation", "base_url": str(u), "max_pages": max_pages}
-                for u in links  # type: ignore[arg-type]
-            ],
-        }
-        tmp_cfg = base_out / f"{slug}.config.json"
-        tmp_cfg.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-        try:
-            skill_dir = build_from_config(tmp_cfg, base_out)
-        finally:
-            try:
-                tmp_cfg.unlink()
-            except Exception:
-                pass
-
-    result = {
-        "slug": skill_dir.name,
-        "skill_dir": str(skill_dir),
-    }
-
-    if package:
-        zip_root = Path(package_dir) if package_dir else (out_dir if out_dir else (cwd / "output"))
-        zip_root = Path(zip_root)
-        zip_path = zip_root / f"{skill_dir.name}.zip"
-        zip_path = _zip_dir(skill_dir, zip_path)
-        result["zip"] = str(zip_path)
-
-    return result
+    # Import and forward to Agent.seeker
+    from omicverse.utils.smart_agent import Agent
+    return Agent.seeker(
+        links,
+        name=name,
+        description=description,
+        max_pages=max_pages,
+        target=target,
+        out_dir=out_dir,
+        package=package,
+        package_dir=package_dir,
+    )
 
 
 __all__ = ["seeker"]
