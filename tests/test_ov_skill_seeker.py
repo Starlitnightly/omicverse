@@ -31,21 +31,62 @@ def stub_omicverse_pkg():
     """Stub the 'omicverse' package to avoid running heavy __init__ on import.
 
     Provides package paths to load submodules directly from the source tree.
+    Purges existing imports and force-registers stubs to ensure monkeypatch
+    attribute resolution works reliably.
     """
     pkgs_root = Path(__file__).resolve().parents[1] / "omicverse"
-    # Create lightweight package stubs
+
+    # Step 1: Purge all omicverse* modules from sys.modules
+    modules_to_purge = [
+        key for key in list(sys.modules.keys())
+        if key == "omicverse" or key.startswith("omicverse.")
+    ]
+    for mod in modules_to_purge:
+        sys.modules.pop(mod, None)
+
+    # Step 2: Create fresh lightweight package stubs
     ov = types.ModuleType("omicverse")
     ov.__path__ = [str(pkgs_root)]  # type: ignore[attr-defined]
+
     utils = types.ModuleType("omicverse.utils")
     utils.__path__ = [str(pkgs_root / "utils")]  # type: ignore[attr-defined]
+
     seeker = types.ModuleType("omicverse.ov_skill_seeker")
     seeker.__path__ = [str(pkgs_root / "ov_skill_seeker")]  # type: ignore[attr-defined]
-    # Attach subpackages as attributes for dotted getattr resolution
+
+    # Create minimal smart_agent stub for alias tests
+    smart_agent = types.ModuleType("omicverse.utils.smart_agent")
+    # Add minimal Agent class stub with seeker method for patching
+    class Agent:
+        @staticmethod
+        def seeker(*args, **kwargs):
+            """Stub method for patching in tests."""
+            pass
+    smart_agent.Agent = Agent  # type: ignore[attr-defined]
+
+    # Step 3: Attach subpackages as attributes for dotted getattr resolution
     setattr(ov, "utils", utils)
     setattr(ov, "ov_skill_seeker", seeker)
-    sys.modules.setdefault("omicverse", ov)
-    sys.modules.setdefault("omicverse.utils", utils)
-    sys.modules.setdefault("omicverse.ov_skill_seeker", seeker)
+    setattr(utils, "smart_agent", smart_agent)
+
+    # Step 4: Force-register stubs in sys.modules (not setdefault)
+    sys.modules["omicverse"] = ov
+    sys.modules["omicverse.utils"] = utils
+    sys.modules["omicverse.ov_skill_seeker"] = seeker
+    sys.modules["omicverse.utils.smart_agent"] = smart_agent
+
+    # Step 5: Load the real agent module using importlib for deprecated API tests
+    # This provides the actual seeker function and _zip_dir
+    import importlib.util
+    agent_spec = importlib.util.spec_from_file_location(
+        "omicverse.agent", pkgs_root / "agent" / "__init__.py"
+    )
+    agent = importlib.util.module_from_spec(agent_spec)  # type: ignore[arg-type]
+    sys.modules["omicverse.agent"] = agent
+    setattr(ov, "agent", agent)
+    assert agent_spec.loader is not None  # type: ignore[union-attr]
+    agent_spec.loader.exec_module(agent)  # type: ignore[union-attr]
+
     try:
         yield
     finally:
