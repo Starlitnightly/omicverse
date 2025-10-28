@@ -1,4 +1,4 @@
-# qc_fastp.py fastp 步骤工厂
+# qc_fastp.py fastp step factory
 from __future__ import annotations
 
 try:
@@ -28,7 +28,7 @@ def _ensure_dir(p: Path) -> Path:
 
 
 def _ext(p: Path) -> str:
-    # 保持与输入一致：输入是 .gz 则输出也 .gz
+    # Preserve input behaviour: emit .gz when the input is gzipped.
     return ".fastq.gz" if p.suffix == ".gz" or p.name.endswith(".fastq.gz") else ".fastq"
 
 def _fastp_one(
@@ -39,21 +39,21 @@ def _fastp_one(
     threads: int = 8,
 ) -> Tuple[str, Path, Path, Path, Path]:
     """
-    跑一个样本的 fastp（paired-end）。
-    返回：(srr, clean1, clean2, json, html)
+    Run fastp for a single paired-end sample.
+    Returns (srr, clean1, clean2, json, html).
     """
     env = merged_env()
-    fastp_bin = which_or_find("fastp")  # 解析可执行路径
+    fastp_bin = which_or_find("fastp")  # Resolve the executable path.
     out_dir = _ensure_dir(out_root / srr)
 
-    # 输出文件名（与输入后缀保持一致）
+    # Compose output filenames (respect the input suffix behaviour).
     oext = _ext(fq1)
     clean1 = out_dir / f"{srr}_clean_1{oext.replace('.fastq', '')}"
     clean2 = out_dir / f"{srr}_clean_2{oext.replace('.fastq', '')}"
     json = out_dir / f"{srr}.fastp.json"
     html = out_dir / f"{srr}.fastp.html"
 
-    # 已存在就跳过（可按需改成强制覆盖）
+    # Skip when outputs already exist (override if you prefer forced rewrites).
     if clean1.exists() and clean2.exists() and json.exists() and html.exists():
         return srr, clean1, clean2, json, html
 
@@ -67,17 +67,17 @@ def _fastp_one(
         "-j", str(json),
         "-h", str(html),
         "--detect_adapter_for_pe",
-        "--thread", str(threads),   # 一些版本也接受 --thread
+        "--thread", str(threads),   # Some versions accept --thread in addition to -w.
         "--overrepresentation_analysis",
     ]
 
-    # 如果输出是 .gz，fastp 会自动压缩（由后缀决定），不必额外 gzip
-    # 可选：加更严格过滤参数（示例）——按需启用：
-    # cmd += ["-q", "20", "-u", "30", "-l", "30"]  # 质量阈值/不合格比例/最短长度
+    # fastp compresses automatically when the suffix is .gz.
+    # Optional stricter filtering parameters (quality, unqualified %, minimum length):
+    # cmd += ["-q", "20", "-u", "30", "-l", "30"]
 
     _run(cmd, env=env)
 
-    # 简单校验
+    # Basic validation.
     if not (clean1.exists() and clean1.stat().st_size > 0 and clean2.exists() and clean2.stat().st_size > 0):
         raise RuntimeError(f"fastp outputs missing/empty for {srr} in {out_dir}")
 
@@ -87,18 +87,18 @@ def _fastp_one(
 def fastp_batch(
     pairs: Sequence[Tuple[str, Path, Path]],  # [(srr, fq1, fq2), ...]
     out_root: str | Path,
-    threads: int = 12,          # 每个样本 fastp 工作线程
-    max_workers: int | None = None,  # 同时处理的样本数；None=和 threads 一样或自动
+    threads: int = 12,          # fastp threads per sample.
+    max_workers: int | None = None,  # Number of samples processed concurrently; None lets us auto-select.
 ) -> List[Tuple[str, Path, Path, Path, Path]]:
     """
-    并发跑 fastp。
-    返回：[(srr, clean1, clean2, json, html), ...]（按输入顺序）
+    Execute fastp concurrently for multiple samples.
+    Returns [(srr, clean1, clean2, json, html), ...] in the original ordering.
     """
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
 
     if max_workers is None:
-        # 默认同时处理的样本数 = min(线程数, 核心数/2)（你也可以换成固定值）
+        # Default concurrency: min(threads, cpu_count/2); adjust to taste.
         import os, math
         max_workers = max(1, min(threads, (os.cpu_count() or 8) // 2))
 
@@ -123,7 +123,7 @@ def fastp_batch(
         msg = "; ".join([f"{s}:{m}" for s, m in errors])
         raise RuntimeError(f"fastp_batch failed for {len(errors)} samples: {msg}")
 
-    # 按输入顺序组织
+    # Preserve the original order.
     order = {s: i for i, (s, _, _) in enumerate(pairs)}
     out = [results[s] for s, _, _ in sorted(pairs, key=lambda x: order[x[0]])]
     return out
@@ -135,29 +135,29 @@ def make_fastp_step(
     backend: str = "process",
 ):
     """
-    输入：FASTQ 列表（[(srr, fq1, fq2), ...]）
-    输出：work/fastp/{SRR}_1.clean.fq.gz, {SRR}_2.clean.fq.gz
-    验证：清洗后的 fq 均存在且 size > 0
+    Input: FASTQ list [(srr, fq1, fq2), ...]
+    Output: work/fastp/{SRR}_1.clean.fq.gz, {SRR}_2.clean.fq.gz
+    Validation: cleaned FASTQ files exist and have size > 0.
     """
     def _cmd(fastq_triplets: Sequence[tuple[str, str, str]], logger=None):
-        # 三元组模式直接传给 fastp_clean_parallel
-        # outdir 在三元组模式下不会被使用，但函数签名需要，给个合理值即可
+        # Forward triplets directly to fastp_clean_parallel.
+        # outdir is unused in triplet mode; provide a reasonable placeholder.
         os.makedirs(out_root, exist_ok=True)
 
-        # 取第一个样本的 fq1 所在目录作为占位 outdir；若列表为空或路径异常，则用 "."
+        # Use the first fq1 directory as a placeholder outdir; default to "." when absent.
         if fastq_triplets:
             first_fq1_dir = os.path.dirname(fastq_triplets[0][1]) or "."
         else:
             first_fq1_dir = "."
 
-        # 关键点：让 fastp_clean 的输出落在 {work_dir}/fastp/ 之下，
-        # 而 out_root = "{work_dir}/fastp"。因此取 work_dir = dirname(out_root)
+        # Key detail: fastp_clean writes to {work_dir}/fastp/ while out_root = {work_dir}/fastp,
+        # so choose work_dir = dirname(out_root).
         work_dir = os.path.dirname(out_root) or "."
 
         return fastp_clean_parallel(
-            samples=list(fastq_triplets),           # 三元组模式 [(srr, fq1, fq2), ...]
-            outdir=first_fq1_dir,                   # 三元组模式会忽略此参数
-            work_dir=work_dir,                      # 确保输出到 {work_dir}/fastp = out_root
+            samples=list(fastq_triplets),           # Triplet mode [(srr, fq1, fq2), ...]
+            outdir=first_fq1_dir,                   # Ignored in triplet mode.
+            work_dir=work_dir,                      # Ensures outputs land in {work_dir}/fastp = out_root.
             fastp_threads=threads_per_job,
             max_workers=max_workers,
             retries=2,
@@ -166,7 +166,7 @@ def make_fastp_step(
 
     return {
         "name": "fastp",
-        "command": _cmd,  # 接收 [(srr, fq1, fq2), ...]
+        "command": _cmd,  # Accepts [(srr, fq1, fq2), ...].
         "outputs": [f"{out_root}" + "/{SRR}_1.clean.fq.gz",
                     f"{out_root}" + "/{SRR}_2.clean.fq.gz"],
         "validation": lambda fs: all(os.path.exists(f) and os.path.getsize(f) > 0 for f in fs),

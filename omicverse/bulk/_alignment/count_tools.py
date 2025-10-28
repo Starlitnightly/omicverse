@@ -1,4 +1,4 @@
-# count_tools.py featureCounts 批量版本
+# count_tools.py featureCounts batch utilities
 from __future__ import annotations
 import os, subprocess, sys
 from pathlib import Path
@@ -36,24 +36,23 @@ def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads
         subprocess.run(cmd, check=True, env=env)
     except FileNotFoundError as e:
         raise RuntimeError(
-            f"[featureCounts] 无法执行 featureCounts (路径: {featurecounts_path})\n"
-            f"文件存在: {os.path.exists(featurecounts_path)}\n"
-            f"文件可执行: {os.access(featurecounts_path, os.X_OK)}\n"
-            f"原始错误: {e}"
+            f"[featureCounts] Failed to execute featureCounts (path: {featurecounts_path})\n"
+            f"Exists: {os.path.exists(featurecounts_path)}\n"
+            f"Executable: {os.access(featurecounts_path, os.X_OK)}\n"
+            f"Original error: {e}"
         ) from e
 
-    # 简化输出（自动识别计数列）
+    # Simplify output by keeping only the count column.
     if simple and os.path.exists(out_file):
         df = pd.read_csv(out_file, sep="\t", comment="#")
-        # featureCounts 的注释列
+        # Annotation columns produced by featureCounts.
         annot_cols = {"Geneid", "Chr", "Start", "End", "Strand", "Length"}
-        # 找出计数列（通常只有 1 列；列名是 BAM 名称/路径）
+        # Identify the count column (usually one column named after the BAM).
         count_cols = [c for c in df.columns if c not in annot_cols]
         if len(count_cols) == 0:
             raise ValueError(f"No count columns found in {out_file}. Got columns: {list(df.columns)}")
         if len(count_cols) > 1:
-            # 多 BAM 情况下这里按需处理；本函数是"单个 bam"，理论上==1
-            # 保险起见，取最后一列当计数列
+            # For multiple BAMs, select the last column as a safeguard.
             counts_col = count_cols[-1]
         else:
             counts_col = count_cols[0]
@@ -66,13 +65,13 @@ def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads
     return srr, out_file
 
 def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8, simple: bool = True):
-    # -------------- 新增安全判断 --------------
+    # -------------- Safety guard for missing GTF --------------
     if gtf is None:
         gtf = os.environ.get("FC_GTF_HINT")
     if not gtf or not os.path.exists(gtf):
         raise RuntimeError(
             f"[featureCounts] Missing valid GTF file for {bam_path}. "
-            "请确认 pipeline 已设置 FC_GTF_HINT 或传入 gtf 参数。"
+            "Ensure the pipeline sets FC_GTF_HINT or pass gtf explicitly."
         )
     # -----------------------------------------
 
@@ -83,33 +82,33 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
     if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
         return srr, out_file
 
-    # -------------- 增强的 featureCounts 检测 --------------
+    # -------------- Enhanced featureCounts detection --------------
     from .tools_check import resolve_tool, merged_env
     import shutil
 
     featurecounts_path = resolve_tool("featureCounts")
     if not featurecounts_path:
-        # 详细的环境诊断信息
+        # Detailed diagnostic information for the environment.
         env_path = os.environ.get("PATH", "Not set")
         jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
 
         raise RuntimeError(
-            f"[featureCounts] 无法找到 featureCounts 可执行文件。\n"
-            f"这可能是因为 Jupyter Lab 内核环境与系统环境不同。\n\n"
-            f"诊断信息:\n"
-            f"  - 当前 Python: {sys.executable}\n"
-            f"  - Jupyter 内核路径: {jupyter_kernel_path}\n"
-            f"  - PATH 环境变量包含 omicverse: {'omicverse' in env_path}\n"
+            f"[featureCounts] Unable to locate the featureCounts executable.\n"
+            f"This often indicates the Jupyter Lab kernel environment differs from the shell.\n\n"
+            f"Diagnostics:\n"
+            f"  - Current Python: {sys.executable}\n"
+            f"  - Jupyter kernel path: {jupyter_kernel_path}\n"
+            f"  - PATH contains 'omicverse': {'omicverse' in env_path}\n"
             f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
-            f"解决方案:\n"
-            f"  1. 在 Jupyter cell 中运行: !which featureCounts\n"
-            f"  2. 如果找不到，安装: !conda install -c bioconda subread -y\n"
-            f"  3. 或者设置环境变量: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
-            f"注意: 'No such file or directory' 指的是找不到 featureCounts 程序，\n"
-            f"      而不是目录不存在，请不要手动创建目录。"
+            f"Suggested fixes:\n"
+            f"  1. In a Jupyter cell run: !which featureCounts\n"
+            f"  2. If missing, install: !conda install -c bioconda subread -y\n"
+            f"  3. Or prepend the env bin: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
+            f"Note: 'No such file or directory' refers to the missing featureCounts binary,\n"
+            f"      not the directory; do not create directories manually."
         )
 
-    # 使用找到的完整路径而不是依赖 PATH
+    # Use the resolved absolute path rather than relying on PATH.
     cmd = [
         featurecounts_path,
         "-T", str(threads),
@@ -118,33 +117,32 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
         bam_path
     ]
 
-    # Use proper environment to ensure featureCounts is found
+    # Use the merged environment to ensure featureCounts is discoverable.
     env = merged_env()
 
     try:
         subprocess.run(cmd, check=True, env=env)
     except FileNotFoundError as e:
-        # 如果仍然找不到，提供更详细的错误信息
+        # Provide more detail if execution still fails.
         raise RuntimeError(
-            f"[featureCounts] 即使找到路径仍无法执行 featureCounts。\n"
-            f"尝试的路径: {featurecounts_path}\n"
-            f"文件存在: {os.path.exists(featurecounts_path)}\n"
-            f"文件可执行: {os.access(featurecounts_path, os.X_OK)}\n"
-            f"原始错误: {e}"
+            f"[featureCounts] Execution failed even though the path was resolved.\n"
+            f"Attempted path: {featurecounts_path}\n"
+            f"Exists: {os.path.exists(featurecounts_path)}\n"
+            f"Executable: {os.access(featurecounts_path, os.X_OK)}\n"
+            f"Original error: {e}"
         ) from e
     
-    # 简化输出（自动识别计数列）
+    # Simplify the output by retaining the gene/count columns.
     if simple and os.path.exists(out_file):
         df = pd.read_csv(out_file, sep="\t", comment="#")
-        # featureCounts 的注释列
+        # Annotation columns included in featureCounts output.
         annot_cols = {"Geneid", "Chr", "Start", "End", "Strand", "Length"}
-        # 找出计数列（通常只有 1 列；列名是 BAM 名称/路径）
+        # Identify the count column (typically the BAM name/path).
         count_cols = [c for c in df.columns if c not in annot_cols]
         if len(count_cols) == 0:
             raise ValueError(f"No count columns found in {out_file}. Got columns: {list(df.columns)}")
         if len(count_cols) > 1:
-            # 多 BAM 情况下这里按需处理；本函数是“单个 bam”，理论上==1
-            # 保险起见，取最后一列当计数列
+            # For multi-BAM tables, fall back to the last column.
             counts_col = count_cols[-1]
         else:
             counts_col = count_cols[0]
@@ -170,48 +168,48 @@ def feature_counts_batch(
     Run featureCounts on multiple BAM files.
     """
     os.makedirs(out_dir, exist_ok=True)
-     # -------------- 新增安全判断 --------------
+    # -------------- Safety guard for missing GTF --------------
     if gtf is None:
         gtf = os.environ.get("FC_GTF_HINT")
     if not gtf or not os.path.exists(gtf):
         raise RuntimeError(
             "[featureCounts_batch] GTF not provided and FC_GTF_HINT not found. "
-            "请在 pipeline 推断 GTF 或手动传入。"
+            "Ensure the pipeline infers the GTF or pass one explicitly."
         )
 
-    # -------------- 增强的 featureCounts 检测 --------------
+    # -------------- Enhanced featureCounts detection --------------
     from .tools_check import resolve_tool, merged_env
     import shutil
 
     featurecounts_path = resolve_tool("featureCounts")
     if not featurecounts_path:
-        # 详细的环境诊断信息
+        # Detailed diagnostic information.
         env_path = os.environ.get("PATH", "Not set")
         jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
 
         raise RuntimeError(
-            f"[featureCounts_batch] 无法找到 featureCounts 可执行文件。\n"
-            f"这可能是因为 Jupyter Lab 内核环境与系统环境不同。\n\n"
-            f"诊断信息:\n"
-            f"  - 当前 Python: {sys.executable}\n"
-            f"  - Jupyter 内核路径: {jupyter_kernel_path}\n"
-            f"  - PATH 环境变量包含 omicverse: {'omicverse' in env_path}\n"
+            f"[featureCounts_batch] Unable to locate the featureCounts executable.\n"
+            f"This often indicates the Jupyter Lab kernel environment differs from the shell.\n\n"
+            f"Diagnostics:\n"
+            f"  - Current Python: {sys.executable}\n"
+            f"  - Jupyter kernel path: {jupyter_kernel_path}\n"
+            f"  - PATH contains 'omicverse': {'omicverse' in env_path}\n"
             f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
-            f"解决方案:\n"
-            f"  1. 在 Jupyter cell 中运行: !which featureCounts\n"
-            f"  2. 如果找不到，安装: !conda install -c bioconda subread -y\n"
-            f"  3. 或者设置环境变量: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
-            f"注意: 'No such file or directory' 指的是找不到 featureCounts 程序，\n"
-            f"      而不是目录不存在，请不要手动创建目录。"
+            f"Suggested fixes:\n"
+            f"  1. In a Jupyter cell run: !which featureCounts\n"
+            f"  2. If missing, install: !conda install -c bioconda subread -y\n"
+            f"  3. Or prepend the env bin: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
+            f"Note: 'No such file or directory' refers to the missing featureCounts binary,\n"
+            f"      not the directory; avoid creating directories manually."
         )
     # -----------------------------------------
 
     results, errors = [], []
 
-    # 计算合适的worker数量，避免资源竞争
+    # Compute a reasonable worker count to avoid resource contention.
     if max_workers is None:
         cpu_count = os.cpu_count() or 1
-        # 确保每个worker有足够的CPU资源
+        # Ensure each worker has enough CPU resources.
         max_workers = min(4, cpu_count // max(1, threads // 4))
 
     with ProcessPoolExecutor(max_workers=max_workers) as ex:
@@ -227,16 +225,15 @@ def feature_counts_batch(
             except Exception as e:
                 print(f"[ERR] {srr}: {e}")
 
-    # 结果汇总（更健壮：支持 Geneid 或 gene_id，自动识别计数列）
-        # 结果汇总（保留 SRR→文件配对；在合并前就把计数列重命名为 SRR，避免重复列名）
+    # Aggregate results; support Geneid or gene_id and rename count columns to SRR IDs.
     pairs = [(srr, f) for (srr, f) in results if os.path.exists(f)]
     if len(pairs) > 1:
         merged_df = None
         for srr, f in pairs:
-            # 跳过注释行，避免列名被干扰
+            # Skip comment lines to avoid header interference.
             df = pd.read_csv(f, sep="\t", comment="#")
 
-            # 基因列：优先 gene_id；否则 Geneid；都没有则用第 1 列
+            # Choose gene column: prefer gene_id, otherwise Geneid, otherwise the first column.
             if "gene_id" in df.columns:
                 gene_col = "gene_id"
             elif "Geneid" in df.columns:
@@ -244,17 +241,17 @@ def feature_counts_batch(
             else:
                 gene_col = df.columns[0]
 
-            # 计数列：去除元数据列后剩下的列（通常只有 1 列，为该样本计数）
+            # Determine count columns by removing annotation fields (typically leaves one column).
             meta_cols = {"Chr", "Start", "End", "Strand", "Length", gene_col}
             count_cols = [c for c in df.columns if c not in meta_cols]
             if not count_cols:
-                # 兜底：最后一列当作计数列
+                # Fallback: treat the final column as the count column.
                 count_col = df.columns[-1]
             else:
-                # 常见只有 1 列；若有多列，取最后一列（通常为计数）
+                # If multiple remain, take the last one (usually the counts).
                 count_col = count_cols[-1]
 
-            # 只保留 gene_id + 该样本计数列，并把计数列名改成 SRR（唯一）
+            # Retain only gene_id plus that sample's count column, renaming the column to the SRR.
             df_simple = df[[gene_col, count_col]].copy()
             df_simple.columns = ["gene_id", srr]
 
@@ -263,58 +260,13 @@ def feature_counts_batch(
             else:
                 merged_df = merged_df.merge(df_simple, on="gene_id", how="outer")
 
-        # 现在 merged_df 的每个计数列名都是 SRR，天然唯一，无需再做后续的正则重命名
+        # Each merged count column now matches its SRR, so no further renaming is required.
         out_path = Path(out_dir) / f"matrix.{by}.csv"
         merged_df.to_csv(out_path, index=False)
         print(f"[OK] featureCounts merged matrix → {out_path}")
-    '''table_files = [f for _, f in results if os.path.exists(f)]
-    if len(table_files) > 1:
-        merged_df = None
-        for f in table_files:
-            # 关键：跳过注释行，避免列名被干扰
-            df = pd.read_csv(f, sep="\t", comment="#")
-    
-            # 基因列：优先 gene_id；否则用 Geneid；都没有就退而求其次第 1 列
-            if "gene_id" in df.columns:
-                gene_col = "gene_id"
-            elif "Geneid" in df.columns:
-                gene_col = "Geneid"
-            else:
-                gene_col = df.columns[0]  # 兜底
-    
-            # 计数列：排除注释列后余下的全是计数列（通常只有 1 列；列名是 BAM 路径/文件名）
-            annot_cols = {gene_col, "Chr", "Start", "End", "Strand", "Length"}
-            count_cols = [c for c in df.columns if c not in annot_cols]
-            if len(count_cols) == 0:
-                raise ValueError(f"No count columns found in {f}. Columns={list(df.columns)}")
-    
-            # 只留“基因 + 计数列”，并统一把基因列命名为 gene_id
-            df = df[[gene_col] + count_cols].rename(columns={gene_col: "gene_id"})
-    
-            if merged_df is None:
-                merged_df = df
-            else:
-                merged_df = merged_df.merge(df, on="gene_id", how="outer")
-    
-        import re
-
-        def _extract_srr(colname: str) -> str:
-            m = re.search(r'(SRR\d{5,})', colname)
-            if m:
-                return m.group(1)
-            return colname  # 如果没匹配到，保留原名
-        
-        # 对除 gene_id 外的列重命名
-        new_cols = [merged_df.columns[0]] + [_extract_srr(c) for c in merged_df.columns[1:]]
-        merged_df.columns = new_cols
-        
-        out_path = Path(out_dir) / f"matrix.{by}.csv"
-        merged_df.to_csv(out_path, index=False)
-        print(f"[OK] featureCounts merged matrix → {out_path}")'''
-    
 
     return {
-        "tables": results,                 # 例如 [(srr, sample_table_path), ...]，按你现有结构
+        "tables": results,                 # e.g. [(srr, sample_table_path), ...] preserving the current structure
         "matrix": str(out_path) if 'out_path' in locals() else None,
         "failed": errors if 'errors' in locals() else [],
     }
@@ -324,39 +276,39 @@ def run_featurecounts_auto(
     index_dir: str | Path,
     out_dir: str = "results",
     accession_id: str | None = None,   # e.g. "GSE157103"
-    srr_id: str | None = None,         # e.g. "SRR12544419"（单样本时）
+    srr_id: str | None = None,         # e.g. "SRR12544419" for single-sample runs
     threads: int = 12,
     output_csv: bool = True,
-    simple: bool = True,                # ✅ 新增：是否精简输出
-    featurecounts_bin: str | None = None,  # 可留空，自动用 PATH 解析
+    simple: bool = True,                # Whether to trim the output table
+    featurecounts_bin: str | None = None,  # Optional explicit featureCounts path
 ) -> Path:
     """
-    - 自动从 STAR index 定位 GTF（并在需要时解压 .gtf.gz）
-    - 根据 accession 或 SRR 自动命名输出文件
-    - 默认将 featureCounts 的制表符输出转换为 CSV
+    - Auto-detect the GTF from the STAR index (decompress .gtf.gz if required).
+    - Auto-name outputs using the accession or SRR.
+    - Convert the default featureCounts TSV output into CSV.
     """
     bam_files = [str(Path(b)) for b in bam_files]
     index_dir = Path(index_dir)
     os.makedirs(out_dir, exist_ok=True)
 
-    # 1) 自动找 GTF
-    gtf_path = get_gtf_for_index(index_dir)  # ← 核心：无需手动提供
+    # 1) Auto-discover the GTF.
+    gtf_path = get_gtf_for_index(index_dir)  # No manual GTF path required.
 
-    # 2) 智能命名
+    # 2) Smart naming.
     if accession_id and not srr_id:
         prefix = f"{accession_id}_counts"
     elif srr_id:
         prefix = f"{srr_id}_counts"
     else:
         prefix = f"counts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    out_txt = Path(out_dir) / f"{prefix}.txt"   # 先让 featureCounts 按默认写 .txt（TSV）
+    out_txt = Path(out_dir) / f"{prefix}.txt"   # Let featureCounts emit its default TSV first.
 
-    # 3) 定位 featureCounts 可执行文件
+    # 3) Locate the featureCounts executable.
     if featurecounts_bin is None:
         import shutil
         featurecounts_bin = shutil.which("featureCounts") or "featureCounts"
 
-    # 4) 运行 featureCounts
+    # 4) Run featureCounts.
     cmd = [
         featurecounts_bin,
         "-T", str(threads),
@@ -375,13 +327,13 @@ def run_featurecounts_auto(
         print(proc.stderr)
         raise subprocess.CalledProcessError(proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr)
 
-    # 读取输出
+    # Read the output.
     df = pd.read_csv(out_txt, sep="\t", comment="#")
 
-    # 若 simple=True，仅保留 Geneid + counts 列
+    # When simple=True, keep only the Geneid and count columns.
     if simple:
         gene_col = "Geneid" if "Geneid" in df.columns else df.columns[0]
-        # 去除注释列，只留基因和样本计数 用于下游 OV pair的比对格式
+        # Remove annotation columns, retaining gene and sample counts for downstream alignment formatting.
         keep_cols = [gene_col] + [
             c for c in df.columns
             if c not in ["Chr", "Start", "End", "Strand", "Length"] and c != gene_col
@@ -389,7 +341,7 @@ def run_featurecounts_auto(
         df = df[keep_cols]
         print(f"[INFO] Simplified output: retained {len(keep_cols)} columns")
 
-    # 导出 CSV 或 TXT
+    # Export to CSV or TXT.
     if output_csv:
         out_csv = out_txt.with_suffix(".csv")
         df.to_csv(out_csv, index=False)

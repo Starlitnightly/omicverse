@@ -1,5 +1,5 @@
+# Author: Zhi Luo
 # omicverse/bulk/alignment.py
-# Contributor: Zhi Luo
 
 """
 Alignment pipeline for bulk RNA-seq in OmicVerse.
@@ -70,12 +70,12 @@ try:
 except Exception:
     from iseq_handler import ISeqHandler
 
-# 设置日志
+# Configure logging.
 logger = logging.getLogger(__name__)
 
 
 class DownloadProgressBar:
-    """实时下载进度条显示类"""
+    """Progress bar helper for real-time download updates."""
 
     def __init__(self, total_size=None, desc="Downloading"):
         self.total_size = total_size
@@ -88,19 +88,19 @@ class DownloadProgressBar:
         self.lock = threading.Lock()
 
     def update(self, current_size):
-        """更新进度"""
+        """Update the progress bar."""
         with self.lock:
             self.current_size = current_size
             current_time = time.time()
 
-            # 每0.5秒更新一次显示，避免过于频繁
+            # Update the display every 0.5 seconds to avoid spamming stdout.
             if current_time - self.last_update >= 0.5:
                 self._display_progress(current_time)
                 self.last_update = current_time
                 self.last_size = current_size
 
     def _display_progress(self, current_time):
-        """显示进度条"""
+        """Render the progress bar."""
         if not self.active:
             return
 
@@ -108,15 +108,15 @@ class DownloadProgressBar:
         if elapsed == 0:
             return
 
-        # 计算速度 (bytes/second)
+        # Compute the speed in bytes per second.
         speed = (self.current_size - self.last_size) / (current_time - self.last_update) if current_time > self.last_update else 0
 
-        # 格式化文件大小
+        # Format the file size.
         current_str = self._format_size(self.current_size)
         speed_str = self._format_size(speed) + "/s"
 
         if self.total_size and self.total_size > 0:
-            # 如果有总大小，显示百分比进度条
+            # Show a percentage progress bar when total size is known.
             percentage = (self.current_size / self.total_size) * 100
             bar_length = 40
             filled_length = int(bar_length * self.current_size // self.total_size)
@@ -127,11 +127,11 @@ class DownloadProgressBar:
 
             print(f'\r{self.desc}: {percentage:.1f}%|{bar}| {current_str}/{total_str} [{speed_str}, ETA: {eta_str}]', end='', flush=True)
         else:
-            # 如果没有总大小，只显示当前大小和速度
+            # Without total size, only display the current size and speed.
             print(f'\r{self.desc}: {current_str} [{speed_str}]', end='', flush=True)
 
     def _format_size(self, size):
-        """格式化文件大小"""
+        """Format file sizes into human-readable strings."""
         if size == 0:
             return "0B"
 
@@ -149,7 +149,7 @@ class DownloadProgressBar:
             return f"{size_float:.1f}{units[unit_index]}"
 
     def _format_time(self, seconds):
-        """格式化时间"""
+        """Format seconds into a human-readable string."""
         if seconds < 60:
             return f"{int(seconds)}s"
         elif seconds < 3600:
@@ -162,10 +162,10 @@ class DownloadProgressBar:
             return f"{hours}h{minutes}m"
 
     def finish(self):
-        """完成进度条"""
+        """Finalize the progress bar."""
         with self.lock:
             self.active = False
-            # 显示最终状态
+            # Show the final state.
             total_time = time.time() - self.start_time
             total_str = self._format_size(self.current_size)
             avg_speed = self.current_size / total_time if total_time > 0 else 0
@@ -175,10 +175,10 @@ class DownloadProgressBar:
                 print(f'\r{self.desc}: 100%|{"█" * 40}| {total_str}/{total_str} [{avg_speed_str}, Total: {self._format_time(total_time)}]')
             else:
                 print(f'\r{self.desc}: {total_str} [{avg_speed_str}, Total: {self._format_time(total_time)}]')
-            print()  # 换行
+            print()  # New line.
 
     def stop(self):
-        """停止进度条"""
+        """Stop the progress bar."""
         self.active = False
 
 
@@ -190,11 +190,11 @@ class AlignmentConfig:
     prefetch_root: Path = field(init=False)
     fasterq_root: Path = field(init=False)
     qc_root: Path = field(init=False)
-    align_root: Path = field(init=False)     # placeholder if you later add HISAT2/STAR
+    align_root: Path = field(init=False)     # Placeholder if you later add HISAT2/STAR.
     counts_root: Path = field(init=False)
 
-    star_index_root: Path = field(init=False)        # 索引根目录（和 star_tools 设定一致）
-    star_align_root: Path  = field(init=False)   # STAR 输出根目录
+    star_index_root: Path = field(init=False)        # Index root (aligned with star_tools).
+    star_align_root: Path  = field(init=False)   # STAR output root.
 
     # Basic prefetch configuration (no mirror switching)
     prefetch_config: Dict[str, Any] = field(default_factory=lambda: {
@@ -212,7 +212,7 @@ class AlignmentConfig:
         self.prefetch_root = self.work_root / "prefetch"
         self.fasterq_root = self.work_root / "fasterq"
         self.qc_root = self.work_root / "fastp"
-        self.align_root = self.work_root / "align" # other align method预留位
+        self.align_root = self.work_root / "align"  # Reserved for alternative aligners.
         self.counts_root = self.work_root / "counts"
         self.star_align_root = self.work_root / "star"
         self.star_index_root = self.work_root / "index"
@@ -267,10 +267,10 @@ class Alignment:
         ]:
             Path(p).mkdir(parents=True, exist_ok=True)
 
-        # 初始化iSeq处理器
+        # Initialize the iSeq handler.
         self.iseq_handler = ISeqHandler(
             sample_id_pattern=self.cfg.iseq_sample_pattern,
-            paired_end=True,  # 默认双端
+            paired_end=True,  # Default to paired-end.
             validate_files=True
         )
 
@@ -280,24 +280,24 @@ class Alignment:
         accession: str,
         meta_dir: Optional[Path] = None,
         out_dir: Optional[Path] = None,
-        organism_filter: Optional[str] = None,   # 例如 "Homo sapiens"
+        organism_filter: Optional[str] = None,   # e.g. "Homo sapiens"
         layout_filter: Optional[str] = None,     # "PAIRED" / "SINGLE"
     ):
         """
-        给一个 GEO accession（GSE/GSM），抓取 SOFT→保存 meta JSON，
-        再走 EDirect 生成 RunInfo CSV，并返回 SRR 列表与路径。
+        Given a GEO accession (GSE/GSM), fetch SOFT, persist the meta JSON,
+        then run EDirect to generate the RunInfo CSV and return SRR IDs plus paths.
         """
         _tools_check.check()
-        # 1) 目录设置
+        # 1) Prepare directories.
         meta_root = Path(meta_dir) if meta_dir else (Path(self.cfg.work_root) / "meta")
         #sra_meta_root = Path(out_dir) if out_dir else (Path(self.cfg.work_root) / "meta")
         meta_root.mkdir(parents=True, exist_ok=True)
         #sra_meta_root.mkdir(parents=True, exist_ok=True)
     
-        # 2) 生成/更新 JSON metadata（注意是 out_dir 参数）
+        # 2) Generate/update the JSON metadata (note the use of out_dir).
         _geo.geo_accession_to_meta_json(accession, out_dir=str(meta_root))
-    
-        # 3) 生成 RunInfo CSV（注意是 accession + meta_dir/out_dir）
+
+        # 3) Generate the RunInfo CSV (uses accession + meta_dir/out_dir).
         info = _ed.gse_meta_to_runinfo_csv(
             accession=accession,
             meta_dir=str(meta_root),
@@ -307,7 +307,7 @@ class Alignment:
         )
         runinfo_csv = Path(info["csv"]) if info.get("csv") else None
     
-        # 4) 提取 SRR 列表
+        # 4) Extract the SRR list.
         srrs: List[str] = []
         if runinfo_csv and runinfo_csv.exists():
             import csv
@@ -318,11 +318,11 @@ class Alignment:
                         if key in row and row[key]:
                             srrs.append(row[key].strip())
                             break
-            # 去重保序
+            # Deduplicate while preserving order.
             seen = set()
             srrs = [x for x in srrs if not (x in seen or seen.add(x))]
     
-        # 5) 可选：结构化字段
+        # 5) Optional: structured metadata (full SOFT parse).
         try:
             meta_struct = _geo.parse_geo_soft_to_struct(_geo.fetch_geo_text(accession))
         except Exception:
@@ -332,33 +332,33 @@ class Alignment:
             "meta_json": meta_root / f"{accession}_meta.json",
             "runinfo_csv": runinfo_csv,
             "srr_list": srrs,
-            "edirect_info": info,   # 包含 term_used/rows 等
+            "edirect_info": info,   # Includes term_used/rows and related fields.
             "meta_struct": meta_struct,
         }
 
     def _parse_progress_line(self, line: str, progress_bar: DownloadProgressBar):
-        """解析iseq输出行的进度信息"""
+        """Parse progress information emitted by iseq."""
         try:
             line_lower = line.lower()
 
-            # 匹配常见的进度格式
-            # 格式1: "45.2MB/125.8MB (36%)" 或 "45.2MB / 125.8MB (36%)"
+            # Match common progress formats.
+            # Pattern 1: "45.2MB/125.8MB (36%)" or "45.2MB / 125.8MB (36%)"
             progress_pattern = r'(\d+(?:\.\d+)?)\s*([KMGT]?B)\s*/\s*(\d+(?:\.\d+)?)\s*([KMGT]?B)\s*\((\d+)%\)'
             match = re.search(progress_pattern, line, re.IGNORECASE)
 
             if match:
                 current_size_str, current_unit, total_size_str, total_unit, percentage = match.groups()
 
-                # 转换为字节
+                # Convert into bytes.
                 current_bytes = self._parse_size_to_bytes(float(current_size_str), current_unit)
                 total_bytes = self._parse_size_to_bytes(float(total_size_str), total_unit)
 
-                # 更新进度条
+                # Update the progress bar accordingly.
                 progress_bar.total_size = total_bytes
                 progress_bar.update(current_bytes)
                 return
 
-            # 格式2: "Downloading: 45.2MB of 125.8MB"
+            # Pattern 2: "Downloading: 45.2MB of 125.8MB"
             download_pattern = r'(\d+(?:\.\d+)?)\s*([KMGT]?B)\s+of\s+(\d+(?:\.\d+)?)\s*([KMGT]?B)'
             match = re.search(download_pattern, line, re.IGNORECASE)
 
@@ -372,7 +372,7 @@ class Alignment:
                 progress_bar.update(current_bytes)
                 return
 
-            # 格式3: "45.2MB downloaded" 或 "Downloaded: 45.2MB"
+            # Pattern 3: "45.2MB downloaded" or "Downloaded: 45.2MB"
             downloaded_pattern = r'(\d+(?:\.\d+)?)\s*([KMGT]?B)\s*(?:downloaded|download)'
             match = re.search(downloaded_pattern, line, re.IGNORECASE)
 
@@ -382,7 +382,7 @@ class Alignment:
                 progress_bar.update(current_bytes)
                 return
 
-            # 格式4: 百分比格式 "36%" 或 "Progress: 36%"
+            # Pattern 4: percentage-only "36%" or "Progress: 36%".
             percent_pattern = r'(\d+)%'
             match = re.search(percent_pattern, line)
 
@@ -393,11 +393,11 @@ class Alignment:
                 return
 
         except Exception as e:
-            # 解析失败时不影响主程序
+            # Silent failure; do not impact the main execution.
             logger.debug(f"Failed to parse progress line '{line}': {e}")
 
     def _monitor_file_sizes(self, out_dir: Path, srr_list: Sequence[str], progress_bar: DownloadProgressBar):
-        """监控下载目录中的文件大小变化"""
+        """Monitor file size changes inside the download directory."""
         try:
             logger.debug("Starting file size monitoring...")
             start_time = time.time()
@@ -407,19 +407,19 @@ class Alignment:
             while progress_bar.active:
                 current_time = time.time()
 
-                # 每2秒检查一次文件大小
+                # Check file sizes every two seconds.
                 if current_time - start_time >= 2:
                     total_size = 0
                     found_files = 0
 
-                    # 检查每个SRR对应的文件
+                    # Inspect files belonging to each SRR.
                     for srr in srr_list:
-                        # 查找可能的文件模式
+                        # Examine possible file patterns.
                         patterns = [
-                            f"{srr}*.fastq*",      # FASTQ文件（可能压缩）
-                            f"{srr}*.fq*",         # 短扩展名
-                            f"{srr}*.sra*",        # SRA格式
-                            f"{srr}*.sralite"      # SRA lite格式
+                            f"{srr}*.fastq*",      # FASTQ files (potentially compressed).
+                            f"{srr}*.fq*",         # Short extensions.
+                            f"{srr}*.sra*",        # SRA archives.
+                            f"{srr}*.sralite"      # SRA lite archives.
                         ]
 
                         srr_size = 0
@@ -431,13 +431,13 @@ class Alignment:
                                         file_size = file_path.stat().st_size
                                         srr_size += file_size
 
-                                        # 记录文件大小变化
+                                        # Track file size changes.
                                         file_key = str(file_path)
                                         if file_key not in monitored_files:
                                             monitored_files[file_key] = file_size
                                             logger.debug(f"Found new file: {file_path.name} ({self._format_size(file_size)})")
                                         elif monitored_files[file_key] != file_size:
-                                            # 文件大小有变化，说明正在下载
+                                            # Size changed, indicating an active download.
                                             monitored_files[file_key] = file_size
 
                                     except Exception as e:
@@ -447,7 +447,7 @@ class Alignment:
                             found_files += 1
                             total_size += srr_size
 
-                    # 如果有文件大小变化，更新进度条
+                    # Update the progress bar when growth is detected.
                     if total_size > last_total_size:
                         progress_bar.update(total_size)
                         last_total_size = total_size
@@ -455,7 +455,7 @@ class Alignment:
 
                     start_time = current_time
 
-                time.sleep(0.5)  # 减少CPU使用率
+                time.sleep(0.5)  # Reduce CPU usage.
 
         except Exception as e:
             logger.debug(f"File monitoring error: {e}")
@@ -463,7 +463,7 @@ class Alignment:
             logger.debug("File size monitoring stopped")
 
     def _parse_size_to_bytes(self, size: float, unit: str) -> int:
-        """将大小字符串转换为字节数"""
+        """Convert a size string into bytes."""
         unit = unit.upper()
         multipliers = {
             'B': 1,
@@ -547,12 +547,12 @@ class Alignment:
         # Handle Aspera - only for ENA/GSA databases
         if iseq_options.get('aspera') is not None:
             if iseq_options['aspera']:
-                # 检查当前数据库设置
+                # Validate the current database selection.
                 current_db = iseq_options.get('database', self.cfg.iseq_database)
                 if current_db in ["ena", "gsa"]:
                     cmd.append("-a")
                 else:
-                    logger.warning(f"Aspera不支持{current_db}数据库，跳过-a参数")
+                    logger.warning(f"Aspera is not supported for database {current_db}; skipping -a.")
             elif "-a" in cmd:
                 cmd.remove("-a")
 
@@ -562,18 +562,20 @@ class Alignment:
         if iseq_options.get('database'):
             new_db = iseq_options['database']
             cmd.extend(["-d", new_db])
-            # 如果切换到非ENA数据库，需要移除协议参数
+            # Remove protocol arguments when switching away from ENA.
             if new_db != "ena" and "-r" in cmd:
-                cmd.remove("-r")
-                cmd.remove(cmd[cmd.index("-r") + 1])  # 移除协议值
+                idx = cmd.index("-r")
+                cmd.pop(idx)  # remove flag
+                if idx < len(cmd):
+                    cmd.pop(idx)  # remove associated value
 
-        # 协议参数仅适用于ENA数据库
+        # The protocol parameter only applies to the ENA database.
         if iseq_options.get('protocol'):
             current_db = iseq_options.get('database', self.cfg.iseq_database)
             if current_db == "ena":
                 cmd.extend(["-r", iseq_options['protocol']])
             else:
-                logger.warning(f"协议参数仅适用于ENA数据库，当前数据库为{current_db}，跳过-r参数")
+                logger.warning(f"Protocol is only valid for ENA; database is {current_db}, skipping -r.")
 
         #if iseq_options.get('quiet', True):
         #    cmd.append("-Q")
@@ -582,17 +584,17 @@ class Alignment:
 
         # Run iseq with real-time progress monitoring
         try:
-            # 使用merged_env确保子进程有正确的环境变量
+            # Ensure the subprocess inherits the merged environment.
             from . import tools_check as _tools_check
 
             logger.info("Starting iseq download with real-time progress monitoring...")
 
-            # 创建进度条
+            # Create the progress bar.
             progress_bar = DownloadProgressBar(desc=f"📥 Downloading {len(srr_list)} SRA file(s)")
 
-            # 启动文件大小监控线程
+            # Kick off file-size monitoring.
             file_monitor_thread = None
-            if len(srr_list) <= 5:  # 只对少量文件启用文件监控
+            if len(srr_list) <= 5:  # Only enable file-size monitoring when the list is small.
                 file_monitor_thread = threading.Thread(
                     target=self._monitor_file_sizes,
                     args=(out_dir, srr_list, progress_bar)
@@ -600,7 +602,7 @@ class Alignment:
                 file_monitor_thread.daemon = True
                 file_monitor_thread.start()
 
-            # 启动进程
+            # Launch the process.
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -611,17 +613,17 @@ class Alignment:
                 env=_tools_check.merged_env()
             )
 
-            # 实时监控输出
+            # Monitor stdout/stderr in real time.
             def monitor_output(pipe, pipe_name):
-                """监控输出流并解析进度信息"""
+                """Monitor process output and parse progress information."""
                 try:
                     for line in iter(pipe.readline, ''):
                         line = line.strip()
                         if line:
                             logger.debug(f"iseq {pipe_name}: {line}")
 
-                            # 尝试解析进度信息
-                            # iseq 可能输出类似: "Downloading: 45.2MB/125.8MB (36%)" 或 "45.2MB downloaded"
+                            # Attempt to decode progress information.
+                            # iseq often prints lines like "Downloading: 45.2MB/125.8MB (36%)" or "45.2MB downloaded".
                             self._parse_progress_line(line, progress_bar)
 
                 except Exception as e:
@@ -629,7 +631,7 @@ class Alignment:
                 finally:
                     pipe.close()
 
-            # 启动监控线程
+            # Spin up monitoring threads.
             stdout_thread = threading.Thread(target=monitor_output, args=(process.stdout, "stdout"))
             stderr_thread = threading.Thread(target=monitor_output, args=(process.stderr, "stderr"))
             stdout_thread.daemon = True
@@ -637,22 +639,22 @@ class Alignment:
             stdout_thread.start()
             stderr_thread.start()
 
-            # 等待进程完成
+            # Wait for the process to finish.
             return_code = process.wait()
 
-            # 等待监控线程完成
+            # Wait for watcher threads to flush.
             stdout_thread.join(timeout=2)
             stderr_thread.join(timeout=2)
 
-            # 停止文件监控
+            # Stop file monitoring.
             if file_monitor_thread:
                 file_monitor_thread.join(timeout=1)
 
-            # 完成进度条
+            # Complete the progress bar.
             progress_bar.finish()
 
             if return_code != 0:
-                # 收集错误信息
+                # Collect error output.
                 error_output = []
                 if process.stderr:
                     try:
@@ -712,9 +714,8 @@ class Alignment:
     def prefetch(self, srr_list: Sequence[str]) -> Sequence[Path]:
         """
         Prefetch SRAs to .sra files.
-        Returns: list of .sra paths.
-
-        新增：支持镜像自动切换，通过配置中的 mirror_config 参数
+        Returns a list of .sra paths.
+        Supports automatic mirror selection via the mirror_config setting.
         """
         # Delegate to your prefetch implementation. We assume it exposes a function like:
         # _sra_prefetch.prefetch_batch(srr_list, out_root=..., threads=..., mirror_config=...)
@@ -724,7 +725,7 @@ class Alignment:
             srr_list=srr_list,
             out_root=str(self.cfg.prefetch_root),
             threads=self.cfg.threads,
-            prefetch_config=self.cfg.prefetch_config  # 使用基本预取配置
+            prefetch_config=self.cfg.prefetch_config  # Use the base prefetch configuration.
         )
 
     # ---------- SRA: fasterq-dump ----------
@@ -770,19 +771,19 @@ class Alignment:
         gencode_release: str = "v44",
         sjdb_overhang: Optional[int] = 149,
         index_root: Optional[Path] = None,
-        accession_for_species: Optional[str] = None,   # 所有样本同一 GSE 时可统一传；否则保持 None
-        max_workers: Optional[int] = None,             # 同时跑多少个样本；None=串行，日志更清晰
+        accession_for_species: Optional[str] = None,   # Provide a shared accession when every sample belongs to the same GSE.
+        max_workers: Optional[int] = None,             # Number of concurrent samples; None keeps logging clearer.
     ) -> list[Tuple[str, str, Optional[str]]]:
         """
-        批量跑 STAR（调用 batch 版 star_step），返回：
-          [(srr, bam_path, index_dir|None), ...]
-        - 幂等：若 <SRR>/Aligned.sortedByCoord.out.bam 已存在且>1MB，则 [SKIP]
-        - index_dir 若在 star_tools 返回中可解析则给出，否则为 None（与你后续 GTF 推断逻辑一致）
+        Run STAR in batch mode via star_step.make_star_step and return
+          [(srr, bam_path, index_dir|None), ...].
+        - Idempotent: skip when <SRR>/Aligned.sortedByCoord.out.bam already exists (>1 MB).
+        - index_dir is returned when star_tools exposes it; otherwise None to keep downstream GTF inference consistent.
         """
         if not hasattr(_star_step, "make_star_step"):
             raise RuntimeError("star_step.make_star_step(...) not found")
 
-        # 构造一步“可批量”的 step（与原有工厂接口完全一致）
+        # Construct a batch-ready step using the existing factory interface.
         step = _star_step.make_star_step(
             index_root=str(self.cfg.star_index_root),
             out_root=str(self.cfg.star_align_root),
@@ -790,18 +791,18 @@ class Alignment:
             gencode_release=gencode_release,
             sjdb_overhang=sjdb_overhang,
             accession_for_species=accession_for_species,
-            max_workers=max_workers,   # None=串行；也可外部传 2/4 并发
+            max_workers=max_workers,   # None = serial; callers can opt-in to 2/4/etc concurrent runs.
         )
 
-        # 规范输入为 [(srr, str(fq1), str(fq2)), ...]
-        # fastq_qc 返回的是5元组：(srr, fq1, fq2, json, html)，我们只需要前三个
+        # Normalize inputs as [(srr, str(fq1), str(fq2)), ...].
+        # fastq_qc returns 5-tuples (srr, fq1, fq2, json, html); only the first three entries are required here.
         pairs: List[Tuple[str, str, str]] = [
             (srr, str(Path(fq1)), str(Path(fq2))) for srr, fq1, fq2, *_ in clean_fastqs
         ]
 
-        # 直接调用批量 command，得到 [(srr, bam, index_dir|None), ...]
+        # Execute the batch command to obtain [(srr, bam, index_dir|None), ...].
         products = step["command"](pairs, logger=None)
-        # 与随后 pipeline 的“三元组规范化”完全兼容
+        # Remains fully compatible with the pipeline's triplet normalization.
         return products
 
     # ---------- Counting via featureCounts ----------
@@ -809,16 +810,16 @@ class Alignment:
         self,
         bam_triples: Sequence[Tuple[str, str | Path, Optional[str]]],   # [(srr, bam, index_dir|None)]
         *,
-        gtf: Optional[str | Path] = None,         # 显式 GTF（优先级最高）
+        gtf: Optional[str | Path] = None,         # Explicit GTF path takes highest priority.
         simple: Optional[bool] = None,            # None→cfg.featurecounts_simple
         by: Optional[str] = None,                 # None→cfg.featurecounts_by
         threads: Optional[int] = None,            # None→cfg.threads
-        max_workers: Optional[int] = None,        # 预留（count_tools 可并行时透传）
+        max_workers: Optional[int] = None,        # Reserved to pass through when count_tools adds parallel support.
     ) -> Dict[str, object]:
         """
-        批量调用 featureCounts。返回：
-          { "tables": [(srr, table_path), ...], "matrix": <path|None>, "failed": [] }
-        幂等：<counts_root>/<SRR>/<SRR>.counts.txt 存在且>0则跳过计算。
+        Batch execution of featureCounts.
+        Returns {"tables": [(srr, table_path), ...], "matrix": <path|None>, "failed": []}.
+        Idempotent: skip when <counts_root>/<SRR>/<SRR>.counts.txt exists and is non-empty.
         """
         if not hasattr(_count_step, "make_featurecounts_step"):
             raise RuntimeError("count_step.make_featurecounts_step(...) not found")
@@ -826,43 +827,43 @@ class Alignment:
         out_root = Path(self.cfg.counts_root)
         out_root.mkdir(parents=True, exist_ok=True)
 
-        # ---------- 内置 GTF 自动推断 ----------
+        # ---------- Built-in GTF inference ----------
         def _infer_gtf_from_bams(triples: Sequence[Tuple[str, str | Path, Optional[str]]]) -> Optional[str]:
-            # 1) 优先：从每个样本携带的 index_dir 推断
+            # 1) Prefer GTF discovery from each sample's index_dir when available.
             for _srr, _bam, idx_dir in triples:
                 if not idx_dir:
                     continue
                 idx = Path(idx_dir)
-                # (a) 本目录 / 父目录搜 *.gtf
+                # (a) Search *.gtf in the directory and its parent.
                 for base in {idx, idx.parent}:
                     for p in base.glob("*.gtf"):
                         return str(p.resolve())
-                # (b) _cache 下搜 *.gtf
+                # (b) Look for *.gtf under a sibling _cache directory.
                 for base in {idx.parent, idx.parent.parent}:
                     cache = base / "_cache"
                     if cache.exists():
                         hits = list(cache.rglob("*.gtf"))
                         if hits:
                             return str(hits[0].resolve())
-                # (c) 再向上一级补充一轮
+                # (c) Finally, search one level higher.
                 for p in idx.parent.parent.glob("*.gtf"):
                     return str(p.resolve())
 
-            # 2) 其次：从配置的 star_index_root 下兜底搜索
+            # 2) Otherwise, fall back to the configured star_index_root.
             idx_root = Path(getattr(self.cfg, "star_index_root", "index"))
             if idx_root.exists():
                 hits = list(idx_root.rglob("*.gtf"))
                 if hits:
                     return str(hits[0].resolve())
 
-            # 3) 最后：环境变量 FC_GTF_HINT
+            # 3) Lastly, honor the FC_GTF_HINT environment variable.
             env_hint = os.environ.get("FC_GTF_HINT")
             if env_hint and Path(env_hint).exists():
                 return str(Path(env_hint).resolve())
 
             return None
 
-        # 若未显式给 gtf，则自动推断
+        # Infer the GTF when it is not supplied explicitly.
         if gtf is None:
             inferred = _infer_gtf_from_bams(bam_triples)
             if inferred:
@@ -870,36 +871,36 @@ class Alignment:
                 gtf = inferred
             else:
                 raise RuntimeError(
-                    "[featureCounts] 无法自动找到 GTF，请显式传入 gtf= 或设置环境变量 FC_GTF_HINT。"
+                    "[featureCounts] Unable to locate a GTF automatically; provide gtf= or set FC_GTF_HINT."
                 )
 
-        # ---------- 构建 step 工厂并幂等检查 ----------
+        # ---------- Build the step factory and enforce idempotency ----------
         step = _count_step.make_featurecounts_step(
             out_root=str(out_root),
             simple=(self.cfg.simple_counts if simple is None else bool(simple)),
-            gtf=None,  # 运行时 gtf 通过 command(...) 传入，优先级最高
+            gtf=None,  # gtf is supplied at command time and takes precedence.
             by=(by or self.cfg.by),
             threads=int(threads or self.cfg.threads),
-            gtf_path=str(gtf),  # 作为工厂的后备（内部优先用 command 的 gtf）
+            gtf_path=str(gtf),  # Acts as a fallback; the command-level GTF wins internally.
         )
 
         def _table_path_for(srr: str) -> Path:
-            # 若你的 count_tools 产物实际是 .csv，这里改成 .csv 并同步改 outputs 模板
+            # Change the extension here if your count_tools output is .csv and adjust the outputs template accordingly.
             return out_root / srr / f"{srr}.counts.txt"
 
-        # 幂等：全部已有则跳过
+        # Idempotent shortcut: skip when every output already exists.
         outs_by_srr: List[Tuple[str, Path]] = [(str(srr), _table_path_for(str(srr))) for srr, _bam, _ in bam_triples]
         if all(step["validation"]([str(p)]) for _, p in outs_by_srr):
             print("[SKIP] featureCounts for all")
             tables = [(srr, str(p)) for srr, p in outs_by_srr]
             return {"tables": tables, "matrix": None, "failed": []}
 
-        # 组装 (srr, bam) 列表并运行
+        # Assemble (srr, bam) pairs and execute.
         bam_pairs = [(str(srr), str(bam)) for (srr, bam, _idx) in bam_triples]
         ret = step["command"](
             bam_pairs,
             logger=None,
-            gtf=str(gtf),  # 显式传入，优先级最高
+            gtf=str(gtf),  # Explicit runtime GTF has top priority.
         )
 
         tables = [(srr, str(_table_path_for(str(srr)))) for srr, _ in bam_pairs]
@@ -915,40 +916,40 @@ class Alignment:
         output_subdir: str = "iseq"
     ) -> Dict[str, Any]:
         """
-        处理公司提供的FASTQ数据
+        Process vendor-provided FASTQ data and align its structure with the SRA workflow.
 
         Args:
-            fastq_input: FASTQ文件路径或路径列表，可以是文件或目录
-            sample_prefix: 样本ID前缀，默认使用配置中的值
-            output_subdir: 输出子目录
+            fastq_input: FASTQ path or collection of paths (files or directories).
+            sample_prefix: Optional sample identifier prefix; falls back to the configured value.
+            output_subdir: Subdirectory under work_root where outputs are written.
 
         Returns:
-            处理结果字典，包含样本信息和文件路径
+            A result dictionary containing sample metadata and resolved file paths.
         """
         if not self.cfg.iseq_enabled:
             raise ValueError("iSeq processing is not enabled. Set iseq_enabled=True in config.")
 
-        # 设置输出目录
+        # Configure the output directory.
         iseq_root = self.cfg.work_root / output_subdir
         iseq_root.mkdir(parents=True, exist_ok=True)
 
-        # 处理输入路径
+        # Normalize the input paths.
         if isinstance(fastq_input, (str, Path)):
             input_paths = [Path(fastq_input)]
         else:
             input_paths = [Path(p) for p in fastq_input]
 
-        # 处理公司数据
+        # Process the vendor data.
         result = self.iseq_handler.process_company_data(
             input_paths[0] if len(input_paths) == 1 else input_paths,
             output_dir=iseq_root,
             sample_prefix=sample_prefix or self.cfg.iseq_sample_prefix
         )
 
-        # 转换为标准格式，与SRA流程兼容
+        # Convert into the standard structure expected by the SRA workflow.
         sample_pairs = []
         for original_id, r1_path, r2_path in result['sample_pairs']:
-            # 使用标准化的样本ID
+            # Use the standardized sample identifier.
             standardized_id = result['sample_id_mapping'].get(original_id, {}).get('standardized_id', original_id)
             sample_pairs.append((standardized_id, r1_path, r2_path))
 
@@ -968,17 +969,17 @@ class Alignment:
         align_index: Optional[Path] = None
     ) -> Dict[str, Any]:
         """
-        从FASTQ文件开始运行完整流程
+        Execute the full pipeline starting from FASTQ inputs.
 
         Args:
-            fastq_pairs: [(sample_id, fq1_path, fq2_path), ...]
-            with_align: 是否进行比对步骤
-            align_index: 比对索引路径
+            fastq_pairs: Iterable of (sample_id, fq1_path, fq2_path or None).
+            with_align: Whether to include the alignment stage.
+            align_index: Optional alignment index overriding the configuration.
 
         Returns:
-            处理结果字典
+            A dictionary describing the processing outcomes.
         """
-        # 直接进行QC步骤
+        # Run QC immediately.
         fastqs_qc = self.fastp(fastq_pairs)
 
         result: dict[str, Any] = {
@@ -993,7 +994,7 @@ class Alignment:
             result["bam"] = bams
             result["counts"] = counts
         else:
-            # 如果不比对，可以直接进行定量（需要kallisto等工具）
+            # Direct quantification without alignment requires external tools (e.g., kallisto) and is not implemented.
             logger.warning("Direct quantification from FASTQ without alignment is not implemented yet.")
 
         return result
@@ -1009,44 +1010,41 @@ class Alignment:
         sample_prefix: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        统一的管道入口，支持多种输入类型
+        Unified pipeline entry point supporting SRA, FASTQ, and vendor data.
 
         Args:
-            input_data: 输入数据，可以是：
-                - SRA: SRR编号列表或GEO accession
-                - FASTQ: FASTQ文件路径或路径列表
-                - Company: 公司数据目录或文件列表
-            input_type: 输入类型，可选 "sra", "fastq", "company", "auto"
-            with_align: 是否进行比对步骤
-            align_index: 比对索引路径
-            sample_prefix: 样本前缀（仅对公司数据有效）
+            input_data: Source data, e.g. SRR list/GEO accession, FASTQ paths, or vendor directories/files.
+            input_type: Explicit input type ("sra", "fastq", "company") or "auto" to detect automatically.
+            with_align: Whether to perform alignment.
+            align_index: Optional alignment index path.
+            sample_prefix: Optional prefix for vendor sample IDs.
 
         Returns:
-            处理结果字典
+            A dictionary describing the processing outcome.
         """
-        # 自动检测输入类型
+        # Auto-detect the input type when requested.
         if input_type == "auto":
             input_type = self._detect_input_type(input_data)
 
         logger.info(f"Detected input type: {input_type}")
 
         if input_type == "sra":
-            # SRA数据 - 使用原有流程
-            # 支持txt文件输入，直接读取其中的accession列表
+            # SRA data — reuse the existing workflow.
+            # Support plain-text files containing accession lists.
             if isinstance(input_data, str) and Path(input_data).exists() and Path(input_data).suffix == '.txt':
-                # 如果是txt文件，读取其中的accession列表
+                # When a txt file is supplied, read accessions from it.
                 srr_list = self._read_sra_accessions_from_file(Path(input_data))
             elif isinstance(input_data, str):
-                srr_list = [input_data]  # 单个字符串包装成列表
+                srr_list = [input_data]  # Wrap a single accession in a list.
             elif isinstance(input_data, (list, tuple)):
-                srr_list = list(input_data)  # 转换列表格式
+                srr_list = list(input_data)  # Normalize to list.
             else:
-                srr_list = list(input_data)  # 其他序列类型
+                srr_list = list(input_data)  # Convert other iterable types.
 
             return self.run(srr_list=srr_list, with_align=with_align, align_index=align_index)
 
         elif input_type == "company":
-            # 公司数据 - 先处理数据，再运行流程
+            # Vendor data: preprocess, then run the pipeline.
             iseq_result = self.process_company_fastq(
                 input_data,
                 sample_prefix=sample_prefix
@@ -1058,7 +1056,7 @@ class Alignment:
             )
 
         elif input_type == "fastq":
-            # 直接FASTQ文件 - 需要用户指定样本ID
+            # Direct FASTQ input requires explicit sample IDs.
             fastq_pairs = self._parse_fastq_input(input_data)
             return self.run_from_fastq(
                 fastq_pairs,
@@ -1070,18 +1068,18 @@ class Alignment:
             raise ValueError(f"Unsupported input type: {input_type}")
 
     def _detect_input_type(self, input_data: Any) -> str:
-        """自动检测输入类型"""
+        """Automatically infer the input type."""
         if isinstance(input_data, str):
-            # 单个字符串
+            # Single string input.
             if input_data.startswith(('SRR', 'ERR', 'DRR')):
                 return "sra"
             elif Path(input_data).exists():
-                # 存在的路径
+                # Path exists locally.
                 path = Path(input_data)
                 if path.is_file() and any(str(path).endswith(ext) for ext in ['.fq', '.fastq', '.fq.gz', '.fastq.gz']):
                     return "fastq"
                 elif path.suffix in ['.txt', '.csv']:
-                    # 检查是否是包含SRA accession的文本文件
+                    # Determine whether the text file contains SRA accessions.
                     if self._is_sra_accession_file(path):
                         return "sra"
                     else:
@@ -1091,11 +1089,11 @@ class Alignment:
                 else:
                     return "fastq"
             else:
-                # 可能是GEO accession
+                # Assume a GEO accession.
                 return "sra"
 
         elif isinstance(input_data, Path):
-            # Path对象
+            # Path object input.
             if input_data.exists():
                 if input_data.is_file() and any(str(input_data).endswith(ext) for ext in ['.fq', '.fastq', '.fq.gz', '.fastq.gz']):
                     return "fastq"
@@ -1105,7 +1103,7 @@ class Alignment:
                 return "sra"
 
         elif isinstance(input_data, (list, tuple)):
-            # 列表或元组
+            # List or tuple input.
             if len(input_data) == 0:
                 raise ValueError("Empty input data")
 
@@ -1121,31 +1119,31 @@ class Alignment:
             raise ValueError(f"Cannot detect input type for: {type(input_data)}")
 
     def _is_sra_accession_file(self, file_path: Path) -> bool:
-        """检查文件是否包含SRA accession列表"""
+        """Check whether the file contains SRA accessions."""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            # 检查前几行是否包含SRA/ERR/DRR accession
+            # Inspect initial lines for SRR/ERR/DRR accessions.
             sra_pattern = re.compile(r'^(SRR|ERR|DRR)\d+$')
             valid_lines = 0
 
-            for line in lines[:20]:  # 检查前20行
+            for line in lines[:20]:  # Examine the first 20 lines.
                 line = line.strip()
-                if line and not line.startswith('#'):  # 跳过空行和注释行
+                if line and not line.startswith('#'):  # Skip empty lines and comment lines.
                     if sra_pattern.match(line):
                         valid_lines += 1
                     else:
-                        return False  # 如果有一行不是SRA格式，返回False
+                        return False  # Reject when a line is not in SRA format.
 
-            # 至少有一行有效的SRA accession
+            # Ensure at least one valid accession.
             return valid_lines > 0
 
         except Exception:
             return False
 
     def _read_sra_accessions_from_file(self, file_path: Path) -> List[str]:
-        """从txt文件中读取SRA accession列表"""
+        """Load SRA accessions from a text file."""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
@@ -1155,64 +1153,64 @@ class Alignment:
 
             for line in lines:
                 line = line.strip()
-                # 跳过空行和注释行
+                # Skip empty lines and comments.
                 if line and not line.startswith('#'):
                     if sra_pattern.match(line):
                         srr_list.append(line)
                     else:
-                        logger.warning(f"跳过无效的行: {line}")
+                        logger.warning(f"Skipping invalid accession line: {line}")
 
             if not srr_list:
-                raise ValueError(f"文件 {file_path} 中没有找到有效的SRA accession")
+                raise ValueError(f"No valid SRA accessions found in {file_path}")
 
-            logger.info(f"从文件 {file_path} 中读取到 {len(srr_list)} 个SRA accession")
+            logger.info(f"Parsed {len(srr_list)} SRA accessions from {file_path}")
             return srr_list
 
         except Exception as e:
-            raise RuntimeError(f"读取SRA accession文件失败 {file_path}: {e}")
+            raise RuntimeError(f"Failed to read SRA accession file {file_path}: {e}")
 
     def _parse_fastq_input(self, input_data: Union[str, Path, List[str], List[Path]]) -> List[Tuple[str, Path, Optional[Path]]]:
-        """解析FASTQ输入数据"""
+        """Parse FASTQ inputs into (sample_id, R1, R2?) tuples."""
         if isinstance(input_data, (str, Path)):
-            # 单个文件
+            # Single file input.
             file_path = Path(input_data)
             if not file_path.exists():
                 raise FileNotFoundError(f"File not found: {file_path}")
 
-            # 自动提取样本ID
+            # Derive the sample ID automatically.
             sample_id = self.iseq_handler.extract_sample_id(file_path)
 
-            # 检查是否为双端测序文件
+            # Determine whether this is an R1 paired-end file.
             if self._is_paired_end_file(file_path):
-                # 需要找到对应的R2文件
+                # Locate the matching R2 file.
                 r2_path = self._find_paired_file(file_path, "R2")
                 return [(sample_id, file_path, r2_path)]
             else:
                 return [(sample_id, file_path, None)]
 
         elif isinstance(input_data, (list, tuple)):
-            # 多个文件
+            # Multiple files input.
             fastq_files = [Path(f) for f in input_data]
 
-            # 使用iSeq处理器进行配对
+            # Use the iSeq handler to pair R1/R2 files.
             return self.iseq_handler.group_paired_end(fastq_files)
 
         else:
             raise ValueError(f"Unsupported input format: {type(input_data)}")
 
     def _is_paired_end_file(self, file_path: Path) -> bool:
-        """检查文件是否为双端测序的R1文件"""
+        """Return True when the filename indicates a paired-end R1 read."""
         filename = file_path.name
         return bool(re.search(r'[._][Rr]1[._]', filename))
 
     def _find_paired_file(self, r1_path: Path, direction: str) -> Optional[Path]:
-        """查找配对的R2文件"""
+        """Locate the paired R2 file for the given R1 path."""
         r1_name = r1_path.name
 
-        # 构建R2文件名
+        # Build the R2 filename.
         if direction == "R2":
             r2_name = re.sub(r'([._])[Rr]1([._])', r'\1R2\2', r1_name)
-            if r2_name == r1_name:  # 如果没有替换成功
+            if r2_name == r1_name:  # Fallback when no replacement occurred.
                 r2_name = r1_name.replace("_R1", "_R2").replace(".R1", ".R2")
         else:
             return None
@@ -1307,13 +1305,13 @@ class Alignment:
         result["fastq_qc"] = fastqs_qc
 
         if with_align:
-            # 使用现有的STAR比对功能
+            # Reuse the existing STAR alignment helper.
             bam_triples = self.star_align(fastqs_qc)
-            # 提取BAM路径（bam_triples格式: [(srr, bam_path, index_dir), ...]）
+            # Extract BAM paths from the bam_triples structure [(srr, bam_path, index_dir), ...].
             bams = [(srr, Path(bam_path)) for srr, bam_path, _ in bam_triples]
         else:
-            # 跳过比对步骤，直接返回空结果
-            logger.info("跳过比对步骤 (with_align=False)")
+            # Skip the alignment step and return an empty result.
+            logger.info("Skipping alignment step because with_align=False")
             bam_triples = []
             bams = []
 

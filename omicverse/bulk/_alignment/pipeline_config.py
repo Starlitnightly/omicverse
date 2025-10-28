@@ -1,6 +1,8 @@
+# Author: Zhi Luo
+
 """
-增强的管道配置文件
-支持多种输入类型和灵活的配置选项
+Enhanced pipeline configuration module.
+Supports multiple input types and flexible configuration options.
 """
 from __future__ import annotations
 
@@ -12,18 +14,18 @@ import yaml
 
 @dataclass
 class EnhancedAlignmentConfig:
-    """增强的比对管道配置"""
+    """Enhanced alignment pipeline configuration."""
 
-    # 基础配置
+    # Base configuration.
     work_root: Path = Path("work")
     threads: int = 8
     memory: str = "8G"
     genome: Literal["human", "mouse", "custom"] = "human"
 
-    # 输入类型配置
+    # Input type configuration.
     input_type: Literal["auto", "sra", "fastq", "company"] = "auto"
 
-    # SRA配置
+    # SRA configuration.
     prefetch_enabled: bool = True
     prefetch_params: Dict[str, Any] = field(default_factory=lambda: {
         "max_size": "100G",
@@ -31,19 +33,19 @@ class EnhancedAlignmentConfig:
         "timeout": 300
     })
 
-    # iSeq/公司数据配置
+    # iSeq/company data configuration.
     iseq_enabled: bool = False
     iseq_sample_prefix: str = "Sample"
     iseq_sample_pattern: str = "auto"  # auto, filename, directory
     iseq_validate_files: bool = True
     iseq_paired_end: bool = True
 
-    # FASTQ处理配置
+    # FASTQ processing configuration.
     fastq_extensions: List[str] = field(default_factory=lambda: [
         ".fq", ".fastq", ".fq.gz", ".fastq.gz"
     ])
 
-    # QC配置
+    # QC configuration.
     fastp_enabled: bool = True
     fastp_params: Dict[str, Any] = field(default_factory=lambda: {
         "qualified_quality_phred": 20,
@@ -51,7 +53,7 @@ class EnhancedAlignmentConfig:
         "detect_adapter_for_pe": True
     })
 
-    # 比对配置
+    # Alignment configuration.
     align_enabled: bool = True
     star_index_root: Path = Path("index")
     star_align_root: Path = Path("work/star")
@@ -63,36 +65,36 @@ class EnhancedAlignmentConfig:
         "alignSJDBoverhangMin": 1
     })
 
-    # 定量配置
+    # Quantification configuration.
     featurecounts_enabled: bool = True
     counts_root: Path = Path("work/counts")
     featurecounts_params: Dict[str, Any] = field(default_factory=lambda: {
-        "gtf": None,  # 将自动检测
+        "gtf": None,  # Auto-detect.
         "simple": True,
         "by": "gene_id",
         "t": "exon",
         "g": "gene_id"
     })
 
-    # 输出配置
+    # Output configuration.
     gzip_fastq: bool = True
     keep_intermediate: bool = True
 
-    # 日志配置
+    # Logging configuration.
     log_level: str = "INFO"
     log_file: Optional[Path] = None
 
-    # 并行配置
-    max_workers: Optional[int] = None  # None表示使用所有可用CPU
+    # Parallelism configuration.
+    max_workers: Optional[int] = None  # None means use every available CPU.
 
-    # 错误处理配置
+    # Error handling configuration.
     continue_on_error: bool = False
     retry_attempts: int = 3
     retry_delay: int = 5
 
     @classmethod
     def from_file(cls, config_file: str | Path) -> "EnhancedAlignmentConfig":
-        """从配置文件加载"""
+        """Load configuration from a JSON or YAML file."""
         config_file = Path(config_file)
 
         if not config_file.exists():
@@ -107,7 +109,7 @@ class EnhancedAlignmentConfig:
         else:
             raise ValueError(f"Unsupported config file format: {config_file.suffix}")
 
-        # 转换路径字符串为Path对象
+        # Convert path strings into Path objects.
         for field_name, field_type in cls.__annotations__.items():
             if field_type == Path and field_name in config_data:
                 config_data[field_name] = Path(config_data[field_name])
@@ -115,10 +117,10 @@ class EnhancedAlignmentConfig:
         return cls(**config_data)
 
     def to_file(self, output_file: str | Path, format: str = "json") -> None:
-        """保存配置到文件"""
+        """Persist the configuration to disk."""
         output_file = Path(output_file)
 
-        # 转换Path对象为字符串
+        # Convert Path objects back to strings.
         config_dict = {}
         for field_name, field_value in self.__dict__.items():
             if isinstance(field_value, Path):
@@ -136,40 +138,40 @@ class EnhancedAlignmentConfig:
             raise ValueError(f"Unsupported output format: {format}")
 
     def validate(self) -> List[str]:
-        """验证配置的有效性"""
+        """Validate configuration values and return a list of errors."""
         errors = []
 
-        # 检查线程数
+        # Validate thread count.
         if self.threads < 1:
             errors.append("threads must be >= 1")
 
-        # 检查内存格式
+        # Validate memory format.
         if not self.memory.endswith(('G', 'M', 'K')):
             errors.append("memory must end with G, M, or K")
 
-        # 检查路径
+        # Validate path fields.
         path_fields = ['work_root', 'star_index_root', 'star_align_root', 'counts_root']
         for field in path_fields:
             path_value = getattr(self, field)
             if not isinstance(path_value, Path):
                 errors.append(f"{field} must be a Path object")
 
-        # 检查基因组
+        # Validate genome selection.
         if self.genome not in ["human", "mouse", "custom"]:
             errors.append(f"genome must be one of: human, mouse, custom")
 
-        # 检查输入类型
+        # Validate input type.
         if self.input_type not in ["auto", "sra", "fastq", "company"]:
             errors.append(f"input_type must be one of: auto, sra, fastq, company")
 
-        # 检查iSeq配置
+        # Validate iSeq configuration.
         if self.iseq_enabled and not self.iseq_sample_pattern in ["auto", "filename", "directory"]:
             errors.append(f"iseq_sample_pattern must be one of: auto, filename, directory")
 
         return errors
 
     def get_tool_config(self, tool_name: str) -> Dict[str, Any]:
-        """获取特定工具的配置"""
+        """Return the configuration block for a specific tool."""
         tool_configs = {
             'star': self.star_params,
             'fastp': self.fastp_params,
@@ -179,7 +181,7 @@ class EnhancedAlignmentConfig:
         return tool_configs.get(tool_name, {})
 
     def update_tool_config(self, tool_name: str, config: Dict[str, Any]) -> None:
-        """更新特定工具的配置"""
+        """Merge and update the configuration for a specific tool."""
         tool_configs = {
             'star': 'star_params',
             'fastp': 'fastp_params',
@@ -193,22 +195,22 @@ class EnhancedAlignmentConfig:
             current_config.update(config)
             setattr(self, attr_name, current_config)
 
-# 默认配置文件模板
+# Default configuration template.
 def create_default_config_template(output_file: str | Path) -> None:
-    """创建默认配置文件模板"""
+    """Create a default configuration template file."""
     config = EnhancedAlignmentConfig()
     config.to_file(output_file, format="yaml")
     print(f"Default config template created: {output_file}")
 
 def load_config(config_source: str | Path | Dict[str, Any]) -> EnhancedAlignmentConfig:
     """
-    从多种来源加载配置
+    Load configuration from various sources.
 
     Args:
-        config_source: 配置来源，可以是文件路径或配置字典
+        config_source: File path or configuration dictionary.
 
     Returns:
-        配置对象
+        An EnhancedAlignmentConfig instance.
     """
     if isinstance(config_source, dict):
         return EnhancedAlignmentConfig(**config_source)
@@ -217,11 +219,11 @@ def load_config(config_source: str | Path | Dict[str, Any]) -> EnhancedAlignment
     else:
         raise ValueError(f"Unsupported config source type: {type(config_source)}")
 
-# 示例配置
+# Example configurations.
 def get_example_configs() -> Dict[str, EnhancedAlignmentConfig]:
-    """获取示例配置"""
+    """Return example configurations covering common scenarios."""
 
-    # SRA数据处理配置
+    # SRA processing configuration.
     sra_config = EnhancedAlignmentConfig(
         work_root=Path("work_sra"),
         input_type="sra",
@@ -229,7 +231,7 @@ def get_example_configs() -> Dict[str, EnhancedAlignmentConfig]:
         genome="human"
     )
 
-    # 公司数据处理配置
+    # Company data processing configuration.
     company_config = EnhancedAlignmentConfig(
         work_root=Path("work_company"),
         input_type="company",
@@ -240,7 +242,7 @@ def get_example_configs() -> Dict[str, EnhancedAlignmentConfig]:
         iseq_sample_pattern="auto"
     )
 
-    # FASTQ文件处理配置
+    # FASTQ file processing configuration.
     fastq_config = EnhancedAlignmentConfig(
         work_root=Path("work_fastq"),
         input_type="fastq",
@@ -248,7 +250,7 @@ def get_example_configs() -> Dict[str, EnhancedAlignmentConfig]:
         genome="mouse"
     )
 
-    # 快速测试配置
+    # Quick test configuration.
     test_config = EnhancedAlignmentConfig(
         work_root=Path("work_test"),
         threads=4,
@@ -265,16 +267,16 @@ def get_example_configs() -> Dict[str, EnhancedAlignmentConfig]:
     }
 
 if __name__ == "__main__":
-    # 创建默认配置模板
+    # Create the default configuration template.
     create_default_config_template("pipeline_config.yaml")
 
-    # 显示示例配置
+    # Display example configurations.
     examples = get_example_configs()
     for name, config in examples.items():
-        print(f"\n{name.upper()} 配置:")
-        print(f"  工作目录: {config.work_root}")
-        print(f"  线程数: {config.threads}")
-        print(f"  基因组: {config.genome}")
-        print(f"  输入类型: {config.input_type}")
+        print(f"\n{name.upper()} configuration:")
+        print(f"  Work root: {config.work_root}")
+        print(f"  Threads: {config.threads}")
+        print(f"  Genome: {config.genome}")
+        print(f"  Input type: {config.input_type}")
         if config.iseq_enabled:
-            print(f"  iSeq样本前缀: {config.iseq_sample_prefix}")
+            print(f"  iSeq sample prefix: {config.iseq_sample_prefix}")

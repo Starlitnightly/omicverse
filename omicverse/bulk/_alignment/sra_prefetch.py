@@ -1,4 +1,4 @@
-# sra_prefetch.py Prefetch步骤工厂
+# sra_prefetch.py Prefetch step factory
 from __future__ import annotations
 import os, time, subprocess, logging
 import threading
@@ -16,13 +16,13 @@ try:
     from .sra_tools import (get_sra_metadata, human_readable_speed, estimate_remaining_time, record_to_log, get_downloaded_file_size, run_prefetch_with_progress)
 except ImportError:
     from sra_tools import (get_sra_metadata, human_readable_speed, estimate_remaining_time, record_to_log, get_downloaded_file_size, run_prefetch_with_progress)
-# ---------- 工具函数（按你的实现/命名保留） ----------
+# ---------- Utility helpers (aligned with your original implementation) ----------
 def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | None:
     """
-    在 output_root 下为 srr_id 查找 .sra/.sralite 文件：
-    1) 先快速检查常见的 0/1 层
-    2) 再在 srr 子目录内 rglob 递归查找
-    3) 轮询等待，直到 timeout 秒或命中有效文件（非空）
+    Locate the .sra/.sralite file for `srr_id` beneath `output_root`:
+      1) Quickly check the root and immediate subdirectory.
+      2) Recursively search the SRR directory.
+      3) Poll until `timeout` seconds or until a non-empty file is found.
     """
     output_root = Path(output_root)
     srr_dir = output_root / srr_id
@@ -33,7 +33,7 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
         except Exception:
             return False
 
-    # 先快速直查
+    # Quick direct checks first.
     quick = [
         output_root / f"{srr_id}.sra",
         output_root / f"{srr_id}.sralite",
@@ -44,12 +44,12 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
         if _ready(p):
             return p
 
-    # 轮询 + 递归
+    # Poll and recurse.
     deadline = time.time() + timeout
     while time.time() < deadline:
         if srr_dir.exists():
-            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # 匹配 .sra/.sralite
-            # 选最新那个，避免抓到未完成的中间文件
+            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # Match .sra/.sralite.
+            # Prioritize the newest file to avoid incomplete downloads.
             hits = [h for h in hits if _ready(h)]
             if hits:
                 hits.sort(key=lambda x: x.stat().st_mtime, reverse=True)
@@ -59,13 +59,13 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
     return None
 def ensure_link_at(output_path: Path, real_file: Path, logger=None, prefer="symlink") -> Path:
     """
-    确保在 output_path 有一个可用的文件指向 real_file：
-      - 优先创建符号链接；不支持时退回硬链接/复制
-    返回 output_path
+    Ensure `output_path` references `real_file`:
+      - Prefer symbolic links; fall back to hardlink/copy when unsupported.
+    Return output_path.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists():
-        # 已有就直接用
+        # Reuse the existing file.
         return output_path
 
     try:
@@ -78,7 +78,7 @@ def ensure_link_at(output_path: Path, real_file: Path, logger=None, prefer="syml
         if logger:
             logger.info(f"[LINK] {output_path} -> {real_file}")
     except Exception as e:
-        # 兼容不支持软链接的环境：退回拷贝
+        # Environments without symlink support: fall back to copying.
         if logger:
             logger.warning(f"[LINK] failed ({e}), fallback to copy")
         shutil.copy2(real_file, output_path)
@@ -98,15 +98,16 @@ def _make_local_logger(name: str, level=logging.INFO) -> logging.Logger:
             logger.addHandler(h)
     return logger
 
-   ################################################
-  #                                              #
- #      兼容Alignment Class与PipLine工厂         #
-#                                             #
-##############################################
+################################################
+#                                              #
+#   Compatibility bridge for Alignment class   #
+#   and pipeline factory interfaces           #
+#                                              #
+################################################
 
 # ---------- For Alignment Class ----------
 def _monitor_file_size(path: Path, pbar: tqdm, stop_event: threading.Event, interval: float = 1.0):
-    """外部监控文件大小并刷新 tqdm"""
+    """Monitor file size externally and refresh the tqdm progress bar."""
     last = 0
     while not stop_event.is_set():
         try:
@@ -118,7 +119,7 @@ def _monitor_file_size(path: Path, pbar: tqdm, stop_event: threading.Event, inte
         except Exception:
             pass
         time.sleep(interval)
-    # 收尾再刷一次
+    # Final refresh at shutdown.
     try:
         size = path.stat().st_size if path.exists() else last
         if size > last:
@@ -130,11 +131,11 @@ def _monitor_file_size(path: Path, pbar: tqdm, stop_event: threading.Event, inte
 def prefetch_batch(
     srr_list: Sequence[str],
     out_root: str | Path,
-    threads: int = 4, # 同时下载的 SRR 数
+    threads: int = 4, # Number of concurrent SRR downloads
     retries: int = 3,
     link_mode: str = "symlink",
     cache_root: str | Path = "sra_cache",
-    prefetch_config: Optional[Dict[str, Any]] = None,  # 基本预取配置
+    prefetch_config: Optional[Dict[str, Any]] = None,  # Base prefetch configuration
 ):
     """
     Adapter to integrate with Alignment.prefetch().
@@ -142,9 +143,9 @@ def prefetch_batch(
       1) call run_prefetch_with_progress(srr, logger, retries, output_root="sra_cache", prefetch_config=prefetch_config)
       2) locate the real .sra in the cache
       3) place a link/copy at <out_root>/<SRR>/<SRR>.sra
-      并发下载 SRA：对 srr_list 中的样本并行执行 prefetch。
-      threads 控制"同时下载任务数"
-      下载后在 cache_root 中找到 .sra，再链接/复制到 out_root/<SRR>/<SRR>.sra
+      Parallel SRA downloads: prefetch each SRR in srr_list concurrently.
+      `threads` controls the number of concurrent download jobs.
+      After download, locate the .sra under cache_root and link/copy to out_root/<SRR>/<SRR>.sra.
 
     """
     out_root = Path(out_root)
@@ -152,25 +153,25 @@ def prefetch_batch(
     out_root.mkdir(parents=True, exist_ok=True)
     
     logger = _make_local_logger("prefetch")
-    # 单个任务
+    # Single download task.
     def _worker(pos: int, srr: str) -> tuple[str, Path]:
         
-        # 监控的目标文件（与你原函数保持一致的落盘位置）
+        # Target directory (mirrors the original landing location).
         srr_dir = cache_root 
         #srr_dir.mkdir(parents=True, exist_ok=True)
         #sra_file = srr_dir / f"{srr}.sra"
 
-        # 下载（使用基本预取配置）
+        # Download using the base prefetch configuration.
         ok = run_prefetch_with_progress(
             srr_id=srr, logger=logger, retries=retries, output_root=str(cache_root),
-            prefetch_config=prefetch_config  # 使用基本预取配置
+            prefetch_config=prefetch_config  # Use the base configuration.
         )
-    
-        # 下载命令成功返回后：
+
+        # After the command returns successfully:
         real = find_sra_file(srr_id=srr, output_root=cache_root, timeout=30)
         if not real:
             logger.error(f"Prefetch completed but cannot locate .sra/.sralite for {srr} under {cache_root}")
-            # 可选：调试输出 ls
+            # Optional: emit a debug tree of the cache folder.
             try:
                 for p in (cache_root / srr).rglob("*"):
                     logger.debug(f"[tree] {p}")
@@ -178,7 +179,7 @@ def prefetch_batch(
                 pass
             raise RuntimeError(f"Prefetch completed but .sra/.sralite not found for {srr}")
 
-        # 目标命名用真实后缀，避免 .sralite 被误命名为 .sra
+        # Preserve the original suffix to avoid mislabeling .sralite as .sra.
         dest = out_root / f"{srr}{Path(real).suffix}"
         dest.parent.mkdir(parents=True, exist_ok=True)
         ensure_link_at( Path(real), dest, prefer=link_mode, logger=logger)
@@ -187,7 +188,7 @@ def prefetch_batch(
     results_map: dict[str, Path] = {}
     failures: list[tuple[str, Exception]] = []
 
-    # Multiple Download 
+    # Execute multiple downloads concurrently.
     with ThreadPoolExecutor(max_workers=int(threads)) as pool:
         fut_map = {pool.submit(_worker, pos,srr): srr for pos, srr in enumerate(srr_list)}
         for fut in as_completed(fut_map):
@@ -203,18 +204,18 @@ def prefetch_batch(
     if failures:
         failed = ", ".join([f"{srr}({repr(err)})" for srr, err in failures])
         raise RuntimeError(f"Prefetch failed for {len(failures)} samples: {failed}")
-    # 保持与输入顺序一致
+    # Preserve the original input order.
     return [results_map[s] for s in srr_list if s in results_map]
 
-# ---------- “步骤工厂”：需要时在编排模块里调用 ----------
+# ---------- Step factory: invoke from orchestration modules when needed ----------
 def make_prefetch_step(output_pattern: str = "sra_cache/{SRR}/{SRR}.sra", validation=None):
     def _safe_valid(fs: list[str]) -> bool:
-        # fs 只会有一个：期望路径，但我们用 find_sra_file 来兜底
+        # fs contains a single expected path; fall back to find_sra_file as a safeguard.
         try:
             f = Path(fs[0])
             if f.exists() and f.stat().st_size > 1_000_000:
                 return True
-            # 用定位函数检查真实缓存位置
+            # Use the locator helper to confirm the cached file.
             real = find_sra_file(f.stem, f.parent.parent)  # stem=SRRxxxxxx, parent.parent=output_root
             return bool(real and real.exists() and real.stat().st_size > 1_000_000)
         except Exception:

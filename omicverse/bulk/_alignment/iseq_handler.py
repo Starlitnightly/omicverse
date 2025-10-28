@@ -1,6 +1,6 @@
 """
-iSeq Handler - 处理公司提供的FASTQ数据
-支持本地FASTQ文件的样本ID分配、验证和格式转换
+iSeq Handler – process vendor-supplied FASTQ data.
+Supports sample ID assignment, validation, and formatting for local FASTQ files.
 """
 from __future__ import annotations
 
@@ -14,19 +14,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ISeqHandler:
-    """处理公司提供的FASTQ数据"""
+    """Handle vendor-provided FASTQ data."""
 
     def __init__(self,
                  sample_id_pattern: str = "auto",
                  paired_end: bool = True,
                  validate_files: bool = True):
         """
-        初始化iSeq处理器
+        Initialize the iSeq handler.
 
         Args:
-            sample_id_pattern: 样本ID提取模式，可选 "auto", "filename", "directory"
-            paired_end: 是否为双端测序
-            validate_files: 是否验证文件完整性
+            sample_id_pattern: How to derive sample IDs: "auto", "filename", or "directory".
+            paired_end: Whether the reads are paired-end.
+            validate_files: Whether to validate file integrity.
         """
         self.sample_id_pattern = sample_id_pattern
         self.paired_end = paired_end
@@ -36,14 +36,14 @@ class ISeqHandler:
                            input_path: str | Path,
                            file_extensions: List[str] = None) -> List[Path]:
         """
-        发现指定路径下的FASTQ文件
+        Discover FASTQ files under the given path.
 
         Args:
-            input_path: 输入路径（文件或目录）
-            file_extensions: 文件扩展名列表，默认 [".fq", ".fastq", ".fq.gz", ".fastq.gz"]
+            input_path: File or directory to inspect.
+            file_extensions: List of extensions to match, defaulting to [".fq", ".fastq", ".fq.gz", ".fastq.gz"].
 
         Returns:
-            FASTQ文件路径列表
+            List of FASTQ file paths.
         """
         if file_extensions is None:
             file_extensions = [".fq", ".fastq", ".fq.gz", ".fastq.gz"]
@@ -52,11 +52,11 @@ class ISeqHandler:
         fastq_files = []
 
         if input_path.is_file():
-            # 单个文件
+            # Single-file input.
             if any(str(input_path).endswith(ext) for ext in file_extensions):
                 fastq_files.append(input_path)
         elif input_path.is_dir():
-            # 目录递归搜索
+            # Recursively search the directory.
             for ext in file_extensions:
                 fastq_files.extend(input_path.rglob(f"*{ext}"))
         else:
@@ -65,20 +65,20 @@ class ISeqHandler:
         if not fastq_files:
             raise ValueError(f"No FASTQ files found in {input_path}")
 
-        # 排序确保一致性
+        # Sort to maintain consistent ordering.
         fastq_files.sort()
         logger.info(f"Discovered {len(fastq_files)} FASTQ files")
         return fastq_files
 
     def extract_sample_id(self, file_path: Path) -> str:
         """
-        从文件路径提取样本ID
+        Extract a sample ID from the given file path.
 
         Args:
-            file_path: FASTQ文件路径
+            file_path: FASTQ file path.
 
         Returns:
-            样本ID
+            Sample ID string.
         """
         if self.sample_id_pattern == "auto":
             return self._auto_extract_sample_id(file_path)
@@ -90,49 +90,49 @@ class ISeqHandler:
             raise ValueError(f"Unknown pattern: {self.sample_id_pattern}")
 
     def _auto_extract_sample_id(self, file_path: Path) -> str:
-        """自动提取样本ID"""
-        # 尝试多种模式
-        filename = file_path.stem  # 移除扩展名
+        """Automatically derive a sample ID."""
+        # Try several patterns.
+        filename = file_path.stem  # Remove extension.
 
-        # 模式1: 移除常见的测序后缀 (_R1, _R2, .R1, .R2, _1, _2)
+        # Pattern 1: remove common sequencing suffixes (_R1, _R2, .R1, .R2, _1, _2).
         cleaned = re.sub(r'[._][Rr]?[12]$', '', filename)
 
-        # 模式2: 如果还包含下划线，取第一部分
+        # Pattern 2: if underscores remain, take the first segment.
         if '_' in cleaned:
             cleaned = cleaned.split('_')[0]
 
-        # 模式3: 检查是否符合常见的样本ID格式
+        # Pattern 3: verify the cleaned ID matches common formatting.
         if re.match(r'^[A-Za-z0-9_-]+$', cleaned):
             return cleaned
         else:
-            # 如果都不匹配，使用文件名（移除特殊字符）
+            # Fallback: sanitize the filename by removing non-alphanumeric characters.
             return re.sub(r'[^A-Za-z0-9_-]', '', cleaned)
 
     def _extract_from_filename(self, file_path: Path) -> str:
-        """从文件名提取样本ID"""
+        """Extract a sample ID from the filename."""
         filename = file_path.stem
-        # 移除测序后缀
+        # Strip sequencing suffixes.
         return re.sub(r'[._][Rr]?[12]$', '', filename)
 
     def _extract_from_directory(self, file_path: Path) -> str:
-        """从目录名提取样本ID"""
+        """Extract a sample ID from the parent directory."""
         return file_path.parent.name
 
     def group_paired_end(self, fastq_files: List[Path]) -> List[Tuple[str, Path, Optional[Path]]]:
         """
-        将FASTQ文件按双端测序配对
+        Group FASTQ files into paired-end tuples.
 
         Args:
-            fastq_files: FASTQ文件列表
+            fastq_files: List of FASTQ file paths.
 
         Returns:
-            配对结果列表: [(sample_id, R1_path, R2_path), ...]
+            List of pairings: [(sample_id, R1_path, R2_path), ...].
         """
         if not self.paired_end:
-            # 单端测序
+            # Handle single-end sequencing.
             return [(self.extract_sample_id(fq), fq, None) for fq in fastq_files]
 
-        # 双端测序配对
+        # Paired-end grouping.
         sample_groups: Dict[str, List[Path]] = {}
 
         for fq_file in fastq_files:
@@ -141,19 +141,19 @@ class ISeqHandler:
                 sample_groups[sample_id] = []
             sample_groups[sample_id].append(fq_file)
 
-        # 配对验证
+        # Validate pairings.
         paired_results = []
         for sample_id, files in sample_groups.items():
             if len(files) == 1:
-                # 单文件，可能是单端或缺失R2
+                # Single file—either single-end or missing R2.
                 logger.warning(f"Sample {sample_id} has only one file: {files[0]}")
                 paired_results.append((sample_id, files[0], None))
             elif len(files) == 2:
-                # 双文件，需要区分R1和R2
+                # Two files—identify R1 and R2.
                 r1_file, r2_file = self._identify_r1_r2(files)
                 paired_results.append((sample_id, r1_file, r2_file))
             else:
-                # 多于2个文件，需要更复杂的配对逻辑
+                # More than two files—log a warning and use the first two.
                 logger.warning(f"Sample {sample_id} has {len(files)} files, using first two")
                 r1_file, r2_file = self._identify_r1_r2(files[:2])
                 paired_results.append((sample_id, r1_file, r2_file))
@@ -161,42 +161,42 @@ class ISeqHandler:
         return paired_results
 
     def _identify_r1_r2(self, files: List[Path]) -> Tuple[Path, Path]:
-        """识别R1和R2文件"""
-        # 根据文件名中的模式识别
+        """Identify R1 and R2 files."""
+        # Use filename patterns when available.
         r1_candidates = [f for f in files if re.search(r'[._][Rr]1[._]', str(f))]
         r2_candidates = [f for f in files if re.search(r'[._][Rr]2[._]', str(f))]
 
         if len(r1_candidates) == 1 and len(r2_candidates) == 1:
             return r1_candidates[0], r2_candidates[0]
 
-        # 如果没有明确的R1/R2标记，按字母顺序
+        # Without explicit markers, sort alphabetically.
         files_sorted = sorted(files, key=lambda x: str(x))
         if len(files_sorted) >= 2:
             return files_sorted[0], files_sorted[1]
 
-        # 兜底方案
+        # Final fallback.
         return files[0], files[1] if len(files) > 1 else None
 
     def validate_fastq_files(self, fastq_pairs: List[Tuple[str, Path, Optional[Path]]]) -> bool:
         """
-        验证FASTQ文件的有效性
+        Validate the supplied FASTQ files.
 
         Args:
-            fastq_pairs: 配对的FASTQ文件列表
+            fastq_pairs: Paired FASTQ file list.
 
         Returns:
-            是否所有文件都有效
+            True when all files pass validation.
         """
         all_valid = True
 
         for sample_id, r1_path, r2_path in fastq_pairs:
-            # 验证R1文件
+            # Validate the R1 file.
             if not self._validate_single_file(r1_path):
                 logger.error(f"Invalid R1 file for sample {sample_id}: {r1_path}")
                 all_valid = False
                 continue
 
-            # 验证R2文件（如果存在）
+            # Validate the R2 file when present.
             if r2_path and not self._validate_single_file(r2_path):
                 logger.error(f"Invalid R2 file for sample {sample_id}: {r2_path}")
                 all_valid = False
@@ -207,14 +207,14 @@ class ISeqHandler:
         return all_valid
 
     def _validate_single_file(self, file_path: Path) -> bool:
-        """验证单个FASTQ文件"""
+        """Validate a single FASTQ file."""
         if not file_path.exists():
             return False
 
         if file_path.stat().st_size == 0:
             return False
 
-        # 简单的格式验证：检查文件头
+        # Basic format check: inspect the first record header.
         try:
             if str(file_path).endswith('.gz'):
                 import gzip
@@ -224,7 +224,7 @@ class ISeqHandler:
                 with open(file_path, 'r') as f:
                     first_line = f.readline().strip()
 
-            # FASTQ文件应该以@开头
+            # FASTQ records should start with '@'.
             return first_line.startswith('@')
         except Exception as e:
             logger.error(f"Error validating file {file_path}: {e}")
@@ -234,14 +234,14 @@ class ISeqHandler:
                              fastq_pairs: List[Tuple[str, Path, Optional[Path]]],
                              output_file: Optional[Path] = None) -> pd.DataFrame:
         """
-        创建样本元数据表
+        Build a sample metadata table.
 
         Args:
-            fastq_pairs: 配对的FASTQ文件列表
-            output_file: 输出文件路径（可选）
+            fastq_pairs: Paired FASTQ file list.
+            output_file: Optional path for writing the CSV output.
 
         Returns:
-            样本元数据DataFrame
+            Sample metadata DataFrame.
         """
         metadata = []
 
@@ -269,37 +269,37 @@ class ISeqHandler:
                            output_dir: str | Path,
                            sample_prefix: str = "Sample") -> Dict[str, Any]:
         """
-        处理公司提供的FASTQ数据的主函数
+        Main entry point for processing vendor FASTQ data.
 
         Args:
-            input_path: 输入FASTQ文件或目录路径
-            output_dir: 输出目录
-            sample_prefix: 样本ID前缀
+            input_path: FASTQ file or directory path.
+            output_dir: Output directory.
+            sample_prefix: Sample ID prefix.
 
         Returns:
-            处理结果字典
+            Result dictionary containing processed metadata.
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Processing company FASTQ data from {input_path}")
 
-        # 1. 发现FASTQ文件
+        # 1. Discover FASTQ files.
         fastq_files = self.discover_fastq_files(input_path)
 
-        # 2. 配对双端测序数据
+        # 2. Pair up the FASTQ files.
         fastq_pairs = self.group_paired_end(fastq_files)
 
-        # 3. 验证文件
+        # 3. Validate files.
         if self.validate_files:
             if not self.validate_fastq_files(fastq_pairs):
                 raise ValueError("Some FASTQ files failed validation")
 
-        # 4. 创建样本元数据
+        # 4. Build sample metadata.
         metadata_file = output_dir / "sample_metadata.csv"
         metadata_df = self.create_sample_metadata(fastq_pairs, metadata_file)
 
-        # 5. 创建标准化的样本ID映射
+        # 5. Create standardized sample ID mappings.
         sample_id_mapping = {}
         for i, (original_id, r1_path, r2_path) in enumerate(fastq_pairs):
             standardized_id = f"{sample_prefix}_{i+1:03d}"
@@ -310,7 +310,7 @@ class ISeqHandler:
                 'paired_end': r2_path is not None
             }
 
-        # 6. 保存映射文件
+        # 6. Persist the mapping file.
         mapping_file = output_dir / "sample_id_mapping.json"
         import json
         with open(mapping_file, 'w') as f:

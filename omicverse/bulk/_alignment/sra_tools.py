@@ -1,3 +1,5 @@
+# Author: Zhi Luo
+
 import os,sys,time, shutil, hashlib, subprocess, requests,argparse,re
 import pandas as pd
 import concurrent.futures
@@ -279,16 +281,16 @@ def _gzip_compress(path_fastq: str, threads: int = 4) -> str:
 
     return str(gz)
 
-# ================= 获取 SRA 文件元信息（大小 + MD5） =================
+# ================= Retrieve SRA file metadata (size + MD5) =================
 import os, time, re, csv, requests
 from typing import Optional
 
 _NCBI_TOOL = "omicverse-prefetch"
 _NCBI_EMAIL = os.environ.get("NCBI_EMAIL", "none@example.com")
-_NCBI_API_KEY = os.environ.get("NCBI_API_KEY")  # 可选，提高速率配额
+_NCBI_API_KEY = os.environ.get("NCBI_API_KEY")  # Optional; increases rate limits.
 
 def _req(url: str, params: dict, timeout=8, max_retries=5, backoff=0.8) -> requests.Response:
-    """带 429 退避重试的请求器"""
+    """Request helper with 429-aware exponential backoff."""
     params = dict(params or {})
     params.setdefault("tool", _NCBI_TOOL)
     params.setdefault("email", _NCBI_EMAIL)
@@ -297,39 +299,39 @@ def _req(url: str, params: dict, timeout=8, max_retries=5, backoff=0.8) -> reque
     for i in range(max_retries):
         r = requests.get(url, params=params, timeout=timeout)
         if r.status_code == 429 or r.status_code >= 500:
-            # 退避
+            # Back off before retrying.
             sleep_s = backoff * (2 ** i)
             time.sleep(sleep_s)
             continue
         r.raise_for_status()
         return r
-    # 最后一轮若仍失败，抛出
+    # After the final attempt, raise the error.
     r.raise_for_status()
     return r  # for type hints
 
 def get_sra_metadata(srr_id: str) -> dict:
     """
-    返回单 SRR 的估计压缩大小（字节）与 md5 列表：
-      1) esearch -> esummary(expxml) 解析 total_size(整组) 与 per-Run total_bases 比例 -> 估算本 SRR
-      2) 失败则回退 ENA submitted_bytes（更接近 .sra/.sralite）
-      3) 都失败则返回 {'size': None, 'md5s': []}
+    Return the estimated compressed size (bytes) and MD5 list for a single SRR:
+      1) esearch -> esummary(expxml) to read total_size and per-Run total_bases proportions → estimate this SRR.
+      2) On failure, fall back to ENA submitted_bytes (closer to .sra/.sralite payloads).
+      3) When both fail, return {'size': None, 'md5s': []}.
     """
-    # ---- NCBI：先 esearch 得 UID ----
+    # ---- NCBI: run esearch to obtain the UID first ----
     try:
         esearch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         r = _req(esearch_url, {"db": "sra", "term": srr_id, "retmode": "json"})
         idlist = r.json().get("esearchresult", {}).get("idlist", [])
         if idlist:
             uid = idlist[0]
-            # ---- esummary 取 expxml ----
+            # ---- Fetch expxml via esummary ----
             esum_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
             r2 = _req(esum_url, {"db": "sra", "id": uid, "retmode": "json"})
             js = r2.json()
             expxml = js.get("result", {}).get(uid, {}).get("expxml", "") or ""
-            # total_size 是整个 SRX 的压缩总量
+            # total_size is the compressed total for the entire SRX.
             m_total = re.search(r'total_size="(\d+)"', expxml)
             total_size = int(m_total.group(1)) if m_total else None
-            # 解析各 Run 的 total_bases
+            # Parse total_bases for each Run.
             runs = re.findall(r'<Run acc="(SRR\d+)"[^>]*total_bases="(\d+)"', expxml)
             if total_size and runs:
                 bases = {acc: int(b) for acc, b in runs}
@@ -337,16 +339,16 @@ def get_sra_metadata(srr_id: str) -> dict:
                 if srr_id in bases:
                     est = int(total_size * bases[srr_id] / sum_b)
                     return {"size": est, "md5s": []}
-            # 没解析出 per-run，就退回 total_size（不理想，但总比 fastq_bytes 准）
+            # If per-run parsing fails, fall back to total_size (less ideal but better than fastq_bytes).
             if total_size:
                 return {"size": total_size/2.3, "md5s": []}
     except requests.HTTPError as e:
-        # 显式打印 429 等情况，但不中断流程
-        print(f"[WARN] NCBI 元信息获取失败: {e}")
+        # Log 429 or similar issues without interrupting the flow.
+        print(f"[WARN] NCBI metadata fetch failed: {e}")
     except Exception as e:
-        print(f"[WARN] NCBI 元信息获取失败: {e}")
+        print(f"[WARN] NCBI metadata fetch failed: {e}")
 
-    # ---- ENA 回退：用 submitted_bytes / submitted_md5，更接近提交的压缩包 ----
+    # ---- ENA fallback: use submitted_bytes / submitted_md5, closer to the archived tarball ----
     try:
         ena_url = "https://www.ebi.ac.uk/ena/portal/api/filereport"
         params = {
@@ -357,14 +359,14 @@ def get_sra_metadata(srr_id: str) -> dict:
         r3 = requests.get(ena_url, params=params, timeout=8)
         r3.raise_for_status()
         txt = r3.text.strip()
-        # 用 csv 解析，避免 split 越界
+        # Parse via CSV to avoid split edge cases.
         rows = list(csv.DictReader(txt.splitlines(), delimiter="\t"))
         size_sum = 0
         md5s = []
         for row in rows:
             bytes_val = (row.get("submitted_bytes") or "").strip()
             md5_val = (row.get("submitted_md5") or "").strip()
-            # submitted_bytes 可能是 "123;456"、"-" 或空
+            # submitted_bytes may look like "123;456", "-" or be empty.
             parts = [p for p in bytes_val.split(";") if p.strip().isdigit()]
             size_sum += sum(int(p) for p in parts)
             if md5_val and md5_val != "-":
@@ -372,9 +374,9 @@ def get_sra_metadata(srr_id: str) -> dict:
         if size_sum > 0:
             return {"size": size_sum, "md5s": md5s}
     except Exception as e:
-        print(f"[WARN] ENA 元信息获取失败: {e}")
+        print(f"[WARN] ENA metadata fetch failed: {e}")
 
-    # ---- 无法取得可靠大小 ----
+    # ---- Unable to obtain a reliable size ----
     return {"size": None, "md5s": []}
 
 def calculate_md5(filepath, chunk_size=8192):
@@ -385,7 +387,7 @@ def calculate_md5(filepath, chunk_size=8192):
                 md5.update(chunk)
         return md5.hexdigest()
     except Exception as e:
-        print(f"计算MD5失败: {e}")
+        print(f"Failed to compute MD5: {e}")
         return None
 
 def human_readable_speed(speed_bps):
@@ -512,10 +514,10 @@ def setup_logger(srr_id):
 # ====================Prefetch Setting==============================
 def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | None:
     """
-    在 output_root 下为 srr_id 查找 .sra/.sralite 文件：
-    1) 先快速检查常见的 0/1 层
-    2) 再在 srr 子目录内 rglob 递归查找
-    3) 轮询等待，直到 timeout 秒或命中有效文件（非空）
+    Locate the .sra/.sralite file for `srr_id` beneath `output_root`:
+      1) Perform quick checks at the root and immediate subdirectory.
+      2) Recursively search the SRR directory.
+      3) Poll until `timeout` seconds elapse or a non-empty file is found.
     """
     output_root = Path(output_root)
     srr_dir = output_root / srr_id
@@ -526,7 +528,7 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
         except Exception:
             return False
 
-    # 先快速直查
+    # Quick direct checks first.
     quick = [
         output_root / f"{srr_id}.sra",
         output_root / f"{srr_id}.sralite",
@@ -537,12 +539,12 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
         if _ready(p):
             return p
 
-    # 轮询 + 递归
+    # Poll with recursive search.
     deadline = time.time() + timeout
     while time.time() < deadline:
         if srr_dir.exists():
-            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # 匹配 .sra/.sralite
-            # 选最新那个，避免抓到未完成的中间文件
+            hits = list(srr_dir.rglob(f"{srr_id}.sr*"))  # Match .sra/.sralite.
+            # Prefer the newest file to avoid partially written intermediates.
             hits = [h for h in hits if _ready(h)]
             if hits:
                 hits.sort(key=lambda x: x.stat().st_mtime, reverse=True)
@@ -553,10 +555,10 @@ def find_sra_file(srr_id: str, output_root: Path, timeout: int = 30) -> Path | N
 
 def ensure_symlink(target: Path, real: Path) -> None:
     """
-    在 target 位置建立到 real 的软链（若不支持软链则复制），确保 target 所在目录存在。
+    Create a symlink at `target` pointing to `real`. Copy instead when symlinks are unsupported.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
-    # 已经是同一个目标则直接返回
+    # If the existing link already targets the same path, exit early.
     if target.exists() or target.is_symlink():
         try:
             if target.resolve() == real.resolve():
@@ -574,16 +576,16 @@ def ensure_symlink(target: Path, real: Path) -> None:
 
 def check_step_completed(step: dict, srr_id: str, logger=None) -> tuple[bool, list[str]]:
     """
-    通用的“此步骤是否完成”检查：
-      - 基于 step["outputs"] 渲染出期望产物路径
-      - 调用 step["validation"](outputs) 判断
-      - 针对 prefetch 步骤做稳健化：如果期望 .sra 不在指定 cache，
-        则用 srapath 找真实文件，存在则补建软链/复制到期望位置，再判定完成
-    返回：(done: bool, outputs: List[str])
+    Generic "step completed" check:
+      - Render expected outputs via step["outputs"].
+      - Evaluate step["validation"](outputs).
+      - For prefetch steps, if the expected .sra is missing from cache, look it up via srapath,
+        rebuild the symlink/copy, and re-validate.
+    Returns (done: bool, outputs: List[str]).
     """
     outs = _render_paths(step["outputs"], SRR=srr_id)
 
-    # 先直接跑 validation（你之前已有 _safe_call_validation 也可以复用）
+    # Run validation first (mirrors the existing _safe_call_validation helper).
     try:
         done = step["validation"](outs)
     except Exception as e:
@@ -591,17 +593,17 @@ def check_step_completed(step: dict, srr_id: str, logger=None) -> tuple[bool, li
             logger.warning(f"[WARN] validation raised: {e}")
         done = all(Path(p).exists() for p in outs)
 
-    # 额外稳健化：prefetch 步骤（通常只有 1 个 .sra 期望路径）
-    # 约定：prefetch 的 outputs 模板里包含 “.sra”
+    # Additional hardening: prefetch steps usually expect a single .sra output.
+    # Assumption: the prefetch outputs template includes ".sra".
     is_prefetch = any(str(p).endswith(".sra") for p in outs)
     if not done and is_prefetch:
-        # outs[0] 就是期望的 sra_cache/SRR/SRR.sra
+        # outs[0] should be the expected sra_cache/SRR/SRR.sra path.
         expected = Path(outs[0])
         real = resolve_sra_path(srr_id)
         if real and real.exists():
-            # 补建软链/复制
+            # Recreate the symlink (or copy if symlinks unavailable).
             ensure_symlink(expected, real)
-            # 重新判定
+            # Re-run validation against the refreshed path.
             try:
                 done = step["validation"]([str(expected)])
             except Exception:
@@ -630,11 +632,11 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
         try:
             subprocess.run(["vdb-validate", str(path)],
                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info(f"{path.name} 已存在且通过 vdb-validate，跳过下载")
+            logger.info(f"{path.name} already exists and passes vdb-validate; skipping download")
             record_to_log(srr_id, "success")
             return True
         except subprocess.CalledProcessError:
-            logger.info(f"{path.name} 存在但未通过 vdb-validate，将尝试重新下载")
+            logger.info(f"{path.name} exists but failed vdb-validate; re-downloading")
 
     # Use minimal parameters to match successful terminal usage
     # Add --type sra to ensure we download .sra files instead of .sralite
@@ -649,21 +651,21 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
     if location and location != "auto":
         cmd.extend(["--location", location])
 
-    logger.info(f"开始下载 {srr_id} (location: {location})")
-    logger.debug(f"执行命令: {' '.join(cmd)}")
+    logger.info(f"Starting download for {srr_id} (location: {location})")
+    logger.debug(f"Running command: {' '.join(cmd)}")
 
     # Get metadata for file size estimation
     try:
         meta = get_sra_metadata(srr_id)
         total_size = meta.get("size") if isinstance(meta, dict) else None
         if not isinstance(total_size, int) or total_size <= 0:
-            # 若没有总量，但已经开始下载一段时间了，就给个软上限，避免一直没百分比
+            # When total size is unknown but progress is underway, set a soft upper bound to show progress.
           if total_size is None and current_size > 0 and elapsed_time > 3:
-              # 初次设置一个软上限（当前值的 1.3 倍）
+              # First soft bound: current size * 1.3.
               total_size = int(current_size * 1.3)
               pbar.total = total_size
               pbar.refresh()
-          # 若逼近上限，则抬高上限，避免显示 >100%
+          # If approaching the bound, raise it to avoid >100% displays.
           if total_size and current_size > total_size * 0.95:
               total_size = int(current_size * 1.1)
               pbar.total = total_size
@@ -731,7 +733,7 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
                     # Update progress bar display
                     if total_size:
                         pbar.set_postfix_str(
-                            f"{human_readable_speed(avg_speed)}" + (f" | 剩余: {eta_str}" if eta_str else "")
+                            f"{human_readable_speed(avg_speed)}" + (f" | ETA: {eta_str}" if eta_str else "")
                         )
                     else:
                         pbar.set_postfix_str(f"{human_readable_speed(avg_speed)}")
@@ -753,7 +755,7 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
                         eta_str = estimate_remaining_time(current_size, total_size, avg_speed) if total_size else ""
                         if total_size:
                             pbar.set_postfix_str(
-                                f"{human_readable_speed(avg_speed)}" + (f" | 剩余: {eta_str}" if eta_str else "")
+                                f"{human_readable_speed(avg_speed)}" + (f" | ETA: {eta_str}" if eta_str else "")
                             )
                         else:
                             pbar.set_postfix_str(f"{human_readable_speed(avg_speed)}")
@@ -779,24 +781,24 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
 
             real = find_sra_file(srr_id=srr_id, output_root=output_root, timeout=30)
             if real:
-                # 可选：强校验
+                # Optional: run a strict validation.
                 try:
                     val = subprocess.run(["vdb-validate", str(real)], capture_output=True, text=True)
                     if val.returncode == 0:
-                        logger.info(f"{Path(real).name} 下载成功并通过 vdb-validate")
+                        logger.info(f"{Path(real).name} downloaded successfully and passed vdb-validate")
                         record_to_log(srr_id, "success")
                         return True
                     else:
-                        logger.warning(f"{Path(real).name} 下载完成但 vdb-validate 失败")
+                        logger.warning(f"{Path(real).name} downloaded but failed vdb-validate")
                         logger.warning(f"Validation error: {val.stderr}")
-                        # vdb-validate 未通过也返回 False，让上游决定是否继续 fasterq
+                        # When vdb-validate fails, propagate False so upper layers decide about fasterq.
                         return False
                 except Exception as e:
-                    logger.warning(f"vdb-validate 执行异常（将以已落盘为准）：{e}")
+                    logger.warning(f"vdb-validate raised an exception (treating on-disk data as authoritative): {e}")
                     return True
             else:
-                # 这里不要报 ERROR（因为可能只是落盘/重命名延迟），交给上层 _worker 再兜底
-                logger.debug(f"Prefetch completed but file not visible yet under {output_root}/{srr_id}（延后由上层兜底解析）")
+                # Avoid logging ERROR here; upstream worker will handle delayed writes or renames.
+                logger.debug(f"Prefetch completed but file not yet visible under {output_root}/{srr_id} (upstream fallback will handle it)")
                 return False
         else:
             logger.error(f"Prefetch failed with exit code {proc.returncode}")
@@ -805,7 +807,7 @@ def run_prefetch_basic(srr_id: str, logger: logging.Logger, retries: int = 3,
 
     except Exception as e:
         pbar.close()
-        logger.error(f"下载过程中发生错误: {e}")
+        logger.error(f"Error occurred during download: {e}")
         return False
 
 def run_prefetch_with_progress(srr_id, logger, retries=3, output_root: str | Path = "sra_cache",
@@ -835,10 +837,10 @@ def run_prefetch_with_progress(srr_id, logger, retries=3, output_root: str | Pat
 def process_srr(srr_id, max_retry=3):
     logger = setup_logger(srr_id)
     if os.path.exists("success.log") and srr_id in Path("success.log").read_text().splitlines():
-        logger.info(f"{srr_id} 已在 success.log 中记录，跳过")
+        logger.info(f"{srr_id} already listed in success.log; skipping")
         return True
 
-    logger.info(f"开始处理 {srr_id}")
+    logger.info(f"Processing {srr_id}")
     start_time = time.time()
     try:
         for step in COMMAND_STEPS:
@@ -846,21 +848,21 @@ def process_srr(srr_id, max_retry=3):
             lock_file = f"{srr_id}_{step_name}.lock"
             with FileLock(lock_file + ".lock"):
                 if not step['command'](srr_id, logger):
-                    raise RuntimeError("Prefetch步骤失败")
+                    raise RuntimeError("Prefetch step failed")
                 if not check_step_completed(step, srr_id, logger):
-                    raise RuntimeError(f"最终验证失败: {step_name}")
+                    raise RuntimeError(f"Final validation failed: {step_name}")
 
         duration = time.time() - start_time
-        logger.info(f"{srr_id} 下载完成，总耗时: {duration:.1f} 秒")
+        logger.info(f"{srr_id} download finished in {duration:.1f} seconds")
         record_to_log(srr_id, "success")
         return True
     except Exception as e:
-        logger.exception(f"{srr_id} 处理失败: {e}")
+        logger.exception(f"{srr_id} processing failed: {e}")
         record_to_log(srr_id, "fail")
         return False
 
 
-# ================= 获取 SRA  =================
+# ================= Fetch SRA =================
 def raw_data_downloader(sample_csv="sample_list.csv", start=0, end=100, max_workers=10, resume=True):
     try:
         df = pd.read_csv(sample_csv)
@@ -872,22 +874,22 @@ def raw_data_downloader(sample_csv="sample_list.csv", start=0, end=100, max_work
             srr_list = srr_list[start:end]
         else:
             srr_list = srr_list[start:]
-        print(f"待处理样本数: {len(srr_list)}")
+        print(f"Samples to process: {len(srr_list)}")
     except Exception as e:
-        print(f"读取样本列表失败: {str(e)}")
+        print(f"Failed to read sample list: {str(e)}")
         return
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(process_srr, srr): srr for srr in srr_list}
-        with tqdm(total=len(srr_list), desc="处理进度") as pbar:
+        with tqdm(total=len(srr_list), desc="Progress") as pbar:
             for future in concurrent.futures.as_completed(futures):
                 srr_id = futures[future]
                 try:
                     success = future.result()
-                    status = "成功" if success else "失败"
+                    status = "SUCCESS" if success else "FAILED"
                     print(f"{srr_id}: {status}")
                 except Exception as e:
-                    print(f"{srr_id}: 异常终止 - {str(e)}")
+                    print(f"{srr_id}: aborted with exception - {str(e)}")
                 finally:
                     pbar.update(1)
 
@@ -899,7 +901,7 @@ def run(cmd):
     print(">>", " ".join(cmd))
     subprocess.run(cmd, check=True)
 
-# ================= 数据前处理 fasterq-dump  ================= 
+# ================= Data preprocessing via fasterq-dump ================= 
 #
 def pyfasterq_dump(srr, outdir):
     """
@@ -926,7 +928,7 @@ def pyfasterq_dump(srr, outdir):
     return [fq1, fq2]
 
 
-# ======== 顶层 worker（可被pickle）========
+# ======== Top-level worker (pickle-friendly) ========
 
 '''
 def _fasterq_run_one(srr: str,
@@ -935,8 +937,8 @@ def _fasterq_run_one(srr: str,
                      mem: str = "4G",
                      retries: int = 2):
     """
-    单个 SRR 的 fasterq-dump 任务。
-    若已存在 {srr}_1.fastq / {srr}_2.fastq 则跳过。
+    Run fasterq-dump for a single SRR.
+    Skip when {srr}_1.fastq / {srr}_2.fastq already exist.
     """
     import os, time, subprocess, shutil
 
@@ -944,7 +946,7 @@ def _fasterq_run_one(srr: str,
     fq1 = os.path.join(outdir, f"{srr}_1.fastq")
     fq2 = os.path.join(outdir, f"{srr}_2.fastq")
 
-    # 已有产物：跳过
+    # Existing outputs: skip.
     if os.path.exists(fq1) and os.path.exists(fq2):
         return (srr, fq1, fq2, "SKIP")
 
@@ -960,13 +962,13 @@ def _fasterq_run_one(srr: str,
                 "--split-files"
             ]
             print(">>", " ".join(cmd))
-            # 确认二进制可见
+            # Ensure the binary is visible.
             if not shutil.which("fasterq-dump"):
                 raise FileNotFoundError("fasterq-dump not found in PATH")
 
             subprocess.run(cmd, check=True)
 
-            # 基本校验
+            # Basic validation.
             if not (os.path.exists(fq1) and os.path.exists(fq2)):
                 raise RuntimeError(f"Missing outputs after fasterq-dump: {fq1}, {fq2}")
             return (srr, fq1, fq2, "OK")
@@ -974,7 +976,7 @@ def _fasterq_run_one(srr: str,
             last_err = e
             if attempt < retries:
                 time.sleep(2 * attempt)
-    # 重试用尽
+    # Retries exhausted.
     raise RuntimeError(f"[{srr}] fasterq-dump failed after {retries} attempts: {last_err}")
 '''
 def _fasterq_run_one_resilient(
@@ -1057,26 +1059,26 @@ def _fasterq_run_one_resilient(
 
     raise RuntimeError(f"[{srr}] fasterq-dump ultimately failed: {last_err}")
 
-# ======== 并行调度器（对外 API）========
+# ======== Parallel scheduler (public API) ========
 def pyfasterq_dump_parallel(
     srr_list: list[str],
     outdir: str,
-    threads_per_job: int = 24,     # 传给 fasterq-dump 的 -e
-    mem_per_job: str = "4G",       # 传给 fasterq-dump 的 --mem
+    threads_per_job: int = 24,     # Passed to fasterq-dump via -e.
+    mem_per_job: str = "4G",       # Passed to fasterq-dump via --mem.
     max_workers: int | None = None,
     retries: int = 2,
     tmp_root: str = "work/tmp",
     compress_after: bool = True,      
     compress_threads: int = 8,         
-    backend: str = "process",      # "process" 或 "thread"
+    backend: str = "process",      # Either "process" or "thread".
 ):
     """
-    批量并行执行 fasterq-dump（与单个 pyfasterq_dump 逻辑一致）。
-    - 自动跳过已存在 {SRR}_1.fastq / {SRR}_2.fastq
-    - 支持失败重试
-    - max_workers 缺省为 (CPU核数 // threads_per_job)
+    Run fasterq-dump in parallel (same logic as pyfasterq_dump per SRR).
+      - Skip samples when {SRR}_1.fastq / {SRR}_2.fastq already exist.
+      - Support retrying failed attempts.
+      - Default max_workers = CPU cores // threads_per_job.
 
-    返回:
+    Returns:
       {"success": [(srr, fq1, fq2, status), ...], "failed": [(srr, errmsg), ...]}
     """
     
@@ -1138,7 +1140,7 @@ ret = pyfasterq_dump_parallel(
 
 '''
 
-# ===============数据质控===================
+# =============== Data quality control ===================
 
 def require_tool(name, hint=""):
     import shutil
@@ -1151,7 +1153,7 @@ def require_tool(name, hint=""):
 
 
 def fastp_clean(fq1, fq2, sample, out_dir, threads = "12" ):
-    # 单一数据的处理 对于多数据并行使用 fastp_clean_parallel(),
+    # Single-sample processing; use fastp_clean_parallel() for multiple samples.
     outdir = os.path.join(out_dir, "fastp"); os.makedirs(outdir, exist_ok=True)
     #require_tool("fastp", "Try: conda install -c bioconda fastp")
     if fq2:  # paired
@@ -1180,11 +1182,11 @@ def fastp_clean(fq1, fq2, sample, out_dir, threads = "12" ):
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from math import floor
 
-# ---- 顶层可pickle的worker ----
+# ---- Top-level worker (pickle-safe) ----
 def _fastp_run_one(sample: str, outdir: str, work_dir: str, fastp_threads: int, retries: int = 2):
     """
-    单样本清洗的子进程任务。需要在模块顶层定义，便于 ProcessPoolExecutor pickle。
-    依赖同模块中的 fastp_clean(fq1, fq2, sample, work_dir, threads=...).
+    Worker process for cleaning a single sample. Must live at module scope so ProcessPoolExecutor can pickle it.
+    Relies on fastp_clean(fq1, fq2, sample, work_dir, threads=...).
     """
     import os, time
 
@@ -1195,7 +1197,7 @@ def _fastp_run_one(sample: str, outdir: str, work_dir: str, fastp_threads: int, 
     if fq2 and not os.path.exists(fq2):
         raise FileNotFoundError(f"[{sample}] FASTQ not found: {fq2}")
 
-    # 已完成则跳过（与 fastp_clean 输出命名保持一致）
+    # Skip when outputs already exist (naming aligned with fastp_clean).
     out1 = os.path.join(work_dir, f"{sample}_1.clean.fq.gz")
     out2 = os.path.join(work_dir, f"{sample}_2.clean.fq.gz")
     if os.path.exists(out1) and os.path.exists(out2):
@@ -1204,7 +1206,7 @@ def _fastp_run_one(sample: str, outdir: str, work_dir: str, fastp_threads: int, 
     last_err = None
     for attempt in range(1, retries + 1):
         try:
-            # 直接调用你已有的 fastp_clean（确保它是模块级函数）
+            # Call the existing fastp_clean (ensure it is defined at module level).
             fq1_clean, fq2_clean = fastp_clean(fq1, fq2, sample, work_dir, threads=fastp_threads)
             if not os.path.exists(fq1_clean) or not os.path.exists(fq2_clean):
                 raise RuntimeError(f"[{sample}] Missing output after fastp_clean.")
@@ -1213,10 +1215,10 @@ def _fastp_run_one(sample: str, outdir: str, work_dir: str, fastp_threads: int, 
             last_err = e
             if attempt < retries:
                 time.sleep(2 * attempt)
-    # 重试用尽
+    # Retries exhausted.
     raise RuntimeError(f"[{sample}] fastp_clean failed after {retries} attempts: {last_err}")
 
-# ---- 并行调度器（对外API）----
+# ---- Parallel scheduler (public API) ----
 def fastp_clean_parallel(
     samples: list[str],
     outdir: str,
@@ -1224,20 +1226,20 @@ def fastp_clean_parallel(
     fastp_threads: int = 4,
     max_workers: int | None = None,
     retries: int = 2,
-    backend: str = "process",   # 可选 "process" 或 "thread"
+    backend: str = "process",   # Either "process" or "thread".
 ):
     """
-    并行批量运行 fastp_clean（对单个样本仍可用原 fastp_clean）。
+    Run fastp_clean across many samples in parallel (single-sample usage still supported via fastp_clean).
 
-    参数
-    ----
-    samples: SRR 列表
-    outdir: 原始 FASTQ 所在目录
-    work_dir: 清洗输出目录（fastp_clean里会用到）
-    fastp_threads: 传给 fastp 的 -w
-    max_workers: 并发度（默认=CPU核数/fastp_threads）
-    retries: 每个样本失败重试次数
-    backend: "process"（默认）或 "thread"；若仍遇到pickling问题可临时用 "thread"
+    Parameters
+    ----------
+    samples: List of SRR/sample identifiers.
+    outdir: Directory containing the raw FASTQ files.
+    work_dir: Output directory used by fastp_clean.
+    fastp_threads: Value passed to fastp via -w.
+    max_workers: Level of concurrency (default = CPU cores / fastp_threads).
+    retries: Number of retry attempts per sample.
+    backend: "process" (default) or "thread"; switch to "thread" if pickling remains an issue.
     """
     import os, sys, shutil
     from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
