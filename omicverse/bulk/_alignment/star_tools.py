@@ -7,9 +7,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .geo_meta_fetcher import parse_geo_soft_to_struct, fetch_geo_text
 
-
-
-# ================= 获GEO取数据信息  ================= 
+# ================= Fetch GEO metadata =================
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Python requests)"}
 
@@ -22,7 +20,7 @@ def fetch_geo_text(accession: str) -> str:
     r = requests.get(url, headers=HEADERS, timeout=120)
     r.raise_for_status()
     return r.text
-# ================= 检测数据来源  ================= 
+# ================= Detect data origin =================
 
 def detect_species_build_from_geo(accession: str) -> Tuple[str, str]:
     """
@@ -59,7 +57,7 @@ def detect_species_build_from_geo(accession: str) -> Tuple[str, str]:
             build = b
     return species, build
 
-# ================= ·download helper ================= 
+# ================= Download helper =================
 '''
 def download_file(url, dest, chunk=1 << 20, max_retries=5):
     """
@@ -69,7 +67,7 @@ def download_file(url, dest, chunk=1 << 20, max_retries=5):
     """
     headers = {
     "User-Agent": "Python-Resumable-Downloader/1.0",
-    "Accept-Encoding": "identity",   # 避免服务器对主体再 gzip，保证 Range 的字节对齐
+    "Accept-Encoding": "identity",   # Avoid extra gzip so byte ranges remain aligned.
     }
     dest = os.path.abspath(dest)
     tmp = dest + ".part"
@@ -143,23 +141,23 @@ def curl_available():
 
 def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8, use_curl_fallback: bool = True):
     """
-    具备断点续传、元信息校验、重试与可选 curl 回退的稳健下载器。
-    - 部分下载写到 dest.part，元信息写到 dest.meta.json
-    - 支持 Range 续传（206）。若服务端忽略 Range（200），可选走 curl -C - 回退。
+    Robust downloader with resume support, metadata validation, retries, and optional curl fallback.
+    - Partial downloads are written to dest.part, with metadata stored in dest.meta.json.
+    - Supports HTTP Range resumes (206). If the server ignores Range (200), optionally fall back to curl -C -.
     """
     dest = os.path.abspath(dest)
     tmp = dest + ".part"
     meta = dest + ".meta.json"
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
-    # 1) 获取服务器元信息
+    # 1) Fetch server metadata.
     info = head_info(url)
     total = info["length"]
     supports_range = info["accept_ranges"]
     etag = info["etag"]
     last_mod = info["last_modified"]
 
-    # 2) 读取本地元信息
+    # 2) Load local metadata.
     local = {"downloaded": 0, "total": total, "etag": etag, "last_modified": last_mod}
     if os.path.exists(meta):
         try:
@@ -167,7 +165,7 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
         except Exception:
             pass
 
-    # 如果服务器文件特征（etag/last-mod/总长）与本地不一致，删除旧片段
+    # Remove stale fragments when server metadata (etag/last-mod/size) differs from local records.
     mismatch = (
         (local.get("etag") and etag and local["etag"] != etag) or
         (local.get("last_modified") and last_mod and local["last_modified"] != last_mod) or
@@ -179,24 +177,24 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
                 os.remove(p)
         local = {"downloaded": 0, "total": total, "etag": etag, "last_modified": last_mod}
 
-    # 若已有完整文件，直接返回
+    # Return immediately if the destination file is already complete.
     if os.path.exists(dest) and (total == 0 or os.path.getsize(dest) == total):
         return dest
 
-    # 初始化/刷新 meta
+    # Initialize or refresh the metadata file.
     local["total"] = total
     local["etag"] = etag
     local["last_modified"] = last_mod
     json.dump(local, open(meta, "w"))
 
-    # 当前已下载字节
+    # Track how many bytes have been downloaded.
     downloaded = os.path.getsize(tmp) if os.path.exists(tmp) else 0
     if downloaded > total > 0:
-        # 异常状态，清理重新来
+        # Inconsistent state detected; reset and start over.
         os.remove(tmp)
         downloaded = 0
 
-    # 3) 如果不支持 Range，且需要续传，考虑 curl 回退或重下
+    # 3) If Range is unsupported but resume is required, consider curl fallback or restarting the download.
     if downloaded > 0 and not supports_range:
         if use_curl_fallback and curl_available():
             print("⚠️ Server does not advertise Range support. Falling back to curl -C - …")
@@ -207,7 +205,7 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
                 os.remove(tmp)
             downloaded = 0
 
-    # 4) 带 Range 的下载循环
+    # 4) Download loop using HTTP Range.
     headers = dict(HEADERS)
     if downloaded > 0:
         headers["Range"] = f"bytes={downloaded}-"
@@ -215,7 +213,7 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
     for attempt in range(1, max_retries + 1):
         try:
             with requests.get(url, headers=headers, stream=True, timeout=600) as r:
-                # 期望 206（续传）；如果返回 200 且我们想续传 → 服务器忽略 Range
+                # Expect 206 for resume; if 200 arrives while resuming, the server ignored Range.
                 if downloaded > 0 and r.status_code == 200:
                     if use_curl_fallback and curl_available():
                         print("⚠️ Server ignored Range (200). Falling back to curl -C - …")
@@ -227,12 +225,12 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
 
                 r.raise_for_status()
 
-                # 进度条
+                # Progress bar display.
                 total_disp = total if total else None
                 pbar = tqdm(total=total_disp, initial=downloaded, unit="B", unit_scale=True,
                             desc=os.path.basename(dest))
 
-                # 以追加或写入模式打开
+                # Open in append or write mode as appropriate.
                 with open(tmp, "ab" if downloaded else "wb") as f:
                     for chunk_bytes in r.iter_content(chunk_size=chunk):
                         if not chunk_bytes:
@@ -240,12 +238,12 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
                         f.write(chunk_bytes)
                         downloaded += len(chunk_bytes)
                         pbar.update(len(chunk_bytes))
-                        # 每写一段就刷新 meta（防止崩溃后能继续）
+                        # Refresh metadata after each chunk to support safe resumption.
                         local["downloaded"] = downloaded
                         json.dump(local, open(meta, "w"))
                 pbar.close()
 
-            # 完成：原子替换
+            # Atomically swap the temporary file into place once complete.
             os.replace(tmp, dest)
             print(f"[OK] {os.path.basename(dest)} downloaded ({downloaded/1e6:.1f} MB)")
             return dest
@@ -254,14 +252,14 @@ def download_file(url: str, dest: str, chunk: int = 1<<20, max_retries: int = 8,
                 requests.exceptions.ConnectionError,
                 requests.exceptions.ReadTimeout) as e:
             print(f"⚠️ Attempt {attempt}/{max_retries} failed: {e}")
-            time.sleep(min(30, 5 * attempt))  # 逐步退避
+            time.sleep(min(30, 5 * attempt))  # Exponential backoff capped at 30 seconds.
 
     raise ResumeError(f"Failed to download after {max_retries} attempts: {url}")
 
 def curl_resume(url: str, dest: str, meta_path: str):
-    """使用 curl -L -C - 断点续传作为回退方案。"""
+    """Fallback resume helper using curl -L -C -."""
     tmp = dest + ".part"
-    # curl 直接对最终文件续传，因此我们对齐逻辑：先把 .part 挪成最终名（若存在）
+    # curl resumes directly onto the destination file; rename any .part beforehand.
     if os.path.exists(tmp) and not os.path.exists(dest):
         os.rename(tmp, dest)
 
@@ -270,7 +268,7 @@ def curl_resume(url: str, dest: str, meta_path: str):
     ret = subprocess.run(cmd)
     if ret.returncode != 0:
         raise ResumeError("curl failed to resume download.")
-    # 校验尺寸并补 meta
+    # Validate file size and refresh metadata.
     try:
         info = head_info(url)
         meta = {"downloaded": os.path.getsize(dest), "total": info["length"],
@@ -281,18 +279,18 @@ def curl_resume(url: str, dest: str, meta_path: str):
     print(f"[OK] {os.path.basename(dest)} downloaded via curl")
     return dest
 
-# ================= ·检测STAR INDEX是否存在 ================= 
+# ================= Detect STAR index assets =================
 def get_gtf_for_index(index_dir: Path) -> Path:
     """
-    根据 STAR index 目录自动定位 GTF：
-    1) 若存在 reference.json（建议在 ensure_star_index 构建索引时写入），直接读取；
-    2) 按约定路径扫描：index/<species>/<build>/STAR → 缓存在 index/_cache/<species>/<build>/*.gtf(.gz)
-    3) 兜底：在 index 根目录向下递归找最近的 .gtf 或 .gtf.gz
+    Locate the GTF associated with a STAR index directory:
+    1) If reference.json exists (recommended when ensure_star_index writes it), read it directly.
+    2) Scan the conventional layout: index/<species>/<build>/STAR with cached copies under index/_cache/<species>/<build>/*.gtf(.gz).
+    3) As a fallback, recursively search from the index root for the nearest .gtf or .gtf.gz.
 
-    返回：解压后的 .gtf 的绝对路径（若原文件是 .gtf.gz，会自动解压并返回解压路径）
+    Returns the absolute path to the extracted .gtf (gzipped files are decompressed automatically).
     """
     index_dir = Path(index_dir).resolve()
-    # 1) 优先用 reference.json（如果你在 ensure_star_index 里写过这个档案）
+    # 1) Prefer reference.json when ensure_star_index generated it.
     ref_json = index_dir.parent / "reference.json"
     if ref_json.exists():
         try:
@@ -300,7 +298,7 @@ def get_gtf_for_index(index_dir: Path) -> Path:
             gtf = Path(meta.get("gtf", ""))
             if gtf.exists():
                 if gtf.suffix == ".gz":
-                    # 解压到同级无后缀路径（可按需改到 cache）
+                    # Decompress alongside the original (adjust to cache if desired).
                     dst = gtf.with_suffix("") 
                     if not dst.exists():
                         _gunzip_to(gtf, dst)
@@ -309,18 +307,17 @@ def get_gtf_for_index(index_dir: Path) -> Path:
         except Exception:
             pass
 
-    # 2) 依约定推导 cache 目录：index/<species>/<build>/STAR
-    #    → index/_cache/<species>/<build>
+    # 2) Derive the cache directory based on the conventional layout.
     #    index_dir.parts: [..., "index", species, build, "STAR"]
     parts = index_dir.parts
-    # 尝试定位 "index" 的位置
+    # Locate the "index" segment within the path.
     try:
         i = parts.index("index")
         species = parts[i+1]
         build   = parts[i+2]
         cache_dir = Path(*parts[:i+1]) / "_cache" / species / build
     except Exception:
-        # 若不符合约定结构，fallback 到 index 的三层上级再去找 _cache
+        # If the structure differs, fall back to searching several levels above for _cache.
         cache_dir = index_dir
         for _ in range(3):
             if cache_dir.name == "STAR":
@@ -329,7 +326,7 @@ def get_gtf_for_index(index_dir: Path) -> Path:
             cache_dir = cache_dir.parent
 
     gtf = None
-    # 2a) cache 下找 .gtf or .gtf.gz
+    # 2a) Search for .gtf or .gtf.gz within the cache directory.
     if cache_dir and cache_dir.exists():
         gz_list  = sorted(cache_dir.glob("*.gtf.gz"))
         gtf_list = sorted(cache_dir.glob("*.gtf"))
@@ -342,10 +339,10 @@ def get_gtf_for_index(index_dir: Path) -> Path:
                 _gunzip_to(gtf_gz, dst)
             gtf = dst
 
-    # 3) 兜底：在 index 根目录附近递归找
+    # 3) Final fallback: recursively search near the index root.
     if gtf is None:
         root = index_dir
-        for _ in range(4):  # 往上最多四层
+        for _ in range(4):  # Search up to four levels upward.
             root = root.parent
         candidates = list(root.rglob("*.gtf")) or list(root.rglob("*.gtf.gz"))
         if not candidates:
@@ -379,7 +376,7 @@ def ensure_star_index(
     species = species.lower()
     build = build.upper()
     
-    # normalize common aliases 确保名称大小写规范
+    # Normalize common aliases and enforce consistent casing.
     if build in ("GRCH38", "HG38"):
         build = "GRCh38"
     elif build in ("GRCH37", "HG19"):
@@ -532,7 +529,7 @@ def _infer_sample_id_from_fq(fq1: Path) -> str:
     m = re.search(r"(SRR\d+)", s, re.I)
     if m:
         return m.group(1)
-    # 常见命名 S1_1.fastq / S1.R1.fq.gz / S1.clean.fq.gz
+    # Handle common naming patterns like S1_1.fastq / S1.R1.fq.gz / S1.clean.fq.gz.
     s = re.sub(r"\.f(ast)?q(\.gz)?$", "", s)
     s = re.sub(r"(_|\.)(R?1|R?2|clean)$", "", s, flags=re.I)
     return s
@@ -547,14 +544,14 @@ def run_star(
     sample: Optional[str] = None,
 ) -> Path:
     """
-    运行 STAR，比对结果写入：<base>/<sample>/<sample>.* 并返回 BAM 路径。
-    - out_prefix：可以传你原来的 "work/star/sample."（我们会基于它构造真正的 per-sample 前缀）
-    - sample：可显式传 SRR；不传则从 fq1 文件名自动推断
+    Run STAR, writing outputs to <base>/<sample>/<sample>.* and return the BAM path.
+    - out_prefix: accept the legacy "work/star/sample." prefix (used to derive the per-sample prefix).
+    - sample: optionally pass an SRR; otherwise infer from fq1.
     """
-    # 检查是否已有结果
+    # Skip when results already exist.
 
     sample = sample or _infer_sample_id_from_fq(fq1)
-    # 以 out_prefix 的父目录为 base，例如 "work/star/sample." -> base="work/star"
+    # Use out_prefix's parent as the base directory (e.g., "work/star/sample." → base="work/star").
     base_dir = out_prefix.parent
     out_dir = base_dir / sample
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -576,7 +573,7 @@ def run_star(
     if fq2:
         cmd += [str(fq2)]
 
-    # 通用 .gz 解压（macOS 用 gunzip -c）
+    # Generic .gz decompression (macOS uses gunzip -c).
     if str(fq1).endswith(".gz") or (fq2 and str(fq2).endswith(".gz")):
         cmd += ["--readFilesCommand", "gunzip", "-c"]
 
@@ -600,11 +597,11 @@ def star_align_auto(
     fq1: str,
     fq2: Optional[str],
     index_root: str = "index",
-    out_prefix: str = "work/star/sample.",  # 基底目录仍沿用这个写法
+    out_prefix: str = "work/star/sample.",  # Base directory naming remains consistent with prior usage.
     threads: int = 12,
     gencode_release: str = "v44",
     sjdb_overhang: Optional[int] = 149,
-    sample: Optional[str] = None,           # 新增：可显式传 SRR
+    sample: Optional[str] = None,           # Optional explicit SRR value.
 ) -> Path:
     species, build = detect_species_build_from_geo(accession)
     print(f"[INFO] Detected: species={species}, build={build}")
@@ -623,7 +620,7 @@ def star_align_auto(
         index_dir=idx,
         out_prefix=Path(out_prefix),
         threads=threads,
-        sample=sample  # 传递 SRR（不传则自动从 fq1 推断）
+        sample=sample  # Propagate the SRR (infer from fq1 when not provided).
     )
     print(f"[OK] STAR alignment finished. BAM -> {bam}")
     return bam, idx
@@ -638,7 +635,7 @@ def _star_align_one(
     sample: str,
 ):
     """
-    执行单个 STAR 对齐任务。
+    Execute a single STAR alignment task.
     """
     os.makedirs(Path(out_prefix).parent, exist_ok=True)
     bam_out = str(Path(out_prefix).with_suffix(".Aligned.sortedByCoord.out.bam"))
@@ -671,7 +668,7 @@ def star_align_auto_parallel(
     max_workers: Optional[int] = None
 ):
     """
-    并行运行 STAR 对齐。
+    Run STAR alignments in parallel.
     """
     species, build = detect_species_build_from_geo(accession or samples[0][0])
 

@@ -1,3 +1,5 @@
+# Author: Zhi Luo
+
 import sys, os, shutil, glob, subprocess
 from pathlib import Path
 import logging
@@ -20,26 +22,26 @@ def resolve_tool(name: str):
 
 def check_tool_availability(tool_name: str, install_command: str = None, package_name: str = None) -> tuple[bool, str]:
     """
-    检查工具是否可用，如果不存在则提供安装指引
+    Determine whether a tool is available, and optionally provide installation guidance when it is missing.
 
     Args:
-        tool_name: 工具名称
-        install_command: 安装命令
-        package_name: 包名称
+        tool_name: The tool to locate.
+        install_command: Optional shell command used to install the tool.
+        package_name: Optional package name to suggest to the user.
 
     Returns:
-        (是否可用, 工具路径或错误信息)
+        (available flag, tool path or explanatory error message)
     """
     tool_path = resolve_tool(tool_name)
     if tool_path:
         return True, tool_path
 
-    # 工具不存在，提供安装指引
+    # Tool missing: provide installation guidance.
     if install_command:
         logger.warning(f"{tool_name} not found. Installing...")
         try:
             subprocess.run(install_command, shell=True, check=True, capture_output=True, text=True)
-            # 再次检查
+            # Check again after installation.
             tool_path = resolve_tool(tool_name)
             if tool_path:
                 logger.info(f"Successfully installed {tool_name}")
@@ -60,7 +62,7 @@ def check_tool_availability(tool_name: str, install_command: str = None, package
         return False, error_msg
 
 def check_sra_tools() -> tuple[bool, str]:
-    """检查SRA工具"""
+    """Ensure SRA Toolkit binaries are available."""
     return check_tool_availability(
         "prefetch",
         package_name="sra-tools",
@@ -68,7 +70,7 @@ def check_sra_tools() -> tuple[bool, str]:
     )
 
 def check_star() -> tuple[bool, str]:
-    """检查STAR比对工具"""
+    """Ensure the STAR aligner is available."""
     return check_tool_availability(
         "STAR",
         package_name="star",
@@ -76,7 +78,7 @@ def check_star() -> tuple[bool, str]:
     )
 
 def check_fastp() -> tuple[bool, str]:
-    """检查fastp质控工具"""
+    """Ensure the fastp QC tool is available."""
     return check_tool_availability(
         "fastp",
         package_name="fastp",
@@ -84,7 +86,7 @@ def check_fastp() -> tuple[bool, str]:
     )
 
 def check_featurecounts() -> tuple[bool, str]:
-    """检查featureCounts定量工具"""
+    """Ensure featureCounts is available."""
     return check_tool_availability(
         "featureCounts",
         package_name="subread",
@@ -92,7 +94,7 @@ def check_featurecounts() -> tuple[bool, str]:
     )
 
 def check_samtools() -> tuple[bool, str]:
-    """检查samtools工具"""
+    """Ensure samtools is available."""
     return check_tool_availability(
         "samtools",
         package_name="samtools",
@@ -100,16 +102,16 @@ def check_samtools() -> tuple[bool, str]:
     )
 
 def check_axel(auto_install: bool = True) -> tuple[bool, str]:
-    """检查axel工具，专门适配Jupyter Lab环境"""
+    """Ensure axel (download accelerator) is available; auto-install for Jupyter Lab setups."""
     tool_path = resolve_tool("axel")
     if tool_path:
         return True, tool_path
 
-    # 工具不存在
+    # Tool still unavailable.
     if auto_install:
         logger.warning("axel not found. Attempting automatic installation...")
 
-        # 尝试多种安装方式
+        # Try multiple installation methods.
         install_commands = [
             "conda install -c conda-forge axel -y",
             "mamba install -c conda-forge axel -y"
@@ -120,7 +122,7 @@ def check_axel(auto_install: bool = True) -> tuple[bool, str]:
                 logger.info(f"Trying installation: {cmd}")
                 result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
 
-                # 再次检查
+                # Check again after installation.
                 tool_path = resolve_tool("axel")
                 if tool_path:
                     logger.info(f"Successfully installed axel using: {cmd}")
@@ -130,7 +132,7 @@ def check_axel(auto_install: bool = True) -> tuple[bool, str]:
                 logger.warning(f"Installation failed with {cmd}: {e.stderr}")
                 continue
 
-        # 所有安装方式都失败
+        # All installation attempts failed.
         error_msg = "Failed to install axel automatically. Please install manually: conda install -c conda-forge axel -y"
         logger.error(error_msg)
         return False, error_msg
@@ -140,18 +142,18 @@ def check_axel(auto_install: bool = True) -> tuple[bool, str]:
         return False, error_msg
 
 def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
-    """检查iseq工具，增强版支持自动安装"""
-    # 首先检查axel（iseq的依赖）
+    """Ensure the iseq downloader is available, optionally auto-installing it."""
+    # First ensure axel is available (dependency for iseq).
     axel_available, axel_path = check_axel(auto_install)
     if not axel_available:
         logger.warning(f"axel is not available, which may cause issues with iseq: {axel_path}")
 
-    # 检查iseq本身
+    # Check for iseq itself.
     tool_path = resolve_tool("iseq")
     if tool_path:
         return True, tool_path
 
-    # iseq不存在，尝试安装
+    # iseq missing; attempt installation.
     if auto_install:
         logger.warning("iseq not found. Attempting automatic installation...")
 
@@ -165,7 +167,7 @@ def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
                 logger.info(f"Trying installation: {cmd}")
                 result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
 
-                # 再次检查
+                # Check again after installation.
                 tool_path = resolve_tool("iseq")
                 if tool_path:
                     logger.info(f"Successfully installed iseq using: {cmd}")
@@ -175,7 +177,7 @@ def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
                 logger.warning(f"Installation failed with {cmd}: {e.stderr}")
                 continue
 
-        # 所有安装方式都失败
+        # All installation attempts failed.
         error_msg = "Failed to install iseq automatically. Please install manually: conda install -c bioconda iseq -y"
         logger.error(error_msg)
         return False, error_msg
@@ -185,7 +187,7 @@ def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
         return False, error_msg
 
 def check_edirect() -> tuple[bool, str]:
-    """检查EDirect工具"""
+    """Ensure EDirect (esearch/efetch) is available."""
     return check_tool_availability(
         "esearch",
         package_name="entrez-direct",
@@ -194,13 +196,13 @@ def check_edirect() -> tuple[bool, str]:
 
 def check_all_tools(auto_install: bool = False) -> dict[str, tuple[bool, str]]:
     """
-    检查所有必需的工具
+    Verify availability of every required tool.
 
     Args:
-        auto_install: 是否自动安装缺失的工具
+        auto_install: Whether to attempt automatic installation of missing tools.
 
     Returns:
-        工具检查结果字典
+        Mapping of tool name to a tuple (available flag, path or error string).
     """
     tools = {
         'sra-tools': check_sra_tools,
@@ -216,7 +218,7 @@ def check_all_tools(auto_install: bool = False) -> dict[str, tuple[bool, str]]:
     all_available = True
 
     for tool_name, check_func in tools.items():
-        # 修复：总是使用专门的检查函数，而不是通用的check_tool_availability
+        # Fix: always use the dedicated checker instead of the generic helper.
         available, path = check_func()
         results[tool_name] = (available, path)
         if not available:
@@ -229,23 +231,23 @@ def check_all_tools(auto_install: bool = False) -> dict[str, tuple[bool, str]]:
 
 def check(auto_install: bool = False, verbose: bool = True) -> bool:
     """
-    检查所有必需的工具是否可用
+    Check whether all required tools are available.
 
     Args:
-        auto_install: 是否自动安装缺失的工具
-        verbose: 是否输出详细信息
+        auto_install: Whether to auto-install missing tools.
+        verbose: Whether to emit log output for each tool.
 
     Returns:
-        是否所有工具都可用
+        True when all tools are present.
     """
     env_bin = str(Path(sys.executable).parent)
     if env_bin not in os.environ.get("PATH", ""):
         os.environ["PATH"] = env_bin + os.pathsep + os.environ.get("PATH", "")
 
-    # 使用新的检查函数
+    # Use the new consolidated checking function.
     results = check_all_tools(auto_install=auto_install)
 
-    # 检查是否所有工具都可用
+    # Verify whether every tool is available.
     all_available = all(result[0] for result in results.values())
 
     if verbose:
@@ -261,24 +263,24 @@ def check(auto_install: bool = False, verbose: bool = True) -> bool:
 
 def which_or_find(cmd: str) -> str:
     """
-    返回 cmd 的绝对路径。先用 shutil.which，
-    再在常见目录和 sratoolkit* 目录下尝试。
-    找不到则抛错并给出可读提示。
+    Return the absolute path to `cmd`. First consult shutil.which,
+    then probe common directories and user-extracted sratoolkit paths.
+    Raise with a helpful message when the tool cannot be located.
     """
     p = shutil.which(cmd)
     if p:
         return p
 
-    # 常见路径兜底：当前 Python env 的 bin、常见系统路径、用户 HOME 下的 sratoolkit 解压目录
+    # Common fallbacks: current Python env bin, typical system paths, user home sratoolkit extractions.
     candidates = []
-    # 1) 当前解释器所在 env 的 bin（对 conda 很有效）
+    # 1) Bin directory of the current interpreter (works well for Conda).
     py_bin = Path(os.path.realpath(os.sys.executable)).parent
     candidates += [str(py_bin / cmd)]
 
-    # 2) 系统常见路径
+    # 2) Standard system locations.
     candidates += [f"/usr/local/bin/{cmd}", f"/usr/bin/{cmd}", f"/bin/{cmd}"]
 
-    # 3) 用户目录下手动解压的 sratoolkit
+    # 3) Manually unpacked sratoolkit directories under the user home.
     for g in glob.glob(str(Path.home() / "sratoolkit*/bin")):
         candidates.append(str(Path(g) / cmd))
 
@@ -295,19 +297,19 @@ def which_or_find(cmd: str) -> str:
 
 def merged_env(extra: dict | None = None) -> dict:
     """
-    生成一个对 subprocess 友好的环境变量字典。
-    确保当前 Conda 环境的 bin 目录在 PATH 中（例如 axel、pigz、aspera 可被 iseq 调用）。
+    Build an environment dictionary suitable for subprocesses.
+    Guarantee the current Conda env bin directory is on PATH (so axel/pigz/aspera are discoverable for iseq).
     """
     import os, sys
     from pathlib import Path
 
     env = os.environ.copy()
     
-    # 关键补丁：强制包含当前 Conda 环境的 bin 目录
+    # Critical patch: force inclusion of the current Conda env bin directory.
     conda_bin = str(Path(sys.executable).parent)
     env["PATH"] = f"{conda_bin}:{env.get('PATH', '')}"
 
-    # 若你有特定的 VDB 配置，可在此注入，例如：
+    # If you have a specific VDB config, inject it here, for example:
     # env.setdefault("VDB_CONFIG", str(Path.home() / ".ncbi/user-settings.mkfg"))
 
     if extra:

@@ -6,11 +6,11 @@ from typing import Tuple, Optional, List, Union
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from math import floor
 
-# --- 你已有的单样本清洗函数，保持不变（示意） ---
+# --- Existing single-sample cleaning function (kept for illustration) ---
 def fastp_clean(fq1: str, fq2: Optional[str], sample: str, work_dir: str, threads: int = 4) -> Tuple[str, str]:
     """
-    读取 fq1,fq2，输出到 {work_dir}/fastp/{sample}_1.clean.fq.gz / _2.clean.fq.gz
-    若已存在则跳过，返回输出路径。
+    Process fq1/fq2 and write outputs to {work_dir}/fastp/{sample}_1.clean.fq.gz / _2.clean.fq.gz.
+    Skip when outputs already exist and return the output paths.
     """
     outdir = Path(work_dir) / "fastp"
     outdir.mkdir(parents=True, exist_ok=True)
@@ -34,18 +34,18 @@ def fastp_clean(fq1: str, fq2: Optional[str], sample: str, work_dir: str, thread
     subprocess.run(cmd, check=True)
     return str(out1), str(out2)
 
-# ---------- 新增：顶层子任务执行器（可被进程池 pickling） ----------
+# ---------- New: top-level worker that ProcessPool can pickle ----------
 def _fastp_run_one_triplet(srr: str, fq1: str, fq2: Optional[str], work_dir: str, fastp_threads: int, retries: int):
     """
-    三元组模式：直接用传入的 fq1/fq2。
-    返回：(sample, out1, out2, status)  status in {"OK","SKIP"}
+    Triplet mode: use the provided fq1/fq2 directly.
+    Return (sample, out1, out2, status) where status ∈ {"OK", "SKIP"}.
     """
     outdir = Path(work_dir) / "fastp"
     out1 = outdir / f"{srr}_1.clean.fq.gz"
     out2 = outdir / f"{srr}_2.clean.fq.gz"
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # 已存在直接跳过
+    # Skip when outputs already exist.
     if out1.exists() and out2.exists():
         return (srr, str(out1), str(out2), "SKIP")
 
@@ -60,13 +60,13 @@ def _fastp_run_one_triplet(srr: str, fq1: str, fq2: Optional[str], work_dir: str
 
 def _fastp_run_one_from_outdir(srr: str, outdir: str, work_dir: str, fastp_threads: int, retries: int):
     """
-    SRR 列表模式：从 outdir/{SRR}_1.fastq / _2.fastq 推断输入。
+    SRR list mode: infer inputs from outdir/{SRR}_1.fastq / _2.fastq.
     """
     fq1 = str(Path(outdir) / f"{srr}_1.fastq")
     fq2 = str(Path(outdir) / f"{srr}_2.fastq")
     return _fastp_run_one_triplet(srr, fq1, fq2, work_dir, fastp_threads, retries)
 
-# ---------- 这里是你的并行 API：最小改动以兼容两种输入 ----------
+# ---------- Parallel API compatible with both input formats ----------
 def fastp_clean_parallel(
     samples: List[Union[str, Tuple[str, str, Optional[str]]]],
     outdir: str,
@@ -77,11 +77,11 @@ def fastp_clean_parallel(
     backend: str = "process",
 ):
     """
-    并行批量运行 fastp_clean。
-    - 输入可为：
-        1) SRR 列表：["SRRxxxx", ...]  将从 outdir/{SRR}_1.fastq/_2.fastq 读取
-        2) 三元组列表：[ (srr, fq1, fq2), ... ]  直接使用指定的 FASTQ 路径
-    - 输出：{"success": [(srr, out1, out2, status), ...], "failed": [(srr, err), ...]}
+    Run fastp_clean in parallel.
+    - Accepted inputs:
+        1) SRR list ["SRRxxxx", ...] reading from outdir/{SRR}_1.fastq/_2.fastq
+        2) Triplet list [(srr, fq1, fq2), ...] using explicit FASTQ paths
+    - Output: {"success": [(srr, out1, out2, status), ...], "failed": [(srr, err), ...]}
     """
     total_cores = os.cpu_count() or 8
     if max_workers is None:
@@ -91,7 +91,7 @@ def fastp_clean_parallel(
     print(f"[INFO] fastp path: {shutil.which('fastp')}")
     print(f"[INFO] Python exec: {sys.executable}")
 
-    # 判定输入模式
+    # Detect the input mode.
     def is_triplet(x):
         return isinstance(x, (tuple, list)) and (2 <= len(x) <= 3)
 
@@ -102,7 +102,7 @@ def fastp_clean_parallel(
 
     with Executor(max_workers=max_workers) as ex:
         if use_triplets:
-            # items: List[(srr, fq1, fq2)]
+            # items: List[(srr, fq1, fq2)].
             futs = {
                 ex.submit(_fastp_run_one_triplet, srr, fq1, (fq2 if len(item) > 2 else None),
                           work_dir, fastp_threads, retries): srr
@@ -110,7 +110,7 @@ def fastp_clean_parallel(
                 for srr, fq1, fq2 in [item if len(item) == 3 else (item[0], item[1], None)]
             }
         else:
-            # items: List[str]  (SRR)
+            # items: List[str] (SRR identifiers).
             futs = {
                 ex.submit(_fastp_run_one_from_outdir, srr, outdir, work_dir, fastp_threads, retries): srr
                 for srr in samples

@@ -1,13 +1,13 @@
 """
-OmicVerse 增强比对管道
-支持多种输入类型：SRA数据、FASTQ数据
+OmicVerse enhanced alignment pipeline.
+Supports multiple input types: SRA data and FASTQ data.
 """
 
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass, fields
-# 设置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 from .alignment import Alignment, AlignmentConfig
 from .iseq_handler import ISeqHandler
@@ -19,9 +19,9 @@ from .tools_check import check_all_tools, check_tool_availability
 __version__ = "2.0.0"
 __author__ = "Zhi Luo"
 
-# 主要导出类
+# Public exports
 __all__ = [
-    # 核心类
+    # Core classes
     'Alignment',
     'AlignmentConfig',
     'EnhancedAlignmentConfig',
@@ -31,18 +31,18 @@ __all__ = [
     'geo_data_preprocess',
     'fq_data_preprocess',
 
-    # 配置相关
+    # Configuration helpers
     'load_config',
     'get_example_configs',
 
-    # 工具检查
+    # Tool check helpers
     'check_all_tools',
     'check_tool_availability',
 
 
 ]
 
-# 便捷的工厂函数
+# Convenience factory functions
 def create_pipeline(
     config_source=None,
     *,
@@ -52,23 +52,23 @@ def create_pipeline(
     input_type: str = "auto"
 ) -> Alignment:
     """
-    创建管道实例的便捷函数
+    Convenience helper for instantiating a pipeline.
 
     Args:
-        config_source: 配置来源（文件路径或配置字典）
-        work_dir: 工作目录
-        threads: 线程数
-        genome: 基因组类型
-        input_type: 输入类型
+        config_source: Config source (file path or dictionary).
+        work_dir: Working directory.
+        threads: Thread count.
+        genome: Genome identifier.
+        input_type: Input type string.
 
     Returns:
-        Alignment实例
+        Alignment instance.
     """
     if config_source is not None:
         from .pipeline_config import load_config
         config = load_config(config_source)
     else:
-        # 使用基础配置
+        # Use the default configuration.
         config = AlignmentConfig(
             work_root=Path(work_dir),
             threads=threads,
@@ -87,8 +87,8 @@ def geo_data_preprocess(
     threads: int = 8,
     genome: str = "human",
     sample_prefix: str = None,
-    download_method: str = "prefetch",  # 新增：下载方法，可选 "prefetch" 或 "iseq"
-    # iseq 特定参数
+    download_method: str = "prefetch",  # Download method: "prefetch" or "iseq".
+    # iseq-specific parameters
     iseq_gzip: bool = True,
     iseq_aspera: bool = False,
     iseq_database: str = "sra",
@@ -97,38 +97,38 @@ def geo_data_preprocess(
     iseq_threads: int = 8
 ) -> dict:
     """
-    一键运行分析的便捷函数
+    Convenience helper that runs the analysis end-to-end.
 
     Args:
-        input_data: 输入数据
-        config: 配置对象或配置源
-        input_type: 输入类型
-        with_align: 是否进行比对
-        work_dir: 工作目录
-        threads: 线程数
-        genome: 基因组类型
-        sample_prefix: 样本前缀（仅对公司数据）
-        download_method: 下载方法，可选 "prefetch" (默认) 或 "iseq"
-            - prefetch: 使用 NCBI SRA Toolkit (prefetch + fasterq-dump)
-            - iseq: 使用 iseq 工具 (支持多数据库、Aspera 加速、直接下载 gzip 等)
-        iseq_gzip: 下载gzip格式的FASTQ文件 (iseq模式有效, 默认: True)
-        iseq_aspera: 使用Aspera加速下载 (iseq模式有效, 默认: False)
-        iseq_database: 选择数据库: ena, sra (iseq模式有效, 默认: ena)
-        iseq_protocol: 选择协议: ftp, https (iseq模式有效, 默认: ftp)
-        iseq_parallel: 并行下载数 (iseq模式有效, 默认: 4)
-        iseq_threads: 处理线程数 (iseq模式有效, 默认: 8)
+        input_data: Input payload.
+        config: Configuration object or source.
+        input_type: Input type string.
+        with_align: Whether to perform alignment.
+        work_dir: Working directory.
+        threads: Thread count.
+        genome: Genome identifier.
+        sample_prefix: Sample ID prefix (vendor data only).
+        download_method: Download method, "prefetch" (default) or "iseq".
+            - prefetch: Use NCBI SRA Toolkit (prefetch + fasterq-dump).
+            - iseq: Use the iseq tool (multi-database, Aspera acceleration, gzip downloads, etc.).
+        iseq_gzip: Download FASTQ as gzip (iseq mode only, default True).
+        iseq_aspera: Enable Aspera acceleration (iseq mode only, default False).
+        iseq_database: Database to target: ena or sra (iseq mode only, default ena).
+        iseq_protocol: Protocol to use: ftp or https (iseq mode only, default ftp).
+        iseq_parallel: Number of parallel downloads (iseq mode only, default 4).
+        iseq_threads: Threads for iseq processing (iseq mode only, default 8).
 
     Returns:
-        分析结果
+        Analysis result dictionary.
     """
-    # 创建或加载配置
+    # Create or load the configuration.
     if config is None:
         pipeline_config = AlignmentConfig(
             work_root=Path(work_dir),
             threads=threads,
             genome=genome,
-            download_method=download_method,  # 新增：下载方法
-            # iseq 特定配置
+            download_method=download_method,  # Download method selection.
+            # iseq-specific configuration.
             iseq_gzip=iseq_gzip,
             iseq_aspera=iseq_aspera,
             iseq_database=iseq_database,
@@ -139,33 +139,33 @@ def geo_data_preprocess(
     elif isinstance(config, (str, Path)):
         from .pipeline_config import load_config
         pipeline_config = load_config(config)
-        # 确保下载方法被设置
+        # Ensure the download method attribute exists.
         if not hasattr(pipeline_config, 'download_method'):
             pipeline_config.download_method = download_method
     else:
         pipeline_config = config
-        # 确保下载方法被设置
+        # Ensure the download method attribute exists.
         if not hasattr(pipeline_config, 'download_method'):
             pipeline_config.download_method = download_method
 
-    # 创建管道
+    # Create the pipeline.
     pipeline = Alignment(pipeline_config)
 
-    # 检查工具
+    # Check tool availability.
     if not check_all_tools():
         raise RuntimeError("Required tools are not available. Please install missing tools.")
 
-    # 如果使用iseq下载方法，额外检查axel（Jupyter Lab环境适配）
+    # When using the iseq download method, ensure axel is available (Jupyter Lab compatibility).
     if download_method == "iseq":
         from . import tools_check as _tools_check
-        logger.info("检测到使用iseq下载方法，正在检查axel依赖...")
+        logger.info("Detected download_method=iseq; verifying axel dependency…")
         axel_available, axel_path = _tools_check.check_axel(auto_install=True)
         if not axel_available:
-            logger.warning(f"axel不可用: {axel_path}。iseq可能无法正常工作，但将继续尝试...")
+            logger.warning(f"axel unavailable: {axel_path}. iseq may not function fully, continuing anyway…")
         else:
-            logger.info(f"axel可用: {axel_path}")
+            logger.info(f"axel available: {axel_path}")
 
-    # 运行分析
+    # Execute the pipeline.
     return pipeline.run_pipeline(
         input_data=input_data,
         input_type=input_type,
@@ -173,23 +173,23 @@ def geo_data_preprocess(
         sample_prefix=sample_prefix
     )
 
-# 配置模板
+# Configuration template
 def get_config_template():
-    """获取配置模板"""
+    """Retrieve configuration templates."""
     return {
-        "基础SRA分析": {
+        "Basic SRA analysis": {
             "work_dir": "work_sra",
             "threads": 16,
             "genome": "human",
             "input_type": "sra"
         },
-        "FASTQ文件分析": {
+        "FASTQ file analysis": {
             "work_dir": "work_fastq",
             "threads": 12,
             "genome": "mouse",
             "input_type": "fastq"
         },
-        "快速测试": {
+        "Quick test": {
             "work_dir": "work_test",
             "threads": 4,
             "genome": "human",
@@ -197,20 +197,20 @@ def get_config_template():
         }
     }
 
-# 版本信息
+# Version information
 def get_version_info():
-    """获取版本信息"""
+    """Retrieve version information."""
     return {
         "version": __version__,
         "author": __author__,
         "features": [
-            "支持SRA数据下载和处理",
-            "支持公司FASTQ数据",
-            "支持直接FASTQ文件输入",
-            "自动输入类型检测",
-            "统一样本ID管理",
-            "增强的工具检查和安装指引",
-            "灵活的配置系统"
+            "Supports SRA data download and processing",
+            "Supports vendor FASTQ data",
+            "Supports direct FASTQ file input",
+            "Automatic input type detection",
+            "Unified sample ID management",
+            "Enhanced tool checks and installation guidance",
+            "Flexible configuration system"
         ]
     }
 
@@ -226,7 +226,7 @@ def _resolve_acfg(
     config: Optional[Union[AlignmentConfig, Dict[str, Any], str, Path]] = None,
     **overrides
 ) -> tuple[AlignmentConfig, list]:
-    # 1) 直接对象
+    # 1) Direct object
     if isinstance(config, AlignmentConfig):
         ok, unknown = _filter_to_acfg_fields(overrides)
         for k, v in ok.items():
@@ -239,7 +239,7 @@ def _resolve_acfg(
 
     base: Dict[str, Any] = {}
 
-    # 2) 配置文件路径
+    # 2) Config file path
     if isinstance(config, (str, Path)):
         try:
             from .pipeline_config import load_config
@@ -255,7 +255,7 @@ def _resolve_acfg(
         else:
             raise TypeError(f"Unsupported config file content type: {type(loaded)}")
 
-    # 3) dict / None 合并 overrides
+    # 3) Merge overrides with dict / None
     if isinstance(config, dict):
         base.update(config)
     base.update(overrides or {})
@@ -272,8 +272,9 @@ def _resolve_acfg(
 
 def _pair_fastqs_flat(fastq_files: List[str]) -> List[Tuple[str, str, Optional[str]]]:
     """
-    将扁平 fastq 列表配对为 [(sample_id, R1, R2), ...]
-    规则：优先识别 _R1/_R2、.R1/.R2、_1/_2；其余视为单端（只有 R1）。
+    Pair a flat FASTQ list into [(sample_id, R1, R2), ...].
+
+    Rule priority: detect _R1/_R2, .R1/.R2, _1/_2; otherwise treat as single-end (R1 only).
     """
     if not fastq_files:
         raise ValueError("No fastq files provided.")
@@ -303,7 +304,7 @@ def _pair_fastqs_flat(fastq_files: List[str]) -> List[Tuple[str, str, Optional[s
         elif stem.endswith("_2"):
             sample_id, role = stem[:-2], "R2"
         else:
-            # 视为单端
+            # Treat as single-end
             sample_id, role = stem, "R1"
 
         if role == "R1":
@@ -323,66 +324,66 @@ def fq_data_preprocess(
     fastq_files: List[str],
     *,
     config: Optional[Union[AlignmentConfig, Dict[str, Any], str, Path]] = None,
-    input_type: str = "fastq",         # 与 geo 风格一致，默认即 fastq
+    input_type: str = "fastq",         # Align with geo style, defaults to fastq
     with_align: bool = True,
     work_dir: str = "work",
     threads: int = 8,
     genome: str = "human",
-    sample_prefix: str = None,         # 为了接口一致性保留，不在此函数中使用
-    # 保持与 geo 一致的扩展方式：其余 AlignmentConfig 字段通过 kwargs 覆盖
+    sample_prefix: str = None,         # Retained for interface consistency; not used in this function
+    # Preserve geo-style extensibility: override other AlignmentConfig fields via kwargs
     **kwargs
 ) -> dict:
     """
-    与 geo_data_preprocess 同风格的 FASTQ 入口：
-    - 不做 prefetch / fasterq-dump；
-    - 接受扁平 fastq 列表并自动配对；
-    - 后续步骤（fastp / STAR / featureCounts）与 geo 一致；
-    - 返回结构与 geo_data_preprocess 一致。
+    FASTQ entry point following the same style as geo_data_preprocess:
+    - Skip prefetch / fasterq-dump
+    - Accept a flat FASTQ list and auto pair
+    - Subsequent steps (fastp / STAR / featureCounts) match geo
+    - Returns the same structure as geo_data_preprocess
     """
-    # 形参 + kwargs → 覆盖 AlignmentConfig，同 geo 的策略
+    # Parameters + kwargs -> override AlignmentConfig, same strategy as geo
     overrides = dict(
         work_root=Path(work_dir),
         threads=threads,
         genome=genome,
-        # 可以用 kwargs 继续覆盖 fastp_enabled / memory / gtf / simple_counts 等
+        # kwargs can override fastp_enabled / memory / gtf / simple_counts, etc.
     )
     overrides.update(kwargs or {})
 
-    # 解析最终配置
+    # Resolve final configuration
     pipeline_config, unknown = _resolve_acfg(config, **overrides)
     if unknown:
         logger.warning(f"[fq_data_preprocess] Ignored unknown config keys: {unknown}")
 
-    # 工具检查（与 geo 对齐）
+    # Tool check (aligned with geo)
     if not check_all_tools():
         raise RuntimeError("Required tools are not available. Please install missing tools.")
 
-    # 创建管道
+    # Create pipeline
     pipeline = Alignment(pipeline_config)
 
-    # 扁平列表 → 配对：(sample_id, fq1, fq2?) 列表
-    # 复用 Alignment 内部的解析逻辑（会用 iseq_handler 以 R1/R2 规则配对）
+    # Flat list -> paired list: (sample_id, fq1, fq2?) entries
+    # Reuse Alignment internal parsing logic (uses iseq_handler R1/R2 pairing rules)
     fastq_pairs: List[Tuple[str, Path, Optional[Path]]] = pipeline._parse_fastq_input(fastq_files)
 
-    # 运行：直接从 FASTQ 进入统一流程（fastp → STAR → featureCounts）
+    # Run: start from FASTQ and enter the unified workflow (fastp -> STAR -> featureCounts)
     return pipeline.run_from_fastq(
         fastq_pairs,
         with_align=with_align
     )
 
 if __name__ == "__main__":
-    # 打印版本信息
+    # Print version information
     version_info = get_version_info()
     print(f"OmicVerse Enhanced Pipeline v{version_info['version']}")
     print(f"Author: {version_info['author']}")
-    print("\n主要功能:")
+    print("\nKey features:")
     for feature in version_info['features']:
         print(f"  - {feature}")
 
-    print("\n使用示例:")
+    print("\nUsage examples:")
     print("  from bulk._alignment import run_analysis")
     print("  result = run_analysis('SRR123456', work_dir='my_analysis')")
-    print("\n  # 公司数据")
+    print("\n  # Vendor data")
     print("  result = run_analysis('/path/to/fastq/files', input_type='company')")
-    print("\n  # FASTQ文件")
+    print("\n  # FASTQ files")
     print("  result = run_analysis(['sample1_R1.fastq.gz', 'sample1_R2.fastq.gz'], input_type='fastq')")

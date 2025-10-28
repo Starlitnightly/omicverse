@@ -50,7 +50,7 @@ __all__ = [
 
     # Alignment
     "Alignment", 
-    "AlignmentConfig"
+    "AlignmentConfig",
     "geo_data_preprocess",
     "fq_data_preprocess",
 

@@ -13,7 +13,7 @@ except ImportError:
 def _fqdump_one(srr: str, outdir: str, fqdump_bin: str, threads: int, mem_gb: int, do_gzip: bool):
     os.makedirs(outdir, exist_ok=True)
     env = merged_env()
-    # fasterq-dump 输出 .fastq（未压缩）
+    # fasterq-dump emits uncompressed .fastq files.
     cmd = [
         fqdump_bin, srr, "-p", "-O", outdir,
         "-e", str(threads), "--mem", f"{mem_gb}G", "--split-files"
@@ -21,13 +21,13 @@ def _fqdump_one(srr: str, outdir: str, fqdump_bin: str, threads: int, mem_gb: in
     print(">>", " ".join(cmd))
     subprocess.run(cmd, check=True, env=env)
 
-    # 产物探测
+    # Detect produced FASTQ files.
     fq1 = os.path.join(outdir, f"{srr}_1.fastq")
     fq2 = os.path.join(outdir, f"{srr}_2.fastq")
     if not (os.path.exists(fq1) and os.path.exists(fq2)):
         raise FileNotFoundError(f"fasterq outputs missing for {srr} in {outdir}")
 
-    # 可选：gzip 压缩并做 md5 校验
+    # Optional: gzip compression with MD5 validation.
     if do_gzip:
         import hashlib, gzip, shutil as _sh
         for p in (fq1, fq2):
@@ -35,7 +35,7 @@ def _fqdump_one(srr: str, outdir: str, fqdump_bin: str, threads: int, mem_gb: in
             if not os.path.exists(gz):
                 with open(p, "rb") as f_in, gzip.open(gz, "wb") as f_out:
                     _sh.copyfileobj(f_in, f_out)
-                # 简单完整性：再打开一次读头若干字节
+                # Simple integrity check: read the header again.
                 with gzip.open(gz, "rb") as f_chk:
                     _ = f_chk.read(128)
                 os.remove(p)
@@ -66,16 +66,16 @@ def _work_one_fasterq(
     gzip_output: bool,
     retries: int = 3,
 ) -> tuple[str, Path, Path]:
-    # 1) 输出和临时目录
+    # 1) Output and temporary directories.
     out_dir = out_root / srr
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir = tmp_root / srr
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2) 自动推断 prefetch 目录（同级目录下）
+    # 2) Auto-detect the prefetch directory (peer directory).
     prefetch_root = out_root.parent / "prefetch"
 
-    # 3) 兼容 .sra / .sralite
+    # 3) Handle both .sra and .sralite inputs.
     local_sra = None
     for ext in [".sra", ".sralite"]:
         candidate = prefetch_root / srr / f"{srr}{ext}"
@@ -83,7 +83,7 @@ def _work_one_fasterq(
             local_sra = candidate
             break
 
-    # 4) 选择输入令牌
+    # 4) Choose the input token.
     input_token = str(local_sra) if local_sra else srr
     cand_dirs = (out_dir, out_root)
     stems = {srr}
@@ -102,21 +102,21 @@ def _work_one_fasterq(
                     if _have(a) and _have(b):
                         return a, b
         return None
-    # ---------------- 早退 1：如果要求 gzip，且 .gz 成对已存在 -> 直接返回 ----------------
+    # ---------------- Early exit 1: gzip requested and paired .gz already present -> return ----------------
     if gzip_output:
         hit_gz = _find_pair(ext_gz=True)
         if hit_gz:
             fq_a, fq_b = hit_gz
-            print(f"[SKIP] {srr}: paired .fastq.gz 已存在，跳过 fasterq-dump。")
+            print(f"[SKIP] {srr}: paired .fastq.gz already exists; skipping fasterq-dump.")
             return srr, fq_a, fq_b
 
-    # ---------------- 早退 2：若 .fastq 成对已存在 ----------------
+    # ---------------- Early exit 2: paired .fastq already present ----------------
     hit_plain = _find_pair(ext_gz=False)
     if hit_plain:
         fq_a, fq_b = hit_plain
         if gzip_output:
-            # 只做 gzip（不再调用 fasterq-dump）
-            print(f"[INFO] {srr}: 检测到未压缩 .fastq，start gzip step.")
+            # Only perform gzip (skip fasterq-dump).
+            print(f"[INFO] {srr}: found uncompressed .fastq, starting gzip step.")
             for src in (fq_a, fq_b):
                 if src.exists() and src.suffix == ".fastq":
                     _run(["gzip", "-f", str(src)])
@@ -124,9 +124,9 @@ def _work_one_fasterq(
             fq_b = fq_b.with_suffix(".fastq.gz")
             if not (_have(fq_a) and _have(fq_b)):
                 raise RuntimeError(f"gzip step did not produce gz files for {srr}")
-            print(f"[SKIP] {srr}: 已完成 gzip 压缩，跳过 fasterq-dump。")
+            print(f"[SKIP] {srr}: gzip already completed; skipping fasterq-dump.")
         else:
-            print(f"[SKIP] {srr}: paired .fastq exists，jump fasterq-dump。")
+            print(f"[SKIP] {srr}: paired .fastq exists; skipping fasterq-dump.")
         return srr, fq_a, fq_b
 
 
@@ -165,23 +165,23 @@ def _work_one_fasterq(
             sleep *= 2
 
     # Validate raw fastq results exist
-    # 产物定位：兼容输入为 .sra 时的 "SRR.sra_1.fastq" 命名 
-    # 候选目录：SRR 子目录 + 根目录
+    # Locate outputs: support names like "SRR.sra_1.fastq" when the input is .sra.
+    # Candidate directories: SRR subdirectory plus the output root.
     cand_dirs = (out_dir, out_root)
 
-    # 生成候选前缀：通常是 srr；若 input_token 是 ".sra" 路径，则补充它的 stem 作为候选
+    # Candidate prefixes: typically the SRR; include the stem of input_token when it is a .sra path.
     stems = {srr}
     try:
-        stems.add(Path(input_token).stem)  # 可能是 "SRR123", 也可能是 "SRR123.sra"
+        stems.add(Path(input_token).stem)  # Could be "SRR123" or "SRR123.sra".
     except Exception:
         pass
 
     def _find_pair(ext_gz: bool) -> tuple[Path, Path] | None:
-        """在 cand_dirs × stems 中寻找成对的 _1/_2.fastq(.gz)"""
+        """Search the cand_dirs × stems space for paired _1/_2.fastq(.gz) files."""
         suffix = ".fastq.gz" if ext_gz else ".fastq"
         for base in cand_dirs:
             for st in stems:
-                # 兼容 "SRR_1" 与 "SRR.sra_1"
+                # Accept both "SRR_1" and "SRR.sra_1" naming variants.
                 for name1 in (f"{st}_1{suffix}", f"{st}.sra_1{suffix}"):
                     name2 = name1.replace("_1", "_2", 1)
                     a, b = base / name1, base / name2
@@ -192,7 +192,7 @@ def _work_one_fasterq(
     hit = _find_pair(ext_gz=True) or _find_pair(ext_gz=False)
 
     if not hit:
-        # 再检查是否出现单端（不符合预期）
+        # Detect unexpected single-end outputs.
         for base in cand_dirs:
             for st in stems:
                 for single in (base / f"{st}.sra.fastq", base / f"{st}.fastq"):
@@ -205,7 +205,7 @@ def _work_one_fasterq(
         raise RuntimeError(f"fasterq outputs missing for {srr} (searched: {searched})")
 
     fq_a, fq_b = hit
-    # 若需要 gzip 且目前是 .fastq，就地压缩
+    # If gzip is requested and the outputs are still .fastq, compress them in place.
     if gzip_output and fq_a.suffix == ".fastq":
         for src in (fq_a, fq_b):
             if src.exists() and src.suffix == ".fastq":
@@ -220,17 +220,17 @@ def _work_one_fasterq(
 def fasterq_batch(
     srr_list: Sequence[str],
     out_root: str | Path,
-    threads: int = 8,          # ← “同时处理多少个 SRR”（映射到 max_workers）
-    gzip_output: bool = True,  # 是否对 fastq 输出 gzip 压缩
+    threads: int = 8,          # Number of SRRs to process concurrently (maps to max_workers).
+    gzip_output: bool = True,  # Whether to gzip the FASTQ output.
     mem: str = "8G",
     tmp_root: str | Path = "work/tmp",
     backend: str = "process",
-    threads_per_job: int = 24,       # 每个 SRR 内部的 fasterq-dump 线程数
+    threads_per_job: int = 24,       # fasterq-dump threads per SRR.
 ) ->list[tuple[str, Path, Path]]:
     """
-    适配器：把类传来的参数映射到 fasterq_dump_parallel，并把 dict 结果转成 list[tuple]
+    Adapter that maps pipeline parameters to fasterq_dump_parallel and returns a list[tuple].
     """
-    # 解析 mem (支持 "4G"/"8G" 这种形式；不匹配时默认 8G)
+    # Parse mem (accept "4G"/"8G" formats; default to 8G when parsing fails).
     try:
         mem_gb = int(str(mem).upper().rstrip("G"))
     except Exception:
@@ -241,7 +241,7 @@ def fasterq_batch(
         out_root=str(out_root),
         threads_per_job=threads_per_job,
         mem_gb=mem_gb,
-        max_workers=int(threads),      # ← 并发度
+        max_workers=int(threads),      # Concurrency level.
         gzip_output=bool(gzip_output),
         backend=backend,
         tmp_root=str(tmp_root),
@@ -251,11 +251,11 @@ def fasterq_batch(
     errs = res.get("failed", [])
 
     if errs:
-        # 你也可以选择仅告警不抛错
+        # Optionally warn instead of raising.
         msgs = "; ".join([f"{s}: {m}" for s, m in errs])
         raise RuntimeError(f"fasterq_batch failed for {len(errs)} samples: {msgs}")
 
-    # 转换为 [(srr, Path, Path)]，并按输入顺序排序
+    # Convert to [(srr, Path, Path)] in the original input order.
     out_pairs = []
     for srr in srr_list:
         if srr in by_srr:
@@ -282,7 +282,7 @@ def fasterq_dump_parallel(
     out_root.mkdir(parents=True, exist_ok=True)
     tmp_root.mkdir(parents=True, exist_ok=True)
 
-    # 解析二进制绝对路径（关键！）
+    # Resolve absolute paths to the fasterq binaries (critical!).
     fqdump_bin = which_or_find("fasterq-dump")
     print(f"[INFO] fasterq-dump: {fqdump_bin}")
 
@@ -325,7 +325,7 @@ def fasterq_dump_parallel(
 
 def _parse_mem_gb(mem_per_job: str | int) -> int:
     """
-    兼容传入 '4G' / '8g' / 4 / '4' 等形式，统一返回整数 GB。
+    Accept formats like '4G' / '8g' / 4 / '4' and normalize to integer GB.
     """
     if isinstance(mem_per_job, int):
         return mem_per_job
@@ -337,95 +337,42 @@ def _parse_mem_gb(mem_per_job: str | int) -> int:
     return int(float(s))
 
 
-'''
-def fasterq_batch(
-    srr_list: Sequence[str],
-    out_root: str | Path,
-    threads: int = 24,
-    gzip_output: bool = True,
-    mem: str = "8G",
-    tmp_root: str = "work/tmp",
-    retries: int = 2,
-) -> list[Tuple[str, Path, Path]]:
-    """
-    批量执行 fasterq-dump。
-    参数：
-        srr_list : SRR 编号列表
-        out_root : 输出目录（FASTQ 文件存放位置）
-        threads  : 每个样本使用的线程数
-        gzip_output : 是否对输出进行 gzip 压缩
-        mem : fasterq-dump 内存参数（默认 4G）
-        tmp_root : 临时目录
-        retries : 单样本失败重试次数
-    返回：
-        [(srr, fq1_path, fq2_path), ...]
-    """
-    out_root = Path(out_root)
-    out_root.mkdir(parents=True, exist_ok=True)
-
-    results = []
-    for srr in srr_list:
-        srr, fq1, fq2, status = fasterq_dump_parallel(
-            srr=srr,
-            outdir=str(out_root),
-            threads=threads,
-            mem=mem,
-            retries=retries,
-            tmp_root=str(tmp_root),
-        )
-
-        # 如果需要压缩输出（可选）
-        if gzip_output:
-            import gzip, shutil
-            for fq in [fq1, fq2]:
-                fq_path = Path(fq)
-                if not fq_path.with_suffix(fq_path.suffix + ".gz").exists():
-                    with open(fq_path, "rb") as f_in, gzip.open(str(fq_path) + ".gz", "wb") as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-                    fq_path.unlink()
-            fq1 = str(Path(fq1).with_suffix(".fastq.gz"))
-            fq2 = str(Path(fq2).with_suffix(".fastq.gz"))
-
-        results.append((srr, Path(fq1), Path(fq2)))
-
-    return results
-    '''
-
+                
 def make_fasterq_step(
-    outdir_pattern: str = "work/fasterq",   # 产出目录（与之前一致）
+    outdir_pattern: str = "work/fasterq",   # Output directory pattern (unchanged from prior behavior).
     threads_per_job: int = 24,
-    mem_per_job: str = "4G",               # 兼容旧写法，内部转成 int GB
+    mem_per_job: str = "4G",               # Back-compat string; converted to integer GB internally.
     max_workers: int | None = None,
-    retries: int = 2,                      # 新实现未用到，先保留以免破坏接口
-    tmp_root: str = "work/tmp",            # 同上
+    retries: int = 2,                      # Placeholder (unused) retained to avoid interface breakage.
+    tmp_root: str = "work/tmp",            # Same rationale as above.
     backend: str = "process",
-    compress_after: bool = True,           # 映射到 gzip_output
-    compress_threads: int = 8,             # 新实现未用到，先保留
+    compress_after: bool = True,           # Maps onto gzip_output.
+    compress_threads: int = 8,             # Placeholder (unused) retained for compatibility.
 ):
     """
-    输入：srr_list（由 pipeline 传入）
-    输出：work/fasterq/{SRR}_1.fastq.gz, {SRR}_2.fastq.gz
-    验证：两端均存在且 size > 0
+    Inputs: srr_list values supplied by the pipeline.
+    Outputs: work/fasterq/{SRR}_1.fastq.gz and {SRR}_2.fastq.gz.
+    Validation: both FASTQ files must exist and be non-empty.
     """
     def _cmd(srr_list: List[str], logger=None) -> List[Tuple[str, str, str]]:
         os.makedirs(outdir_pattern, exist_ok=True)
 
-        # 映射参数到新的 fasterq_dump_parallel
+        # Map parameters to the newer fasterq_dump_parallel helper.
         mem_gb = _parse_mem_gb(mem_per_job)
 
         ret = fasterq_dump_parallel(
             srr_list=srr_list,
-            out_root=outdir_pattern,         # 对应 outdir_pattern
+            out_root=outdir_pattern,         # Match the configured output pattern.
             threads_per_job=threads_per_job,
-            mem_gb=mem_gb,                   # 统一成 int GB
+            mem_gb=mem_gb,                   # Normalized integer GB.
             max_workers=max_workers,
-            gzip_output=compress_after,      # compress_after -> gzip_output
+            gzip_output=compress_after,      # Map compress_after to gzip_output.
             backend=backend,
         )
-        # 规范化输出为 [(srr, fq1, fq2), ...]，供 pipeline 使用
+        # Normalize outputs into [(srr, fq1, fq2), ...] for pipeline consumption.
         by_srr = ret.get("by_srr", {})
         products = [(srr, paths[0], paths[1]) for srr, paths in by_srr.items()]
-        # 若需要，你也可以在此打印 ret["failed"] 以便日志观察
+        # Optionally surface ret["failed"] to the logs.
         if logger and ret.get("failed"):
             for srr, err in ret["failed"]:
                 logger.error(f"[fasterq] {srr} failed: {err}")
@@ -433,7 +380,7 @@ def make_fasterq_step(
 
     return {
         "name": "fasterq",
-        "command": _cmd,  # 接收 srr_list
+        "command": _cmd,  # Accepts a list of SRRs.
         "outputs": [f"{outdir_pattern}" + "/{SRR}_1.fastq.gz",
                     f"{outdir_pattern}" + "/{SRR}_2.fastq.gz"],
         "validation": lambda fs: all(os.path.exists(f) and os.path.getsize(f) > 0 for f in fs),
