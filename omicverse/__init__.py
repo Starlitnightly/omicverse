@@ -115,11 +115,3 @@ try:
     from . import agent  # noqa: F401
 except Exception:  # pragma: no cover - optional
     agent = None
-
-# Expose ov_skill_seeker subpackage on the top-level package for attribute resolution
-# This helps tools like pytest's monkeypatch resolve dotted paths such as
-# "omicverse.ov_skill_seeker.docs_scraper.scrape" via getattr on the parent package.
-try:  # pragma: no cover - import-time wiring only
-    from . import ov_skill_seeker as ov_skill_seeker  # re-export subpackage
-except Exception:
-    ov_skill_seeker = None  # type: ignore[assignment]
