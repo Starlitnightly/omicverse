@@ -205,7 +205,7 @@ def aggregate_peaks_10x(adata_atac, peak_annot_file, linkage_file, peak_dist=200
                         enhancer_dict[gene].append(peak)
 
     # aggregate to genes
-    adata_atac_X_copy = adata_atac.X.A
+    adata_atac_X_copy = adata_atac.X.toarray()
     gene_mat = np.zeros((adata_atac.shape[0], len(promoter_genes)))
     var_names = adata_atac.var_names.to_numpy()
     for i, gene in tqdm(enumerate(promoter_genes), total=len(promoter_genes)):

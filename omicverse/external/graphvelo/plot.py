@@ -474,19 +474,19 @@ def scatter_plot_mm(adata,
             else adata[:, gene].layers['unspliced'].copy()
         s = adata[:, gene].layers['Ms'].copy() if 'Ms' in adata.layers \
             else adata[:, gene].layers['spliced'].copy()
-        u = u.A if sp.issparse(u) else u
-        s = s.A if sp.issparse(s) else s
+        u = u.toarray() if sp.issparse(u) else u
+        s = s.toarray() if sp.issparse(s) else s
         u, s = np.ravel(u), np.ravel(s)
         if 'ATAC' not in adata.layers.keys() and \
                 'Mc' not in adata.layers.keys():
             raise ValueError('Cannot find ATAC data in adata layers.')
         elif 'ATAC' in adata.layers.keys():
             c = adata[:, gene].layers['ATAC'].copy()
-            c = c.A if sp.issparse(c) else c
+            c = c.toarray() if sp.issparse(c) else c
             c = np.ravel(c)
         elif 'Mc' in adata.layers.keys():
             c = adata[:, gene].layers['Mc'].copy()
-            c = c.A if sp.issparse(c) else c
+            c = c.toarray() if sp.issparse(c) else c
             c = np.ravel(c)
 
         if velocity_arrows:
@@ -1202,7 +1202,7 @@ def gene_trend(adata,
         total=gn,
         desc="Fitting trends using GAM",):
         x = adata[:, gene].layers[layer]
-        x = x.A.flatten() if sp.issparse(x) else x.flatten()
+        x = x.toarray().flatten() if sp.issparse(x) else x.flatten()
 
         ### GAM fitting
         term  =s(
