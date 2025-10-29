@@ -824,139 +824,13 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def _seeker_impl(
-    links: Union[str, List[str]],
-    *,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    max_pages: int = 30,
-    target: str = "skills",
-    out_dir: Optional[Union[str, Path]] = None,
-    package: bool = False,
-    package_dir: Optional[Union[str, Path]] = None,
-) -> Dict[str, str]:
-    """Implementation of seeker functionality with lazy imports and optional deps guard."""
-    from typing import Union, List, Optional, Dict
-    from pathlib import Path
-    import json
-    import tempfile
-
-    # Lazy import builders first
-    try:
-        from omicverse.ov_skill_seeker.link_builder import build_from_link
-        from omicverse.ov_skill_seeker.unified_builder import build_from_config
-    except ImportError as e:
-        raise ImportError(
-            f"ov_skill_seeker module not found: {e}. "
-            "Ensure the skill seeker components are properly installed."
-        ) from e
-
-    # Step 1: Compute output_root from target parameter
-    if target == "skills":
-        output_root = Path.cwd() / ".claude" / "skills"
-    else:  # target == "output"
-        if out_dir is not None:
-            output_root = Path(out_dir)
-        else:
-            output_root = Path.cwd() / "output"
-
-    output_root.mkdir(parents=True, exist_ok=True)
-
-    # Determine which builder to use based on input
-    if isinstance(links, str):
-        # Step 2: Single link → use link_builder with selective dependency check
-        # Guard bs4 dependency for docs scraping
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError as e:
-            raise ImportError(
-                f"Missing optional dependency: beautifulsoup4. "
-                "Install optional extras: pip install -e .[skillseeker]"
-            ) from e
-
-        # Call build_from_link with correct signature (no unsupported kwargs)
-        skill_dir = build_from_link(
-            links,
-            output_root,
-            name=name,
-            description=description,
-            max_pages=max_pages,
-        )
-    else:
-        # Step 3: Multi-link → use unified_builder with temp config file
-        # Guard dependencies based on what sources will be used
-        # For documentation sources, we need bs4
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError as e:
-            raise ImportError(
-                f"Missing optional dependency: beautifulsoup4. "
-                "Install optional extras: pip install -e .[skillseeker]"
-            ) from e
-
-        # Create minimal config dict
-        config_dict = {
-            "name": name or "multi-source-skill",
-            "description": description or f"Skill built from {len(links)} sources",
-            "sources": [{"type": "documentation", "base_url": url, "max_pages": max_pages} for url in links]
-        }
-
-        # Write to temp JSON file
-        temp_config_fd, temp_config_path = tempfile.mkstemp(suffix=".json", dir=output_root)
-        try:
-            with os.fdopen(temp_config_fd, 'w') as f:
-                json.dump(config_dict, f, indent=2)
-
-            # Call build_from_config with correct signature (config_path as Path, output_root)
-            skill_dir = build_from_config(
-                Path(temp_config_path),
-                output_root,
-            )
-        finally:
-            # Clean up temp config file
-            try:
-                Path(temp_config_path).unlink()
-            except Exception:
-                pass  # Best effort cleanup
-
-    # Step 4: Implement packaging logic
-    slug = skill_dir.name  # skill_dir is output_root / slug
-
-    if package:
-        # Determine zip output location
-        if package_dir is not None:
-            zip_base = Path(package_dir)
-        elif out_dir is not None:
-            zip_base = Path(out_dir)
-        else:
-            zip_base = Path.cwd() / "output"
-
-        zip_base.mkdir(parents=True, exist_ok=True)
-        zip_path = zip_base / f"{slug}.zip"
-
-        # Import and call _zip_dir
-        from omicverse.agent import _zip_dir
-        _zip_dir(skill_dir, zip_path)
-
-        return {
-            'slug': slug,
-            'skill_dir': str(skill_dir),
-            'zip': str(zip_path)
-        }
-    else:
-        return {
-            'slug': slug,
-            'skill_dir': str(skill_dir)
-        }
-
-
 def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: Optional[str] = None) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
-
+    
     This function creates and returns a smart agent that can execute OmicVerse functions
     based on natural language descriptions.
-
+    
     Parameters
     ----------
     model : str, optional
@@ -965,37 +839,33 @@ def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: O
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional
         Custom API endpoint. If not provided, will use default for the provider
-
+        
     Returns
     -------
     OmicVerseAgent
         Configured agent instance ready for use
-
+        
     Examples
     --------
     >>> import omicverse as ov
     >>> import scanpy as sc
-    >>>
+    >>> 
     >>> # Create agent instance
     >>> agent = ov.Agent(model="gpt-4o-mini", api_key="your-key")
-    >>>
+    >>> 
     >>> # Load data
     >>> adata = sc.datasets.pbmc3k()
-    >>>
+    >>> 
     >>> # Use agent for quality control
     >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
-    >>>
-    >>> # Use agent for preprocessing
+    >>> 
+    >>> # Use agent for preprocessing  
     >>> adata = agent.run("preprocess with 2000 highly variable genes", adata)
-    >>>
+    >>> 
     >>> # Use agent for clustering
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)
     """
     return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint)
-
-
-# Attach seeker as a function attribute to Agent
-Agent.seeker = _seeker_impl
 
 
 # Export the main functions
