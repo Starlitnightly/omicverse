@@ -9,7 +9,7 @@ What it does
 - Package skills into uploadable `.zip` archives
 - Create a new skill from a single link (same‑domain crawl)
 - Build a new skill from a unified JSON config (docs + GitHub + PDFs)
-- Jupyter API: `ov.Agent.seeker(...)` for notebook workflows
+- Jupyter API: `ov.agent.seeker(...)` for notebook workflows
 
 Install optional extras (for full builders)
 - pip install -e .[skillseeker]
@@ -43,17 +43,15 @@ CLI usage (from repo root)
 Jupyter API (notebook friendly)
 - Single link
   >>> import omicverse as ov
-  >>> ov.Agent.seeker("https://example.com/docs/feature", name="New Analysis", package=True)
+  >>> ov.agent.seeker("https://example.com/docs/feature", name="New Analysis", package=True)
   {'slug': 'new-analysis', 'skill_dir': '.../.claude/skills/new-analysis', 'zip': '.../output/new-analysis.zip'}
 
 - Multiple links to output directory
-  >>> ov.Agent.seeker([
+  >>> ov.agent.seeker([
   ...   "https://docs.site-a.com/",
   ...   "https://docs.site-b.com/guide"
   ... ], name="multi-source", target="output", package=True)
   {'slug': 'multi-source', 'skill_dir': '.../output/multi-source', 'zip': '.../output/multi-source.zip'}
-
-Note: `ov.agent.seeker()` is deprecated. Use `ov.Agent.seeker()` instead.
 
 Unified config format (JSON)
 - Example (save as `my_unified_config.json`):
