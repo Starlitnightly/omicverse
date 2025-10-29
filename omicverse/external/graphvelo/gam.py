@@ -154,7 +154,7 @@ def fit_gene_trend(
         total=gn,
         desc="Fitting trends using GAM",):
         x = adata[:, gene].layers[layer]
-        x = x.A.flatten() if sp.issparse(x) else x.flatten()
+        x = x.toarray().flatten() if sp.issparse(x) else x.flatten()
 
         ### GAM fitting
         term  =s(
