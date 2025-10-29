@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "$#"
+if [ "$#" -lt 14 ]; then
+    echo ""
+    echo "USAGE: bash run_pybp.bsh -x file.x -x.type file.x.type -ref file.ref -ref.file.type file.ref.type -ref.data.type data.type -species hs|mm -out out_prefix --file.cell.type file.cell"
+    echo ""
+    exit 1
+fi
+
+ncores=32
+
+# Change directory to the location of the bash script
+cd "$(dirname "$0")"
+
+echo "Using: python main.py -n $ncores $@"
+python main.py -n $ncores "$@"
