@@ -7,6 +7,7 @@ Design goals:
 - Minimal dependencies: requests + beautifulsoup4 (optional)
 - Conservative: same-domain crawl with a max_pages cap
 - Extracts headings, text, and code blocks into lightweight markdown
+- Security: validates URLs, sanitizes content, prevents traversal attacks
 
 Note: Network access depends on runtime environment. This module is safe to
 import when dependencies are missing; functions will raise informative errors.
@@ -15,6 +16,8 @@ import when dependencies are missing; functions will raise informative errors.
 from typing import Iterable, List, Set, Tuple
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
+
+from .security import validate_url, sanitize_filename, sanitize_html_content, SecurityError
 
 
 def _require_deps():
@@ -39,6 +42,9 @@ def _normalize_url(url: str) -> str:
 
 def _extract_markdown(html: str, url: str) -> str:
     from bs4 import BeautifulSoup
+
+    # Sanitize HTML before processing
+    html = sanitize_html_content(html)
 
     soup = BeautifulSoup(html, "html.parser")
     title = soup.find("title")
@@ -71,9 +77,20 @@ def scrape(base_url: str, max_pages: int = 50) -> List[Tuple[str, str]]:
     """Crawl same-domain pages from base_url up to max_pages.
 
     Returns a list of (filename, markdown_content) tuples.
+
+    Raises
+    ------
+    SecurityError
+        If the base_url fails security validation
     """
     _require_deps()
     import requests
+
+    # Validate the base URL
+    try:
+        validate_url(base_url)
+    except SecurityError as e:
+        raise SecurityError(f"Invalid base URL: {e}")
 
     base_url = _normalize_url(base_url)
     netloc = urlparse(base_url).netloc
@@ -87,6 +104,14 @@ def scrape(base_url: str, max_pages: int = 50) -> List[Tuple[str, str]]:
         url = _normalize_url(url)
         if url in seen:
             continue
+
+        # Validate each URL before visiting
+        try:
+            validate_url(url)
+        except SecurityError:
+            # Skip invalid URLs silently
+            continue
+
         seen.add(url)
         try:
             resp = requests.get(url, timeout=10)
@@ -97,7 +122,9 @@ def scrape(base_url: str, max_pages: int = 50) -> List[Tuple[str, str]]:
 
         md = _extract_markdown(resp.text, url)
         slug = urlparse(url).path.strip("/").replace("/", "-") or "index"
-        filename = f"docs-{len(results)+1:03d}-{slug}.md"
+        # Sanitize the filename
+        safe_slug = sanitize_filename(slug)
+        filename = f"docs-{len(results)+1:03d}-{safe_slug}.md"
         results.append((filename, md))
 
         # Discover links

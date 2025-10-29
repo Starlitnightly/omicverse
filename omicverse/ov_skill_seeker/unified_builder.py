@@ -6,6 +6,8 @@ Unified Skill Builder for OmicVerse.
 Given a JSON config (validated by config_validator), this module gathers
 content from documentation, GitHub, and PDFs into a skill directory with
 SKILL.md and reference markdown files.
+
+Security: validates output paths and sanitizes generated filenames.
 """
 
 import json
@@ -15,6 +17,7 @@ from typing import Dict, List, Tuple
 
 from .config_validator import validate_config
 from omicverse.utils.skill_registry import SkillRegistry  # for slug helpers only
+from .security import validate_output_path, sanitize_filename, SecurityError
 
 
 def _slugify(value: str) -> str:
@@ -43,7 +46,9 @@ class BuildConfig:
 def _write_files(target_dir: Path, files: List[Tuple[str, str]]) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     for fname, content in files:
-        (target_dir / fname).write_text(content, encoding="utf-8")
+        # Sanitize filename before writing
+        safe_fname = sanitize_filename(fname)
+        (target_dir / safe_fname).write_text(content, encoding="utf-8")
 
 
 def _generate_skill_md(slug: str, title: str, description: str, sources: List[Dict]) -> str:
@@ -74,8 +79,16 @@ def _generate_skill_md(slug: str, title: str, description: str, sources: List[Di
 
 
 def build_from_config(config_path: Path, output_root: Path) -> Path:
+    # Validate output_root to prevent directory traversal
+    try:
+        output_root = validate_output_path(output_root, base_dir=Path.cwd(), create=True)
+    except SecurityError as e:
+        raise SecurityError(f"Invalid output directory: {e}")
+
     cfg = BuildConfig.from_json(config_path)
-    slug = _slugify(cfg.name)
+    raw_slug = _slugify(cfg.name)
+    # Sanitize the slug to ensure it's a safe directory name
+    slug = sanitize_filename(raw_slug)
     skill_dir = output_root / slug
 
     # Collect references
@@ -99,8 +112,14 @@ def build_from_config(config_path: Path, output_root: Path) -> Path:
                 references.append((f"github-error.md", f"Error extracting {repo}: {exc}"))
         elif t == "pdf":
             from .pdf_scraper import extract as pdf_extract
+            # Validate and expand PDF path
             p = Path(src["path"]).expanduser()
             try:
+                # Ensure PDF path is within reasonable bounds (not absolute traversal)
+                if p.is_absolute():
+                    # For absolute paths, just check they exist and are readable
+                    if not p.exists() or not p.is_file():
+                        raise SecurityError(f"PDF path does not exist or is not a file: {p}")
                 references += pdf_extract(p)
             except Exception as exc:
                 references.append((f"pdf-error.md", f"Error extracting {p}: {exc}"))
