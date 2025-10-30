@@ -10,12 +10,17 @@ nav:
 - Installation: Installation_guild.md
 - Tutorial:
     - Bulk:
-        - Batch correction in Bulk RNA-seq or microarray data: Tutorials-bulk/t_bulk_combat.ipynb
-        - Different expression analysis: Tutorials-bulk/t_deg.ipynb
-        - Different expression analysis with DEseq2: Tutorials-bulk/t_deseq2.ipynb
-        - Protein-Protein interaction (PPI) analysis by String-db: Tutorials-bulk/t_network.ipynb
-        - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
-        - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
+        - Preprocessing:
+            - Batch correction in Bulk RNA-seq or microarray data: Tutorials-bulk/t_bulk_combat.ipynb
+        - Downstream:
+            - Different expression analysis: Tutorials-bulk/t_deg.ipynb
+            - Different expression analysis with DEseq2: Tutorials-bulk/t_deseq2.ipynb
+            - Protein-Protein interaction (PPI) analysis by String-db: Tutorials-bulk/t_network.ipynb
+            - WGCNA (Weighted gene co-expression network analysis) analysis: Tutorials-bulk/t_wgcna.ipynb
+        - Deconvolution:
+            - Bulk deconvolution with reference scRNA-seq: Tutorials-bulk/t_decov_bulk.ipynb
+        - Others:
+            - TCGA database preprocess: Tutorials-bulk/t_tcga.ipynb
     - Single:
         - Alignment:
             - Alignment of single-cell RNA-seq data: Tutorials-single/t_alignment_1k.ipynb
@@ -100,6 +105,7 @@ nav:
 plugins:
   - mkdocs-jupyter:
       include_requirejs: true
+      include_source: true
   - mermaid2
   - glightbox
   - plotly

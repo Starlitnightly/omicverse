@@ -1,6 +1,7 @@
 import anndata
 import numpy as np
 import pandas as pd
+from scipy.sparse import issparse
 from tqdm import tqdm
 from numpy.random import choice
 import numpy as np
@@ -34,9 +35,8 @@ def generate_simulated_data(sc_data, outname=None,
 
     print('You are using H5AD format data, please make sure "CellType" occurs in the adata.obs')
     print("transformer to array")
-    if isinstance(sc_data.X, np.ndarray):
-        pass
-    else:
+    sc_data=sc_data.copy()
+    if issparse(sc_data.X):
         sc_data.X = sc_data.X.toarray()
         
     print("transformer to dataframe")

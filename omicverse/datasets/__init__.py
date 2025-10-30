@@ -87,5 +87,8 @@ from ._datasets import (
     hematopoiesis,
     hematopoiesis_raw,
     human_tfs,
-    multi_brain_5k
+    multi_brain_5k,
+
+    decov_bulk_covid_bulk,
+    decov_bulk_covid_single,
 )
