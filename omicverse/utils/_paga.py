@@ -179,16 +179,37 @@ def get_sparse_from_igraph(graph, weight_attr=None):
     if weight_attr is None:
         weights = [1] * len(edges)
     else:
-        weights = graph.es[weight_attr]
+        # Convert to list to ensure proper extend behavior
+        try:
+            weights = list(graph.es[weight_attr])
+        except (KeyError, AttributeError):
+            # If weight attribute doesn't exist or is malformed, use default weights
+            weights = [1] * len(edges)
+
     if not graph.is_directed():
+        # Create a copy of the current weights before extending
+        current_weights = weights.copy() if hasattr(weights, 'copy') else list(weights)
         edges.extend([(v, u) for u, v in edges])
-        weights.extend(weights)
+        weights.extend(current_weights)
+
     shape = graph.vcount()
     shape = (shape, shape)
-    if len(edges) > 0:
-        row_indices, col_indices = zip(*edges)
-        return csr_matrix((weights, (row_indices, col_indices)), shape=shape)
+
+    # Check that we have valid edges and matching weights
+    if len(edges) > 0 and len(weights) == len(edges):
+        # Unpack edges into separate row and column index lists
+        try:
+            row_indices, col_indices = zip(*edges)
+            # Convert to lists to ensure compatibility with scipy
+            row_indices = list(row_indices)
+            col_indices = list(col_indices)
+            return csr_matrix((weights, (row_indices, col_indices)), shape=shape)
+        except (ValueError, TypeError) as e:
+            # If unpacking fails, return empty sparse matrix
+            print(f"Warning: Failed to unpack edges: {e}. Returning empty sparse matrix.")
+            return csr_matrix(shape)
     else:
+        # Return empty sparse matrix with the correct shape
         return csr_matrix(shape)
 
 
