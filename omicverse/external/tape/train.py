@@ -109,9 +109,9 @@ def predict(test_x, genename, celltypes, samplename,
             for i in tqdm(range(len(test_x))):
                 x = test_x[i,:].reshape(1,-1)
                 if model_name is not None and model is None:
-                    model = torch.load(model_name + ".pth")
+                    model = torch.load(model_name + ".pth", weights_only=False)
                 elif model is not None and model_name is None:
-                    model = torch.load("model.pth")
+                    model = torch.load("model.pth", weights_only=False)
                 decoder_parameters = [{'params': [p for n, p in model.named_parameters() if 'decoder' in n]}]
                 encoder_parameters = [{'params': [p for n, p in model.named_parameters() if 'encoder' in n]}]
                 optimizerD = torch.optim.Adam(decoder_parameters, lr=1e-4)
@@ -132,9 +132,9 @@ def predict(test_x, genename, celltypes, samplename,
 
         elif mode == 'overall':
             if model_name is not None and model is None:
-                model = torch.load(model_name + ".pth")
+                model = torch.load(model_name + ".pth", weights_only=False)
             elif model is not None and model_name is None:
-                model = torch.load("model.pth")
+                model = torch.load("model.pth", weights_only=False)
             decoder_parameters = [{'params': [p for n, p in model.named_parameters() if 'decoder' in n]}]
             encoder_parameters = [{'params': [p for n, p in model.named_parameters() if 'encoder' in n]}]
             optimizerD = torch.optim.Adam(decoder_parameters, lr=1e-4)
@@ -149,7 +149,7 @@ def predict(test_x, genename, celltypes, samplename,
 
     else:
         if model_name is not None and model is None:
-            model = torch.load(model_name+".pth")
+            model = torch.load(model_name+".pth", weights_only=False)
         elif model is not None and model_name is None:
             model = model
         print('Predict cell fractions without adaptive training')

@@ -10,7 +10,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
                   datatype='counts', genelenfile=None, d_prior=None,
                   mode='overall', adaptive=True,
                   save_model_name=None, sparse=True,
-                  batch_size=128, epochs=128, seed=0):
+                  batch_size=128, epochs=128, seed=0,scale=True):
     """
     :param necessary_data: for single-cell data, txt file and dataframe are supported. for simulated data, file location
                            and the h5ad variable are supported. for a trained model, model location(saved with pth) and
@@ -57,7 +57,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
             raise Exception('Please give the correct input')
     else:
         if type(necessary_data) is pd.DataFrame:
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=5000, d_prior=d_prior, sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=2000,  sparse=sparse)
 
         elif type(necessary_data) is anndata.AnnData:
             simudata = necessary_data
@@ -67,9 +67,27 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
         else:
             raise Exception('Please give the correct input')
 
+    if type(real_bulk) is pd.DataFrame:
+        real_bulk=real_bulk 
+    elif type(real_bulk) is anndata.AnnData:
+        real_bulk=real_bulk.to_df()
+    else:
+        raise Exception('Please give the correct input')
+
+    if scale:
+        ## Min-Max Scaling
+        from sklearn.preprocessing import MinMaxScaler
+        scaler = MinMaxScaler()
+        simudata.X = scaler.fit_transform(simudata.X)
+        real_bulk_values = scaler.fit_transform(real_bulk.values)
+        real_bulk = pd.DataFrame(real_bulk_values, columns=real_bulk.columns, index=real_bulk.index)
+
+
     train_x, train_y, test_x, genename, celltypes, samplename = \
-        ProcessInputData(simudata, real_bulk, sep=sep, datatype=datatype, genelenfile=genelenfile,
-                         variance_threshold=variance_threshold, scaler=scaler)
+        ProcessInputData(simudata, real_bulk, sep=sep, datatype='counts')
+        #ProcessInputData(simudata, real_bulk, sep=sep, datatype=datatype, genelenfile=genelenfile,
+        #                 variance_threshold=variance_threshold, scaler=scaler)
+    #print(simudata.to_df().head())
     print('training data shape is ', train_x.shape, '\ntest data shape is ', test_x.shape)
     if save_model_name is not None:
         reproducibility(seed)
@@ -100,7 +118,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
         return Sigm, Pred
 
 def ScadenDeconvolution(necessary_data, real_bulk, sep='\t', sparse=True,
-                        batch_size=128, epochs=128):
+                        batch_size=128, epochs=128, scale=True,):
     if type(necessary_data) is str:
         postfix = necessary_data.split('.')[-1]
         if postfix == 'txt':
@@ -115,7 +133,11 @@ def ScadenDeconvolution(necessary_data, real_bulk, sep='\t', sparse=True,
             raise Exception('Please give the correct input')
     else:
         if type(necessary_data) is pd.DataFrame:
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=5000, sparse=sparse)
+            #from ..bulk2single.OmicsTweezer.simulation import generate_simulated_data as generate_simulated_data_omics_tweezer
+            #necessary_data=anndata.AnnData(necessary_data)
+            #necessary_data.obs['CellType']=necessary_data.obs.index.tolist()
+            #simudata = generate_simulated_data_omics_tweezer(sc_data=necessary_data, samplenum=2000, sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=2000, sparse=sparse)
 
         elif type(necessary_data) is anndata.AnnData:
             simudata = necessary_data
@@ -125,8 +147,24 @@ def ScadenDeconvolution(necessary_data, real_bulk, sep='\t', sparse=True,
         else:
             raise Exception('Please give the correct input')
 
+    if type(real_bulk) is pd.DataFrame:
+        real_bulk=real_bulk 
+    elif type(real_bulk) is anndata.AnnData:
+        real_bulk=real_bulk.to_df()
+    else:
+        raise Exception('Please give the correct input')
+
+    if scale:
+        ## Min-Max Scaling
+        from sklearn.preprocessing import MinMaxScaler
+        scaler = MinMaxScaler()
+        simudata.X = scaler.fit_transform(simudata.X)
+        real_bulk_values = scaler.fit_transform(real_bulk.values)
+        real_bulk = pd.DataFrame(real_bulk_values, columns=real_bulk.columns, index=real_bulk.index)
+
     train_x, train_y, test_x, genename, celltypes, samplename = \
         ProcessInputData(simudata, real_bulk, sep=sep, datatype='counts')
+    #print(simudata.to_df().head())
     print('training data shape is ', train_x.shape, '\ntest data shape is ', test_x.shape)
     pred = test_scaden(train_x,train_y,test_x,batch_size=batch_size,epochs=epochs)
     pred = pd.DataFrame(pred, columns=celltypes, index=samplename)
