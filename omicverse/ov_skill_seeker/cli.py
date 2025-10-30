@@ -287,8 +287,15 @@ def main(argv: List[str] | None = None) -> int:
         if not packaged:
             print("No skills packaged.")
 
-    # If no flags provided, show help
-    if not any([args.list, args.validate, args.package, args.package_all]):
+    # If no actionable flags provided, show help
+    if not any([
+        args.list,
+        args.validate,
+        args.package,
+        args.package_all,
+        args.create_from_link,
+        args.build_config,
+    ]):
         parser.print_help()
 
     return 0
