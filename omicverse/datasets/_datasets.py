@@ -842,6 +842,31 @@ def create_mock_dataset(
     return adata
 
 
+def decov_bulk_covid_bulk(
+    url: str = "https://figshare.com/ndownloader/files/59192924",
+    filename: str = "COVID_PBMC_bulk.h5ad"
+) -> AnnData:
+    """COVID-19 PBMC bulk data from Decov et al. 2020.
+    
+    This data consists of 10,000 cells × 15,000 genes.
+    """
+    print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC bulk data{Colors.ENDC}")
+    adata = get_adata(url, filename)
+    return adata
+
+def decov_bulk_covid_single(
+    url: str = "https://figshare.com/ndownloader/files/59192927",
+    filename: str = "COVID_PBMC_single.h5ad"
+) -> AnnData:
+    """COVID-19 PBMC single-cell data from Decov et al. 2020.
+    
+    This data consists of 10,000 cells × 15,000 genes.
+    """
+    print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC single-cell data{Colors.ENDC}")
+    adata = get_adata(url, filename)
+    return adata
+
+
 def pbmc3k(processed: bool = False) -> AnnData:
     """
     Load PBMC 3k dataset from URL.
