@@ -105,7 +105,30 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
 def cluster(adata:anndata.AnnData,method:str='leiden',
             use_rep:str='X_pca',random_state:int=1024,
             n_components=None, **kwargs):
-    
+    r"""Perform clustering using various algorithms including Leiden, Louvain, GMM, K-means, and scICE.
+
+    Arguments:
+        adata: AnnData object containing single-cell data.
+        method: Clustering algorithm to use - 'leiden', 'louvain', 'GMM', 'kmeans', 'mclust', 'schist', or 'scICE'. Default: 'leiden'.
+        use_rep: Representation in adata.obsm to use for clustering. Default: 'X_pca'.
+        random_state: Random seed for reproducibility. Default: 1024.
+        n_components: Number of clusters (required for GMM and kmeans). Default: None.
+        **kwargs: Additional arguments passed to the clustering algorithm.
+
+    Returns:
+        For scICE method, returns the scICE model object. Otherwise returns None and adds cluster labels to adata.obs.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Leiden clustering (recommended)
+        >>> sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50)
+        >>> ov.utils.cluster(adata, method='leiden', resolution=1.0)
+        >>> # Gaussian Mixture Model clustering
+        >>> ov.utils.cluster(adata, method='GMM', n_components=10)
+        >>> # scICE ensemble clustering
+        >>> model = ov.utils.cluster(adata, method='scICE', resolution_range=(5,20))
+    """
+
     if method=='leiden':
         sc.tl.leiden(adata,**kwargs)
         add_reference(adata,'leiden','clustering with Leiden')
@@ -270,6 +293,32 @@ def filtered(adata:anndata.AnnData,
     related=["utils.cluster", "single.cNMF", "pl.embedding"]
 )
 class LDA_topic(object):
+    r"""Latent Dirichlet Allocation (LDA) topic modeling for single-cell data using MIRA.
+
+    Arguments:
+        adata: AnnData object containing single-cell data.
+        feature_type: Type of features to use. Default: 'expression'.
+        highly_variable_key: Key in adata.var for highly variable features. Default: 'highly_variable_features'.
+        layers: Layer in adata.layers containing count data. Default: 'counts'.
+        batch_key: Column in adata.obs for batch correction. Default: None.
+        learning_rate: Learning rate for optimization. Default: 1e-3.
+        ondisk: Whether to use on-disk datasets for large data. Default: False.
+
+    Returns:
+        LDA_topic: Object with methods for topic modeling analysis.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Basic LDA topic modeling
+        >>> LDA_obj = ov.utils.LDA_topic(adata, feature_type='expression',
+        ...                              layers='counts')
+        >>> # Determine optimal number of topics
+        >>> LDA_obj.plot_topic_contributions(6)
+        >>> # Fit model and predict topics
+        >>> LDA_obj.predicted(13)
+        >>> # Advanced classification with Random Forest
+        >>> LDA_obj.get_results_rfc(adata, use_rep='X_pca', LDA_threshold=0.4)
+    """
 
     def _apply_torch_compatibility_fix(self):
         """
