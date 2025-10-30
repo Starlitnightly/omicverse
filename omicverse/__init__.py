@@ -109,6 +109,7 @@ from ._settings import settings, generate_reference_table
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from anndata import AnnData
 
 # Expose agent helpers (e.g., ov.agent.seeker)
 try:
