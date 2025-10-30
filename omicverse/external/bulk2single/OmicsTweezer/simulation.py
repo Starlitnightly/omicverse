@@ -21,7 +21,7 @@ def set_seed(seed=42):
 set_seed()
 
 def generate_simulated_data(sc_data, outname=None,
-                            d_prior=None,
+                            d_prior=None,celltype_key='CellType',
                             n=500, samplenum=5000,
                             random_state=None, sparse=True, sparse_prob=0.5,
                             rare=False, rare_percentage=0.4,miss_value = 0):
@@ -39,7 +39,7 @@ def generate_simulated_data(sc_data, outname=None,
         
     print("transformer to dataframe")
     
-    sc_data = pd.DataFrame(sc_data.X, index=sc_data.obs["CellType"], columns=sc_data.var.index)
+    sc_data = pd.DataFrame(sc_data.X, index=sc_data.obs[celltype_key], columns=sc_data.var.index)
     sc_data.dropna(inplace=True)
     sc_data['celltype'] = sc_data.index
     sc_data.index = range(len(sc_data))
@@ -124,7 +124,7 @@ def generate_simulated_data(sc_data, outname=None,
     sample = np.zeros((prop.shape[0], sc_data.shape[1]))
     allcellname = celltype_groups.keys()
     print('Sampling cells to compose pseudo-bulk data')
-    for i, sample_prop in tqdm(enumerate(cell_num)):
+    for i, sample_prop in enumerate(tqdm(cell_num)):
         for j, cellname in enumerate(allcellname):
             select_index = choice(celltype_groups[cellname], size=int(sample_prop[j]), replace=True)
             #print(select_index)
@@ -255,7 +255,7 @@ def generate_simulated_data_spatial(sc_data, outname=None,
     sample = np.zeros((prop.shape[0], sc_data.shape[1]))
     allcellname = celltype_groups.keys()
     print('Sampling cells to compose pseudo-bulk data')
-    for i, sample_prop in tqdm(enumerate(cell_num)):
+    for i, sample_prop in enumerate(tqdm(cell_num)):
         for j, cellname in enumerate(allcellname):
            
             select_index = choice(celltype_groups[cellname], size=int(sample_prop[j]), replace=True)

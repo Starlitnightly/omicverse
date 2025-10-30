@@ -49,7 +49,8 @@ def adaptive_stage(model, data, optimizerD, optimizerE, step=10, max_iter=5):
     ori_pred = ori_pred.detach()
     model.state = 'train'
     
-    for k in range(max_iter):
+    from tqdm import tqdm
+    for k in tqdm(range(max_iter)):
         model.train()
         for i in range(step):
             reproducibility(seed=0)

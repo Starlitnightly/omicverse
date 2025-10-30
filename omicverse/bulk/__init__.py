@@ -44,6 +44,7 @@ from ._chm13 import get_chm13_gene,find_chm13_gene
 from ._Deseq2 import pyDEG,deseq2_normalize,estimateSizeFactors,estimateDispersions,Matrix_ID_mapping,data_drop_duplicates_index
 from ._tcga import pyTCGA
 from ._combat import batch_correction
+from ._decov import Deconvolution
 
 __all__ = [
     # Gene co-expression analysis
@@ -82,4 +83,7 @@ __all__ = [
     
     # Batch correction
     'batch_correction',
+
+    # Deconvolution
+    'Deconvolution',
 ]
