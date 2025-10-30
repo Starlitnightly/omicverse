@@ -78,7 +78,6 @@ class Prism:
             cell_state_labels = cell_type_labels
 
         print("number of cells in each cell state")
-        print(pd.Series(cell_state_labels).value_counts().sort_values(ascending = False))
         if np.min(pd.Series(cell_state_labels).value_counts()) < 20:
             print("recommend to have sufficient number of cells in each cell state")
         
@@ -145,6 +144,67 @@ class Prism:
             key,
             mixture
         )
+
+    def new_anndata(reference_adata,
+                    mixture,
+                    cell_type_key,
+                    cell_state_key=None,
+                    key=None,
+                    input_type='count.matrix',
+                    outlier_cut=0.01,
+                    outlier_fraction=0.1,
+                    pseudo_min=1E-8):
+        """
+        Create a Prism instance using an AnnData object as the single-cell reference.
+
+        Args:
+            reference_adata: AnnData with cells × genes counts in `.X`.
+            mixture: Bulk mixture expression (DataFrame or array-like).
+            cell_type_key: Column in `reference_adata.obs` with cell type labels.
+            cell_state_key: Optional column in `reference_adata.obs` with cell state labels.
+            key: Optional tumor key passed through to `Prism.new`.
+            input_type: Passed to `Prism.new` (defaults to 'count.matrix').
+            outlier_cut: Passed to `Prism.new`.
+            outlier_fraction: Passed to `Prism.new`.
+            pseudo_min: Passed to `Prism.new`.
+        """
+        try:
+            from anndata import AnnData
+        except ImportError as exc:
+            raise ImportError("Prism.new_anndata requires the `anndata` package.") from exc
+
+        if not isinstance(reference_adata, AnnData):
+            raise TypeError("reference_adata must be an instance of anndata.AnnData.")
+
+        if cell_type_key not in reference_adata.obs.columns:
+            raise KeyError(f"Column '{cell_type_key}' not found in AnnData.obs.")
+
+        if cell_state_key is not None and cell_state_key not in reference_adata.obs.columns:
+            raise KeyError(f"Column '{cell_state_key}' not found in AnnData.obs.")
+
+        # Extract labels from obs
+        cell_type_labels = reference_adata.obs[cell_type_key].tolist()
+        if cell_state_key is None:
+            cell_state_labels = cell_type_labels
+        else:
+            cell_state_labels = reference_adata.obs[cell_state_key].tolist()
+
+        # Convert AnnData matrix to DataFrame (cells × genes)
+        reference_matrix = reference_adata.X
+        reference_matrix = reference_matrix.toarray() if hasattr(reference_matrix, "toarray") else np.array(reference_matrix)
+        reference_df = pd.DataFrame(reference_matrix,
+                                    index=reference_adata.obs_names,
+                                    columns=reference_adata.var_names)
+
+        return Prism.new(reference=reference_df,
+                         input_type=input_type,
+                         cell_type_labels=cell_type_labels,
+                         cell_state_labels=cell_state_labels,
+                         key=key,
+                         mixture=mixture,
+                         outlier_cut=outlier_cut,
+                         outlier_fraction=outlier_fraction,
+                         pseudo_min=pseudo_min)
 
     def run(self, n_cores = 1, update_gibbs = True, gibbs_control = {}, opt_control = {}, fast_mode = False):
 

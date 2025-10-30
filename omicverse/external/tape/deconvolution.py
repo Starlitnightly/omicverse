@@ -10,7 +10,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
                   datatype='counts', genelenfile=None, d_prior=None,
                   mode='overall', adaptive=True,
                   save_model_name=None, sparse=True,
-                  batch_size=128, epochs=128, seed=0,scale=True):
+                  batch_size=128, epochs=128, seed=0,scale=True,pseudobulk_size=2000):
     """
     :param necessary_data: for single-cell data, txt file and dataframe are supported. for simulated data, file location
                            and the h5ad variable are supported. for a trained model, model location(saved with pth) and
@@ -46,7 +46,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
     if type(necessary_data) is str:
         postfix = necessary_data.split('.')[-1]
         if postfix == 'txt':
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=5000, d_prior=d_prior, sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=pseudobulk_size, d_prior=d_prior, sparse=sparse)
 
         elif postfix == 'h5ad':
             simudata = anndata.read_h5ad(necessary_data)
@@ -57,7 +57,7 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
             raise Exception('Please give the correct input')
     else:
         if type(necessary_data) is pd.DataFrame:
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=2000,  sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=pseudobulk_size,  sparse=sparse)
 
         elif type(necessary_data) is anndata.AnnData:
             simudata = necessary_data
@@ -118,11 +118,11 @@ def Deconvolution(necessary_data, real_bulk, sep='\t', variance_threshold=0.98,
         return Sigm, Pred
 
 def ScadenDeconvolution(necessary_data, real_bulk, sep='\t', sparse=True,
-                        batch_size=128, epochs=128, scale=True,):
+                        batch_size=128, epochs=128, scale=True,pseudobulk_size=2000):
     if type(necessary_data) is str:
         postfix = necessary_data.split('.')[-1]
         if postfix == 'txt':
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=5000, sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=pseudobulk_size, sparse=sparse)
 
         elif postfix == 'h5ad':
             simudata = anndata.read_h5ad(necessary_data)
@@ -137,7 +137,7 @@ def ScadenDeconvolution(necessary_data, real_bulk, sep='\t', sparse=True,
             #necessary_data=anndata.AnnData(necessary_data)
             #necessary_data.obs['CellType']=necessary_data.obs.index.tolist()
             #simudata = generate_simulated_data_omics_tweezer(sc_data=necessary_data, samplenum=2000, sparse=sparse)
-            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=2000, sparse=sparse)
+            simudata = generate_simulated_data(sc_data=necessary_data, samplenum=pseudobulk_size, sparse=sparse)
 
         elif type(necessary_data) is anndata.AnnData:
             simudata = necessary_data
