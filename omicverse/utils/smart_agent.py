@@ -19,6 +19,7 @@ import ast
 import textwrap
 import builtins
 import warnings
+import threading
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -774,6 +775,30 @@ Example workflow:
         >>> agent = ov.Agent(model="gpt-4o-mini")
         >>> result = agent.run("quality control with nUMI>500, mito<0.2", adata)
         """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            result_container: Dict[str, Any] = {}
+            error_container: Dict[str, BaseException] = {}
+
+            def _run_in_thread() -> None:
+                try:
+                    result_container["value"] = asyncio.run(self.run_async(request, adata))
+                except BaseException as exc:  # pragma: no cover - propagate to caller
+                    error_container["error"] = exc
+
+            thread = threading.Thread(target=_run_in_thread, name="OmicVerseAgentRunner")
+            thread.start()
+            thread.join()
+
+            if "error" in error_container:
+                raise error_container["error"]
+
+            return result_container.get("value")
+
         return asyncio.run(self.run_async(request, adata))
 
 
