@@ -27,7 +27,24 @@ class omicverseConfig:
         related=["settings.cpu_init", "settings.cpu_gpu_mixed_init", "pp.anndata_to_GPU"]
     )
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):
-        
+        r"""Initialize GPU mode with RAPIDS for accelerated single-cell analysis.
+
+        Arguments:
+            managed_memory: Enable NVIDIA Unified Memory for oversubscription. Default: True.
+            pool_allocator: Enable memory pool allocator for faster allocations. Default: True.
+            devices: GPU device IDs to register. Default: 0.
+
+        Returns:
+            None: Sets the mode to 'gpu' and configures RAPIDS environment.
+
+        Examples:
+            >>> import omicverse as ov
+            >>> # Initialize GPU mode with default settings
+            >>> ov.settings.gpu_init()
+            >>> # Custom GPU initialization
+            >>> ov.settings.gpu_init(managed_memory=False, pool_allocator=True)
+        """
+
         import scanpy as sc
         import cupy as cp
 
@@ -66,6 +83,22 @@ class omicverseConfig:
         related=["settings.gpu_init", "settings.cpu_init", "pp.qc", "pp.preprocess"]
     )
     def cpu_gpu_mixed_init(self):
+        r"""Initialize CPU-GPU mixed mode for accelerated single-cell analysis.
+
+        Arguments:
+            None
+
+        Returns:
+            None: Sets the mode to 'cpu-gpu-mixed' and detects available GPU accelerators.
+
+        Examples:
+            >>> import omicverse as ov
+            >>> # Initialize mixed mode for better performance
+            >>> ov.settings.cpu_gpu_mixed_init()
+            >>> # Use mixed mode with preprocessing
+            >>> ov.settings.cpu_gpu_mixed_init()
+            >>> adata = ov.pp.qc(adata)  # Automatically uses mixed mode
+        """
         print('CPU-GPU mixed mode activated')
         
         # Detect available GPU accelerators for mixed mode

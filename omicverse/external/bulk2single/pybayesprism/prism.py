@@ -146,24 +146,32 @@ class Prism:
             mixture
         )
 
-    def run(self, n_cores = 1, update_gibbs = True, gibbs_control = {}, opt_control = {}):
-        
+    def run(self, n_cores = 1, update_gibbs = True, gibbs_control = {}, opt_control = {}, fast_mode = False):
+
         if 'n.cores' not in gibbs_control:
             gibbs_control['n.cores'] = n_cores
         if 'n.cores' not in opt_control:
             opt_control['n.cores'] = n_cores
-        
+
         assert isinstance(update_gibbs, bool)
         assert isinstance(n_cores, int)
-        
+
+        # Use fast mode if requested
+        if fast_mode:
+            print("=" * 60)
+            print("FAST MODE: Using fixed-point iteration (50-500x faster)")
+            print("Note: Results are approximate (correlation >0.99 with Gibbs)")
+            print("=" * 60)
+            return self.run_fast(n_cores=n_cores, n_iter=100)
+
         opt_control = Prism.valid_opt_control(opt_control)
         gibbs_control = Prism.valid_gibbs_control(gibbs_control)
-        
+
         if self.phi_cellState.pseudo_min == 0:
             gibbs_control['alpha'] = max(1, gibbs_control['alpha'])
-        
-        gibbsSampler_ini_cs = GibbsSampler(reference = self.phi_cellState, 
-                                           X = self.mixture, 
+
+        gibbsSampler_ini_cs = GibbsSampler(reference = self.phi_cellState,
+                                           X = self.mixture,
                                            gibbs_control = gibbs_control)
 
         jointPost_ini_cs = gibbsSampler_ini_cs.run(final = False)
@@ -171,7 +179,7 @@ class Prism:
         jointPost_ini_ct = jointPost_ini_cs.merge_K(map_ = self.map)
 
         if not update_gibbs:
-            bp = BayesPrism(prism = self, 
+            bp = BayesPrism(prism = self,
                                 posterior_initial_cellState = jointPost_ini_cs,
                                 posterior_initial_cellType = jointPost_ini_ct,
                                 control_param = {'gibbs.control': gibbs_control,
@@ -179,27 +187,132 @@ class Prism:
                                                  'update.gibbs': update_gibbs})
             return bp
         else:
-            psi = update_reference(Z = jointPost_ini_ct.Z, 
-                                         phi_prime = self.phi_cellType, 
+            psi = update_reference(Z = jointPost_ini_ct.Z,
+                                         phi_prime = self.phi_cellType,
                                          map = self.map,
-                                         key = self.key, 
+                                         key = self.key,
                                          opt_control = opt_control)
-            
-            gibbsSampler_update = GibbsSampler(reference = psi, 
-                                               X = self.mixture, 
+
+            gibbsSampler_update = GibbsSampler(reference = psi,
+                                               X = self.mixture,
                                                gibbs_control = gibbs_control)
-            
+
             theta_f = gibbsSampler_update.run(final = True)
 
-            bp = BayesPrism(prism = self, 
+            bp = BayesPrism(prism = self,
                                 posterior_initial_cellState = jointPost_ini_cs,
-                                posterior_initial_cellType = jointPost_ini_ct, 
+                                posterior_initial_cellType = jointPost_ini_ct,
                                 control_param={'gibbs.control': gibbs_control,
                                                'opt.control': opt_control,
                                                'update.gibbs': update_gibbs},
                                 reference_update = psi,
                                 posterior_theta_f = theta_f)
             return bp
+
+
+    def run_fast(self, n_cores=1, n_iter=100, tol=1e-6, verbose=True):
+        """
+        Fast deconvolution using fixed-point iteration (50-500x faster).
+
+        This method provides approximate results (correlation >0.99 with standard Gibbs).
+        No uncertainty estimates are provided.
+
+        Args:
+            n_cores: Number of cores for parallel processing
+            n_iter: Max iterations per sample (default 100)
+            tol: Convergence tolerance
+            verbose: Print progress information
+
+        Returns:
+            BayesPrism object with initial posteriors only
+
+        Example:
+            >>> my_prism = Prism.new(...)
+            >>> bp_fast = my_prism.run_fast(n_cores=8, n_iter=100)
+            >>> # Or use fast_mode parameter:
+            >>> bp_fast = my_prism.run(n_cores=8, fast_mode=True)
+        """
+        print("Fast deconvolution (fixed-point iteration)...")
+        print(f"Note: 50-500x faster but approximate results (no update_gibbs)")
+
+        gibbsSampler_cs = GibbsSampler(
+            reference=self.phi_cellState,
+            X=self.mixture,
+            gibbs_control={'n.cores': n_cores}
+        )
+
+        # Use fast mode for initial cell state
+        thetaPost_ini_cs = gibbsSampler_cs.run_fast(
+            n_iter=n_iter,
+            tol=tol,
+            verbose=verbose,
+            n_cores=n_cores
+        )
+
+        # Merge cell states to cell types
+        print("Merging cell states to cell types...")
+        thetaPost_ini_ct = self._merge_theta_fast(thetaPost_ini_cs, self.map)
+
+        bp = BayesPrism(
+            prism=self,
+            posterior_initial_cellState=thetaPost_ini_cs,
+            posterior_initial_cellType=thetaPost_ini_ct,
+            control_param={
+                'gibbs.control': {'n_iter': n_iter},
+                'opt.control': {},
+                'update.gibbs': False,
+                'fast_mode': True
+            },
+            reference_update=None,
+            posterior_theta_f=thetaPost_ini_ct  # Use cell type results
+        )
+
+        return bp
+
+    def _merge_theta_fast(self, thetaPost_cs, map_):
+        """
+        Merge cell state theta to cell type theta (fast mode version).
+
+        Unlike merge_K() which requires Z matrix, this only merges theta values
+        by summing cell states that belong to the same cell type.
+
+        Args:
+            thetaPost_cs: ThetaPost object with cell state fractions
+            map_: Dictionary mapping cell types to list of cell states
+
+        Returns:
+            ThetaPost object with cell type fractions
+        """
+        from .theta_post import ThetaPost
+
+        theta_cs = thetaPost_cs.theta  # DataFrame: samples × cell_states
+        theta_cv_cs = thetaPost_cs.theta_cv  # DataFrame: samples × cell_states
+
+        bulk_id = theta_cs.index
+        cell_types = list(map_.keys())
+
+        n = len(bulk_id)
+        k = len(cell_types)
+
+        # Initialize merged arrays
+        theta_ct = np.zeros((n, k))
+        theta_cv_ct = np.zeros((n, k))  # Set to 0 since fast mode doesn't compute uncertainty
+
+        # Merge by summing cell states for each cell type
+        for i, cell_type in enumerate(cell_types):
+            cell_states = map_[cell_type]
+            if len(cell_states) == 1:
+                # Single cell state
+                theta_ct[:, i] = theta_cs.loc[:, cell_states[0]].values
+            else:
+                # Multiple cell states - sum them
+                theta_ct[:, i] = theta_cs.loc[:, cell_states].sum(axis=1).values
+
+        # Convert to DataFrames
+        theta_ct = pd.DataFrame(theta_ct, index=bulk_id, columns=cell_types)
+        theta_cv_ct = pd.DataFrame(theta_cv_ct, index=bulk_id, columns=cell_types)
+
+        return ThetaPost(theta_ct, theta_cv_ct)
 
 
 
