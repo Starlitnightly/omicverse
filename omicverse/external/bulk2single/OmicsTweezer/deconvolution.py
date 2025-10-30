@@ -55,7 +55,8 @@ def mian(necessary_data, real_bulk ,ot_weight=1,sep='\t', sparse=True,
             raise Exception('Please give the correct input')
 
     train_x, train_y, test_x, genename, celltypes, samplename = \
-        ProcessInputData(simudata, pd.DataFrame(real_bulk.X, columns=real_bulk.var.index), sep=sep, datatype='counts')
+        ProcessInputData(simudata, pd.DataFrame(real_bulk.X, columns=real_bulk.var.index), 
+        sep=sep, datatype='counts')
     print('training data shape is ', train_x.shape, '\ntest data shape is ', test_x.shape)
 
     # Auto-detect if real_bulk has ground truth
@@ -63,7 +64,8 @@ def mian(necessary_data, real_bulk ,ot_weight=1,sep='\t', sparse=True,
     target_type = "simulated" 
     print(f"Target data type: {target_type} (ground truth {'available' if has_ground_truth else 'not available'})")
 
-    pred, groudT = test(train_x,train_y,test_x,real_bulk.obs,celltypes,target_type,ot_weight, batch_size=batch_size,epochs=epochs, device=device)
+    pred, groudT = test(train_x,train_y,test_x,real_bulk.obs,celltypes,target_type,ot_weight, 
+                batch_size=batch_size,epochs=epochs, device=device)
 
     return pred, groudT
 

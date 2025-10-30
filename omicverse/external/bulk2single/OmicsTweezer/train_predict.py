@@ -10,7 +10,7 @@ def train_predict(
     from .deconvolution import mian
     
     ## Sampling Training Samples
-    train_bulk = generate_simulated_data(train_reference,samplenum=num,sparse=False,celltype_key=celltype_key)
+    train_bulk = generate_simulated_data(train_reference,samplenum=num,sparse=True,celltype_key=celltype_key)
     if scale:
         ## Min-Max Scaling
         scaler = MinMaxScaler()

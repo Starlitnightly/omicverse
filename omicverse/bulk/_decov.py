@@ -47,12 +47,59 @@ class Deconvolution(object):
         #self.sc_ref=self.sc_ref.T
         print('......single-cell reference built finished')
 
-        if gpu=='mps' and torch.backends.mps.is_available():
-            print('Note that mps may loss will be nan, used it when torch is supported')
-            self.used_device = torch.device("mps")
-        else:
-            self.used_device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
+        self.used_device = self._select_device(gpu)
         self.history=[]
+
+    def _select_device(self, gpu):
+        """
+        Select computation device based on user input and PyTorch backend availability.
+        Supports CUDA, MPS (Apple Silicon) and CPU.
+        """
+        if isinstance(gpu, torch.device):
+            return gpu
+        mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        if isinstance(gpu, str):
+            gpu_lower = gpu.lower()
+            if gpu_lower == 'mps':
+                if mps_available:
+                    print('Using Apple Metal Performance Shaders (MPS) backend.')
+                    return torch.device('mps')
+                print('MPS backend requested but not available, falling back to CPU.')
+                return torch.device('cpu')
+            if gpu_lower in ('cpu', 'none'):
+                return torch.device('cpu')
+            if gpu_lower.startswith('cuda'):
+                if torch.cuda.is_available():
+                    # Allow formats like 'cuda', 'cuda:0'
+                    return torch.device(gpu_lower)
+                print('CUDA backend requested but not available, falling back to CPU.')
+                return torch.device('cpu')
+            # Unknown string input, try best effort
+            if torch.cuda.is_available():
+                print(f"Unrecognized gpu spec '{gpu}', defaulting to CUDA:0.")
+                return torch.device('cuda:0')
+            if mps_available:
+                print(f"Unrecognized gpu spec '{gpu}', defaulting to MPS.")
+                return torch.device('mps')
+            print(f"Unrecognized gpu spec '{gpu}', defaulting to CPU.")
+            return torch.device('cpu')
+
+        if isinstance(gpu, int):
+            if torch.cuda.is_available():
+                return torch.device(f'cuda:{gpu}')
+            if mps_available:
+                print('CUDA not available, using MPS backend instead.')
+                return torch.device('mps')
+            if gpu >= 0:
+                print('CUDA not available, falling back to CPU.')
+            return torch.device('cpu')
+
+        # Fallback for unexpected types
+        if torch.cuda.is_available():
+            return torch.device('cuda:0')
+        if mps_available:
+            return torch.device('mps')
+        return torch.device('cpu')
 
     def deconvolution(
         self,method='tape',
@@ -94,7 +141,8 @@ class Deconvolution(object):
             from ..external.bulk2single.OmicsTweezer.train_predict import train_predict
             #from ..external.bulk2single.OmicsTweezer.deconvolution import mian
             CellFractionPrediction=train_predict(self.adata_single, self.adata_bulk,
-                            ot_weight=1, num=pseudobulk_size,scale=scale,celltype_key=self.celltype_key)
+                            ot_weight=1, num=pseudobulk_size,scale=scale,celltype_key=self.celltype_key,
+                            device=self.used_device,batch_size=batch_size, epochs=epochs)
         else:
             raise ValueError(f"method {method} not supported")
         return CellFractionPrediction
