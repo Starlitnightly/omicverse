@@ -96,6 +96,12 @@ full = [
   'memento-de'
 ]
 
+skillseeker = [
+  "beautifulsoup4>=4.12",
+  "PyGithub>=2.2",
+  "PyMuPDF>=1.24",
+]
+
 
 [project.urls]
 Github = 'https://github.com/Starlitnightly/omicverse'
@@ -103,3 +109,5 @@ Github = 'https://github.com/Starlitnightly/omicverse'
 [tool.flit.sdist]
 exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
 
+[project.scripts]
+ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
