@@ -10,10 +10,12 @@ def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch.backends, "cudnn") and torch.backends.cudnn.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     print("seed is fixed, seed is {}".format(seed))
 set_seed()
     
@@ -26,7 +28,7 @@ from .simulation import generate_simulated_data
 
 
 def mian(necessary_data, real_bulk ,ot_weight=1,sep='\t', sparse=True,
-                        batch_size=128, epochs=128):
+                        batch_size=128, epochs=128, device=None):
     print("begin")
     if type(necessary_data) is str:
         postfix = necessary_data.split('.')[-1]
@@ -61,11 +63,13 @@ def mian(necessary_data, real_bulk ,ot_weight=1,sep='\t', sparse=True,
     target_type = "simulated" 
     print(f"Target data type: {target_type} (ground truth {'available' if has_ground_truth else 'not available'})")
 
-    pred, groudT = test(train_x,train_y,test_x,real_bulk.obs,celltypes,target_type,ot_weight, batch_size=batch_size,epochs=epochs)
+    pred, groudT = test(train_x,train_y,test_x,real_bulk.obs,celltypes,target_type,ot_weight, batch_size=batch_size,epochs=epochs, device=device)
 
     return pred, groudT
 
-def test(train_x,train_y,test_x,test_y,celltypes,target_type,ot_weight,batch_size=128,epochs=128):
+def test(train_x,train_y,test_x,test_y,celltypes,target_type,ot_weight,batch_size=128,epochs=128, device=None):
+    if device is None:
+        device = torch.device('cpu')
     architectures = {'m256': ([256,128,64,32],[0,0,0,0]),
                      'm512': ([512,256,128,64],[0, 0.3, 0.2, 0.1]),
                      'm1024': ([1024, 512, 256, 128],[0, 0.6, 0.3, 0.1])}
@@ -82,7 +86,7 @@ def test(train_x,train_y,test_x,test_y,celltypes,target_type,ot_weight,batch_siz
                              index=test_y.index if hasattr(test_y, 'index') else None)
 
     for key in ["m256", "m512", "m1024"]:
-        model_da = OmicsTweezer(architectures[key], epochs, batch_size, target_type, 0.0001)
+        model_da = OmicsTweezer(architectures[key], epochs, batch_size, target_type, 0.0001, device=device)
         train_y_df = pd.DataFrame(train_y, columns=cell_type_names)
 
         train, test = anndata.AnnData(train_x, obs=train_y_df), anndata.AnnData(test_x, obs=test_y)
@@ -98,4 +102,3 @@ def test(train_x,train_y,test_x,test_y,celltypes,target_type,ot_weight,batch_siz
 
     return final_p, final_g
     
-

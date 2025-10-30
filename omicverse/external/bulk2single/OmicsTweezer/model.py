@@ -13,6 +13,7 @@ warnings.filterwarnings('ignore')
 import numpy as np
 import random
 import torch
+from tqdm.auto import trange
 
 
 # 固定随机种子
@@ -20,10 +21,12 @@ def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch.backends, "cudnn") and torch.backends.cudnn.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     print("seed is fixed, seed is {}".format(seed))
 set_seed()
 
@@ -53,7 +56,7 @@ class DecoderBlock(nn.Module):
 
         
 class OmicsTweezer(object):
-    def __init__(self, architectures, epochs, batch_size, target_type, learning_rate):
+    def __init__(self, architectures, epochs, batch_size, target_type, learning_rate, device=None):
         self.num_epochs = epochs
         self.batch_size = batch_size
         self.target_type = target_type
@@ -66,9 +69,16 @@ class OmicsTweezer(object):
         self.architectures_dim = architectures[0]
         self.architectures_drop = architectures[1]
         cudnn.deterministic = True
-        torch.cuda.manual_seed_all(self.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(self.seed)
         torch.manual_seed(self.seed)
         random.seed(self.seed)
+        if device is None:
+            self.device = torch.device('cpu')
+        elif isinstance(device, str):
+            self.device = torch.device(device)
+        else:
+            self.device = device
 
     def OmicsTweezer_model(self, celltype_num):
         feature_num = len(self.used_features)
@@ -130,7 +140,10 @@ class OmicsTweezer(object):
 
         ### prepare model structure ###
         self.prepare_dataloader(source_data, target_data, self.batch_size)
-        self.model_da = self.OmicsTweezer_model(self.celltype_num).cuda()
+        self.model_da = self.OmicsTweezer_model(self.celltype_num)
+        self.encoder_da.to(self.device)
+        self.predictor_da.to(self.device)
+        self.model_da.to(self.device)
         self.loss_weight= loss_weight
         ### setup optimizer ###
 
@@ -141,7 +154,8 @@ class OmicsTweezer(object):
         
         metric_logger = defaultdict(list) 
 
-        for epoch in range(self.num_epochs):
+        epoch_iter = trange(self.num_epochs, desc='Training', unit='epoch')
+        for epoch in epoch_iter:
             self.model_da.train()
 
             train_target_iterator = iter(self.train_target_loader)
@@ -154,13 +168,17 @@ class OmicsTweezer(object):
                     train_target_iterator = iter(self.train_target_loader)
                     target_x, _ = next(train_target_iterator)
 
-                embedding_source = self.encoder_da(source_x.cuda())
-                embedding_target = self.encoder_da(target_x.cuda())
+                source_x = source_x.to(self.device)
+                source_y = source_y.to(self.device)
+                target_x = target_x.to(self.device)
+
+                embedding_source = self.encoder_da(source_x)
+                embedding_target = self.encoder_da(target_x)
                 frac_pred = self.predictor_da(embedding_source)
 
 
                 # caculate loss 
-                pred_loss = L1_loss(frac_pred, source_y.cuda())       
+                pred_loss = L1_loss(frac_pred, source_y)       
                 pred_loss_epoch += pred_loss.data.item()
 
                 w_distance = embedding_source.mean() - embedding_target.mean()
@@ -176,11 +194,7 @@ class OmicsTweezer(object):
 
             pred_loss_epoch = pred_loss_epoch/(batch_idx + 1)
             metric_logger['pred_loss'].append(pred_loss_epoch)
-
-        
-            if (epoch+1) % 1 == 0:
-                print('============= Epoch {:02d}/{:02d} in training ============='.format(epoch + 1, self.num_epochs))
-                print("pred_loss=%f" % (pred_loss_epoch))
+            epoch_iter.set_postfix(pred_loss=f"{pred_loss_epoch:.4f}")
 
 
             
@@ -188,7 +202,8 @@ class OmicsTweezer(object):
         self.model_da.eval()
         preds, gt = None, None
         for batch_idx, (x, y) in enumerate(self.test_target_loader):
-            logits = self.predictor_da(self.encoder_da(x.cuda())).detach().cpu().numpy()
+            x = x.to(self.device)
+            logits = self.predictor_da(self.encoder_da(x)).detach().cpu().numpy()
             frac = y.detach().cpu().numpy()
             preds = logits if preds is None else np.concatenate((preds, logits), axis=0)
             gt = frac if gt is None else np.concatenate((gt, frac), axis=0)
