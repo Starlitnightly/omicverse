@@ -106,8 +106,8 @@ def data_preparation(input_expData: Union[str, sc.AnnData, pd.DataFrame],
         adata_l.uns['name'] = l
 
         ## [5] Additional edges with high spearman correlation
-        if isinstance(adata_l.X, sparse.csr_matrix):
-            gene_exp = pd.DataFrame(adata_l.X.A.T, index=priori_network_nodes)
+        if sparse.issparse(adata_l.X):
+            gene_exp = pd.DataFrame(adata_l.X.toarray().T, index=priori_network_nodes)
         else:
             gene_exp = pd.DataFrame(adata_l.X.T, index=priori_network_nodes)
 
