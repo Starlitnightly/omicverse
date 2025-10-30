@@ -1,6 +1,9 @@
 
 
-def train_predict(train_reference, test_bulk, num, scale, ot_weight,celltype_key='CellType'):
+def train_predict(
+    train_reference, test_bulk, num, scale, 
+    ot_weight,celltype_key='CellType', device=None,
+    batch_size=128, epochs=30):
 
     from .simulation import generate_simulated_data
     from sklearn.preprocessing import MinMaxScaler
@@ -20,6 +23,6 @@ def train_predict(train_reference, test_bulk, num, scale, ot_weight,celltype_key
     
     ## train and predict
     predict_output, ground_truth = mian(train_bulk, test_bulk_copy,  ot_weight,sep='\t',
-                               batch_size=128, epochs=30)
+                               batch_size=batch_size, epochs=epochs, device=device)
 
     return (predict_output[0]+predict_output[1]+predict_output[2])/3
