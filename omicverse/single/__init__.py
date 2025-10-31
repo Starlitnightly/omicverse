@@ -109,8 +109,9 @@ from ._lazy_step_by_step import (
 from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
 from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulation,plot_grn
-
+from ._annotation import Annotation
 from ._velo import Velo,velocity_embedding
+
 
 __all__ = [
     # Core analysis functions
@@ -249,6 +250,7 @@ __all__ = [
     'add_tf_regulation',
     'plot_grn',
     'Velo',
-    'velocity_embedding'
+    'velocity_embedding',
+    'Annotation',
 ]
 
