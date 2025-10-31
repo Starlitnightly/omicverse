@@ -250,6 +250,7 @@ class Annotation(object):
     def annotate(
         self,
         method='celltypist',
+        cluster_key='leiden',
         **kwargs
     ):
         if method=='celltypist':
@@ -275,25 +276,34 @@ class Annotation(object):
                         model_path=self.scsa_db_path,
                         **kwargs
             )
-            if 'over_clustering' not in self.adata.obs.columns:
-                if self.adata.n_obs < 5000:
-                    resolution = 5
-                elif self.adata.n_obs < 20000:
-                    resolution = 10
-                elif self.adata.n_obs < 40000:
-                    resolution = 15
-                elif self.adata.n_obs < 100000:
-                    resolution = 20
-                elif self.adata.n_obs < 200000:
-                    resolution = 25
-                else:
-                    resolution = 30
-                sc.tl.leiden(self.adata, resolution=resolution, key_added='over_clustering')
+            if cluster_key not in self.adata.obs.columns:
+                resolution = 1
+                sc.tl.leiden(self.adata, resolution=resolution, key_added=cluster_key)
 
-            anno=scsa.cell_anno(clustertype='over_clustering',
+            anno=scsa.cell_anno(clustertype=cluster_key,
                cluster='all',rank_rep=True)
             result=scsa.cell_auto_anno(self.adata, key='scsa_prediction')
             return result
+        elif method=='gpt4celltype':
+            from ._anno import get_celltype_marker
+            from ._gptcelltype import gptcelltype
+            all_markers=get_celltype_marker(
+                self.adata,clustertype=cluster_key,rank=True,
+                    key='rank_genes_groups',
+                    foldchange=2,topgenenumber=10
+            )
+            result = gptcelltype(all_markers, **kwargs)
+            #return result
+            #new_result={}
+            #for key in result.keys():
+            #    new_result[key]=result[key].split(': ')[-1].split(' (')[0].split('. ')[1]
+            self.adata.obs['gpt4celltype_prediction'] = self.adata.obs[cluster_key].map(result).astype('category')
+            print(f"GPT4celltype prediction saved to adata.obs['gpt4celltype_prediction']")
+            return result
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+                
+
 
     def add_reference_sc(self, reference: AnnData):
         self.adata_ref=reference
@@ -305,15 +315,19 @@ class Annotation(object):
         self.model = models.Model.load(model = self.pkl_ref)
 
     def add_reference_scsa_db(self, reference: str):
-        self.scsa_db_path=reference
+        self.scsa_db_path = reference
+
 
     def download_scsa_db(self, save_path: str = 'temp/pySCSA_2024_v1_plus.db'):
+        parent_dir = os.path.dirname(save_path)
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
         download_data(url='https://figshare.com/ndownloader/files/41369037',
-                        file_path=save_path, dir=save_path)
+                        file_path=os.path.basename(save_path), dir=parent_dir)
         print(f"SCSA database saved to {save_path}")
         return save_path
 
-    def download_reference_pkl(from omicverse.utils._data import download_data
+    def download_reference_pkl(
         self, 
         reference_name: str, 
         save_path: str,
