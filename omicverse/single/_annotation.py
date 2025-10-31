@@ -236,6 +236,7 @@ class Annotation(object):
         self.cellxgene_desc_df = None
         self.celltypist_models_df = None
         self._llm_client = None
+        self.scsa_db_path = None
         self._llm_runtime_config: Optional[Dict[str, Any]] = None
         self._llm_config_signature: Optional[str] = None
 
@@ -246,6 +247,54 @@ class Annotation(object):
         self.last_reference_llm_raw: Optional[str] = None
         self.last_reference_prompt: Optional[str] = None
 
+    def annotate(
+        self,
+        method='celltypist',
+        **kwargs
+    ):
+        if method=='celltypist':
+            import celltypist
+            predictions = celltypist.annotate(
+                self.adata, model = self.pkl_ref,
+                majority_voting = True,
+                **kwargs
+            )
+            #return predictions
+            
+            self.adata.obs['celltypist_prediction'] = predictions.predicted_labels['majority_voting'].astype(str)
+            self.adata.obsm['celltypist_decision_matrix']=predictions.decision_matrix
+            self.adata.obsm['celltypist_probability_matrix']=predictions.probability_matrix
+            print(f"Celltypist prediction saved to adata.obs['celltypist_prediction']")
+            print(f"Celltypist decision matrix saved to adata.obsm['celltypist_decision_matrix']")
+            print(f"Celltypist probability matrix saved to adata.obsm['celltypist_probability_matrix']")
+        elif method=='scsa':
+            from ._anno import pySCSA
+            if self.scsa_db_path is None:
+                self.scsa_db_path = self.download_scsa_db()
+            scsa=pySCSA(adata=self.adata,
+                        model_path=self.scsa_db_path,
+                        **kwargs
+            )
+            if 'over_clustering' not in self.adata.obs.columns:
+                if self.adata.n_obs < 5000:
+                    resolution = 5
+                elif self.adata.n_obs < 20000:
+                    resolution = 10
+                elif self.adata.n_obs < 40000:
+                    resolution = 15
+                elif self.adata.n_obs < 100000:
+                    resolution = 20
+                elif self.adata.n_obs < 200000:
+                    resolution = 25
+                else:
+                    resolution = 30
+                sc.tl.leiden(self.adata, resolution=resolution, key_added='over_clustering')
+
+            anno=scsa.cell_anno(clustertype='over_clustering',
+               cluster='all',rank_rep=True)
+            result=scsa.cell_auto_anno(self.adata, key='scsa_prediction')
+            return result
+
     def add_reference_sc(self, reference: AnnData):
         self.adata_ref=reference
 
@@ -255,7 +304,16 @@ class Annotation(object):
         from celltypist import models
         self.model = models.Model.load(model = self.pkl_ref)
 
-    def download_reference_pkl(
+    def add_reference_scsa_db(self, reference: str):
+        self.scsa_db_path=reference
+
+    def download_scsa_db(self, save_path: str = 'temp/pySCSA_2024_v1_plus.db'):
+        download_data(url='https://figshare.com/ndownloader/files/41369037',
+                        file_path=save_path, dir=save_path)
+        print(f"SCSA database saved to {save_path}")
+        return save_path
+
+    def download_reference_pkl(from omicverse.utils._data import download_data
         self, 
         reference_name: str, 
         save_path: str,
@@ -444,24 +502,7 @@ class Annotation(object):
 
         return result_df
 
-    def annotate(
-        self,
-        method='celltypist',
-    ):
-        if method=='celltypist':
-            import celltypist
-            predictions = celltypist.annotate(
-                self.adata, model = self.pkl_ref,
-                majority_voting = True
-            )
-            #return predictions
-            
-            self.adata.obs['celltypist_prediction'] = predictions.predicted_labels['majority_voting'].astype(str)
-            self.adata.obsm['celltypist_decision_matrix']=predictions.decision_matrix
-            self.adata.obsm['celltypist_probability_matrix']=predictions.probability_matrix
-            print(f"Celltypist prediction saved to adata.obs['celltypist_prediction']")
-            print(f"Celltypist decision matrix saved to adata.obsm['celltypist_decision_matrix']")
-            print(f"Celltypist probability matrix saved to adata.obsm['celltypist_probability_matrix']")
+    
 
     def _ensure_llm_client(
         self,
