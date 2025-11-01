@@ -5,11 +5,15 @@ Build a new skill from a single link to cover functionality OmicVerse does not y
 
 This scaffolds a SKILL.md and scrapes the provided URL (same-domain crawl)
 to populate reference markdown files.
+
+Security: validates output paths and sanitizes generated filenames.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+
+from .security import validate_output_path, sanitize_filename, SecurityError
 
 
 def _slugify(value: str) -> str:
@@ -72,9 +76,23 @@ def _generate_skill_md(slug: str, title: str, description: str, link: str) -> st
 def build_from_link(link: str, output_root: Path, name: Optional[str] = None, description: Optional[str] = None, max_pages: int = 30) -> Path:
     from .docs_scraper import scrape
 
-    # Derive name/slug
+    # Validate output_root to prevent directory traversal
+    # Allow absolute paths (resolve and ensure they exist); constrain relative
+    # paths to the current working directory for safety.
+    try:
+        if Path(output_root).is_absolute():
+            output_root = Path(output_root).resolve()
+            output_root.mkdir(parents=True, exist_ok=True)
+        else:
+            output_root = validate_output_path(output_root, base_dir=Path.cwd(), create=True)
+    except Exception as e:
+        raise SecurityError(f"Invalid output directory: {e}")
+
+    # Derive name/slug with sanitization
     title = name or link
-    slug = _slugify(name) if name else _slugify(link)
+    raw_slug = _slugify(name) if name else _slugify(link)
+    # Sanitize the slug to ensure it's a safe filename
+    slug = sanitize_filename(raw_slug)
 
     # Ensure target dir unique
     skill_dir = _ensure_unique_dir(output_root, slug)
@@ -89,7 +107,9 @@ def build_from_link(link: str, output_root: Path, name: Optional[str] = None, de
         files = [("source-error.md", f"Error scraping {link}: {exc}")]
 
     for fname, content in files:
-        (refs_dir / fname).write_text(content, encoding="utf-8")
+        # Sanitize filename before writing
+        safe_fname = sanitize_filename(fname)
+        (refs_dir / safe_fname).write_text(content, encoding="utf-8")
 
     # Write SKILL.md
     desc = description or f"Prototype skill for capability not yet in OmicVerse, sourced from {link}"
@@ -97,4 +117,3 @@ def build_from_link(link: str, output_root: Path, name: Optional[str] = None, de
     (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
 
     return skill_dir
-
