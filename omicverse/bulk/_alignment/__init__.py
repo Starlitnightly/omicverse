@@ -4,6 +4,8 @@ Supports multiple input types: SRA data and FASTQ data.
 """
 
 import logging
+import sys
+import types
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass, fields
@@ -41,6 +43,74 @@ __all__ = [
 
 
 ]
+
+
+def _register_alignment_namespace() -> None:
+    """Expose alignment helpers under the public ``<package>.alignment.bulk`` path."""
+    root_pkg = __name__.split(".", 1)[0]
+    pkg_name = f"{root_pkg}.alignment"
+    bulk_name = f"{pkg_name}.bulk"
+
+    alignment_pkg = sys.modules.get(pkg_name)
+    if alignment_pkg is None:
+        alignment_pkg = types.ModuleType(pkg_name)
+        alignment_pkg.__path__ = []
+        alignment_pkg.__package__ = pkg_name
+        sys.modules[pkg_name] = alignment_pkg
+    else:
+        # Ensure the namespace behaves like a package
+        if not hasattr(alignment_pkg, "__path__"):
+            alignment_pkg.__path__ = []
+        if getattr(alignment_pkg, "__package__", None) is None:
+            alignment_pkg.__package__ = pkg_name
+
+    bulk_module = sys.modules.get(bulk_name)
+    if bulk_module is None:
+        bulk_module = types.ModuleType(bulk_name)
+        bulk_module.__package__ = bulk_name
+        sys.modules[bulk_name] = bulk_module
+
+    allowed_names = set(__all__)
+    for name, obj in globals().items():
+        if name.startswith("_"):
+            continue
+        if isinstance(obj, (types.FunctionType, type)):
+            allowed_names.add(name)
+
+    exported_items = {
+        name: globals()[name]
+        for name in allowed_names
+        if name in globals()
+    }
+
+    for name, obj in exported_items.items():
+        setattr(bulk_module, name, obj)
+        module_name = getattr(obj, "__module__", None)
+        if module_name is None:
+            continue
+        if not isinstance(obj, (type, types.FunctionType)):
+            # Preserve module metadata for non-callable objects
+            continue
+        namespace_prefix = f"{root_pkg}."
+        if not module_name.startswith(namespace_prefix):
+            continue
+        try:
+            obj.__module__ = bulk_name
+        except (AttributeError, TypeError):
+            # Some objects (e.g., functools.partial) may not allow reassignment
+            pass
+
+    existing_bulk_all = set(getattr(bulk_module, "__all__", []))
+    bulk_module.__all__ = sorted(existing_bulk_all | set(exported_items.keys()))
+    bulk_module.__doc__ = __doc__
+
+    alignment_pkg.bulk = bulk_module
+    existing_alignment_all = set(getattr(alignment_pkg, "__all__", []))
+    alignment_pkg.__all__ = sorted(existing_alignment_all | {"bulk"})
+
+    parent_pkg = sys.modules.get(root_pkg)
+    if parent_pkg is not None:
+        setattr(parent_pkg, "alignment", alignment_pkg)
 
 # Convenience factory functions
 def create_pipeline(
@@ -370,6 +440,9 @@ def fq_data_preprocess(
         fastq_pairs,
         with_align=with_align
     )
+
+
+_register_alignment_namespace()
 
 if __name__ == "__main__":
     # Print version information
