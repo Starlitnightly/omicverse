@@ -18,6 +18,91 @@ except Exception:  # pragma: no cover - optional dependency
 logger = logging.getLogger(__name__)
 
 
+class SkillInstructionFormatter:
+    """Formats skill instructions optimally for different LLM providers.
+
+    Each LLM family has different strengths in processing instructions:
+    - GPT: Excels at structured, step-by-step instructions
+    - Gemini: Prefers concise, logically-flowing descriptions
+    - Claude: Understands natural language with implicit context
+    - Others: Default to explicit, detailed instructions
+    """
+
+    PROVIDER_STYLES = {
+        'openai': 'structured',
+        'gpt': 'structured',
+        'google': 'concise',
+        'gemini': 'concise',
+        'anthropic': 'natural',
+        'claude': 'natural',
+        'deepseek': 'explicit',
+        'qwen': 'explicit',
+        'default': 'explicit'
+    }
+
+    @classmethod
+    def format_for_provider(cls, skill_body: str, provider: Optional[str] = None, max_chars: int = 4000) -> str:
+        """Format skill instructions based on LLM provider.
+
+        Args:
+            skill_body: Raw skill instruction text
+            provider: LLM provider name (openai, google, anthropic, etc.)
+            max_chars: Maximum characters to return
+
+        Returns:
+            Formatted instruction text optimized for the provider
+        """
+        text = (skill_body or "").strip()
+        if not text:
+            return ""
+
+        provider_key = (provider or 'default').lower()
+        style = cls.PROVIDER_STYLES.get(provider_key, cls.PROVIDER_STYLES['default'])
+
+        if style == 'structured':
+            formatted = cls._add_structure_markers(text)
+        elif style == 'concise':
+            formatted = cls._make_concise(text)
+        elif style == 'natural':
+            formatted = text
+        else:  # explicit
+            formatted = cls._add_explicit_details(text)
+
+        if len(formatted) <= max_chars:
+            return formatted
+        return formatted[: max_chars - 3].rstrip() + "..."
+
+    @staticmethod
+    def _add_structure_markers(text: str) -> str:
+        """Add structured markers for GPT-style processing."""
+        # Already numbered headings present
+        if re.search(r'^\d+\.', text, re.MULTILINE):
+            return text
+
+        lines = text.split('\n')
+        structured: List[str] = []
+        for line in lines:
+            if line.startswith('##'):
+                structured.append(f"\n{line.upper()}\n")
+            else:
+                structured.append(line)
+        return '\n'.join(structured)
+
+    @staticmethod
+    def _make_concise(text: str) -> str:
+        """Simplify for Gemini-style processing."""
+        if len(text) > 2000:
+            parts = re.split(r'\n## Example', text)
+            if len(parts) > 2:
+                text = parts[0] + '\n## Example' + parts[1]
+        return text
+
+    @staticmethod
+    def _add_explicit_details(text: str) -> str:
+        """Add explicit details for general LLMs."""
+        return re.sub(r'\n## (Usage|How to|Best Practices)', r'\n## IMPORTANT: \1', text)
+
+
 @dataclass
 class SkillDefinition:
     """Represents a single Agent Skill discovered on disk.
@@ -32,13 +117,9 @@ class SkillDefinition:
     body: str
     metadata: Dict[str, str] = field(default_factory=dict)
 
-    def prompt_instructions(self, max_chars: int = 4000) -> str:
-        """Return the main instruction body, trimmed if necessary."""
-
-        text = self.body.strip()
-        if len(text) <= max_chars:
-            return text
-        return text[: max_chars - 3].rstrip() + "..."
+    def prompt_instructions(self, max_chars: int = 4000, provider: Optional[str] = None) -> str:
+        """Return the main instruction body, formatted for the LLM provider."""
+        return SkillInstructionFormatter.format_for_provider(self.body, provider=provider, max_chars=max_chars)
 
     @property
     def summary_text(self) -> str:
@@ -269,10 +350,51 @@ def build_skill_registry(project_root: Path) -> Optional[SkillRegistry]:
     return registry
 
 
+def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> Optional[SkillRegistry]:
+    """
+    Load skills from multiple paths with priority ordering.
+
+    Searches for skills in:
+    1. Package root (.claude/skills in omicverse installation directory) - built-in skills
+    2. Current working directory (.claude/skills in user's project) - user-created skills
+
+    User-created skills (CWD) take priority over built-in skills (package) if there are duplicates.
+
+    Returns a merged SkillRegistry or None when no skills are found.
+    """
+    package_skill_root = package_root / ".claude" / "skills"
+    cwd_skill_root = cwd / ".claude" / "skills"
+
+    pkg = SkillRegistry(skill_root=package_skill_root)
+    pkg.load()
+    usr = SkillRegistry(skill_root=cwd_skill_root)
+    usr.load()
+
+    merged: Dict[str, SkillDefinition] = {}
+    if pkg.skills:
+        merged.update(pkg.skills)
+        logger.info("Loaded %d built-in skills from %s", len(pkg.skills), package_skill_root)
+    if usr.skills:
+        for slug, defn in usr.skills.items():
+            if slug in merged:
+                logger.info("User skill '%s' overrides built-in skill", defn.name)
+            merged[slug] = defn
+        logger.info("Loaded %d user skills from %s", len(usr.skills), cwd_skill_root)
+
+    if not merged:
+        logger.warning("No skills discovered in package or CWD")
+        return None
+
+    reg = SkillRegistry(skill_root=package_skill_root)
+    reg._skills = merged
+    return reg
+
 __all__ = [
+    "SkillInstructionFormatter",
     "SkillDefinition",
     "SkillMatch",
     "SkillRegistry",
     "SkillRouter",
     "build_skill_registry",
+    "build_multi_path_skill_registry",
 ]
