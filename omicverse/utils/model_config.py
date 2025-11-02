@@ -157,22 +157,80 @@ PROVIDER_ENDPOINTS = {
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
 }
 
+# Provider-level default API keys (fallback when a specific model isn't mapped)
+PROVIDER_DEFAULT_KEYS = {
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "dashscope": "DASHSCOPE_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "xai": "XAI_API_KEY",
+    "zhipu": "ZAI_API_KEY",
+}
+
+# Model ID aliases for backward compatibility
+MODEL_ALIASES: Dict[str, str] = {
+    # Claude 4.5 variations
+    "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
+    "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
+    "claude-sonnet-4-5-20250929": "anthropic/claude-sonnet-4-20250514",
+    # Claude 3.7
+    "claude-sonnet-3-7": "anthropic/claude-3-7-sonnet-20250219",
+    "claude-3-7-sonnet": "anthropic/claude-3-7-sonnet-20250219",
+    # Claude 3.5
+    "claude-3-5-haiku": "anthropic/claude-3-5-haiku-20241022",
+    "claude-haiku-3-5": "anthropic/claude-3-5-haiku-20241022",
+    # Claude 3 legacy
+    "claude-3-opus": "anthropic/claude-3-opus-20240229",
+    "claude-opus-3": "anthropic/claude-3-opus-20240229",
+    "claude-3-sonnet": "anthropic/claude-3-sonnet-20240229",
+    "claude-sonnet-3": "anthropic/claude-3-sonnet-20240229",
+    "claude-3-haiku": "anthropic/claude-3-haiku-20240307",
+    "claude-haiku-3": "anthropic/claude-3-haiku-20240307",
+    # Gemini
+    "gemini-2.5-pro": "gemini/gemini-2.5-pro",
+    "gemini-2-5-pro": "gemini/gemini-2.5-pro",
+    "gemini-2.5-flash": "gemini/gemini-2.5-flash",
+    "gemini-2-5-flash": "gemini/gemini-2.5-flash",
+    "gemini-2.0-pro": "gemini/gemini-2.0-pro",
+    "gemini-2-0-pro": "gemini/gemini-2.0-pro",
+    "gemini-2.0-flash": "gemini/gemini-2.0-flash",
+    "gemini-2-0-flash": "gemini/gemini-2.0-flash",
+    "gemini-pro": "gemini/gemini-pro",
+    # Deepseek
+    "deepseek-chat": "deepseek/deepseek-chat",
+    "deepseek-reasoner": "deepseek/deepseek-reasoner",
+}
+
 class ModelConfig:
     """Model configuration and validation for OmicVerse Smart Agent"""
     
     @staticmethod
+    def normalize_model_id(model: str) -> str:
+        """Normalize model ID to canonical form using alias mapping."""
+        if model in AVAILABLE_MODELS:
+            return model
+        alias = MODEL_ALIASES.get(model.lower())
+        return alias or model
+
+    @staticmethod
     def is_model_supported(model: str) -> bool:
         """Check if a model is supported"""
-        return model in AVAILABLE_MODELS
+        normalized = ModelConfig.normalize_model_id(model)
+        return normalized in AVAILABLE_MODELS
     
     @staticmethod
     def get_model_description(model: str) -> str:
         """Get human-readable description for a model"""
-        return AVAILABLE_MODELS.get(model, f"Unknown model: {model}")
+        normalized = ModelConfig.normalize_model_id(model)
+        return AVAILABLE_MODELS.get(normalized, f"Unknown model: {model}")
     
     @staticmethod
     def get_provider_from_model(model: str) -> str:
         """Determine provider from model name"""
+        # Normalize first to handle aliases/unprefixed
+        model = ModelConfig.normalize_model_id(model)
         if model.startswith("anthropic/"):
             return "anthropic"
         elif model.startswith(("qwq-", "qwen-", "qvq-")) or model.startswith("qwen/"):
@@ -193,15 +251,18 @@ class ModelConfig:
     @staticmethod
     def check_api_key_availability(model: str) -> Tuple[bool, str]:
         """Check if required API key is available for the model"""
-        required_key = PROVIDER_API_KEYS.get(model)
+        normalized = ModelConfig.normalize_model_id(model)
+        required_key = PROVIDER_API_KEYS.get(normalized)
+        if not required_key:
+            provider = ModelConfig.get_provider_from_model(normalized)
+            required_key = PROVIDER_DEFAULT_KEYS.get(provider)
         if not required_key:
             return True, "No API key required"
-        
         if os.getenv(required_key):
-            provider = ModelConfig.get_provider_from_model(model)
+            provider = ModelConfig.get_provider_from_model(normalized)
             return True, f"{provider.title()} API key available"
         else:
-            provider = ModelConfig.get_provider_from_model(model)
+            provider = ModelConfig.get_provider_from_model(normalized)
             return False, f"{provider.title()} API key required: set {required_key}"
     
     @staticmethod
@@ -248,16 +309,20 @@ class ModelConfig:
     @staticmethod
     def validate_model_setup(model: str, api_key: Optional[str] = None) -> Tuple[bool, str]:
         """Validate if model can be used with current setup"""
-        if not ModelConfig.is_model_supported(model):
+        normalized = ModelConfig.normalize_model_id(model)
+        if not ModelConfig.is_model_supported(normalized):
             return False, f"Model '{model}' is not supported. Use ov.list_supported_models() to see available models."
         
-        # Check API key if needed
-        required_key = PROVIDER_API_KEYS.get(model)
+        # Check API key if needed (model mapping or provider default)
+        required_key = PROVIDER_API_KEYS.get(normalized)
+        if not required_key:
+            provider = ModelConfig.get_provider_from_model(normalized)
+            required_key = PROVIDER_DEFAULT_KEYS.get(provider)
         if required_key:
             if api_key or os.getenv(required_key):
-                return True, f"✅ Model {model} ready to use"
+                return True, f"✅ Model {normalized} ready to use"
             else:
-                provider = ModelConfig.get_provider_from_model(model)
-                return False, f"❌ Model {model} requires {required_key}. Set environment variable or pass api_key parameter."
+                provider = ModelConfig.get_provider_from_model(normalized)
+                return False, f"❌ Model {normalized} requires {required_key}. Set environment variable or pass api_key parameter."
         
-        return True, f"✅ Model {model} ready to use"
+        return True, f"✅ Model {normalized} ready to use"

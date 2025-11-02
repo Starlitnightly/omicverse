@@ -35,6 +35,7 @@ from omicverse.utils.skill_registry import (
     SkillRegistry,
     SkillDefinition,
     build_skill_registry,
+    build_multi_path_skill_registry,
 )
 
 logger = logging.getLogger("ov_skill_seeker")
@@ -54,7 +55,9 @@ def _resolve_repo_root() -> Path:
 
 
 def _load_registry(project_root: Path) -> SkillRegistry:
-    registry = build_skill_registry(project_root)
+    """Load skills using dual-path discovery to match Agent behavior."""
+    cwd = Path.cwd()
+    registry = build_multi_path_skill_registry(project_root, cwd)
     return registry  # type: ignore[return-value]
 
 
@@ -114,7 +117,11 @@ def _zip_skill(defn: SkillDefinition, out_dir: Path) -> Path:
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="OmicVerse Skill Seeker: list, validate, and package bundled skills",
+        description=(
+            "OmicVerse Skill Seeker: list, validate, and package bundled skills. "
+            "Discovers skills from both package installation (.claude/skills) and current working directory (.claude/skills). "
+            "User skills override package skills when slugs collide."
+        ),
     )
     parser.add_argument(
         "--project-root",
