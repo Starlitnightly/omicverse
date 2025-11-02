@@ -40,6 +40,7 @@ from .skill_registry import (
     SkillRegistry,
     SkillRouter,
     build_skill_registry,
+    build_multi_path_skill_registry,
 )
 
 
@@ -74,7 +75,16 @@ class OmicVerseAgent:
             print(f"❌ Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
             raise ImportError("Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
         
-        # Validate model
+        # Normalize model ID for aliases and variations, then validate
+        original_model = model
+        try:
+            model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
+        except Exception:
+            # Older ModelConfig without normalization: proceed as-is
+            model = model
+        if model != original_model:
+            print(f"   📝 Model ID normalized: {original_model} → {model}")
+
         is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
         if not is_valid:
             print(f"❌ {validation_msg}")
@@ -83,6 +93,8 @@ class OmicVerseAgent:
         self.model = model
         self.api_key = api_key
         self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
+        # Store provider to allow provider-aware formatting of skills
+        self.provider = ModelConfig.get_provider_from_model(model)
         self.agent = None
         self.skill_registry: Optional[SkillRegistry] = None
         self.skill_router: Optional[SkillRouter] = None
@@ -118,11 +130,12 @@ class OmicVerseAgent:
             raise
 
     def _initialize_skill_registry(self) -> None:
-        """Load the OmicVerse project skills and prepare routing helpers."""
+        """Load skills from package install and current working directory and prepare routing helpers."""
 
-        project_root = Path(__file__).resolve().parents[2]
+        package_root = Path(__file__).resolve().parents[2]
+        cwd = Path.cwd()
         try:
-            registry = build_skill_registry(project_root)
+            registry = build_multi_path_skill_registry(package_root, cwd)
         except Exception as exc:  # pragma: no cover - defensive logging
             print(f"⚠️  Failed to load Agent Skills: {exc}")
             registry = None
@@ -131,7 +144,20 @@ class OmicVerseAgent:
             self.skill_registry = registry
             self.skill_router = SkillRouter(registry)
             self._skill_overview_text = self._format_skill_overview()
-            print(f"   🧭 Loaded {len(self.skill_registry.skills)} project skills from .claude/skills")
+
+            package_skill_root = package_root / ".claude" / "skills"
+            cwd_skill_root = cwd / ".claude" / "skills"
+            builtin_count = len([s for s in registry.skills.values() if str(package_skill_root) in str(s.path)])
+            user_count = len([s for s in registry.skills.values() if str(cwd_skill_root) in str(s.path)])
+            total = len(registry.skills)
+            msg = f"   🧭 Loaded {total} skills"
+            if builtin_count and user_count:
+                msg += f" ({builtin_count} built-in + {user_count} user-created)"
+            elif builtin_count:
+                msg += f" ({builtin_count} built-in)"
+            elif user_count:
+                msg += f" ({user_count} user-created)"
+            print(msg)
         else:
             self.skill_registry = None
             self.skill_router = None
@@ -444,7 +470,7 @@ User request: "quality control with nUMI>500, mito<0.2"
             {
                 "name": definition.name,
                 "description": definition.description,
-                "instructions": definition.prompt_instructions(),
+                "instructions": definition.prompt_instructions(provider=getattr(self, "provider", None)),
                 "path": str(definition.path),
                 "metadata": definition.metadata,
             },
@@ -582,7 +608,9 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
         allowed_modules = {}
-        for module_name in ("omicverse", "numpy", "pandas", "scanpy"):
+        core_modules = ("omicverse", "numpy", "pandas", "scanpy")
+        skill_modules = ("openpyxl", "reportlab", "matplotlib", "seaborn", "scipy", "statsmodels", "sklearn")
+        for module_name in core_modules + skill_modules:
             try:
                 allowed_modules[module_name] = __import__(module_name)
             except ImportError:
