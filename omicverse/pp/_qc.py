@@ -112,10 +112,10 @@ def _print_gene_detection_table(mt_count, ribo_count, hb_count, mt_genes=None, r
     for i, (name, count, method) in enumerate(families):
         # Color code based on count
         if count == 0:
-            count_color = Colors.WARNING
+            count_color = Colors.FAIL
             count_str = f"{count:,} ⚠️"
         elif count < 5:
-            count_color = Colors.YELLOW
+            count_color = Colors.WARNING
             count_str = f"{count:,}"
         else:
             count_color = Colors.GREEN
@@ -165,7 +165,7 @@ def _print_filtering_results_table(mode, tresh, n_total, mt_failed, umis_failed,
         if fail_pct > 50:
             fail_color = Colors.WARNING
         elif fail_pct > 20:
-            fail_color = Colors.YELLOW
+            fail_color = Colors.WARNING
         else:
             fail_color = Colors.GREEN
 
@@ -222,7 +222,7 @@ def _print_final_summary_table(n_start, n_end, genes_start, genes_end):
         quality_color = Colors.CYAN
         quality_msg = "Good"
     elif cells_retention >= 40:
-        quality_color = Colors.YELLOW
+        quality_color = Colors.WARNING
         quality_msg = "Moderate"
     else:
         quality_color = Colors.WARNING
