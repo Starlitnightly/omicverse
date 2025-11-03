@@ -231,8 +231,9 @@ class LLMTableSelector:
 
 class Annotation(object):
 
-    def __init__(self, adata: AnnData):
+    def __init__(self, adata: AnnData,):
         self.adata = adata
+
         self.cellxgene_desc_df = None
         self.celltypist_models_df = None
         self._llm_client = None
@@ -300,13 +301,36 @@ class Annotation(object):
             self.adata.obs['gpt4celltype_prediction'] = self.adata.obs[cluster_key].map(result).astype('category')
             print(f"GPT4celltype prediction saved to adata.obs['gpt4celltype_prediction']")
             return result
+        elif method=='harmony':
+            from ._annotation_ref import AnnotationRef
+            annotation_ref=AnnotationRef(adata_query=self.adata,adata_ref=self.adata_ref,celltype_key=self.celltype_key)
+            annotation_ref.train(method='harmony',**kwargs)
+            annotation_ref.predict(method='harmony',n_neighbors=15,
+                pred_key='harmony_prediction',uncert_key='harmony_uncertainty',**kwargs)
+            return annotation_ref.adata_query
+        elif method=='scVI':
+            from ._annotation_ref import AnnotationRef
+            annotation_ref=AnnotationRef(adata_query=self.adata,adata_ref=self.adata_ref,celltype_key=self.celltype_key)
+            annotation_ref.train(method='scVI',**kwargs)
+            annotation_ref.predict(method='scVI',n_neighbors=15,
+                pred_key='scVI_prediction',uncert_key='scVI_uncertainty',**kwargs)
+            return annotation_ref.adata_query
+        elif method=='scanorama':
+            from ._annotation_ref import AnnotationRef
+            annotation_ref=AnnotationRef(adata_query=self.adata,adata_ref=self.adata_ref,celltype_key=self.celltype_key)
+            annotation_ref.train(method='scanorama',**kwargs)
+            annotation_ref.predict(method='scanorama',n_neighbors=15,
+                pred_key='scanorama_prediction',uncert_key='scanorama_uncertainty',**kwargs)
+            return annotation_ref.adata_query
         else:
             raise ValueError(f"Unsupported method: {method}")
                 
 
 
-    def add_reference_sc(self, reference: AnnData):
+    def add_reference_sc(self, reference: AnnData, celltype_key: str = 'celltype'):
         self.adata_ref=reference
+        self.celltype_key=celltype_key
+
 
     def add_reference_pkl(self, reference: str):
         self.pkl_ref=reference
