@@ -512,7 +512,7 @@ class Slingshot:
             curve.fit(
                 self.data,
                 max_iter=1,
-                w=self.cell_weights[:, l_idx]
+                weights=self.cell_weights[:, l_idx]
             )
 
             if self.debug_plot_lineages:

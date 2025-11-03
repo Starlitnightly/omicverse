@@ -370,6 +370,12 @@ def corr2_coeff(a, b):
     """
     resol = 10 ** (-15)
 
+    # Convert sparse matrices to dense arrays if necessary
+    if issparse(a):
+        a = a.toarray()
+    if issparse(b):
+        b = b.toarray()
+
     a_ma = a - a.mean(1)[:, None]
     b_mb = b - b.mean(1)[:, None]
     ssa = (a_ma ** 2).sum(1)
@@ -395,9 +401,9 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
     cc_genes = list(set(cycling_genes['G1/S']) | set(cycling_genes['G2/M']))
     cc_genes = [ x for x in cc_genes if x in adata.var_names ]
     # Compute corr
-    cc_expression = adata[:, cc_genes].X.A.T
+    cc_expression = adata[:, cc_genes].X.toarray().T if issparse(adata[:, cc_genes].X) else adata[:, cc_genes].X.T
     hvgs = adata.var_names[adata.var['highly_variable_features']]
-    hvgs_expression = adata[:, hvgs].X.A.T
+    hvgs_expression = adata[:, hvgs].X.toarray().T if issparse(adata[:, hvgs].X) else adata[:, hvgs].X.T
     cc_corr = corr2_coeff(hvgs_expression, cc_expression)
 
     # Discard genes having the maximum correlation with one of the cc > corr_threshold

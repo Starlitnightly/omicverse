@@ -66,13 +66,6 @@ from ._violin import violin
 from ._animation_lines import *
 
 
-# Note: Specific function names are imported through wildcard imports
-# from individual modules. Key functions include:
-# - embedding, umap, tsne: dimensionality reduction plots
-# - violin, dotplot, stacked_violin: expression distribution plots  
-# - spatial, spatial_domains: spatial transcriptomics plots
-# - heatmap, clustermap: heatmap visualizations
-# - volcano, ma_plot: differential expression plots
-# - network, chord_diagram: network visualizations
-# - palette functions: color scheme utilities
+
+
 

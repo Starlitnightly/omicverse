@@ -15,6 +15,12 @@ import asyncio
 import json
 import re
 import inspect
+import ast
+import textwrap
+import builtins
+import warnings
+import threading
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 
@@ -28,7 +34,13 @@ else:
 
 # Import registry system and model configuration
 from .registry import _global_registry
-from .model_config import ModelConfig, PROVIDER_API_KEYS, AVAILABLE_MODELS
+from .model_config import ModelConfig, PROVIDER_API_KEYS
+from .skill_registry import (
+    SkillMatch,
+    SkillRegistry,
+    SkillRouter,
+    build_skill_registry,
+)
 
 
 class OmicVerseAgent:
@@ -72,10 +84,14 @@ class OmicVerseAgent:
         self.api_key = api_key
         self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
         self.agent = None
-        
-        # Set up API key based on provider
-        self._setup_api_keys(api_key)
-        
+        self.skill_registry: Optional[SkillRegistry] = None
+        self.skill_router: Optional[SkillRouter] = None
+        self._skill_overview_text: str = ""
+        self._managed_api_env: Dict[str, str] = self._collect_api_key_env(api_key)
+
+        # Discover project skills for progressive disclosure guidance
+        self._initialize_skill_registry()
+
         # Display model info
         provider = ModelConfig.get_provider_from_model(model)
         model_desc = ModelConfig.get_model_description(model)
@@ -84,21 +100,43 @@ class OmicVerseAgent:
         print(f"    Endpoint: {self.endpoint}")
         
         # Check API key status
-        key_available, key_msg = ModelConfig.check_api_key_availability(model)
+        with self._temporary_api_keys():
+            key_available, key_msg = ModelConfig.check_api_key_availability(model)
         if key_available:
             print(f"   ✅ {key_msg}")
         else:
             print(f"   ⚠️  {key_msg}")
         
         try:
-            self._setup_agent()
+            with self._temporary_api_keys():
+                self._setup_agent()
             stats = self._get_registry_stats()
             print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
             raise
-    
+
+    def _initialize_skill_registry(self) -> None:
+        """Load the OmicVerse project skills and prepare routing helpers."""
+
+        project_root = Path(__file__).resolve().parents[2]
+        try:
+            registry = build_skill_registry(project_root)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            print(f"⚠️  Failed to load Agent Skills: {exc}")
+            registry = None
+
+        if registry and registry.skills:
+            self.skill_registry = registry
+            self.skill_router = SkillRouter(registry)
+            self._skill_overview_text = self._format_skill_overview()
+            print(f"   🧭 Loaded {len(self.skill_registry.skills)} project skills from .claude/skills")
+        else:
+            self.skill_registry = None
+            self.skill_router = None
+            self._skill_overview_text = ""
+
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
         # Get all unique functions from registry
@@ -141,19 +179,45 @@ class OmicVerseAgent:
         
         return json.dumps(functions_info, indent=2, ensure_ascii=False)
     
-    def _setup_api_keys(self, api_key: Optional[str] = None):
-        """Setup API keys based on the model provider"""
-        import os
-        
-        if api_key:
-            # Determine which environment variable to set based on model
-            required_key = PROVIDER_API_KEYS.get(self.model)
-            if required_key:
-                os.environ[required_key] = api_key
-                # Also set OPENAI_API_KEY for backwards compatibility if it's an OpenAI model
-                if required_key == "OPENAI_API_KEY":
-                    os.environ['OPENAI_API_KEY'] = api_key
-    
+    def _collect_api_key_env(self, api_key: Optional[str] = None) -> Dict[str, str]:
+        """Collect environment variables required for API authentication."""
+
+        if not api_key:
+            return {}
+
+        env_mapping: Dict[str, str] = {}
+        required_key = PROVIDER_API_KEYS.get(self.model)
+        if required_key:
+            env_mapping[required_key] = api_key
+
+        provider = ModelConfig.get_provider_from_model(self.model)
+        if provider == "openai":
+            # Ensure OPENAI_API_KEY is always populated for OpenAI-compatible SDKs
+            env_mapping.setdefault("OPENAI_API_KEY", api_key)
+
+        return env_mapping
+
+    @contextmanager
+    def _temporary_api_keys(self):
+        """Temporarily inject API keys into the environment and clean up afterwards."""
+
+        if not self._managed_api_env:
+            yield
+            return
+
+        previous_values: Dict[str, Optional[str]] = {}
+        try:
+            for key, value in self._managed_api_env.items():
+                previous_values[key] = os.environ.get(key)
+                os.environ[key] = value
+            yield
+        finally:
+            for key, previous in previous_values.items():
+                if previous is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = previous
+
     def _setup_agent(self):
         """Setup the pantheon agent with dynamic instructions."""
         
@@ -235,6 +299,16 @@ User request: "quality control with nUMI>500, mito<0.2"
 - Provide helpful feedback about what was executed
 - Handle errors gracefully and suggest alternatives if needed
 """
+
+        if self._skill_overview_text:
+            instructions += (
+                "\n\n## Project Skill Catalog\n"
+                "OmicVerse provides curated Agent Skills that capture end-to-end workflows. "
+                "Before executing complex tasks, call `_list_project_skills` to view the catalog and `_load_skill_guidance` "
+                "to read detailed instructions for relevant skills. Follow the selected skill guidance when planning code "
+                "execution.\n\n"
+                f"{self._skill_overview_text}"
+            )
         
         # Set API key as environment variable if provided
         if self.api_key:
@@ -253,6 +327,9 @@ User request: "quality control with nUMI>500, mito<0.2"
         # Add custom tools for function discovery (no Python interpreter needed)
         self.agent.tool(self._search_functions)
         self.agent.tool(self._get_function_details)
+        if self.skill_registry:
+            self.agent.tool(self._list_project_skills)
+            self.agent.tool(self._load_skill_guidance)
     
     def _search_functions(self, query: str) -> str:
         """
@@ -298,7 +375,7 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _get_function_details(self, function_name: str) -> str:
         """
         Get detailed information about a specific function.
-        
+
         Parameters
         ----------
         function_name : str
@@ -332,7 +409,203 @@ User request: "quality control with nUMI>500, mito<0.2"
             
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
-    
+
+    def _list_project_skills(self) -> str:
+        """Return a JSON catalog of the discovered project skills."""
+
+        if not self.skill_registry or not self.skill_registry.skills:
+            return json.dumps({"skills": [], "message": "No project skills available."}, indent=2)
+
+        skills_payload = [
+            {
+                "name": skill.name,
+                "description": skill.description,
+                "path": str(skill.path),
+                "metadata": skill.metadata,
+            }
+            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
+        ]
+        return json.dumps({"skills": skills_payload}, indent=2)
+
+    def _load_skill_guidance(self, skill_name: str) -> str:
+        """Return the detailed instructions for a requested skill."""
+
+        if not self.skill_registry or not self.skill_registry.skills:
+            return json.dumps({"error": "No project skills are available."})
+
+        if not skill_name or not skill_name.strip():
+            return json.dumps({"error": "Provide a skill name to load guidance."})
+
+        definition = self.skill_registry.skills.get(skill_name.strip().lower())
+        if not definition:
+            return json.dumps({"error": f"Skill '{skill_name}' not found."})
+
+        return json.dumps(
+            {
+                "name": definition.name,
+                "description": definition.description,
+                "instructions": definition.prompt_instructions(),
+                "path": str(definition.path),
+                "metadata": definition.metadata,
+            },
+            indent=2,
+        )
+
+    def _extract_python_code(self, response_text: str) -> str:
+        """Extract executable Python code from the agent response using AST validation."""
+
+        candidates = self._gather_code_candidates(response_text)
+        if not candidates:
+            raise ValueError("no code candidates found in the response")
+
+        syntax_errors = []
+        for candidate in candidates:
+            try:
+                normalized = self._normalize_code_candidate(candidate)
+            except ValueError as exc:
+                syntax_errors.append(str(exc))
+                continue
+            try:
+                ast.parse(normalized)
+            except SyntaxError as exc:
+                syntax_errors.append(str(exc))
+                continue
+            return normalized
+
+        raise ValueError("; ".join(syntax_errors) or "no syntactically valid python code detected")
+
+    def _gather_code_candidates(self, response_text: str) -> List[str]:
+        """Collect possible Python snippets from fenced or inline blocks."""
+
+        fenced_pattern = re.compile(r"```(?:python)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+        candidates = [
+            textwrap.dedent(match.group(1)).strip()
+            for match in fenced_pattern.finditer(response_text)
+            if match.group(1).strip()
+        ]
+
+        if candidates:
+            return candidates
+
+        inline = self._extract_inline_python(response_text)
+        return [inline] if inline else []
+
+    def _extract_inline_python(self, response_text: str) -> str:
+        """Heuristically gather inline Python statements for AST validation."""
+
+        python_line_pattern = re.compile(r"^\s*(?:import |from |for |while |if |elif |else:|try:|except |with |return |@|print|adata|ov\.)")
+        assignment_pattern = re.compile(r"^\s*[\w\.]+\s*=.*")
+        collected: List[str] = []
+
+        for raw_line in response_text.splitlines():
+            line = raw_line.rstrip()
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if python_line_pattern.match(line) or assignment_pattern.match(line):
+                collected.append(line)
+
+        snippet = "\n".join(collected).strip()
+        return textwrap.dedent(snippet) if snippet else ""
+
+    def _normalize_code_candidate(self, code: str) -> str:
+        """Ensure imports and formatting are in place for execution."""
+
+        dedented = textwrap.dedent(code).strip()
+        if not dedented:
+            raise ValueError("empty code candidate")
+
+        import_present = re.search(r"^\s*(?:import|from)\s+omicverse", dedented, re.MULTILINE)
+        if not import_present:
+            dedented = "import omicverse as ov\n" + dedented
+
+        return dedented
+
+    def _execute_generated_code(self, code: str, adata: Any) -> Any:
+        """Execute generated Python code in a sandboxed namespace.
+
+        Notes
+        -----
+        The sandbox restricts available built-ins and module imports, but it is not a
+        foolproof security boundary. Only run the agent with data and environments you
+        trust, and consider additional isolation (e.g., containers) for untrusted input.
+        """
+
+        compiled = compile(code, "<omicverse-agent>", "exec")
+        sandbox_globals = self._build_sandbox_globals()
+        sandbox_locals = {"adata": adata}
+
+        with self._temporary_api_keys():
+            exec(compiled, sandbox_globals, sandbox_locals)
+
+        return sandbox_locals.get("adata", adata)
+
+    def _build_sandbox_globals(self) -> Dict[str, Any]:
+        """Create a restricted global namespace for executing agent code."""
+
+        allowed_builtins = [
+            "abs",
+            "all",
+            "any",
+            "bool",
+            "dict",
+            "enumerate",
+            "Exception",
+            "float",
+            "int",
+            "isinstance",
+            "iter",
+            "len",
+            "list",
+            "map",
+            "max",
+            "min",
+            "next",
+            "pow",
+            "print",
+            "range",
+            "round",
+            "set",
+            "sorted",
+            "str",
+            "sum",
+            "tuple",
+            "zip",
+            "filter",
+            "type",
+            "ValueError",
+            "RuntimeError",
+            "TypeError",
+            "KeyError",
+            "AssertionError",
+        ]
+
+        safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
+        allowed_modules = {}
+        for module_name in ("omicverse", "numpy", "pandas", "scanpy"):
+            try:
+                allowed_modules[module_name] = __import__(module_name)
+            except ImportError:
+                warnings.warn(
+                    f"Module '{module_name}' is not available inside the agent sandbox.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
+        def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
+            root_name = name.split(".")[0]
+            if root_name not in allowed_modules:
+                raise ImportError(
+                    f"Module '{name}' is not available inside the OmicVerse agent sandbox."
+                )
+            return __import__(name, globals, locals, fromlist, level)
+
+        safe_builtins["__import__"] = limited_import
+
+        sandbox_globals: Dict[str, Any] = {"__builtins__": safe_builtins}
+        sandbox_globals.update(allowed_modules)
+        return sandbox_globals
+
     async def run_async(self, request: str, adata: Any) -> Any:
         """
         Process a natural language request and execute the generated code locally.
@@ -350,6 +623,21 @@ User request: "quality control with nUMI>500, mito<0.2"
             Processed adata object
         """
         
+        # Determine which project skills are relevant to this request
+        skill_matches = self._select_skill_matches(request, top_k=2)
+        if skill_matches:
+            print("\n🎯 Matched project skills:")
+            for match in skill_matches:
+                print(f"   - {match.skill.name} (score={match.score:.3f})")
+
+        skill_guidance_text = self._format_skill_guidance(skill_matches)
+        skill_guidance_section = ""
+        if skill_guidance_text:
+            skill_guidance_section = (
+                "\nRelevant project skills:\n"
+                f"{skill_guidance_text}\n"
+            )
+
         # Ask agent to generate the appropriate function call code
         code_generation_request = f'''
 Please analyze this OmicVerse request: "{request}"
@@ -363,6 +651,7 @@ Your task:
 Dataset info:
 - Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
 - Request: {request}
+{skill_guidance_section}
 
 CRITICAL INSTRUCTIONS:
 1. ALWAYS call _search_functions first to find the right function
@@ -385,7 +674,8 @@ Example workflow:
         
         # Get the code from the agent
         print(f"\n🤔 Agent analyzing request: '{request}'...")
-        response = await self.agent.run(code_generation_request)
+        with self._temporary_api_keys():
+            response = await self.agent.run(code_generation_request)
         
         # Extract code from the response
         # Check if response has content attribute (Pantheon agent response)
@@ -404,92 +694,66 @@ Example workflow:
             print(response_text)
         print("-" * 50)
         
-        # Find code blocks in the response
-        code_blocks = []
-        import re
-        
-        # Look for ```python code blocks
-        python_blocks = re.findall(r'```python\n(.*?)\n```', response_text, re.DOTALL)
-        code_blocks.extend(python_blocks)
-        
-        # Look for ``` code blocks without language specification
-        generic_blocks = re.findall(r'```\n(.*?)\n```', response_text, re.DOTALL)
-        code_blocks.extend(generic_blocks)
-        
-        if not code_blocks:
-            # If no code blocks found, check if response_text is already clean code
-            # Extract all Python code lines including variable definitions
-            clean_lines = []
-            for line in response_text.split('\n'):
-                line_stripped = line.strip()
-                # Skip empty lines and non-code lines
-                if not line_stripped:
-                    continue
-                # Include lines that are Python code
-                if any([
-                    line_stripped.startswith('import '),
-                    line_stripped.startswith('from '),
-                    line_stripped.startswith('adata'),
-                    line_stripped.startswith('tresh'),
-                    '=' in line_stripped,  # Variable assignments
-                    'ov.' in line_stripped,
-                    line_stripped.startswith('try:'),
-                    line_stripped.startswith('except'),
-                ]):
-                    clean_lines.append(line_stripped)
-            
-            if clean_lines:
-                # Ensure import is at the top
-                has_import = any('import omicverse' in line for line in clean_lines)
-                if not has_import:
-                    code = "import omicverse as ov\n" + '\n'.join(clean_lines)
-                else:
-                    code = '\n'.join(clean_lines)
-                
-                # Filter out lines that shouldn't be in final code (indentation issues)
-                # Only keep the essential lines
-                essential_lines = []
-                for line in code.split('\n'):
-                    # Skip try/except blocks that might have indentation issues
-                    if line.strip().startswith('try:') or line.strip().startswith('except'):
-                        continue
-                    if line.strip().startswith('pc_count'):
-                        continue
-                    essential_lines.append(line)
-                    
-                # Keep only the core function calls
-                if essential_lines:
-                    code = '\n'.join(essential_lines)
-            else:
-                raise ValueError(f"❌ Could not extract executable code from agent response")
-        else:
-            # Use the first code block found
-            code = code_blocks[0].strip()
-        
+        try:
+            code = self._extract_python_code(response_text)
+        except ValueError as exc:
+            raise ValueError(f"❌ Could not extract executable code from agent response: {exc}") from exc
+
         print(f"\n🧬 Generated code to execute:")
         print("=" * 50)
         print(f"{code}")
         print("=" * 50)
-        
+
         # Execute the code locally
         print(f"\n⚡ Executing code locally...")
         try:
-            # Create execution context with adata
-            local_vars = {'adata': adata}
-            exec(code, globals(), local_vars)
-            
-            # Return the modified adata
-            result_adata = local_vars.get('adata', adata)
+            result_adata = self._execute_generated_code(code, adata)
             print(f"✅ Code executed successfully!")
             print(f"📊 Result shape: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
-            
+
             return result_adata
-            
+
         except Exception as e:
             print(f"❌ Error executing generated code: {e}")
             print(f"Code that failed: {code}")
             return adata
-    
+
+    def _select_skill_matches(self, request: str, top_k: int = 1) -> List[SkillMatch]:
+        """Return the most relevant project skills for the request."""
+
+        if not self.skill_router:
+            return []
+        try:
+            return self.skill_router.route(request, top_k=top_k)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            print(f"⚠️  Skill routing failed: {exc}")
+            return []
+
+    def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
+        """Format skill instructions for prompt injection."""
+
+        if not matches:
+            return ""
+        blocks = []
+        for match in matches:
+            instructions = match.skill.prompt_instructions(max_chars=2000)
+            blocks.append(
+                f"- {match.skill.name} (score={match.score:.3f})\n"
+                f"{instructions}"
+            )
+        return "\n\n".join(blocks)
+
+    def _format_skill_overview(self) -> str:
+        """Generate a bullet overview of available project skills."""
+
+        if not self.skill_registry or not self.skill_registry.skills:
+            return ""
+        lines = [
+            f"- **{skill.name}** — {skill.description}"
+            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
+        ]
+        return "\n".join(lines)
+
     def run(self, request: str, adata: Any) -> Any:
         """
         Process a natural language request with the provided adata (main method).
@@ -511,6 +775,30 @@ Example workflow:
         >>> agent = ov.Agent(model="gpt-4o-mini")
         >>> result = agent.run("quality control with nUMI>500, mito<0.2", adata)
         """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            result_container: Dict[str, Any] = {}
+            error_container: Dict[str, BaseException] = {}
+
+            def _run_in_thread() -> None:
+                try:
+                    result_container["value"] = asyncio.run(self.run_async(request, adata))
+                except BaseException as exc:  # pragma: no cover - propagate to caller
+                    error_container["error"] = exc
+
+            thread = threading.Thread(target=_run_in_thread, name="OmicVerseAgentRunner")
+            thread.start()
+            thread.join()
+
+            if "error" in error_container:
+                raise error_container["error"]
+
+            return result_container.get("value")
+
         return asyncio.run(self.run_async(request, adata))
 
 
@@ -581,4 +869,4 @@ def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: O
 
 
 # Export the main functions
-__all__ = ['Agent', 'OmicVerseAgent', 'list_supported_models']
+__all__ = ["Agent", "OmicVerseAgent", "list_supported_models"]

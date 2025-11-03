@@ -227,18 +227,18 @@ class GraphVelo():
         """
 
         if X_data is not None and V_data is not None:
-            X = np.array(X_data.A if sp.issparse(X_data)
+            X = np.array(X_data.toarray() if sp.issparse(X_data)
             else X_data)
-            V = np.array(V_data.A if sp.issparse(V_data)
+            V = np.array(V_data.toarray() if sp.issparse(V_data)
             else V_data)
         else:
             X_org = np.array(
-                adata.layers[xkey].A
+                adata.layers[xkey].toarray()
                 if sp.issparse(adata.layers[xkey])
                 else adata.layers[xkey]
             )
             V_org = np.array(
-                adata.layers[vkey].A
+                adata.layers[vkey].toarray()
                 if sp.issparse(adata.layers[vkey])
                 else adata.layers[vkey]
             )
@@ -310,7 +310,7 @@ class GraphVelo():
         train_params = {'a': a, 'b': b, 'r': r, 'loss_func': loss_func, 'softmax_adjusted': softmax_adjusted}
         if transition_matrix is None:
             P = corr_kernel(self.X, self.V, self.nbrs_idx, corr_func=cos_corr, softmax_adjusted=softmax_adjusted)
-            P_dc = density_corrected_transition_matrix(P).A
+            P_dc = density_corrected_transition_matrix(P).toarray()
         else:
             P_dc = transition_matrix
         T = tangent_space_projection(self.X, self.V, P_dc, self.nbrs_idx, a=a, b=b, r=r, loss_func=loss_func, n_jobs=n_jobs)
@@ -338,7 +338,7 @@ class GraphVelo():
 
         sparse_emb = False
         if sp.issparse(X_embedding):
-            X_embedding = X_embedding.A
+            X_embedding = X_embedding.toarray()
             sparse_emb = True
 
         with warnings.catch_warnings():
@@ -369,7 +369,7 @@ class GraphVelo():
             raise ImportError(
                 "You need to install `seaborn` for `phi` distribution visualization.")
 
-        T = self.T.A
+        T = self.T.toarray()
         sns.distplot(T[T>0])
         plt.show()
 

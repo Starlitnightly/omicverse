@@ -18,6 +18,29 @@ from pickle import dump,load
 from scipy.stats import fisher_exact
 from scipy.sparse import coo_matrix
 
+# Import color formatting from omicverse settings
+try:
+    from .._settings import Colors, EMOJI
+except ImportError:
+    # Fallback if import fails
+    class Colors:
+        HEADER = '\033[95m'
+        BLUE = '\033[94m'
+        CYAN = '\033[96m'
+        GREEN = '\033[92m'
+        WARNING = '\033[93m'
+        FAIL = '\033[91m'
+        ENDC = '\033[0m'
+        BOLD = '\033[1m'
+        UNDERLINE = '\033[4m'
+    EMOJI = {
+        "start": "🔍",
+        "done": "✅",
+        "error": "❌",
+        "check_mark": "✅",
+        "warning": "⚠️",
+    }
+
 class Annotator(object):
     def __init__(self,foldchange,weight,
                  pvalue,tissue,species,
@@ -144,21 +167,19 @@ class Annotator(object):
     def do_go_annotation(self,gof,fore,back,cname,gtype):
         """return go annotation with significance tag"""
 
-        if self.year == 2024:
-            fil = gof['2'].map(lambda value: len(set([value]) & fore) > 0)
-            fgnames = gof[fil].groupby(by="4")["2"].unique()
-            bfil = gof["2"].map(lambda value: len(set([value]) & back) > 0)
-            bgnames = gof[bfil].groupby(by="4")["2"].unique()
-        elif self.year == 2023:
-            fil = gof[2].map(lambda value: len(set([value]) & fore) > 0)
-            fgnames = gof[fil].groupby(by=4)[2].unique()
-            bfil = gof[2].map(lambda value: len(set([value]) & back) > 0)
-            bgnames = gof[bfil].groupby(by=4)[2].unique()
-        else:
-            fil = gof[2].map(lambda value: len(set([value]) & fore) > 0)
-            fgnames = gof[fil].groupby(by=4)[2].unique()
-            bfil = gof[2].map(lambda value: len(set([value]) & back) > 0)
-            bgnames = gof[bfil].groupby(by=4)[2].unique()
+        # Check if DataFrame has string or integer column names
+        # Try string column names first (for newer databases), fall back to integer
+        try:
+            col2 = '2' if '2' in gof.columns else 2
+            col4 = '4' if '4' in gof.columns else 4
+        except:
+            col2 = 2
+            col4 = 4
+
+        fil = gof[col2].map(lambda value: len(set([value]) & fore) > 0)
+        fgnames = gof[fil].groupby(by=col4)[col2].unique()
+        bfil = gof[col2].map(lambda value: len(set([value]) & back) > 0)
+        bgnames = gof[bfil].groupby(by=col4)[col2].unique()
             
         dat = DataFrame({"genes":fgnames,"othergenes":bgnames})
         num1 = len(fore)
@@ -441,8 +462,6 @@ class Annotator(object):
         if self.output:
             self.wb.close()
             self.wbgo.close()
-        if self.noprint == False:
-            print("#"*80 + "\n")
         return outs
 
     def calcu_seurat_group(self,expfile,hgvc=False):
@@ -547,12 +566,12 @@ class Annotator(object):
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
-            print("Other Gene number:",len(other_gene_names))
+            # Print compact cluster info with progress
+            progress_bar = f"[{cluster_idx}/{total_clusters}]"
+            print(f"{Colors.CYAN}{progress_bar:<10} Cluster {cname:<4} {Colors.BLUE}│ {Colors.GREEN}{cluster_gene_count:<4} genes{Colors.BLUE} │ {Colors.GREEN}{len(other_gene_names):<4} other genes{Colors.ENDC}")
         if self.output:
             self.wb.close()
             self.wbgo.close()
-        if self.noprint == False:
-            print("#"*80 + "\n")
         return outs
 
     def calcu_scanpy_group(self,expfile,hgvc=False):
@@ -616,6 +635,13 @@ class Annotator(object):
                 print("Error output format: -m, -outfmt,(ms-excel,[txt])")
                 sys.exit(0)
 
+        # Print header
+        total_clusters = len(list(sorted(cnum)))
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}{Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.CYAN}🔬 Analyzing {total_clusters} clusters...{Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.CYAN}{'='*60}{Colors.ENDC}\n")
+
+        cluster_idx = 0
         for i in list(sorted(cnum)):
             cname = str(i)
             if self.cluster != "all":
@@ -626,9 +652,8 @@ class Annotator(object):
                 else:
                     if cname != self.cluster:
                         continue
-            o = " ".join(["#"*30,"Cluster",cname, "#"*30]) + "\n"
-            if self.noprint == False:
-                print(o)
+
+            cluster_idx += 1
             ltitle = cname + "_" + pre
             fid = cname + "_" + rfid
             ptitle = cname + "_" + pname
@@ -641,11 +666,14 @@ class Annotator(object):
             #print(newexps)
 
             h_values,colnames = self.get_cell_matrix(newexps,ltitle,fid,gcol,ccol,abs_tag)
-            print("Cluster " + cname + " Gene number:",newexps[fid].unique().shape[0])
             #print(colnames)
             #for x in newexps[fid].unique():
             #    print(x)
             #exit()
+
+            # Store cluster gene count for later display
+            cluster_gene_count = newexps[fid].unique().shape[0]
+
             if self.output:
                 h_values['Cluster'] = cname
                 Annotator.to_output(h_values,self.wb,self.outfmt,cname,"Cell Type")
@@ -692,12 +720,18 @@ class Annotator(object):
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
-            print("Other Gene number:",len(other_gene_names))
+            # Print compact cluster info with progress
+            progress_bar = f"[{cluster_idx}/{total_clusters}]"
+            print(f"{Colors.CYAN}{progress_bar:<10} Cluster {cname:<4} {Colors.BLUE}│ {Colors.GREEN}{cluster_gene_count:<4} genes{Colors.BLUE} │ {Colors.GREEN}{len(other_gene_names):<4} other genes{Colors.ENDC}")
+
+        # Print summary
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*60}{Colors.ENDC}")
+        print(f"{Colors.GREEN}{EMOJI.get('done', '✅')} Cluster analysis completed! ({cluster_idx}/{total_clusters} processed){Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.CYAN}{'='*60}{Colors.ENDC}\n")
+
         if self.output:
             self.wb.close()
             self.wbgo.close()
-        if self.noprint == False:
-            print("#"*80 + "\n")
         return outs
 
     def calcu_scran_group(self,expfile,hgvc=False):
@@ -784,7 +818,7 @@ class Annotator(object):
             #continue
 
             h_values,colnames = self.get_cell_matrix(newexps,ltitle,fid,gcol,ccol,abs_tag)
-            print("Cluster " + cname + " Gene number:",newexps[fid].unique().shape[0])
+            print(f"{Colors.CYAN}🔬 Cluster {cname} {Colors.BLUE}Gene number: {Colors.GREEN}{newexps[fid].unique().shape[0]}{Colors.ENDC}")
             #print(colnames)
             #for x in newexps[fid].unique():
             #    print(x)
@@ -835,12 +869,12 @@ class Annotator(object):
                 if not trownames:continue
                 other_gene_names = set(tcolnames)
                 self.deal_with_badtype(cname,other_gene_names,colnames)
-            print("Other Gene number:",len(other_gene_names))
+            # Print compact cluster info with progress
+            progress_bar = f"[{cluster_idx}/{total_clusters}]"
+            print(f"{Colors.CYAN}{progress_bar:<10} Cluster {cname:<4} {Colors.BLUE}│ {Colors.GREEN}{cluster_gene_count:<4} genes{Colors.BLUE} │ {Colors.GREEN}{len(other_gene_names):<4} other genes{Colors.ENDC}")
         if self.output:
             self.wb.close()
             self.wbgo.close()
-        if self.noprint == False:
-            print("#"*80 + "\n")
         return outs
 
 
@@ -848,23 +882,22 @@ class Annotator(object):
         """format the cell_deg_matrix and calculate the zscore of certain cell types."""
 
         #filter gene expressed matrix according to the markers
-        from numpy import mat
         gene_exps = exps.loc[:,[fid,ltitle]][exps[fid].isin(colnames)]
 
-        gene_matrix = mat(gene_exps.sort_values(fid)[ltitle]).T
+        gene_matrix = np.array(gene_exps.sort_values(fid)[ltitle]).reshape(1, -1)
         gene_matrix = gene_matrix * np.mean(gene_matrix) ### / np.min(gene_matrix))
 
-        if gene_matrix.shape[0] != cell_matrix.shape[1]:
+        if gene_matrix.shape[1] != cell_matrix.shape[1]:
             #print(gene_matrix.shape,cell_matrix.shape)
             #print(len(gene_exps[fid].unique()))
             #print(gene_matrix)
             #print(cell_matrix)
             print("Error for inconsistent gene numbers, please check your expression csv for '" + fid + "'")
             return None
-        
-        nonzero = np.matrix(np.count_nonzero(cell_matrix,axis=1)).T
+
+        nonzero = np.count_nonzero(cell_matrix,axis=1).reshape(-1, 1)
         #gene_matrix = np.ones_like(gene_matrix)
-        cell_deg_matrix = cell_matrix * gene_matrix
+        cell_deg_matrix = cell_matrix @ gene_matrix.T
 
         #print("cell",cell_matrix)
         #print("gene",gene_matrix)
@@ -898,19 +931,19 @@ class Annotator(object):
 
         #print(np.std(cell_matrix,axis=1))
         #print(cell_matrix.shape,cell_deg_matrix.shape)
-        wstd = np.matrix(np.std(cell_matrix,axis=1)).T
+        wstd = np.std(cell_matrix,axis=1).reshape(-1, 1)
         #print(wstd.shape,wstd,nonzero)
         if usertag:
-            cell_deg_matrix = np.matrix(np.array(cell_deg_matrix))
+            cell_deg_matrix = np.array(cell_deg_matrix)
         else:
             if (wstd.shape == np.ones_like(wstd)).all:
-                wstd = [[1]]
+                wstd = np.array([[1]])
             if (nonzero == np.ones_like(nonzero)).all:
-                cell_deg_matrix = np.matrix(np.array(cell_deg_matrix) * np.array(wstd))
+                cell_deg_matrix = np.array(cell_deg_matrix) * np.array(wstd)
             else:
-                cell_deg_matrix = np.matrix(np.array(cell_deg_matrix) * np.array(log2(nonzero)) * np.array(wstd))
+                cell_deg_matrix = np.array(cell_deg_matrix) * np.array(log2(nonzero)) * np.array(wstd)
 
-        out = DataFrame({"Z-score":cell_deg_matrix.A1},index=rownames)
+        out = DataFrame({"Z-score":cell_deg_matrix.flatten()},index=rownames)
         out.sort_values(['Z-score'],inplace=True,ascending=False)
         #out.to_csv("wei.sco",sep="\t")
         #print(cell_deg_matrix,wstd,log2(nonzero))
@@ -1083,7 +1116,7 @@ class Annotator(object):
                 wm = [1]
             else:
                 wm =[0.1,0.9]
-        weight_matrix = mat(wm).T
+        weight_matrix = np.array(wm).reshape(-1, 1)
 
         if colnames is None:
             return DataFrame(),None
@@ -1092,8 +1125,8 @@ class Annotator(object):
             return DataFrame(),set(colnames)
 
         #print(cell_value)
-        last_value = array(cell_value) * weight_matrix
-        result = DataFrame({"Cell Type":cell_value.index,"Z-score":last_value.A1})
+        last_value = array(cell_value) @ weight_matrix
+        result = DataFrame({"Cell Type":cell_value.index,"Z-score":last_value.flatten()})
         result = result.sort_values(by="Z-score",ascending = False)
         #if self.target == "cancersea":
         #    result['note'] = result['Cell Type'].apply(lambda x: self.snames[x])
@@ -1201,6 +1234,12 @@ class Annotator(object):
                 raise ValueError("2023 database build on pandas<2, please downgrade your pandas version!")
         elif '2024' in db:
             self.year=2024
+            if pd.__version__ > "1.5.3":
+                import sys
+                import pandas
+
+                sys.modules['pandas.core.indexes.numeric'] = pandas.core.indexes.base
+                pandas.core.indexes.base.Int64Index = pandas.core.indexes.base.Index
             if pd.__version__ <= "1.5.3":
                 print("2024 database build on pandas>2 or higher, please update your pandas version!")
                 raise ValueError("2024 database build on pandas>2 or higher, please update your pandas version!")
@@ -1233,19 +1272,19 @@ class Annotator(object):
         
         #if self.noprint == False:
         if self.year == 2023:
-            print("Version V2.1 [2023/06/27]")
+            print(f"{Colors.CYAN}{EMOJI.get('start', '🔍')} Version V2.1 [2023/06/27]{Colors.ENDC}")
         elif self.year == 2024:
-            print("Version V2.2 [2024/12/18]")
+            print(f"{Colors.CYAN}{EMOJI.get('start', '🔍')} Version V2.2 [2024/12/18]{Colors.ENDC}")
         else:
-            print("Unknown version")
+            print(f"{Colors.WARNING}{EMOJI.get('warning', '⚠️')} Unknown version{Colors.ENDC}")
         if 'plus' not in db:
-            print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
-                    len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
-            )
+            print(f"{Colors.BLUE}📊 DB load: {Colors.GREEN}GO_items:{len(self.gos)}{Colors.BLUE}, {Colors.GREEN}Human_GO:{len(self.human_gofs)}{Colors.BLUE}, {Colors.GREEN}Mouse_GO:{len(self.mouse_gofs)}{Colors.BLUE},")
+            print(f"           {Colors.GREEN}CellMarkers:{len(self.cmarkers)}{Colors.BLUE}, {Colors.GREEN}CancerSEA:{len(self.smarkers)}{Colors.BLUE},")
+            print(f"           {Colors.GREEN}Ensembl_HGNC:{len(self.ensem_hgncs)}{Colors.BLUE}, {Colors.GREEN}Ensembl_Mouse:{len(self.ensem_mouse)}{Colors.ENDC}")
         else:
-            print("DB load: GO_items:{},Human_GO:{},Mouse_GO:{},\nCellMarkers:{},CancerSEA:{},PanglaoDB:{}\nEnsembl_HGNC:{},Ensembl_Mouse:{}".format(
-                    len(self.gos),len(self.human_gofs),len(self.mouse_gofs),len(self.cmarkers),len(self.smarkers),len(self.pmarkers),len(self.ensem_hgncs),len(self.ensem_mouse))
-            )
+            print(f"{Colors.BLUE}📊 DB load: {Colors.GREEN}GO_items:{len(self.gos)}{Colors.BLUE}, {Colors.GREEN}Human_GO:{len(self.human_gofs)}{Colors.BLUE}, {Colors.GREEN}Mouse_GO:{len(self.mouse_gofs)}{Colors.BLUE},")
+            print(f"           {Colors.GREEN}CellMarkers:{len(self.cmarkers)}{Colors.BLUE}, {Colors.GREEN}CancerSEA:{len(self.smarkers)}{Colors.BLUE}, {Colors.GREEN}PanglaoDB:{len(self.pmarkers)}{Colors.BLUE}")
+            print(f"           {Colors.GREEN}Ensembl_HGNC:{len(self.ensem_hgncs)}{Colors.BLUE}, {Colors.GREEN}Ensembl_Mouse:{len(self.ensem_mouse)}{Colors.ENDC}")
 
     def read_tissues_species(self,tissue="All",species="Human",celltype="normal"):
         """read markers according to certain tissue and certain species"""
@@ -1267,7 +1306,7 @@ class Annotator(object):
 
 
         #self.cmarkers = self.cmarkers[self.cmarkers['cellName']!="Mesenchymal stem cell"]
-        print("load markers:",len(self.cmarkers))
+        print(f"{Colors.BLUE}📦 Load markers: {Colors.GREEN}{len(self.cmarkers)}{Colors.ENDC}")
         self.cmarkers = self.cmarkers[self.cmarkers['speciesType'].isin([species])]
         #print(self.cmarkers)
 
@@ -1442,9 +1481,37 @@ class Process(object):
                  outfmt,celltype,Gensymbol,list_tissue,cellrange)
         anno.load_pickle_module(rdbname)
         outs=anno.run_detail_cmd()
-        print("#Cluster","Type","Celltype","Score","Times")
+
+        # Print header with colors
+        print(f"\n{Colors.BOLD}{Colors.HEADER}{'='*80}{Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.CYAN}📋 Cell Type Annotation Results{Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.HEADER}{'='*80}{Colors.ENDC}\n")
+        print(f"{Colors.BOLD}{Colors.BLUE}{'Cluster':<10} {'Type':<8} {'Cell Type':<35} {'Score':<15} {'Times'}{Colors.ENDC}")
+        print(f"{Colors.HEADER}{'-'*80}{Colors.ENDC}")
+
+        # Print results with colors
         for o in outs:
-            print(o)
+            cluster, type_val, celltype, score, times = o
+
+            # Color based on confidence type
+            if type_val == 'Good':
+                type_color = Colors.GREEN
+                type_emoji = EMOJI.get('check_mark', '✅')
+            elif type_val == '?':
+                type_color = Colors.WARNING
+                type_emoji = EMOJI.get('warning', '⚠️')
+            else:
+                type_color = Colors.FAIL
+                type_emoji = EMOJI.get('error', '❌')
+
+            # Format celltype with multiple options
+            celltype_str = str(celltype) if celltype != '-' else '-'
+            score_str = str(score) if score != '-' else '-'
+            times_str = f"{times:.2f}" if isinstance(times, (int, float)) else str(times)
+
+            print(f"{Colors.CYAN}{cluster:<10}{Colors.ENDC} {type_color}{type_emoji} {type_val:<6}{Colors.ENDC} {Colors.GREEN}{celltype_str:<35}{Colors.ENDC} {Colors.BLUE}{score_str:<15}{Colors.ENDC} {times_str}")
+
+        print(f"{Colors.HEADER}{'='*80}{Colors.ENDC}\n")
         pass
         #anno = Anno
 

@@ -119,6 +119,27 @@ def preprocess(adata:anndata.AnnData, mode:str='scanpy', target_sum:int=50*1e4, 
 
 ```
 
+### Registering functions for the OmicVerse Smart Agent
+
+Functions that should be discoverable by the Smart Agent must be decorated with `@register_function`. The decorator lives in `omicverse.utils.registry` and records critical metadata such as aliases, category, and a human-readable description. This metadata is surfaced to the agent during intent detection and code generation, so omit none of the required fields.
+
+```python
+from omicverse.utils.registry import register_function
+
+
+@register_function(
+    aliases=["质控", "qc", "quality_control"],
+    category="preprocessing",
+    description="Perform standard single-cell quality control filtering",
+    examples=["ov.pp.qc(adata, tresh={'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250})"],
+)
+def qc(adata, tresh=None):
+    """Run OmicVerse QC on the provided AnnData."""
+    ...
+```
+
+Be sure to provide at least one alias, a non-empty description, and a category; the registry validation enforces these requirements. Including docstrings and representative examples significantly improves the quality of agent suggestions and auto-generated code.
+
 ## Pull request
 
 1. You need to `fork` omicverse at first, and git clone your fork from your repository.

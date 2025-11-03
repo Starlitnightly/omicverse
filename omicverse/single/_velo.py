@@ -173,6 +173,7 @@ class Velo:
         celltype_key=None,
         batch_key=None,
         latentvelo_VAE_kwargs={},
+        use_rep=None,
         **kwargs):
         try:
             import torchdiffeq
@@ -201,13 +202,13 @@ class Velo:
         # Shared preprocessing
         if celltype_key == None:
             self.adata = standard_clean_recipe(self.adata, batch_key=batch_key, 
-                        celltype_key=celltype_key, r2_adjust=True,)
+                        celltype_key=celltype_key, r2_adjust=True,use_rep=use_rep)
 
             self.model = VAE(**latentvelo_VAE_kwargs)
             epochs, vae, val_traj = train(self.model,self.adata,name=param_name_key,**kwargs)
         else:
             self.adata=anvi_clean_recipe(self.adata, celltype_key=celltype_key,
-                        batch_key=batch_key,r2_adjust=True,)
+                        batch_key=batch_key,r2_adjust=True,use_rep=use_rep)
             # Get required parameters from adata
             observed = self.adata.n_vars
             celltypes = len(self.adata.obs[celltype_key].unique())

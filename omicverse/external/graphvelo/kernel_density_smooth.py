@@ -398,9 +398,9 @@ def velocity_kde(adata, regulator, coregulator, effector, axis_layer = 'M_t', dr
 
     
     # Get the gene expression profile for regulator(x), coregulator(y) and effector(z)
-    x_axis = adata[:, regulator].layers[axis_layer].A.flatten()
-    y_axis = adata[:, coregulator].layers[axis_layer].A.flatten()
-    z_axis = adata[:, effector].layers[axis_layer].A.flatten()
+    x_axis = adata[:, regulator].layers[axis_layer].toarray().flatten()
+    y_axis = adata[:, coregulator].layers[axis_layer].toarray().flatten()
+    z_axis = adata[:, effector].layers[axis_layer].toarray().flatten()
     
     # Calculate the velocity (model 2)
     v = adata.layers['velocity_hill']
@@ -490,8 +490,8 @@ def jacobian_kde(adata, regulator, effector, axis_layer = 'M_t', drop_zero_cells
             "package via `pip install dynamo-release` see more details at https://dynamo-release.readthedocs.io/en/latest/,")
     
     #Get the gene expression profile for regulator(x) and effector(y) 
-    x_axis = adata[:, regulator].layers[axis_layer].A.flatten().reshape(-1,1)
-    y_axis = adata[:, effector].layers[axis_layer].A.flatten().reshape(-1,1)
+    x_axis = adata[:, regulator].layers[axis_layer].toarray().flatten().reshape(-1,1)
+    y_axis = adata[:, effector].layers[axis_layer].toarray().flatten().reshape(-1,1)
 
     # #Get the cell_type information
     # keys_to_check = ['cell_type', 'celltype', 'dyn_phase', 'cell_cycle_phase']
@@ -592,9 +592,9 @@ def jacobian_kde_3d(adata, regulator, coregulator, effector, axis_layer = 'M_t',
             "If you want to show jacobian analysis in plotting function, you need to install `dynamo` "
             "package via `pip install dynamo-release` see more details at https://dynamo-release.readthedocs.io/en/latest/,")
     
-    x_axis = adata[:, regulator].layers[axis_layer].A.flatten().reshape(-1,1)
-    y_axis = adata[:, coregulator].layers[axis_layer].A.flatten().reshape(-1,1)
-    z_axis = adata[:, effector].layers[axis_layer].A.flatten().reshape(-1,1)
+    x_axis = adata[:, regulator].layers[axis_layer].toarray().flatten().reshape(-1,1)
+    y_axis = adata[:, coregulator].layers[axis_layer].toarray().flatten().reshape(-1,1)
+    z_axis = adata[:, effector].layers[axis_layer].toarray().flatten().reshape(-1,1)
 
     #Calculate the Jacobian
     dyn.vf.jacobian(adata, regulators = [regulator, effector], effectors=[regulator, effector])

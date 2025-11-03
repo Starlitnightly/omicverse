@@ -688,3 +688,48 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
     ax.spines['bottom'].set_position(('outward', 10))
     
     return fig,ax
+
+
+def plot_grouped_fractions(res, obs, group_key, 
+                           color_dict=None,agg='mean', normalize=True,
+                           figsize=(4, 4),
+                          ):
+    """
+    res: 行为 sample、列为 cell type 的预测比例表（你现在的 res）
+    obs: bulk_ad.obs
+    group_key: 例如 'severity' / 'disease_state' / 'gender' / 任意 obs 列
+    agg: 'mean' / 'median' / 'sum'
+    normalize: 是否把每组的细胞类型比例归一化到和为1
+    """
+    # 1) 对齐索引（样本名）
+    common = res.index.intersection(obs.index)
+    df = res.loc[common].copy()
+    groups = obs.loc[common, group_key].copy()
+
+    # 可选：去掉前缀（例如 "severity: Severe" -> "Severe"）
+    if groups.dtype == 'object':
+        groups = groups.astype(str).str.split(':').str[-1].str.strip()
+
+    # 2) 聚合
+    df[group_key] = groups.values
+    if   agg == 'median': g = df.groupby(group_key).median(numeric_only=True)
+    elif agg == 'sum':    g = df.groupby(group_key).sum(numeric_only=True)
+    else:                 g = df.groupby(group_key).mean(numeric_only=True)
+
+    # 3) 归一化到每组合计为1（按需）
+    if normalize:
+        g = g.div(g.sum(axis=1), axis=0).fillna(0)
+
+    # 4) 列顺序与颜色一致
+    ct_order=list(color_dict.keys())
+    g = g.reindex(columns=ct_order, fill_value=0)
+    colors = [color_dict[c] for c in g.columns]
+
+    # 5) 画图
+    ax = g.plot(kind='bar', stacked=True, figsize=figsize, color=colors)
+    ax.set_xlabel(group_key)
+    ax.set_ylabel('Cell Fraction')
+    ax.set_title(f'Cell fractions grouped by {group_key} ({agg})')
+    ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left', title='Cell type', ncol=1)
+    #plt.tight_layout()
+    return ax

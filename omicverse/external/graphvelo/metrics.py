@@ -36,8 +36,8 @@ def cross_boundary_correctness(adata,
         X = adata.obsm['X_'+basis]
         V = adata.obsm[vector+'_'+basis]
     else:
-        X = adata.layers[xkey].A if issparse(adata.layers[xkey]) else adata.layers[xkey]
-        V = adata.layers[vkey].A if issparse(adata.layers[vkey]) else adata.layers[vkey]
+        X = adata.layers[xkey].toarray() if issparse(adata.layers[xkey]) else adata.layers[xkey]
+        V = adata.layers[vkey].toarray() if issparse(adata.layers[vkey]) else adata.layers[vkey]
         V[np.isnan(V)] = 0
     nbrs_idx = adata.uns[neighbor_key]['indices'] # [n * 30]
         

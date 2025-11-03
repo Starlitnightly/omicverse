@@ -45,6 +45,7 @@ from ._Deseq2 import pyDEG,deseq2_normalize,estimateSizeFactors,estimateDispersi
 from ._tcga import pyTCGA
 from ._combat import batch_correction
 from ._alignment import Alignment, AlignmentConfig, geo_data_preprocess, fq_data_preprocess
+from ._decov import Deconvolution
 
 __all__ = [
 
@@ -90,4 +91,7 @@ __all__ = [
     
     # Batch correction
     'batch_correction',
+
+    # Deconvolution
+    'Deconvolution',
 ]

@@ -4,6 +4,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.sparse import issparse
 
 
 def _load_pbmc3k():
@@ -40,7 +41,7 @@ def _ensure_clusters(adata, key="leiden"):
 
 def _compute_simple_markers(adata, cluster_key: str, topn: int = 15) -> Dict[str, List[str]]:
     markers = {}
-    X = adata.X.A if hasattr(adata.X, "A") else adata.X
+    X = adata.X.toarray() if issparse(adata.X) else adata.X
     for ct in adata.obs[cluster_key].cat.categories:
         idx_in = np.where(adata.obs[cluster_key].values == ct)[0]
         idx_out = np.where(adata.obs[cluster_key].values != ct)[0]
