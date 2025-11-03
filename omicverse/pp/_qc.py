@@ -151,8 +151,36 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
     related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
 )
 def qc(adata,**kwargs):
-    '''
+    r'''
     qc
+    Arguments:
+        adata : AnnData object
+        mode : The filtering method to use. Valid options are 'seurat'
+        and 'mads'. Default is 'seurat'.
+        min_cells : The minimum number of cells for a sample to pass QC. Default is 3.
+        min_genes : The minimum number of genes for a cell to pass QC. Default is 200.
+        max_cells_ratio : The maximum number of cells ratio for a sample to pass QC. Default is 1.
+        max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
+        nmads : The number of MADs to use for MADs filtering. Default is 5.
+        doublets : Whether to perform doublet detection. Default is True.
+        doublets_method : The doublet detection method to use. Options are 'scrublet' or 'sccomposite'. Default is 'scrublet'.
+        filter_doublets : Whether to filter out doublets (True) or just flag them (False). Default is True.
+        path_viz : The path to save the QC plots. Default is None.
+        tresh : A dictionary of QC thresholds. The keys should be 'mito_perc',
+        'nUMIs', and 'detected_genes'.
+            Only used if mode is 'seurat'. Default is None.
+        mt_startswith : The prefix of mitochondrial genes. Default is 'MT-'.
+        mt_genes : The list of mitochondrial genes. Default is None.
+        if mt_genes is not None, mt_startswith will be ignored.
+
+    Returns:
+        adata : An AnnData object containing cells that passed QC filters.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> adata = ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})
+        >>> adata = ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)
+
     '''
 
     if settings.mode == 'gpu':
@@ -172,8 +200,10 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        filter_doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,use_gpu=True,
-       batch_wise_mad=None):
+       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,
+       ribo_startswith=("RPS", "RPL"),ribo_genes=None,
+       hb_startswith="^HB[^(P)]",hb_genes=None,
+       use_gpu=True,batch_wise_mad=None):
     """
     Perform quality control on a dictionary of AnnData objects.
 
@@ -235,7 +265,35 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.var["mt"] = var_names.str.startswith(mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
         print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
-    
+
+    if ribo_genes is not None:
+        adata.var["ribo"] = False
+        adata.var.loc[list(set(adata.var_names) & set(ribo_genes)),'ribo']=True
+        ribo_genes_found = sum(adata.var["ribo"])
+        print(f"   {Colors.CYAN}Ribosomal genes: {Colors.BOLD}{ribo_genes_found}/{len(ribo_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["ribo"] = var_names.str.startswith(ribo_startswith)
+        ribo_genes_found = sum(adata.var["ribo"])
+        print(f"   {Colors.CYAN}Ribosomal genes (prefix '{ribo_startswith}'): {Colors.BOLD}{ribo_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
+    if hb_genes is not None:
+        adata.var["hb"] = False
+        adata.var.loc[list(set(adata.var_names) & set(hb_genes)),'hb']=True
+        hb_genes_found = sum(adata.var["hb"])
+        print(f"   {Colors.CYAN}Hemoglobin genes: {Colors.BOLD}{hb_genes_found}/{len(hb_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["hb"] = var_names.str.contains(hb_startswith)
+        hb_genes_found = sum(adata.var["hb"])
+        print(f"   {Colors.CYAN}Hemoglobin genes (regex '{hb_startswith}'): {Colors.BOLD}{hb_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
     # Check if it's a Rust backend
     is_rust = _is_rust_backend(adata)
     
@@ -243,35 +301,51 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
         adata.obs['nUMIs'].values
+        adata.obs['ribo_perc'] = np.array(adata[:, adata.var["ribo"]].X.sum(axis=1)).reshape(-1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['hb_perc'] = np.array(adata[:, adata.var["hb"]].X.sum(axis=1)).reshape(-1) / \
+        adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
     elif is_rust:
         # For Rust backend (snapatac2) - use adata.X[:] and subset method
         adata.obs['nUMIs'] = np.array(adata.X[:].sum(axis=1)).reshape(-1)
         # Use subset method for Rust backend slicing
         mt_indices = np.where(adata.var["mt"])[0]
+        ribo_indices = np.where(adata.var["ribo"])[0]
+        hb_indices = np.where(adata.var["hb"])[0]
         if len(mt_indices) > 0:
             #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
             adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+            adata.obs['ribo_perc'] = np.array(adata.X[:,ribo_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+            adata.obs['hb_perc'] = np.array(adata.X[:,hb_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
         else:
             adata.obs['mito_perc'] = np.zeros(adata.n_obs)
+            adata.obs['ribo_perc'] = np.zeros(adata.n_obs)
+            adata.obs['hb_perc'] = np.zeros(adata.n_obs)
         adata.obs['detected_genes'] = adata.X[:].getnnz(axis=1)
     else:
         # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
         adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
+        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"] is True].X.sum(axis=1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['hb_perc'] = adata[:, adata.var["hb"] is True].X.sum(axis=1) / \
+        adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    
+
     # Display QC statistics
     print(f"   {Colors.GREEN}✓ QC metrics calculated:{Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean ribosomal %: {Colors.BOLD}{adata.obs['ribo_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['ribo_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean hemoglobin %: {Colors.BOLD}{adata.obs['hb_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['hb_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
-    
+
     # Post seurat or mads filtering QC plot
 
     # Filters
@@ -449,13 +523,29 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     return adata
 
 
-def qc_cpu(adata:anndata.AnnData, mode='seurat',
-       min_cells=3, min_genes=200, nmads=5,
-       max_cells_ratio=1,max_genes_ratio=1,
-       batch_key=None,doublets=True,doublets_method='scrublet',
-       filter_doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
-    """
+def qc_cpu(
+    adata:anndata.AnnData, 
+    mode='seurat',
+    min_cells: Optional[int] = 3, 
+    min_genes: Optional[int] = 200, 
+    nmads: Optional[int] = 5,
+    max_cells_ratio: Optional[float] = 1,
+    max_genes_ratio: Optional[float] = 1,
+    batch_key: Optional[str] = None,
+    doublets: Optional[bool] = True,
+    doublets_method: Optional[str] = 'scrublet',
+    filter_doublets: Optional[bool] = True,
+    path_viz: Optional[str] = None, 
+    tresh: Optional[dict] = None,
+    mt_startswith: Optional[str] = 'MT-',
+    mt_genes: Optional[list] = None,
+    ribo_startswith: Optional[tuple] = ("RPS", "RPL"),
+    ribo_genes: Optional[list] = None, 
+    hb_startswith: Optional[str] = "^HB[^(P)]",
+    hb_genes: Optional[list] = None, 
+    **kwargs
+):
+    r"""
     Perform quality control on a dictionary of AnnData objects.
 
     This function calculates several QC metrics, including mitochondrial percentage, nUMIs,
@@ -512,12 +602,44 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         mt_genes_found = sum(adata.var["mt"])
         print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     
+    if ribo_genes is not None:
+        adata.var["ribo"] = False 
+        adata.var.loc[list(set(adata.var_names) & set(ribo_genes)),'ribo']=True 
+        ribo_genes_found = sum(adata.var["ribo"]) 
+        print(f"   {Colors.CYAN}Ribosomal genes: {Colors.BOLD}{ribo_genes_found}/{len(ribo_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["ribo"] = var_names.str.startswith(ribo_startswith)
+        ribo_genes_found = sum(adata.var["ribo"])
+        print(f"   {Colors.CYAN}Ribosomal genes (prefix '{ribo_startswith}'): {Colors.BOLD}{ribo_genes_found}/{len(ribo_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
+    if hb_genes is not None:
+        adata.var["hb"] = False 
+        adata.var.loc[list(set(adata.var_names) & set(hb_genes)),'hb']=True 
+        hb_genes_found = sum(adata.var["hb"]) 
+        print(f"   {Colors.CYAN}Hemoglobin genes: {Colors.BOLD}{hb_genes_found}/{len(hb_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["hb"] = var_names.str.contains(hb_startswith)
+        hb_genes_found = sum(adata.var["hb"])
+        print(f"   {Colors.CYAN}Hemoglobin genes (regex '{hb_startswith}'): {Colors.BOLD}{hb_genes_found}/{len(hb_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
     # Check if it's a Rust backend
     is_rust = _is_rust_backend(adata)
     
     if issparse(adata.X):
         adata.obs['nUMIs'] = np.array(adata.X.sum(axis=1)).reshape(-1)
         adata.obs['mito_perc'] = np.array(adata[:, adata.var["mt"]].X.sum(axis=1)).reshape(-1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['ribo_perc'] = np.array(adata[:, adata.var["ribo"]].X.sum(axis=1)).reshape(-1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['hb_perc'] = np.array(adata[:, adata.var["hb"]].X.sum(axis=1)).reshape(-1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
     elif is_rust:
@@ -528,13 +650,21 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
         if len(mt_indices) > 0:
             #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
             adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+            adata.obs['ribo_perc'] = np.array(adata.X[:,ribo_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
+            adata.obs['hb_perc'] = np.array(adata.X[:,hb_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
         else:
             adata.obs['mito_perc'] = np.zeros(adata.n_obs)
+            adata.obs['ribo_perc'] = np.zeros(adata.n_obs)
+            adata.obs['hb_perc'] = np.zeros(adata.n_obs)
         adata.obs['detected_genes'] = adata.X[:].getnnz(axis=1)
     else:
         # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
         adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"] is True].X.sum(axis=1) / \
+        adata.obs['nUMIs'].values
+        adata.obs['hb_perc'] = adata[:, adata.var["hb"] is True].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
@@ -544,6 +674,8 @@ def qc_cpu(adata:anndata.AnnData, mode='seurat',
     print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean ribosomal %: {Colors.BOLD}{adata.obs['ribo_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['ribo_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean hemoglobin %: {Colors.BOLD}{adata.obs['hb_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['hb_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
@@ -730,7 +862,9 @@ def qc_gpu(adata, mode='seurat',
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        filter_doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None):
+       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,
+       ribo_startswith=("RPS", "RPL"),ribo_genes=None,
+       hb_startswith="^HB[^(P)]",hb_genes=None):
     '''
     GPU-accelerated quality control using RAPIDS
     '''
@@ -763,18 +897,52 @@ def qc_gpu(adata, mode='seurat',
         rsc.pp.flag_gene_family(adata, gene_family_name="mt", gene_family_prefix=mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
         print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
-    
-    rsc.pp.calculate_qc_metrics(adata, qc_vars=["mt"])
+
+    if ribo_genes is not None:
+        adata.var["ribo"] = False
+        adata.var.loc[list(set(adata.var_names) & set(ribo_genes)),'ribo']=True
+        ribo_genes_found = sum(adata.var["ribo"])
+        print(f"   {Colors.CYAN}Ribosomal genes: {Colors.BOLD}{ribo_genes_found}/{len(ribo_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        # For tuple of prefixes, we need to flag each prefix separately
+        adata.var["ribo"] = False
+        for prefix in ribo_startswith:
+            rsc.pp.flag_gene_family(adata, gene_family_name="ribo_temp", gene_family_prefix=prefix)
+            adata.var["ribo"] = adata.var["ribo"] | adata.var["ribo_temp"]
+        adata.var.drop(columns=["ribo_temp"], inplace=True, errors='ignore')
+        ribo_genes_found = sum(adata.var["ribo"])
+        print(f"   {Colors.CYAN}Ribosomal genes (prefix '{ribo_startswith}'): {Colors.BOLD}{ribo_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
+    if hb_genes is not None:
+        adata.var["hb"] = False
+        adata.var.loc[list(set(adata.var_names) & set(hb_genes)),'hb']=True
+        hb_genes_found = sum(adata.var["hb"])
+        print(f"   {Colors.CYAN}Hemoglobin genes: {Colors.BOLD}{hb_genes_found}/{len(hb_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+    else:
+        # Use regex pattern for hemoglobin genes
+        if type(adata.var_names) is list:
+            var_names = pd.Index(adata.var_names)
+        else:
+            var_names = adata.var_names
+        adata.var["hb"] = var_names.str.contains(hb_startswith)
+        hb_genes_found = sum(adata.var["hb"])
+        print(f"   {Colors.CYAN}Hemoglobin genes (regex '{hb_startswith}'): {Colors.BOLD}{hb_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
+
+    rsc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "ribo", "hb"])
     adata.obs['nUMIs'] = adata.obs['total_counts']
     adata.obs['mito_perc'] = adata.obs['pct_counts_mt']/100
+    adata.obs['ribo_perc'] = adata.obs['pct_counts_ribo']/100
+    adata.obs['hb_perc'] = adata.obs['pct_counts_hb']/100
     adata.obs['detected_genes'] = adata.obs['n_genes_by_counts']
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
-    
+
     # Display QC statistics
     print(f"   {Colors.GREEN}✓ QC metrics calculated:{Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean nUMIs: {Colors.BOLD}{adata.obs['nUMIs'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['nUMIs'].min():.0f}-{adata.obs['nUMIs'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean genes: {Colors.BOLD}{adata.obs['detected_genes'].mean():.0f}{Colors.ENDC}{Colors.BLUE} (range: {adata.obs['detected_genes'].min():.0f}-{adata.obs['detected_genes'].max():.0f}){Colors.ENDC}")
     print(f"     {Colors.BLUE}• Mean mitochondrial %: {Colors.BOLD}{adata.obs['mito_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['mito_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean ribosomal %: {Colors.BOLD}{adata.obs['ribo_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['ribo_perc'].max()*100:.1f}%){Colors.ENDC}")
+    print(f"     {Colors.BLUE}• Mean hemoglobin %: {Colors.BOLD}{adata.obs['hb_perc'].mean()*100:.1f}%{Colors.ENDC}{Colors.BLUE} (max: {adata.obs['hb_perc'].max()*100:.1f}%){Colors.ENDC}")
 
     # Original QC plot
     n0 = adata.shape[0]
