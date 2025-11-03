@@ -175,6 +175,9 @@ MODEL_ALIASES: Dict[str, str] = {
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
     "claude-sonnet-4-5-20250929": "anthropic/claude-sonnet-4-20250514",
+    # Claude 4 Opus variations
+    "claude-4-opus": "anthropic/claude-opus-4-20250514",
+    "claude-opus-4": "anthropic/claude-opus-4-20250514",
     # Claude 3.7
     "claude-sonnet-3-7": "anthropic/claude-3-7-sonnet-20250219",
     "claude-3-7-sonnet": "anthropic/claude-3-7-sonnet-20250219",
