@@ -79,3 +79,6 @@ from ._cluster import cluster,LDA_topic,filtered,refine_label
 from ._venn import venny4py
 from ._lsi import *
 from ._neighboors import neighbors
+
+# Import smart_agent module to make it accessible
+from . import smart_agent

@@ -39,6 +39,7 @@ def test_agent_initialization_with_skills_no_crash(capsys):
                     mock_model_config.get_model_description.return_value = "GPT-4o Mini"
                     mock_model_config.get_endpoint_for_model.return_value = "https://api.openai.com/v1"
                     mock_model_config.normalize_model_id.return_value = "gpt-4o-mini"
+                    mock_model_config.check_api_key_availability.return_value = (True, "OpenAI API key available")
 
                     # Import Agent after all mocks are in place
                     from omicverse.utils.smart_agent import Agent
@@ -97,6 +98,7 @@ def test_agent_skill_count_with_multiple_sources(capsys):
                     mock_model_config.get_model_description.return_value = "GPT-4o"
                     mock_model_config.get_endpoint_for_model.return_value = "https://api.openai.com/v1"
                     mock_model_config.normalize_model_id.return_value = "gpt-4o"
+                    mock_model_config.check_api_key_availability.return_value = (True, "OpenAI API key available")
 
                     from omicverse.utils.smart_agent import Agent
 
