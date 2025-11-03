@@ -55,6 +55,7 @@ except ModuleNotFoundError:
     version = lambda name: get_distribution(name).version
 
 # Core submodules - direct imports
+from . import alignment
 from . import bulk
 from . import single
 from . import utils
@@ -108,3 +109,10 @@ from ._settings import settings, generate_reference_table
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from anndata import AnnData
+
+# Expose agent helpers (e.g., ov.agent.seeker)
+try:
+    from . import agent  # noqa: F401
+except Exception:  # pragma: no cover - optional
+    agent = None

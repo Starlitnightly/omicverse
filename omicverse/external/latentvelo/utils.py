@@ -185,9 +185,10 @@ def paired_correlation_numpy(x, y, axis=1):
     return corr
 
     
-def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced', batch_key = None, root_cells = None, terminal_cells = None,
-                          normalize_library=True, n_top_genes = 2000, n_neighbors=30, smooth = True, umap=False, log=True, r2_adjust=True, share_normalization=False, center=False, celltype_key=None,
-                          bknn=False, retain_genes = None):
+def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced', 
+            batch_key = None, root_cells = None, terminal_cells = None,
+            normalize_library=True, n_top_genes = 2000, n_neighbors=30, smooth = True, umap=False, log=True, r2_adjust=True, share_normalization=False, center=False, celltype_key=None,
+            bknn=False, retain_genes = None,use_rep=None):
 
     """
     Clean and setup data for LatentVelo
@@ -274,7 +275,10 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
         log1p(adata)
     
     scale(adata)
-    pca(adata,layer='scaled')
+    if use_rep == None:
+        pca(adata,layer='scaled')
+    else:
+        adata.obsm['X_pca']= adata.obsm[use_rep]
     
     adata.layers['spliced'] = adata.layers[spliced_key]
     adata.layers['unspliced'] = adata.layers[unspliced_key]
@@ -414,7 +418,7 @@ def standard_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspl
 
 def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced', batch_key = None, root_cells=None, terminal_cells=None,
                           normalize_library=True, n_top_genes = 2000, n_neighbors=30, smooth = True, umap=False, log=True, celltype_key='celltype', r2_adjust=True, share_normalization=False, center=False, 
-                      bknn=False, retain_genes = None):
+                      bknn=False, retain_genes = None,use_rep=None):
 
     """
     Clean and setup data for celltype annotated version of LatentVelo
@@ -493,7 +497,10 @@ def anvi_clean_recipe(adata, spliced_key = 'spliced', unspliced_key = 'unspliced
         log1p(adata)
     
     scale(adata)
-    pca(adata,layer='scaled')
+    if use_rep == None:
+        pca(adata,layer='scaled')
+    else:
+        adata.obsm['X_pca']= adata.obsm[use_rep]
     
     adata.layers['spliced'] = adata.layers[spliced_key]
     adata.layers['unspliced'] = adata.layers[unspliced_key]

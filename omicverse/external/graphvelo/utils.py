@@ -15,7 +15,7 @@ def flatten(arr: Union[pd.Series, sp.csr_matrix, np.ndarray]) -> np.ndarray:
     if type(arr) == pd.core.series.Series:
         ret = arr.values.flatten()
     elif sp.issparse(arr):
-        ret = arr.A.flatten()
+        ret = arr.toarray().flatten()
     else:
         ret = arr.flatten()
     return ret
@@ -149,13 +149,13 @@ def adj_to_knn(adj: np.ndarray, n_neighbors: int = 30) -> Tuple[np.ndarray, np.n
         cur_n_neighbors = len(cur_neighbors[1])
 
         if cur_n_neighbors > n_neighbors - 1:
-            sorted_indices = np.argsort(adj[cur_cell][:, cur_neighbors[1]].A)[0][: (n_neighbors - 1)]
+            sorted_indices = np.argsort(adj[cur_cell][:, cur_neighbors[1]].toarray())[0][: (n_neighbors - 1)]
             idx[cur_cell, 1:] = cur_neighbors[1][sorted_indices]
-            wgt[cur_cell, 1:] = adj[cur_cell][0, cur_neighbors[1][sorted_indices]].A
+            wgt[cur_cell, 1:] = adj[cur_cell][0, cur_neighbors[1][sorted_indices]].toarray()
         else:
             idx_ = np.arange(1, (cur_n_neighbors + 1))
             idx[cur_cell, idx_] = cur_neighbors[1]
-            wgt[cur_cell, idx_] = adj[cur_cell][:, cur_neighbors[1]].A
+            wgt[cur_cell, idx_] = adj[cur_cell][:, cur_neighbors[1]].toarray()
 
     return idx, wgt
 
@@ -194,8 +194,8 @@ def velo_angle(v1, v2):
     if v1.shape[1] != v2.shape[1]:
         raise ValueError('Velocity dimension inconsistent ERROR.')
     N = v1.shape[0]
-    v1 = v1.A if sp.issparse(v1) else v1
-    v2 = v2.A if sp.issparse(v2) else v2
+    v1 = v1.toarray() if sp.issparse(v1) else v1
+    v2 = v2.toarray() if sp.issparse(v2) else v2
 
     cell_angles = np.zeros(N, dtype=float)
     for i in range(N):
@@ -206,8 +206,8 @@ def velo_angle(v1, v2):
 
 def velocity_consistency(adata, vkey, gvkey, V_threshold):
     """ Compute velocity consistency between original one and graphvelo output. """
-    v1 = adata.layers[vkey].A if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
-    v2 = adata.layers[gvkey].A if sp.issparse(adata.layers[gvkey]) else adata.layers[gvkey]
+    v1 = adata.layers[vkey].toarray() if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
+    v2 = adata.layers[gvkey].toarray() if sp.issparse(adata.layers[gvkey]) else adata.layers[gvkey]
     threshold_v1 = np.percentile(abs(v1), V_threshold)
     threshold_v2 = np.percentile(abs(v2), V_threshold)
     v1_sign = v1 > -threshold_v1
@@ -351,7 +351,7 @@ def gene_wise_confidence(
         if len(genes) == 0:
             raise ValueError("No genes from your genes list appear in your adata object.")
     else:
-        tmp_V = adata.layers[vkey].A if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
+        tmp_V = adata.layers[vkey].toarray() if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
         genes = adata[:, ~np.isnan(tmp_V.sum(0))].var_names
 
     if X_data is None or V_data is None:
@@ -371,8 +371,8 @@ def gene_wise_confidence(
         desc="calculating gene velocity vectors mack_val based on phase "
         "portrait location with priors of progenitor/mature cell types",
     ):
-        all_vals = X_data[:, i_gene].A if sparse else X_data[:, i_gene]
-        all_vals_v = V_data[:, i_gene].A if sparse_v else V_data[:, i_gene]
+        all_vals = X_data[:, i_gene].toarray() if sparse else X_data[:, i_gene]
+        all_vals_v = V_data[:, i_gene].toarray() if sparse_v else V_data[:, i_gene]
 
         for progenitors_groups, mature_cells_groups in lineage_dict.items():
             progenitors_groups = [progenitors_groups]
@@ -511,7 +511,7 @@ def mack_score(
         if len(genes) == 0:
             raise ValueError("No genes from your genes list appear in your adata object.")
     else:
-        tmp_V = adata.layers[vkey].A if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
+        tmp_V = adata.layers[vkey].toarray() if sp.issparse(adata.layers[vkey]) else adata.layers[vkey]
         genes = adata[:, ~np.isnan(tmp_V.sum(0))].var_names
 
     # Get X_data and V_data if not provided.
@@ -534,7 +534,7 @@ def mack_score(
             nbrs_idx, _ = knn(adata.obsm[basis_for_knn], n_neighbors)
         else:
             logging.info(f"Compute knn in original basis...")
-            X_for_knn = adata.X.A if sp.issparse(adata.X) else adata.X
+            X_for_knn = adata.X.toarray() if sp.issparse(adata.X) else adata.X
             nbrs_idx, _ = knn(X_for_knn, n_neighbors)
     
     # Ensure nbrs_idx is a 2D NumPy array.

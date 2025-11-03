@@ -44,7 +44,7 @@ def counts2TPM(counts, genelen):
 
 
 def ProcessInputData(train_data, test_data, sep=None, datatype='TPM', variance_threshold=0.98,
-                     scaler="mms",
+                     scaler="ss",
                      genelenfile=None):
     ### read train data
     print('Reading training data')

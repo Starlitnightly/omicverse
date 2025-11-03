@@ -127,7 +127,7 @@ def generate_simulated_data(sc_data, outname=None,
     sample = np.zeros((prop.shape[0], sc_data.shape[1]))
     allcellname = celltype_groups.keys()
     print('Sampling cells to compose pseudo-bulk data')
-    for i, sample_prop in tqdm(enumerate(cell_num)):
+    for i, sample_prop in enumerate(tqdm(cell_num)):
         for j, cellname in enumerate(allcellname):
             select_index = choice(celltype_groups[cellname], size=int(sample_prop[j]), replace=True)
             sample[i] += sc_data[select_index].sum(axis=0)

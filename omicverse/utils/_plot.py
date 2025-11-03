@@ -1374,6 +1374,27 @@ def plot_pca_variance_ratio(
     show=None,
     save=None,
 ):
+    r"""Plot PCA variance ratio to determine optimal number of principal components.
+
+    Arguments:
+        adata: AnnData object containing PCA results.
+        use_rep: Key in adata.uns for variance ratios. Default: 'scaled|original|pca_var_ratios'.
+        n_pcs: Number of principal components to plot. Default: 30.
+        log: Whether to use logarithmic scale. Default: False.
+        show: Show the figure. Default: None.
+        save: Save the figure to file. Default: None.
+
+    Returns:
+        None: Displays or saves the PCA variance ratio plot.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Basic PCA variance ratio plot
+        >>> ov.pp.pca(adata, n_pcs=50)
+        >>> ov.utils.plot_pca_variance_ratio(adata, n_pcs=30)
+        >>> # Custom variance ratios with log scale
+        >>> ov.utils.plot_pca_variance_ratio(adata, n_pcs=50, log=True)
+    """
     ranking(
         adata,
         "uns",

@@ -12,3 +12,4 @@ sentence-transformers
 gpt4all
 tiktoken
 pyngrok
+PyYAML
