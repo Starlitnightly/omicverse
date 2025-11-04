@@ -68,7 +68,7 @@ dependencies = [
     #'skimage>=0.21',
     #'scrublet>=0.2',
     #'scvi-tools>=0.20.1',
-    'pynvml',
+    #'pynvml',
     'plotly',
     'numba>=0.56',
     'tqdm',

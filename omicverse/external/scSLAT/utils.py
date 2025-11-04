@@ -3,7 +3,7 @@ Miscellaneous utilities
 """
 import random
 
-from pynvml import *
+#from pynvml import *
 from anndata import AnnData
 from typing import List, Optional, Union
 
@@ -62,6 +62,7 @@ def get_free_gpu() -> int:
     ----------
     https://stackoverflow.com/questions/58216000/get-total-amount-of-free-gpu-memory-and-available-using-pytorch
     """
+    from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
     nvmlInit()
     index = 0
     max = 0
