@@ -610,6 +610,7 @@ Added and fixed the `anndata-rs` to support million size's datasets (#336)
 - Added enhanced verbose output with device selection information and emoji indicators
 - Added optimal component determination based on variance contribution thresholds in `init_pca()`
 - Added GPU-accelerated SUDE dimensionality reduction in `ov.pp.sude()` with MLX/CUDA support
+- Optimize the `ov.pp.qc` and added ribosome and hb-genes to know more information of data quantity.
 
 ### Datasets Module
 - Complete elimination of scanpy dependencies for faster loading
@@ -624,6 +625,15 @@ Added and fixed the `anndata-rs` to support million size's datasets (#336)
 - Added code generation architecture with local execution
 - Added function registry system with multi-language aliases
 - Added smart API key management and provider-specific configuration
+
+### Bulk Module
+- Added `BayesPrime` and `Scaden` to deconvoluted Bulk RNA-seq's celltype proportion.
+- Added `alignment` to alignment the fastq to counts.
+
+### Single Module
+- Added `ov.single.Annotation` and `ov.single.AnnotationRef` to annotate the cell type automatically.
+- Added `ov.alignment.single` to alignment the scRNA-seq to counts directly.
+
 
 
 
