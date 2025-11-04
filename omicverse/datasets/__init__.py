@@ -48,6 +48,7 @@ from ._datasets import (
     download_data,
     download_data_requests,
     get_adata,
+    pancreas_cellrank,
     
     # Main dataset loaders
     pbmc3k,

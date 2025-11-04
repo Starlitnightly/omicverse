@@ -342,6 +342,18 @@ def pancreatic_endocrinogenesis(
 
     return adata
 
+def pancreas_cellrank(
+    url: str = "https://figshare.com/ndownloader/files/25060877",
+    filename: str = "pancreas_cellrank.h5ad",
+) -> AnnData:
+    """The pancreas cellrank dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/Pancreas.
+
+    This data consists of 13,913 genes across 2,930 cells.
+    """
+    adata = get_adata(url, filename)
+    return adata
+
+
 
 def dentate_gyrus_scvelo(
     url: str = "https://figshare.com/ndownloader/files/47439623",
