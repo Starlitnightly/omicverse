@@ -58,7 +58,7 @@ def _load_registry(project_root: Path) -> SkillRegistry:
     """Load skills using dual-path discovery to match Agent behavior."""
     cwd = Path.cwd()
     registry = build_multi_path_skill_registry(project_root, cwd)
-    return registry  # type: ignore[return-value]
+    return registry
 
 
 def _print_skill_list(skills: List[SkillDefinition]) -> None:
@@ -112,6 +112,19 @@ def _zip_skill(defn: SkillDefinition, out_dir: Path) -> Path:
                     continue
                 arcname = path.relative_to(defn.path)
                 zf.write(path, arcname)
+    return zip_path
+
+
+def _package_skill_with_validation(defn: SkillDefinition, out_dir: Path) -> Path:
+    """Package a skill after validating metadata and required files."""
+
+    ok, msgs = _validate_skill(defn)
+    if not ok:
+        print(f"⚠️  {defn.slug} has validation issues:")
+        for message in msgs:
+            print(f"   - {message}")
+    zip_path = _zip_skill(defn, out_dir)
+    print(f"✅ Packaged {defn.slug} -> {zip_path}")
     return zip_path
 
 
@@ -271,25 +284,11 @@ def main(argv: List[str] | None = None) -> int:
             if not target:
                 print(f"❌ Skill not found (by slug): {args.package}")
                 return 1
-            ok, msgs = _validate_skill(target)
-            if not ok:
-                print(f"⚠️  Packaging despite validation issues for {target.slug}:")
-                for m in msgs:
-                    print(f"   - {m}")
-            zip_path = _zip_skill(target, out_dir)
-            print(f"✅ Packaged {target.slug} -> {zip_path}")
-            packaged.append(zip_path)
+            packaged.append(_package_skill_with_validation(target, out_dir))
 
         if args.package_all:
             for defn in skills:
-                ok, msgs = _validate_skill(defn)
-                if not ok:
-                    print(f"⚠️  {defn.slug} has validation issues; continuing:")
-                    for m in msgs:
-                        print(f"   - {m}")
-                zip_path = _zip_skill(defn, out_dir)
-                print(f"✅ Packaged {defn.slug} -> {zip_path}")
-                packaged.append(zip_path)
+                packaged.append(_package_skill_with_validation(defn, out_dir))
 
         if not packaged:
             print("No skills packaged.")
