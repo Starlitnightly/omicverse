@@ -29,15 +29,20 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 # Some of the test doubles create a lightweight ``omicverse`` package stub that
-# does not populate the ``utils`` attribute on the parent package.  Python 3.11
-# implicitly exposes the submodule attribute during import, but Python 3.10
-# requires it to be explicitly set.  When this module is imported in the test
-# suite, we make sure ``omicverse.utils`` is attached to ``omicverse`` so that
-# attribute lookups performed by ``unittest.mock.patch`` succeed.
+# does not populate the ``utils`` attribute on the parent package or expose this
+# module as ``omicverse.utils.smart_agent``.  Python 3.10 (used in CI) requires
+# these attributes to be set manually for ``unittest.mock.patch`` lookups to
+# succeed.  When this module is imported in the test suite, we make sure the
+# parent references are wired correctly.
 _parent_pkg = sys.modules.get("omicverse")
 _utils_pkg = sys.modules.get("omicverse.utils")
-if _parent_pkg is not None and _utils_pkg is not None and not hasattr(_parent_pkg, "utils"):
-    setattr(_parent_pkg, "utils", _utils_pkg)
+if _parent_pkg is not None and _utils_pkg is not None:
+    if not hasattr(_parent_pkg, "utils"):
+        setattr(_parent_pkg, "utils", _utils_pkg)
+
+    module_name = __name__.split(".")[-1]
+    if not hasattr(_utils_pkg, module_name):
+        setattr(_utils_pkg, module_name, sys.modules[__name__])
 
 # Add pantheon path if not already in path
 try:
