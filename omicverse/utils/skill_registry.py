@@ -118,7 +118,22 @@ class SkillDefinition:
     metadata: Dict[str, str] = field(default_factory=dict)
 
     def prompt_instructions(self, max_chars: int = 4000, provider: Optional[str] = None) -> str:
-        """Return the main instruction body, formatted for the LLM provider."""
+        """Return the main instruction body, formatted for the LLM provider.
+
+        Examples
+        --------
+        >>> skill = SkillDefinition(
+        ...     name="QC",
+        ...     slug="qc",
+        ...     description="Quality control workflow",
+        ...     path=Path("/tmp/qc"),
+        ...     body="---\\ntitle: QC\\nslug: qc\\n---\\n## Steps\\n- filter\\n- score",
+        ...     metadata={"title": "QC"},
+        ... )
+        >>> snippet = skill.prompt_instructions(max_chars=16)
+        >>> isinstance(snippet, str)
+        True
+        """
         return SkillInstructionFormatter.format_for_provider(self.body, provider=provider, max_chars=max_chars)
 
     @property
@@ -339,7 +354,7 @@ class SkillRouter:
         return numerator / denominator
 
 
-def build_skill_registry(project_root: Path) -> Optional[SkillRegistry]:
+def build_skill_registry(project_root: Path) -> SkillRegistry:
     """Helper to create and load a registry from the project root."""
 
     skill_root = project_root / ".claude" / "skills"
@@ -350,7 +365,7 @@ def build_skill_registry(project_root: Path) -> Optional[SkillRegistry]:
     return registry
 
 
-def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> Optional[SkillRegistry]:
+def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> SkillRegistry:
     """
     Load skills from multiple paths with priority ordering.
 
@@ -383,7 +398,7 @@ def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> Optional[S
 
     if not merged:
         logger.warning("No skills discovered in package or CWD")
-        return None
+        return SkillRegistry(skill_root=package_skill_root)
 
     reg = SkillRegistry(skill_root=package_skill_root)
     reg._skills = merged
