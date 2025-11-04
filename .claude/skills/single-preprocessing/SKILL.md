@@ -34,8 +34,16 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
      - `ov.pp.neighbors(..., method='cagra')` on GPU to call RAPIDS graph primitives.
    - Generate embeddings via `ov.utils.mde(...)`, `ov.pp.umap(adata)`, `ov.pp.mde(...)`, `ov.pp.tsne(...)`, or `ov.pp.sude(...)` depending on the notebook variant.
 8. **Cluster and annotate**
-   - Run `ov.pp.leiden(adata, resolution=1)` after neighbour graph construction; CPU–GPU pipelines also showcase `ov.pp.score_genes_cell_cycle` before clustering.
-   - Plot embeddings with `ov.pl.embedding(...)` or `ov.utils.embedding(...)`, colouring by `leiden` clusters and marker genes.
+   - Run `ov.pp.leiden(adata, resolution=1)` or `ov.single.leiden(adata, resolution=1.0)` after neighbour graph construction; CPU–GPU pipelines also showcase `ov.pp.score_genes_cell_cycle` before clustering.
+   - **IMPORTANT - Defensive checks**: When generating code that plots by clustering results (e.g., `color='leiden'`), always check if the clustering has been performed first:
+     ```python
+     # Check if leiden clustering exists, if not, run it
+     if 'leiden' not in adata.obs:
+         if 'neighbors' not in adata.uns:
+             ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
+         ov.single.leiden(adata, resolution=1.0)
+     ```
+   - Plot embeddings with `ov.pl.embedding(...)` or `ov.utils.embedding(...)`, colouring by `leiden` clusters and marker genes. Always verify that the column specified in `color=` parameter exists in `adata.obs` before plotting.
 9. **Document outputs**
    - Encourage saving intermediate AnnData objects (`adata.write('write/pbmc3k_preprocessed.h5ad')`) and figure exports using Matplotlib’s `plt.savefig(...)` to preserve QC summaries and embeddings.
 10. **Notebook-specific notes**
@@ -47,6 +55,11 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
     - Address GPU import errors by confirming the conda environment matches the RAPIDS version for the installed CUDA driver (`nvidia-smi`).
     - For `ov.pp.preprocess` dimension mismatches, ensure QC filtered out empty barcodes so HVG selection does not encounter zero-variance features.
     - When embeddings lack expected fields (e.g., `scaled|original|X_pca` missing), re-run `ov.pp.scale` and `ov.pp.pca` to rebuild the cached layers.
+    - **Pipeline dependency errors**: When encountering errors like "Could not find 'leiden' in adata.obs or adata.var_names":
+      - Always check if required preprocessing steps (neighbors, PCA) exist before dependent operations
+      - Check if clustering results exist in `adata.obs` before trying to color plots by them
+      - Use defensive checks in generated code to handle incomplete pipelines gracefully
+    - **Code generation best practice**: Generate robust code with conditional checks for prerequisites rather than assuming perfect sequential execution. Users may run steps in separate sessions or skip intermediate steps.
 
 ## Examples
 - "Download PBMC3k counts, run QC with Scrublet, normalise with `shiftlog|pearson`, and compute MDE + UMAP embeddings on CPU." 

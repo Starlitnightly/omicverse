@@ -23,9 +23,22 @@ This skill distills the single-cell tutorials [`t_cluster.ipynb`](../../omicvers
    - Call `ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=3000, batch_key=None)` to normalise, log-transform, and flag highly variable genes; assign `adata.raw = adata` and subset to `adata.var.highly_variable_features` for downstream modelling.
    - Scale expression (`ov.pp.scale(adata)`) and compute PCA scores with `ov.pp.pca(adata, layer='scaled', n_pcs=50)`. Encourage reviewing variance explained via `ov.utils.plot_pca_variance_ratio(adata)`.
 5. **Construct neighbourhood graph and baseline clustering**
-   - Build neighbour graph using `sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, use_rep='scaled|original|X_pca')`.
-   - Generate Leiden or Louvain labels through `ov.utils.cluster(adata, method='leiden'|'louvain', resolution=1)`; remind users that resolution tunes granularity.
-   - Visualise embeddings with `ov.pl.embedding(adata, basis='X_umap', color=['clusters','leiden'], frameon='small', wspace=0.5)` and confirm cluster separation.
+   - Build neighbour graph using `sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, use_rep='scaled|original|X_pca')` or `ov.pp.neighbors(...)`.
+   - Generate Leiden or Louvain labels through `ov.utils.cluster(adata, method='leiden'|'louvain', resolution=1)`, `ov.single.leiden(adata, resolution=1.0)`, or `ov.pp.leiden(adata, resolution=1)`; remind users that resolution tunes granularity.
+   - **IMPORTANT - Dependency checks**: Always verify prerequisites before clustering or plotting:
+     ```python
+     # Before clustering: check neighbors graph exists
+     if 'neighbors' not in adata.uns:
+         if 'X_pca' in adata.obsm:
+             ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
+         else:
+             raise ValueError("PCA must be computed before neighbors graph")
+
+     # Before plotting by cluster: check clustering was performed
+     if 'leiden' not in adata.obs:
+         ov.single.leiden(adata, resolution=1.0)
+     ```
+   - Visualise embeddings with `ov.pl.embedding(adata, basis='X_umap', color=['clusters','leiden'], frameon='small', wspace=0.5)` and confirm cluster separation. Always check that columns in `color=` parameter exist in `adata.obs` before plotting.
 6. **Explore advanced clustering strategies**
    - **scICE consensus**: instantiate `model = ov.utils.cluster(adata, method='scICE', use_rep='scaled|original|X_pca', resolution_range=(4,20), n_boot=50, n_steps=11)` and inspect stability via `model.plot_ic(figsize=(6,4))` before selecting `model.best_k` groups.
    - **Gaussian mixtures**: run `ov.utils.cluster(..., method='GMM', n_components=21, covariance_type='full', tol=1e-9, max_iter=1000)` for model-based assignments.
@@ -45,6 +58,11 @@ This skill distills the single-cell tutorials [`t_cluster.ipynb`](../../omicvers
     - Ensure `adata.raw` captures the unscaled log-normalised matrix before subsetting to HVGs.
     - Confirm `use_rep='scaled|original|X_pca'` strings exist in `adata.obsm` prior to clustering; rerun preprocessing if missing.
     - Monitor memory when running cNMF or scVI; adjust `n_iter`, `components`, or latent dimensions for smaller datasets.
+    - **Pipeline dependency errors**: When you encounter errors like "Could not find 'leiden' in adata.obs", always check and add prerequisites:
+      - Before leiden/louvain clustering → ensure `'neighbors' in adata.uns`
+      - Before plotting by clustering → ensure the cluster column exists in `adata.obs`
+      - Before UMAP/embedding → ensure PCA or another dimensionality reduction is complete
+    - **Code generation pattern**: When generating multi-step code, use defensive checks rather than assuming prior steps completed successfully. This prevents cascading failures when users run steps out of order or in separate sessions.
 
 ## Examples
 - "Normalise dentate gyrus cells, compare Leiden, scICE, and GMM clusters, and report ARI scores versus provided `clusters`."
