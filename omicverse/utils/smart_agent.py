@@ -20,7 +20,6 @@ import textwrap
 import builtins
 import warnings
 import threading
-import logging
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -63,9 +62,6 @@ from .skill_registry import (
     build_skill_registry,
     build_multi_path_skill_registry,
 )
-
-
-logger = logging.getLogger(__name__)
 
 
 class OmicVerseAgent:
@@ -123,12 +119,7 @@ class OmicVerseAgent:
         self.skill_registry: Optional[SkillRegistry] = None
         self.skill_router: Optional[SkillRouter] = None
         self._skill_overview_text: str = ""
-        self._managed_api_env: Dict[str, str] = {}
-        try:
-            self._managed_api_env = self._collect_api_key_env(api_key)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.warning("Failed to collect API key environment variables: %s", exc)
-            self._managed_api_env = {}
+        self._managed_api_env: Dict[str, str] = self._collect_api_key_env(api_key)
 
         # Discover project skills for progressive disclosure guidance
         self._initialize_skill_registry()
@@ -589,12 +580,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         compiled = compile(code, "<omicverse-agent>", "exec")
         sandbox_globals = self._build_sandbox_globals()
         sandbox_locals = {"adata": adata}
-
-        warnings.warn(
-            "Executing agent-generated code. Ensure the input model and prompts come from a trusted source.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
 
         with self._temporary_api_keys():
             exec(compiled, sandbox_globals, sandbox_locals)
