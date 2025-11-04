@@ -91,7 +91,7 @@ class PAGA_tree(PAGA):
         transitions_conf.eliminate_zeros()
 
         # remove non-confident direct paths if more confident indirect path is found.
-        T = transitions_conf.A
+        T = transitions_conf.toarray()
         threshold = max(np.nanmin(np.nanmax(T / (T > 0), axis=0)) - 1e-6, 0.01)
         T *= T > threshold
         for i in range(len(T)):
@@ -110,7 +110,7 @@ class PAGA_tree(PAGA):
                     T_tmp[np.where(T_num[:, i])[0][0], i] = T_max
             from scipy.sparse.csgraph import minimum_spanning_tree
 
-            T_tmp = np.abs(minimum_spanning_tree(-T_tmp).A) > 0
+            T_tmp = np.abs(minimum_spanning_tree(-T_tmp).toarray()) > 0
             T = T_tmp * T
 
         transitions_conf = csr_matrix(T)

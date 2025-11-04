@@ -173,6 +173,22 @@ class TrajInfer(object):
             self.adata.obs['slingshot_pseudotime']=pseudotime
             self.slingshot=slingshot
             add_reference(self.adata,'slingshot','trajectory inference with slingshot')
+        elif method=='sctour':
+            import sctour as sct
+            tnode = sct.train.Trainer(
+                self.adata, loss_mode='nb', 
+                **kwargs
+            )
+            tnode.train()
+            self.adata.obs['sctour_pseudotime'] = tnode.get_time()
+            mix_zs, zs, pred_zs = tnode.get_latentsp(alpha_z=0.5, alpha_predz=0.5)
+            self.adata.obsm['X_TNODE'] = mix_zs
+            self.adata.obsm['X_VF'] = tnode.get_vector_field(
+                self.adata.obs['sctour_pseudotime'].values, 
+                self.adata.obsm['X_TNODE']
+            )
+            add_reference(self.adata,'sctour','trajectory inference with sctour')
+            self.tnode=tnode
         else:
             print('Please input the correct method name, such as `palantir` or `diffusion_map`')
             return
