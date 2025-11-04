@@ -88,7 +88,8 @@ class SCENIC:
         print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
 
-    def cal_grn(self,layer='counts',**kwargs):
+    def cal_grn(
+        self,method='regdiffusion',layer='counts',tf_names=None,**kwargs):
         r"""
         Initialize and Train a RegDiffusion model.
 
@@ -156,37 +157,24 @@ class SCENIC:
                 is None. 
         """
         from .._settings import Colors, EMOJI, print_gpu_usage_color
-        import regdiffusion as rd
+        
         
         print(f"\n{Colors.HEADER}{Colors.BOLD}🧬 Gene Regulatory Network (GRN) Inference:{Colors.ENDC}")
-        print(f"   {Colors.CYAN}Method: {Colors.BOLD}RegDiffusion{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Method: {Colors.BOLD}{method}{Colors.ENDC}")
         print(f"   {Colors.BLUE}Data layer: {Colors.BOLD}'{layer}'{Colors.ENDC}")
         
         # Data preparation
         if layer in self.adata.layers:
+            if self.adata.layers[layer].max()<np.log1p(1e4):
+                raise ValueError(f"Layer '{layer}' has been log normalized, please use a layer with raw counts data")
             x = self.adata.layers[layer].toarray()
             x = np.log(x+1.0)
             print(f"   {Colors.GREEN}✓ Using existing '{layer}' layer{Colors.ENDC}")
         else:
             print(f"   {Colors.WARNING}⚠️  Layer '{layer}' not found, recovering counts...{Colors.ENDC}")
-            from ..pp import recover_counts
-            
-            if self.adata.X.max()<np.log1p(1e4):
-                X_counts_recovered, size_factors_sub=recover_counts(self.adata.X, 1e4, 1e5, log_base=None, 
-                                                          chunk_size=10000)
-                self.adata.layers['counts']=X_counts_recovered
-                print(f"   {Colors.GREEN}✓ Counts recovered (target: 1e4){Colors.ENDC}")
-            elif self.adata.X.max()<np.log1p(50*1e4):
-                X_counts_recovered, size_factors_sub=recover_counts(self.adata.X, 50*1e4, 50*1e5, log_base=None, 
-                                                          chunk_size=10000)
-                self.adata.layers['counts']=X_counts_recovered
-                print(f"   {Colors.GREEN}✓ Counts recovered (target: 50*1e4){Colors.ENDC}")
-            else:
-                print(f'   {Colors.FAIL}{EMOJI["error"]} Please provide a layer with raw counts data{Colors.ENDC}')
-                return None
+            raise ValueError(f"Layer '{layer}' not found")
 
-            x = self.adata.layers['counts'].toarray()
-            x = np.log(x+1.0)
+        
 
         # Display data statistics
         print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Data Statistics:{Colors.ENDC}")
@@ -195,57 +183,77 @@ class SCENIC:
         print(f"   {Colors.BLUE}Sparsity: {Colors.BOLD}{(x == 0).sum() / x.size * 100:.1f}%{Colors.ENDC}")
         
         # Display training parameters
-        print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Training Parameters:{Colors.ENDC}")
-        default_params = {
-            'T': 5000, 'start_noise': 0.0001, 'end_noise': 0.02,
-            'time_dim': 64, 'celltype_dim': 4, 'hidden_dim': [16, 16, 16],
-            'init_coef': 5, 'lr_nn': 0.001, 'lr_adj': None,
-            'weight_decay_nn': 0.1, 'weight_decay_adj': 0.01,
-            'sparse_loss_coef': 0.25, 'adj_dropout': 0.3,
-            'batch_size': 128, 'n_steps': 1000, 'train_split': 1.0,
-            'device': 'cuda'
-        }
-        
-        # Show key parameters
-        key_params = ['n_steps', 'batch_size', 'device', 'lr_nn', 'sparse_loss_coef']
-        for param in key_params:
-            value = kwargs.get(param, default_params.get(param, 'Default'))
-            if param == 'device':
-                color = Colors.GREEN if 'cuda' in str(value) else Colors.BLUE
-            else:
-                color = Colors.BLUE
-            print(f"   {color}{param}: {Colors.BOLD}{value}{Colors.ENDC}")
-        
-        # GPU status check
-        if kwargs.get('device', 'cuda') != 'cpu':
-            print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['gpu']} GPU Training Status:{Colors.ENDC}")
-            try:
-                print_gpu_usage_color(bar_length=20)
-            except:
-                print(f"   {Colors.WARNING}GPU status check failed{Colors.ENDC}")
-        
-        # Training time estimation
-        estimated_time = x.shape[0] * kwargs.get('n_steps', 1000) / 10000  # rough estimate
-        if estimated_time > 60:
-            print(f"\n{Colors.HEADER}{Colors.BOLD}⏱️  Estimated Training Time:{Colors.ENDC}")
-            print(f"   {Colors.CYAN}Approximate: {Colors.BOLD}{estimated_time/60:.1f} minutes{Colors.ENDC}")
-            if estimated_time > 300:  # 5 minutes
-                print(f"   {Colors.WARNING}💡 This may take a while. Consider reducing n_steps or using GPU{Colors.ENDC}")
+        if method=='regdiffusion':
+            import regdiffusion as rd
+            print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Training Parameters:{Colors.ENDC}")
+            default_params = {
+                'T': 5000, 'start_noise': 0.0001, 'end_noise': 0.02,
+                'time_dim': 64, 'celltype_dim': 4, 'hidden_dim': [16, 16, 16],
+                'init_coef': 5, 'lr_nn': 0.001, 'lr_adj': None,
+                'weight_decay_nn': 0.1, 'weight_decay_adj': 0.01,
+                'sparse_loss_coef': 0.25, 'adj_dropout': 0.3,
+                'batch_size': 128, 'n_steps': 1000, 'train_split': 1.0,
+                'device': 'cuda'
+            }
+            
+            # Show key parameters
+            key_params = ['n_steps', 'batch_size', 'device', 'lr_nn', 'sparse_loss_coef']
+            for param in key_params:
+                value = kwargs.get(param, default_params.get(param, 'Default'))
+                if param == 'device':
+                    color = Colors.GREEN if 'cuda' in str(value) else Colors.BLUE
+                else:
+                    color = Colors.BLUE
+                print(f"   {color}{param}: {Colors.BOLD}{value}{Colors.ENDC}")
+            
+            # GPU status check
+            if kwargs.get('device', 'cuda') != 'cpu':
+                print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['gpu']} GPU Training Status:{Colors.ENDC}")
+                try:
+                    print_gpu_usage_color(bar_length=20)
+                except:
+                    print(f"   {Colors.WARNING}GPU status check failed{Colors.ENDC}")
+            
+            # Training time estimation
+            estimated_time = x.shape[0] * kwargs.get('n_steps', 1000) / 10000  # rough estimate
+            if estimated_time > 60:
+                print(f"\n{Colors.HEADER}{Colors.BOLD}⏱️  Estimated Training Time:{Colors.ENDC}")
+                print(f"   {Colors.CYAN}Approximate: {Colors.BOLD}{estimated_time/60:.1f} minutes{Colors.ENDC}")
+                if estimated_time > 300:  # 5 minutes
+                    print(f"   {Colors.WARNING}💡 This may take a while. Consider reducing n_steps or using GPU{Colors.ENDC}")
 
-        print(f"\n{Colors.GREEN}{EMOJI['start']} Starting RegDiffusion training...{Colors.ENDC}")
-        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            print(f"\n{Colors.GREEN}{EMOJI['start']} Starting RegDiffusion training...{Colors.ENDC}")
+            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
 
-        rd_trainer = rd.RegDiffusionTrainer(x,**kwargs)
-        rd_trainer.train()
-        grn = rd_trainer.get_grn(self.adata.var_names, top_gene_percentile=50)
+            rd_trainer = rd.RegDiffusionTrainer(x,**kwargs)
+            rd_trainer.train()
+            grn = rd_trainer.get_grn(self.adata.var_names, top_gene_percentile=50)
 
-        # Here for each gene, we are going to extract all edges
-        edgelist = grn.extract_edgelist(k=-1, workers=self.n_jobs)
-        edgelist.columns = ['TF', 'target', 'importance']
-        self.edgelist = edgelist
-        
-        self.edgelist['importance']=self.edgelist['importance'].astype(np.float32)
-        self.adjacencies = self.edgelist
+            # Here for each gene, we are going to extract all edges
+            edgelist = grn.extract_edgelist(k=-1, workers=self.n_jobs)
+            edgelist.columns = ['TF', 'target', 'importance']
+            self.edgelist = edgelist
+            
+            self.edgelist['importance']=self.edgelist['importance'].astype(np.float32)
+            self.adjacencies = self.edgelist
+        elif method=='grnboost2': 
+            from ..external.single.arboreto.algo import grnboost2
+            edgelist = grnboost2(expression_data=x,
+                    tf_names=tf_names)
+            self.edgelist = edgelist
+            self.edgelist['importance']=self.edgelist['importance'].astype(np.float32)
+            self.adjacencies = self.edgelist
+        elif method=='genie3':
+            from ..external.single.arboreto.algo import genie3
+            edgelist = genie3(expression_data=x,
+                    tf_names=tf_names)
+            self.edgelist = edgelist
+            self.edgelist['importance']=self.edgelist['importance'].astype(np.float32)
+            self.adjacencies = self.edgelist
+        else:
+            raise ValueError(f"Method '{method}' not supported")
+
+
         
         # Display results
         print(f"\n{Colors.GREEN}{EMOJI['done']} GRN inference completed!{Colors.ENDC}")
