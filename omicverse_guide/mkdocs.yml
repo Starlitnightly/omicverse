@@ -86,6 +86,7 @@ nav:
     - LLM:
         - Domain Research (dr): Tutorials-llm/t_dr.ipynb
         - Domain Research (dr) — Live Web: Tutorials-llm/t_dr_web.md
+        - ov.Agent PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
         - UCE: Tutorials-llm/t_uce.ipynb
         - scGPT: Tutorials-llm/t_scgpt.ipynb
         - scFoundation: Tutorials-llm/t_scfoundation.ipynb
