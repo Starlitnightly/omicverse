@@ -33,6 +33,8 @@ nav:
             - Consensus Non-negative Matrix factorization (cNMF): Tutorials-single/t_cnmf.ipynb
             - Lazy analysis of scRNA-seq: Tutorials-single/t_lazy.ipynb
         - Annotation: 
+            - Reference-free automated single-cell cell type annotation: Tutorials-single/t_anno_noref.ipynb
+            - Reference automated single-cell cell type annotation: Tutorials-single/t_anno_ref.ipynb
             - Automatic cell type annotation with GPT/Other: Tutorials-single/t_gptanno.ipynb
             - Mapping Cell Names to the Cell Ontology: Tutorials-single/t_cellmatch.ipynb
             - Celltype auto annotation with SCSA: Tutorials-single/t_cellanno.ipynb
