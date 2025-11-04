@@ -30,6 +30,18 @@ It covers how to configure OmicVerse's plotting style, choose colors from the Fo
    - Highlight using these palettes in embeddings: `ov.pl.embedding(adata, basis='X_umap', color='clusters', palette=color_dict, ax=ax)`.
 4. **Single-cell visualizations (`t_visualize_single`)**
    - Remind users to preprocess AnnData if needed (`adata = ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=2000)`).
+   - **IMPORTANT - Data validation**: Before plotting, always verify that required data exists:
+     ```python
+     # Before plotting by clustering or other categorical variable
+     color_col = 'leiden'  # or 'clusters', 'celltype', etc.
+     if color_col not in adata.obs.columns:
+         raise ValueError(f"Column '{color_col}' not found in adata.obs. Available columns: {list(adata.obs.columns)}")
+
+     # Before plotting embeddings
+     basis = 'X_umap'  # or 'X_pca', 'X_tsne', etc.
+     if basis not in adata.obsm.keys():
+         raise ValueError(f"Embedding '{basis}' not found in adata.obsm. Available embeddings: {list(adata.obsm.keys())}")
+     ```
    - For palette optimization, use `ov.pl.optim_palette(adata, basis='X_umap', colors='clusters')` to auto-generate color schemes when categories clash.
    - Reproduce stacked proportions with `ov.pl.cellproportion(adata, groupby='clusters', celltype_clusters='celltype', ax=ax)` and transform into stacked area charts by setting `kind='area'`.
    - Showcase compound embedding utilities:
@@ -42,7 +54,11 @@ It covers how to configure OmicVerse's plotting style, choose colors from the Fo
 5. **Finishing touches and exports**
    - Encourage adding titles, axis labels, and `fig.tight_layout()` to prevent clipping.
    - Suggest saving figures with `fig.savefig('plot.png', dpi=300, bbox_inches='tight')` and documenting color mappings for reproducibility.
-   - Troubleshoot common issues: missing AnnData keys, palette names not found, or Matplotlib font rendering when using Chinese characters.
+   - Troubleshoot common issues:
+     - **Missing AnnData keys**: Always validate `adata.obs` columns and `adata.obsm` embeddings exist before plotting
+     - **Palette names not found**: Verify color dictionaries match actual category values
+     - **Matplotlib font rendering**: When using Chinese characters, ensure appropriate fonts are installed
+     - **"Could not find X in adata.obs"**: Check that clustering or annotation has been performed before trying to visualize results. Use defensive checks to compute missing prerequisites on-the-fly.
 
 ## Examples
 - "Plot a three-set Venn diagram of overlapping DEG lists and reuse Forbidden City colors for consistency."
