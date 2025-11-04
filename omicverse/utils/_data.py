@@ -19,6 +19,7 @@ import warnings
 from scipy.stats import norm
 from .._settings import Colors  # Import Colors from settings
 from .registry import register_function
+from ..datasets import download_data
 
 
 # Internal debug logger (opt-in via env OV_DEBUG/OMICVERSE_DEBUG)
@@ -1330,10 +1331,12 @@ def download_pathway_database():
         'WikiPathways_2019_Mouse':'https://figshare.com/ndownloader/files/39820717',
         'Reactome_2022':'https://figshare.com/ndownloader/files/39820702',
     }
+    from ..datasets import download_data
      
     for datasets_name in _datasets.keys():
         print('......Pathway Geneset download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
+        #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
+        model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.txt',dir='./genesets')
     print('......Pathway Geneset download finished!')
     print('......Other Genesets can be dowload in `https://maayanlab.cloud/Enrichr/#libraries`')
 
@@ -1375,13 +1378,15 @@ def download_geneid_annotation_pair():
         if datasets_name == 'pair_hgnc_all':
             # Handle the tar.gz file for HGNC mapping
             import tarfile
-            tar_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tar.gz'.format(datasets_name),title=datasets_name)
+            #tar_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tar.gz'.format(datasets_name),title=datasets_name)
+            tar_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.tar.gz',dir='./genesets')
             # Extract the TSV file from tar.gz
             with tarfile.open(tar_path, 'r:gz') as tar:
                 tar.extractall(path='genesets/')
             print('......Extracted pair_hgnc_all.tsv from tar.gz')
         else:
-            model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
+            #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
+            model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.tsv',dir='./genesets')
     print('......Geneid Annotation Pair download finished!')
 
 @register_function(
@@ -1485,7 +1490,8 @@ def download_tosica_gmt():
      
     for datasets_name in _datasets.keys():
         print('......TOSICA gmt dataset download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
+        #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
+        model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.gmt',dir='./genesets')
     print('......TOSICA gmt dataset download finished!')
 
 @register_function(
