@@ -5,7 +5,6 @@ Based on pantheon-cli model manager design
 
 from typing import Dict, Optional, Tuple
 import os
-import sys
 
 # Available models configuration - based on pantheon-cli
 AVAILABLE_MODELS = {
@@ -171,7 +170,7 @@ PROVIDER_DEFAULT_KEYS = {
 }
 
 # Model ID aliases for backward compatibility
-_RAW_MODEL_ALIASES = {
+MODEL_ALIASES: Dict[str, str] = {
     # Claude 4.5 variations
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
@@ -206,20 +205,6 @@ _RAW_MODEL_ALIASES = {
     "deepseek-chat": "deepseek/deepseek-chat",
     "deepseek-reasoner": "deepseek/deepseek-reasoner",
 }
-
-MODEL_ALIASES: Dict[str, str] = {key.lower(): value for key, value in _RAW_MODEL_ALIASES.items()}
-
-
-def _supports_unicode_output() -> bool:
-    """Best-effort detection for whether stdout can render emoji."""
-
-    encoding = getattr(sys.stdout, "encoding", None) or os.getenv("PYTHONIOENCODING") or "utf-8"
-    try:
-        "💡".encode(encoding)
-        return True
-    except (UnicodeEncodeError, LookupError):
-        return False
-
 
 class ModelConfig:
     """Model configuration and validation for OmicVerse Smart Agent"""
@@ -320,12 +305,8 @@ class ModelConfig:
             result += "\n"
         
         result += "Legend: ✅ API key available | ❌ API key missing\n\n"
-        usage_hint = "Usage: `agent = ov.Agent(model='model_id', api_key='your_key')`"
-        if _supports_unicode_output():
-            result += f"💡 {usage_hint}"
-        else:
-            result += usage_hint
-
+        result += "💡 Usage: `agent = ov.Agent(model='model_id', api_key='your_key')`"
+        
         return result
     
     @staticmethod
