@@ -94,7 +94,7 @@ from .utils.registry import (
     import_registry
 )
 
-# Smart Agent system using Pantheon
+# Smart Agent system (internal backend)
 from .utils.smart_agent import Agent, list_supported_models
 
 name = "omicverse"

@@ -1,8 +1,9 @@
 """
-OmicVerse Smart Agent using Pantheon Framework
+OmicVerse Smart Agent (internal LLM backend)
 
 This module provides a smart agent that can understand natural language requests
-and automatically execute appropriate OmicVerse functions.
+and automatically execute appropriate OmicVerse functions. It now uses a built-in
+LLM backend (see `agent_backend.py`) instead of the external Pantheon framework.
 
 Usage:
     import omicverse as ov
@@ -45,13 +46,8 @@ if _parent_pkg is not None and _utils_pkg is not None:
     if not hasattr(_utils_pkg, module_name):
         setattr(_utils_pkg, module_name, sys.modules[__name__])
 
-# Add pantheon path if not already in path
-try:
-    from pantheon.agent import Agent as PantheonAgent
-except ImportError:
-    PANTHEON_INSTALLED = False
-else:
-    PANTHEON_INSTALLED = True
+# Internal LLM backend (Pantheon replacement)
+from .agent_backend import OmicVerseLLMBackend
 
 # Import registry system and model configuration
 from .registry import _global_registry
@@ -72,32 +68,28 @@ class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
     
-    This agent uses the Pantheon framework to understand natural language
+    This agent uses an internal LLM backend to understand natural language
     requests and automatically execute appropriate OmicVerse functions.
     
     Usage:
-        agent = ov.Agent(model="gpt-4o-mini", api_key="your-api-key")
+        agent = ov.Agent(model="gpt-5", api_key="your-api-key")
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: Optional[str] = None):
+    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None):
         """
         Initialize the OmicVerse Smart Agent.
         
         Parameters
         ----------
         model : str
-            LLM model to use for reasoning (default: "gpt-4o-mini")
+            LLM model to use for reasoning (default: "gpt-5")
         api_key : str, optional
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
             Custom API endpoint. If not provided, will use default for the provider
         """
-        if PANTHEON_INSTALLED:
-            print(f" Initializing OmicVerse Smart Agent...")
-        else:
-            print(f"❌ Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
-            raise ImportError("Pantheon not found. Please install pantheon-agents using `pip install pantheon-agents`")
+        print(f" Initializing OmicVerse Smart Agent (internal backend)...")
         
         # Normalize model ID for aliases and variations, then validate
         original_model = model
@@ -119,11 +111,13 @@ class OmicVerseAgent:
         self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
         # Store provider to allow provider-aware formatting of skills
         self.provider = ModelConfig.get_provider_from_model(model)
-        self.agent = None
+        self._llm: Optional[OmicVerseLLMBackend] = None
         self.skill_registry: Optional[SkillRegistry] = None
         self.skill_router: Optional[SkillRouter] = None
         self._skill_overview_text: str = ""
         self._managed_api_env: Dict[str, str] = {}
+        # Token usage tracking at agent level
+        self.last_usage = None
         try:
             self._managed_api_env = self._collect_api_key_env(api_key)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -274,18 +268,7 @@ class OmicVerseAgent:
                     os.environ[key] = previous
 
     def _setup_agent(self):
-        """Setup the pantheon agent with dynamic instructions."""
-        
-        # Suppress debug logs from Pantheon
-        import logging
-        import sys
-        try:
-            from loguru import logger
-            logger.remove()  # Remove default handler
-            logger.add(sys.stderr, level="INFO")  # Only show INFO and above
-        except ImportError:
-            # Fallback to standard logging
-            logging.getLogger('pantheon').setLevel(logging.WARNING)
+        """Setup the internal agent backend with dynamic instructions."""
         
         # Get current function information dynamically
         functions_info = self._get_available_functions_info()
@@ -365,26 +348,21 @@ User request: "quality control with nUMI>500, mito<0.2"
                 f"{self._skill_overview_text}"
             )
         
-        # Set API key as environment variable if provided
+        # Prepare API key environment pin if passed (non-destructive)
         if self.api_key:
-            provider = ModelConfig.get_provider_from_model(self.model)
             required_key = PROVIDER_API_KEYS.get(self.model)
             if required_key and not os.getenv(required_key):
                 os.environ[required_key] = self.api_key
-        
-        # Create the pantheon agent with only function discovery tools
-        self.agent = PantheonAgent(
-            "omicverse_agent",
-            instructions,
+
+        # Create the internal LLM backend
+        self._llm = OmicVerseLLMBackend(
+            system_prompt=instructions,
             model=self.model,
+            api_key=self.api_key,
+            endpoint=self.endpoint,
+            max_tokens=8192,
+            temperature=0.2,
         )
-        
-        # Add custom tools for function discovery (no Python interpreter needed)
-        self.agent.tool(self._search_functions)
-        self.agent.tool(self._get_function_details)
-        if self.skill_registry:
-            self.agent.tool(self._list_project_skills)
-            self.agent.tool(self._load_skill_guidance)
     
     def _search_functions(self, query: str) -> str:
         """
@@ -548,7 +526,7 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _extract_inline_python(self, response_text: str) -> str:
         """Heuristically gather inline Python statements for AST validation."""
 
-        python_line_pattern = re.compile(r"^\s*(?:import |from |for |while |if |elif |else:|try:|except |with |return |@|print|adata|ov\.)")
+        python_line_pattern = re.compile(r"^\s*(?:import |from |for |while |if |elif |else:|try:|except |with |return |@|print|adata|ov\.|sc\.)")
         assignment_pattern = re.compile(r"^\s*[\w\.]+\s*=.*")
         collected: List[str] = []
 
@@ -701,14 +679,14 @@ User request: "quality control with nUMI>500, mito<0.2"
                 f"{skill_guidance_text}\n"
             )
 
-        # Ask agent to generate the appropriate function call code
+        # Ask backend to generate the appropriate function call code
         code_generation_request = f'''
 Please analyze this OmicVerse request: "{request}"
 
 Your task:
-1. Use the _search_functions tool to find the most appropriate OmicVerse function
-2. Use the _get_function_details tool to get the complete function signature and docstring
-3. Based on the function details, extract parameters from the request text
+1. Review the Available OmicVerse Functions (in the system prompt) to choose the best function
+2. Carefully examine function signatures and parameters described there
+3. Extract parameters from the request text
 4. Generate executable Python code that calls the correct OmicVerse function with proper parameters
 
 Dataset info:
@@ -717,11 +695,9 @@ Dataset info:
 {skill_guidance_section}
 
 CRITICAL INSTRUCTIONS:
-1. ALWAYS call _search_functions first to find the right function
-2. ALWAYS call _get_function_details to get complete help info before generating code
-3. Read the 'help' field carefully to understand all parameters and their defaults
-4. Generate code that matches the actual function signature
-5. Return ONLY executable Python code, no explanations
+1. Read the function 'help' information embedded above (docstrings and examples)
+2. Generate code that matches the actual function signature
+3. Return ONLY executable Python code, no explanations
 
 For the qc function specifically:
 - The tresh parameter needs a dict with 'mito_perc', 'nUMIs', 'detected_genes' keys
@@ -729,38 +705,30 @@ For the qc function specifically:
 - Extract values from user request and update the dict accordingly
 
 Example workflow:
-1. _search_functions("quality control") → finds ov.pp.qc
-2. _get_function_details("qc") → read help to see all parameters
-3. Parse request: "nUMI>500" means tresh['nUMIs']=500
-4. Generate: ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
+1. Determine that ov.pp.qc is relevant for quality control
+2. Parse request: "nUMI>500" means tresh['nUMIs']=500
+3. Generate: ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
 '''
         
-        # Get the code from the agent
-        print(f"\n🤔 Agent analyzing request: '{request}'...")
+        # Get the code from the LLM backend
+        print(f"\n🤔 LLM analyzing request: '{request}'...")
         with self._temporary_api_keys():
-            response = await self.agent.run(code_generation_request)
-        
-        # Extract code from the response
-        # Check if response has content attribute (Pantheon agent response)
-        if hasattr(response, 'content'):
-            response_text = response.content
-        else:
-            response_text = str(response)
-        
-        # Display agent's response
-        print(f"\n💭 Agent response:")
+            if not self._llm:
+                raise RuntimeError("LLM backend is not initialized")
+            response_text = await self._llm.run(code_generation_request)
+            # Copy usage information from backend to agent
+            self.last_usage = self._llm.last_usage
+
+        # Display LLM response text
+        print(f"\n💭 LLM response:")
         print("-" * 50)
-        # Only show the actual content, not the full object
-        if hasattr(response, 'content'):
-            print(f"{response.content}")
-        else:
-            print(response_text)
+        print(response_text)
         print("-" * 50)
         
         try:
             code = self._extract_python_code(response_text)
         except ValueError as exc:
-            raise ValueError(f"❌ Could not extract executable code from agent response: {exc}") from exc
+            raise ValueError(f"❌ Could not extract executable code from LLM response: {exc}") from exc
 
         print(f"\n🧬 Generated code to execute:")
         print("=" * 50)
@@ -816,6 +784,148 @@ Example workflow:
             for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
         ]
         return "\n".join(lines)
+
+    async def stream_async(self, request: str, adata: Any):
+        """
+        Stream LLM response chunks as they arrive while processing a request.
+
+        This method is similar to run_async() but yields LLM response chunks
+        in real-time before executing the generated code.
+
+        Parameters
+        ----------
+        request : str
+            Natural language description of what to do
+        adata : Any
+            AnnData object to process
+
+        Yields
+        ------
+        dict
+            Dictionary with 'type' and 'content' keys. Types include:
+            - 'skill_match': Matched skills
+            - 'llm_chunk': Streaming LLM response chunks
+            - 'code': Generated code to execute
+            - 'result': Final result after execution
+            - 'usage': Token usage statistics (emitted as final event)
+
+        Examples
+        --------
+        >>> agent = ov.Agent(model="gpt-4o-mini")
+        >>> async for event in agent.stream_async("qc with nUMI>500", adata):
+        ...     if event['type'] == 'llm_chunk':
+        ...         print(event['content'], end='', flush=True)
+        ...     elif event['type'] == 'result':
+        ...         result_adata = event['content']
+        ...     elif event['type'] == 'usage':
+        ...         print(f"Tokens used: {event['content'].total_tokens}")
+        """
+
+        # Determine which project skills are relevant to this request
+        skill_matches = self._select_skill_matches(request, top_k=2)
+        if skill_matches:
+            yield {
+                'type': 'skill_match',
+                'content': [
+                    {'name': match.skill.name, 'score': match.score}
+                    for match in skill_matches
+                ]
+            }
+
+        skill_guidance_text = self._format_skill_guidance(skill_matches)
+        skill_guidance_section = ""
+        if skill_guidance_text:
+            skill_guidance_section = (
+                "\nRelevant project skills:\n"
+                f"{skill_guidance_text}\n"
+            )
+
+        # Build code generation request
+        code_generation_request = f'''
+Please analyze this OmicVerse request: "{request}"
+
+Your task:
+1. Review the Available OmicVerse Functions (in the system prompt) to choose the best function
+2. Carefully examine function signatures and parameters described there
+3. Extract parameters from the request text
+4. Generate executable Python code that calls the correct OmicVerse function with proper parameters
+
+Dataset info:
+- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+- Request: {request}
+{skill_guidance_section}
+
+CRITICAL INSTRUCTIONS:
+1. Read the function 'help' information embedded above (docstrings and examples)
+2. Generate code that matches the actual function signature
+3. Return ONLY executable Python code, no explanations
+
+For the qc function specifically:
+- The tresh parameter needs a dict with 'mito_perc', 'nUMIs', 'detected_genes' keys
+- Default is: tresh={{'mito_perc': 0.15, 'nUMIs': 500, 'detected_genes': 250}}
+- Extract values from user request and update the dict accordingly
+
+Example workflow:
+1. Determine that ov.pp.qc is relevant for quality control
+2. Parse request: "nUMI>500" means tresh['nUMIs']=500
+3. Generate: ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
+'''
+
+        # Stream the LLM response with error handling
+        response_chunks = []
+        try:
+            with self._temporary_api_keys():
+                if not self._llm:
+                    raise RuntimeError("LLM backend is not initialized")
+
+                async for chunk in self._llm.stream(code_generation_request):
+                    response_chunks.append(chunk)
+                    yield {'type': 'llm_chunk', 'content': chunk}
+
+                # Copy usage information from backend to agent after streaming completes
+                self.last_usage = self._llm.last_usage
+        except Exception as exc:
+            yield {
+                'type': 'error',
+                'content': f"LLM streaming failed: {type(exc).__name__}: {exc}"
+            }
+            return
+
+        # Assemble full response
+        response_text = "".join(response_chunks)
+
+        # Extract and yield generated code
+        try:
+            code = self._extract_python_code(response_text)
+            yield {'type': 'code', 'content': code}
+        except ValueError as exc:
+            yield {
+                'type': 'error',
+                'content': f"Could not extract executable code from LLM response: {exc}"
+            }
+            return
+
+        # Execute the code
+        try:
+            result_adata = self._execute_generated_code(code, adata)
+            yield {
+                'type': 'result',
+                'content': result_adata,
+                'shape': (result_adata.shape[0], result_adata.shape[1])
+            }
+        except Exception as e:
+            yield {
+                'type': 'error',
+                'content': f"Error executing generated code: {e}",
+                'code': code
+            }
+
+        # Emit usage event as final event (optional for users to consume)
+        if self.last_usage:
+            yield {
+                'type': 'usage',
+                'content': self.last_usage
+            }
 
     def run(self, request: str, adata: Any) -> Any:
         """
@@ -887,7 +997,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gpt-4o-mini", api_key: Optional[str] = None, endpoint: Optional[str] = None) -> OmicVerseAgent:
+def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
     

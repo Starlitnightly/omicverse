@@ -14,14 +14,7 @@ modes (paper checker, computer-use agent, and the standard document assistant).
 pip install -r OvIntelligence/requirements.txt
 ```
 
-4. Install the Pantheon agent framework, which is required for the smart agent integration:
-
-```bash
-pip install pantheon-agents
-```
-
-Pantheon is not bundled with the default requirements to avoid forcing the dependency on all users.
-The Streamlit UI will raise an informative error during startup if Pantheon is missing.
+4. No Pantheon dependency is required. The smart agent now uses an internal backend.
 
 ## Configuring document packages
 
