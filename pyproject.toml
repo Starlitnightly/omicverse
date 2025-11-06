@@ -102,6 +102,11 @@ skillseeker = [
   "PyMuPDF>=1.24",
 ]
 
+tests = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.23",
+]
+
 
 [project.urls]
 Github = 'https://github.com/Starlitnightly/omicverse'

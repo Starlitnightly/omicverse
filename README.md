@@ -201,6 +201,20 @@ The table contains the tools have been published
 
 If you would like to contribute to omicverse, please refer to our [developer documentation](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
 
+### Running tests locally
+
+Install the test dependencies and execute the suite with `pytest`:
+
+```bash
+pip install -e .[tests]
+# or install the pinned latest requirements
+pip install -r requirements-latest.txt
+
+pytest
+```
+
+The optional `tests` extra and the `requirements-latest.txt` file now include `pytest-asyncio>=0.23`, which is required for the asynchronous streaming tests under `tests/utils/`.
+
 <table align="center">
     <tr>
       <th colspan="2">
