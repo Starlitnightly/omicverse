@@ -116,3 +116,10 @@ exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
 
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
