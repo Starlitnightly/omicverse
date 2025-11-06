@@ -11,7 +11,7 @@ This module tests the Usage dataclass and token usage tracking across all provid
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from types import SimpleNamespace
 
 # Load agent_backend directly from file to avoid importing heavy utils package
