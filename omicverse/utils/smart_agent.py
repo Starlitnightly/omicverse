@@ -54,6 +54,8 @@ from .registry import _global_registry
 from .model_config import ModelConfig, PROVIDER_API_KEYS
 from .skill_registry import (
     SkillMatch,
+    SkillMetadata,
+    SkillDefinition,
     SkillRegistry,
     SkillRouter,
     build_skill_registry,
@@ -113,8 +115,8 @@ class OmicVerseAgent:
         self.provider = ModelConfig.get_provider_from_model(model)
         self._llm: Optional[OmicVerseLLMBackend] = None
         self.skill_registry: Optional[SkillRegistry] = None
-        self.skill_router: Optional[SkillRouter] = None
         self._skill_overview_text: str = ""
+        self._use_llm_skill_matching: bool = True  # Use LLM-based skill matching (Claude Code approach)
         self._managed_api_env: Dict[str, str] = {}
         # Token usage tracking at agent level
         self.last_usage = None
@@ -163,17 +165,17 @@ class OmicVerseAgent:
             print(f"⚠️  Failed to load Agent Skills: {exc}")
             registry = None
 
-        if registry and registry.skills:
+        if registry and registry.skill_metadata:
             self.skill_registry = registry
-            self.skill_router = SkillRouter(registry)
             self._skill_overview_text = self._format_skill_overview()
 
             package_skill_root = package_root / ".claude" / "skills"
             cwd_skill_root = cwd / ".claude" / "skills"
-            builtin_count = len([s for s in registry.skills.values() if str(package_skill_root) in str(s.path)])
-            user_count = len([s for s in registry.skills.values() if str(cwd_skill_root) in str(s.path)])
-            total = len(registry.skills)
-            msg = f"   🧭 Loaded {total} skills"
+            # Count from metadata instead of full skills
+            builtin_count = len([s for s in registry.skill_metadata.values() if str(package_skill_root) in str(s.path)])
+            user_count = len([s for s in registry.skill_metadata.values() if str(cwd_skill_root) in str(s.path)])
+            total = len(registry.skill_metadata)
+            msg = f"   🧭 Loaded {total} skills (progressive disclosure)"
             if builtin_count and user_count:
                 msg += f" ({builtin_count} built-in + {user_count} user-created)"
             elif builtin_count:
@@ -183,7 +185,6 @@ class OmicVerseAgent:
             print(msg)
         else:
             self.skill_registry = None
-            self.skill_router = None
             self._skill_overview_text = ""
 
     def _get_registry_stats(self) -> dict:
@@ -446,30 +447,36 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _list_project_skills(self) -> str:
         """Return a JSON catalog of the discovered project skills."""
 
-        if not self.skill_registry or not self.skill_registry.skills:
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
             return json.dumps({"skills": [], "message": "No project skills available."}, indent=2)
 
         skills_payload = [
             {
                 "name": skill.name,
+                "slug": skill.slug,
                 "description": skill.description,
                 "path": str(skill.path),
                 "metadata": skill.metadata,
             }
-            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
+            for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda item: item.name.lower())
         ]
         return json.dumps({"skills": skills_payload}, indent=2)
 
     def _load_skill_guidance(self, skill_name: str) -> str:
-        """Return the detailed instructions for a requested skill."""
+        """Return the detailed instructions for a requested skill.
 
-        if not self.skill_registry or not self.skill_registry.skills:
+        This triggers lazy loading of the full skill content if using progressive disclosure.
+        """
+
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
             return json.dumps({"error": "No project skills are available."})
 
         if not skill_name or not skill_name.strip():
             return json.dumps({"error": "Provide a skill name to load guidance."})
 
-        definition = self.skill_registry.skills.get(skill_name.strip().lower())
+        # Lazy load the full skill content
+        slug = skill_name.strip().lower()
+        definition = self.skill_registry.load_full_skill(slug)
         if not definition:
             return json.dumps({"error": f"Skill '{skill_name}' not found."})
 
@@ -672,12 +679,18 @@ User request: "quality control with nUMI>500, mito<0.2"
             Processed adata object
         """
         
-        # Determine which project skills are relevant to this request
-        skill_matches = self._select_skill_matches(request, top_k=2)
-        if skill_matches:
-            print("\n🎯 Matched project skills:")
-            for match in skill_matches:
-                print(f"   - {match.skill.name} (score={match.score:.3f})")
+        # Determine which project skills are relevant to this request using LLM
+        matched_skill_slugs = await self._select_skill_matches_llm(request, top_k=2)
+
+        # Load full content for matched skills (lazy loading)
+        skill_matches = []
+        if matched_skill_slugs:
+            print("\n🎯 LLM matched skills:")
+            for slug in matched_skill_slugs:
+                full_skill = self.skill_registry.load_full_skill(slug)
+                if full_skill:
+                    print(f"   - {full_skill.name}")
+                    skill_matches.append(SkillMatch(skill=full_skill, score=1.0))
 
         skill_guidance_text = self._format_skill_guidance(skill_matches)
         skill_guidance_section = ""
@@ -757,16 +770,66 @@ Example workflow:
             print(f"Code that failed: {code}")
             return adata
 
-    def _select_skill_matches(self, request: str, top_k: int = 1) -> List[SkillMatch]:
-        """Return the most relevant project skills for the request."""
+    async def _select_skill_matches_llm(self, request: str, top_k: int = 2) -> List[str]:
+        """Use LLM to select relevant skills based on the request (Claude Code approach).
 
-        if not self.skill_router:
+        This is pure LLM reasoning - no algorithmic routing, embeddings, or pattern matching.
+        The LLM reads skill descriptions and decides which skills match the user's intent.
+
+        Returns:
+            List of skill slugs matched by the LLM
+        """
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
             return []
+
+        # Format all available skills for LLM
+        skills_list = []
+        for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda s: s.name.lower()):
+            skills_list.append(f"- **{skill.slug}**: {skill.description}")
+
+        skills_catalog = "\n".join(skills_list)
+
+        # Ask LLM to match skills
+        matching_prompt = f"""You are a skill matching system. Given a user request and a list of available skills, determine which skills (if any) are relevant.
+
+User Request: "{request}"
+
+Available Skills:
+{skills_catalog}
+
+Your task:
+1. Analyze the user request to understand their intent
+2. Review the skill descriptions
+3. Select the {top_k} most relevant skills (or fewer if not many are relevant)
+4. Respond with ONLY the skill slugs as a JSON array, e.g., ["skill-slug-1", "skill-slug-2"]
+5. If no skills are relevant, return an empty array: []
+
+IMPORTANT: Respond with ONLY the JSON array, nothing else."""
+
         try:
-            return self.skill_router.route(request, top_k=top_k)
-        except Exception as exc:  # pragma: no cover - defensive guard
-            print(f"⚠️  Skill routing failed: {exc}")
+            with self._temporary_api_keys():
+                if not self._llm:
+                    return []
+                response = await self._llm.run(matching_prompt)
+
+            # Extract JSON array from response
+            import re
+            json_match = re.search(r'\[.*?\]', response, re.DOTALL)
+            if json_match:
+                matched_slugs = json.loads(json_match.group(0))
+                return [slug for slug in matched_slugs if slug in self.skill_registry.skill_metadata]
             return []
+
+        except Exception as exc:
+            logger.warning(f"LLM skill matching failed: {exc}")
+            return []
+
+    def _select_skill_matches(self, request: str, top_k: int = 1) -> List[SkillMatch]:
+        """Return the most relevant project skills for the request (deprecated - kept for backward compatibility)."""
+
+        # LLM-based matching is now done directly in run_async
+        # This method is kept for backward compatibility only
+        return []
 
     def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
         """Format skill instructions for prompt injection."""
@@ -785,11 +848,11 @@ Example workflow:
     def _format_skill_overview(self) -> str:
         """Generate a bullet overview of available project skills."""
 
-        if not self.skill_registry or not self.skill_registry.skills:
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
             return ""
         lines = [
             f"- **{skill.name}** — {skill.description}"
-            for skill in sorted(self.skill_registry.skills.values(), key=lambda item: item.name.lower())
+            for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda item: item.name.lower())
         ]
         return "\n".join(lines)
 
