@@ -526,8 +526,11 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _extract_inline_python(self, response_text: str) -> str:
         """Heuristically gather inline Python statements for AST validation."""
 
-        python_line_pattern = re.compile(r"^\s*(?:import |from |for |while |if |elif |else:|try:|except |with |return |@|print|adata|ov\.|sc\.)")
+        python_line_pattern = re.compile(
+            r"^\s*(?:async\s+def |def |class |import |from |for |while |if |elif |else:|try:|except |with |return |@|print|adata|ov\.|sc\.)"
+        )
         assignment_pattern = re.compile(r"^\s*[\w\.]+\s*=.*")
+        call_pattern = re.compile(r"^\s*[\w\.]+\s*\(.*")
         collected: List[str] = []
 
         for raw_line in response_text.splitlines():
@@ -535,7 +538,12 @@ User request: "quality control with nUMI>500, mito<0.2"
             stripped = line.strip()
             if not stripped:
                 continue
-            if python_line_pattern.match(line) or assignment_pattern.match(line):
+            if (
+                python_line_pattern.match(line)
+                or assignment_pattern.match(line)
+                or call_pattern.match(line)
+                or stripped.startswith("#")
+            ):
                 collected.append(line)
 
         snippet = "\n".join(collected).strip()
