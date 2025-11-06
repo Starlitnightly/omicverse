@@ -11,7 +11,7 @@ This module tests the Usage dataclass and token usage tracking across all provid
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock
 from types import SimpleNamespace
 
 # Load agent_backend directly from file to avoid importing heavy utils package
@@ -162,8 +162,7 @@ class TestOpenAIUsageTracking:
             if 'openai' in sys.modules:
                 del sys.modules['openai']
 
-    @patch('omicverse.utils.agent_backend.urllib_request.urlopen')
-    def test_openai_http_usage_tracking(self, mock_urlopen, monkeypatch):
+    def test_openai_http_usage_tracking(self, monkeypatch):
         """Test that OpenAI HTTP fallback captures usage information."""
         # Mock HTTP response
         mock_response = Mock()
@@ -177,7 +176,10 @@ class TestOpenAIUsageTracking:
         }'''
         mock_response.__enter__ = Mock(return_value=mock_response)
         mock_response.__exit__ = Mock(return_value=False)
-        mock_urlopen.return_value = mock_response
+
+        # Mock urlopen
+        mock_urlopen = Mock(return_value=mock_response)
+        monkeypatch.setattr(agent_backend_module.urllib_request, 'urlopen', mock_urlopen)
 
         # Mock ModelConfig
         monkeypatch.setattr(
@@ -270,8 +272,7 @@ class TestResponsesAPIUsageTracking:
             assert backend.last_usage.model == "gpt-5"
             assert backend.last_usage.provider == "openai"
 
-    @patch('omicverse.utils.agent_backend.urllib_request.urlopen')
-    def test_responses_api_http_usage_tracking(self, mock_urlopen, monkeypatch):
+    def test_responses_api_http_usage_tracking(self, monkeypatch):
         """Test that Responses API HTTP fallback captures usage information."""
         # Mock HTTP response
         mock_response = Mock()
@@ -285,7 +286,10 @@ class TestResponsesAPIUsageTracking:
         }'''
         mock_response.__enter__ = Mock(return_value=mock_response)
         mock_response.__exit__ = Mock(return_value=False)
-        mock_urlopen.return_value = mock_response
+
+        # Mock urlopen
+        mock_urlopen = Mock(return_value=mock_response)
+        monkeypatch.setattr(agent_backend_module.urllib_request, 'urlopen', mock_urlopen)
 
         # Mock ModelConfig
         monkeypatch.setattr(
