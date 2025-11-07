@@ -78,10 +78,10 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None):
+    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1):
         """
         Initialize the OmicVerse Smart Agent.
-        
+
         Parameters
         ----------
         model : str
@@ -90,6 +90,10 @@ class OmicVerseAgent:
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
             Custom API endpoint. If not provided, will use default for the provider
+        enable_reflection : bool, optional
+            Enable reflection step to review and improve generated code (default: True)
+        reflection_iterations : int, optional
+            Maximum number of reflection iterations (default: 1, range: 1-3)
         """
         print(f" Initializing OmicVerse Smart Agent (internal backend)...")
         
@@ -118,8 +122,16 @@ class OmicVerseAgent:
         self._skill_overview_text: str = ""
         self._use_llm_skill_matching: bool = True  # Use LLM-based skill matching (Claude Code approach)
         self._managed_api_env: Dict[str, str] = {}
+        # Reflection configuration
+        self.enable_reflection = enable_reflection
+        self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
         # Token usage tracking at agent level
         self.last_usage = None
+        self.last_usage_breakdown: Dict[str, Any] = {
+            'generation': None,
+            'reflection': [],
+            'total': None
+        }
         try:
             self._managed_api_env = self._collect_api_key_env(api_key)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -149,6 +161,13 @@ class OmicVerseAgent:
                 self._setup_agent()
             stats = self._get_registry_stats()
             print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
+
+            # Display reflection configuration
+            if self.enable_reflection:
+                print(f"   🔍 Reflection enabled: {self.reflection_iterations} iteration{'s' if self.reflection_iterations > 1 else ''} (code review & validation)")
+            else:
+                print(f"   ⚡ Reflection disabled (faster execution, no validation)")
+
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
@@ -569,6 +588,137 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         return dedented
 
+    async def _reflect_on_code(self, code: str, request: str, adata: Any, iteration: int = 1) -> Dict[str, Any]:
+        """
+        Reflect on generated code to identify issues and improvements.
+
+        This method uses the LLM to review the generated code, checking for:
+        - Correctness of function calls
+        - Proper parameter formatting
+        - Syntax errors
+        - Alignment with user request
+
+        Parameters
+        ----------
+        code : str
+            The generated Python code to review
+        request : str
+            The original user request
+        adata : Any
+            The AnnData object being processed
+        iteration : int, optional
+            Current reflection iteration number (default: 1)
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - 'improved_code': str - improved version of code
+            - 'issues_found': List[str] - list of issues identified
+            - 'confidence': float - confidence in the code (0-1)
+            - 'needs_revision': bool - whether code needs revision
+            - 'explanation': str - brief explanation of changes
+        """
+        reflection_prompt = f"""You are a code reviewer for OmicVerse bioinformatics code.
+
+Original User Request: "{request}"
+
+Generated Code (Iteration {iteration}):
+```python
+{code}
+```
+
+Dataset Information:
+- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+
+Your task is to review this code and provide feedback:
+
+1. **Check for correctness**:
+   - Are the function calls correct?
+   - Are parameters properly formatted (especially dict parameters like 'tresh')?
+   - Are there any syntax errors?
+   - Does the code match the user's request?
+
+2. **Common issues to check**:
+   - Missing or incorrect imports
+   - Wrong parameter types or values
+   - Incorrect function selection
+   - Parameter extraction errors (e.g., nUMI>500 should map to correct parameter)
+   - Missing required parameters
+   - Using wrong parameter names
+
+3. **Provide feedback as a JSON object**:
+{{
+  "issues_found": ["specific issue 1", "specific issue 2"],
+  "needs_revision": true,
+  "confidence": 0.85,
+  "improved_code": "the corrected code here",
+  "explanation": "brief explanation of what was fixed"
+}}
+
+If no issues are found:
+{{
+  "issues_found": [],
+  "needs_revision": false,
+  "confidence": 0.95,
+  "improved_code": "{code}",
+  "explanation": "Code looks correct"
+}}
+
+IMPORTANT:
+- Return ONLY the JSON object, nothing else
+- Keep confidence between 0.0 and 1.0
+- If you fix the code, put the complete corrected code in 'improved_code'
+- Be specific about issues found
+"""
+
+        try:
+            with self._temporary_api_keys():
+                if not self._llm:
+                    raise RuntimeError("LLM backend is not initialized")
+
+                response_text = await self._llm.run(reflection_prompt)
+
+                # Track reflection token usage
+                if self._llm.last_usage:
+                    self.last_usage_breakdown['reflection'].append(self._llm.last_usage)
+
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if not json_match:
+                # Fallback: no issues found
+                return {
+                    'improved_code': code,
+                    'issues_found': [],
+                    'confidence': 0.8,
+                    'needs_revision': False,
+                    'explanation': 'Reflection completed (JSON extraction failed, assuming code is OK)'
+                }
+
+            reflection_result = json.loads(json_match.group(0))
+
+            # Validate and normalize the result
+            result = {
+                'improved_code': reflection_result.get('improved_code', code),
+                'issues_found': reflection_result.get('issues_found', []),
+                'confidence': max(0.0, min(1.0, float(reflection_result.get('confidence', 0.8)))),
+                'needs_revision': bool(reflection_result.get('needs_revision', False)),
+                'explanation': reflection_result.get('explanation', 'No explanation provided')
+            }
+
+            return result
+
+        except Exception as exc:
+            logger.warning(f"Reflection failed: {exc}")
+            # Fallback: return original code
+            return {
+                'improved_code': code,
+                'issues_found': [],
+                'confidence': 0.7,
+                'needs_revision': False,
+                'explanation': f'Reflection failed: {exc}'
+            }
+
     def _execute_generated_code(self, code: str, adata: Any) -> Any:
         """Execute generated Python code in a sandboxed namespace.
 
@@ -751,10 +901,65 @@ Example workflow:
         except ValueError as exc:
             raise ValueError(f"❌ Could not extract executable code from LLM response: {exc}") from exc
 
-        print(f"\n🧬 Generated code to execute:")
+        # Track generation usage
+        self.last_usage_breakdown['generation'] = self.last_usage
+
+        print(f"\n🧬 Generated code:")
         print("=" * 50)
         print(f"{code}")
         print("=" * 50)
+
+        # Reflection step: Review and improve the generated code
+        if self.enable_reflection:
+            print(f"\n🔍 Reflecting on generated code (max {self.reflection_iterations} iteration{'s' if self.reflection_iterations > 1 else ''})...")
+
+            for iteration in range(self.reflection_iterations):
+                reflection_result = await self._reflect_on_code(code, request, adata, iteration + 1)
+
+                if reflection_result['issues_found']:
+                    print(f"   ⚠️  Issues found (iteration {iteration + 1}):")
+                    for issue in reflection_result['issues_found']:
+                        print(f"      - {issue}")
+
+                if reflection_result['needs_revision']:
+                    print(f"   ✏️  Applying improvements...")
+                    code = reflection_result['improved_code']
+                    print(f"   📈 Confidence: {reflection_result['confidence']:.1%}")
+                    if reflection_result['explanation']:
+                        print(f"   💡 {reflection_result['explanation']}")
+                else:
+                    print(f"   ✅ Code validated (confidence: {reflection_result['confidence']:.1%})")
+                    if reflection_result['explanation']:
+                        print(f"   💡 {reflection_result['explanation']}")
+                    break
+
+            # Show final code if it was modified
+            if reflection_result['needs_revision']:
+                print(f"\n🧬 Final code after reflection:")
+                print("=" * 50)
+                print(f"{code}")
+                print("=" * 50)
+
+        # Compute total usage
+        if self.last_usage_breakdown['generation'] or self.last_usage_breakdown['reflection']:
+            gen_usage = self.last_usage_breakdown['generation']
+            total_input = gen_usage.input_tokens if gen_usage else 0
+            total_output = gen_usage.output_tokens if gen_usage else 0
+
+            for ref_usage in self.last_usage_breakdown['reflection']:
+                total_input += ref_usage.input_tokens
+                total_output += ref_usage.output_tokens
+
+            from .agent_backend import Usage
+            self.last_usage_breakdown['total'] = Usage(
+                input_tokens=total_input,
+                output_tokens=total_output,
+                total_tokens=total_input + total_output,
+                model=self.model,
+                provider=self.provider
+            )
+            # Update last_usage to reflect total
+            self.last_usage = self.last_usage_breakdown['total']
 
         # Execute the code locally
         print(f"\n⚡ Executing code locally...")
@@ -1068,48 +1273,58 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None) -> OmicVerseAgent:
+def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
-    
+
     This function creates and returns a smart agent that can execute OmicVerse functions
     based on natural language descriptions.
-    
+
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gpt-4o-mini"). Use list_supported_models() to see all options
+        LLM model to use (default: "gpt-5"). Use list_supported_models() to see all options
     api_key : str, optional
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional
         Custom API endpoint. If not provided, will use default for the provider
-        
+    enable_reflection : bool, optional
+        Enable reflection step to review and improve generated code (default: True)
+    reflection_iterations : int, optional
+        Maximum number of reflection iterations (default: 1, range: 1-3)
+
     Returns
     -------
     OmicVerseAgent
         Configured agent instance ready for use
-        
+
     Examples
     --------
     >>> import omicverse as ov
     >>> import scanpy as sc
-    >>> 
-    >>> # Create agent instance
-    >>> agent = ov.Agent(model="gpt-4o-mini", api_key="your-key")
-    >>> 
+    >>>
+    >>> # Create agent instance with reflection enabled (default)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key")
+    >>>
+    >>> # Create agent with multiple reflection iterations
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", reflection_iterations=2)
+    >>>
+    >>> # Create agent without reflection (faster, but less validation)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False)
+    >>>
     >>> # Load data
     >>> adata = sc.datasets.pbmc3k()
-    >>> 
+    >>>
     >>> # Use agent for quality control
     >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
-    >>> 
-    >>> # Use agent for preprocessing  
+    >>>
+    >>> # Use agent for preprocessing
     >>> adata = agent.run("preprocess with 2000 highly variable genes", adata)
-    >>> 
+    >>>
     >>> # Use agent for clustering
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)
     """
-    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint)
+    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint, enable_reflection=enable_reflection, reflection_iterations=reflection_iterations)
 
 
 # Export the main functions
