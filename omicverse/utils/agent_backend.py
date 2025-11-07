@@ -627,14 +627,14 @@ class OmicVerseLLMBackend:
                     },
                 ]
 
-                # GPT-5 models use reasoning tokens - control effort to ensure completion
-                # Set reasoning effort to 'low' to reduce token usage and ensure response completes
+                # GPT-5 models use reasoning tokens - control effort for response quality
+                # Set reasoning effort to 'high' for maximum reasoning capability and best quality responses
                 resp = client.responses.create(
                     model=self.config.model,
                     input=input_payload,
                     instructions=self.config.system_prompt,
                     max_output_tokens=self.config.max_tokens,
-                    reasoning={"effort": "low"}  # Reduce reasoning effort for faster, complete responses
+                    reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
                 )
 
                 # Capture usage information from Responses API (only if numeric)
@@ -760,7 +760,7 @@ class OmicVerseLLMBackend:
                         ],
                         "instructions": self.config.system_prompt,
                         "max_output_tokens": self.config.max_tokens,
-                        "reasoning": {"effort": "low"}  # Reduce reasoning effort for completion
+                        "reasoning": {"effort": "high"}  # Use high reasoning effort for better quality responses
                     }
                 else:
                     return {
@@ -768,7 +768,7 @@ class OmicVerseLLMBackend:
                         "input": user_prompt,
                         "instructions": self.config.system_prompt,
                         "max_output_tokens": self.config.max_tokens,
-                        "reasoning": {"effort": "low"}  # Reduce reasoning effort for completion
+                        "reasoning": {"effort": "high"}  # Use high reasoning effort for better quality responses
                     }
 
             body = make_body(parts_style=True)
