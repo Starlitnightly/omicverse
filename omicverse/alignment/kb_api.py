@@ -17,6 +17,7 @@ import shutil
 import subprocess
 from uuid import uuid4
 from typing import List, Dict, Optional, Union
+import importlib.util
 
 class Colors:
     """ANSI color codes for terminal output styling."""
@@ -39,19 +40,51 @@ def _ensure_dir(path: str):
 
 def _which_kb() -> str:
     """
-    Resolve the kb executable.
-    Returns the absolute path to the 'kb' executable if found in PATH, else
-    returns a 'python -m kb_python' launcher string if Python is available.
+    Resolve the 'kb' executable.
+
+    Priority:
+    1) Return the 'kb' executable found on the PATH.
+    2) If not found, try to find an executable named 'kb' in the same directory
+       as the current Python interpreter (this covers venv/conda installs).
+    3) If still not found, fall back to invoking a module with the current Python:
+       prefer `python -m kb` if the 'kb' module is importable, otherwise try
+       `python -m kb_python` if that module is importable.
+    If none of the above are available, raise FileNotFoundError.
     """
+    # 1) Look for 'kb' on PATH first
     kb = shutil.which('kb')
     if kb:
         return kb
+
+    # 2) Try to find a 'kb' executable next to the current Python executable
+    #    (handles cases where the console script is installed into the env's bin/)
+    if sys.executable:
+        exe_dir = os.path.dirname(sys.executable)
+        for candidate in ('kb', 'kb.exe'):
+            cand_path = os.path.join(exe_dir, candidate)
+            if os.path.isfile(cand_path) and os.access(cand_path, os.X_OK):
+                return cand_path
+
+    # 3) Fall back to using `python -m <module>` but only if the module exists.
     python_exe = sys.executable or shutil.which('python3') or shutil.which('python')
     if python_exe:
-        return f'{python_exe} -m kb_python'
+        try:
+            # Prefer the 'kb' module (if present) so we run `python -m kb`
+            if importlib.util.find_spec('kb') is not None:
+                return f'{python_exe} -m kb'
+            # Otherwise, try the legacy/alternate 'kb_python' package
+            if importlib.util.find_spec('kb_python') is not None:
+                return f'{python_exe} -m kb_python'
+        except Exception:
+            # If importlib checks fail unexpectedly, fall through to the final error.
+            pass
+
+    # Nothing found — raise a helpful error
     raise FileNotFoundError(
-        "Could not find 'kb' executable on PATH and no suitable Python interpreter to "
-        "run 'python -m kb_python'. Please ensure kb-python is installed and available."
+        "Could not find the 'kb' executable on PATH or next to the current Python interpreter, "
+        "and neither 'kb' nor 'kb_python' modules are importable for `python -m` invocation. "
+        "Please ensure kb-python is installed in the active environment (e.g. activate your conda/venv), "
+        "or provide the absolute path to the 'kb' executable."
     )
 
 
