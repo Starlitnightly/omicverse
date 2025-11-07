@@ -78,7 +78,7 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1):
+    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
@@ -94,6 +94,8 @@ class OmicVerseAgent:
             Enable reflection step to review and improve generated code (default: True)
         reflection_iterations : int, optional
             Maximum number of reflection iterations (default: 1, range: 1-3)
+        enable_result_review : bool, optional
+            Enable result review to validate output matches user intent (default: True)
         """
         print(f" Initializing OmicVerse Smart Agent (internal backend)...")
         
@@ -125,11 +127,14 @@ class OmicVerseAgent:
         # Reflection configuration
         self.enable_reflection = enable_reflection
         self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
+        # Result review configuration
+        self.enable_result_review = enable_result_review
         # Token usage tracking at agent level
         self.last_usage = None
         self.last_usage_breakdown: Dict[str, Any] = {
             'generation': None,
             'reflection': [],
+            'review': [],
             'total': None
         }
         try:
@@ -162,11 +167,16 @@ class OmicVerseAgent:
             stats = self._get_registry_stats()
             print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
 
-            # Display reflection configuration
+            # Display reflection and result review configuration
             if self.enable_reflection:
                 print(f"   🔍 Reflection enabled: {self.reflection_iterations} iteration{'s' if self.reflection_iterations > 1 else ''} (code review & validation)")
             else:
-                print(f"   ⚡ Reflection disabled (faster execution, no validation)")
+                print(f"   ⚡ Reflection disabled (faster execution, no code validation)")
+
+            if self.enable_result_review:
+                print(f"   ✅ Result review enabled (output validation & assessment)")
+            else:
+                print(f"   ⚡ Result review disabled (no output validation)")
 
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
@@ -588,6 +598,162 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         return dedented
 
+    async def _review_result(self, original_adata: Any, result_adata: Any, request: str, code: str) -> Dict[str, Any]:
+        """
+        Review the execution result to validate it matches the user's task assignment.
+
+        This method compares the original and result data to verify:
+        - Expected transformations occurred
+        - Data integrity maintained
+        - Result aligns with user intent
+        - No unexpected side effects
+
+        Parameters
+        ----------
+        original_adata : Any
+            Original AnnData object before execution
+        result_adata : Any
+            Result AnnData object after execution
+        request : str
+            The original user request
+        code : str
+            The executed code
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing:
+            - 'matched': bool - whether result matches user intent
+            - 'assessment': str - overall assessment
+            - 'changes_detected': List[str] - list of detected changes
+            - 'issues': List[str] - list of issues or concerns
+            - 'confidence': float - confidence in result correctness (0-1)
+            - 'recommendation': str - recommendation (accept/review/retry)
+        """
+        # Gather comparison data
+        original_shape = (original_adata.shape[0], original_adata.shape[1])
+        result_shape = (result_adata.shape[0], result_adata.shape[1])
+
+        # Check for new attributes
+        original_obs_cols = list(getattr(original_adata, 'obs', {}).columns) if hasattr(original_adata, 'obs') else []
+        result_obs_cols = list(getattr(result_adata, 'obs', {}).columns) if hasattr(result_adata, 'obs') else []
+        new_obs_cols = [col for col in result_obs_cols if col not in original_obs_cols]
+
+        original_uns_keys = list(getattr(original_adata, 'uns', {}).keys()) if hasattr(original_adata, 'uns') else []
+        result_uns_keys = list(getattr(result_adata, 'uns', {}).keys()) if hasattr(result_adata, 'uns') else []
+        new_uns_keys = [key for key in result_uns_keys if key not in original_uns_keys]
+
+        # Build review prompt
+        review_prompt = f"""You are an expert bioinformatics analyst reviewing the results of an OmicVerse operation.
+
+User Request: "{request}"
+
+Executed Code:
+```python
+{code}
+```
+
+Original Data:
+- Shape: {original_shape[0]} cells × {original_shape[1]} genes
+- Observation columns: {len(original_obs_cols)} columns
+- Uns keys: {len(original_uns_keys)} keys
+
+Result Data:
+- Shape: {result_shape[0]} cells × {result_shape[1]} genes
+- Observation columns: {len(result_obs_cols)} columns (new: {new_obs_cols if new_obs_cols else 'none'})
+- Uns keys: {len(result_uns_keys)} keys (new: {new_uns_keys if new_uns_keys else 'none'})
+
+Changes Detected:
+- Cells: {original_shape[0]} → {result_shape[0]} (change: {result_shape[0] - original_shape[0]:+d})
+- Genes: {original_shape[1]} → {result_shape[1]} (change: {result_shape[1] - original_shape[1]:+d})
+- New observation columns: {new_obs_cols if new_obs_cols else 'none'}
+- New uns keys: {new_uns_keys if new_uns_keys else 'none'}
+
+Your task:
+1. **Evaluate if the result matches the user's intent**:
+   - Does the transformation align with the request?
+   - Are the changes expected for this operation?
+   - Is the data integrity maintained?
+
+2. **Identify any issues or concerns**:
+   - Unexpected data loss (too many cells/genes filtered)
+   - Missing expected outputs
+   - Suspicious transformations
+
+3. **Provide assessment as JSON**:
+{{
+  "matched": true,
+  "assessment": "Brief assessment of the result quality",
+  "changes_detected": ["change 1", "change 2"],
+  "issues": ["issue 1"] or [],
+  "confidence": 0.92,
+  "recommendation": "accept"
+}}
+
+Recommendation values:
+- "accept": Result looks good, matches intent
+- "review": Result may have issues, user should review
+- "retry": Result appears incorrect, suggest retry
+
+IMPORTANT:
+- Return ONLY the JSON object
+- Keep confidence between 0.0 and 1.0
+- Be specific about changes and issues
+- Consider the context of the user's request
+"""
+
+        try:
+            with self._temporary_api_keys():
+                if not self._llm:
+                    raise RuntimeError("LLM backend is not initialized")
+
+                response_text = await self._llm.run(review_prompt)
+
+                # Track review token usage
+                if self._llm.last_usage:
+                    if 'review' not in self.last_usage_breakdown:
+                        self.last_usage_breakdown['review'] = []
+                    self.last_usage_breakdown['review'].append(self._llm.last_usage)
+
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if not json_match:
+                # Fallback: assume success
+                return {
+                    'matched': True,
+                    'assessment': 'Result review completed (JSON extraction failed)',
+                    'changes_detected': [f'Shape changed: {original_shape} → {result_shape}'],
+                    'issues': [],
+                    'confidence': 0.7,
+                    'recommendation': 'accept'
+                }
+
+            review_result = json.loads(json_match.group(0))
+
+            # Validate and normalize
+            result = {
+                'matched': bool(review_result.get('matched', True)),
+                'assessment': review_result.get('assessment', 'No assessment provided'),
+                'changes_detected': review_result.get('changes_detected', []),
+                'issues': review_result.get('issues', []),
+                'confidence': max(0.0, min(1.0, float(review_result.get('confidence', 0.8)))),
+                'recommendation': review_result.get('recommendation', 'accept')
+            }
+
+            return result
+
+        except Exception as exc:
+            logger.warning(f"Result review failed: {exc}")
+            # Fallback: assume success with low confidence
+            return {
+                'matched': True,
+                'assessment': f'Result review failed: {exc}',
+                'changes_detected': [f'Shape: {original_shape} → {result_shape}'],
+                'issues': [],
+                'confidence': 0.6,
+                'recommendation': 'review'
+            }
+
     async def _reflect_on_code(self, code: str, request: str, adata: Any, iteration: int = 1) -> Dict[str, Any]:
         """
         Reflect on generated code to identify issues and improvements.
@@ -964,9 +1130,67 @@ Example workflow:
         # Execute the code locally
         print(f"\n⚡ Executing code locally...")
         try:
+            # Keep reference to original for review
+            original_adata = adata
             result_adata = self._execute_generated_code(code, adata)
             print(f"✅ Code executed successfully!")
             print(f"📊 Result shape: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+
+            # Result review: Validate output matches user intent
+            if self.enable_result_review:
+                print(f"\n📋 Reviewing result to validate task completion...")
+                review_result = await self._review_result(original_adata, result_adata, request, code)
+
+                # Display review assessment
+                if review_result['matched']:
+                    print(f"   ✅ Result matches intent (confidence: {review_result['confidence']:.1%})")
+                else:
+                    print(f"   ⚠️  Result may not match intent (confidence: {review_result['confidence']:.1%})")
+
+                if review_result['changes_detected']:
+                    print(f"   📊 Changes detected:")
+                    for change in review_result['changes_detected']:
+                        print(f"      - {change}")
+
+                if review_result['issues']:
+                    print(f"   ⚠️  Issues found:")
+                    for issue in review_result['issues']:
+                        print(f"      - {issue}")
+
+                print(f"   💡 {review_result['assessment']}")
+
+                # Show recommendation
+                recommendation_icons = {
+                    'accept': '✅',
+                    'review': '⚠️',
+                    'retry': '❌'
+                }
+                icon = recommendation_icons.get(review_result['recommendation'], '❓')
+                print(f"   {icon} Recommendation: {review_result['recommendation'].upper()}")
+
+                # Update total usage with review tokens
+                if self.last_usage_breakdown['review']:
+                    gen_usage = self.last_usage_breakdown.get('generation')
+                    total_input = gen_usage.input_tokens if gen_usage else 0
+                    total_output = gen_usage.output_tokens if gen_usage else 0
+
+                    for ref_usage in self.last_usage_breakdown.get('reflection', []):
+                        total_input += ref_usage.input_tokens
+                        total_output += ref_usage.output_tokens
+
+                    for rev_usage in self.last_usage_breakdown['review']:
+                        total_input += rev_usage.input_tokens
+                        total_output += rev_usage.output_tokens
+
+                    from .agent_backend import Usage
+                    self.last_usage_breakdown['total'] = Usage(
+                        input_tokens=total_input,
+                        output_tokens=total_output,
+                        total_tokens=total_input + total_output,
+                        model=self.model,
+                        provider=self.provider
+                    )
+                    self.last_usage = self.last_usage_breakdown['total']
 
             return result_adata
 
@@ -1273,7 +1497,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1) -> OmicVerseAgent:
+def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -1292,6 +1516,8 @@ def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optiona
         Enable reflection step to review and improve generated code (default: True)
     reflection_iterations : int, optional
         Maximum number of reflection iterations (default: 1, range: 1-3)
+    enable_result_review : bool, optional
+        Enable result review to validate output matches user intent (default: True)
 
     Returns
     -------
@@ -1303,14 +1529,17 @@ def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optiona
     >>> import omicverse as ov
     >>> import scanpy as sc
     >>>
-    >>> # Create agent instance with reflection enabled (default)
+    >>> # Create agent instance with full validation (default)
     >>> agent = ov.Agent(model="gpt-5", api_key="your-key")
     >>>
     >>> # Create agent with multiple reflection iterations
     >>> agent = ov.Agent(model="gpt-5", api_key="your-key", reflection_iterations=2)
     >>>
-    >>> # Create agent without reflection (faster, but less validation)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False)
+    >>> # Create agent without validation (fastest execution)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=False)
+    >>>
+    >>> # Create agent with only result review (skip code reflection)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=True)
     >>>
     >>> # Load data
     >>> adata = sc.datasets.pbmc3k()
@@ -1324,7 +1553,7 @@ def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optiona
     >>> # Use agent for clustering
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)
     """
-    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint, enable_reflection=enable_reflection, reflection_iterations=reflection_iterations)
+    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint, enable_reflection=enable_reflection, reflection_iterations=reflection_iterations, enable_result_review=enable_result_review)
 
 
 # Export the main functions
