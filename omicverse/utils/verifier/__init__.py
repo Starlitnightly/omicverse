@@ -24,6 +24,12 @@ from .notebook_task_extractor import (
     NotebookTaskExtractor,
     create_task_extractor,
 )
+from .end_to_end_verifier import (
+    EndToEndVerifier,
+    VerificationRunConfig,
+    VerificationSummary,
+    create_verifier,
+)
 
 __all__ = [
     "SkillDescription",
@@ -40,4 +46,8 @@ __all__ = [
     "create_quality_checker",
     "NotebookTaskExtractor",
     "create_task_extractor",
+    "EndToEndVerifier",
+    "VerificationRunConfig",
+    "VerificationSummary",
+    "create_verifier",
 ]
