@@ -30,6 +30,7 @@ from .end_to_end_verifier import (
     VerificationSummary,
     create_verifier,
 )
+from .cli import main as cli_main
 
 __all__ = [
     "SkillDescription",
@@ -50,4 +51,5 @@ __all__ = [
     "VerificationRunConfig",
     "VerificationSummary",
     "create_verifier",
+    "cli_main",
 ]
