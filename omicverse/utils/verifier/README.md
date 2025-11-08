@@ -140,24 +140,72 @@ description: Guide Claude through omicverse's bulk RNA-seq DEG pipeline, from ge
 ---
 ```
 
-## Phase 2: LLM Skill Selector (PENDING)
+## Phase 2: LLM Skill Selector ✅ COMPLETED
 
-Will implement LLM-based skill selection that mimics Claude Code's behavior.
+Implements LLM-based skill selection that mimics Claude Code's behavior.
 
-**Planned Features**:
-- Pure LLM reasoning (no algorithmic matching)
-- Given task description → ask LLM which skills to use
+### LLMSkillSelector
+
+Uses pure LLM reasoning to select skills - NO algorithmic routing!
+
+**Features**:
+- Pure language understanding (no embeddings, no classifiers)
+- Asks LLM to select skills based on descriptions
 - Returns selected skills with ordering and reasoning
-- Supports multiple LLM backends (GPT, Claude, Gemini)
+- Supports async and sync execution
+- Batch selection for multiple tasks in parallel
+- Robust JSON parsing (handles markdown, malformed responses)
+- Integrates with OmicVerse's LLM backend infrastructure
 
-**Planned Usage**:
+**Usage**:
 ```python
-selector = LLMSkillSelector(llm_backend, skill_descriptions)
+from omicverse.utils.verifier import LLMSkillSelector, create_skill_selector
+
+# Option 1: Use convenience function
+selector = create_skill_selector(
+    skill_descriptions=skills,
+    model="gpt-4o-mini",
+    temperature=0.0
+)
+
+# Option 2: Create with custom backend
+from omicverse.utils.agent_backend import OmicVerseLLMBackend
+
+backend = OmicVerseLLMBackend(
+    system_prompt="...",
+    model="gpt-4o-mini",
+    temperature=0.0
+)
+selector = LLMSkillSelector(
+    llm_backend=backend,
+    skill_descriptions=skills
+)
+
+# Select skills for a task
 result = selector.select_skills(task)
 print(f"Selected: {result.selected_skills}")
 print(f"Order: {result.skill_order}")
 print(f"Reasoning: {result.reasoning}")
+
+# Async usage
+result = await selector.select_skills_async(task)
+
+# Batch selection (parallel)
+results = selector.select_skills_batch([task1, task2, task3])
 ```
+
+**How It Works**:
+1. Formats skill descriptions into LLM prompt
+2. Sends task description + skills to LLM
+3. LLM responds with JSON: `{"skills": [...], "order": [...], "reasoning": "..."}`
+4. Parses response (handles markdown, malformed JSON)
+5. Returns `LLMSelectionResult` with selections
+
+**Robust Parsing**:
+- Handles clean JSON: `{"skills": ...}`
+- Handles markdown: ` ```json ... ``` `
+- Handles text with JSON: `"Here's my answer: {...}"`
+- Graceful error handling for invalid responses
 
 ## Phase 3: Skill Description Quality Checker (PENDING)
 
@@ -286,13 +334,13 @@ Format for task dataset (planned):
 ## Implementation Timeline
 
 - **Phase 1** (Skill Description Loader): ✅ **COMPLETED**
-- **Phase 2** (LLM Skill Selector): 2 days
+- **Phase 2** (LLM Skill Selector): ✅ **COMPLETED**
 - **Phase 3** (Description Quality Checker): 2 days
 - **Phase 4** (Notebook Task Extractor): 2-3 days
 - **Phase 5** (End-to-End Verification): 2 days
 - **Phase 6** (Documentation & CI): 1 day
 
-**Total**: ~12-14 days
+**Progress**: 2/6 phases complete (~33%)
 
 ## Key Principles
 
