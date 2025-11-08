@@ -506,6 +506,173 @@ The `VerificationSummary` object contains:
 - 100% notebook coverage (73 notebooks)
 - 100% skill coverage (23 skills)
 
+## Phase 6: CLI Tool ✅ COMPLETED
+
+Command-line interface for running verification, validating descriptions, and extracting tasks.
+
+### Command: verify
+
+Run end-to-end verification on notebooks:
+
+```bash
+# Basic verification
+python -m omicverse.utils.verifier verify ./notebooks
+
+# With filters and options
+python -m omicverse.utils.verifier verify ./notebooks \
+    --pattern "**/*.ipynb" \
+    --model gpt-4o-mini \
+    --max-concurrent 5 \
+    --categories bulk single-cell \
+    --detailed \
+    --output report.txt \
+    --json-output summary.json
+
+# Skip specific notebooks
+python -m omicverse.utils.verifier verify ./notebooks \
+    --skip old_notebook.ipynb deprecated.ipynb
+```
+
+**Options**:
+- `--pattern`: Glob pattern for notebooks (default: `**/*.ipynb`)
+- `--model`: LLM model (default: `gpt-4o-mini`)
+- `--temperature`: LLM temperature (default: 0.0)
+- `--max-concurrent`: Max parallel tasks (default: 5)
+- `--skip`: Notebooks to skip
+- `--categories`: Filter by categories (e.g., `bulk single-cell`)
+- `--detailed`: Generate detailed report
+- `--output`: Save report to file
+- `--json-output`: Save JSON summary
+
+**Exit Codes**:
+- `0`: Verification passed criteria
+- `1`: Verification failed criteria
+
+### Command: validate
+
+Validate skill descriptions:
+
+```bash
+# Basic validation
+python -m omicverse.utils.verifier validate
+
+# With quality checks
+python -m omicverse.utils.verifier validate --check-quality
+
+# Detailed quality metrics
+python -m omicverse.utils.verifier validate --check-quality --detailed
+```
+
+**Options**:
+- `--check-quality`: Run quality metrics analysis
+- `--detailed`: Show detailed quality breakdown
+
+**Checks**:
+- Action verbs (what the skill does)
+- "When to use" indicators
+- Conciseness (< 100 words)
+- Token efficiency (< 80 tokens)
+- Completeness score
+- Clarity score
+
+### Command: extract
+
+Extract tasks from notebooks:
+
+```bash
+# Extract from single notebook
+python -m omicverse.utils.verifier extract --notebook ./t_deg.ipynb \
+    --detailed \
+    --show-coverage \
+    --output tasks.json
+
+# Extract from directory
+python -m omicverse.utils.verifier extract --directory ./notebooks \
+    --pattern "**/*.ipynb" \
+    --show-coverage \
+    --output tasks.json
+```
+
+**Options**:
+- `--notebook`: Single notebook path
+- `--directory`: Directory of notebooks
+- `--pattern`: Glob pattern (default: `**/*.ipynb`)
+- `--detailed`: Show detailed task info
+- `--show-coverage`: Show skill coverage stats
+- `--output`: Save tasks to JSON
+
+### Command: test-selection
+
+Test LLM skill selection interactively:
+
+```bash
+# Interactive mode
+python -m omicverse.utils.verifier test-selection
+
+# With task provided
+python -m omicverse.utils.verifier test-selection \
+    --task "Perform differential expression analysis on bulk RNA-seq" \
+    --model gpt-4o-mini
+
+# Custom model and temperature
+python -m omicverse.utils.verifier test-selection \
+    --task "Cluster single-cell data" \
+    --model gpt-4o \
+    --temperature 0.2
+```
+
+**Options**:
+- `--task`: Task description (prompts if not provided)
+- `--model`: LLM model (default: `gpt-4o-mini`)
+- `--temperature`: LLM temperature (default: 0.0)
+
+### Global Options
+
+Available for all commands:
+
+```bash
+--skills-dir PATH    # Custom skills directory (default: .claude/skills/)
+```
+
+### Usage Examples
+
+**Example 1: Quick validation**
+```bash
+python -m omicverse.utils.verifier validate
+```
+
+**Example 2: Full verification with report**
+```bash
+python -m omicverse.utils.verifier verify ./omicverse_guide/docs/Tutorials-bulk \
+    --detailed \
+    --output bulk_verification_report.txt \
+    --json-output bulk_summary.json
+```
+
+**Example 3: Extract and analyze coverage**
+```bash
+python -m omicverse.utils.verifier extract \
+    --directory ./omicverse_guide/docs \
+    --show-coverage \
+    --output all_tasks.json
+```
+
+**Example 4: Test skill selection**
+```bash
+python -m omicverse.utils.verifier test-selection \
+    --task "Preprocess and cluster PBMC3k dataset"
+```
+
+**Example 5: CI/CD Integration**
+```bash
+# Validation check in CI
+python -m omicverse.utils.verifier validate --check-quality || exit 1
+
+# Verification test in CI
+python -m omicverse.utils.verifier verify ./notebooks --categories bulk
+# Exit code 0 if passed, 1 if failed
+```
+
 ## Testing
 
 ### Current Status
@@ -517,6 +684,7 @@ The `VerificationSummary` object contains:
 - ✅ SkillDescriptionQualityChecker with effectiveness testing
 - ✅ NotebookTaskExtractor with ground truth mapping
 - ✅ EndToEndVerifier with complete workflow testing
+- ✅ CLI tool with 4 commands (verify, validate, extract, test-selection)
 - ✅ Comprehensive test suites (130+ tests total)
 - ✅ Token estimation and statistics
 - ✅ Description quality validation
@@ -525,6 +693,7 @@ The `VerificationSummary` object contains:
 - ✅ Notebook parsing and task extraction
 - ✅ Coverage statistics
 - ✅ Success criteria checking
+- ✅ CI/CD integration support
 
 **Test Files**:
 - `tests/verifier/test_skill_description_loader.py` - SkillDescriptionLoader tests (20+ tests)
@@ -620,9 +789,9 @@ Format for task dataset (planned):
 - **Phase 3** (Description Quality Checker): ✅ **COMPLETED**
 - **Phase 4** (Notebook Task Extractor): ✅ **COMPLETED**
 - **Phase 5** (End-to-End Verification): ✅ **COMPLETED**
-- **Phase 6** (CLI Tool & Documentation): 1 day
+- **Phase 6** (CLI Tool & Documentation): ✅ **COMPLETED**
 
-**Progress**: 5/6 phases complete (83%)
+**Progress**: 6/6 phases complete (100%) 🎉
 
 ## Key Principles
 
