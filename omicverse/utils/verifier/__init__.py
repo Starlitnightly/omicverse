@@ -20,6 +20,10 @@ from .skill_description_quality import (
     ComparisonResult,
     create_quality_checker,
 )
+from .notebook_task_extractor import (
+    NotebookTaskExtractor,
+    create_task_extractor,
+)
 
 __all__ = [
     "SkillDescription",
@@ -34,4 +38,6 @@ __all__ = [
     "EffectivenessResult",
     "ComparisonResult",
     "create_quality_checker",
+    "NotebookTaskExtractor",
+    "create_task_extractor",
 ]

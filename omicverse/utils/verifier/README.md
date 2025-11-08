@@ -317,15 +317,103 @@ print(f"Recommendation: {comparison.recommendation}")
 - **F1 Score**: Harmonic mean of precision and recall
 - **Accuracy**: (True positives + True negatives) / Total
 
-## Phase 4: Notebook Task Extractor (PENDING)
+## Phase 4: Notebook Task Extractor ✅ COMPLETED
 
-Will extract task descriptions from tutorial notebooks.
+Extracts task descriptions from Jupyter notebooks and maps them to skills.
 
-**Planned Features**:
-- Parse Jupyter notebooks
-- Extract natural language tasks from markdown cells
-- Infer tasks from code flow
-- Build ground truth task → skills mapping
+### NotebookTaskExtractor
+
+Parses .ipynb files to extract tasks and build ground truth dataset.
+
+**Features**:
+- Parse Jupyter notebooks using nbformat
+- Extract task descriptions from markdown cells
+- Detect task indicators ("In this tutorial", "The goal is", etc.)
+- Map code patterns to skills (function call analysis)
+- Ground truth mapping (notebook basename → expected skills)
+- Coverage statistics calculation
+- JSON serialization for task datasets
+
+**Usage**:
+```python
+from omicverse.utils.verifier import NotebookTaskExtractor, create_task_extractor
+
+# Create extractor
+extractor = create_task_extractor()
+
+# Extract from single notebook
+tasks = extractor.extract_from_notebook("path/to/t_deg.ipynb")
+
+for task in tasks:
+    print(f"Task: {task.task_description}")
+    print(f"Skills: {task.expected_skills}")
+    print(f"Category: {task.category}")
+
+# Extract from all notebooks in directory
+all_tasks = extractor.extract_from_directory(
+    "omicverse_guide/docs/Tutorials-bulk"
+)
+
+# Get coverage statistics
+from omicverse.utils.verifier import SkillDescriptionLoader
+
+loader = SkillDescriptionLoader()
+skills = loader.load_all_descriptions()
+
+stats = extractor.get_coverage_statistics(all_tasks, skills)
+print(f"Coverage: {stats['coverage_percentage']:.1f}%")
+print(f"Covered skills: {stats['covered_skills']}")
+print(f"Not covered: {stats['not_covered_skills']}")
+
+# Save to JSON
+extractor.save_tasks_to_json(all_tasks, "tasks_dataset.json")
+
+# Load from JSON
+loaded_tasks = NotebookTaskExtractor.load_tasks_from_json("tasks_dataset.json")
+```
+
+**Task Extraction**:
+- **Main task**: From notebook title + introduction
+- **Sub-tasks**: From H2/H3 section headings
+- **Task indicators detected**:
+  - "in this tutorial"
+  - "we will"
+  - "the goal is"
+  - "this tutorial demonstrates"
+  - "here we"
+  - "an important task"
+
+**Skill Mapping**:
+Maps code patterns to skills by detecting function calls:
+- `ov.bulk.pyDEG` → `bulk-deg-analysis`
+- `ov.pp.qc` + `ov.pp.preprocess` → `single-preprocessing`
+- `ov.single.cluster` → `single-clustering`
+- `ov.single.CellVote` → `single-annotation`
+- And 20+ more patterns
+
+**Ground Truth Mapping**:
+Pre-built mapping for known notebooks:
+```python
+{
+    't_deg.ipynb': ['bulk-deg-analysis'],
+    't_preprocess.ipynb': ['single-preprocessing'],
+    't_cluster.ipynb': ['single-clustering'],
+    # ... 20+ more mappings
+}
+```
+
+**Coverage Statistics**:
+```python
+{
+    'total_tasks': 45,
+    'total_notebooks': 15,
+    'skills_covered': 18,
+    'skills_not_covered': 5,
+    'coverage_percentage': 78.3,
+    'covered_skills': ['bulk-deg-analysis', 'single-preprocessing', ...],
+    'not_covered_skills': ['data-export-pdf', ...]
+}
+```
 
 ## Phase 5: End-to-End Verification (PENDING)
 
@@ -346,16 +434,20 @@ Will test complete workflow: notebook → task → LLM selection → verificatio
 - ✅ SkillDescriptionLoader with progressive disclosure
 - ✅ LLMSkillSelector with pure LLM reasoning
 - ✅ SkillDescriptionQualityChecker with effectiveness testing
-- ✅ Comprehensive test suites (40+ tests total)
+- ✅ NotebookTaskExtractor with ground truth mapping
+- ✅ Comprehensive test suites (100+ tests total)
 - ✅ Token estimation and statistics
 - ✅ Description quality validation
 - ✅ A/B testing framework
 - ✅ Report generation
+- ✅ Notebook parsing and task extraction
+- ✅ Coverage statistics
 
 **Test Files**:
 - `tests/verifier/test_skill_description_loader.py` - SkillDescriptionLoader tests (20+ tests)
 - `tests/verifier/test_llm_skill_selector.py` - LLMSkillSelector tests (25+ tests)
 - `tests/verifier/test_skill_description_quality.py` - Quality checker tests (30+ tests)
+- `tests/verifier/test_notebook_task_extractor.py` - NotebookTaskExtractor tests (35+ tests)
 
 ### Running Tests
 
@@ -442,11 +534,11 @@ Format for task dataset (planned):
 - **Phase 1** (Skill Description Loader): ✅ **COMPLETED**
 - **Phase 2** (LLM Skill Selector): ✅ **COMPLETED**
 - **Phase 3** (Description Quality Checker): ✅ **COMPLETED**
-- **Phase 4** (Notebook Task Extractor): 2-3 days
+- **Phase 4** (Notebook Task Extractor): ✅ **COMPLETED**
 - **Phase 5** (End-to-End Verification): 2 days
 - **Phase 6** (Documentation & CI): 1 day
 
-**Progress**: 3/6 phases complete (50%)
+**Progress**: 4/6 phases complete (67%)
 
 ## Key Principles
 
