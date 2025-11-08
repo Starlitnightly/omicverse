@@ -12,6 +12,7 @@ from .data_structures import (
     VerificationResult,
 )
 from .skill_description_loader import SkillDescriptionLoader
+from .llm_skill_selector import LLMSkillSelector, create_skill_selector
 
 __all__ = [
     "SkillDescription",
@@ -19,4 +20,6 @@ __all__ = [
     "LLMSelectionResult",
     "VerificationResult",
     "SkillDescriptionLoader",
+    "LLMSkillSelector",
+    "create_skill_selector",
 ]
