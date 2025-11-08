@@ -148,13 +148,9 @@ class EndToEndVerifier:
         llm_result = await selector.select_skills_async(task)
 
         # Compare against ground truth
-        verification = VerificationResult.from_comparison(
-            task_id=task.task_id,
-            expected_skills=task.expected_skills,
-            selected_skills=llm_result.selected_skills,
-            expected_order=task.expected_order,
-            selected_order=llm_result.skill_order,
-            alternate_acceptable=task.alternate_acceptable,
+        verification = VerificationResult.calculate(
+            task=task,
+            llm_result=llm_result,
         )
 
         return llm_result, verification
