@@ -29,3 +29,9 @@ tmp_omicverse/
 
 # Local progress log
 progress.json
+
+# Coverage reports
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
