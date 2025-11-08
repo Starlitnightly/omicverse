@@ -113,13 +113,13 @@ class TestQualityMetricsCalculation:
         """Test token count estimation."""
         skill = SkillDescription(
             name="test-skill",
-            description="Short description with few words"  # ~10 words total
+            description="Short description with few words"  # 5 words
         )
 
         metrics = checker.check_quality(skill)
 
-        # Estimate: ~10 words * 1.3 = ~13 tokens
-        assert 10 <= metrics.token_estimate <= 20
+        # Estimate: ~5 words * 1.3 = ~6.5 tokens
+        assert 5 <= metrics.token_estimate <= 10
         assert metrics.is_token_efficient is True
 
     def test_sentence_counting(self, checker):
@@ -355,21 +355,21 @@ class TestComparisonABTesting:
         """Test comparison when modified description is better."""
         # Mock: modified performs better
         async def mock_test_effectiveness(skill, pos, neg, all_skills):
-            if "improved" in skill.description:
-                # Modified version
+            if "Improved" in skill.description:
+                # Modified version - significantly better (>5% improvement)
                 return EffectivenessResult(
                     skill_name=skill.name,
                     total_tasks=10,
-                    correct_matches=9,
+                    correct_matches=10,
                     false_matches=0,
-                    missed_matches=1,
+                    missed_matches=0,
                     precision=1.0,
-                    recall=0.9,
-                    f1_score=0.95,
-                    accuracy=0.9
+                    recall=1.0,
+                    f1_score=1.0,  # Perfect score
+                    accuracy=1.0
                 )
             else:
-                # Original version
+                # Original version - mediocre
                 return EffectivenessResult(
                     skill_name=skill.name,
                     total_tasks=10,
@@ -378,7 +378,7 @@ class TestComparisonABTesting:
                     missed_matches=3,
                     precision=0.875,
                     recall=0.7,
-                    f1_score=0.778,
+                    f1_score=0.778,  # Below threshold
                     accuracy=0.7
                 )
 
@@ -410,7 +410,8 @@ class TestComparisonABTesting:
     async def test_comparison_original_is_better(self, mock_selector):
         """Test comparison when original description is better."""
         async def mock_test_effectiveness(skill, pos, neg, all_skills):
-            if "improved" in skill.description:
+            if "worse" in skill.description:
+                # Modified version - significantly worse
                 return EffectivenessResult(
                     skill_name=skill.name,
                     total_tasks=10,
@@ -419,27 +420,28 @@ class TestComparisonABTesting:
                     missed_matches=5,
                     precision=0.714,
                     recall=0.5,
-                    f1_score=0.588,
+                    f1_score=0.588,  # Poor score
                     accuracy=0.5
                 )
             else:
+                # Original version - excellent
                 return EffectivenessResult(
                     skill_name=skill.name,
                     total_tasks=10,
-                    correct_matches=9,
+                    correct_matches=10,
                     false_matches=0,
-                    missed_matches=1,
+                    missed_matches=0,
                     precision=1.0,
-                    recall=0.9,
-                    f1_score=0.95,
-                    accuracy=0.9
+                    recall=1.0,
+                    f1_score=1.0,  # Perfect score
+                    accuracy=1.0
                 )
 
         checker = SkillDescriptionQualityChecker(llm_selector=mock_selector)
         checker.test_effectiveness_async = mock_test_effectiveness
 
         original = SkillDescription(name="test", description="Good description")
-        modified = SkillDescription(name="test", description="Improved but worse")
+        modified = SkillDescription(name="test", description="Modified but worse")
 
         result = await checker.compare_descriptions_async(
             original, modified, ["task"], [0], []

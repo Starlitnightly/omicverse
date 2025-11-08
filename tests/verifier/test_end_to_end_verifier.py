@@ -220,11 +220,15 @@ async def test_verify_tasks_with_failure(mock_tasks, mock_llm_selector):
     """Test that verification handles task failures gracefully."""
     verifier = EndToEndVerifier(llm_selector=mock_llm_selector)
 
+    # Store original function
+    original_select = mock_llm_selector.select_skills_async
+
     # Make one task fail
     async def failing_select(task):
         if task.task_id == "task-002":
             raise ValueError("Simulated failure")
-        return await mock_llm_selector.select_skills_async(task)
+        # Call original for other tasks
+        return await original_select(task)
 
     mock_llm_selector.select_skills_async = AsyncMock(side_effect=failing_select)
 
