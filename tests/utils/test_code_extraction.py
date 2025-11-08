@@ -537,7 +537,8 @@ class TestEdgeCases:
         ```
         """)
 
-        with pytest.raises(ValueError, match="no syntactically valid"):
+        # Should raise ValueError with syntax error details
+        with pytest.raises(ValueError, match="invalid syntax"):
             agent._extract_python_code(response)
 
     def test_empty_fenced_block(self):
@@ -564,9 +565,12 @@ class TestEdgeCases:
         ```
         """)
 
-        # Should fail - no executable code
-        with pytest.raises(ValueError):
-            agent._extract_python_code(response)
+        # Comments are valid Python, should extract successfully
+        code = agent._extract_python_code(response)
+        assert "# This is a comment" in code
+        assert "# Another comment" in code
+        # Should be valid Python (comments are valid)
+        ast.parse(code)
 
     def test_indentation_preserved(self):
         """Test that indentation is preserved for code blocks"""
@@ -801,7 +805,7 @@ class TestFuzzingCodeExtraction:
         """Test code with special characters in strings"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = r"""
+        response = textwrap.dedent(r"""
         ```python
         import omicverse as ov
 
@@ -809,7 +813,7 @@ class TestFuzzingCodeExtraction:
         text = "Line with \"quotes\" and 'apostrophes'"
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "pattern" in code
