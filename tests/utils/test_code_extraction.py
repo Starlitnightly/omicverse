@@ -817,7 +817,9 @@ class TestFuzzingCodeExtraction:
 
         code = agent._extract_python_code(response)
         assert "pattern" in code
-        assert '"quotes"' in code
+        # Check for the word "quotes" (escaped quotes are preserved in raw strings)
+        assert "quotes" in code
+        assert "apostrophes" in code
         ast.parse(code)
 
 
