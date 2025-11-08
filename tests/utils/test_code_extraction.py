@@ -16,6 +16,7 @@ Date: 2025-01-08
 
 import pytest
 import ast
+import textwrap
 from omicverse.utils.smart_agent import OmicVerseAgent
 
 
@@ -26,14 +27,14 @@ class TestFencedCodeExtraction:
         """Test basic fenced code block"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         Here's the code:
 
         ```python
         import omicverse as ov
         adata = ov.pp.qc(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "import omicverse as ov" in code
@@ -45,12 +46,12 @@ class TestFencedCodeExtraction:
         """Test fenced block without 'python' keyword"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```
         import omicverse as ov
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "ov.pp.normalize" in code
@@ -60,7 +61,7 @@ class TestFencedCodeExtraction:
         """Test multiple fenced blocks (should extract first)"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         First approach:
         ```python
         import omicverse as ov
@@ -72,7 +73,7 @@ class TestFencedCodeExtraction:
         import omicverse as ov
         result2 = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         # Should extract first valid block
@@ -83,7 +84,7 @@ class TestFencedCodeExtraction:
         """Test fenced block with unusual whitespace"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
 
 
@@ -93,7 +94,7 @@ class TestFencedCodeExtraction:
 
 
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "import omicverse" in code
@@ -104,7 +105,7 @@ class TestFencedCodeExtraction:
         """Test fenced block with comments"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         # Preprocess the data
         import omicverse as ov
@@ -112,7 +113,7 @@ class TestFencedCodeExtraction:
         # Quality control
         adata = ov.pp.qc(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "# Preprocess" in code
@@ -127,7 +128,7 @@ class TestAsyncAwaitExtraction:
         """Test async function extraction"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -137,7 +138,7 @@ class TestAsyncAwaitExtraction:
 
         adata = await process_data(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "async def process_data" in code
@@ -148,14 +149,14 @@ class TestAsyncAwaitExtraction:
         """Test async with statement"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         async with ov.async_processor() as processor:
             adata = await processor.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "async with" in code
@@ -165,13 +166,13 @@ class TestAsyncAwaitExtraction:
         """Test async comprehensions"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         results = [await ov.process(x) async for x in data_stream]
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "async for" in code
@@ -186,7 +187,7 @@ class TestDecoratorExtraction:
         """Test simple decorator"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -196,7 +197,7 @@ class TestDecoratorExtraction:
 
         adata = process_data(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "@ov.cache_result" in code
@@ -207,7 +208,7 @@ class TestDecoratorExtraction:
         """Test decorator with arguments"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -217,7 +218,7 @@ class TestDecoratorExtraction:
 
         adata = unstable_process(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "@ov.retry(max_attempts=3" in code
@@ -227,7 +228,7 @@ class TestDecoratorExtraction:
         """Test multiple decorators on one function"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -239,7 +240,7 @@ class TestDecoratorExtraction:
 
         adata = process_data(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "@ov.cache" in code
@@ -251,7 +252,7 @@ class TestDecoratorExtraction:
         """Test class decorator"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -263,7 +264,7 @@ class TestDecoratorExtraction:
         processor = CustomProcessor()
         adata = processor.process(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "@ov.register_processor" in code
@@ -278,7 +279,7 @@ class TestComplexPatternsExtraction:
         """Test nested function definition"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -291,7 +292,7 @@ class TestComplexPatternsExtraction:
 
         adata = outer_process(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "def outer_process" in code
@@ -302,14 +303,14 @@ class TestComplexPatternsExtraction:
         """Test lambda expressions"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         normalize = lambda x: ov.pp.normalize(x)
         adata = normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "lambda" in code
@@ -319,13 +320,13 @@ class TestComplexPatternsExtraction:
         """Test list comprehension"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         results = [ov.pp.normalize(x) for x in adata_list]
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "[ov.pp.normalize(x) for x in adata_list]" in code
@@ -335,13 +336,13 @@ class TestComplexPatternsExtraction:
         """Test dictionary comprehension"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         results = {key: ov.pp.normalize(val) for key, val in data.items()}
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "{key: ov.pp.normalize(val)" in code
@@ -351,14 +352,14 @@ class TestComplexPatternsExtraction:
         """Test generator expression"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         gen = (ov.pp.normalize(x) for x in adata_list)
         results = list(gen)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "(ov.pp.normalize(x) for x in adata_list)" in code
@@ -368,14 +369,14 @@ class TestComplexPatternsExtraction:
         """Test context manager (with statement)"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
         with ov.batch_processor() as processor:
             adata = processor.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "with ov.batch_processor()" in code
@@ -385,7 +386,7 @@ class TestComplexPatternsExtraction:
         """Test try/except/finally"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -397,7 +398,7 @@ class TestComplexPatternsExtraction:
         finally:
             print("Processing complete")
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "try:" in code
@@ -409,7 +410,7 @@ class TestComplexPatternsExtraction:
         """Test multiline strings"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = '''
+        response = textwrap.dedent('''
         ```python
         import omicverse as ov
 
@@ -420,7 +421,7 @@ class TestComplexPatternsExtraction:
 
         adata = ov.pp.normalize(adata)
         ```
-        '''
+        ''')
 
         code = agent._extract_python_code(response)
         assert '"""' in code
@@ -430,7 +431,7 @@ class TestComplexPatternsExtraction:
         """Test f-string formatting"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -438,7 +439,7 @@ class TestComplexPatternsExtraction:
         print(f"Applying {method} to data")
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert 'f"Applying {method}' in code
@@ -452,14 +453,14 @@ class TestInlineCodeExtraction:
         """Test simple inline code extraction"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         To normalize your data, use:
 
         import omicverse as ov
         adata = ov.pp.normalize(adata)
 
         This will normalize the counts.
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "import omicverse" in code
@@ -470,7 +471,7 @@ class TestInlineCodeExtraction:
         """Test inline code with comments"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         Here's how to process your data:
 
         # Import the library
@@ -478,7 +479,7 @@ class TestInlineCodeExtraction:
 
         # Normalize the data
         adata = ov.pp.normalize(adata)
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "# Import" in code
@@ -489,7 +490,7 @@ class TestInlineCodeExtraction:
         """Test inline code mixed with explanatory text"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         First, import the library:
         import omicverse as ov
 
@@ -498,7 +499,7 @@ class TestInlineCodeExtraction:
 
         Finally, cluster the cells:
         adata = ov.pp.cluster(adata)
-        """
+        """)
 
         code = agent._extract_python_code(response)
         # Should extract Python lines only
@@ -518,9 +519,9 @@ class TestEdgeCases:
         """Test response with no code"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         I cannot help with that request. Please provide more information.
-        """
+        """)
 
         with pytest.raises(ValueError, match="no code candidates found"):
             agent._extract_python_code(response)
@@ -529,12 +530,12 @@ class TestEdgeCases:
         """Test fenced block with invalid syntax"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
         this is not valid python syntax!!!
         ```
-        """
+        """)
 
         with pytest.raises(ValueError, match="no syntactically valid"):
             agent._extract_python_code(response)
@@ -543,11 +544,11 @@ class TestEdgeCases:
         """Test empty fenced block"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
 
         ```
-        """
+        """)
 
         with pytest.raises(ValueError):
             agent._extract_python_code(response)
@@ -556,12 +557,12 @@ class TestEdgeCases:
         """Test code with only comments"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         # This is a comment
         # Another comment
         ```
-        """
+        """)
 
         # Should fail - no executable code
         with pytest.raises(ValueError):
@@ -571,7 +572,7 @@ class TestEdgeCases:
         """Test that indentation is preserved for code blocks"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -580,7 +581,7 @@ class TestEdgeCases:
             if True:
                 adata = ov.pp.qc(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         # Check indentation is valid
@@ -592,7 +593,7 @@ class TestEdgeCases:
         """Test code with unicode characters"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
 
@@ -600,7 +601,7 @@ class TestEdgeCases:
         adata = ov.pp.normalize(adata)
         print("Finished ✓")
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "データ" in code
@@ -611,12 +612,12 @@ class TestEdgeCases:
         """Test automatic omicverse import injection"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         # No import statement
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         # Should auto-inject import
@@ -627,12 +628,12 @@ class TestEdgeCases:
         """Test that existing import is not duplicated"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         # Should not duplicate import
@@ -689,7 +690,7 @@ class TestGatherCodeCandidates:
         """Test that fenced blocks are prioritized over inline"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         Some inline code here:
         import omicverse as ov
 
@@ -698,7 +699,7 @@ class TestGatherCodeCandidates:
         import omicverse as ov
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         candidates = agent._gather_code_candidates(response)
         # Should only return fenced block (prioritized)
@@ -710,7 +711,7 @@ class TestGatherCodeCandidates:
         """Test that all fenced blocks are collected"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
         code1 = True
@@ -720,7 +721,7 @@ class TestGatherCodeCandidates:
         import omicverse as ov
         code2 = True
         ```
-        """
+        """)
 
         candidates = agent._gather_code_candidates(response)
         # Should collect both blocks
@@ -730,10 +731,10 @@ class TestGatherCodeCandidates:
         """Test inline extraction when no fenced blocks"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         import omicverse as ov
         adata = ov.pp.normalize(adata)
-        """
+        """)
 
         candidates = agent._gather_code_candidates(response)
         assert len(candidates) >= 1
@@ -747,12 +748,12 @@ class TestFuzzingCodeExtraction:
         """Test handling of malformed backticks"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ``python
         import omicverse as ov
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         # Should handle gracefully
         try:
@@ -767,13 +768,13 @@ class TestFuzzingCodeExtraction:
         """Test nested code block markers (edge case)"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = """
+        response = textwrap.dedent("""
         ```python
         import omicverse as ov
         # Example: ```nested backticks```
         adata = ov.pp.normalize(adata)
         ```
-        """
+        """)
 
         code = agent._extract_python_code(response)
         assert "import omicverse" in code
