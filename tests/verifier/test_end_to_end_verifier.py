@@ -331,18 +331,29 @@ def test_verification_summary_creation(mock_tasks, mock_llm_selector):
     verifier = EndToEndVerifier(llm_selector=mock_llm_selector)
 
     # Create mock results
+    llm_result_1 = LLMSelectionResult(
+        task_id="task-001",
+        selected_skills=["bulk-deg-analysis"],
+        skill_order=["bulk-deg-analysis"],
+        reasoning="DEG analysis",
+    )
+    llm_result_2 = LLMSelectionResult(
+        task_id="task-002",
+        selected_skills=["single-preprocessing", "single-clustering"],
+        skill_order=["single-preprocessing", "single-clustering"],
+        reasoning="Preprocess and cluster",
+    )
+
     results = [
         (
             mock_tasks[0],
-            LLMSelectionResult(
-                task_id="task-001",
-                selected_skills=["bulk-deg-analysis"],
-                skill_order=["bulk-deg-analysis"],
-                reasoning="DEG analysis",
-            ),
+            llm_result_1,
             VerificationResult(
                 task_id="task-001",
                 passed=True,
+                llm_selection=llm_result_1,
+                expected_skills=mock_tasks[0].expected_skills,
+                expected_order=mock_tasks[0].expected_order,
                 precision=1.0,
                 recall=1.0,
                 f1_score=1.0,
@@ -351,15 +362,13 @@ def test_verification_summary_creation(mock_tasks, mock_llm_selector):
         ),
         (
             mock_tasks[1],
-            LLMSelectionResult(
-                task_id="task-002",
-                selected_skills=["single-preprocessing", "single-clustering"],
-                skill_order=["single-preprocessing", "single-clustering"],
-                reasoning="Preprocess and cluster",
-            ),
+            llm_result_2,
             VerificationResult(
                 task_id="task-002",
                 passed=True,
+                llm_selection=llm_result_2,
+                expected_skills=mock_tasks[1].expected_skills,
+                expected_order=mock_tasks[1].expected_order,
                 precision=1.0,
                 recall=1.0,
                 f1_score=1.0,
@@ -392,18 +401,29 @@ def test_verification_summary_with_failures(mock_tasks, mock_llm_selector):
     """Test summary with some failed tasks."""
     verifier = EndToEndVerifier(llm_selector=mock_llm_selector)
 
+    llm_result_1 = LLMSelectionResult(
+        task_id="task-001",
+        selected_skills=["bulk-deg-analysis"],
+        skill_order=["bulk-deg-analysis"],
+        reasoning="DEG analysis",
+    )
+    llm_result_2 = LLMSelectionResult(
+        task_id="task-002",
+        selected_skills=["single-clustering"],  # Missing preprocessing
+        skill_order=["single-clustering"],
+        reasoning="Just cluster",
+    )
+
     results = [
         (
             mock_tasks[0],
-            LLMSelectionResult(
-                task_id="task-001",
-                selected_skills=["bulk-deg-analysis"],
-                skill_order=["bulk-deg-analysis"],
-                reasoning="DEG analysis",
-            ),
+            llm_result_1,
             VerificationResult(
                 task_id="task-001",
                 passed=True,
+                llm_selection=llm_result_1,
+                expected_skills=mock_tasks[0].expected_skills,
+                expected_order=mock_tasks[0].expected_order,
                 precision=1.0,
                 recall=1.0,
                 f1_score=1.0,
@@ -412,15 +432,13 @@ def test_verification_summary_with_failures(mock_tasks, mock_llm_selector):
         ),
         (
             mock_tasks[1],
-            LLMSelectionResult(
-                task_id="task-002",
-                selected_skills=["single-clustering"],  # Missing preprocessing
-                skill_order=["single-clustering"],
-                reasoning="Just cluster",
-            ),
+            llm_result_2,
             VerificationResult(
                 task_id="task-002",
                 passed=False,
+                llm_selection=llm_result_2,
+                expected_skills=mock_tasks[1].expected_skills,
+                expected_order=mock_tasks[1].expected_order,
                 precision=1.0,
                 recall=0.5,  # Only got 1 of 2 skills
                 f1_score=0.67,
@@ -499,13 +517,20 @@ def test_category_metrics_calculation(mock_tasks, mock_llm_selector):
     """Test category metrics calculation."""
     verifier = EndToEndVerifier(llm_selector=mock_llm_selector)
 
+    llm_result_1 = Mock()
+    llm_result_2 = Mock()
+    llm_result_3 = Mock()
+
     results = [
         (
             mock_tasks[0],  # bulk
-            Mock(),
+            llm_result_1,
             VerificationResult(
                 task_id="task-001",
                 passed=True,
+                llm_selection=llm_result_1,
+                expected_skills=mock_tasks[0].expected_skills,
+                expected_order=mock_tasks[0].expected_order,
                 precision=1.0,
                 recall=1.0,
                 f1_score=1.0,
@@ -514,10 +539,13 @@ def test_category_metrics_calculation(mock_tasks, mock_llm_selector):
         ),
         (
             mock_tasks[1],  # single-cell
-            Mock(),
+            llm_result_2,
             VerificationResult(
                 task_id="task-002",
                 passed=True,
+                llm_selection=llm_result_2,
+                expected_skills=mock_tasks[1].expected_skills,
+                expected_order=mock_tasks[1].expected_order,
                 precision=0.9,
                 recall=0.9,
                 f1_score=0.9,
@@ -526,10 +554,13 @@ def test_category_metrics_calculation(mock_tasks, mock_llm_selector):
         ),
         (
             mock_tasks[2],  # single-cell
-            Mock(),
+            llm_result_3,
             VerificationResult(
                 task_id="task-003",
                 passed=False,
+                llm_selection=llm_result_3,
+                expected_skills=mock_tasks[2].expected_skills,
+                expected_order=mock_tasks[2].expected_order,
                 precision=0.8,
                 recall=0.7,
                 f1_score=0.75,
@@ -556,13 +587,19 @@ def test_difficulty_metrics_calculation(mock_tasks, mock_llm_selector):
     """Test difficulty metrics calculation."""
     verifier = EndToEndVerifier(llm_selector=mock_llm_selector)
 
+    llm_result_1 = Mock()
+    llm_result_2 = Mock()
+
     results = [
         (
             mock_tasks[0],  # single
-            Mock(),
+            llm_result_1,
             VerificationResult(
                 task_id="task-001",
                 passed=True,
+                llm_selection=llm_result_1,
+                expected_skills=mock_tasks[0].expected_skills,
+                expected_order=mock_tasks[0].expected_order,
                 precision=1.0,
                 recall=1.0,
                 f1_score=1.0,
@@ -571,10 +608,13 @@ def test_difficulty_metrics_calculation(mock_tasks, mock_llm_selector):
         ),
         (
             mock_tasks[1],  # workflow
-            Mock(),
+            llm_result_2,
             VerificationResult(
                 task_id="task-002",
                 passed=True,
+                llm_selection=llm_result_2,
+                expected_skills=mock_tasks[1].expected_skills,
+                expected_order=mock_tasks[1].expected_order,
                 precision=0.9,
                 recall=0.9,
                 f1_score=0.9,
