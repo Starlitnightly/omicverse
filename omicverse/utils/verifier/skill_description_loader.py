@@ -272,6 +272,7 @@ class SkillDescriptionLoader:
                 'total_skills': 0,
                 'avg_description_length': 0,
                 'avg_token_estimate': 0,
+                'total_token_estimate': 0,
                 'categories': {}
             }
 
@@ -293,5 +294,6 @@ class SkillDescriptionLoader:
             'avg_token_estimate': sum(token_estimates) / len(skills),
             'max_token_estimate': max(token_estimates),
             'min_token_estimate': min(token_estimates),
+            'total_token_estimate': sum(token_estimates),
             'categories': categories
         }
