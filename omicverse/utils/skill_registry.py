@@ -547,11 +547,11 @@ def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> SkillRegis
     if not merged:
         logger.warning("No skills discovered in package or CWD")
         reg = SkillRegistry(skill_root=package_skill_root)
-        reg._skills = {}
+        reg._full_skills_cache = {}
         return reg
 
     reg = SkillRegistry(skill_root=package_skill_root)
-    reg._skills = merged
+    reg._full_skills_cache = merged
     return reg
 
 __all__ = [
