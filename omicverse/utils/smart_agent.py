@@ -826,6 +826,259 @@ Now generate code for: "{request}"
             print(f"   ❌ Execution failed: {e}")
             raise ValueError(f"Priority 1 execution failed: {e}") from e
 
+    async def _run_skills_workflow(self, request: str, adata: Any) -> Any:
+        """
+        Execute Priority 2: Skills-guided workflow for complex tasks.
+
+        This method provides a comprehensive execution path for complex tasks that require
+        multi-step workflows. It uses BOTH the function registry AND matched skill guidance
+        to generate complete pipelines.
+
+        Parameters
+        ----------
+        request : str
+            The user's natural language request (pre-classified as complex)
+        adata : Any
+            AnnData object to process
+
+        Returns
+        -------
+        Any
+            Processed adata object
+
+        Raises
+        ------
+        ValueError
+            If code generation or extraction fails
+        RuntimeError
+            If LLM backend is not initialized
+
+        Notes
+        -----
+        This is the Priority 2 comprehensive path that:
+        - Matches relevant skills using LLM
+        - Loads full skill guidance (lazy loading)
+        - Injects both registry + skills into prompt
+        - Generates multi-step code
+        - More thorough but slower than Priority 1
+
+        The generated code may contain multiple steps, loops, and complex logic.
+        """
+
+        print(f"🧠 Priority 2: Skills-guided workflow for complex tasks")
+
+        # Step 1: Match relevant skills using LLM
+        print(f"   🎯 Matching relevant skills...")
+        matched_skill_slugs = await self._select_skill_matches_llm(request, top_k=2)
+
+        # Step 2: Load full content for matched skills (lazy loading)
+        skill_matches = []
+        if matched_skill_slugs:
+            print(f"   📚 Loading skill guidance:")
+            for slug in matched_skill_slugs:
+                full_skill = self.skill_registry.load_full_skill(slug) if self.skill_registry else None
+                if full_skill:
+                    print(f"      - {full_skill.name}")
+                    skill_matches.append(SkillMatch(skill=full_skill, score=1.0))
+
+        skill_guidance_text = self._format_skill_guidance(skill_matches)
+        skill_guidance_section = ""
+        if skill_guidance_text:
+            skill_guidance_section = (
+                "\nRelevant project skills:\n"
+                f"{skill_guidance_text}\n"
+            )
+
+        # Step 3: Build comprehensive prompt (registry + skills)
+        functions_info = self._get_available_functions_info()
+
+        priority2_prompt = f'''You are a workflow orchestrator for OmicVerse. This is a COMPLEX task requiring multiple steps.
+
+Request: "{request}"
+
+Dataset info:
+- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+
+Available OmicVerse Functions (Registry):
+{functions_info}
+{skill_guidance_section}
+
+INSTRUCTIONS:
+1. This is a COMPLEX task - generate a complete multi-step workflow
+2. Review the skill guidance above for best practices and recommended approaches
+3. Use the registry functions to implement each step
+4. Extract parameters from the request
+5. Generate a comprehensive pipeline with proper sequencing
+6. Return executable Python code ONLY, no explanations
+
+WORKFLOW GUIDELINES:
+- Break down the task into logical steps
+- Use appropriate functions from the registry for each step
+- Include comments explaining each major step
+- Add print statements to show progress
+- Handle intermediate results properly
+
+IMPORTANT:
+- This is NOT a simple task - generate a complete workflow
+- Follow the skill guidance if provided
+- Ensure proper sequencing of operations
+- Include validation and progress tracking
+
+Now generate a complete workflow for: "{request}"
+'''
+
+        # Step 4: Get code from LLM
+        print(f"   💭 Generating multi-step workflow code...")
+        with self._temporary_api_keys():
+            if not self._llm:
+                raise RuntimeError("LLM backend is not initialized")
+
+            response_text = await self._llm.run(priority2_prompt)
+            self.last_usage = self._llm.last_usage
+
+        # Track generation usage
+        self.last_usage_breakdown['generation'] = self.last_usage
+
+        # Step 5: Extract code
+        try:
+            code = self._extract_python_code(response_text)
+        except ValueError as exc:
+            raise ValueError(f"Could not extract executable code: {exc}") from exc
+
+        print(f"   🧬 Generated workflow code:")
+        print("   " + "=" * 46)
+        for line in code.split('\n'):
+            print(f"   {line}")
+        print("   " + "=" * 46)
+
+        # Step 6: Reflection (if enabled)
+        if self.enable_reflection:
+            print(f"   🔍 Validating workflow code (max {self.reflection_iterations} iteration{'s' if self.reflection_iterations > 1 else ''})...")
+
+            for iteration in range(self.reflection_iterations):
+                reflection_result = await self._reflect_on_code(code, request, adata, iteration + 1)
+
+                if reflection_result['issues_found']:
+                    print(f"      ⚠️  Issues found (iteration {iteration + 1}):")
+                    for issue in reflection_result['issues_found']:
+                        print(f"         - {issue}")
+
+                if reflection_result['needs_revision']:
+                    print(f"      ✏️  Applying improvements...")
+                    code = reflection_result['improved_code']
+                    print(f"      📈 Confidence: {reflection_result['confidence']:.1%}")
+                    if reflection_result['explanation']:
+                        print(f"      💡 {reflection_result['explanation']}")
+                else:
+                    print(f"      ✅ Workflow validated (confidence: {reflection_result['confidence']:.1%})")
+                    if reflection_result['explanation']:
+                        print(f"      💡 {reflection_result['explanation']}")
+                    break
+
+            # Track reflection usage
+            if self._llm.last_usage:
+                self.last_usage_breakdown['reflection'].append(self._llm.last_usage)
+
+            # Show final code if modified
+            if reflection_result['needs_revision']:
+                print(f"   🧬 Final workflow after reflection:")
+                print("   " + "=" * 46)
+                for line in code.split('\n'):
+                    print(f"   {line}")
+                print("   " + "=" * 46)
+
+        # Compute total usage (generation + reflection)
+        if self.last_usage_breakdown['generation'] or self.last_usage_breakdown['reflection']:
+            gen_usage = self.last_usage_breakdown['generation']
+            total_input = gen_usage.input_tokens if gen_usage else 0
+            total_output = gen_usage.output_tokens if gen_usage else 0
+
+            for ref_usage in self.last_usage_breakdown['reflection']:
+                total_input += ref_usage.input_tokens
+                total_output += ref_usage.output_tokens
+
+            from .agent_backend import Usage
+            self.last_usage_breakdown['total'] = Usage(
+                input_tokens=total_input,
+                output_tokens=total_output,
+                total_tokens=total_input + total_output,
+                model=self.model,
+                provider=self.provider
+            )
+            self.last_usage = self.last_usage_breakdown['total']
+
+        # Step 7: Execute workflow
+        print(f"   ⚡ Executing workflow...")
+        try:
+            original_adata = adata
+            result_adata = self._execute_generated_code(code, adata)
+            print(f"   ✅ Workflow execution successful!")
+            print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+
+            # Step 8: Result review (if enabled)
+            if self.enable_result_review:
+                print(f"   📋 Reviewing workflow result...")
+                review_result = await self._review_result(original_adata, result_adata, request, code)
+
+                if review_result['matched']:
+                    print(f"      ✅ Result matches intent (confidence: {review_result['confidence']:.1%})")
+                else:
+                    print(f"      ⚠️  Result may not match intent (confidence: {review_result['confidence']:.1%})")
+
+                if review_result['changes_detected']:
+                    print(f"      📊 Changes detected:")
+                    for change in review_result['changes_detected']:
+                        print(f"         - {change}")
+
+                if review_result['issues']:
+                    print(f"      ⚠️  Issues found:")
+                    for issue in review_result['issues']:
+                        print(f"         - {issue}")
+
+                print(f"      💡 {review_result['assessment']}")
+
+                # Show recommendation
+                recommendation_icons = {
+                    'accept': '✅',
+                    'review': '⚠️',
+                    'retry': '❌'
+                }
+                icon = recommendation_icons.get(review_result['recommendation'], '❓')
+                print(f"      {icon} Recommendation: {review_result['recommendation'].upper()}")
+
+                # Track review usage
+                if self._llm.last_usage:
+                    self.last_usage_breakdown['review'].append(self._llm.last_usage)
+
+                    # Recompute total with review
+                    gen_usage = self.last_usage_breakdown.get('generation')
+                    total_input = gen_usage.input_tokens if gen_usage else 0
+                    total_output = gen_usage.output_tokens if gen_usage else 0
+
+                    for ref_usage in self.last_usage_breakdown.get('reflection', []):
+                        total_input += ref_usage.input_tokens
+                        total_output += ref_usage.output_tokens
+
+                    for rev_usage in self.last_usage_breakdown['review']:
+                        total_input += rev_usage.input_tokens
+                        total_output += rev_usage.output_tokens
+
+                    from .agent_backend import Usage
+                    self.last_usage_breakdown['total'] = Usage(
+                        input_tokens=total_input,
+                        output_tokens=total_output,
+                        total_tokens=total_input + total_output,
+                        model=self.model,
+                        provider=self.provider
+                    )
+                    self.last_usage = self.last_usage_breakdown['total']
+
+            return result_adata
+
+        except Exception as e:
+            print(f"   ❌ Workflow execution failed: {e}")
+            raise ValueError(f"Priority 2 execution failed: {e}") from e
+
     def _list_project_skills(self) -> str:
         """Return a JSON catalog of the discovered project skills."""
 
