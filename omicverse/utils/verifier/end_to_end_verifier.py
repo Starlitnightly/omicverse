@@ -443,8 +443,12 @@ class EndToEndVerifier:
         lines.append("-" * 80)
         lines.append(f"Total Tasks: {summary.total_tasks}")
         lines.append(f"Tasks Verified: {summary.tasks_verified}")
-        lines.append(f"Tasks Passed: {summary.tasks_passed} ({summary.tasks_passed/summary.tasks_verified*100:.1f}%)")
-        lines.append(f"Tasks Failed: {summary.tasks_failed} ({summary.tasks_failed/summary.tasks_verified*100:.1f}%)")
+        if summary.tasks_verified > 0:
+            lines.append(f"Tasks Passed: {summary.tasks_passed} ({summary.tasks_passed/summary.tasks_verified*100:.1f}%)")
+            lines.append(f"Tasks Failed: {summary.tasks_failed} ({summary.tasks_failed/summary.tasks_verified*100:.1f}%)")
+        else:
+            lines.append(f"Tasks Passed: {summary.tasks_passed} (N/A)")
+            lines.append(f"Tasks Failed: {summary.tasks_failed} (N/A)")
         lines.append("")
 
         # Metrics
@@ -485,7 +489,10 @@ class EndToEndVerifier:
                 for category, metrics in sorted(summary.category_metrics.items()):
                     lines.append(f"{category}:")
                     lines.append(f"  Tasks: {metrics['count']}")
-                    lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} ({metrics['passed']/metrics['count']*100:.1f}%)")
+                    if metrics['count'] > 0:
+                        lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} ({metrics['passed']/metrics['count']*100:.1f}%)")
+                    else:
+                        lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} (N/A)")
                     lines.append(f"  F1-Score: {metrics['f1_score']:.3f}")
                     lines.append(f"  Ordering: {metrics['ordering_accuracy']:.3f}")
                     lines.append("")
@@ -497,7 +504,10 @@ class EndToEndVerifier:
                 for difficulty, metrics in sorted(summary.difficulty_metrics.items()):
                     lines.append(f"{difficulty}:")
                     lines.append(f"  Tasks: {metrics['count']}")
-                    lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} ({metrics['passed']/metrics['count']*100:.1f}%)")
+                    if metrics['count'] > 0:
+                        lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} ({metrics['passed']/metrics['count']*100:.1f}%)")
+                    else:
+                        lines.append(f"  Passed: {metrics['passed']}/{metrics['count']} (N/A)")
                     lines.append(f"  F1-Score: {metrics['f1_score']:.3f}")
                     lines.append(f"  Ordering: {metrics['ordering_accuracy']:.3f}")
                     lines.append("")
