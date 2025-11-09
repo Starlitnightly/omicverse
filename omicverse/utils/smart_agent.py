@@ -473,6 +473,150 @@ User request: "quality control with nUMI>500, mito<0.2"
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
+    async def _analyze_task_complexity(self, request: str) -> str:
+        """
+        Analyze the complexity of a user request to determine the appropriate execution strategy.
+
+        This method uses a combination of pattern matching and LLM reasoning to classify
+        whether a task can be handled with a single function call (simple) or requires
+        a multi-step workflow (complex).
+
+        Parameters
+        ----------
+        request : str
+            The user's natural language request
+
+        Returns
+        -------
+        str
+            Complexity classification: 'simple' or 'complex'
+
+        Examples
+        --------
+        Simple tasks:
+        - "quality control with nUMI>500"
+        - "normalize data"
+        - "run PCA"
+        - "leiden clustering"
+
+        Complex tasks:
+        - "complete bulk RNA-seq DEG analysis pipeline"
+        - "perform spatial deconvolution from start to finish"
+        - "full single-cell preprocessing workflow"
+        - "analyze my data and generate report"
+        """
+
+        # Pattern-based quick classification (fast path, no LLM needed)
+        request_lower = request.lower()
+
+        # Keywords that strongly indicate complexity
+        complex_keywords = [
+            'complete', 'full', 'entire', 'whole', 'comprehensive',
+            'pipeline', 'workflow', 'analysis', 'from start', 'end-to-end',
+            'step by step', 'all steps', 'everything', 'report',
+            'multiple', 'several', 'various', 'different steps',
+            'and then', 'followed by', 'after that', 'next',
+        ]
+
+        # Keywords that strongly indicate simplicity
+        simple_keywords = [
+            'just', 'only', 'single', 'one', 'simply',
+            'quick', 'fast', 'basic',
+        ]
+
+        # Specific function names (simple operations)
+        simple_functions = [
+            'qc', 'quality control', '质控',
+            'normalize', 'normalization', '归一化',
+            'pca', 'dimensionality reduction', '降维',
+            'cluster', 'clustering', 'leiden', 'louvain', '聚类',
+            'plot', 'visualize', 'show', '可视化',
+            'filter', 'subset', '过滤',
+            'scale', 'log transform',
+        ]
+
+        # Count pattern matches
+        complex_score = sum(1 for keyword in complex_keywords if keyword in request_lower)
+        simple_score = sum(1 for keyword in simple_keywords if keyword in request_lower)
+        function_matches = sum(1 for func in simple_functions if func in request_lower)
+
+        # Pattern-based decision rules
+        if complex_score >= 2:
+            # Multiple complexity indicators = definitely complex
+            logger.debug(f"Complexity: complex (pattern match, score={complex_score})")
+            return 'complex'
+
+        if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
+            # Short request with function name, no complexity indicators = simple
+            logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
+            return 'simple'
+
+        # Ambiguous cases: Use LLM for classification
+        logger.debug("Complexity: using LLM classifier for ambiguous request")
+
+        classification_prompt = f"""You are a task complexity analyzer for bioinformatics workflows.
+
+Analyze this user request and classify it as either SIMPLE or COMPLEX:
+
+Request: "{request}"
+
+Classification rules:
+
+SIMPLE tasks:
+- Single operation or function call
+- One specific action (e.g., "quality control", "normalize", "cluster", "plot")
+- Direct parameter specification (e.g., "with nUMI>500")
+- Examples:
+  - "quality control with nUMI>500, mito<0.2"
+  - "normalize using log transformation"
+  - "run PCA with 50 components"
+  - "leiden clustering with resolution=1.0"
+  - "plot UMAP"
+
+COMPLEX tasks:
+- Multiple steps or operations needed
+- Full workflows or pipelines
+- Phrases like "complete analysis", "full pipeline", "from start to finish"
+- Multiple operations in sequence (e.g., "do X and then Y")
+- Vague requests needing multiple steps (e.g., "analyze my data")
+- Examples:
+  - "complete bulk RNA-seq DEG analysis pipeline"
+  - "full preprocessing workflow for single-cell data"
+  - "spatial deconvolution from start to finish"
+  - "perform clustering and generate visualizations"
+  - "analyze my data and create a report"
+
+Respond with ONLY one word: either "simple" or "complex"
+"""
+
+        try:
+            with self._temporary_api_keys():
+                if not self._llm:
+                    # Fallback to conservative default if LLM unavailable
+                    logger.warning("LLM unavailable for complexity classification, defaulting to 'complex'")
+                    return 'complex'
+
+                response_text = await self._llm.run(classification_prompt)
+
+                # Extract classification from response
+                response_clean = response_text.strip().lower()
+
+                if 'simple' in response_clean:
+                    logger.debug(f"Complexity: simple (LLM classified)")
+                    return 'simple'
+                elif 'complex' in response_clean:
+                    logger.debug(f"Complexity: complex (LLM classified)")
+                    return 'complex'
+                else:
+                    # Unable to parse, default to complex (safer)
+                    logger.warning(f"Could not parse LLM complexity response: {response_text}, defaulting to 'complex'")
+                    return 'complex'
+
+        except Exception as exc:
+            # On any error, default to complex (safer, won't break functionality)
+            logger.warning(f"Complexity classification failed: {exc}, defaulting to 'complex'")
+            return 'complex'
+
     def _list_project_skills(self) -> str:
         """Return a JSON catalog of the discovered project skills."""
 
