@@ -4,9 +4,35 @@ Tests for the task complexity classifier in OmicVerseAgent.
 import asyncio
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def create_mock_adata():
+    """Create a minimal mock AnnData object for testing.
+
+    This mock object has the basic structure that DataStateInspector expects,
+    but represents "raw" data without any preprocessing.
+    """
+    mock_adata = MagicMock()
+    mock_adata.shape = (100, 2000)  # 100 cells, 2000 genes
+    mock_adata.layers = {}  # No processed layers
+    mock_adata.obsm = {}  # No embeddings
+    mock_adata.uns = {}  # No additional metadata
+
+    # Create mock obs/var with columns attribute
+    mock_obs = MagicMock()
+    mock_obs.columns = []
+    mock_var = MagicMock()
+    mock_var.columns = []
+
+    mock_adata.obs = mock_obs
+    mock_adata.var = mock_var
+    mock_adata.obsp = {}  # No pairwise obs data
+    mock_adata.varp = {}  # No pairwise var data
+    return mock_adata
 
 
 def test_complexity_classifier_pattern_matching_simple():
@@ -15,6 +41,9 @@ def test_complexity_classifier_pattern_matching_simple():
 
     # Create a minimal agent instance for testing
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Create mock AnnData object
+    mock_adata = create_mock_adata()
 
     # Test simple tasks (should be classified by pattern matching, no LLM call)
     simple_requests = [
@@ -29,7 +58,7 @@ def test_complexity_classifier_pattern_matching_simple():
     ]
 
     for request in simple_requests:
-        result = asyncio.run(agent._analyze_task_complexity(request))
+        result = asyncio.run(agent._analyze_task_complexity(request, mock_adata))
         assert result == 'simple', f"Expected 'simple' for '{request}', got '{result}'"
         print(f"✓ '{request}' -> {result}")
 
@@ -39,6 +68,9 @@ def test_complexity_classifier_pattern_matching_complex():
     from omicverse.utils.smart_agent import OmicVerseAgent
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Create mock AnnData object
+    mock_adata = create_mock_adata()
 
     # Test complex tasks (should be classified by pattern matching, no LLM call)
     complex_requests = [
@@ -51,7 +83,7 @@ def test_complexity_classifier_pattern_matching_complex():
     ]
 
     for request in complex_requests:
-        result = asyncio.run(agent._analyze_task_complexity(request))
+        result = asyncio.run(agent._analyze_task_complexity(request, mock_adata))
         assert result == 'complex', f"Expected 'complex' for '{request}', got '{result}'"
         print(f"✓ '{request}' -> {result}")
 
@@ -61,6 +93,9 @@ def test_complexity_classifier_keyword_detection():
     from omicverse.utils.smart_agent import OmicVerseAgent
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Create mock AnnData object
+    mock_adata = create_mock_adata()
 
     # Test cases with expected results
     test_cases = [
@@ -75,7 +110,7 @@ def test_complexity_classifier_keyword_detection():
     ]
 
     for request, expected in test_cases:
-        result = asyncio.run(agent._analyze_task_complexity(request))
+        result = asyncio.run(agent._analyze_task_complexity(request, mock_adata))
         assert result == expected, f"Expected '{expected}' for '{request}', got '{result}'"
         print(f"✓ '{request}' -> {result} (expected: {expected})")
 
@@ -85,6 +120,9 @@ def test_complexity_classifier_multilingual():
     from omicverse.utils.smart_agent import OmicVerseAgent
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Create mock AnnData object
+    mock_adata = create_mock_adata()
 
     # Chinese simple tasks
     chinese_simple = [
@@ -96,7 +134,7 @@ def test_complexity_classifier_multilingual():
     ]
 
     for request in chinese_simple:
-        result = asyncio.run(agent._analyze_task_complexity(request))
+        result = asyncio.run(agent._analyze_task_complexity(request, mock_adata))
         assert result == 'simple', f"Expected 'simple' for Chinese '{request}', got '{result}'"
         print(f"✓ '{request}' (Chinese) -> {result}")
 
@@ -107,6 +145,9 @@ def test_complexity_classifier_edge_cases():
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
 
+    # Create mock AnnData object
+    mock_adata = create_mock_adata()
+
     # Edge cases - these may go to LLM or use defaults
     edge_cases = [
         "",  # empty
@@ -116,7 +157,7 @@ def test_complexity_classifier_edge_cases():
     ]
 
     for request in edge_cases:
-        result = asyncio.run(agent._analyze_task_complexity(request))
+        result = asyncio.run(agent._analyze_task_complexity(request, mock_adata))
         # Just verify it returns a valid value, don't assert specific result
         assert result in ['simple', 'complex'], f"Invalid result '{result}' for '{request}'"
         print(f"✓ '{request}' -> {result}")
