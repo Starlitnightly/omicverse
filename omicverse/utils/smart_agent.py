@@ -372,6 +372,277 @@ class DataStateInspector:
         return result
 
 
+class LLMPrerequisiteInference:
+    """
+    Layer 2: LLM-based prerequisite inference.
+
+    Uses LLM to intelligently infer function prerequisites by analyzing:
+    - Function documentation
+    - Current data state
+    - Skill best practices
+    - Bioinformatics workflow knowledge
+
+    This provides maximum flexibility without hardcoding, learning from
+    documentation and context to make smart decisions.
+    """
+
+    def __init__(self, llm_backend):
+        """
+        Initialize prerequisite inference engine.
+
+        Parameters
+        ----------
+        llm_backend : OmicVerseLLMBackend
+            LLM backend for inference
+        """
+        self.llm = llm_backend
+        self._cache = {}  # Cache inference results to avoid redundant calls
+
+    def _get_cache_key(self, function_name: str, data_state: Dict[str, Any]) -> str:
+        """Generate cache key for prerequisite analysis."""
+        # Cache based on function name and key data state features
+        state_key = (
+            tuple(sorted(data_state.get('capabilities', []))),
+            tuple(sorted(data_state['available'].get('layers', []))),
+            tuple(sorted(data_state['available'].get('obsm', [])))
+        )
+        return f"{function_name}::{state_key}"
+
+    async def infer_prerequisites(self,
+                                  function_name: str,
+                                  function_info: Dict[str, Any],
+                                  data_state: Dict[str, Any],
+                                  skill_context: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Infer prerequisites for a function using LLM reasoning.
+
+        This method asks the LLM to analyze function documentation and
+        current data state to determine what's needed. Unlike hardcoded
+        rules, this adapts to any function and learns from context.
+
+        Parameters
+        ----------
+        function_name : str
+            Name of the function to analyze
+        function_info : Dict[str, Any]
+            Function metadata from registry (docstring, signature, etc.)
+        data_state : Dict[str, Any]
+            Current data state from DataStateInspector
+        skill_context : str, optional
+            Relevant skill guidance for context
+
+        Returns
+        -------
+        Dict[str, Any]
+            Inference result:
+            {
+                'can_run': bool,              # Can function run on current data?
+                'confidence': float,          # Confidence level (0-1)
+                'missing_items': List[str],   # What's missing
+                'required_steps': List[str],  # Steps to prepare data
+                'complexity': str,            # 'simple' or 'complex'
+                'reasoning': str,             # LLM's explanation
+                'auto_fixable': bool          # Can auto-run prerequisites?
+            }
+
+        Examples
+        --------
+        >>> inference = LLMPrerequisiteInference(llm_backend)
+        >>> result = await inference.infer_prerequisites(
+        ...     'pca',
+        ...     function_info,
+        ...     data_state
+        ... )
+        >>> print(result['reasoning'])
+        "PCA requires scaled data. Current data has no processed layers.
+         Needs: QC → normalize → scale → PCA (4 steps = complex)"
+        """
+        # Check cache first
+        cache_key = self._get_cache_key(function_name, data_state)
+        if cache_key in self._cache:
+            logger.debug(f"Using cached prerequisite inference for {function_name}")
+            return self._cache[cache_key]
+
+        # Prepare context for LLM
+        prompt = self._build_inference_prompt(
+            function_name, function_info, data_state, skill_context
+        )
+
+        try:
+            # Call LLM for analysis
+            response_text = await self.llm.run(prompt)
+
+            # Parse response
+            result = self._parse_inference_response(response_text, function_name)
+
+            # Cache result
+            self._cache[cache_key] = result
+
+            logger.debug(
+                f"LLM prerequisite inference for {function_name}: "
+                f"can_run={result['can_run']}, complexity={result['complexity']}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"LLM prerequisite inference failed: {e}")
+            # Return conservative fallback
+            return {
+                'can_run': False,
+                'confidence': 0.0,
+                'missing_items': [],
+                'required_steps': [],
+                'complexity': 'complex',
+                'reasoning': f"Could not analyze prerequisites: {e}",
+                'auto_fixable': False
+            }
+
+    def _build_inference_prompt(self,
+                                function_name: str,
+                                function_info: Dict[str, Any],
+                                data_state: Dict[str, Any],
+                                skill_context: Optional[str]) -> str:
+        """Build prompt for LLM prerequisite inference."""
+
+        # Format data state
+        state_summary = []
+        if data_state['capabilities']:
+            state_summary.append(f"**Capabilities**: {', '.join(data_state['capabilities'])}")
+        if data_state['available']['layers']:
+            state_summary.append(f"**Layers**: {', '.join(data_state['available']['layers'])}")
+        if data_state['available']['obsm']:
+            state_summary.append(f"**Obsm**: {', '.join(data_state['available']['obsm'])}")
+        if data_state['available']['uns']:
+            state_summary.append(f"**Uns**: {', '.join(data_state['available']['uns'][:5])}")
+
+        state_str = "\n".join(state_summary) if state_summary else "No preprocessing detected (raw data)"
+
+        # Build prompt
+        prompt = f"""You are a bioinformatics workflow expert analyzing function prerequisites.
+
+## Function to Analyze
+**Name**: {function_name}
+**Full Name**: {function_info.get('full_name', function_name)}
+**Category**: {function_info.get('category', 'unknown')}
+**Signature**: {function_info.get('signature', '(adata, **kwargs)')}
+
+**Documentation**:
+{function_info.get('docstring', 'No documentation available')[:500]}
+
+**Examples**:
+{chr(10).join(function_info.get('examples', ['No examples available'])[:2])}
+
+## Current Data State
+{state_str}
+
+## Your Task
+Analyze whether this function can run on the current data state, and determine what prerequisites are needed.
+
+Consider:
+1. **Function signature**: What parameters does it expect? (e.g., layer='scaled', use_rep='X_pca')
+2. **Common bioinformatics workflows**: Standard order is QC → normalize → scale → PCA → neighbors → clustering
+3. **Current data state**: What's already available vs. what's missing
+4. **Complexity**: How many steps to prepare the data?
+
+## Skill Context (Best Practices)
+{skill_context or 'No specific skill guidance available'}
+
+## Response Format
+Respond in JSON format:
+{{
+  "can_run": true/false,
+  "confidence": 0.0-1.0,
+  "missing_items": ["item1", "item2"],
+  "required_steps": ["step1", "step2"],
+  "complexity": "simple" or "complex",
+  "reasoning": "Your detailed analysis",
+  "auto_fixable": true/false
+}}
+
+**Guidelines**:
+- `can_run`: true if function can execute on current data without errors
+- `confidence`: How confident you are (1.0 = very confident, 0.5 = uncertain)
+- `missing_items`: Specific things missing (e.g., "scaled layer", "X_pca", "neighbors")
+- `required_steps`: Functions to run to prepare data (e.g., ["scale", "pca"])
+- `complexity`: "simple" if 0-1 steps needed, "complex" if 2+ steps needed
+- `reasoning`: Explain your analysis in 1-2 sentences
+- `auto_fixable`: true if missing items can be auto-fixed with ≤1 simple step
+
+**Examples**:
+
+Example 1: PCA on preprocessed data
+Function: pca, signature: (adata, layer='scaled')
+Data State: Has 'scaled' layer
+Response: {{"can_run": true, "confidence": 1.0, "missing_items": [], "required_steps": [], "complexity": "simple", "reasoning": "Function expects scaled layer which is available.", "auto_fixable": false}}
+
+Example 2: PCA on raw data
+Function: pca, signature: (adata, layer='scaled')
+Data State: No preprocessing
+Response: {{"can_run": false, "confidence": 0.9, "missing_items": ["scaled layer"], "required_steps": ["qc", "preprocess", "scale"], "complexity": "complex", "reasoning": "PCA requires scaled data. Current data is raw and needs full preprocessing pipeline (3+ steps).", "auto_fixable": false}}
+
+Example 3: Leiden with PCA, missing neighbors
+Function: leiden, signature: (adata, resolution=1.0)
+Data State: Has X_pca, missing neighbors
+Response: {{"can_run": false, "confidence": 0.95, "missing_items": ["neighbors"], "required_steps": ["neighbors"], "complexity": "simple", "reasoning": "Leiden clustering needs neighbor graph. Data has PCA, only missing neighbors (1 step).", "auto_fixable": true}}
+
+Now analyze the function and data state above. Return ONLY valid JSON, no additional text.
+"""
+
+        return prompt
+
+    def _parse_inference_response(self, response_text: str, function_name: str) -> Dict[str, Any]:
+        """Parse LLM response into structured result."""
+        try:
+            # Extract JSON from response (might be wrapped in markdown)
+            json_text = response_text.strip()
+
+            # Remove markdown code blocks if present
+            if json_text.startswith('```'):
+                lines = json_text.split('\n')
+                json_text = '\n'.join(lines[1:-1]) if len(lines) > 2 else json_text
+                json_text = json_text.replace('```json', '').replace('```', '').strip()
+
+            result = json.loads(json_text)
+
+            # Validate required fields
+            required_fields = ['can_run', 'confidence', 'missing_items',
+                             'required_steps', 'complexity', 'reasoning', 'auto_fixable']
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"Missing required field: {field}")
+
+            # Validate types
+            if not isinstance(result['can_run'], bool):
+                result['can_run'] = bool(result['can_run'])
+            if not isinstance(result['auto_fixable'], bool):
+                result['auto_fixable'] = bool(result['auto_fixable'])
+            if not isinstance(result['confidence'], (int, float)):
+                result['confidence'] = 0.5
+            if result['complexity'] not in ['simple', 'complex']:
+                result['complexity'] = 'complex' if len(result['required_steps']) > 1 else 'simple'
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"Failed to parse LLM inference response: {e}")
+            # Return conservative fallback
+            return {
+                'can_run': False,
+                'confidence': 0.3,
+                'missing_items': [],
+                'required_steps': [],
+                'complexity': 'complex',
+                'reasoning': f"Could not parse LLM response for {function_name}",
+                'auto_fixable': False
+            }
+
+    def clear_cache(self):
+        """Clear the inference cache."""
+        self._cache = {}
+        logger.debug("Prerequisite inference cache cleared")
+
+
 class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
@@ -430,6 +701,7 @@ class OmicVerseAgent:
         self._skill_overview_text: str = ""
         self._use_llm_skill_matching: bool = True  # Use LLM-based skill matching (Claude Code approach)
         self._managed_api_env: Dict[str, str] = {}
+        self._prerequisite_inference: Optional[LLMPrerequisiteInference] = None  # Layer 2: LLM inference
         # Reflection configuration
         self.enable_reflection = enable_reflection
         self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
@@ -699,7 +971,11 @@ User request: "quality control with nUMI>500, mito<0.2"
             max_tokens=8192,
             temperature=0.2,
         )
-    
+
+        # Initialize Layer 2: LLM-based prerequisite inference
+        self._prerequisite_inference = LLMPrerequisiteInference(self._llm)
+        logger.debug("Layer 2: LLM prerequisite inference initialized")
+
     def _search_functions(self, query: str) -> str:
         """
         Search for functions in the OmicVerse registry.
@@ -1040,35 +1316,111 @@ Respond with ONLY one word: either "simple" or "complex"
         The generated code should contain 1-2 function calls maximum.
         """
 
-        print(f"🚀 Priority 1: Fast registry-based workflow")
+        print(f"🚀 Priority 1: Fast registry-based workflow (with Layer 2 LLM inference)")
 
-        # Inspect current data state
+        # Layer 1: Inspect current data state
         data_state_summary = DataStateInspector.get_readable_summary(adata)
         data_state = DataStateInspector.inspect(adata)
 
         # Build registry-only prompt (no skills, focused on single function)
         functions_info = self._get_available_functions_info()
 
-        priority1_prompt = f"""You are a fast function executor for OmicVerse with PREREQUISITE AWARENESS.
+        #  Layer 2: Optional LLM-based prerequisite inference for ambiguous cases
+        # This provides enhanced intelligence for edge cases
+        llm_inference_context = ""
+        try:
+            # Try to identify the target function from the request
+            request_lower = request.lower()
+            target_function = None
+
+            # Simple heuristic to find target function
+            common_functions = {
+                'pca': ['pca', '主成分', 'principal'],
+                'leiden': ['leiden', '聚类'],
+                'neighbors': ['neighbor', 'knn'],
+                'qc': ['qc', 'quality', '质控'],
+                'umap': ['umap'],
+                'tsne': ['tsne'],
+                'scale': ['scale', '标准化']
+            }
+
+            for func_key, keywords in common_functions.items():
+                if any(kw in request_lower for kw in keywords):
+                    target_function = func_key
+                    break
+
+            # If we identified a target function, use Layer 2 for deeper analysis
+            if target_function and self._prerequisite_inference:
+                logger.debug(f"Layer 2: Running LLM inference for function '{target_function}'")
+
+                # Get function info from registry
+                func_results = _global_registry.find(target_function)
+                if func_results:
+                    func_info = func_results[0]
+
+                    # Run LLM-based prerequisite inference
+                    inference_result = await self._prerequisite_inference.infer_prerequisites(
+                        function_name=target_function,
+                        function_info=func_info,
+                        data_state=data_state,
+                        skill_context=None  # Could add skill context if needed
+                    )
+
+                    # Build context string for the prompt
+                    if not inference_result['can_run']:
+                        llm_inference_context = f"""
+
+## Layer 2: LLM Prerequisite Analysis for '{target_function}'
+
+**LLM Analysis** (Confidence: {inference_result['confidence']:.0%}):
+{inference_result['reasoning']}
+
+**Missing Items**: {', '.join(inference_result['missing_items']) if inference_result['missing_items'] else 'None'}
+**Required Steps**: {' → '.join(inference_result['required_steps']) if inference_result['required_steps'] else 'None'}
+**Complexity**: {inference_result['complexity'].upper()}
+**Auto-fixable**: {"YES - can auto-run missing prerequisites" if inference_result['auto_fixable'] else "NO - needs full workflow"}
+
+**Recommendation**:
+{"Auto-add the missing prerequisite(s) to your code." if inference_result['auto_fixable'] else 'Respond with "NEEDS_WORKFLOW" - this requires multiple preprocessing steps.'}
+"""
+                        logger.debug(f"Layer 2: Inference suggests complexity={inference_result['complexity']}, auto_fixable={inference_result['auto_fixable']}")
+
+        except Exception as e:
+            logger.warning(f"Layer 2 inference failed (non-critical): {e}")
+            # Continue without Layer 2 enhancement
+
+
+        priority1_prompt = f"""You are a fast function executor for OmicVerse with MULTI-LAYER PREREQUISITE AWARENESS.
+
+## Intelligent Prerequisite System
+This system uses TWO layers:
+- **Layer 1** (Runtime Inspection): Facts about current data state
+- **Layer 2** (LLM Inference): Intelligent reasoning about prerequisites
+
+Use both layers to make smart decisions about prerequisite handling.
 
 Request: "{request}"
 
 {data_state_summary}
+{llm_inference_context}
 
 Available OmicVerse Functions (Registry):
 {functions_info}
 
-INSTRUCTIONS - PREREQUISITE-AWARE EXECUTION:
-1. **Check the current data state above** - See what's already available (layers, obsm, uns, capabilities)
-2. **Find the best function** from the registry for the user's request
-3. **Analyze if prerequisites are met**:
+INSTRUCTIONS - MULTI-LAYER PREREQUISITE-AWARE EXECUTION:
+1. **Check Layer 1 (Data State)** - See what's available in the current data (layers, obsm, uns, capabilities)
+2. **Check Layer 2 (LLM Analysis)** - If provided above, review the LLM's prerequisite analysis and recommendation
+3. **Find the best function** from the registry for the user's request
+4. **Analyze if prerequisites are met**:
    - Does the function need a 'scaled' layer? Check if it exists in available layers
    - Does it need 'X_pca'? Check if it exists in available obsm
    - Does it need 'neighbors'? Check if it exists in uns
    - Does it need clustering results? Check detected capabilities
-4. **Handle missing prerequisites intelligently**:
+   - **IMPORTANT**: If Layer 2 analysis is provided, prioritize its recommendation
+5. **Handle missing prerequisites intelligently**:
+   - If Layer 2 says "Auto-fixable: YES" → Auto-add the missing prerequisite(s)
    - If 0-1 simple prerequisite is missing (e.g., just needs scaling) → Auto-add it to the code
-   - If 2+ steps are missing (e.g., needs QC + normalize + scale) → Respond "NEEDS_WORKFLOW"
+   - If 2+ steps are missing OR Layer 2 says "NEEDS_WORKFLOW" → Respond "NEEDS_WORKFLOW"
 5. **Extract parameters** from request (e.g., "nUMI>500" → tresh={{'nUMIs': 500, ...}})
 6. **Return executable Python code ONLY**, no explanations
 

@@ -27,6 +27,14 @@ Instead of hardcoding prerequisites, we implemented a **flexible, self-maintaini
 └────────────────┬─────────────────────────────────────┘
                  │
 ┌────────────────▼─────────────────────────────────────┐
+│  Layer 2: LLM Inference (✅ IMPLEMENTED)             │
+│  - Analyzes function documentation                   │
+│  - Reasons about prerequisites intelligently         │
+│  - Provides structured analysis & recommendations    │
+│  - Caches results for performance                    │
+└────────────────┬─────────────────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────────────────┐
 │  Data State-Aware Classification (✅ IMPLEMENTED)    │
 │  - Uses data state to classify task complexity       │
 │  - PCA on scaled data = SIMPLE                       │
@@ -34,9 +42,9 @@ Instead of hardcoding prerequisites, we implemented a **flexible, self-maintaini
 └────────────────┬─────────────────────────────────────┘
                  │
 ┌────────────────▼─────────────────────────────────────┐
-│  Prerequisite-Aware Prompt (✅ IMPLEMENTED)          │
-│  - Injects data state into LLM prompt                │
-│  - LLM reasons about prerequisites                   │
+│  Multi-Layer Prerequisite Prompt (✅ IMPLEMENTED)    │
+│  - Injects data state + LLM analysis into prompt     │
+│  - Code-generating LLM reasons about prerequisites   │
 │  - Auto-runs simple prerequisites (≤1 step)          │
 └──────────────────────────────────────────────────────┘
 ```
@@ -217,43 +225,128 @@ Run with:
 python test_workflow_dependency_hybrid.py
 ```
 
-## Next Steps (Optional)
+## Layer 2: LLM-Based Prerequisite Inference (✅ IMPLEMENTED!)
 
-### Layer 2: LLM-Based Prerequisite Inference (Not Implemented Yet)
+For maximum intelligence, we added a second layer that uses LLM reasoning:
 
-For even more intelligence, could add:
+### LLMPrerequisiteInference Class
+
+**Location**: `omicverse/utils/smart_agent.py:375-643`
+
+**Purpose**: Use LLM to analyze function documentation and intelligently infer prerequisites.
+
+**Key Features**:
+1. **Documentation Analysis**: Reads function docstrings, signatures, and examples
+2. **Data State Reasoning**: Compares requirements with current data state
+3. **Structured Output**: Returns JSON with analysis and recommendations
+4. **Performance Caching**: Caches results to avoid redundant LLM calls
+5. **Skill Context**: Can incorporate workflow best practices
+
+**Example Usage**:
 
 ```python
-class LLMPrerequisiteInference:
-    """
-    Use LLM to infer prerequisites from function documentation.
-    Learns dynamically from docstrings and skills.
-    """
+inference = LLMPrerequisiteInference(llm_backend)
 
-    async def infer_prerequisites(self, function_name, function_docs, data_state):
-        """Ask LLM what prerequisites a function needs"""
+result = await inference.infer_prerequisites(
+    function_name='pca',
+    function_info={
+        'signature': '(adata, layer="scaled", n_pcs=50)',
+        'docstring': 'Principal Component Analysis...',
+        'category': 'preprocessing'
+    },
+    data_state=data_state
+)
+
+# Returns:
+{
+    'can_run': False,
+    'confidence': 0.9,
+    'missing_items': ['scaled layer'],
+    'required_steps': ['qc', 'preprocess', 'scale'],
+    'complexity': 'complex',
+    'reasoning': 'PCA requires scaled data. Current data is raw...',
+    'auto_fixable': False
+}
 ```
 
-**Benefits**:
-- Handles novel functions automatically
-- Learns from documentation
-- Adapts to custom user pipelines
+### Integration into Priority 1
 
-**When to implement**:
-- If edge cases arise that pattern matching misses
-- If you want even more flexibility
-- If function registry grows significantly
+Layer 2 enhances Priority 1 by:
+1. Detecting the target function from the user request
+2. Running LLM inference if the function is common (PCA, leiden, etc.)
+3. Injecting the analysis into the code-generating LLM's prompt
+4. Providing clear recommendations (auto-fix vs. escalate)
+
+**Enhanced Prompt**:
+
+```
+Request: "Run PCA"
+
+## Current Data State (Layer 1)
+**Shape**: 1,000 cells × 500 genes
+**Av available Layers**: None (raw X matrix only)
+**Detected Capabilities**: Raw data (no preprocessing detected)
+
+## Layer 2: LLM Prerequisite Analysis for 'pca'
+
+**LLM Analysis** (Confidence: 90%):
+PCA requires scaled data. Current data is raw and needs full preprocessing pipeline (3+ steps).
+
+**Missing Items**: scaled layer
+**Required Steps**: qc → preprocess → scale
+**Complexity**: COMPLEX
+**Auto-fixable**: NO - needs full workflow
+
+**Recommendation**:
+Respond with "NEEDS_WORKFLOW" - this requires multiple preprocessing steps.
+```
+
+### Benefits of Layer 2
+
+| Feature | Layer 1 Only | Layer 1 + Layer 2 |
+|---------|-------------|-------------------|
+| **Speed** | Very fast (no LLM) | Fast (cached after first call) |
+| **Accuracy** | Good for common cases | Excellent for all cases |
+| **Novel functions** | Pattern matching only | Learns from documentation |
+| **Custom pipelines** | Limited support | Full support |
+| **Reasoning** | Heuristic | Intelligent analysis |
+| **Edge cases** | May miss | Handles well |
+
+### Layer 2 Tests
+
+**Test file**: `test_layer2_llm_inference.py`
+
+Tests included:
+1. ✅ LLM inference on PCA (raw data → complex)
+2. ✅ LLM inference on PCA (preprocessed → simple)
+3. ✅ LLM inference on leiden (with PCA → auto-fixable)
+4. ✅ Cache functionality
+5. ✅ Integration in agent workflow
+
+Run with:
+```bash
+python test_layer2_llm_inference.py
+```
+
+**Note**: Requires API key (OPENAI_API_KEY or ANTHROPIC_API_KEY)
 
 ## Files Modified
 
 1. **`omicverse/utils/smart_agent.py`**
    - Added `DataStateInspector` class (300 lines)
+   - Added `LLMPrerequisiteInference` class (270 lines)
    - Updated `_analyze_task_complexity()` method (60 lines)
-   - Updated `_run_registry_workflow()` prompt (90 lines)
-   - Total: ~450 lines added/modified
+   - Updated `_run_registry_workflow()` with Layer 2 integration (150 lines)
+   - Total: **~780 lines added/modified**
 
 2. **`test_workflow_dependency_hybrid.py`**
-   - New test file (300 lines)
+   - New test file for Layer 1 (300 lines)
+
+3. **`test_layer2_llm_inference.py`**
+   - New test file for Layer 2 (250 lines)
+
+4. **`WORKFLOW_DEPENDENCY_FIX.md`**
+   - Comprehensive documentation (updated with Layer 2)
 
 ## Summary
 
