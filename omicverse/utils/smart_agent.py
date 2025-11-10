@@ -66,6 +66,312 @@ from .skill_registry import (
 logger = logging.getLogger(__name__)
 
 
+class DataStateInspector:
+    """
+    Dynamically inspect AnnData state without hardcoded prerequisites.
+
+    This class provides runtime analysis of data state by examining what
+    actually exists in the AnnData object, rather than relying on hardcoded
+    rules. This makes it flexible and future-proof.
+    """
+
+    @staticmethod
+    def inspect(adata: Any) -> Dict[str, Any]:
+        """
+        Inspect adata and return complete state description.
+
+        This method reports facts about the data structure without making
+        assumptions or enforcing rules. It simply catalogs what exists.
+
+        Parameters
+        ----------
+        adata : Any
+            AnnData object to inspect
+
+        Returns
+        -------
+        Dict[str, Any]
+            Complete state information:
+            {
+                'available': {
+                    'layers': List[str],
+                    'obsm': List[str],
+                    'uns': List[str],
+                    'obs_columns': List[str],
+                    'var_columns': List[str],
+                    'obsp': List[str],
+                    'varp': List[str]
+                },
+                'shape': Tuple[int, int],
+                'capabilities': List[str],  # What operations appear possible
+                'embeddings': List[str]     # Available embedding types
+            }
+        """
+        state = {
+            'available': {
+                'layers': [],
+                'obsm': [],
+                'uns': [],
+                'obs_columns': [],
+                'var_columns': [],
+                'obsp': [],
+                'varp': []
+            },
+            'shape': (0, 0),
+            'capabilities': [],
+            'embeddings': []
+        }
+
+        try:
+            # Get basic dimensions
+            if hasattr(adata, 'shape'):
+                state['shape'] = adata.shape
+
+            # Collect what exists (facts, not interpretations)
+            if hasattr(adata, 'layers') and adata.layers is not None:
+                state['available']['layers'] = list(adata.layers.keys())
+
+            if hasattr(adata, 'obsm') and adata.obsm is not None:
+                state['available']['obsm'] = list(adata.obsm.keys())
+
+            if hasattr(adata, 'uns') and adata.uns is not None:
+                state['available']['uns'] = list(adata.uns.keys())
+
+            if hasattr(adata, 'obs') and adata.obs is not None:
+                state['available']['obs_columns'] = list(adata.obs.columns)
+
+            if hasattr(adata, 'var') and adata.var is not None:
+                state['available']['var_columns'] = list(adata.var.columns)
+
+            if hasattr(adata, 'obsp') and adata.obsp is not None:
+                state['available']['obsp'] = list(adata.obsp.keys())
+
+            if hasattr(adata, 'varp') and adata.varp is not None:
+                state['available']['varp'] = list(adata.varp.keys())
+
+            # Infer capabilities from available data (still factual, just derived)
+            capabilities = []
+
+            # Check for PCA
+            if 'X_pca' in state['available']['obsm']:
+                capabilities.append('has_pca')
+
+            # Check for neighbor graph
+            if 'neighbors' in state['available']['uns']:
+                capabilities.append('has_neighbors')
+
+            # Check for processed layers
+            processed_indicators = ['scaled', 'normalized', 'lognorm', 'pearson_residuals']
+            if any(indicator in layer.lower()
+                   for layer in state['available']['layers']
+                   for indicator in processed_indicators):
+                capabilities.append('has_processed_layers')
+
+            # Check for neighborhood graph in obsp
+            if any(key in ['connectivities', 'distances']
+                   for key in state['available']['obsp']):
+                capabilities.append('has_neighborhood_graph')
+
+            # Collect available embeddings
+            embedding_keys = ['X_umap', 'X_tsne', 'X_draw_graph', 'X_phate',
+                            'X_diffmap', 'X_mde', 'X_sude', 'spatial']
+            available_embeddings = [k for k in embedding_keys
+                                   if k in state['available']['obsm']]
+            if available_embeddings:
+                capabilities.append('has_embeddings')
+                state['embeddings'] = available_embeddings
+
+            # Check for clustering results
+            clustering_indicators = ['leiden', 'louvain', 'cluster']
+            clustering_columns = [col for col in state['available']['obs_columns']
+                                if any(ind in col.lower() for ind in clustering_indicators)]
+            if clustering_columns:
+                capabilities.append('has_clustering')
+                state['clustering_columns'] = clustering_columns
+
+            state['capabilities'] = capabilities
+
+        except Exception as e:
+            warnings.warn(f"Error inspecting data state: {e}", UserWarning)
+
+        return state
+
+    @staticmethod
+    def get_readable_summary(adata: Any) -> str:
+        """
+        Generate human-readable summary of data state.
+
+        This creates a formatted string suitable for displaying to users
+        or including in LLM prompts.
+
+        Parameters
+        ----------
+        adata : Any
+            AnnData object to summarize
+
+        Returns
+        -------
+        str
+            Human-readable summary
+        """
+        state = DataStateInspector.inspect(adata)
+
+        lines = [
+            "## Current Data State",
+            f"**Shape**: {state['shape'][0]:,} cells × {state['shape'][1]:,} genes",
+            ""
+        ]
+
+        # Available components
+        if state['available']['layers']:
+            layers_str = ', '.join(state['available']['layers'][:5])
+            if len(state['available']['layers']) > 5:
+                layers_str += f" (+ {len(state['available']['layers']) - 5} more)"
+            lines.append(f"**Available Layers**: {layers_str}")
+        else:
+            lines.append("**Available Layers**: None (raw X matrix only)")
+
+        if state['available']['obsm']:
+            obsm_str = ', '.join(state['available']['obsm'][:8])
+            if len(state['available']['obsm']) > 8:
+                obsm_str += f" (+ {len(state['available']['obsm']) - 8} more)"
+            lines.append(f"**Available Obsm**: {obsm_str}")
+        else:
+            lines.append("**Available Obsm**: None")
+
+        if state['available']['uns']:
+            uns_list = state['available']['uns'][:5]
+            uns_str = ', '.join(uns_list)
+            if len(state['available']['uns']) > 5:
+                uns_str += f" (+ {len(state['available']['uns']) - 5} more)"
+            lines.append(f"**Available Uns**: {uns_str}")
+
+        lines.append("")
+
+        # Capabilities (what's possible)
+        if state['capabilities']:
+            lines.append("**Detected Capabilities**:")
+            if 'has_processed_layers' in state['capabilities']:
+                lines.append("  ✅ Data appears preprocessed")
+            if 'has_pca' in state['capabilities']:
+                lines.append("  ✅ PCA computed")
+            if 'has_neighbors' in state['capabilities']:
+                lines.append("  ✅ Neighbor graph available")
+            if 'has_embeddings' in state['capabilities']:
+                emb_str = ', '.join(state.get('embeddings', [])[:3])
+                lines.append(f"  ✅ Embeddings available: {emb_str}")
+            if 'has_clustering' in state['capabilities']:
+                clust_str = ', '.join(state.get('clustering_columns', [])[:2])
+                lines.append(f"  ✅ Clustering results: {clust_str}")
+        else:
+            lines.append("**Detected Capabilities**: Raw data (no preprocessing detected)")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def check_compatibility(adata: Any, function_name: str,
+                           function_signature: str,
+                           function_category: str) -> Dict[str, Any]:
+        """
+        Check if a function can likely be called on current data.
+
+        Uses function signature inspection and category to infer requirements,
+        NOT hardcoded rules. This is adaptive and learns from the function itself.
+
+        Parameters
+        ----------
+        adata : Any
+            AnnData object to check
+        function_name : str
+            Name of the function to check
+        function_signature : str
+            Function signature string
+        function_category : str
+            Function category from registry
+
+        Returns
+        -------
+        Dict[str, Any]
+            Compatibility analysis:
+            {
+                'likely_compatible': bool,
+                'warnings': List[str],
+                'suggestions': List[str],
+                'reasoning': str
+            }
+        """
+        state = DataStateInspector.inspect(adata)
+        result = {
+            'likely_compatible': True,
+            'warnings': [],
+            'suggestions': [],
+            'reasoning': ''
+        }
+
+        try:
+            sig_lower = function_signature.lower()
+            name_lower = function_name.lower()
+
+            # Check for layer parameter expectations
+            if "layer='scaled'" in sig_lower or 'layer="scaled"' in sig_lower:
+                if 'scaled' not in state['available']['layers']:
+                    result['warnings'].append(
+                        "Function signature suggests it expects 'scaled' layer"
+                    )
+                    result['suggestions'].append(
+                        "Consider running ov.pp.scale(adata) or checking if data is already normalized"
+                    )
+
+            # Check for use_rep parameter expectations
+            if "use_rep='x_pca'" in sig_lower or 'use_rep="x_pca"' in sig_lower:
+                if 'X_pca' not in state['available']['obsm']:
+                    result['warnings'].append(
+                        "Function signature suggests it expects PCA representation"
+                    )
+                    result['suggestions'].append(
+                        "Consider running ov.pp.pca(adata) first"
+                    )
+
+            # Infer from function name (not hardcoded, just pattern matching)
+            if any(word in name_lower for word in ['leiden', 'louvain']):
+                if 'has_neighbors' not in state['capabilities']:
+                    result['warnings'].append(
+                        "Clustering functions typically work better with neighbor graph"
+                    )
+                    result['suggestions'].append(
+                        "Consider running ov.pp.neighbors(adata) first"
+                    )
+
+            # Check category-based expectations
+            if function_category == 'clustering':
+                if 'has_pca' not in state['capabilities']:
+                    result['warnings'].append(
+                        "Clustering typically performed on dimensionality-reduced data"
+                    )
+
+            if function_category in ['visualization', 'plotting']:
+                if not state['embeddings'] and 'has_pca' not in state['capabilities']:
+                    result['warnings'].append(
+                        "Visualization works best with precomputed embeddings or PCA"
+                    )
+
+            # Set reasoning
+            if result['warnings']:
+                result['reasoning'] = (
+                    f"Function {function_name} may need preprocessing. "
+                    f"Current state: {', '.join(state['capabilities']) or 'raw data'}."
+                )
+            else:
+                result['reasoning'] = (
+                    f"Function {function_name} appears compatible with current data state."
+                )
+
+        except Exception as e:
+            result['warnings'].append(f"Could not fully analyze compatibility: {e}")
+
+        return result
+
+
 class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
@@ -473,18 +779,23 @@ User request: "quality control with nUMI>500, mito<0.2"
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
-    async def _analyze_task_complexity(self, request: str) -> str:
+    async def _analyze_task_complexity(self, request: str, adata: Any) -> str:
         """
-        Analyze the complexity of a user request to determine the appropriate execution strategy.
+        Analyze the complexity of a user request with data state awareness.
 
-        This method uses a combination of pattern matching and LLM reasoning to classify
-        whether a task can be handled with a single function call (simple) or requires
-        a multi-step workflow (complex).
+        This method uses a combination of pattern matching, data state analysis,
+        and LLM reasoning to classify whether a task can be handled with a single
+        function call (simple) or requires a multi-step workflow (complex).
+
+        Now considers the CURRENT DATA STATE to make smarter decisions. For example,
+        "run PCA" is SIMPLE if data is already scaled, but COMPLEX if it's raw data.
 
         Parameters
         ----------
         request : str
             The user's natural language request
+        adata : Any
+            AnnData object with current state
 
         Returns
         -------
@@ -493,18 +804,21 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         Examples
         --------
-        Simple tasks:
-        - "quality control with nUMI>500"
-        - "normalize data"
-        - "run PCA"
-        - "leiden clustering"
+        Simple tasks (when data state supports them):
+        - "quality control with nUMI>500" (always simple)
+        - "normalize data" (simple if QC done)
+        - "run PCA" (simple if data is scaled)
+        - "leiden clustering" (simple if PCA + neighbors exist)
 
         Complex tasks:
         - "complete bulk RNA-seq DEG analysis pipeline"
-        - "perform spatial deconvolution from start to finish"
-        - "full single-cell preprocessing workflow"
+        - "run PCA" on raw unprepared data (needs QC + normalize + scale first)
+        - "leiden clustering" without PCA (needs full preprocessing)
         - "analyze my data and generate report"
         """
+
+        # Get current data state
+        data_state = DataStateInspector.inspect(adata)
 
         # Pattern-based quick classification (fast path, no LLM needed)
         request_lower = request.lower()
@@ -549,6 +863,76 @@ User request: "quality control with nUMI>500, mito<0.2"
         if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
             # Short request with function name, no complexity indicators = simple
             logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
+            return 'simple'
+
+        # DATA STATE-AWARE CLASSIFICATION (New layer!)
+        # Check if the requested operation is feasible given current data state
+        logger.debug("Complexity: analyzing data state for context-aware classification")
+
+        has_processed = 'has_processed_layers' in data_state['capabilities']
+        has_pca = 'has_pca' in data_state['capabilities']
+        has_neighbors = 'has_neighbors' in data_state['capabilities']
+        has_clustering = 'has_clustering' in data_state['capabilities']
+
+        # PCA-related requests
+        if any(kw in request_lower for kw in ['pca', '主成分', 'principal component']):
+            if has_processed or has_pca:
+                # Data is preprocessed or already has PCA → SIMPLE
+                logger.debug("PCA requested: data preprocessed → SIMPLE")
+                return 'simple'
+            else:
+                # Raw data needs full preprocessing → COMPLEX
+                logger.debug("PCA requested: raw data needs preprocessing → COMPLEX")
+                return 'complex'
+
+        # Clustering requests
+        if any(kw in request_lower for kw in ['leiden', 'louvain', 'cluster', '聚类']):
+            if has_clustering:
+                # Already clustered → SIMPLE (maybe wants to adjust resolution)
+                logger.debug("Clustering requested: already has clustering → SIMPLE")
+                return 'simple'
+            elif has_pca and has_neighbors:
+                # Ready to cluster → SIMPLE
+                logger.debug("Clustering requested: has PCA + neighbors → SIMPLE")
+                return 'simple'
+            elif has_pca:
+                # Only needs neighbors (1 step) → SIMPLE
+                logger.debug("Clustering requested: has PCA, needs neighbors → SIMPLE")
+                return 'simple'
+            else:
+                # Needs full preprocessing → COMPLEX
+                logger.debug("Clustering requested: needs full preprocessing → COMPLEX")
+                return 'complex'
+
+        # Neighbor graph requests
+        if any(kw in request_lower for kw in ['neighbor', 'neighbours', 'knn']):
+            if has_pca:
+                # Has PCA, can compute neighbors → SIMPLE
+                logger.debug("Neighbors requested: has PCA → SIMPLE")
+                return 'simple'
+            else:
+                # Needs preprocessing first → COMPLEX
+                logger.debug("Neighbors requested: needs preprocessing → COMPLEX")
+                return 'complex'
+
+        # Visualization requests
+        if any(kw in request_lower for kw in ['plot', 'visualize', 'umap', 'tsne', 'embedding']):
+            # Check if wants to color by clustering
+            color_by_clustering = any(kw in request_lower for kw in ['leiden', 'louvain', 'cluster'])
+
+            if color_by_clustering and not has_clustering and not has_neighbors:
+                # Wants clustering colors but no clustering/neighbors → COMPLEX
+                logger.debug("Visualization with clustering: no clustering available → COMPLEX")
+                return 'complex'
+            elif has_pca or data_state['embeddings']:
+                # Has embeddings or PCA → SIMPLE
+                logger.debug("Visualization: has embeddings/PCA → SIMPLE")
+                return 'simple'
+            # Otherwise fall through to LLM
+
+        # QC requests are typically simple
+        if any(kw in request_lower for kw in ['qc', 'quality control', '质控']):
+            logger.debug("QC requested → SIMPLE")
             return 'simple'
 
         # Ambiguous cases: Use LLM for classification
@@ -658,51 +1042,102 @@ Respond with ONLY one word: either "simple" or "complex"
 
         print(f"🚀 Priority 1: Fast registry-based workflow")
 
+        # Inspect current data state
+        data_state_summary = DataStateInspector.get_readable_summary(adata)
+        data_state = DataStateInspector.inspect(adata)
+
         # Build registry-only prompt (no skills, focused on single function)
         functions_info = self._get_available_functions_info()
 
-        priority1_prompt = f"""You are a fast function executor for OmicVerse. Your task is to find and execute the SINGLE BEST function for this request.
+        priority1_prompt = f"""You are a fast function executor for OmicVerse with PREREQUISITE AWARENESS.
 
 Request: "{request}"
 
-Dataset info:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{data_state_summary}
 
 Available OmicVerse Functions (Registry):
 {functions_info}
 
-INSTRUCTIONS:
-1. This is a SIMPLE task requiring ONE function call (or at most 2-3 closely related calls)
-2. Search the registry above for the most appropriate function
-3. Extract parameters from the request (e.g., "nUMI>500" → tresh={{'nUMIs': 500, ...}})
-4. Generate ONLY the essential code - no complex workflows
-5. Return executable Python code ONLY, no explanations
+INSTRUCTIONS - PREREQUISITE-AWARE EXECUTION:
+1. **Check the current data state above** - See what's already available (layers, obsm, uns, capabilities)
+2. **Find the best function** from the registry for the user's request
+3. **Analyze if prerequisites are met**:
+   - Does the function need a 'scaled' layer? Check if it exists in available layers
+   - Does it need 'X_pca'? Check if it exists in available obsm
+   - Does it need 'neighbors'? Check if it exists in uns
+   - Does it need clustering results? Check detected capabilities
+4. **Handle missing prerequisites intelligently**:
+   - If 0-1 simple prerequisite is missing (e.g., just needs scaling) → Auto-add it to the code
+   - If 2+ steps are missing (e.g., needs QC + normalize + scale) → Respond "NEEDS_WORKFLOW"
+5. **Extract parameters** from request (e.g., "nUMI>500" → tresh={{'nUMIs': 500, ...}})
+6. **Return executable Python code ONLY**, no explanations
+
+PREREQUISITE HANDLING EXAMPLES:
+
+Example 1: Ready to execute (no prerequisites needed)
+Request: "Run PCA"
+Data State: Has 'scaled' layer ✅
+Code:
+```python
+import omicverse as ov
+adata = ov.pp.pca(adata, layer='scaled', n_pcs=50)
+print(f"✅ PCA completed: {{adata.obsm['X_pca'].shape}}")
+```
+
+Example 2: Auto-add 1 simple prerequisite
+Request: "Run leiden clustering"
+Data State: Has 'X_pca' ✅, missing 'neighbors' ❌
+Code:
+```python
+import omicverse as ov
+# Auto-add missing prerequisite (1 step)
+if 'neighbors' not in adata.uns:
+    print("📊 Computing neighbor graph first...")
+    adata = ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
+# Now run requested function
+adata = ov.pp.leiden(adata, resolution=1.0)
+print(f"✅ Leiden clustering: {{adata.obs['leiden'].nunique()}} clusters")
+```
+
+Example 3: Missing too many prerequisites
+Request: "Run PCA"
+Data State: No preprocessing (raw data only) ❌
+Response: "NEEDS_WORKFLOW"
+Reason: Needs QC → normalize → scale → PCA (4 steps = too complex for Priority 1)
+
+Example 4: Defensive validation for visualization
+Request: "Plot UMAP colored by leiden"
+Data State: Has 'X_umap' ✅, missing 'leiden' in obs ❌
+Code:
+```python
+import omicverse as ov
+# Validate clustering exists
+if 'leiden' not in adata.obs:
+    if 'neighbors' not in adata.uns:
+        print("NEEDS_WORKFLOW")  # Too many steps
+    print("📊 Running leiden clustering...")
+    adata = ov.pp.leiden(adata, resolution=1.0)
+# Now plot
+ov.pl.embedding(adata, basis='X_umap', color='leiden', frameon='small')
+print("✅ UMAP plot generated")
+```
 
 IMPORTANT CONSTRAINTS:
-- Generate 1-3 function calls maximum
-- No loops, conditionals, or complex control flow
-- Focus on direct parameter extraction and function execution
-- If this requires multiple steps or a workflow, respond with: "NEEDS_WORKFLOW"
+- Maximum 1-4 function calls (including auto-added prerequisites)
+- Can auto-add up to 1 simple prerequisite (like neighbors, scaling)
+- If >2 prerequisites missing OR complex pipeline needed → "NEEDS_WORKFLOW"
+- Always check data state before executing
+- Include informative print statements
 
-Examples of GOOD responses:
-```python
-import omicverse as ov
-adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
-print(f"QC completed: {{adata.shape[0]}} cells")
-```
-
-```python
-import omicverse as ov
-adata = ov.pp.pca(adata, n_comps=50)
-print(f"PCA completed: {{adata.obsm['X_pca'].shape}}")
-```
-
-Examples of tasks that need NEEDS_WORKFLOW:
-- "complete pipeline"
-- "do X and then Y and then Z"
-- "full workflow from start to finish"
+Common prerequisite patterns:
+- PCA needs: 'scaled' layer (or at least preprocessed data)
+- Clustering (leiden/louvain) needs: 'neighbors' in uns + 'X_pca' in obsm
+- Neighbors needs: 'X_pca' in obsm
+- Visualization with clusters needs: clustering results in obs
 
 Now generate code for: "{request}"
+
+Remember: Check the data state above, auto-add ≤1 simple prerequisite if needed, or respond "NEEDS_WORKFLOW" if too complex.
 """
 
         # Get code from LLM
@@ -1723,9 +2158,9 @@ IMPORTANT:
         print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
         print(f"{'=' * 70}\n")
 
-        # Step 1: Analyze task complexity
+        # Step 1: Analyze task complexity (with data state awareness)
         print(f"📊 Analyzing task complexity...")
-        complexity = await self._analyze_task_complexity(request)
+        complexity = await self._analyze_task_complexity(request, adata)
         print(f"   Classification: {complexity.upper()}")
         print()
 
