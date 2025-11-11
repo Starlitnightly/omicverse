@@ -20,6 +20,18 @@ sf_install = False
     aliases=["SpaceFlow空间流", "pySpaceFlow", "SpaceFlow", "空间流分析", "伪空间图谱"],
     category="space",
     description="SpaceFlow spatial flow analysis using deep graph neural networks with spatial regularization",
+    prerequisites={
+        'functions': [],
+        'optional_functions': ['preprocess', 'scale']
+    },
+    requires={
+        'obsm': ['spatial']
+    },
+    produces={
+        'obsm': ['spaceflow'],
+        'obs': ['pSM_spaceflow']
+    },
+    auto_fix='none',
     examples=[
         "# Basic SpaceFlow analysis",
         "spaceflow = ov.space.pySpaceFlow(adata)",

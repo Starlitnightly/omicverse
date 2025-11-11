@@ -15,10 +15,21 @@ from .registry import register_function
 
 @register_function(
     aliases=["MDE降维", "mde", "minimum_distortion_embedding", "MDE嵌入", "最小失真嵌入"],
-    category="utils", 
+    category="utils",
     description="Minimum Distortion Embedding (MDE) for 2D visualization with GPU acceleration",
+    prerequisites={
+        'functions': ['pca'],
+        'optional_functions': []
+    },
+    requires={
+        'obsm': ['X_pca']
+    },
+    produces={
+        'obsm': ['X_mde']
+    },
+    auto_fix='none',
     examples=[
-        "# Basic MDE embedding", 
+        "# Basic MDE embedding",
         "X_mde = ov.utils.mde(adata.obsm['X_pca'])",
         "adata.obsm['X_mde'] = X_mde",
         "# GPU-accelerated MDE",
