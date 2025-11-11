@@ -1093,6 +1093,18 @@ def neighbors(
     aliases=["umap", "UMAP", "非线性降维"],
     category="preprocessing",
     description="Compute UMAP embedding for visualization",
+    prerequisites={
+        'functions': ['neighbors'],
+        'optional_functions': ['pca']
+    },
+    requires={
+        'uns': ['neighbors'],
+        'obsp': ['connectivities', 'distances']
+    },
+    produces={
+        'obsm': ['X_umap']
+    },
+    auto_fix='auto',
     examples=["ov.pp.umap(adata)"],
     related=["tsne", "pca", "mde", "neighbors"]
 )
@@ -1149,6 +1161,18 @@ def louvain(adata, **kwargs):
     aliases=["莱顿聚类", "leiden", "clustering", "聚类"],
     category="preprocessing",
     description="Perform Leiden community detection clustering",
+    prerequisites={
+        'functions': ['neighbors'],
+        'optional_functions': ['pca', 'umap']
+    },
+    requires={
+        'uns': ['neighbors'],
+        'obsp': ['connectivities']
+    },
+    produces={
+        'obs': ['leiden']
+    },
+    auto_fix='auto',
     examples=["ov.pp.leiden(adata, resolution=1.0)"],
     related=["louvain", "neighbors"]
 )
@@ -1193,6 +1217,13 @@ def leiden(
     aliases=["细胞周期评分", "score_genes_cell_cycle", "cell_cycle", "细胞周期", "cc_score"],
     category="preprocessing",
     description="Score cell cycle phases (S and G2M) using predefined gene sets",
+    prerequisites={
+        'optional_functions': ['qc', 'preprocess']
+    },
+    produces={
+        'obs': ['S_score', 'G2M_score', 'phase']
+    },
+    auto_fix='none',
     examples=[
         "# Basic cell cycle scoring for human data",
         "ov.pp.score_genes_cell_cycle(adata, species='human')",
