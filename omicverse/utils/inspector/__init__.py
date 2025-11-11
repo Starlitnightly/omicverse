@@ -15,6 +15,7 @@ Main Components:
     AgentContextInjector: Injects prerequisite state into LLM prompts (Layer 3 Phase 1)
     DataStateValidator: Pre-execution validation with auto-correction (Layer 3 Phase 2)
     WorkflowEscalator: Intelligent workflow complexity analysis and escalation (Layer 3 Phase 3)
+    AutoPrerequisiteInserter: Automatic prerequisite insertion into code (Layer 3 Phase 4)
 
 Usage (Quick Start):
     >>> from omicverse.utils.inspector import create_inspector, validate_function
@@ -89,6 +90,8 @@ from .agent_context_injector import AgentContextInjector, ConversationState
 from .data_state_validator import DataStateValidator, ValidationFeedback, validate_code
 # Layer 3 Phase 3: Workflow Escalator
 from .workflow_escalator import WorkflowEscalator, EscalationResult, EscalationStrategy, analyze_and_escalate
+# Layer 3 Phase 4: Auto Prerequisite Inserter
+from .auto_prerequisite_inserter import AutoPrerequisiteInserter, InsertionResult, InsertionPolicy, auto_insert_prerequisites
 # Shared data structures
 from .data_structures import ComplexityLevel
 
@@ -137,8 +140,13 @@ __all__ = [
     'EscalationResult',
     'EscalationStrategy',
     'analyze_and_escalate',
+    # Layer 3 Phase 4: Auto Prerequisite Inserter
+    'AutoPrerequisiteInserter',
+    'InsertionResult',
+    'InsertionPolicy',
+    'auto_insert_prerequisites',
     # Shared data structures
     'ComplexityLevel',
 ]
 
-__version__ = '0.8.0'  # Layer 3 Phase 3 complete
+__version__ = '1.0.0'  # Layer 3 COMPLETE - All 4 phases implemented
