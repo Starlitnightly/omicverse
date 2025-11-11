@@ -12,6 +12,17 @@ from ..utils.registry import register_function
     aliases=["差异组成分析", "DCT", "differential_abundance", "差异丰度分析", "细胞组成分析"],
     category="single",
     description="Differential cell type composition analysis using scCODA or Milo methods for abundance testing",
+    prerequisites={
+        'functions': ['leiden'],
+        'optional_functions': ['pca', 'neighbors']
+    },
+    requires={
+        'obs': []
+    },
+    produces={
+        'uns': ['DCT_results']
+    },
+    auto_fix='escalate',
     examples=[
         "# Initialize DCT with scCODA",
         "dct_obj = ov.single.DCT(adata, condition='treatment', ctrl_group='Control',",
@@ -23,7 +34,7 @@ from ..utils.registry import register_function
         "# Set FDR threshold",
         "dct_obj.model.set_fdr(dct_obj.sccoda_data, modality_key='coda', est_fdr=0.4)",
         "# Initialize DCT with Milo",
-        "dct_obj = ov.single.DCT(adata, condition='condition', ctrl_group='Control',", 
+        "dct_obj = ov.single.DCT(adata, condition='condition', ctrl_group='Control',",
         "                        test_group='Disease', cell_type_key='celltype',",
         "                        method='milo', use_rep='X_pca')",
         "# Run Milo analysis",

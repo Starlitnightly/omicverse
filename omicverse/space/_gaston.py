@@ -13,6 +13,18 @@ from ..utils.registry import register_function
     aliases=["GASTON空间深度分析", "GASTON", "spatial_depth_analysis", "空间深度建模", "组织空间组织"],
     category="space",
     description="GASTON spatial depth estimation and clustering using neural networks",
+    prerequisites={
+        'functions': [],
+        'optional_functions': []
+    },
+    requires={
+        'obsm': ['spatial']
+    },
+    produces={
+        'uns': ['gaston'],
+        'obs': ['gaston_isodepth', 'gaston_labels']
+    },
+    auto_fix='none',
     examples=[
         "# Basic GASTON analysis",
         "gaston = ov.space.GASTON(adata)",
