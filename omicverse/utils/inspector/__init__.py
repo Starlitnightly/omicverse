@@ -11,18 +11,45 @@ Main Components:
     PrerequisiteChecker: Detects executed functions (Phase 2)
     SuggestionEngine: Generates fix suggestions (Phase 3)
     LLMFormatter: Formats results for LLM integration (Phase 4)
+    Production API: Convenient factory functions and helpers (Phase 5)
 
-Usage:
-    >>> from omicverse.utils.inspector import DataStateInspector
-    >>> from omicverse.utils.registry import get_registry
+Usage (Quick Start):
+    >>> from omicverse.utils.inspector import create_inspector, validate_function
     >>>
-    >>> inspector = DataStateInspector(adata, get_registry())
+    >>> # Quick validation
+    >>> result = validate_function(adata, 'leiden')
+    >>> if not result.is_valid:
+    ...     print(result.message)
+    >>>
+    >>> # Or create inspector for multiple validations
+    >>> inspector = create_inspector(adata)
     >>> result = inspector.validate_prerequisites('leiden')
-    >>>
     >>> if not result.is_valid:
     ...     print(result.message)
     ...     for suggestion in result.suggestions:
     ...         print(suggestion.code)
+
+Advanced Usage:
+    >>> # Get workflow suggestions
+    >>> workflow = get_workflow_suggestions(adata, 'leiden', strategy='comprehensive')
+    >>>
+    >>> # Batch validate multiple functions
+    >>> results = batch_validate(adata, ['pca', 'neighbors', 'leiden'])
+    >>>
+    >>> # Generate validation report
+    >>> report = get_validation_report(adata, format='markdown')
+    >>>
+    >>> # Use as decorator
+    >>> @check_prerequisites('leiden')
+    ... def my_function(adata):
+    ...     # Your code here
+    ...     pass
+    >>>
+    >>> # Use as context manager
+    >>> with ValidationContext(adata, 'leiden') as ctx:
+    ...     if ctx.is_valid:
+    ...         # Run your analysis
+    ...         pass
 """
 
 from .inspector import DataStateInspector
@@ -41,13 +68,27 @@ from .data_structures import (
     ExecutionEvidence,
     Suggestion,
 )
+# Phase 5: Production API
+from .production_api import (
+    create_inspector,
+    clear_inspector_cache,
+    validate_function,
+    explain_requirements,
+    check_prerequisites,
+    get_workflow_suggestions,
+    batch_validate,
+    get_validation_report,
+    ValidationContext,
+)
 
 __all__ = [
+    # Core components
     'DataStateInspector',
     'DataValidators',
     'PrerequisiteChecker',
     'SuggestionEngine',
     'LLMFormatter',
+    # Data structures
     'ValidationResult',
     'DataCheckResult',
     'DetectionResult',
@@ -63,6 +104,16 @@ __all__ = [
     'LayersCheckResult',
     'ExecutionEvidence',
     'Suggestion',
+    # Production API (Phase 5)
+    'create_inspector',
+    'clear_inspector_cache',
+    'validate_function',
+    'explain_requirements',
+    'check_prerequisites',
+    'get_workflow_suggestions',
+    'batch_validate',
+    'get_validation_report',
+    'ValidationContext',
 ]
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
