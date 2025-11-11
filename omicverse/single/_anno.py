@@ -279,6 +279,16 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
     aliases=["字典注释", "scanpy_cellanno_from_dict", "manual_annotation", "手动注释", "字典映射注释"],
     category="single",
     description="Manual cell type annotation from cluster-to-celltype dictionary mapping",
+    prerequisites={
+        'functions': ['leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: requires user-specified clustertype column
+    },
+    produces={
+        'obs': []  # Dynamic: creates {anno_name}_celltype column
+    },
+    auto_fix='none',
     examples=[
         "# Basic manual annotation from dictionary",
         "cluster2annotation = {",
@@ -320,6 +330,16 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
     aliases=["细胞类型标记基因", "get_celltype_marker", "celltype_markers", "标记基因", "差异基因"],
     category="single",
     description="Extract cell type-specific marker genes from differential expression analysis",
+    prerequisites={
+        'functions': ['leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: requires user-specified clustertype column
+    },
+    produces={
+        'uns': ['rank_genes_groups']
+    },
+    auto_fix='escalate',
     examples=[
         "# Get markers for all cell types",
         "marker_dict = ov.single.get_celltype_marker(adata,",
@@ -403,6 +423,17 @@ def get_celltype_marker(adata:anndata.AnnData,
     aliases=["单细胞注释", "pySCSA", "cell_annotation", "细胞类型注释", "自动注释"],
     category="single",
     description="Automated cell type annotation using SCSA (Single Cell Signature Analysis) with multiple databases",
+    prerequisites={
+        'optional_functions': ['preprocess', 'leiden']
+    },
+    requires={
+        'var': [],  # Flexible - works with raw or processed data
+        'obs': []   # Clustering recommended but not required
+    },
+    produces={
+        'obs': ['scsa_celltype']
+    },
+    auto_fix='none',
     examples=[
         "# Basic SCSA annotation with CellMarker database",
         "scsa = ov.single.pySCSA(adata, foldchange=1.5, pvalue=0.01,",

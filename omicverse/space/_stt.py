@@ -11,6 +11,18 @@ from ..utils.registry import register_function
     aliases=["STT空间转换张量", "STT", "spatial_transition_tensor", "空间转换分析", "空间动力学"],
     category="space",
     description="Spatial Transition Tensor analysis for modeling spatial dynamics and cell state transitions",
+    prerequisites={
+        'functions': []  # Requires RNA velocity preprocessing (spliced/unspliced)
+    },
+    requires={
+        'layers': ['spliced', 'unspliced'],  # RNA velocity data required
+        'obsm': []  # Spatial coordinates (user-specified)
+    },
+    produces={
+        'layers': ['velocity'],
+        'obs': ['pseudotime']
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic STT analysis",
         "stt = ov.space.STT(adata, spatial_loc='spatial',",

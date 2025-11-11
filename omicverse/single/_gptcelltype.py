@@ -8,11 +8,21 @@ from ..utils.registry import register_function
     aliases=["GPT细胞类型注释", "gptcelltype", "ai_celltype", "GPT注释", "AI细胞注释"],
     category="single",
     description="AI-powered cell type annotation using GPT-4, Qwen, Kimi, and other large language models",
+    prerequisites={
+        'functions': ['leiden', 'get_celltype_marker']
+    },
+    requires={
+        'obs': []  # Dynamic: requires clustertype column
+    },
+    produces={
+        'obs': []  # User manually maps result to obs
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic GPT annotation with Qwen",
         "os.environ['AGI_API_KEY'] = 'your-api-key'",
         "markers = ov.single.get_celltype_marker(adata, clustertype='leiden')",
-        "result = ov.single.gptcelltype(markers, tissuename='PBMC',", 
+        "result = ov.single.gptcelltype(markers, tissuename='PBMC',",
         "                               speciename='human', provider='qwen')",
         "# Using OpenAI GPT-4",
         "result = ov.single.gptcelltype(markers, tissuename='Brain',",

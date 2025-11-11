@@ -68,6 +68,17 @@ def weighted_knn_trainer(train_adata:anndata.AnnData,
     aliases=["KNN标签迁移", "weighted_knn_transfer", "knn_transfer", "细胞类型迁移", "跨模态标签迁移"],
     category="utils",
     description="Transfer cell type annotations across modalities using trained weighted KNN classifier",
+    prerequisites={
+        'functions': ['weighted_knn_trainer'],
+        'optional_functions': ['batch_correction']
+    },
+    requires={
+        'obsm': []
+    },
+    produces={
+        'obs': ['transferred_labels']
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic cross-modal annotation transfer",
         "labels, uncert = ov.utils.weighted_knn_transfer(",

@@ -52,6 +52,18 @@ def hematopoiesis()->anndata.AnnData:
     aliases=["VIA轨迹推断", "pyVIA", "via_analysis", "VIA算法", "轨迹拓扑分析"],
     category="single",
     description="VIA (Velocity and Topology Inference Algorithm) for single-cell trajectory inference with automated terminal state prediction",
+    prerequisites={
+        'functions': ['pca', 'neighbors'],
+        'optional_functions': ['umap', 'leiden']
+    },
+    requires={
+        'obsm': ['X_pca'],  # Required for adata_key parameter
+        'uns': ['neighbors']  # VIA uses neighborhood graph
+    },
+    produces={
+        'obs': ['pt_via']  # Pseudotime values
+    },
+    auto_fix='auto',
     examples=[
         "# Initialize pyVIA",
         "v0 = ov.single.pyVIA(adata=adata, adata_key='X_pca', adata_ncomps=80,",
@@ -71,7 +83,7 @@ def hematopoiesis()->anndata.AnnData:
         "fig, ax1, ax2 = v0.plot_trajectory_gams(basis='umap', clusters='celltype')",
         "# Plot stream plot",
         "fig, ax = v0.plot_stream(basis='umap', clusters='celltype', density_grid=0.8)",
-        "# Plot lineage probabilities", 
+        "# Plot lineage probabilities",
         "fig, axs = v0.plot_lineage_probability(figsize=(8,4))",
         "# Plot clustergraph with genes",
         "fig, axs = v0.plot_clustergraph(gene_list=['CD34', 'GATA1'], figsize=(12,3))"
