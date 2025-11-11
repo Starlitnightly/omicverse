@@ -6,6 +6,17 @@ from ..utils.registry import register_function
     aliases=["批次效应校正", "batch_correction", "combat", "批次校正", "去批次效应"],
     category="bulk",
     description="Perform batch effect correction using ComBat algorithm for bulk RNA-seq data",
+    prerequisites={
+        'functions': [],
+        'optional_functions': []
+    },
+    requires={
+        'obs': []
+    },
+    produces={
+        'layers': ['batch_correction']
+    },
+    auto_fix='none',
     examples=[
         "ov.bulk.batch_correction(adata, batch_key='batch')",
         "ov.bulk.batch_correction(adata, batch_key='sample_batch', key_added='combat_corrected')"

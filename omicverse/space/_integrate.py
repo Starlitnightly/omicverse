@@ -47,6 +47,16 @@ from ..utils.registry import register_function
     aliases=["空间网络构建", "Cal_Spatial_Net", "spatial_network", "空间邻域网络", "构建空间图"],
     category="space",
     description="Construct spatial neighbor networks for spatial transcriptomics integration",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obsm': ['spatial']  # Spatial coordinates required
+    },
+    produces={
+        'uns': ['Spatial_Net', 'adj']
+    },
+    auto_fix='none',
     examples=[
         "# Radius-based spatial network",
         "ov.space.Cal_Spatial_Net(adata, rad_cutoff=150, model='Radius')",
@@ -156,6 +166,19 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     aliases=["STAligner空间整合", "pySTAligner", "STAligner", "空间数据整合", "空间转录组整合"],
     category="space",
     description="STAligner for integrating spatial transcriptomics data across conditions and technologies",
+    prerequisites={
+        'functions': ['Cal_Spatial_Net'],
+        'optional_functions': []
+    },
+    requires={
+        'obsm': ['spatial'],
+        'obs': [],  # Requires batch_name column (user-specified)
+        'uns': ['Spatial_Net', 'adj']  # From Cal_Spatial_Net
+    },
+    produces={
+        'obsm': ['STAligner', 'STAligner_embed']
+    },
+    auto_fix='auto',
     examples=[
         "# Basic STAligner integration",
         "staligner = ov.space.pySTAligner(adata, batch_name='batch',",

@@ -9,6 +9,17 @@ from ..utils.registry import register_function
     aliases=["批次校正", "batch_correction", "batch_correct", "数据整合", "去批次效应"],
     category="single",
     description="Comprehensive batch effect correction using multiple methods including Harmony, Combat, Scanorama, scVI, and CellANOVA",
+    prerequisites={
+        'optional_functions': ['preprocess', 'scale', 'pca']
+    },
+    requires={
+        'obsm': [],  # Flexible - some methods use X_pca, others raw data
+        'obs': []    # Requires batch_key column (user-specified)
+    },
+    produces={
+        'obsm': []  # Dynamic: X_pca_harmony, X_combat, X_scanorama, X_scVI, or X_cellanova
+    },
+    auto_fix='none',
     examples=[
         "# Harmony batch correction (recommended for most cases)",
         "ov.single.batch_correction(adata, batch_key='batch', methods='harmony')",
