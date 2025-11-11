@@ -791,6 +791,19 @@ class my_PCA:
     aliases=["主成分分析", "pca", "PCA", "降维"],
     category="preprocessing",
     description="Perform Principal Component Analysis for dimensionality reduction",
+    prerequisites={
+        'functions': ['scale'],
+        'optional_functions': ['qc', 'preprocess']
+    },
+    requires={
+        'layers': ['scaled']
+    },
+    produces={
+        'obsm': ['X_pca'],
+        'varm': ['PCs'],
+        'uns': ['pca']
+    },
+    auto_fix='escalate',
     examples=["ov.pp.pca(adata, n_pcs=50)"],
     related=["umap", "tsne", "mde"]
 )
