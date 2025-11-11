@@ -28,6 +28,7 @@ Usage:
 from .inspector import DataStateInspector
 from .validators import DataValidators
 from .prerequisite_checker import PrerequisiteChecker, DetectionResult
+from .suggestion_engine import SuggestionEngine, WorkflowPlan, WorkflowStep, WorkflowStrategy
 from .data_structures import (
     ValidationResult,
     DataCheckResult,
@@ -37,21 +38,27 @@ from .data_structures import (
     UnsCheckResult,
     LayersCheckResult,
     ExecutionEvidence,
+    Suggestion,
 )
 
 __all__ = [
     'DataStateInspector',
     'DataValidators',
     'PrerequisiteChecker',
+    'SuggestionEngine',
     'ValidationResult',
     'DataCheckResult',
     'DetectionResult',
+    'WorkflowPlan',
+    'WorkflowStep',
+    'WorkflowStrategy',
     'ObsCheckResult',
     'ObsmCheckResult',
     'ObspCheckResult',
     'UnsCheckResult',
     'LayersCheckResult',
     'ExecutionEvidence',
+    'Suggestion',
 ]
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
