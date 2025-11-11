@@ -12,6 +12,7 @@ from anndata import AnnData
 from .validators import DataValidators
 from .prerequisite_checker import PrerequisiteChecker
 from .suggestion_engine import SuggestionEngine
+from .llm_formatter import LLMFormatter, OutputFormat
 from .data_structures import (
     ValidationResult,
     DataCheckResult,
@@ -32,6 +33,7 @@ class DataStateInspector:
         validators: DataValidators instance for checking data structures.
         prerequisite_checker: PrerequisiteChecker for detecting executed functions.
         suggestion_engine: SuggestionEngine for generating fix suggestions.
+        llm_formatter: LLMFormatter for LLM-friendly output.
 
     Example:
         >>> from omicverse.utils.registry import get_registry
@@ -39,8 +41,9 @@ class DataStateInspector:
         >>> result = inspector.validate_prerequisites('leiden')
         >>> if not result.is_valid:
         ...     print(result.message)
-        ...     for suggestion in result.suggestions:
-        ...         print(suggestion.code)
+        ...     # Get LLM-formatted output
+        ...     formatted = inspector.format_for_llm(result)
+        ...     print(formatted)
     """
 
     def __init__(self, adata: AnnData, registry: Any):
@@ -55,6 +58,7 @@ class DataStateInspector:
         self.validators = DataValidators(adata)
         self.prerequisite_checker = PrerequisiteChecker(adata, registry)
         self.suggestion_engine = SuggestionEngine(registry)
+        self.llm_formatter = LLMFormatter()
 
     def validate_prerequisites(self, function_name: str) -> ValidationResult:
         """Validate all prerequisites for a given function.
@@ -395,3 +399,61 @@ class DataStateInspector:
         """
         result = self.validate_prerequisites(function_name)
         return result.get_summary()
+
+    def format_for_llm(
+        self,
+        result: ValidationResult,
+        output_format: OutputFormat = OutputFormat.MARKDOWN,
+    ) -> str:
+        """Format validation result for LLM consumption.
+
+        Args:
+            result: ValidationResult to format.
+            output_format: Desired output format (markdown, plain_text, json, prompt).
+
+        Returns:
+            Formatted string in the specified format.
+
+        Example:
+            >>> result = inspector.validate_prerequisites('leiden')
+            >>> formatted = inspector.format_for_llm(result, OutputFormat.MARKDOWN)
+            >>> print(formatted)
+        """
+        return self.llm_formatter.format_validation_result(result, output_format)
+
+    def get_llm_prompt(
+        self,
+        function_name: str,
+        task: str = "Fix the validation errors",
+    ) -> str:
+        """Get LLM prompt for validation issues.
+
+        Args:
+            function_name: Name of the function to validate.
+            task: Task description for the LLM.
+
+        Returns:
+            LLMPrompt with system and user prompts.
+
+        Example:
+            >>> prompt = inspector.get_llm_prompt('leiden', "Fix preprocessing issues")
+            >>> print(prompt)
+        """
+        result = self.validate_prerequisites(function_name)
+        return self.llm_formatter.create_agent_prompt(result, task)
+
+    def get_natural_language_explanation(self, function_name: str) -> str:
+        """Get natural language explanation of validation result.
+
+        Args:
+            function_name: Name of the function to validate.
+
+        Returns:
+            Natural language explanation suitable for users.
+
+        Example:
+            >>> explanation = inspector.get_natural_language_explanation('leiden')
+            >>> print(explanation)
+        """
+        result = self.validate_prerequisites(function_name)
+        return self.llm_formatter.format_natural_language(result)

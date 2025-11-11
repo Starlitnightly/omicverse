@@ -29,6 +29,7 @@ from .inspector import DataStateInspector
 from .validators import DataValidators
 from .prerequisite_checker import PrerequisiteChecker, DetectionResult
 from .suggestion_engine import SuggestionEngine, WorkflowPlan, WorkflowStep, WorkflowStrategy
+from .llm_formatter import LLMFormatter, LLMPrompt, OutputFormat
 from .data_structures import (
     ValidationResult,
     DataCheckResult,
@@ -46,12 +47,15 @@ __all__ = [
     'DataValidators',
     'PrerequisiteChecker',
     'SuggestionEngine',
+    'LLMFormatter',
     'ValidationResult',
     'DataCheckResult',
     'DetectionResult',
     'WorkflowPlan',
     'WorkflowStep',
     'WorkflowStrategy',
+    'LLMPrompt',
+    'OutputFormat',
     'ObsCheckResult',
     'ObsmCheckResult',
     'ObspCheckResult',
@@ -61,4 +65,4 @@ __all__ = [
     'Suggestion',
 ]
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
