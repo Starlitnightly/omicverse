@@ -507,6 +507,14 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
     category="preprocessing",
     description="Complete preprocessing pipeline including normalization, HVG selection, scaling, and PCA",
+    prerequisites={
+        'optional_functions': ['qc']
+    },
+    produces={
+        'layers': ['counts'],
+        'var': ['highly_variable_features', 'means', 'variances', 'residual_variances']
+    },
+    auto_fix='none',
     examples=[
         "ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=2000)",
         "ov.pp.preprocess(adata, mode='pearson|pearson', target_sum=50e4)"
@@ -673,6 +681,13 @@ def highly_variable_genes(adata,**kwargs):
     aliases=["标准化", "scale", "scaling", "标准化处理"],
     category="preprocessing",
     description="Scale data to unit variance and zero mean",
+    prerequisites={
+        'optional_functions': ['normalize', 'qc']
+    },
+    produces={
+        'layers': ['scaled']
+    },
+    auto_fix='none',
     examples=["ov.pp.scale(adata, max_value=10)"],
     related=["normalize", "regress"]
 )
@@ -974,6 +989,17 @@ from types import MappingProxyType
     aliases=["计算邻居", "neighbors", "knn", "邻居图"],
     category="preprocessing",
     description="Compute neighborhood graph of cells",
+    prerequisites={
+        'optional_functions': ['pca']
+    },
+    requires={
+        'obsm': ['X_pca']
+    },
+    produces={
+        'obsp': ['distances', 'connectivities'],
+        'uns': ['neighbors']
+    },
+    auto_fix='auto',
     examples=["ov.pp.neighbors(adata, n_neighbors=15)"],
     related=["umap", "leiden", "louvain"]
 )
