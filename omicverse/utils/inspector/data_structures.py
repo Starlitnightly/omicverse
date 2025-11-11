@@ -8,6 +8,14 @@ system to represent validation results, data checks, and suggestions.
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Literal
+from enum import Enum
+
+
+class ComplexityLevel(Enum):
+    """Workflow complexity classification."""
+    LOW = "low"  # 0-1 missing prerequisites
+    MEDIUM = "medium"  # 2-3 missing prerequisites
+    HIGH = "high"  # 4+ missing prerequisites OR includes qc/preprocess
 
 
 @dataclass

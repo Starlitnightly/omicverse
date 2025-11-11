@@ -14,6 +14,7 @@ Main Components:
     Production API: Convenient factory functions and helpers (Phase 5)
     AgentContextInjector: Injects prerequisite state into LLM prompts (Layer 3 Phase 1)
     DataStateValidator: Pre-execution validation with auto-correction (Layer 3 Phase 2)
+    WorkflowEscalator: Intelligent workflow complexity analysis and escalation (Layer 3 Phase 3)
 
 Usage (Quick Start):
     >>> from omicverse.utils.inspector import create_inspector, validate_function
@@ -85,7 +86,11 @@ from .production_api import (
 # Layer 3 Phase 1: Agent Context Injection
 from .agent_context_injector import AgentContextInjector, ConversationState
 # Layer 3 Phase 2: Data State Validator
-from .data_state_validator import DataStateValidator, ValidationFeedback, ComplexityLevel, validate_code
+from .data_state_validator import DataStateValidator, ValidationFeedback, validate_code
+# Layer 3 Phase 3: Workflow Escalator
+from .workflow_escalator import WorkflowEscalator, EscalationResult, EscalationStrategy, analyze_and_escalate
+# Shared data structures
+from .data_structures import ComplexityLevel
 
 __all__ = [
     # Core components
@@ -126,8 +131,14 @@ __all__ = [
     # Layer 3 Phase 2: Data State Validator
     'DataStateValidator',
     'ValidationFeedback',
-    'ComplexityLevel',
     'validate_code',
+    # Layer 3 Phase 3: Workflow Escalator
+    'WorkflowEscalator',
+    'EscalationResult',
+    'EscalationStrategy',
+    'analyze_and_escalate',
+    # Shared data structures
+    'ComplexityLevel',
 ]
 
-__version__ = '0.7.0'  # Layer 3 Phase 2 complete
+__version__ = '0.8.0'  # Layer 3 Phase 3 complete

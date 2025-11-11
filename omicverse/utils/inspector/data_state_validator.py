@@ -39,14 +39,7 @@ from enum import Enum
 from anndata import AnnData
 
 from .inspector import DataStateInspector
-from .data_structures import ValidationResult
-
-
-class ComplexityLevel(Enum):
-    """Workflow complexity classification."""
-    LOW = "low"  # 0-1 missing prerequisites
-    MEDIUM = "medium"  # 2-3 missing prerequisites
-    HIGH = "high"  # 4+ missing prerequisites OR includes qc/preprocess
+from .data_structures import ValidationResult, ComplexityLevel
 
 
 @dataclass
