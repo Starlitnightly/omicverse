@@ -229,10 +229,13 @@ class ExecutionEvidence:
 
     function_name: str
     confidence: float  # 0.0 to 1.0
+    evidence_type: Literal['metadata_marker', 'output_signature', 'distribution_pattern', 'distribution_analysis']
 
-    evidence_type: Literal['metadata_marker', 'output_signature', 'distribution_analysis']
+    # Additional fields for detailed evidence
+    location: str = ''  # Where the evidence was found (e.g., 'adata.uns["pca"]')
+    description: str = ''  # Human-readable description of the evidence
+
     evidence_details: Dict[str, Any] = field(default_factory=dict)
-
     detected_outputs: List[str] = field(default_factory=list)
     timestamp: Optional[datetime] = None
 
