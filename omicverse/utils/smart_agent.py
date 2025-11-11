@@ -66,583 +66,6 @@ from .skill_registry import (
 logger = logging.getLogger(__name__)
 
 
-class DataStateInspector:
-    """
-    Dynamically inspect AnnData state without hardcoded prerequisites.
-
-    This class provides runtime analysis of data state by examining what
-    actually exists in the AnnData object, rather than relying on hardcoded
-    rules. This makes it flexible and future-proof.
-    """
-
-    @staticmethod
-    def inspect(adata: Any) -> Dict[str, Any]:
-        """
-        Inspect adata and return complete state description.
-
-        This method reports facts about the data structure without making
-        assumptions or enforcing rules. It simply catalogs what exists.
-
-        Parameters
-        ----------
-        adata : Any
-            AnnData object to inspect
-
-        Returns
-        -------
-        Dict[str, Any]
-            Complete state information:
-            {
-                'available': {
-                    'layers': List[str],
-                    'obsm': List[str],
-                    'uns': List[str],
-                    'obs_columns': List[str],
-                    'var_columns': List[str],
-                    'obsp': List[str],
-                    'varp': List[str]
-                },
-                'shape': Tuple[int, int],
-                'capabilities': List[str],  # What operations appear possible
-                'embeddings': List[str]     # Available embedding types
-            }
-        """
-        state = {
-            'available': {
-                'layers': [],
-                'obsm': [],
-                'uns': [],
-                'obs_columns': [],
-                'var_columns': [],
-                'obsp': [],
-                'varp': []
-            },
-            'shape': (0, 0),
-            'capabilities': [],
-            'embeddings': []
-        }
-
-        try:
-            # Get basic dimensions
-            if hasattr(adata, 'shape'):
-                state['shape'] = adata.shape
-
-            # Collect what exists (facts, not interpretations)
-            if hasattr(adata, 'layers') and adata.layers is not None:
-                state['available']['layers'] = list(adata.layers.keys())
-
-            if hasattr(adata, 'obsm') and adata.obsm is not None:
-                state['available']['obsm'] = list(adata.obsm.keys())
-
-            if hasattr(adata, 'uns') and adata.uns is not None:
-                state['available']['uns'] = list(adata.uns.keys())
-
-            if hasattr(adata, 'obs') and adata.obs is not None:
-                state['available']['obs_columns'] = list(adata.obs.columns)
-
-            if hasattr(adata, 'var') and adata.var is not None:
-                state['available']['var_columns'] = list(adata.var.columns)
-
-            if hasattr(adata, 'obsp') and adata.obsp is not None:
-                state['available']['obsp'] = list(adata.obsp.keys())
-
-            if hasattr(adata, 'varp') and adata.varp is not None:
-                state['available']['varp'] = list(adata.varp.keys())
-
-            # Infer capabilities from available data (still factual, just derived)
-            capabilities = []
-
-            # Check for PCA
-            if 'X_pca' in state['available']['obsm']:
-                capabilities.append('has_pca')
-
-            # Check for neighbor graph
-            if 'neighbors' in state['available']['uns']:
-                capabilities.append('has_neighbors')
-
-            # Check for processed layers
-            processed_indicators = ['scaled', 'normalized', 'lognorm', 'pearson_residuals']
-            if any(indicator in layer.lower()
-                   for layer in state['available']['layers']
-                   for indicator in processed_indicators):
-                capabilities.append('has_processed_layers')
-
-            # Check for neighborhood graph in obsp
-            if any(key in ['connectivities', 'distances']
-                   for key in state['available']['obsp']):
-                capabilities.append('has_neighborhood_graph')
-
-            # Collect available embeddings
-            embedding_keys = ['X_umap', 'X_tsne', 'X_draw_graph', 'X_phate',
-                            'X_diffmap', 'X_mde', 'X_sude', 'spatial']
-            available_embeddings = [k for k in embedding_keys
-                                   if k in state['available']['obsm']]
-            if available_embeddings:
-                capabilities.append('has_embeddings')
-                state['embeddings'] = available_embeddings
-
-            # Check for clustering results
-            clustering_indicators = ['leiden', 'louvain', 'cluster']
-            clustering_columns = [col for col in state['available']['obs_columns']
-                                if any(ind in col.lower() for ind in clustering_indicators)]
-            if clustering_columns:
-                capabilities.append('has_clustering')
-                state['clustering_columns'] = clustering_columns
-
-            state['capabilities'] = capabilities
-
-        except Exception as e:
-            warnings.warn(f"Error inspecting data state: {e}", UserWarning)
-
-        return state
-
-    @staticmethod
-    def get_readable_summary(adata: Any) -> str:
-        """
-        Generate human-readable summary of data state.
-
-        This creates a formatted string suitable for displaying to users
-        or including in LLM prompts.
-
-        Parameters
-        ----------
-        adata : Any
-            AnnData object to summarize
-
-        Returns
-        -------
-        str
-            Human-readable summary
-        """
-        state = DataStateInspector.inspect(adata)
-
-        lines = [
-            "## Current Data State",
-            f"**Shape**: {state['shape'][0]:,} cells × {state['shape'][1]:,} genes",
-            ""
-        ]
-
-        # Available components
-        if state['available']['layers']:
-            layers_str = ', '.join(state['available']['layers'][:5])
-            if len(state['available']['layers']) > 5:
-                layers_str += f" (+ {len(state['available']['layers']) - 5} more)"
-            lines.append(f"**Available Layers**: {layers_str}")
-        else:
-            lines.append("**Available Layers**: None (raw X matrix only)")
-
-        if state['available']['obsm']:
-            obsm_str = ', '.join(state['available']['obsm'][:8])
-            if len(state['available']['obsm']) > 8:
-                obsm_str += f" (+ {len(state['available']['obsm']) - 8} more)"
-            lines.append(f"**Available Obsm**: {obsm_str}")
-        else:
-            lines.append("**Available Obsm**: None")
-
-        if state['available']['uns']:
-            uns_list = state['available']['uns'][:5]
-            uns_str = ', '.join(uns_list)
-            if len(state['available']['uns']) > 5:
-                uns_str += f" (+ {len(state['available']['uns']) - 5} more)"
-            lines.append(f"**Available Uns**: {uns_str}")
-
-        lines.append("")
-
-        # Capabilities (what's possible)
-        if state['capabilities']:
-            lines.append("**Detected Capabilities**:")
-            if 'has_processed_layers' in state['capabilities']:
-                lines.append("  ✅ Data appears preprocessed")
-            if 'has_pca' in state['capabilities']:
-                lines.append("  ✅ PCA computed")
-            if 'has_neighbors' in state['capabilities']:
-                lines.append("  ✅ Neighbor graph available")
-            if 'has_embeddings' in state['capabilities']:
-                emb_str = ', '.join(state.get('embeddings', [])[:3])
-                lines.append(f"  ✅ Embeddings available: {emb_str}")
-            if 'has_clustering' in state['capabilities']:
-                clust_str = ', '.join(state.get('clustering_columns', [])[:2])
-                lines.append(f"  ✅ Clustering results: {clust_str}")
-        else:
-            lines.append("**Detected Capabilities**: Raw data (no preprocessing detected)")
-
-        return "\n".join(lines)
-
-    @staticmethod
-    def check_compatibility(adata: Any, function_name: str,
-                           function_signature: str,
-                           function_category: str) -> Dict[str, Any]:
-        """
-        Check if a function can likely be called on current data.
-
-        Uses function signature inspection and category to infer requirements,
-        NOT hardcoded rules. This is adaptive and learns from the function itself.
-
-        Parameters
-        ----------
-        adata : Any
-            AnnData object to check
-        function_name : str
-            Name of the function to check
-        function_signature : str
-            Function signature string
-        function_category : str
-            Function category from registry
-
-        Returns
-        -------
-        Dict[str, Any]
-            Compatibility analysis:
-            {
-                'likely_compatible': bool,
-                'warnings': List[str],
-                'suggestions': List[str],
-                'reasoning': str
-            }
-        """
-        state = DataStateInspector.inspect(adata)
-        result = {
-            'likely_compatible': True,
-            'warnings': [],
-            'suggestions': [],
-            'reasoning': ''
-        }
-
-        try:
-            sig_lower = function_signature.lower()
-            name_lower = function_name.lower()
-
-            # Check for layer parameter expectations
-            if "layer='scaled'" in sig_lower or 'layer="scaled"' in sig_lower:
-                if 'scaled' not in state['available']['layers']:
-                    result['warnings'].append(
-                        "Function signature suggests it expects 'scaled' layer"
-                    )
-                    result['suggestions'].append(
-                        "Consider running ov.pp.scale(adata) or checking if data is already normalized"
-                    )
-
-            # Check for use_rep parameter expectations
-            if "use_rep='x_pca'" in sig_lower or 'use_rep="x_pca"' in sig_lower:
-                if 'X_pca' not in state['available']['obsm']:
-                    result['warnings'].append(
-                        "Function signature suggests it expects PCA representation"
-                    )
-                    result['suggestions'].append(
-                        "Consider running ov.pp.pca(adata) first"
-                    )
-
-            # Infer from function name (not hardcoded, just pattern matching)
-            if any(word in name_lower for word in ['leiden', 'louvain']):
-                if 'has_neighbors' not in state['capabilities']:
-                    result['warnings'].append(
-                        "Clustering functions typically work better with neighbor graph"
-                    )
-                    result['suggestions'].append(
-                        "Consider running ov.pp.neighbors(adata) first"
-                    )
-
-            # Check category-based expectations
-            if function_category == 'clustering':
-                if 'has_pca' not in state['capabilities']:
-                    result['warnings'].append(
-                        "Clustering typically performed on dimensionality-reduced data"
-                    )
-
-            if function_category in ['visualization', 'plotting']:
-                if not state['embeddings'] and 'has_pca' not in state['capabilities']:
-                    result['warnings'].append(
-                        "Visualization works best with precomputed embeddings or PCA"
-                    )
-
-            # Set reasoning
-            if result['warnings']:
-                result['reasoning'] = (
-                    f"Function {function_name} may need preprocessing. "
-                    f"Current state: {', '.join(state['capabilities']) or 'raw data'}."
-                )
-            else:
-                result['reasoning'] = (
-                    f"Function {function_name} appears compatible with current data state."
-                )
-
-        except Exception as e:
-            result['warnings'].append(f"Could not fully analyze compatibility: {e}")
-
-        return result
-
-
-class LLMPrerequisiteInference:
-    """
-    Layer 2: LLM-based prerequisite inference.
-
-    Uses LLM to intelligently infer function prerequisites by analyzing:
-    - Function documentation
-    - Current data state
-    - Skill best practices
-    - Bioinformatics workflow knowledge
-
-    This provides maximum flexibility without hardcoding, learning from
-    documentation and context to make smart decisions.
-    """
-
-    def __init__(self, llm_backend):
-        """
-        Initialize prerequisite inference engine.
-
-        Parameters
-        ----------
-        llm_backend : OmicVerseLLMBackend
-            LLM backend for inference
-        """
-        self.llm = llm_backend
-        self._cache = {}  # Cache inference results to avoid redundant calls
-
-    def _get_cache_key(self, function_name: str, data_state: Dict[str, Any]) -> str:
-        """Generate cache key for prerequisite analysis."""
-        # Cache based on function name and key data state features
-        state_key = (
-            tuple(sorted(data_state.get('capabilities', []))),
-            tuple(sorted(data_state['available'].get('layers', []))),
-            tuple(sorted(data_state['available'].get('obsm', [])))
-        )
-        return f"{function_name}::{state_key}"
-
-    async def infer_prerequisites(self,
-                                  function_name: str,
-                                  function_info: Dict[str, Any],
-                                  data_state: Dict[str, Any],
-                                  skill_context: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Infer prerequisites for a function using LLM reasoning.
-
-        This method asks the LLM to analyze function documentation and
-        current data state to determine what's needed. Unlike hardcoded
-        rules, this adapts to any function and learns from context.
-
-        Parameters
-        ----------
-        function_name : str
-            Name of the function to analyze
-        function_info : Dict[str, Any]
-            Function metadata from registry (docstring, signature, etc.)
-        data_state : Dict[str, Any]
-            Current data state from DataStateInspector
-        skill_context : str, optional
-            Relevant skill guidance for context
-
-        Returns
-        -------
-        Dict[str, Any]
-            Inference result:
-            {
-                'can_run': bool,              # Can function run on current data?
-                'confidence': float,          # Confidence level (0-1)
-                'missing_items': List[str],   # What's missing
-                'required_steps': List[str],  # Steps to prepare data
-                'complexity': str,            # 'simple' or 'complex'
-                'reasoning': str,             # LLM's explanation
-                'auto_fixable': bool          # Can auto-run prerequisites?
-            }
-
-        Examples
-        --------
-        >>> inference = LLMPrerequisiteInference(llm_backend)
-        >>> result = await inference.infer_prerequisites(
-        ...     'pca',
-        ...     function_info,
-        ...     data_state
-        ... )
-        >>> print(result['reasoning'])
-        "PCA requires scaled data. Current data has no processed layers.
-         Needs: QC → normalize → scale → PCA (4 steps = complex)"
-        """
-        # Check cache first
-        cache_key = self._get_cache_key(function_name, data_state)
-        if cache_key in self._cache:
-            logger.debug(f"Using cached prerequisite inference for {function_name}")
-            return self._cache[cache_key]
-
-        # Prepare context for LLM
-        prompt = self._build_inference_prompt(
-            function_name, function_info, data_state, skill_context
-        )
-
-        try:
-            # Call LLM for analysis
-            response_text = await self.llm.run(prompt)
-
-            # Parse response
-            result = self._parse_inference_response(response_text, function_name)
-
-            # Cache result
-            self._cache[cache_key] = result
-
-            logger.debug(
-                f"LLM prerequisite inference for {function_name}: "
-                f"can_run={result['can_run']}, complexity={result['complexity']}"
-            )
-
-            return result
-
-        except Exception as e:
-            logger.warning(f"LLM prerequisite inference failed: {e}")
-            # Return conservative fallback
-            return {
-                'can_run': False,
-                'confidence': 0.0,
-                'missing_items': [],
-                'required_steps': [],
-                'complexity': 'complex',
-                'reasoning': f"Could not analyze prerequisites: {e}",
-                'auto_fixable': False
-            }
-
-    def _build_inference_prompt(self,
-                                function_name: str,
-                                function_info: Dict[str, Any],
-                                data_state: Dict[str, Any],
-                                skill_context: Optional[str]) -> str:
-        """Build prompt for LLM prerequisite inference."""
-
-        # Format data state
-        state_summary = []
-        if data_state['capabilities']:
-            state_summary.append(f"**Capabilities**: {', '.join(data_state['capabilities'])}")
-        if data_state['available']['layers']:
-            state_summary.append(f"**Layers**: {', '.join(data_state['available']['layers'])}")
-        if data_state['available']['obsm']:
-            state_summary.append(f"**Obsm**: {', '.join(data_state['available']['obsm'])}")
-        if data_state['available']['uns']:
-            state_summary.append(f"**Uns**: {', '.join(data_state['available']['uns'][:5])}")
-
-        state_str = "\n".join(state_summary) if state_summary else "No preprocessing detected (raw data)"
-
-        # Build prompt
-        prompt = f"""You are a bioinformatics workflow expert analyzing function prerequisites.
-
-## Function to Analyze
-**Name**: {function_name}
-**Full Name**: {function_info.get('full_name', function_name)}
-**Category**: {function_info.get('category', 'unknown')}
-**Signature**: {function_info.get('signature', '(adata, **kwargs)')}
-
-**Documentation**:
-{function_info.get('docstring', 'No documentation available')[:500]}
-
-**Examples**:
-{chr(10).join(function_info.get('examples', ['No examples available'])[:2])}
-
-## Current Data State
-{state_str}
-
-## Your Task
-Analyze whether this function can run on the current data state, and determine what prerequisites are needed.
-
-Consider:
-1. **Function signature**: What parameters does it expect? (e.g., layer='scaled', use_rep='X_pca')
-2. **Common bioinformatics workflows**: Standard order is QC → normalize → scale → PCA → neighbors → clustering
-3. **Current data state**: What's already available vs. what's missing
-4. **Complexity**: How many steps to prepare the data?
-
-## Skill Context (Best Practices)
-{skill_context or 'No specific skill guidance available'}
-
-## Response Format
-Respond in JSON format:
-{{
-  "can_run": true/false,
-  "confidence": 0.0-1.0,
-  "missing_items": ["item1", "item2"],
-  "required_steps": ["step1", "step2"],
-  "complexity": "simple" or "complex",
-  "reasoning": "Your detailed analysis",
-  "auto_fixable": true/false
-}}
-
-**Guidelines**:
-- `can_run`: true if function can execute on current data without errors
-- `confidence`: How confident you are (1.0 = very confident, 0.5 = uncertain)
-- `missing_items`: Specific things missing (e.g., "scaled layer", "X_pca", "neighbors")
-- `required_steps`: Functions to run to prepare data (e.g., ["scale", "pca"])
-- `complexity`: "simple" if 0-1 steps needed, "complex" if 2+ steps needed
-- `reasoning`: Explain your analysis in 1-2 sentences
-- `auto_fixable`: true if missing items can be auto-fixed with ≤1 simple step
-
-**Examples**:
-
-Example 1: PCA on preprocessed data
-Function: pca, signature: (adata, layer='scaled')
-Data State: Has 'scaled' layer
-Response: {{"can_run": true, "confidence": 1.0, "missing_items": [], "required_steps": [], "complexity": "simple", "reasoning": "Function expects scaled layer which is available.", "auto_fixable": false}}
-
-Example 2: PCA on raw data
-Function: pca, signature: (adata, layer='scaled')
-Data State: No preprocessing
-Response: {{"can_run": false, "confidence": 0.9, "missing_items": ["scaled layer"], "required_steps": ["qc", "preprocess", "scale"], "complexity": "complex", "reasoning": "PCA requires scaled data. Current data is raw and needs full preprocessing pipeline (3+ steps).", "auto_fixable": false}}
-
-Example 3: Leiden with PCA, missing neighbors
-Function: leiden, signature: (adata, resolution=1.0)
-Data State: Has X_pca, missing neighbors
-Response: {{"can_run": false, "confidence": 0.95, "missing_items": ["neighbors"], "required_steps": ["neighbors"], "complexity": "simple", "reasoning": "Leiden clustering needs neighbor graph. Data has PCA, only missing neighbors (1 step).", "auto_fixable": true}}
-
-Now analyze the function and data state above. Return ONLY valid JSON, no additional text.
-"""
-
-        return prompt
-
-    def _parse_inference_response(self, response_text: str, function_name: str) -> Dict[str, Any]:
-        """Parse LLM response into structured result."""
-        try:
-            # Extract JSON from response (might be wrapped in markdown)
-            json_text = response_text.strip()
-
-            # Remove markdown code blocks if present
-            if json_text.startswith('```'):
-                lines = json_text.split('\n')
-                json_text = '\n'.join(lines[1:-1]) if len(lines) > 2 else json_text
-                json_text = json_text.replace('```json', '').replace('```', '').strip()
-
-            result = json.loads(json_text)
-
-            # Validate required fields
-            required_fields = ['can_run', 'confidence', 'missing_items',
-                             'required_steps', 'complexity', 'reasoning', 'auto_fixable']
-            for field in required_fields:
-                if field not in result:
-                    raise ValueError(f"Missing required field: {field}")
-
-            # Validate types
-            if not isinstance(result['can_run'], bool):
-                result['can_run'] = bool(result['can_run'])
-            if not isinstance(result['auto_fixable'], bool):
-                result['auto_fixable'] = bool(result['auto_fixable'])
-            if not isinstance(result['confidence'], (int, float)):
-                result['confidence'] = 0.5
-            if result['complexity'] not in ['simple', 'complex']:
-                result['complexity'] = 'complex' if len(result['required_steps']) > 1 else 'simple'
-
-            return result
-
-        except Exception as e:
-            logger.warning(f"Failed to parse LLM inference response: {e}")
-            # Return conservative fallback
-            return {
-                'can_run': False,
-                'confidence': 0.3,
-                'missing_items': [],
-                'required_steps': [],
-                'complexity': 'complex',
-                'reasoning': f"Could not parse LLM response for {function_name}",
-                'auto_fixable': False
-            }
-
-    def clear_cache(self):
-        """Clear the inference cache."""
-        self._cache = {}
-        logger.debug("Prerequisite inference cache cleared")
-
-
 class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
@@ -701,7 +124,6 @@ class OmicVerseAgent:
         self._skill_overview_text: str = ""
         self._use_llm_skill_matching: bool = True  # Use LLM-based skill matching (Claude Code approach)
         self._managed_api_env: Dict[str, str] = {}
-        self._prerequisite_inference: Optional[LLMPrerequisiteInference] = None  # Layer 2: LLM inference
         # Reflection configuration
         self.enable_reflection = enable_reflection
         self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
@@ -971,11 +393,7 @@ User request: "quality control with nUMI>500, mito<0.2"
             max_tokens=8192,
             temperature=0.2,
         )
-
-        # Initialize Layer 2: LLM-based prerequisite inference
-        self._prerequisite_inference = LLMPrerequisiteInference(self._llm)
-        logger.debug("Layer 2: LLM prerequisite inference initialized")
-
+    
     def _search_functions(self, query: str) -> str:
         """
         Search for functions in the OmicVerse registry.
@@ -1055,23 +473,18 @@ User request: "quality control with nUMI>500, mito<0.2"
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
-    async def _analyze_task_complexity(self, request: str, adata: Any) -> str:
+    async def _analyze_task_complexity(self, request: str) -> str:
         """
-        Analyze the complexity of a user request with data state awareness.
+        Analyze the complexity of a user request to determine the appropriate execution strategy.
 
-        This method uses a combination of pattern matching, data state analysis,
-        and LLM reasoning to classify whether a task can be handled with a single
-        function call (simple) or requires a multi-step workflow (complex).
-
-        Now considers the CURRENT DATA STATE to make smarter decisions. For example,
-        "run PCA" is SIMPLE if data is already scaled, but COMPLEX if it's raw data.
+        This method uses a combination of pattern matching and LLM reasoning to classify
+        whether a task can be handled with a single function call (simple) or requires
+        a multi-step workflow (complex).
 
         Parameters
         ----------
         request : str
             The user's natural language request
-        adata : Any
-            AnnData object with current state
 
         Returns
         -------
@@ -1080,21 +493,18 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         Examples
         --------
-        Simple tasks (when data state supports them):
-        - "quality control with nUMI>500" (always simple)
-        - "normalize data" (simple if QC done)
-        - "run PCA" (simple if data is scaled)
-        - "leiden clustering" (simple if PCA + neighbors exist)
+        Simple tasks:
+        - "quality control with nUMI>500"
+        - "normalize data"
+        - "run PCA"
+        - "leiden clustering"
 
         Complex tasks:
         - "complete bulk RNA-seq DEG analysis pipeline"
-        - "run PCA" on raw unprepared data (needs QC + normalize + scale first)
-        - "leiden clustering" without PCA (needs full preprocessing)
+        - "perform spatial deconvolution from start to finish"
+        - "full single-cell preprocessing workflow"
         - "analyze my data and generate report"
         """
-
-        # Get current data state
-        data_state = DataStateInspector.inspect(adata)
 
         # Pattern-based quick classification (fast path, no LLM needed)
         request_lower = request.lower()
@@ -1139,76 +549,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
             # Short request with function name, no complexity indicators = simple
             logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
-            return 'simple'
-
-        # DATA STATE-AWARE CLASSIFICATION (New layer!)
-        # Check if the requested operation is feasible given current data state
-        logger.debug("Complexity: analyzing data state for context-aware classification")
-
-        has_processed = 'has_processed_layers' in data_state['capabilities']
-        has_pca = 'has_pca' in data_state['capabilities']
-        has_neighbors = 'has_neighbors' in data_state['capabilities']
-        has_clustering = 'has_clustering' in data_state['capabilities']
-
-        # PCA-related requests
-        if any(kw in request_lower for kw in ['pca', '主成分', 'principal component']):
-            if has_processed or has_pca:
-                # Data is preprocessed or already has PCA → SIMPLE
-                logger.debug("PCA requested: data preprocessed → SIMPLE")
-                return 'simple'
-            else:
-                # Raw data needs full preprocessing → COMPLEX
-                logger.debug("PCA requested: raw data needs preprocessing → COMPLEX")
-                return 'complex'
-
-        # Clustering requests
-        if any(kw in request_lower for kw in ['leiden', 'louvain', 'cluster', '聚类']):
-            if has_clustering:
-                # Already clustered → SIMPLE (maybe wants to adjust resolution)
-                logger.debug("Clustering requested: already has clustering → SIMPLE")
-                return 'simple'
-            elif has_pca and has_neighbors:
-                # Ready to cluster → SIMPLE
-                logger.debug("Clustering requested: has PCA + neighbors → SIMPLE")
-                return 'simple'
-            elif has_pca:
-                # Only needs neighbors (1 step) → SIMPLE
-                logger.debug("Clustering requested: has PCA, needs neighbors → SIMPLE")
-                return 'simple'
-            else:
-                # Needs full preprocessing → COMPLEX
-                logger.debug("Clustering requested: needs full preprocessing → COMPLEX")
-                return 'complex'
-
-        # Neighbor graph requests
-        if any(kw in request_lower for kw in ['neighbor', 'neighbours', 'knn']):
-            if has_pca:
-                # Has PCA, can compute neighbors → SIMPLE
-                logger.debug("Neighbors requested: has PCA → SIMPLE")
-                return 'simple'
-            else:
-                # Needs preprocessing first → COMPLEX
-                logger.debug("Neighbors requested: needs preprocessing → COMPLEX")
-                return 'complex'
-
-        # Visualization requests
-        if any(kw in request_lower for kw in ['plot', 'visualize', 'umap', 'tsne', 'embedding']):
-            # Check if wants to color by clustering
-            color_by_clustering = any(kw in request_lower for kw in ['leiden', 'louvain', 'cluster'])
-
-            if color_by_clustering and not has_clustering and not has_neighbors:
-                # Wants clustering colors but no clustering/neighbors → COMPLEX
-                logger.debug("Visualization with clustering: no clustering available → COMPLEX")
-                return 'complex'
-            elif has_pca or data_state['embeddings']:
-                # Has embeddings or PCA → SIMPLE
-                logger.debug("Visualization: has embeddings/PCA → SIMPLE")
-                return 'simple'
-            # Otherwise fall through to LLM
-
-        # QC requests are typically simple
-        if any(kw in request_lower for kw in ['qc', 'quality control', '质控']):
-            logger.debug("QC requested → SIMPLE")
             return 'simple'
 
         # Ambiguous cases: Use LLM for classification
@@ -1316,180 +656,53 @@ Respond with ONLY one word: either "simple" or "complex"
         The generated code should contain 1-2 function calls maximum.
         """
 
-        print(f"🚀 Priority 1: Fast registry-based workflow (with Layer 2 LLM inference)")
-
-        # Layer 1: Inspect current data state
-        data_state_summary = DataStateInspector.get_readable_summary(adata)
-        data_state = DataStateInspector.inspect(adata)
+        print(f"🚀 Priority 1: Fast registry-based workflow")
 
         # Build registry-only prompt (no skills, focused on single function)
         functions_info = self._get_available_functions_info()
 
-        #  Layer 2: Optional LLM-based prerequisite inference for ambiguous cases
-        # This provides enhanced intelligence for edge cases
-        llm_inference_context = ""
-        try:
-            # Try to identify the target function from the request
-            request_lower = request.lower()
-            target_function = None
-
-            # Simple heuristic to find target function
-            common_functions = {
-                'pca': ['pca', '主成分', 'principal'],
-                'leiden': ['leiden', '聚类'],
-                'neighbors': ['neighbor', 'knn'],
-                'qc': ['qc', 'quality', '质控'],
-                'umap': ['umap'],
-                'tsne': ['tsne'],
-                'scale': ['scale', '标准化']
-            }
-
-            for func_key, keywords in common_functions.items():
-                if any(kw in request_lower for kw in keywords):
-                    target_function = func_key
-                    break
-
-            # If we identified a target function, use Layer 2 for deeper analysis
-            if target_function and self._prerequisite_inference:
-                logger.debug(f"Layer 2: Running LLM inference for function '{target_function}'")
-
-                # Get function info from registry
-                func_results = _global_registry.find(target_function)
-                if func_results:
-                    func_info = func_results[0]
-
-                    # Run LLM-based prerequisite inference
-                    inference_result = await self._prerequisite_inference.infer_prerequisites(
-                        function_name=target_function,
-                        function_info=func_info,
-                        data_state=data_state,
-                        skill_context=None  # Could add skill context if needed
-                    )
-
-                    # Build context string for the prompt
-                    if not inference_result['can_run']:
-                        llm_inference_context = f"""
-
-## Layer 2: LLM Prerequisite Analysis for '{target_function}'
-
-**LLM Analysis** (Confidence: {inference_result['confidence']:.0%}):
-{inference_result['reasoning']}
-
-**Missing Items**: {', '.join(inference_result['missing_items']) if inference_result['missing_items'] else 'None'}
-**Required Steps**: {' → '.join(inference_result['required_steps']) if inference_result['required_steps'] else 'None'}
-**Complexity**: {inference_result['complexity'].upper()}
-**Auto-fixable**: {"YES - can auto-run missing prerequisites" if inference_result['auto_fixable'] else "NO - needs full workflow"}
-
-**Recommendation**:
-{"Auto-add the missing prerequisite(s) to your code." if inference_result['auto_fixable'] else 'Respond with "NEEDS_WORKFLOW" - this requires multiple preprocessing steps.'}
-"""
-                        logger.debug(f"Layer 2: Inference suggests complexity={inference_result['complexity']}, auto_fixable={inference_result['auto_fixable']}")
-
-        except Exception as e:
-            logger.warning(f"Layer 2 inference failed (non-critical): {e}")
-            # Continue without Layer 2 enhancement
-
-
-        priority1_prompt = f"""You are a fast function executor for OmicVerse with MULTI-LAYER PREREQUISITE AWARENESS.
-
-## Intelligent Prerequisite System
-This system uses TWO layers:
-- **Layer 1** (Runtime Inspection): Facts about current data state
-- **Layer 2** (LLM Inference): Intelligent reasoning about prerequisites
-
-Use both layers to make smart decisions about prerequisite handling.
+        priority1_prompt = f"""You are a fast function executor for OmicVerse. Your task is to find and execute the SINGLE BEST function for this request.
 
 Request: "{request}"
 
-{data_state_summary}
-{llm_inference_context}
+Dataset info:
+- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
 
 Available OmicVerse Functions (Registry):
 {functions_info}
 
-INSTRUCTIONS - MULTI-LAYER PREREQUISITE-AWARE EXECUTION:
-1. **Check Layer 1 (Data State)** - See what's available in the current data (layers, obsm, uns, capabilities)
-2. **Check Layer 2 (LLM Analysis)** - If provided above, review the LLM's prerequisite analysis and recommendation
-3. **Find the best function** from the registry for the user's request
-4. **Analyze if prerequisites are met**:
-   - Does the function need a 'scaled' layer? Check if it exists in available layers
-   - Does it need 'X_pca'? Check if it exists in available obsm
-   - Does it need 'neighbors'? Check if it exists in uns
-   - Does it need clustering results? Check detected capabilities
-   - **IMPORTANT**: If Layer 2 analysis is provided, prioritize its recommendation
-5. **Handle missing prerequisites intelligently**:
-   - If Layer 2 says "Auto-fixable: YES" → Auto-add the missing prerequisite(s)
-   - If 0-1 simple prerequisite is missing (e.g., just needs scaling) → Auto-add it to the code
-   - If 2+ steps are missing OR Layer 2 says "NEEDS_WORKFLOW" → Respond "NEEDS_WORKFLOW"
-5. **Extract parameters** from request (e.g., "nUMI>500" → tresh={{'nUMIs': 500, ...}})
-6. **Return executable Python code ONLY**, no explanations
-
-PREREQUISITE HANDLING EXAMPLES:
-
-Example 1: Ready to execute (no prerequisites needed)
-Request: "Run PCA"
-Data State: Has 'scaled' layer ✅
-Code:
-```python
-import omicverse as ov
-adata = ov.pp.pca(adata, layer='scaled', n_pcs=50)
-print(f"✅ PCA completed: {{adata.obsm['X_pca'].shape}}")
-```
-
-Example 2: Auto-add 1 simple prerequisite
-Request: "Run leiden clustering"
-Data State: Has 'X_pca' ✅, missing 'neighbors' ❌
-Code:
-```python
-import omicverse as ov
-# Auto-add missing prerequisite (1 step)
-if 'neighbors' not in adata.uns:
-    print("📊 Computing neighbor graph first...")
-    adata = ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
-# Now run requested function
-adata = ov.pp.leiden(adata, resolution=1.0)
-print(f"✅ Leiden clustering: {{adata.obs['leiden'].nunique()}} clusters")
-```
-
-Example 3: Missing too many prerequisites
-Request: "Run PCA"
-Data State: No preprocessing (raw data only) ❌
-Response: "NEEDS_WORKFLOW"
-Reason: Needs QC → normalize → scale → PCA (4 steps = too complex for Priority 1)
-
-Example 4: Defensive validation for visualization
-Request: "Plot UMAP colored by leiden"
-Data State: Has 'X_umap' ✅, missing 'leiden' in obs ❌
-Code:
-```python
-import omicverse as ov
-# Validate clustering exists
-if 'leiden' not in adata.obs:
-    if 'neighbors' not in adata.uns:
-        print("NEEDS_WORKFLOW")  # Too many steps
-    print("📊 Running leiden clustering...")
-    adata = ov.pp.leiden(adata, resolution=1.0)
-# Now plot
-ov.pl.embedding(adata, basis='X_umap', color='leiden', frameon='small')
-print("✅ UMAP plot generated")
-```
+INSTRUCTIONS:
+1. This is a SIMPLE task requiring ONE function call (or at most 2-3 closely related calls)
+2. Search the registry above for the most appropriate function
+3. Extract parameters from the request (e.g., "nUMI>500" → tresh={{'nUMIs': 500, ...}})
+4. Generate ONLY the essential code - no complex workflows
+5. Return executable Python code ONLY, no explanations
 
 IMPORTANT CONSTRAINTS:
-- Maximum 1-4 function calls (including auto-added prerequisites)
-- Can auto-add up to 1 simple prerequisite (like neighbors, scaling)
-- If >2 prerequisites missing OR complex pipeline needed → "NEEDS_WORKFLOW"
-- Always check data state before executing
-- Include informative print statements
+- Generate 1-3 function calls maximum
+- No loops, conditionals, or complex control flow
+- Focus on direct parameter extraction and function execution
+- If this requires multiple steps or a workflow, respond with: "NEEDS_WORKFLOW"
 
-Common prerequisite patterns:
-- PCA needs: 'scaled' layer (or at least preprocessed data)
-- Clustering (leiden/louvain) needs: 'neighbors' in uns + 'X_pca' in obsm
-- Neighbors needs: 'X_pca' in obsm
-- Visualization with clusters needs: clustering results in obs
+Examples of GOOD responses:
+```python
+import omicverse as ov
+adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
+print(f"QC completed: {{adata.shape[0]}} cells")
+```
+
+```python
+import omicverse as ov
+adata = ov.pp.pca(adata, n_comps=50)
+print(f"PCA completed: {{adata.obsm['X_pca'].shape}}")
+```
+
+Examples of tasks that need NEEDS_WORKFLOW:
+- "complete pipeline"
+- "do X and then Y and then Z"
+- "full workflow from start to finish"
 
 Now generate code for: "{request}"
-
-Remember: Check the data state above, auto-add ≤1 simple prerequisite if needed, or respond "NEEDS_WORKFLOW" if too complex.
 """
 
         # Get code from LLM
@@ -2510,9 +1723,9 @@ IMPORTANT:
         print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
         print(f"{'=' * 70}\n")
 
-        # Step 1: Analyze task complexity (with data state awareness)
+        # Step 1: Analyze task complexity
         print(f"📊 Analyzing task complexity...")
-        complexity = await self._analyze_task_complexity(request, adata)
+        complexity = await self._analyze_task_complexity(request)
         print(f"   Classification: {complexity.upper()}")
         print()
 
