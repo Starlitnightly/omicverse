@@ -8,6 +8,16 @@ from ..utils.registry import register_function
     aliases=["空间变异基因", "svg", "spatially_variable_genes", "空间变异基因检测", "SVG检测"],
     category="space",
     description="Identify spatially variable genes using multiple methods (PROST, Pearson, Spateo)",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obsm': ['spatial']  # Spatial coordinates required
+    },
+    produces={
+        'var': ['space_variable_features']
+    },
+    auto_fix='none',
     examples=[
         "# Basic SVG detection with PROST",
         "adata = ov.space.svg(adata, mode='prost', n_svgs=3000)",

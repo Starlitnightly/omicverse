@@ -19,6 +19,16 @@ tg_install=False
     aliases=["Tangram空间解卷积", "Tangram", "spatial_deconvolution", "空间解卷积分析", "空间映射"],
     category="space",
     description="Tangram spatial deconvolution for mapping scRNA-seq cell types to spatial locations",
+    prerequisites={
+        'functions': []  # Requires scRNA-seq with annotations and spatial data
+    },
+    requires={
+        'obs': []  # Requires clusters column in scRNA-seq (user-specified)
+    },
+    produces={
+        'obsm': ['tangram_ct_pred']  # Cell type predictions in spatial data
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic Tangram analysis",
         "tangram = ov.space.Tangram(adata_sc=sc_adata, adata_sp=spatial_adata,",
