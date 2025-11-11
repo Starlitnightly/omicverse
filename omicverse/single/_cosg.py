@@ -332,6 +332,16 @@ class _RankGenes:
     aliases=["COSG分析", "cosg", "marker_genes", "标记基因", "cluster_markers"],
     category="single",
     description="Identify cluster-specific marker genes using COSG (COSine similarity-based Gene set scoring)",
+    prerequisites={
+        'functions': ['leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: user-specified groupby column
+    },
+    produces={
+        'uns': ['cosg', 'cosg_logfoldchanges']
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic COSG marker gene identification",
         "cosg_results = ov.single.cosg(adata, groupby='leiden', n_genes_user=50)",
