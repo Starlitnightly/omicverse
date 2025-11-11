@@ -12,6 +12,7 @@ Main Components:
     SuggestionEngine: Generates fix suggestions (Phase 3)
     LLMFormatter: Formats results for LLM integration (Phase 4)
     Production API: Convenient factory functions and helpers (Phase 5)
+    AgentContextInjector: Injects prerequisite state into LLM prompts (Layer 3)
 
 Usage (Quick Start):
     >>> from omicverse.utils.inspector import create_inspector, validate_function
@@ -80,6 +81,8 @@ from .production_api import (
     get_validation_report,
     ValidationContext,
 )
+# Layer 3 Phase 1: Agent Context Injection
+from .agent_context_injector import AgentContextInjector, ConversationState
 
 __all__ = [
     # Core components
@@ -114,6 +117,9 @@ __all__ = [
     'batch_validate',
     'get_validation_report',
     'ValidationContext',
+    # Layer 3 Phase 1: Agent Context Injection
+    'AgentContextInjector',
+    'ConversationState',
 ]
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'  # Layer 3 Phase 1 complete
