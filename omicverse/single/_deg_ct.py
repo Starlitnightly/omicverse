@@ -160,6 +160,16 @@ class DCT:
     aliases=["差异表达分析", "DEG", "differential_expression", "差异基因分析", "单细胞差异表达"],
     category="single",
     description="Differential gene expression analysis for single-cell data using Wilcoxon, t-test, or memento methods",
+    prerequisites={
+        'optional_functions': ['preprocess', 'leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: requires condition and celltype_key columns (user-specified)
+    },
+    produces={
+        'uns': ['rank_genes_groups']  # For wilcoxon/t-test methods
+    },
+    auto_fix='none',
     examples=[
         "# Initialize DEG with Wilcoxon test",
         "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',",
@@ -169,7 +179,7 @@ class DCT:
         "# Get results",
         "results = deg_obj.get_results()",
         "# Initialize with t-test method",
-        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',", 
+        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',",
         "                        test_group='Disease', method='t-test')",
         "# Run for all cell types",
         "deg_obj.run(celltype_key='celltype', celltype_group=None)",
