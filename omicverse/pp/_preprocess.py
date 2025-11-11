@@ -510,6 +510,7 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     prerequisites={
         'optional_functions': ['qc']
     },
+    requires={},
     produces={
         'layers': ['counts'],
         'var': ['highly_variable_features', 'means', 'variances', 'residual_variances']
@@ -684,6 +685,7 @@ def highly_variable_genes(adata,**kwargs):
     prerequisites={
         'optional_functions': ['normalize', 'qc']
     },
+    requires={},
     produces={
         'layers': ['scaled']
     },

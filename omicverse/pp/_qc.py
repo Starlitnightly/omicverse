@@ -336,6 +336,8 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
     aliases=["质控", "qc", "quality_control", "质量控制"],
     category="preprocessing",
     description="Perform comprehensive quality control on single-cell data. For seurat mode, use tresh dict with keys: 'mito_perc', 'nUMIs', 'detected_genes'",
+    prerequisites={},
+    requires={},
     produces={
         'obs': ['n_genes', 'n_counts', 'pct_counts_mt'],
         'var': ['mt', 'n_cells']
