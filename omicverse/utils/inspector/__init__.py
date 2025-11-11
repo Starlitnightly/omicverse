@@ -8,9 +8,9 @@ and prerequisite functions have been executed before allowing operations.
 Main Components:
     DataStateInspector: Main orchestrator for validation
     DataValidators: Validates data structure requirements
-    PrerequisiteChecker: Detects executed functions (coming soon)
-    SuggestionEngine: Generates fix suggestions (coming soon)
-    LLMFormatter: Formats results for LLM integration (coming soon)
+    PrerequisiteChecker: Detects executed functions (Phase 2)
+    SuggestionEngine: Generates fix suggestions (Phase 3)
+    LLMFormatter: Formats results for LLM integration (Phase 4)
 
 Usage:
     >>> from omicverse.utils.inspector import DataStateInspector
@@ -27,6 +27,7 @@ Usage:
 
 from .inspector import DataStateInspector
 from .validators import DataValidators
+from .prerequisite_checker import PrerequisiteChecker, DetectionResult
 from .data_structures import (
     ValidationResult,
     DataCheckResult,
@@ -35,18 +36,22 @@ from .data_structures import (
     ObspCheckResult,
     UnsCheckResult,
     LayersCheckResult,
+    ExecutionEvidence,
 )
 
 __all__ = [
     'DataStateInspector',
     'DataValidators',
+    'PrerequisiteChecker',
     'ValidationResult',
     'DataCheckResult',
+    'DetectionResult',
     'ObsCheckResult',
     'ObsmCheckResult',
     'ObspCheckResult',
     'UnsCheckResult',
     'LayersCheckResult',
+    'ExecutionEvidence',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
