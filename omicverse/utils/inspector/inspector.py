@@ -11,6 +11,7 @@ from anndata import AnnData
 
 from .validators import DataValidators
 from .prerequisite_checker import PrerequisiteChecker
+from .suggestion_engine import SuggestionEngine
 from .data_structures import (
     ValidationResult,
     DataCheckResult,
@@ -30,6 +31,7 @@ class DataStateInspector:
         registry: Function registry with Layer 1 metadata.
         validators: DataValidators instance for checking data structures.
         prerequisite_checker: PrerequisiteChecker for detecting executed functions.
+        suggestion_engine: SuggestionEngine for generating fix suggestions.
 
     Example:
         >>> from omicverse.utils.registry import get_registry
@@ -52,6 +54,7 @@ class DataStateInspector:
         self.registry = registry
         self.validators = DataValidators(adata)
         self.prerequisite_checker = PrerequisiteChecker(adata, registry)
+        self.suggestion_engine = SuggestionEngine(registry)
 
     def validate_prerequisites(self, function_name: str) -> ValidationResult:
         """Validate all prerequisites for a given function.
@@ -113,24 +116,13 @@ class DataStateInspector:
                 confidence_scores=confidence_scores,
             )
 
-        # Generate suggestions for missing requirements
-        suggestions = self._generate_data_suggestions(
-            function_name,
-            data_check,
-            func_meta
+        # Generate comprehensive suggestions using SuggestionEngine (Phase 3)
+        suggestions = self.suggestion_engine.generate_suggestions(
+            function_name=function_name,
+            missing_prerequisites=missing_prereqs,
+            missing_data=data_check.all_missing_structures,
+            data_check_result=data_check,
         )
-
-        # Add suggestions for missing prerequisite functions
-        prereq_suggestions = self._generate_prerequisite_suggestions(
-            function_name,
-            missing_prereqs,
-            func_meta
-        )
-        suggestions.extend(prereq_suggestions)
-
-        # Sort by priority
-        priority_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3}
-        suggestions.sort(key=lambda s: priority_order.get(s.priority, 999))
 
         return ValidationResult(
             function_name=function_name,
