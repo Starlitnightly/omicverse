@@ -33,14 +33,14 @@ class TestStreamingAPI:
 
     @pytest.mark.asyncio
     async def test_stream_validates_prompt_length(self):
-        """Test that stream() validates prompt length."""
+        """Test that stream() validates prompt length (>200k chars)."""
         backend = OmicVerseLLMBackend(
             system_prompt="You are a helpful assistant",
             model="gpt-4o",
             api_key="test-key"
         )
 
-        long_prompt = "x" * 100001
+        long_prompt = "x" * 200001
         with pytest.raises(ValueError, match="too long"):
             async for _ in backend.stream(long_prompt):
                 pass

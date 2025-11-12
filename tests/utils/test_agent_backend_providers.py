@@ -740,14 +740,14 @@ class TestInputValidation:
             asyncio.run(backend.run("   \n\t  "))
 
     def test_excessive_length_prompt_raises_error(self, sample_system_prompt):
-        """Verify prompt >100k chars raises ValueError."""
+        """Verify prompt >200k chars raises ValueError."""
         backend = OmicVerseLLMBackend(
             system_prompt=sample_system_prompt,
             model="gpt-4o-mini",
             api_key="test-key"
         )
 
-        long_prompt = "a" * 100001
+        long_prompt = "a" * 200001
         with pytest.raises(ValueError, match="user_prompt too long"):
             asyncio.run(backend.run(long_prompt))
 
