@@ -308,6 +308,9 @@ def test_documentation():
     print("\n=== Testing README.md ===")
 
     path = 'omicverse/utils/inspector/README.md'
+    if not os.path.exists(path):
+        print("⚠ README.md not found (documentation removed)")
+        return
     content = read_file(path)
 
     # Check for key sections

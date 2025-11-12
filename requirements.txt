@@ -49,3 +49,4 @@ requests
 wandb
 munch
 datasets
+openai

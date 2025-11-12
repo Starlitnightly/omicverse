@@ -1213,39 +1213,127 @@ Now generate a complete workflow for: "{request}"
 
         candidates = self._gather_code_candidates(response_text)
         if not candidates:
-            raise ValueError("no code candidates found in the response")
+            # Provide detailed diagnostic information
+            error_msg = (
+                f"Could not extract executable code: no code candidates found in the response.\n"
+                f"Response length: {len(response_text)} characters\n"
+                f"Response preview (first 500 chars):\n{response_text[:500]}\n"
+                f"Response preview (last 300 chars):\n...{response_text[-300:]}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        logger.debug(f"Found {len(candidates)} code candidate(s) to validate")
 
         syntax_errors = []
-        for candidate in candidates:
+        for i, candidate in enumerate(candidates):
+            logger.debug(f"Validating candidate {i+1}/{len(candidates)} (length: {len(candidate)} chars)")
+            logger.debug(f"Candidate preview (first 200 chars): {candidate[:200]}")
+
             try:
                 normalized = self._normalize_code_candidate(candidate)
             except ValueError as exc:
-                syntax_errors.append(str(exc))
+                error = f"Candidate {i+1}: normalization failed - {exc}"
+                logger.debug(error)
+                syntax_errors.append(error)
                 continue
+
             try:
                 ast.parse(normalized)
+                logger.debug(f"✓ Candidate {i+1} validated successfully")
+                return normalized
             except SyntaxError as exc:
-                syntax_errors.append(str(exc))
+                error = f"Candidate {i+1}: syntax error - {exc}"
+                logger.debug(error)
+                syntax_errors.append(error)
                 continue
-            return normalized
 
-        raise ValueError("; ".join(syntax_errors) or "no syntactically valid python code detected")
+        # All candidates failed - provide detailed error message
+        error_msg = (
+            f"Could not extract executable code: all {len(candidates)} candidate(s) failed validation.\n"
+            f"Errors:\n" + "\n".join(f"  - {err}" for err in syntax_errors)
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     def _gather_code_candidates(self, response_text: str) -> List[str]:
-        """Collect possible Python snippets from fenced or inline blocks."""
+        """Enhanced code extraction with multiple strategies to handle various formats."""
 
-        fenced_pattern = re.compile(r"```(?:python)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
-        candidates = [
-            textwrap.dedent(match.group(1)).strip()
-            for match in fenced_pattern.finditer(response_text)
-            if match.group(1).strip()
+        candidates = []
+
+        # Strategy 1: Standard fenced code blocks with python identifier
+        fenced_python = re.compile(r"```python\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+        for match in fenced_python.finditer(response_text):
+            code = textwrap.dedent(match.group(1)).strip()
+            if code:
+                candidates.append(code)
+
+        # Strategy 2: Generic fenced code blocks (```...```)
+        if not candidates:
+            fenced_generic = re.compile(r"```\s*(.*?)```", re.DOTALL)
+            for match in fenced_generic.finditer(response_text):
+                code = textwrap.dedent(match.group(1)).strip()
+                # Skip if starts with language identifier that's not python
+                first_line = code.split('\n')[0].strip().lower()
+                if first_line in ['bash', 'shell', 'json', 'yaml', 'xml', 'html', 'css', 'javascript']:
+                    continue
+                if code and self._looks_like_python(code):
+                    candidates.append(code)
+
+        # Strategy 3: Code blocks with alternative language identifiers (py, python3)
+        if not candidates:
+            fenced_alt = re.compile(r"```(?:py|python3)\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+            for match in fenced_alt.finditer(response_text):
+                code = textwrap.dedent(match.group(1)).strip()
+                if code:
+                    candidates.append(code)
+
+        # Strategy 4: Code following "Here's the code:" or similar phrases
+        if not candidates:
+            code_intro = re.compile(
+                r"(?:here'?s? (?:the )?code|code:|solution:)\s*[:\n]\s*```(?:python)?\s*(.*?)```",
+                re.DOTALL | re.IGNORECASE
+            )
+            for match in code_intro.finditer(response_text):
+                code = textwrap.dedent(match.group(1)).strip()
+                if code:
+                    candidates.append(code)
+
+        # Strategy 5: GPT-5 specific - last code block (reasoning may come before)
+        # If we have multiple candidates, try the last one first (GPT-5 reasoning is before code)
+        if len(candidates) > 1:
+            # Reverse order to try last code block first
+            candidates = list(reversed(candidates))
+
+        # Strategy 6: Inline extraction as fallback
+        if not candidates:
+            inline = self._extract_inline_python(response_text)
+            if inline:
+                candidates.append(inline)
+
+        return candidates
+
+    def _looks_like_python(self, code: str) -> bool:
+        """Heuristic check if code snippet looks like Python."""
+
+        # Python indicators to look for
+        python_indicators = [
+            r'\bimport\b',
+            r'\bdef\b',
+            r'\bclass\b',
+            r'\badata\b',
+            r'\bov\.',
+            r'\bsc\.',
+            r'\breturn\b',
+            r'\bfor\b.*\bin\b',
+            r'\bif\b.*:',
+            r'\.obs\[',
+            r'\.var\[',
+            r'=\s*\w+\(',
         ]
 
-        if candidates:
-            return candidates
-
-        inline = self._extract_inline_python(response_text)
-        return [inline] if inline else []
+        matches = sum(1 for pattern in python_indicators if re.search(pattern, code))
+        return matches >= 2  # At least 2 Python indicators
 
     def _extract_inline_python(self, response_text: str) -> str:
         """Heuristically gather inline Python statements for AST validation."""
