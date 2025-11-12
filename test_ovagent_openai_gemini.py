@@ -240,9 +240,15 @@ def test_preprocessing(agent, adata, model):
 
         elapsed = time.time() - start_time
 
-        # Verify HVGs computed
-        assert 'highly_variable' in result.var.columns, "HVGs not computed"
-        hvg_count = result.var['highly_variable'].sum()
+        # Verify HVGs computed (check for both possible column names)
+        hvg_column = None
+        if 'highly_variable' in result.var.columns:
+            hvg_column = 'highly_variable'
+        elif 'highly_variable_features' in result.var.columns:
+            hvg_column = 'highly_variable_features'
+
+        assert hvg_column is not None, "HVGs not computed (neither 'highly_variable' nor 'highly_variable_features' found)"
+        hvg_count = result.var[hvg_column].sum()
 
         print(f"   Preprocessing completed in {elapsed:.2f}s")
         print(f"   HVGs identified: {hvg_count}")
@@ -387,7 +393,9 @@ def test_end_to_end_pipeline(agent, adata, model):
 
         print("   Step 2: Preprocessing")
         adata_work = agent.run('preprocess with 2000 highly variable genes using shiftlog|pearson', adata_work)
-        hvg_count = adata_work.var['highly_variable'].sum()
+        # Check for both possible HVG column names
+        hvg_col = 'highly_variable' if 'highly_variable' in adata_work.var.columns else 'highly_variable_features'
+        hvg_count = adata_work.var[hvg_col].sum()
         print(f"      → {hvg_count} HVGs selected")
 
         print("   Step 3: Clustering")
@@ -404,7 +412,7 @@ def test_end_to_end_pipeline(agent, adata, model):
         # Validate final state
         checks = [
             ('QC applied', adata_work.n_obs < adata.n_obs),
-            ('HVGs computed', 'highly_variable' in adata_work.var.columns),
+            ('HVGs computed', 'highly_variable' in adata_work.var.columns or 'highly_variable_features' in adata_work.var.columns),
             ('Clustering done', 'leiden' in adata_work.obs.columns),
             ('UMAP computed', 'X_umap' in adata_work.obsm.keys()),
         ]
