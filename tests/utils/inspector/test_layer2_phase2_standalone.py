@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from anndata import AnnData
+from pathlib import Path
 
 
 def import_module_from_path(module_name, file_path):
@@ -27,22 +28,25 @@ def import_module_from_path(module_name, file_path):
     return module
 
 
+# Get project root dynamically
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
 # Import data_structures first
 data_structures = import_module_from_path(
     'omicverse.utils.inspector.data_structures',
-    '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
 )
 
 # Import validators
 validators = import_module_from_path(
     'omicverse.utils.inspector.validators',
-    '/home/user/omicverse/omicverse/utils/inspector/validators.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/validators.py')
 )
 
 # Import prerequisite_checker
 prerequisite_checker = import_module_from_path(
     'omicverse.utils.inspector.prerequisite_checker',
-    '/home/user/omicverse/omicverse/utils/inspector/prerequisite_checker.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/prerequisite_checker.py')
 )
 
 # Get the classes we need

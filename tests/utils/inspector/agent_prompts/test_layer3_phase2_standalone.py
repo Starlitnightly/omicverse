@@ -8,6 +8,7 @@ import sys
 import importlib.util
 import numpy as np
 from anndata import AnnData
+from pathlib import Path
 
 
 def import_module_from_path(module_name, file_path):
@@ -19,40 +20,43 @@ def import_module_from_path(module_name, file_path):
     return module
 
 
+# Get project root dynamically
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
+
 # Import required modules
 data_structures = import_module_from_path(
     'omicverse.utils.inspector.data_structures',
-    '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
 )
 
 validators = import_module_from_path(
     'omicverse.utils.inspector.validators',
-    '/home/user/omicverse/omicverse/utils/inspector/validators.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/validators.py')
 )
 
 prerequisite_checker = import_module_from_path(
     'omicverse.utils.inspector.prerequisite_checker',
-    '/home/user/omicverse/omicverse/utils/inspector/prerequisite_checker.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/prerequisite_checker.py')
 )
 
 suggestion_engine = import_module_from_path(
     'omicverse.utils.inspector.suggestion_engine',
-    '/home/user/omicverse/omicverse/utils/inspector/suggestion_engine.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/suggestion_engine.py')
 )
 
 llm_formatter = import_module_from_path(
     'omicverse.utils.inspector.llm_formatter',
-    '/home/user/omicverse/omicverse/utils/inspector/llm_formatter.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/llm_formatter.py')
 )
 
 inspector_module = import_module_from_path(
     'omicverse.utils.inspector.inspector',
-    '/home/user/omicverse/omicverse/utils/inspector/inspector.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/inspector.py')
 )
 
 data_state_validator = import_module_from_path(
     'omicverse.utils.inspector.data_state_validator',
-    '/home/user/omicverse/omicverse/utils/inspector/data_state_validator.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/data_state_validator.py')
 )
 
 # Get classes

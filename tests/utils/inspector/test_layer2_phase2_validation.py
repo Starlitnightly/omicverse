@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from anndata import AnnData
+from pathlib import Path
 
 
 def import_module_from_path(module_name, file_path):
@@ -30,6 +31,9 @@ def import_module_from_path(module_name, file_path):
     return module
 
 
+# Get project root dynamically
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
 def validate_prerequisite_checker_structure():
     """Validate PrerequisiteChecker class structure."""
     print("\n=== Validating PrerequisiteChecker Structure ===")
@@ -37,7 +41,7 @@ def validate_prerequisite_checker_structure():
     # Import prerequisite_checker
     prerequisite_checker = import_module_from_path(
         'omicverse.utils.inspector.prerequisite_checker',
-        '/home/user/omicverse/omicverse/utils/inspector/prerequisite_checker.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/prerequisite_checker.py')
     )
 
     PrerequisiteChecker = prerequisite_checker.PrerequisiteChecker
@@ -91,22 +95,22 @@ def validate_integration_with_inspector():
     # Import modules
     data_structures = import_module_from_path(
         'omicverse.utils.inspector.data_structures',
-        '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
     )
 
     validators = import_module_from_path(
         'omicverse.utils.inspector.validators',
-        '/home/user/omicverse/omicverse/utils/inspector/validators.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/validators.py')
     )
 
     prerequisite_checker = import_module_from_path(
         'omicverse.utils.inspector.prerequisite_checker',
-        '/home/user/omicverse/omicverse/utils/inspector/prerequisite_checker.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/prerequisite_checker.py')
     )
 
     inspector = import_module_from_path(
         'omicverse.utils.inspector.inspector',
-        '/home/user/omicverse/omicverse/utils/inspector/inspector.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/inspector.py')
     )
 
     DataStateInspector = inspector.DataStateInspector
@@ -163,12 +167,12 @@ def validate_detection_strategies():
     # Import modules
     data_structures = import_module_from_path(
         'omicverse.utils.inspector.data_structures',
-        '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
     )
 
     prerequisite_checker = import_module_from_path(
         'omicverse.utils.inspector.prerequisite_checker',
-        '/home/user/omicverse/omicverse/utils/inspector/prerequisite_checker.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/prerequisite_checker.py')
     )
 
     PrerequisiteChecker = prerequisite_checker.PrerequisiteChecker
@@ -233,7 +237,7 @@ def validate_execution_evidence():
 
     data_structures = import_module_from_path(
         'omicverse.utils.inspector.data_structures',
-        '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
     )
 
     ExecutionEvidence = data_structures.ExecutionEvidence
@@ -277,7 +281,7 @@ def validate_exports():
 
     init_module = import_module_from_path(
         'omicverse.utils.inspector',
-        '/home/user/omicverse/omicverse/utils/inspector/__init__.py'
+        str(PROJECT_ROOT / 'omicverse/utils/inspector/__init__.py')
     )
 
     required_exports = [
