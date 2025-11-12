@@ -76,6 +76,7 @@ dependencies = [
     'transformers>=0.30',
     'marsilea',
     'wandb',
+    'openai>=1.0',
     #'cvxpy>=1.3',
 
 ]

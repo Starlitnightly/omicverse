@@ -319,6 +319,17 @@ class OmicVerseLLMBackend:
         # Token usage tracking
         self.last_usage: Optional[Usage] = None
 
+        # Validate GPT-5 model accessibility
+        if 'gpt-5' in model.lower():
+            api_key = self._resolve_api_key()
+            if not api_key:
+                warnings.warn(
+                    f"GPT-5 model '{model}' requires OPENAI_API_KEY to be set. "
+                    "Set the environment variable or pass api_key to the constructor.",
+                    UserWarning
+                )
+            logger.debug(f"GPT-5 model detected: {model}, using Responses API")
+
     async def run(self, user_prompt: str) -> str:
         """Run an LLM completion and return the response text."""
 
@@ -328,9 +339,9 @@ class OmicVerseLLMBackend:
         # Validate input
         if not user_prompt or not user_prompt.strip():
             raise ValueError("user_prompt cannot be empty")
-        if len(user_prompt) > 100000:
+        if len(user_prompt) > 200000:
             raise ValueError(
-                f"user_prompt too long ({len(user_prompt)} chars, max 100000)"
+                f"user_prompt too long ({len(user_prompt)} chars, max 200000)"
             )
 
         # Many provider SDKs are synchronous; use a thread to avoid blocking the loop
@@ -370,9 +381,9 @@ class OmicVerseLLMBackend:
         # Validate input
         if not user_prompt or not user_prompt.strip():
             raise ValueError("user_prompt cannot be empty")
-        if len(user_prompt) > 100000:
+        if len(user_prompt) > 200000:
             raise ValueError(
-                f"user_prompt too long ({len(user_prompt)} chars, max 100000)"
+                f"user_prompt too long ({len(user_prompt)} chars, max 200000)"
             )
 
         # Stream responses using provider-specific implementations
@@ -612,6 +623,9 @@ class OmicVerseLLMBackend:
                 # Responses API uses 'instructions' for system prompt
                 # and 'input' as a string (not message array)
                 # Note: gpt-5 Responses API does not support temperature parameter
+                logger.debug(f"GPT-5 Responses API call: model={self.config.model}, max_tokens={self.config.max_tokens}")
+                logger.debug(f"User prompt length: {len(user_prompt)} chars")
+
                 input_payload = [
                     {
                         "role": "system",
@@ -629,6 +643,7 @@ class OmicVerseLLMBackend:
 
                 # GPT-5 models use reasoning tokens - control effort for response quality
                 # Set reasoning effort to 'high' for maximum reasoning capability and best quality responses
+                logger.debug("Creating GPT-5 Responses API request with high reasoning effort...")
                 resp = client.responses.create(
                     model=self.config.model,
                     input=input_payload,
@@ -636,6 +651,9 @@ class OmicVerseLLMBackend:
                     max_output_tokens=self.config.max_tokens,
                     reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
                 )
+
+                logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
+                logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
 
                 # Capture usage information from Responses API (only if numeric)
                 if hasattr(resp, 'usage') and resp.usage is not None:
@@ -658,46 +676,71 @@ class OmicVerseLLMBackend:
                         )
 
                 # Extract text from Responses API format with fallback chain
+                logger.debug("Attempting to extract text from GPT-5 response...")
+
                 # Try output_text first (most common)
                 if hasattr(resp, 'output_text') and resp.output_text:
+                    logger.debug(f"✓ Extracted via output_text (length: {len(resp.output_text)} chars)")
+                    logger.debug(f"Response preview (first 200 chars): {resp.output_text[:200]}")
                     return resp.output_text
 
                 # Try output.text
                 if hasattr(resp, 'output'):
                     output = resp.output
+                    logger.debug(f"Found output attribute: type={type(output).__name__}")
+
                     # Direct string
                     if isinstance(output, str):
+                        logger.debug(f"✓ Extracted via output (direct string, length: {len(output)} chars)")
                         return output
                     # Object with .text
                     if hasattr(output, 'text') and getattr(output, 'text'):
-                        return getattr(output, 'text')
+                        text = getattr(output, 'text')
+                        logger.debug(f"✓ Extracted via output.text (length: {len(text)} chars)")
+                        return text
                     # Object with .content (list of parts)
                     if hasattr(output, 'content'):
                         parts = getattr(output, 'content')
+                        logger.debug(f"Found output.content: type={type(parts)}, length={len(parts) if hasattr(parts, '__len__') else 'N/A'}")
                         try:
-                            for p in parts:
+                            for i, p in enumerate(parts):
                                 # p may be object or dict
                                 if hasattr(p, 'text') and getattr(p, 'text'):
-                                    return getattr(p, 'text')
+                                    text = getattr(p, 'text')
+                                    logger.debug(f"✓ Extracted via output.content[{i}].text (length: {len(text)} chars)")
+                                    return text
                                 if isinstance(p, dict) and p.get('text'):
-                                    return p['text']
-                        except Exception:
+                                    text = p['text']
+                                    logger.debug(f"✓ Extracted via output.content[{i}]['text'] (length: {len(text)} chars)")
+                                    return text
+                        except Exception as e:
+                            logger.debug(f"Error iterating output.content: {e}")
                             pass
                     # List (first element may be dict or object)
                     if isinstance(output, list) and len(output) > 0:
                         first = output[0]
+                        logger.debug(f"Output is a list, first element type: {type(first).__name__}")
                         if isinstance(first, str):
+                            logger.debug(f"✓ Extracted via output[0] (direct string, length: {len(first)} chars)")
                             return first
                         if hasattr(first, 'text') and getattr(first, 'text'):
-                            return getattr(first, 'text')
+                            text = getattr(first, 'text')
+                            logger.debug(f"✓ Extracted via output[0].text (length: {len(text)} chars)")
+                            return text
                         if isinstance(first, dict) and first.get('text'):
-                            return first['text']
+                            text = first['text']
+                            logger.debug(f"✓ Extracted via output[0]['text'] (length: {len(text)} chars)")
+                            return text
 
                 # Fallback: try text attribute directly
                 if hasattr(resp, 'text') and resp.text:
+                    logger.debug(f"✓ Extracted via text attribute (length: {len(resp.text)} chars)")
                     return resp.text
 
                 # If nothing worked, provide diagnostic info
+                logger.error("❌ Could not extract text from GPT-5 response")
+                logger.error(f"Response type: {type(resp).__name__}")
+                logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
                 raise RuntimeError(
                     f"Unexpected Responses API response format. "
                     f"Type: {type(resp).__name__}, "
