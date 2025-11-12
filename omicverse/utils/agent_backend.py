@@ -888,6 +888,16 @@ class OmicVerseLLMBackend:
                     print(f"    Response keys: {list(payload.keys())}", file=sys.stderr)
                     print(f"    Full payload (first 500 chars): {str(payload)[:500]}", file=sys.stderr)
 
+                    # Diagnostic: Check what's in key fields
+                    if 'output' in payload:
+                        print(f"    'output' field: type={type(payload['output'])}, value={str(payload['output'])[:200]}", file=sys.stderr)
+                    if 'text' in payload:
+                        print(f"    'text' field: type={type(payload['text'])}, value={str(payload['text'])[:200]}", file=sys.stderr)
+                    if 'output_text' in payload:
+                        print(f"    'output_text' field: type={type(payload['output_text'])}, value={str(payload['output_text'])[:200]}", file=sys.stderr)
+                    if 'reasoning' in payload:
+                        print(f"    'reasoning' field: type={type(payload['reasoning'])}, value={str(payload['reasoning'])[:200]}", file=sys.stderr)
+
                     # Capture usage information if present and numeric
                     usage_data = payload.get("usage", {})
                     if isinstance(usage_data, dict) and usage_data:
