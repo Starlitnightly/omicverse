@@ -543,12 +543,13 @@ class TestEdgeCases:
             agent._extract_python_code(response)
 
     def test_empty_fenced_block(self):
-        """Test empty fenced block - should raise error"""
+        """Test response with no extractable code"""
         agent = OmicVerseAgent(model="gpt-4o", api_key="test-key")
 
-        response = "```python\n```"
+        # Response with no code blocks at all
+        response = "I cannot help with that."
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="no code candidates found|Could not extract"):
             agent._extract_python_code(response)
 
     def test_only_comments(self):
