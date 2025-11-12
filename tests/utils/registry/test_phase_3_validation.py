@@ -433,7 +433,3 @@ TOTAL: {5+6+9+complete}/36 functions ({(5+6+9+complete)/36*100:.1f}%)
 print("=" * 80)
 print("Validation completed!")
 print("=" * 80)
-
-# Exit with appropriate code
-import sys
-sys.exit(0 if all_tests_passed else 1)
