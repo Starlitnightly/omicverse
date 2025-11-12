@@ -600,6 +600,49 @@ class OmicVerseLLMBackend:
         )
 
     # ----------------------------- OpenAI Responses API (gpt-5 series) -----------------------------
+    def _to_text_from_openai_response(self, resp) -> str:
+        """Robust text extraction from OpenAI Responses API response object.
+
+        Handles multiple response formats:
+        - SDK 1.x+ Responses API with output_text, output blocks, content blocks
+        - Chat Completions fallback
+        - Various nested structures (text.value, dict['text']['value'], etc.)
+        """
+        # 1) Responses API (python SDK >=1.x) - most common
+        if hasattr(resp, "output_text") and resp.output_text:
+            return resp.output_text
+
+        # Some SDK builds expose .output or .content as blocks
+        for attr in ("output", "content"):
+            blocks = getattr(resp, attr, None)
+            if isinstance(blocks, list):
+                parts = []
+                for b in blocks:
+                    # Common shapes:
+                    # - b.type in {"output_text", "message", "text"}
+                    # - b.text.value or b.get("text", {}).get("value")
+                    text = None
+                    if hasattr(b, "text") and hasattr(b.text, "value"):
+                        text = b.text.value
+                    elif isinstance(b, dict):
+                        if isinstance(b.get("text"), dict):
+                            text = b["text"].get("value")
+                        else:
+                            text = b.get("text")
+                    if text:
+                        parts.append(text)
+                if parts:
+                    return "\n".join(parts)
+
+        # 2) Chat Completions fallback (if SDK somehow returns chat format)
+        try:
+            return resp["choices"][0]["message"]["content"]
+        except (KeyError, TypeError, IndexError):
+            pass
+
+        # 3) Last-resort stringification
+        return str(resp)
+
     def _chat_via_openai_responses(self, base_url: str, api_key: str, user_prompt: str) -> str:
         """Use OpenAI Responses API for models that require it (gpt-5 series).
 
@@ -702,101 +745,31 @@ class OmicVerseLLMBackend:
                             provider=self.config.provider
                         )
 
-                # Extract text from Responses API format with fallback chain
+                # Extract text using robust extraction function
                 logger.debug("Attempting to extract text from GPT-5 response...")
+                try:
+                    response_text = self._to_text_from_openai_response(resp)
+                    print(f"✓ Successfully extracted response text (length: {len(response_text)} chars)", file=sys.stderr)
+                    print(f"  Preview (first 200 chars): {response_text[:200]}", file=sys.stderr)
+                    logger.debug(f"✓ Extracted response text (length: {len(response_text)} chars)")
+                    logger.debug(f"Response preview: {response_text[:200]}")
+                    return response_text
+                except Exception as e:
+                    print(f"\n❌ FAILED TO EXTRACT TEXT FROM RESPONSE", file=sys.stderr)
+                    print(f"Error: {e}", file=sys.stderr)
+                    print(f"Response object: {resp}", file=sys.stderr)
+                    print(f"Response type: {type(resp)}", file=sys.stderr)
+                    print(f"Response str(): {str(resp)[:500]}", file=sys.stderr)
+                    print(f"Response repr(): {repr(resp)[:500]}", file=sys.stderr)
 
-                # Try output_text first (most common)
-                if hasattr(resp, 'output_text') and resp.output_text:
-                    logger.debug(f"✓ Extracted via output_text (length: {len(resp.output_text)} chars)")
-                    logger.debug(f"Response preview (first 200 chars): {resp.output_text[:200]}")
-                    return resp.output_text
-
-                # Try output.text
-                if hasattr(resp, 'output'):
-                    output = resp.output
-                    logger.debug(f"Found output attribute: type={type(output).__name__}")
-
-                    # Log all attributes of output object
-                    if hasattr(output, '__dict__'):
-                        logger.debug(f"Output object attributes: {list(output.__dict__.keys())}")
-                        for key, val in output.__dict__.items():
-                            if not key.startswith('_'):
-                                logger.debug(f"  output.{key} = {type(val).__name__}: {str(val)[:100]}")
-
-                    # Direct string
-                    if isinstance(output, str):
-                        logger.debug(f"✓ Extracted via output (direct string, length: {len(output)} chars)")
-                        return output
-
-                    # Try output.message first (common in chat responses)
-                    if hasattr(output, 'message'):
-                        message = getattr(output, 'message')
-                        logger.debug(f"Found output.message: type={type(message).__name__}")
-                        if hasattr(message, 'content'):
-                            content = getattr(message, 'content')
-                            if isinstance(content, str):
-                                logger.debug(f"✓ Extracted via output.message.content (length: {len(content)} chars)")
-                                return content
-
-                    # Object with .text
-                    if hasattr(output, 'text') and getattr(output, 'text'):
-                        text = getattr(output, 'text')
-                        logger.debug(f"✓ Extracted via output.text (length: {len(text)} chars)")
-                        return text
-                    # Object with .content (list of parts)
-                    if hasattr(output, 'content'):
-                        parts = getattr(output, 'content')
-                        logger.debug(f"Found output.content: type={type(parts)}, length={len(parts) if hasattr(parts, '__len__') else 'N/A'}")
-                        try:
-                            for i, p in enumerate(parts):
-                                # p may be object or dict
-                                if hasattr(p, 'text') and getattr(p, 'text'):
-                                    text = getattr(p, 'text')
-                                    logger.debug(f"✓ Extracted via output.content[{i}].text (length: {len(text)} chars)")
-                                    return text
-                                if isinstance(p, dict) and p.get('text'):
-                                    text = p['text']
-                                    logger.debug(f"✓ Extracted via output.content[{i}]['text'] (length: {len(text)} chars)")
-                                    return text
-                        except Exception as e:
-                            logger.debug(f"Error iterating output.content: {e}")
-                            pass
-                    # List (first element may be dict or object)
-                    if isinstance(output, list) and len(output) > 0:
-                        first = output[0]
-                        logger.debug(f"Output is a list, first element type: {type(first).__name__}")
-                        if isinstance(first, str):
-                            logger.debug(f"✓ Extracted via output[0] (direct string, length: {len(first)} chars)")
-                            return first
-                        if hasattr(first, 'text') and getattr(first, 'text'):
-                            text = getattr(first, 'text')
-                            logger.debug(f"✓ Extracted via output[0].text (length: {len(text)} chars)")
-                            return text
-                        if isinstance(first, dict) and first.get('text'):
-                            text = first['text']
-                            logger.debug(f"✓ Extracted via output[0]['text'] (length: {len(text)} chars)")
-                            return text
-
-                # Fallback: try text attribute directly
-                if hasattr(resp, 'text') and resp.text:
-                    logger.debug(f"✓ Extracted via text attribute (length: {len(resp.text)} chars)")
-                    return resp.text
-
-                # If nothing worked, provide diagnostic info
-                print(f"\n❌ FAILED TO EXTRACT TEXT FROM RESPONSE", file=sys.stderr)
-                print(f"Response object: {resp}", file=sys.stderr)
-                print(f"Response type: {type(resp)}", file=sys.stderr)
-                print(f"Response str(): {str(resp)[:500]}", file=sys.stderr)
-                print(f"Response repr(): {repr(resp)[:500]}", file=sys.stderr)
-
-                logger.error("❌ Could not extract text from GPT-5 response")
-                logger.error(f"Response type: {type(resp).__name__}")
-                logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
-                raise RuntimeError(
-                    f"Unexpected Responses API response format. "
-                    f"Type: {type(resp).__name__}, "
-                    f"Available attributes: {dir(resp)}"
-                )
+                    logger.error("❌ Could not extract text from GPT-5 response")
+                    logger.error(f"Error: {e}")
+                    logger.error(f"Response type: {type(resp).__name__}")
+                    logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
+                    raise RuntimeError(
+                        f"Failed to extract text from Responses API response. "
+                        f"Type: {type(resp).__name__}, Error: {e}"
+                    ) from e
 
             return _retry_with_backoff(
                 _make_responses_sdk_call,
