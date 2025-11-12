@@ -465,6 +465,11 @@ class OmicVerseLLMBackend:
 
     # ----------------------------- OpenAI compatible -----------------------------
     def _chat_via_openai_compatible(self, user_prompt: str) -> str:
+        import sys
+        print(f"\n>>> [BACKEND] _chat_via_openai_compatible called", file=sys.stderr)
+        print(f"    Model: {self.config.model}", file=sys.stderr)
+        print(f"    Provider: {self.config.provider}", file=sys.stderr)
+
         base_url = self.config.endpoint or OPENAI_COMPAT_BASE_URLS[self.config.provider]
         api_key = self._resolve_api_key()
         if not api_key:
@@ -473,8 +478,15 @@ class OmicVerseLLMBackend:
             )
 
         # Check if model requires Responses API (gpt-5 series)
-        if ModelConfig.requires_responses_api(self.config.model):
+        print(f"    Checking if model requires Responses API...", file=sys.stderr)
+        requires_responses = ModelConfig.requires_responses_api(self.config.model)
+        print(f"    requires_responses_api() = {requires_responses}", file=sys.stderr)
+
+        if requires_responses:
+            print(f"    → Calling _chat_via_openai_responses()", file=sys.stderr)
             return self._chat_via_openai_responses(base_url, api_key, user_prompt)
+
+        print(f"    → Using standard Chat Completions API", file=sys.stderr)
 
         # Otherwise use Chat Completions API (standard path for gpt-4o, gpt-4o-mini, etc.)
         # Try modern OpenAI SDK first, then fallback to raw HTTP
