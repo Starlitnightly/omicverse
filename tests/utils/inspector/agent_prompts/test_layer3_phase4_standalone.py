@@ -6,6 +6,7 @@ Tests the automatic prerequisite insertion system.
 
 import sys
 import importlib.util
+from pathlib import Path
 
 
 def import_module_from_path(module_name, file_path):
@@ -17,11 +18,14 @@ def import_module_from_path(module_name, file_path):
     return module
 
 
+# Get project root dynamically
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
+
 # First, import data_structures to get shared classes
 sys.path.insert(0, '/home/user/omicverse')
 data_structures = import_module_from_path(
     'omicverse.utils.inspector.data_structures',
-    '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
 )
 
 # Get ComplexityLevel
@@ -32,9 +36,10 @@ import re
 from typing import List, Dict, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 
 # Read auto_prerequisite_inserter code and exec it
-with open('/home/user/omicverse/omicverse/utils/inspector/auto_prerequisite_inserter.py', 'r') as f:
+with open(str(PROJECT_ROOT / 'omicverse/utils/inspector/auto_prerequisite_inserter.py'), 'r') as f:
     code = f.read()
     # Replace the imports with our local variables
     code = code.replace(
