@@ -465,11 +465,6 @@ class OmicVerseLLMBackend:
 
     # ----------------------------- OpenAI compatible -----------------------------
     def _chat_via_openai_compatible(self, user_prompt: str) -> str:
-        import sys
-        print(f"\n>>> [BACKEND] _chat_via_openai_compatible called", file=sys.stderr)
-        print(f"    Model: {self.config.model}", file=sys.stderr)
-        print(f"    Provider: {self.config.provider}", file=sys.stderr)
-
         base_url = self.config.endpoint or OPENAI_COMPAT_BASE_URLS[self.config.provider]
         api_key = self._resolve_api_key()
         if not api_key:
@@ -478,15 +473,8 @@ class OmicVerseLLMBackend:
             )
 
         # Check if model requires Responses API (gpt-5 series)
-        print(f"    Checking if model requires Responses API...", file=sys.stderr)
-        requires_responses = ModelConfig.requires_responses_api(self.config.model)
-        print(f"    requires_responses_api() = {requires_responses}", file=sys.stderr)
-
-        if requires_responses:
-            print(f"    → Calling _chat_via_openai_responses()", file=sys.stderr)
+        if ModelConfig.requires_responses_api(self.config.model):
             return self._chat_via_openai_responses(base_url, api_key, user_prompt)
-
-        print(f"    → Using standard Chat Completions API", file=sys.stderr)
 
         # Otherwise use Chat Completions API (standard path for gpt-4o, gpt-4o-mini, etc.)
         # Try modern OpenAI SDK first, then fallback to raw HTTP
@@ -612,49 +600,6 @@ class OmicVerseLLMBackend:
         )
 
     # ----------------------------- OpenAI Responses API (gpt-5 series) -----------------------------
-    def _to_text_from_openai_response(self, resp) -> str:
-        """Robust text extraction from OpenAI Responses API response object.
-
-        Handles multiple response formats:
-        - SDK 1.x+ Responses API with output_text, output blocks, content blocks
-        - Chat Completions fallback
-        - Various nested structures (text.value, dict['text']['value'], etc.)
-        """
-        # 1) Responses API (python SDK >=1.x) - most common
-        if hasattr(resp, "output_text") and resp.output_text:
-            return resp.output_text
-
-        # Some SDK builds expose .output or .content as blocks
-        for attr in ("output", "content"):
-            blocks = getattr(resp, attr, None)
-            if isinstance(blocks, list):
-                parts = []
-                for b in blocks:
-                    # Common shapes:
-                    # - b.type in {"output_text", "message", "text"}
-                    # - b.text.value or b.get("text", {}).get("value")
-                    text = None
-                    if hasattr(b, "text") and hasattr(b.text, "value"):
-                        text = b.text.value
-                    elif isinstance(b, dict):
-                        if isinstance(b.get("text"), dict):
-                            text = b["text"].get("value")
-                        else:
-                            text = b.get("text")
-                    if text:
-                        parts.append(text)
-                if parts:
-                    return "\n".join(parts)
-
-        # 2) Chat Completions fallback (if SDK somehow returns chat format)
-        try:
-            return resp["choices"][0]["message"]["content"]
-        except (KeyError, TypeError, IndexError):
-            pass
-
-        # 3) Last-resort stringification
-        return str(resp)
-
     def _chat_via_openai_responses(self, base_url: str, api_key: str, user_prompt: str) -> str:
         """Use OpenAI Responses API for models that require it (gpt-5 series).
 
@@ -667,27 +612,17 @@ class OmicVerseLLMBackend:
           encourage plain-text responses suitable for code extraction.
         - Response: prefer output_text; otherwise inspect output.{text|content[*].text} or text
         """
-        import sys
-        print(f"\n>>> [RESPONSES API] _chat_via_openai_responses() called", file=sys.stderr)
-        print(f"    base_url: {base_url}", file=sys.stderr)
-        print(f"    prompt length: {len(user_prompt)} chars", file=sys.stderr)
-
         # Try OpenAI SDK first
-        print(f"    Trying OpenAI SDK import...", file=sys.stderr)
         try:
             from openai import OpenAI  # type: ignore
-            print(f"    ✓ OpenAI SDK imported successfully", file=sys.stderr)
 
             client = OpenAI(base_url=base_url, api_key=api_key)
-            print(f"    ✓ OpenAI client created", file=sys.stderr)
 
             # Wrap SDK call with retry logic
             def _make_responses_sdk_call():
                 # Responses API uses 'instructions' for system prompt
                 # and 'input' as a string (not message array)
                 # Note: gpt-5 Responses API does not support temperature parameter
-                import sys
-                print(f"\n>>> Calling GPT-5 Responses API: model={self.config.model}", file=sys.stderr)
                 logger.debug(f"GPT-5 Responses API call: model={self.config.model}, max_tokens={self.config.max_tokens}")
                 logger.debug(f"User prompt length: {len(user_prompt)} chars")
 
@@ -717,33 +652,8 @@ class OmicVerseLLMBackend:
                     reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
                 )
 
-                # Force output to stderr so it's visible even if logging fails
-                import sys
-                print(f"\n{'='*70}", file=sys.stderr)
-                print(f"GPT-5 RESPONSE DEBUG", file=sys.stderr)
-                print(f"{'='*70}", file=sys.stderr)
-                print(f"Response type: {type(resp).__name__}", file=sys.stderr)
-                print(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}", file=sys.stderr)
-
                 logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
                 logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
-
-                # Detailed diagnostic logging - show ALL attributes and their values
-                print(f"\nFull attribute dump:", file=sys.stderr)
-                logger.debug("=== Full Response Diagnostic ===")
-                for attr in dir(resp):
-                    if not attr.startswith('_'):
-                        try:
-                            value = getattr(resp, attr)
-                            if not callable(value):
-                                value_str = str(value)[:200]  # Limit to 200 chars
-                                print(f"  {attr}: {type(value).__name__} = {value_str}", file=sys.stderr)
-                                logger.debug(f"  {attr}: {type(value).__name__} = {value_str}")
-                        except Exception as e:
-                            print(f"  {attr}: <error: {e}>", file=sys.stderr)
-                            logger.debug(f"  {attr}: <error getting value: {e}>")
-                print(f"{'='*70}\n", file=sys.stderr)
-                logger.debug("=== End Response Diagnostic ===")
 
                 # Capture usage information from Responses API (only if numeric)
                 if hasattr(resp, 'usage') and resp.usage is not None:
@@ -765,31 +675,77 @@ class OmicVerseLLMBackend:
                             provider=self.config.provider
                         )
 
-                # Extract text using robust extraction function
+                # Extract text from Responses API format with fallback chain
                 logger.debug("Attempting to extract text from GPT-5 response...")
-                try:
-                    response_text = self._to_text_from_openai_response(resp)
-                    print(f"✓ Successfully extracted response text (length: {len(response_text)} chars)", file=sys.stderr)
-                    print(f"  Preview (first 200 chars): {response_text[:200]}", file=sys.stderr)
-                    logger.debug(f"✓ Extracted response text (length: {len(response_text)} chars)")
-                    logger.debug(f"Response preview: {response_text[:200]}")
-                    return response_text
-                except Exception as e:
-                    print(f"\n❌ FAILED TO EXTRACT TEXT FROM RESPONSE", file=sys.stderr)
-                    print(f"Error: {e}", file=sys.stderr)
-                    print(f"Response object: {resp}", file=sys.stderr)
-                    print(f"Response type: {type(resp)}", file=sys.stderr)
-                    print(f"Response str(): {str(resp)[:500]}", file=sys.stderr)
-                    print(f"Response repr(): {repr(resp)[:500]}", file=sys.stderr)
 
-                    logger.error("❌ Could not extract text from GPT-5 response")
-                    logger.error(f"Error: {e}")
-                    logger.error(f"Response type: {type(resp).__name__}")
-                    logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
-                    raise RuntimeError(
-                        f"Failed to extract text from Responses API response. "
-                        f"Type: {type(resp).__name__}, Error: {e}"
-                    ) from e
+                # Try output_text first (most common)
+                if hasattr(resp, 'output_text') and resp.output_text:
+                    logger.debug(f"✓ Extracted via output_text (length: {len(resp.output_text)} chars)")
+                    logger.debug(f"Response preview (first 200 chars): {resp.output_text[:200]}")
+                    return resp.output_text
+
+                # Try output.text
+                if hasattr(resp, 'output'):
+                    output = resp.output
+                    logger.debug(f"Found output attribute: type={type(output).__name__}")
+
+                    # Direct string
+                    if isinstance(output, str):
+                        logger.debug(f"✓ Extracted via output (direct string, length: {len(output)} chars)")
+                        return output
+                    # Object with .text
+                    if hasattr(output, 'text') and getattr(output, 'text'):
+                        text = getattr(output, 'text')
+                        logger.debug(f"✓ Extracted via output.text (length: {len(text)} chars)")
+                        return text
+                    # Object with .content (list of parts)
+                    if hasattr(output, 'content'):
+                        parts = getattr(output, 'content')
+                        logger.debug(f"Found output.content: type={type(parts)}, length={len(parts) if hasattr(parts, '__len__') else 'N/A'}")
+                        try:
+                            for i, p in enumerate(parts):
+                                # p may be object or dict
+                                if hasattr(p, 'text') and getattr(p, 'text'):
+                                    text = getattr(p, 'text')
+                                    logger.debug(f"✓ Extracted via output.content[{i}].text (length: {len(text)} chars)")
+                                    return text
+                                if isinstance(p, dict) and p.get('text'):
+                                    text = p['text']
+                                    logger.debug(f"✓ Extracted via output.content[{i}]['text'] (length: {len(text)} chars)")
+                                    return text
+                        except Exception as e:
+                            logger.debug(f"Error iterating output.content: {e}")
+                            pass
+                    # List (first element may be dict or object)
+                    if isinstance(output, list) and len(output) > 0:
+                        first = output[0]
+                        logger.debug(f"Output is a list, first element type: {type(first).__name__}")
+                        if isinstance(first, str):
+                            logger.debug(f"✓ Extracted via output[0] (direct string, length: {len(first)} chars)")
+                            return first
+                        if hasattr(first, 'text') and getattr(first, 'text'):
+                            text = getattr(first, 'text')
+                            logger.debug(f"✓ Extracted via output[0].text (length: {len(text)} chars)")
+                            return text
+                        if isinstance(first, dict) and first.get('text'):
+                            text = first['text']
+                            logger.debug(f"✓ Extracted via output[0]['text'] (length: {len(text)} chars)")
+                            return text
+
+                # Fallback: try text attribute directly
+                if hasattr(resp, 'text') and resp.text:
+                    logger.debug(f"✓ Extracted via text attribute (length: {len(resp.text)} chars)")
+                    return resp.text
+
+                # If nothing worked, provide diagnostic info
+                logger.error("❌ Could not extract text from GPT-5 response")
+                logger.error(f"Response type: {type(resp).__name__}")
+                logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
+                raise RuntimeError(
+                    f"Unexpected Responses API response format. "
+                    f"Type: {type(resp).__name__}, "
+                    f"Available attributes: {dir(resp)}"
+                )
 
             return _retry_with_backoff(
                 _make_responses_sdk_call,
@@ -799,16 +755,11 @@ class OmicVerseLLMBackend:
                 jitter=self.config.retry_jitter
             )
 
-        except ImportError as e:
+        except ImportError:
             # OpenAI SDK not installed, fallback to HTTP
-            print(f"    ❌ ImportError: {e}", file=sys.stderr)
-            print(f"    → Falling back to HTTP implementation", file=sys.stderr)
             return self._chat_via_openai_responses_http(base_url, api_key, user_prompt)
         except Exception as exc:
             # Log SDK failure but try HTTP fallback as last resort
-            print(f"    ❌ SDK Exception: {type(exc).__name__}: {exc}", file=sys.stderr)
-            print(f"    → Falling back to HTTP implementation", file=sys.stderr)
-
             logger.warning(
                 "OpenAI Responses API SDK call failed (%s: %s), trying HTTP fallback",
                 type(exc).__name__,
@@ -828,10 +779,6 @@ class OmicVerseLLMBackend:
         Uses 'instructions' for system prompt and 'input' as string.
         Note: gpt-5 Responses API does not support temperature parameter.
         """
-        import sys
-        print(f"\n>>> [HTTP FALLBACK] _chat_via_openai_responses_http() called", file=sys.stderr)
-        print(f"    Using raw HTTP POST to {base_url}/responses", file=sys.stderr)
-
         # Wrap entire HTTP call logic with retry
         def _make_responses_http_call():
             url = base_url.rstrip("/") + "/responses"
@@ -883,20 +830,6 @@ class OmicVerseLLMBackend:
                 with urllib_request.urlopen(req, context=ctx, timeout=90) as resp:
                     content = resp.read().decode("utf-8")
                     payload = json.loads(content)
-
-                    print(f"    ✓ HTTP response received", file=sys.stderr)
-                    print(f"    Response keys: {list(payload.keys())}", file=sys.stderr)
-                    print(f"    Full payload (first 500 chars): {str(payload)[:500]}", file=sys.stderr)
-
-                    # Diagnostic: Check what's in key fields
-                    if 'output' in payload:
-                        print(f"    'output' field: type={type(payload['output'])}, value={str(payload['output'])[:200]}", file=sys.stderr)
-                    if 'text' in payload:
-                        print(f"    'text' field: type={type(payload['text'])}, value={str(payload['text'])[:200]}", file=sys.stderr)
-                    if 'output_text' in payload:
-                        print(f"    'output_text' field: type={type(payload['output_text'])}, value={str(payload['output_text'])[:200]}", file=sys.stderr)
-                    if 'reasoning' in payload:
-                        print(f"    'reasoning' field: type={type(payload['reasoning'])}, value={str(payload['reasoning'])[:200]}", file=sys.stderr)
 
                     # Capture usage information if present and numeric
                     usage_data = payload.get("usage", {})
