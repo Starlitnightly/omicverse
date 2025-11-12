@@ -356,7 +356,3 @@ Auto-fix Distribution:
 print("=" * 80)
 print("Validation completed!")
 print("=" * 80)
-
-# Exit with appropriate code
-import sys
-sys.exit(0 if all_tests_passed else 1)

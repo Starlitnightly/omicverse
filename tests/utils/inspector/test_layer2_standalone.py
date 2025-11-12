@@ -20,6 +20,7 @@ from anndata import AnnData
 # But we need to avoid importing the full omicverse package
 # Import the specific modules directly
 import importlib.util
+from pathlib import Path
 
 def import_module_from_path(module_name, file_path):
     """Import a module from a file path."""
@@ -29,16 +30,19 @@ def import_module_from_path(module_name, file_path):
     spec.loader.exec_module(module)
     return module
 
+# Get project root dynamically
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
 # Import data_structures first (no dependencies on other local modules)
 data_structures = import_module_from_path(
     'omicverse.utils.inspector.data_structures',
-    '/home/user/omicverse/omicverse/utils/inspector/data_structures.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
 )
 
 # Import validators (depends on data_structures)
 validators = import_module_from_path(
     'omicverse.utils.inspector.validators',
-    '/home/user/omicverse/omicverse/utils/inspector/validators.py'
+    str(PROJECT_ROOT / 'omicverse/utils/inspector/validators.py')
 )
 
 # Get the classes we need

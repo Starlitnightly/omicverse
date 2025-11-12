@@ -380,6 +380,3 @@ print("=" * 80)
 print("Comprehensive validation completed!")
 print("=" * 80)
 
-# Exit code
-import sys
-sys.exit(0)
