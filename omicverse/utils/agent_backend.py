@@ -667,11 +667,19 @@ class OmicVerseLLMBackend:
           encourage plain-text responses suitable for code extraction.
         - Response: prefer output_text; otherwise inspect output.{text|content[*].text} or text
         """
+        import sys
+        print(f"\n>>> [RESPONSES API] _chat_via_openai_responses() called", file=sys.stderr)
+        print(f"    base_url: {base_url}", file=sys.stderr)
+        print(f"    prompt length: {len(user_prompt)} chars", file=sys.stderr)
+
         # Try OpenAI SDK first
+        print(f"    Trying OpenAI SDK import...", file=sys.stderr)
         try:
             from openai import OpenAI  # type: ignore
+            print(f"    ✓ OpenAI SDK imported successfully", file=sys.stderr)
 
             client = OpenAI(base_url=base_url, api_key=api_key)
+            print(f"    ✓ OpenAI client created", file=sys.stderr)
 
             # Wrap SDK call with retry logic
             def _make_responses_sdk_call():
@@ -791,11 +799,16 @@ class OmicVerseLLMBackend:
                 jitter=self.config.retry_jitter
             )
 
-        except ImportError:
+        except ImportError as e:
             # OpenAI SDK not installed, fallback to HTTP
+            print(f"    ❌ ImportError: {e}", file=sys.stderr)
+            print(f"    → Falling back to HTTP implementation", file=sys.stderr)
             return self._chat_via_openai_responses_http(base_url, api_key, user_prompt)
         except Exception as exc:
             # Log SDK failure but try HTTP fallback as last resort
+            print(f"    ❌ SDK Exception: {type(exc).__name__}: {exc}", file=sys.stderr)
+            print(f"    → Falling back to HTTP implementation", file=sys.stderr)
+
             logger.warning(
                 "OpenAI Responses API SDK call failed (%s: %s), trying HTTP fallback",
                 type(exc).__name__,
@@ -815,6 +828,10 @@ class OmicVerseLLMBackend:
         Uses 'instructions' for system prompt and 'input' as string.
         Note: gpt-5 Responses API does not support temperature parameter.
         """
+        import sys
+        print(f"\n>>> [HTTP FALLBACK] _chat_via_openai_responses_http() called", file=sys.stderr)
+        print(f"    Using raw HTTP POST to {base_url}/responses", file=sys.stderr)
+
         # Wrap entire HTTP call logic with retry
         def _make_responses_http_call():
             url = base_url.rstrip("/") + "/responses"
@@ -866,6 +883,10 @@ class OmicVerseLLMBackend:
                 with urllib_request.urlopen(req, context=ctx, timeout=90) as resp:
                     content = resp.read().decode("utf-8")
                     payload = json.loads(content)
+
+                    print(f"    ✓ HTTP response received", file=sys.stderr)
+                    print(f"    Response keys: {list(payload.keys())}", file=sys.stderr)
+                    print(f"    Full payload (first 500 chars): {str(payload)[:500]}", file=sys.stderr)
 
                     # Capture usage information if present and numeric
                     usage_data = payload.get("usage", {})
