@@ -623,6 +623,8 @@ class OmicVerseLLMBackend:
                 # Responses API uses 'instructions' for system prompt
                 # and 'input' as a string (not message array)
                 # Note: gpt-5 Responses API does not support temperature parameter
+                import sys
+                print(f"\n>>> Calling GPT-5 Responses API: model={self.config.model}", file=sys.stderr)
                 logger.debug(f"GPT-5 Responses API call: model={self.config.model}, max_tokens={self.config.max_tokens}")
                 logger.debug(f"User prompt length: {len(user_prompt)} chars")
 
@@ -652,10 +654,19 @@ class OmicVerseLLMBackend:
                     reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
                 )
 
+                # Force output to stderr so it's visible even if logging fails
+                import sys
+                print(f"\n{'='*70}", file=sys.stderr)
+                print(f"GPT-5 RESPONSE DEBUG", file=sys.stderr)
+                print(f"{'='*70}", file=sys.stderr)
+                print(f"Response type: {type(resp).__name__}", file=sys.stderr)
+                print(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}", file=sys.stderr)
+
                 logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
                 logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
 
                 # Detailed diagnostic logging - show ALL attributes and their values
+                print(f"\nFull attribute dump:", file=sys.stderr)
                 logger.debug("=== Full Response Diagnostic ===")
                 for attr in dir(resp):
                     if not attr.startswith('_'):
@@ -663,9 +674,12 @@ class OmicVerseLLMBackend:
                             value = getattr(resp, attr)
                             if not callable(value):
                                 value_str = str(value)[:200]  # Limit to 200 chars
+                                print(f"  {attr}: {type(value).__name__} = {value_str}", file=sys.stderr)
                                 logger.debug(f"  {attr}: {type(value).__name__} = {value_str}")
                         except Exception as e:
+                            print(f"  {attr}: <error: {e}>", file=sys.stderr)
                             logger.debug(f"  {attr}: <error getting value: {e}>")
+                print(f"{'='*70}\n", file=sys.stderr)
                 logger.debug("=== End Response Diagnostic ===")
 
                 # Capture usage information from Responses API (only if numeric)
@@ -769,6 +783,12 @@ class OmicVerseLLMBackend:
                     return resp.text
 
                 # If nothing worked, provide diagnostic info
+                print(f"\n❌ FAILED TO EXTRACT TEXT FROM RESPONSE", file=sys.stderr)
+                print(f"Response object: {resp}", file=sys.stderr)
+                print(f"Response type: {type(resp)}", file=sys.stderr)
+                print(f"Response str(): {str(resp)[:500]}", file=sys.stderr)
+                print(f"Response repr(): {repr(resp)[:500]}", file=sys.stderr)
+
                 logger.error("❌ Could not extract text from GPT-5 response")
                 logger.error(f"Response type: {type(resp).__name__}")
                 logger.error(f"Available attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
