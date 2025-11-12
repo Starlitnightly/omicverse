@@ -655,6 +655,19 @@ class OmicVerseLLMBackend:
                 logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
                 logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
 
+                # Detailed diagnostic logging - show ALL attributes and their values
+                logger.debug("=== Full Response Diagnostic ===")
+                for attr in dir(resp):
+                    if not attr.startswith('_'):
+                        try:
+                            value = getattr(resp, attr)
+                            if not callable(value):
+                                value_str = str(value)[:200]  # Limit to 200 chars
+                                logger.debug(f"  {attr}: {type(value).__name__} = {value_str}")
+                        except Exception as e:
+                            logger.debug(f"  {attr}: <error getting value: {e}>")
+                logger.debug("=== End Response Diagnostic ===")
+
                 # Capture usage information from Responses API (only if numeric)
                 if hasattr(resp, 'usage') and resp.usage is not None:
                     usage = resp.usage
@@ -689,10 +702,28 @@ class OmicVerseLLMBackend:
                     output = resp.output
                     logger.debug(f"Found output attribute: type={type(output).__name__}")
 
+                    # Log all attributes of output object
+                    if hasattr(output, '__dict__'):
+                        logger.debug(f"Output object attributes: {list(output.__dict__.keys())}")
+                        for key, val in output.__dict__.items():
+                            if not key.startswith('_'):
+                                logger.debug(f"  output.{key} = {type(val).__name__}: {str(val)[:100]}")
+
                     # Direct string
                     if isinstance(output, str):
                         logger.debug(f"✓ Extracted via output (direct string, length: {len(output)} chars)")
                         return output
+
+                    # Try output.message first (common in chat responses)
+                    if hasattr(output, 'message'):
+                        message = getattr(output, 'message')
+                        logger.debug(f"Found output.message: type={type(message).__name__}")
+                        if hasattr(message, 'content'):
+                            content = getattr(message, 'content')
+                            if isinstance(content, str):
+                                logger.debug(f"✓ Extracted via output.message.content (length: {len(content)} chars)")
+                                return content
+
                     # Object with .text
                     if hasattr(output, 'text') and getattr(output, 'text'):
                         text = getattr(output, 'text')
