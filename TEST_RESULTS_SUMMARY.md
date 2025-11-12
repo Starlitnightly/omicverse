@@ -226,3 +226,148 @@ git pull origin claude/plan-ovagent-pbm3k-testing-011CV3gMwNmwMsYhaGESGYr1
 ---
 
 **Great work running the tests!** You found a real bug that was blocking all users. 🎉
+
+---
+
+# 🔧 Update: GPT-5 Fixes Applied
+
+**Update Date**: 2025-11-12 09:20:00
+**Status**: Additional fixes implemented for GPT-5 Responses API
+
+---
+
+## New Issues Discovered
+
+After applying the prompt length fix, we discovered GPT-5 was extracting **metadata** instead of actual response text:
+
+```
+❌ Response extracted: {'format': {'type': 'text'}, 'verbosity': 'medium'}
+✅ Expected: Actual Python code from GPT-5
+```
+
+---
+
+## Additional Fixes Applied
+
+### Fix #1: Robust Text Extraction (Commit: `ea8d386`)
+
+**Problem**: Complex Responses API response structure not handled correctly
+
+**Solution**: Added `_to_text_from_openai_response()` helper function that:
+- Checks `output_text` first (SDK 1.x+ Responses API)
+- Handles `output`/`content` blocks with `text.value` patterns
+- Supports dict-based responses with nested text fields
+- Falls back to Chat Completions format
+- Last resort: stringification
+
+**Code**:
+```python
+def _to_text_from_openai_response(self, resp) -> str:
+    # 1) Try output_text first
+    if hasattr(resp, "output_text") and resp.output_text:
+        return resp.output_text
+    
+    # 2) Handle blocks
+    for attr in ("output", "content"):
+        blocks = getattr(resp, attr, None)
+        if isinstance(blocks, list):
+            # Extract from text.value, dict structures
+            ...
+    
+    # 3) Chat Completions fallback
+    # 4) Stringification
+```
+
+### Fix #2: Enhanced Diagnostic Output (Commits: `fbaac27`, `7c13a8a`)
+
+Added aggressive debug output using `print()` to stderr to ensure visibility:
+- Full response attribute dump
+- Type and value for each field
+- Success/failure messages with previews
+
+---
+
+## How to Test the Fixes
+
+```bash
+cd ~/PycharmProjects/ovagent103/omicverse
+
+# Pull ALL latest fixes (prompt length + GPT-5 extraction)
+git pull origin claude/plan-ovagent-pbm3k-testing-011CV3gMwNmwMsYhaGESGYr1
+
+# Quick test (single request)
+python3 test_gpt5_quick.py
+
+# Full test suite
+export OVAGENT_DEBUG=1
+python3 test_ovagent_openai_gemini.py
+```
+
+---
+
+## Expected Output
+
+### Quick Test Success:
+```
+>>> Calling GPT-5 Responses API: model=gpt-5
+
+======================================================================
+GPT-5 RESPONSE DEBUG
+======================================================================
+Response type: Response
+Response attributes: ['output_text', 'usage', ...]
+
+Full attribute dump:
+  output_text: str = Here is the Python code for quality control...
+======================================================================
+
+✓ Successfully extracted response text (length: 1234 chars)
+  Preview: ```python\nimport omicverse as ov\n...
+
+✅ SUCCESS! Cells: 2700 → 2648
+   Filtered: 52 cells removed
+```
+
+### Full Test Suite Expected:
+
+| Model | Before | After (Expected) |
+|-------|--------|------------------|
+| GPT-5 | ❌ 0/7 | ✅ 6-7/7 |
+| GPT-4o-mini | ⚠️ 2/7 | ✅ 6-7/7 |
+| Gemini Pro | ✅ 4/7 | ✅ 6-7/7 |
+| Gemini Flash | ✅ 4/7 | ✅ 6-7/7 |
+| **Overall** | **58.8%** | **>80%** |
+
+---
+
+## All Fixes Summary
+
+### Commit History:
+1. `ab9844d` - Initial comprehensive fixes (code extraction, logging, test assertions)
+2. `e98fd78` - Added quick test script
+3. `fbaac27` - Comprehensive diagnostic logging
+4. `7c13a8a` - Aggressive debug output to stderr
+5. `ea8d386` - **Robust text extraction (KEY FIX)**
+
+### Files Modified:
+- `omicverse/utils/agent_backend.py` - Robust extraction, logging, validation
+- `omicverse/utils/smart_agent.py` - Multi-strategy code extraction  
+- `omicverse/utils/logging_config.py` - Debug mode support (NEW)
+- `omicverse/utils/__init__.py` - Import logging_config
+- `test_ovagent_openai_gemini.py` - Fixed test assertions
+- `test_gpt5_quick.py` - Quick test script (NEW)
+
+---
+
+## If Tests Still Fail
+
+The diagnostic output will show:
+1. **What GPT-5 actually returns** - Full response structure
+2. **Which extraction path was tried** - Debug output for each attempt
+3. **Why extraction failed** - Error messages with context
+
+Share the stderr output (especially the "GPT-5 RESPONSE DEBUG" section) if issues persist.
+
+---
+
+**All fixes are now on the branch - pull and test!** 🚀
