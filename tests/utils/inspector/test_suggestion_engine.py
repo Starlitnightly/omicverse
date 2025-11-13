@@ -2,10 +2,7 @@
 Unit tests for SuggestionEngine class.
 """
 
-import sys
-sys.path.insert(0, '/home/user/omicverse/omicverse/utils/inspector')
-
-from suggestion_engine import SuggestionEngine, WorkflowPlan, WorkflowStep, WorkflowStrategy
+from omicverse.utils.inspector.suggestion_engine import SuggestionEngine, WorkflowPlan, WorkflowStep, WorkflowStrategy
 
 
 # Mock registry for testing

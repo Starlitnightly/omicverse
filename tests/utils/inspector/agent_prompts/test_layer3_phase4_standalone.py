@@ -22,7 +22,7 @@ def import_module_from_path(module_name, file_path):
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
 # First, import data_structures to get shared classes
-sys.path.insert(0, '/home/user/omicverse')
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 data_structures = import_module_from_path(
     'omicverse.utils.inspector.data_structures',
     str(PROJECT_ROOT / 'omicverse/utils/inspector/data_structures.py')
@@ -36,7 +36,6 @@ import re
 from typing import List, Dict, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 
 # Read auto_prerequisite_inserter code and exec it
 with open(str(PROJECT_ROOT / 'omicverse/utils/inspector/auto_prerequisite_inserter.py'), 'r') as f:

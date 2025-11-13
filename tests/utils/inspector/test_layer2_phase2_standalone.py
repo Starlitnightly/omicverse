@@ -8,15 +8,15 @@ the full omicverse package.
 import sys
 import os
 import importlib.util
+from pathlib import Path
 
 # Add the omicverse directory to sys.path
-sys.path.insert(0, '/home/user/omicverse')
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from anndata import AnnData
-from pathlib import Path
 
 
 def import_module_from_path(module_name, file_path):
