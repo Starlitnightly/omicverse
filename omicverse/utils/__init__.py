@@ -97,3 +97,13 @@ globals()['verifier'] = verifier
 __all__ = [name for name in globals() if not name.startswith("_")]
 if 'verifier' not in __all__:
     __all__.append('verifier')
+
+# Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
+# This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
+def __getattr__(name):
+    """Dynamically return module attributes for Python 3.10 compatibility."""
+    if name == 'verifier':
+        # Return the already imported verifier module
+        import sys
+        return sys.modules.get('omicverse.utils.verifier')
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
