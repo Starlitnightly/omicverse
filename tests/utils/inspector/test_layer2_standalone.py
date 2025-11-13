@@ -7,9 +7,10 @@ the full omicverse package.
 
 import sys
 import os
+from pathlib import Path
 
 # Add the omicverse directory to sys.path so we can import omicverse.utils.inspector
-sys.path.insert(0, '/home/user/omicverse')
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,6 @@ from anndata import AnnData
 # But we need to avoid importing the full omicverse package
 # Import the specific modules directly
 import importlib.util
-from pathlib import Path
 
 def import_module_from_path(module_name, file_path):
     """Import a module from a file path."""
