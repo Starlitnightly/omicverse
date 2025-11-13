@@ -85,6 +85,11 @@ from . import agent_backend, smart_agent, verifier
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
 
+# Explicitly set verifier as module attribute for Python 3.10 compatibility
+# This ensures unittest.mock.patch can find it via getattr
+import sys
+sys.modules[__name__].verifier = verifier
+
 # Build __all__ dynamically and ensure verifier is included
 __all__ = [name for name in globals() if not name.startswith("_")]
 if 'verifier' not in __all__:
