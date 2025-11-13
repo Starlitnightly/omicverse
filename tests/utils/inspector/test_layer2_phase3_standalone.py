@@ -11,7 +11,7 @@ import importlib.util
 from pathlib import Path
 
 # Add the omicverse directory to sys.path
-sys.path.insert(0, '/home/user/omicverse')
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 
 def import_module_from_path(module_name, file_path):

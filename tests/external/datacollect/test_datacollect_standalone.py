@@ -27,9 +27,11 @@ def test_datacollect_standalone():
     print("1️⃣ Testing direct API client imports...")
     try:
         # Add the datacollect path to sys.path
-        datacollect_path = Path(__file__).parent / "api"
-        if datacollect_path.exists():
-            sys.path.insert(0, str(datacollect_path.parent))
+        # Calculate path from test location to source location
+        test_root = Path(__file__).parent.parent.parent.parent  # Get to repo root
+        datacollect_path = test_root / "omicverse" / "external" / "datacollect"
+        if datacollect_path.exists() and (datacollect_path / "api").exists():
+            sys.path.insert(0, str(datacollect_path))
             
             # Test importing some core clients
             from api.proteins.uniprot import UniProtClient

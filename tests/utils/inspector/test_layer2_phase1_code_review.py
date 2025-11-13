@@ -268,7 +268,7 @@ def test_unit_tests():
     """Test that unit tests are comprehensive."""
     print("\n=== Testing test_validators.py ===")
 
-    path = 'omicverse/utils/inspector/tests/test_validators.py'
+    path = 'tests/utils/inspector/test_validators.py'
     content = read_file(path)
 
     # Count test functions
@@ -392,7 +392,7 @@ def main():
         print("   ✓ Comprehensive documentation")
         print("\nNext steps:")
         print("   - Install full dependencies to run unit tests")
-        print("   - Run: python omicverse/utils/inspector/tests/test_validators.py")
+        print("   - Run: python tests/utils/inspector/test_validators.py")
         print("   - Integration test with actual registry")
         return 0
     else:
