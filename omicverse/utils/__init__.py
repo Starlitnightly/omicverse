@@ -85,4 +85,7 @@ from . import agent_backend, smart_agent, verifier
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
 
+# Build __all__ dynamically and ensure verifier is included
 __all__ = [name for name in globals() if not name.startswith("_")]
+if 'verifier' not in __all__:
+    __all__.append('verifier')
