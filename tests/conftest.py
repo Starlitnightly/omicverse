@@ -1,0 +1,112 @@
+"""
+Shared pytest configuration and fixtures for OmicVerse test suite.
+
+This file contains common fixtures and configuration that are shared across
+all test modules in the OmicVerse project.
+"""
+
+import pytest
+import numpy as np
+import pandas as pd
+import tempfile
+import os
+from pathlib import Path
+
+
+@pytest.fixture
+def tmp_path_factory_session(tmp_path_factory):
+    """
+    Provides a session-scoped temporary directory factory.
+    Useful for creating temporary files that persist across multiple tests.
+    """
+    return tmp_path_factory
+
+
+@pytest.fixture
+def random_seed():
+    """
+    Provides a consistent random seed for reproducible tests.
+    """
+    return 42
+
+
+@pytest.fixture
+def sample_dataframe(random_seed):
+    """
+    Creates a simple pandas DataFrame for testing.
+    """
+    np.random.seed(random_seed)
+    return pd.DataFrame({
+        'feature1': np.random.randn(100),
+        'feature2': np.random.randn(100),
+        'label': np.random.choice(['A', 'B', 'C'], 100)
+    })
+
+
+@pytest.fixture
+def temp_output_dir(tmp_path):
+    """
+    Provides a temporary directory for test outputs.
+    Automatically cleaned up after test completion.
+    """
+    output_dir = tmp_path / "test_output"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir
+
+
+@pytest.fixture(autouse=True)
+def reset_random_state(random_seed):
+    """
+    Automatically reset random state before each test for reproducibility.
+    """
+    np.random.seed(random_seed)
+
+
+@pytest.fixture
+def mock_env_vars(monkeypatch):
+    """
+    Fixture to safely mock environment variables in tests.
+    Usage:
+        def test_something(mock_env_vars):
+            mock_env_vars({'API_KEY': 'test_key'})
+    """
+    def _set_env_vars(env_dict):
+        for key, value in env_dict.items():
+            monkeypatch.setenv(key, value)
+    return _set_env_vars
+
+
+# Configure pytest to use non-interactive matplotlib backend
+@pytest.fixture(scope='session', autouse=True)
+def configure_matplotlib():
+    """
+    Configure matplotlib to use non-interactive backend for all tests.
+    This prevents tests from trying to display plots during test runs.
+    """
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+    except ImportError:
+        pass  # matplotlib not installed, skip configuration
+
+
+# Add custom markers for test categorization
+def pytest_configure(config):
+    """
+    Register custom pytest markers for better test organization.
+    """
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+    )
+    config.addinivalue_line(
+        "markers", "integration: marks tests as integration tests"
+    )
+    config.addinivalue_line(
+        "markers", "unit: marks tests as unit tests"
+    )
+    config.addinivalue_line(
+        "markers", "requires_network: marks tests that require network access"
+    )
+    config.addinivalue_line(
+        "markers", "requires_gpu: marks tests that require GPU"
+    )
