@@ -3,8 +3,13 @@
 OVAgent Comprehensive Test Suite - OpenAI and Gemini Providers
 Based on OVAGENT_PBMC3K_TESTING_PLAN.md
 
-Run this script in an environment with omicverse and scanpy installed.
+Run this script directly (not via pytest) in an environment with omicverse and scanpy installed.
 Requires OPENAI_API_KEY and/or GEMINI_API_KEY environment variables.
+
+Usage:
+    python tests/llm/test_ovagent_openai_gemini.py
+
+Note: This is a standalone test script, not a pytest test.
 """
 
 import os
@@ -13,6 +18,10 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
+import pytest
+
+# Skip this file when running under pytest - it's designed to run as a standalone script
+pytestmark = pytest.mark.skip(reason="Standalone script - run directly with: python tests/llm/test_ovagent_openai_gemini.py")
 
 # Configuration
 TEST_OPENAI = True  # Set to False to skip OpenAI tests
