@@ -11,7 +11,9 @@ from pathlib import Path
 
 def read_smart_agent():
     """Read the smart_agent.py file."""
-    agent_file = Path(__file__).parent / "omicverse" / "utils" / "smart_agent.py"
+    # Go up to repo root, then down to the file
+    repo_root = Path(__file__).parent.parent.parent
+    agent_file = repo_root / "omicverse" / "utils" / "smart_agent.py"
     with open(agent_file, 'r') as f:
         return f.read()
 
