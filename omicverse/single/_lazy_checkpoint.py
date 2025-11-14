@@ -394,9 +394,9 @@ def lazy_checkpoint(
             # Create HVG subset to reduce memory usage
             adata_hvg = adata.copy()
             if "highly_variable_features" in adata_hvg.var.columns:
-                adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features]
+                adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features].copy()
             elif "highly_variable" in adata_hvg.var.columns:
-                adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable]
+                adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable].copy()
 
             if scvi_kwargs is None:
                 scvi_kwargs = {"n_layers": 2, "n_latent": 30, "gene_likelihood": "nb"}
