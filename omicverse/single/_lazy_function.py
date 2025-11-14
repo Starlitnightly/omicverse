@@ -1,256 +1,306 @@
-from ..pp import qc,preprocess,scale,pca,score_genes_cell_cycle,neighbors,umap,tsne,mde
+from ..pp import (
+    qc,
+    preprocess,
+    scale,
+    pca,
+    score_genes_cell_cycle,
+    neighbors,
+    umap,
+    tsne,
+    mde,
+)
 import scanpy as sc
 import numpy as np
 
-from .._settings import add_reference,settings
+from .._settings import add_reference, settings
 
-def lazy(adata,
-         species='human',
-         reforce_steps=[],
-         sample_key=None,
-         qc_kwargs=None,
-         preprocess_kwargs=None,
-         pca_kwargs=None,
-         harmony_kwargs=None,
-         scvi_kwargs=None,
-         ):
+
+def lazy(
+    adata,
+    species="human",
+    reforce_steps=[],
+    sample_key=None,
+    qc_kwargs=None,
+    preprocess_kwargs=None,
+    pca_kwargs=None,
+    harmony_kwargs=None,
+    scvi_kwargs=None,
+):
     """
     This is a very interesting function. We can use this function to avoid many unnecessary steps.
 
     arguments:
         adata: the data to analysis
-        reforce_steps: we can reforce run lazy step, because some step have been run and will be skipped. 
+        reforce_steps: we can reforce run lazy step, because some step have been run and will be skipped.
                         ['qc','pca','preprocess','scaled','Harmony','scVI','eval_bench','eval_clusters']
         sample_key: the key store in `adata.obs` to batch correction.
-    
+
     """
-    mode=settings.mode
-    print(f'🔧 The mode of lazy is {mode}')
-    if mode == 'cpu-gpu-mixed':
+    mode = settings.mode
+    print(f"🔧 The mode of lazy is {mode}")
+    if mode == "cpu-gpu-mixed":
         try:
             import pymde
         except:
-            print('❌ pymde package not found, we will install it now')
+            print("❌ pymde package not found, we will install it now")
             import pip
-            pip.main(['install','pymde'])
+
+            pip.main(["install", "pymde"])
             import pymde
     else:
         pass
 
-    #step 0: check packages:
+    # step 0: check packages:
     try:
         import louvain
     except:
-        print('❌ Louvain package not found, we will install it now')
+        print("❌ Louvain package not found, we will install it now")
         import pip
-        pip.main(['install','louvain'])
+
+        pip.main(["install", "louvain"])
         import louvain
-    
 
     try:
         import louvain
     except:
-        print('❌ louvain package not found, we will install it now')
+        print("❌ louvain package not found, we will install it now")
         import pip
-        pip.main(['install','louvain'])
+
+        pip.main(["install", "louvain"])
         import louvain
-        
-    print('✅ All packages used in lazy are installed')
-    
-    #step 1: qc:
+
+    print("✅ All packages used in lazy are installed")
+
+    # step 1: qc:
     adata.var_names_make_unique()
     adata.obs_names_make_unique()
     adata.copy()
-    #check adata.uns['status']
-    if 'status' not in adata.uns.keys():
-        adata.uns['status'] = {}
+    # check adata.uns['status']
+    if "status" not in adata.uns.keys():
+        adata.uns["status"] = {}
 
-    if  ('qc' not in adata.uns['status'].keys()) or ('qc' in adata.uns['status'].keys() and adata.uns['status']['qc'] == False) or ('qc' in reforce_steps):
-        print('❌ QC step didn\'t start, we will start it now')
+    if (
+        ("qc" not in adata.uns["status"].keys())
+        or ("qc" in adata.uns["status"].keys() and adata.uns["status"]["qc"] == False)
+        or ("qc" in reforce_steps)
+    ):
+        print("❌ QC step didn't start, we will start it now")
         if qc_kwargs is None:
             qc_kwargs = {
-                'tresh': {'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250},
-                'doublets_method': 'scrublet',
-                'batch_key': sample_key
+                "tresh": {"mito_perc": 0.2, "nUMIs": 500, "detected_genes": 250},
+                "doublets_method": "scrublet",
+                "batch_key": sample_key,
             }
-        print(f'🔧 The argument of qc we set\n'
-              f'   mito_perc: {qc_kwargs["tresh"]["mito_perc"]}\n'
-              f'   nUMIs: {qc_kwargs["tresh"]["nUMIs"]}\n'
-              f'   detected_genes: {qc_kwargs["tresh"]["detected_genes"]}\n'
-              f'   doublets_method: {qc_kwargs["doublets_method"]}\n'
-              f'   batch_key: {qc_kwargs["batch_key"]}\n'
-              )
-        adata = qc(adata,
-                **qc_kwargs)
+        print(
+            f"🔧 The argument of qc we set\n"
+            f"   mito_perc: {qc_kwargs['tresh']['mito_perc']}\n"
+            f"   nUMIs: {qc_kwargs['tresh']['nUMIs']}\n"
+            f"   detected_genes: {qc_kwargs['tresh']['detected_genes']}\n"
+            f"   doublets_method: {qc_kwargs['doublets_method']}\n"
+            f"   batch_key: {qc_kwargs['batch_key']}\n"
+        )
+        adata = qc(adata, **qc_kwargs)
     else:
-        print('✅ QC step already finished, skipping it')
-        print(f'🔧 The argument of qc we set\n'
-              f'   mito_perc: {adata.uns["status_args"]["qc"]["mito_perc"]}\n'
-              f'   nUMIs: {adata.uns["status_args"]["qc"]["nUMIs"]}\n'
-              f'   detected_genes: {adata.uns["status_args"]["qc"]["detected_genes"]}\n'
-              f'   doublets_method: {adata.uns["status_args"]["qc"]["doublets_method"]}\n'
-              f'   batch_key: {adata.uns["status_args"]["qc"]["batch_key"]}\n'
-              )
+        print("✅ QC step already finished, skipping it")
+        print(
+            f"🔧 The argument of qc we set\n"
+            f"   mito_perc: {adata.uns['status_args']['qc']['mito_perc']}\n"
+            f"   nUMIs: {adata.uns['status_args']['qc']['nUMIs']}\n"
+            f"   detected_genes: {adata.uns['status_args']['qc']['detected_genes']}\n"
+            f"   doublets_method: {adata.uns['status_args']['qc']['doublets_method']}\n"
+            f"   batch_key: {adata.uns['status_args']['qc']['batch_key']}\n"
+        )
 
-    #step 2: normalization and highly variable genes:
-    if  ('preprocess' not in adata.uns['status'].keys()) or ('preprocess' in adata.uns['status'].keys() and adata.uns['status']['preprocess'] == False)  or ('preprocess' in reforce_steps):
-        print('❌ Preprocess step didn\'t start, we will start it now')
+    # step 2: normalization and highly variable genes:
+    if (
+        ("preprocess" not in adata.uns["status"].keys())
+        or (
+            "preprocess" in adata.uns["status"].keys()
+            and adata.uns["status"]["preprocess"] == False
+        )
+        or ("preprocess" in reforce_steps)
+    ):
+        print("❌ Preprocess step didn't start, we will start it now")
         if preprocess_kwargs is None:
             preprocess_kwargs = {
-                'mode': 'shiftlog|pearson',
-                'n_HVGs': 2000,
-                'target_sum': 50*1e4
+                "mode": "shiftlog|pearson",
+                "n_HVGs": 2000,
+                "target_sum": 50 * 1e4,
             }
-        print(f'🔧 The argument of preprocess we set\n'
-              f'   mode: {preprocess_kwargs["mode"]}\n'
-              f'   n_HVGs: {preprocess_kwargs["n_HVGs"]}\n'
-              f'   target_sum: {preprocess_kwargs["target_sum"]}\n'
-              )
-        adata = preprocess(adata,**preprocess_kwargs)
+        print(
+            f"🔧 The argument of preprocess we set\n"
+            f"   mode: {preprocess_kwargs['mode']}\n"
+            f"   n_HVGs: {preprocess_kwargs['n_HVGs']}\n"
+            f"   target_sum: {preprocess_kwargs['target_sum']}\n"
+        )
+        adata = preprocess(adata, **preprocess_kwargs)
     else:
-        print('✅ Preprocess step already finished, skipping it')
-        print(f'🔧 The argument of preprocess in data\n'
-              f'   mode: {adata.uns["status_args"]["preprocess"]["mode"]}\n'
-              f'   n_HVGs: {adata.uns["status_args"]["preprocess"]["n_HVGs"]}\n'
-              f'   target_sum: {adata.uns["status_args"]["preprocess"]["target_sum"]}\n'
-              )
-        
-    if  ('scaled' not in adata.uns['status'].keys()) or ('scaled' in adata.uns['status'].keys() and adata.uns['status']['scaled'] == False)  or ('scaled' in reforce_steps):
-        print('❌ Scaled step didn\'t start, we will start it now')
+        print("✅ Preprocess step already finished, skipping it")
+        print(
+            f"🔧 The argument of preprocess in data\n"
+            f"   mode: {adata.uns['status_args']['preprocess']['mode']}\n"
+            f"   n_HVGs: {adata.uns['status_args']['preprocess']['n_HVGs']}\n"
+            f"   target_sum: {adata.uns['status_args']['preprocess']['target_sum']}\n"
+        )
+
+    if (
+        ("scaled" not in adata.uns["status"].keys())
+        or (
+            "scaled" in adata.uns["status"].keys()
+            and adata.uns["status"]["scaled"] == False
+        )
+        or ("scaled" in reforce_steps)
+    ):
+        print("❌ Scaled step didn't start, we will start it now")
         scale(adata)
     else:
-        print('✅ Scaled step already finished, skipping it')
-    
-    #step 3: PCA:
-    if  ('pca' not in adata.uns['status'].keys()) or ('pca' in adata.uns['status'].keys() and adata.uns['status']['pca'] == False)  or ('pca' in reforce_steps):
-        print('❌ PCA step didn\'t start, we will start it now')
-        if sc.__version__>='1.11.0':
+        print("✅ Scaled step already finished, skipping it")
+
+    # step 3: PCA:
+    if (
+        ("pca" not in adata.uns["status"].keys())
+        or ("pca" in adata.uns["status"].keys() and adata.uns["status"]["pca"] == False)
+        or ("pca" in reforce_steps)
+    ):
+        print("❌ PCA step didn't start, we will start it now")
+        if sc.__version__ >= "1.11.0":
             if pca_kwargs is None:
                 pca_kwargs = {
-                    'layer':'scaled',
-                    'n_pcs':50,
-                    'use_highly_variable': True,
+                    "layer": "scaled",
+                    "n_pcs": 50,
+                    "use_highly_variable": True,
                 }
-            if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
-                adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
-            print(f'🔧 The argument of PCA we set\n'
-                    f'   layer: {pca_kwargs["layer"]}\n'
-                    f'   n_pcs: {pca_kwargs["n_pcs"]}\n'
-                    f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
-                    )
-            pca(adata,**pca_kwargs)
-            adata.obsm['X_pca']=adata.obsm["scaled|original|X_pca"]
+            if ("highly_variable" not in adata.var.columns) and (
+                "highly_variable_features" in adata.var.columns
+            ):
+                adata.var["highly_variable"] = adata.var[
+                    "highly_variable_features"
+                ].tolist()
+            print(
+                f"🔧 The argument of PCA we set\n"
+                f"   layer: {pca_kwargs['layer']}\n"
+                f"   n_pcs: {pca_kwargs['n_pcs']}\n"
+                f"   use_highly_variable: {pca_kwargs['use_highly_variable']}\n"
+            )
+            pca(adata, **pca_kwargs)
+            adata.obsm["X_pca"] = adata.obsm["scaled|original|X_pca"]
         else:
-            print('❌ The version of scanpy is lower than 1.11.0, we will use the old version of PCA function (sc.pp.pca)')
+            print(
+                "❌ The version of scanpy is lower than 1.11.0, we will use the old version of PCA function (sc.pp.pca)"
+            )
             if pca_kwargs is None:
                 pca_kwargs = {
-                    'layer':'scaled',
-                    'n_comps':50,
-                    'use_highly_variable': True,
+                    "layer": "scaled",
+                    "n_comps": 50,
+                    "use_highly_variable": True,
                 }
-            if ('highly_variable' not in adata.var.columns) and ('highly_variable_features' in adata.var.columns):
-                adata.var['highly_variable'] = adata.var['highly_variable_features'].tolist()
-            print(f'🔧 The argument of PCA we set\n'
-                    f'   layer: {pca_kwargs["layer"]}\n'
-                    f'   n_comps: {pca_kwargs["n_comps"]}\n'
-                    f'   use_highly_variable: {pca_kwargs["use_highly_variable"]}\n'
-                    )
-            sc.pp.pca(adata,**pca_kwargs)
-            print('❌ The version of scanpy is lower than 1.11.0, GPU mode will not work, we will use CPU mode')
-            print('    If you want to use GPU mode, please update scanpy to 1.11.0 or higher')
+            if ("highly_variable" not in adata.var.columns) and (
+                "highly_variable_features" in adata.var.columns
+            ):
+                adata.var["highly_variable"] = adata.var[
+                    "highly_variable_features"
+                ].tolist()
+            print(
+                f"🔧 The argument of PCA we set\n"
+                f"   layer: {pca_kwargs['layer']}\n"
+                f"   n_comps: {pca_kwargs['n_comps']}\n"
+                f"   use_highly_variable: {pca_kwargs['use_highly_variable']}\n"
+            )
+            sc.pp.pca(adata, **pca_kwargs)
+            print(
+                "❌ The version of scanpy is lower than 1.11.0, GPU mode will not work, we will use CPU mode"
+            )
+            print(
+                "    If you want to use GPU mode, please update scanpy to 1.11.0 or higher"
+            )
     else:
-        print('✅ PCA step already finished, skipping it')
+        print("✅ PCA step already finished, skipping it")
 
-    #step 4 Score cell cycle:
-    if  ('cell_cycle' not in adata.uns['status'].keys()) or ('cell_cycle' in adata.uns['status'].keys() and adata.uns['status']['cell_cycle'] == False)  or ('cell_cycle' in reforce_steps):
-        print('❌ Cell cycle scoring step didn\'t start, we will start it now')
-        score_genes_cell_cycle(adata,species=species)
+    # step 4 Score cell cycle:
+    if (
+        ("cell_cycle" not in adata.uns["status"].keys())
+        or (
+            "cell_cycle" in adata.uns["status"].keys()
+            and adata.uns["status"]["cell_cycle"] == False
+        )
+        or ("cell_cycle" in reforce_steps)
+    ):
+        print("❌ Cell cycle scoring step didn't start, we will start it now")
+        score_genes_cell_cycle(adata, species=species)
     else:
-        print('✅ Cell cycle scoring step already finished, skipping it')
+        print("✅ Cell cycle scoring step already finished, skipping it")
 
-    #step 5 batch remove:
-    adata_hvg=adata.copy()
-    if 'highly_variable_features' in adata_hvg.var.columns:
+    # step 5 batch remove:
+    adata_hvg = adata.copy()
+    if "highly_variable_features" in adata_hvg.var.columns:
         adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features]
-    elif 'highly_variable' in adata_hvg.var.columns:
+    elif "highly_variable" in adata_hvg.var.columns:
         adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable]
     from . import batch_correction
-    if ('X_harmony' not in adata.obsm.keys()) or ('Harmony' in reforce_steps):
-        print('❌ Batch Correction: `Harmony` step didn\'t start, we will start it now')
-        if harmony_kwargs is None:
-            harmony_kwargs={
-                'n_pcs':50
-            }
-        batch_correction(
-            adata_hvg,
-            batch_key=sample_key,
-            methods='harmony',
-            **harmony_kwargs
-        )
-        adata.obsm['X_harmony']=adata_hvg.obsm['X_harmony']
-        if 'status' not in adata.uns.keys():
-            adata.uns['status'] = {}
-        if 'status_args' not in adata.uns.keys():
-            adata.uns['status_args'] = {}
 
-        adata.uns['status']['harmony'] = True
-        adata.uns['status_args']['harmony']={
-            'n_pcs':harmony_kwargs['n_pcs'],
+    if ("X_harmony" not in adata.obsm.keys()) or ("Harmony" in reforce_steps):
+        print("❌ Batch Correction: `Harmony` step didn't start, we will start it now")
+        if harmony_kwargs is None:
+            harmony_kwargs = {"n_pcs": 50}
+        batch_correction(
+            adata_hvg, batch_key=sample_key, methods="harmony", **harmony_kwargs
+        )
+        adata.obsm["X_harmony"] = adata_hvg.obsm["X_pca_harmony"]
+        if "status" not in adata.uns.keys():
+            adata.uns["status"] = {}
+        if "status_args" not in adata.uns.keys():
+            adata.uns["status_args"] = {}
+
+        adata.uns["status"]["harmony"] = True
+        adata.uns["status_args"]["harmony"] = {
+            "n_pcs": harmony_kwargs["n_pcs"],
         }
-        neighbors(adata=adata,n_neighbors=15,use_rep='X_harmony',n_pcs=30)
+        neighbors(adata=adata, n_neighbors=15, use_rep="X_harmony", n_pcs=30)
         umap(adata)
-        tsne(adata,use_rep='X_harmony')
-        adata.obsm['X_umap_harmony']=adata.obsm['X_umap']
-        adata.obsm['X_tsne_harmony']=adata.obsm['X_tsne']
+        tsne(adata, use_rep="X_harmony")
+        adata.obsm["X_umap_harmony"] = adata.obsm["X_umap"]
+        adata.obsm["X_tsne_harmony"] = adata.obsm["X_tsne"]
     else:
-        print('✅ Batch Correction: `Harmony` step already finished, skipping it')
-    
+        print("✅ Batch Correction: `Harmony` step already finished, skipping it")
+
     try:
         import scvi
-        if ('X_scVI' not in adata.obsm.keys())  or ('scVI' in reforce_steps):
-            print('❌ Batch Correction: `scVI` step didn\'t start, we will start it now')
-            if scvi_kwargs is None:
-                scvi_kwargs={
-                    'n_layers':2, 
-                    'n_latent':30, 
-                    'gene_likelihood':"nb"
-                }
-            batch_correction(
-                adata_hvg,
-                batch_key=sample_key,
-                methods='scVI',
-                **scvi_kwargs
-            )
-            adata.obsm['X_scVI']=adata_hvg.obsm['X_scVI']
-            if 'status' not in adata.uns.keys():
-                adata.uns['status'] = {}
-            if 'status_args' not in adata.uns.keys():
-                adata.uns['status_args'] = {}
 
-            adata.uns['status']['scVI'] = True
-            adata.uns['status_args']['scVI']={
-                'n_layers':scvi_kwargs['n_layers'],
-                'n_latent':scvi_kwargs['n_latent'],
-                'gene_likelihood':scvi_kwargs['gene_likelihood'],
+        if ("X_scVI" not in adata.obsm.keys()) or ("scVI" in reforce_steps):
+            print("❌ Batch Correction: `scVI` step didn't start, we will start it now")
+            if scvi_kwargs is None:
+                scvi_kwargs = {"n_layers": 2, "n_latent": 30, "gene_likelihood": "nb"}
+            batch_correction(
+                adata_hvg, batch_key=sample_key, methods="scVI", **scvi_kwargs
+            )
+            adata.obsm["X_scVI"] = adata_hvg.obsm["X_scVI"]
+            if "status" not in adata.uns.keys():
+                adata.uns["status"] = {}
+            if "status_args" not in adata.uns.keys():
+                adata.uns["status_args"] = {}
+
+            adata.uns["status"]["scVI"] = True
+            adata.uns["status_args"]["scVI"] = {
+                "n_layers": scvi_kwargs["n_layers"],
+                "n_latent": scvi_kwargs["n_latent"],
+                "gene_likelihood": scvi_kwargs["gene_likelihood"],
             }
-            neighbors(adata=adata,n_neighbors=15,use_rep='X_scVI',n_pcs=30)
+            neighbors(adata=adata, n_neighbors=15, use_rep="X_scVI", n_pcs=30)
             umap(adata)
-            tsne(adata,use_rep='X_scVI')
-            adata.obsm['X_umap_scVI']=adata.obsm['X_umap']
-            adata.obsm['X_tsne_scVI']=adata.obsm['X_tsne']
+            tsne(adata, use_rep="X_scVI")
+            adata.obsm["X_umap_scVI"] = adata.obsm["X_umap"]
+            adata.obsm["X_tsne_scVI"] = adata.obsm["X_tsne"]
         else:
-            print('✅ Batch Correction: `scVI` step already finished, skipping it')
+            print("✅ Batch Correction: `scVI` step already finished, skipping it")
         del adata_hvg
     except:
-        print('❌ scvi package not found, we will not run scVI step')
-        
-    
+        print("❌ scvi package not found, we will not run scVI step")
 
-    if ('bench_best_res' not in adata.uns.keys()) or ('eval_bench' in reforce_steps):
-        print('❌ Best Bench Correction Eval step didn\'t start, we will start it now')
+    if ("bench_best_res" not in adata.uns.keys()) or ("eval_bench" in reforce_steps):
+        print("❌ Best Bench Correction Eval step didn't start, we will start it now")
         """
         from scib_metrics.benchmark import Benchmarker
-        
+
         emb_keys=["X_harmony",'X_scVI']
         bm = Benchmarker(
             adata,
@@ -269,61 +319,89 @@ def lazy(adata,
         import matplotlib.pyplot as plt
         bm.plot_results_table(min_max_scale=False,show=False)
         """
-        if 'X_scVI' in adata.obsm.keys():
-            adata.uns['bench_best_res']='X_scVI'
+        if "X_scVI" in adata.obsm.keys():
+            adata.uns["bench_best_res"] = "X_scVI"
         else:
-            adata.uns['bench_best_res']='X_harmony'
-        print(f'The Best Bench Correction Method is {adata.uns["bench_best_res"]}')
+            adata.uns["bench_best_res"] = "X_harmony"
+        print(f"The Best Bench Correction Method is {adata.uns['bench_best_res']}")
         print("We can found it in `adata.uns['bench_best_res']`")
     else:
-        print('✅ Best Bench Correction Eval step already finished, skipping it')
+        print("✅ Best Bench Correction Eval step already finished, skipping it")
 
-    #step 6 clusters:
-    if ('best_clusters' not in adata.obs.columns)  or ('eval_clusters' in reforce_steps):
-        print('❌ Best Clusters step didn\'t start, we will start it now')
-        method_test=adata.uns['bench_best_res']
+    # step 6 clusters:
+    if ("best_clusters" not in adata.obs.columns) or ("eval_clusters" in reforce_steps):
+        print("❌ Best Clusters step didn't start, we will start it now")
+        method_test = adata.uns["bench_best_res"]
         print(f"Automatic clustering using sccaf")
         print(f"Dimensionality using :{method_test}")
-        mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',
-                    n_pcs=30, use_rep=adata.uns['bench_best_res'],)
-        neighbors(adata=adata,n_neighbors=15,use_rep=adata.uns['bench_best_res'],n_pcs=30)
-        #预聚类
+        mde(
+            adata,
+            embedding_dim=2,
+            n_neighbors=15,
+            basis="X_mde",
+            n_pcs=30,
+            use_rep=adata.uns["bench_best_res"],
+        )
+        neighbors(
+            adata=adata, n_neighbors=15, use_rep=adata.uns["bench_best_res"], n_pcs=30
+        )
+        # 预聚类
         print(f"Automatic clustering using leiden for preprocessed")
-        sc.tl.leiden(adata, resolution=1.5, key_added = 'leiden_r1.5')
-        #self.adata.obs['L1_Round0'] = self.adata.obs['leiden_r1.5']
-        adata.obs['L1_result_smooth']=adata.obs['leiden_r1.5']
-        #自动聚类
+        sc.tl.leiden(adata, resolution=1.5, key_added="leiden_r1.5")
+        # self.adata.obs['L1_Round0'] = self.adata.obs['leiden_r1.5']
+        adata.obs["L1_result_smooth"] = adata.obs["leiden_r1.5"]
+        # 自动聚类
         for idx in range(10):
-            if (len(np.unique(adata.obs['L1_result_smooth'].tolist()))>3) and idx>0:
+            if (len(np.unique(adata.obs["L1_result_smooth"].tolist())) > 3) and idx > 0:
                 break
             else:
-                adata.obs['L1_Round0']=adata.obs['L1_result_smooth']
+                adata.obs["L1_Round0"] = adata.obs["L1_result_smooth"]
                 print(f"Automatic clustering using sccaf, Times: {idx}")
                 from . import SCCAF_optimize_all
-                SCCAF_optimize_all(min_acc=0.95, ad=adata, classifier='RF',n_jobs=4,
-                                        use=adata.uns['bench_best_res'], basis ='X_mde',
-                                        method='leiden',prefix='L1',plot=True)
-                #平滑聚类效果
+
+                SCCAF_optimize_all(
+                    min_acc=0.95,
+                    ad=adata,
+                    classifier="RF",
+                    n_jobs=4,
+                    use=adata.uns["bench_best_res"],
+                    basis="X_mde",
+                    method="leiden",
+                    prefix="L1",
+                    plot=True,
+                )
+                # 平滑聚类效果
                 print(f"Smoothing the effect of clustering, Times: {idx}")
-                adata.obs['L1_result_smooth'] = adata.obs['L1_result'].tolist()
-                
-        #获取最佳聚类
-        adata.obs['best_clusters']=adata.obs['L1_result_smooth'].copy()
-        sc.tl.leiden(adata, resolution=1, key_added = 'leiden_clusters_L1')
-        sc.tl.louvain(adata, resolution=1, key_added = 'louvain_clusters_L1')
-        sc.tl.leiden(adata, resolution=0.5, key_added = 'leiden_clusters_L2')
-        sc.tl.louvain(adata, resolution=0.5, key_added = 'louvain_clusters_L2')
-    else:
-        print('✅ Best Clusters step already finished, skipping it')
+                adata.obs["L1_result_smooth"] = adata.obs["L1_result"].tolist()
 
-    #step 7 UMAP:
-    if ('X_umap' not in adata.obsm.keys()) or ('umap' in reforce_steps):
-        print('❌ UMAP step didn\'t start, we will start it now')
+        # 获取最佳聚类
+        adata.obs["best_clusters"] = adata.obs["L1_result_smooth"].copy()
+        sc.tl.leiden(adata, resolution=1, key_added="leiden_clusters_L1")
+        sc.tl.louvain(adata, resolution=1, key_added="louvain_clusters_L1")
+        sc.tl.leiden(adata, resolution=0.5, key_added="leiden_clusters_L2")
+        sc.tl.louvain(adata, resolution=0.5, key_added="louvain_clusters_L2")
+    else:
+        print("✅ Best Clusters step already finished, skipping it")
+
+    # step 7 UMAP:
+    if ("X_umap" not in adata.obsm.keys()) or ("umap" in reforce_steps):
+        print("❌ UMAP step didn't start, we will start it now")
         umap(adata)
-        adata.obsm['X_umap']=adata.obsm['X_umap']
+        adata.obsm["X_umap"] = adata.obsm["X_umap"]
     else:
-        print('✅ UMAP step already finished, skipping it')
+        print("✅ UMAP step already finished, skipping it")
 
+    # step 8 tsne:
+    if ("X_tsne" not in adata.obsm.keys()) or ("tsne" in reforce_steps):
+        print("❌ tSNE step didn't start, we will start it now")
+        tsne(adata, use_rep=adata.uns["bench_best_res"])
+        adata.obsm["X_tsne"] = adata.obsm["X_tsne"]
+    else:
+        print("✅ tSNE step already finished, skipping it")
+
+    return adata
+
+    # step 7 anno celltype automatically:
     #step 8 tsne:
     if ('X_tsne' not in adata.obsm.keys()) or ('tsne' in reforce_steps):
         print('❌ tSNE step didn\'t start, we will start it now')
@@ -335,4 +413,3 @@ def lazy(adata,
     return adata
 
     #step 7 anno celltype automatically:
-
