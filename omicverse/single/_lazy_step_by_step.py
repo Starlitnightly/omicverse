@@ -330,9 +330,9 @@ def lazy_step_scvi(adata, sample_key, output_path=None, **scvi_kwargs):
     print("🔧 Processing HVG subset to reduce memory usage...")
     adata_hvg = adata.copy()
     if "highly_variable_features" in adata_hvg.var.columns:
-        adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features]
+        adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable_features].copy()
     elif "highly_variable" in adata_hvg.var.columns:
-        adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable]
+        adata_hvg = adata_hvg[:, adata_hvg.var.highly_variable].copy()
 
     print(
         f"🔧 scVI parameters:\n"
