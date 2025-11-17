@@ -69,23 +69,23 @@ logger = logging.getLogger(__name__)
 class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
-    
+
     This agent uses an internal LLM backend to understand natural language
     requests and automatically execute appropriate OmicVerse functions.
-    
+
     Usage:
-        agent = ov.Agent(model="gpt-5", api_key="your-api-key")
+        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-2.5-flash by default
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True):
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
         Parameters
         ----------
         model : str
-            LLM model to use for reasoning (default: "gpt-5")
+            LLM model to use for reasoning (default: "gemini-2.5-flash")
         api_key : str, optional
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
@@ -2405,7 +2405,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -2415,7 +2415,7 @@ def Agent(model: str = "gpt-5", api_key: Optional[str] = None, endpoint: Optiona
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gpt-5"). Use list_supported_models() to see all options
+        LLM model to use (default: "gemini-2.5-flash"). Use list_supported_models() to see all options
     api_key : str, optional
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional
