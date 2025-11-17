@@ -1213,9 +1213,8 @@ class OmicVerseLLMBackend:
 
         # Check if model requires Responses API (gpt-5 series)
         if ModelConfig.requires_responses_api(self.config.model):
-            # Responses API doesn't support streaming yet in our implementation
-            # Fall back to non-streaming
-            async for chunk in self._stream_openai_responses_fallback(base_url, api_key, user_prompt):
+            # Use proper streaming for Responses API
+            async for chunk in self._stream_openai_responses(base_url, api_key, user_prompt):
                 yield chunk
             return
 
@@ -1295,15 +1294,141 @@ class OmicVerseLLMBackend:
         )
         yield result
 
-    async def _stream_openai_responses_fallback(self, base_url: str, api_key: str, user_prompt: str):
-        """Non-streaming fallback for OpenAI Responses API (gpt-5 series)."""
-        result = await asyncio.to_thread(
-            self._chat_via_openai_responses,
-            base_url,
-            api_key,
-            user_prompt
-        )
-        yield result
+    async def _stream_openai_responses(self, base_url: str, api_key: str, user_prompt: str):
+        """Stream responses from OpenAI Responses API (gpt-5 series) with proper streaming support."""
+        try:
+            from openai import OpenAI  # type: ignore
+
+            client = OpenAI(base_url=base_url, api_key=api_key)
+
+            # Generator function for streaming with retry on session creation
+            def _stream_responses_sdk():
+                def _create_stream():
+                    logger.debug(f"Creating GPT-5 Responses API stream: model={self.config.model}")
+
+                    input_payload = [
+                        {
+                            "role": "system",
+                            "content": [
+                                {"type": "input_text", "text": self.config.system_prompt}
+                            ],
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": user_prompt}
+                            ],
+                        },
+                    ]
+
+                    return client.responses.create(
+                        model=self.config.model,
+                        input=input_payload,
+                        instructions=self.config.system_prompt,
+                        max_output_tokens=self.config.max_tokens,
+                        reasoning={"effort": "high"},
+                        stream=True  # Enable streaming for GPT-5 Responses API
+                    )
+
+                # Retry stream creation on transient failures
+                stream = _retry_with_backoff(
+                    _create_stream,
+                    max_attempts=self.config.max_retry_attempts,
+                    base_delay=self.config.retry_base_delay,
+                    factor=self.config.retry_backoff_factor,
+                    jitter=self.config.retry_jitter
+                )
+
+                # Process streaming chunks
+                for chunk in stream:
+                    # Capture usage from streaming chunks (typically in final chunk)
+                    if hasattr(chunk, 'usage') and chunk.usage:
+                        usage = chunk.usage
+                        pt = _coerce_int(getattr(usage, 'input_tokens', None))
+                        if pt is None:
+                            pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
+                        ct = _coerce_int(getattr(usage, 'output_tokens', None))
+                        if ct is None:
+                            ct = _coerce_int(getattr(usage, 'completion_tokens', None))
+                        tt = _coerce_int(getattr(usage, 'total_tokens', None))
+                        tt = _compute_total(pt, ct, tt)
+                        if tt is not None:
+                            self.last_usage = Usage(
+                                input_tokens=pt or 0,
+                                output_tokens=ct or 0,
+                                total_tokens=tt,
+                                model=self.config.model,
+                                provider=self.config.provider
+                            )
+
+                    # Extract text delta from chunk
+                    # Try multiple extraction paths for Responses API streaming
+                    delta_text = None
+
+                    # Try output_text_delta
+                    if hasattr(chunk, 'output_text_delta') and chunk.output_text_delta:
+                        delta_text = chunk.output_text_delta
+                    # Try delta attribute
+                    elif hasattr(chunk, 'delta'):
+                        delta = chunk.delta
+                        if isinstance(delta, str):
+                            delta_text = delta
+                        elif hasattr(delta, 'text') and delta.text:
+                            delta_text = delta.text
+                        elif hasattr(delta, 'content'):
+                            content = delta.content
+                            if isinstance(content, str):
+                                delta_text = content
+                            elif isinstance(content, list) and len(content) > 0:
+                                for part in content:
+                                    if hasattr(part, 'text') and part.text:
+                                        delta_text = part.text
+                                        break
+                                    elif isinstance(part, dict) and part.get('text'):
+                                        delta_text = part['text']
+                                        break
+                    # Try output attribute with delta
+                    elif hasattr(chunk, 'output'):
+                        output = chunk.output
+                        if isinstance(output, str):
+                            delta_text = output
+                        elif hasattr(output, 'delta') and output.delta:
+                            if isinstance(output.delta, str):
+                                delta_text = output.delta
+                            elif hasattr(output.delta, 'text'):
+                                delta_text = output.delta.text
+
+                    if delta_text:
+                        yield delta_text
+
+            # Use helper to run generator in thread
+            async for chunk in self._run_generator_in_thread(_stream_responses_sdk):
+                yield chunk
+
+        except ImportError:
+            # OpenAI SDK not installed, fall back to non-streaming HTTP
+            logger.warning("OpenAI SDK not available for Responses API streaming, falling back to non-streaming")
+            result = await asyncio.to_thread(
+                self._chat_via_openai_responses,
+                base_url,
+                api_key,
+                user_prompt
+            )
+            yield result
+        except Exception as exc:
+            # Log SDK failure and fall back to non-streaming
+            logger.warning(
+                "OpenAI Responses API streaming failed (%s: %s), falling back to non-streaming",
+                type(exc).__name__,
+                exc
+            )
+            result = await asyncio.to_thread(
+                self._chat_via_openai_responses,
+                base_url,
+                api_key,
+                user_prompt
+            )
+            yield result
 
     async def _stream_anthropic(self, user_prompt: str):
         """Stream responses from Anthropic Claude models with retry on session creation."""

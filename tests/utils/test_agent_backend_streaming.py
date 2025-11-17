@@ -151,11 +151,11 @@ class TestOpenAIStreaming:
             api_key="test-key"
         )
 
-        # Mock the responses API fallback
-        async def mock_responses_fallback(base_url, api_key, prompt):
+        # Mock the responses API streaming
+        async def mock_responses_stream(base_url, api_key, prompt):
             yield "GPT-5 full response"
 
-        monkeypatch.setattr(backend, "_stream_openai_responses_fallback", mock_responses_fallback)
+        monkeypatch.setattr(backend, "_stream_openai_responses", mock_responses_stream)
 
         chunks = []
         async for chunk in backend._stream_openai_compatible("Test prompt"):
