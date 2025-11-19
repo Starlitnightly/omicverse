@@ -16,7 +16,6 @@ from ._compat import CSBase, CSCBase, CSRBase, DaskArray, njit, old_positionals
 from scanpy._utils import (
     _check_array_function_arguments,
     axis_mul_or_truediv,
-    dematrix,
     raise_not_implemented_error_if_backed_type,
     renamed_arg,
     view_to_actual,
@@ -221,6 +220,12 @@ def scale_array(
     else:
         return x
 
+def dematrix(x: _A | np.matrix) -> _A:
+    if isinstance(x, np.matrix):
+        return x.A
+    if isinstance(x, DaskArray) and isinstance(x._meta, np.matrix):
+        return x.map_blocks(np.asarray, meta=np.array([], dtype=x.dtype))
+    return x
 
 def scale_array_masked(
     x: _A,
