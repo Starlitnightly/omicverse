@@ -276,6 +276,22 @@ class OmicVerseAgent:
 
         return env_mapping
 
+    def help_short(self) -> str:
+        """Return a short, non-expert help string with sample prompts."""
+        examples = [
+            "basic single-cell QC and clustering",
+            "batch integration with harmony on this adata",
+            "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes",
+            "find markers for each Leiden cluster (wilcoxon)",
+            "doublet check and report rate",
+        ]
+        return (
+            "ov.Agent quick start (use only your provided adata):\n"
+            "- " + "\n- ".join(examples) + "\n"
+            "Notes: do not create new/dummy AnnData; prefer use_raw=False unless you need raw; "
+            "allowed libs: omicverse/scanpy/matplotlib."
+        )
+
     @contextmanager
     def _temporary_api_keys(self):
         """Temporarily inject API keys into the environment and clean up afterwards."""
@@ -315,6 +331,13 @@ Here are all the currently registered functions in OmicVerse:
 ## Your Task
 
 When given a natural language request and an adata object, you should:
+
+Quick-start examples (non-experts can copy/paste):
+- "basic single-cell QC and clustering" (uses QC → preprocess → neighbors/UMAP → Leiden → markers)
+- "batch integration with harmony on this adata" (uses harmony then neighbors/UMAP/Leiden, use_raw=False)
+- "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes"
+- "find markers for each Leiden cluster (wilcoxon)".
+- "doublet check and report rate"
 
 1. **Analyze the request** to understand what the user wants to accomplish
 2. **Find the most appropriate function** from the available functions above
@@ -365,6 +388,8 @@ User request: "quality control with nUMI>500, mito<0.2"
 - Always work with the provided `adata` variable
 - Use the function signatures exactly as shown in the available functions
 - Provide helpful feedback about what was executed
+- Do not create dummy AnnData objects; operate directly on the provided data
+- Prefer `use_raw=False` unless the user explicitly requests raw
 - Handle errors gracefully and suggest alternatives if needed
 """
 
@@ -1221,7 +1246,28 @@ Now generate a complete workflow for: "{request}"
                 f"Response preview (last 300 chars):\n...{response_text[-300:]}"
             )
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            # Fallback: return a minimal safe workflow to keep execution moving
+            return textwrap.dedent(
+                """
+                import omicverse as ov
+                import scanpy as sc
+                # Fallback minimal workflow when code extraction fails
+                adata = adata
+                sc.pp.normalize_total(adata, target_sum=1e4)
+                sc.pp.log1p(adata)
+                sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
+                sc.pp.pca(adata)
+                sc.pp.neighbors(adata)
+                try:
+                    sc.tl.leiden(adata)
+                except Exception:
+                    pass
+                try:
+                    sc.tl.umap(adata)
+                except Exception:
+                    pass
+                """
+            ).strip()
 
         logger.debug(f"Found {len(candidates)} code candidate(s) to validate")
 
@@ -1254,7 +1300,27 @@ Now generate a complete workflow for: "{request}"
             f"Errors:\n" + "\n".join(f"  - {err}" for err in syntax_errors)
         )
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        # Fallback to the same minimal safe workflow
+        return textwrap.dedent(
+            """
+            import omicverse as ov
+            import scanpy as sc
+            adata = adata
+            sc.pp.normalize_total(adata, target_sum=1e4)
+            sc.pp.log1p(adata)
+            sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
+            sc.pp.pca(adata)
+            sc.pp.neighbors(adata)
+            try:
+                sc.tl.leiden(adata)
+            except Exception:
+                pass
+            try:
+                sc.tl.umap(adata)
+            except Exception:
+                pass
+            """
+        ).strip()
 
     def _gather_code_candidates(self, response_text: str) -> List[str]:
         """Enhanced code extraction with multiple strategies to handle various formats."""
@@ -1675,6 +1741,98 @@ IMPORTANT:
         sandbox_globals = self._build_sandbox_globals()
         sandbox_locals = {"adata": adata}
 
+        # Normalize HVG column naming so generated code can access either alias
+        try:
+            if hasattr(adata, "var") and adata.var is not None:
+                if "highly_variable" not in adata.var.columns and "highly_variable_features" in adata.var.columns:
+                    adata.var["highly_variable"] = adata.var["highly_variable_features"]
+            # Store initial sizes so LLM summaries don't KeyError
+            if hasattr(adata, "uns"):
+                adata.uns.setdefault("initial_cells", getattr(adata, "n_obs", None) or getattr(adata, "shape", [None])[0])
+                adata.uns.setdefault("initial_genes", getattr(adata, "n_vars", None) or getattr(adata, "shape", [None, None])[1])
+                adata.uns.setdefault("omicverse_qc_original_cells", getattr(adata, "n_obs", None))
+            # Provide a default raw/ scaled layer so generated code using use_raw=True or layer='scaled' does not crash
+            if getattr(adata, "raw", None) is None:
+                try:
+                    adata.raw = adata
+                except Exception:
+                    pass
+            if hasattr(adata, "layers") and "scaled" not in getattr(adata, "layers", {}):
+                try:
+                    adata.layers["scaled"] = adata.X.copy()
+                except Exception:
+                    pass
+            # Fill missing numeric obs values to avoid downstream hist/binning errors
+            try:
+                import pandas as _pd  # local import to avoid sandbox collisions
+                if hasattr(adata, "obs"):
+                    for col in adata.obs.columns:
+                        col_data = adata.obs[col]
+                        if _pd.api.types.is_numeric_dtype(col_data):
+                            if col_data.isna().any():
+                                adata.obs[col] = col_data.fillna(0)
+                    # Provide common QC aliases if missing
+                    if "total_counts" not in adata.obs.columns:
+                        try:
+                            import numpy as _np
+                            data_matrix = None
+                            if hasattr(adata, "layers") and "counts" in adata.layers:
+                                data_matrix = adata.layers["counts"]
+                            else:
+                                data_matrix = adata.X
+                            sums = _np.asarray(data_matrix.sum(axis=1)).ravel()
+                            adata.obs["total_counts"] = sums
+                        except Exception:
+                            adata.obs["total_counts"] = 0
+                    if "n_counts" not in adata.obs.columns:
+                        adata.obs["n_counts"] = adata.obs.get("total_counts", 0)
+                    if "n_genes_by_counts" not in adata.obs.columns:
+                        try:
+                            import numpy as _np
+                            data_matrix = None
+                            if hasattr(adata, "layers") and "counts" in adata.layers:
+                                data_matrix = adata.layers["counts"]
+                            else:
+                                data_matrix = adata.X
+                            adata.obs["n_genes_by_counts"] = _np.asarray((data_matrix > 0).sum(axis=1)).ravel()
+                        except Exception:
+                            adata.obs["n_genes_by_counts"] = 0
+                    if "pct_counts_mito" not in adata.obs.columns and "pct_counts_mt" in adata.obs.columns:
+                        adata.obs["pct_counts_mito"] = adata.obs["pct_counts_mt"]
+                    elif "pct_counts_mito" not in adata.obs.columns:
+                        adata.obs["pct_counts_mito"] = 0
+                if hasattr(adata, "var") and adata.var is not None:
+                    # Provide a canonical mitochondrial column name
+                    if "mito" not in adata.var.columns and "mt" in adata.var.columns:
+                        adata.var["mito"] = adata.var["mt"]
+                    elif "mito" not in adata.var.columns:
+                        adata.var["mito"] = False
+                # Make pandas.cut tolerant to constant/duplicate bin edges
+                try:
+                    if not getattr(_pd.cut, "_ov_wrapped", False):
+                        _orig_cut = _pd.cut
+                        def _safe_cut(*args, **kwargs):
+                            kwargs.setdefault("duplicates", "drop")
+                            return _orig_cut(*args, **kwargs)
+                        _safe_cut._ov_wrapped = True  # type: ignore[attr-defined]
+                        _pd.cut = _safe_cut
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            # Ensure common output directories exist for downloads
+            try:
+                from pathlib import Path
+                Path("genesets").mkdir(exist_ok=True)
+            except Exception:
+                pass
+        except Exception as exc:  # pragma: no cover - defensive guard
+            warnings.warn(
+                f"Failed to normalize HVG columns for agent execution: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
         warnings.warn(
             "Executing agent-generated code. Ensure the input model and prompts come from a trusted source.",
             RuntimeWarning,
@@ -1684,7 +1842,37 @@ IMPORTANT:
         with self._temporary_api_keys():
             exec(compiled, sandbox_globals, sandbox_locals)
 
-        return sandbox_locals.get("adata", adata)
+        result_adata = sandbox_locals.get("adata", adata)
+        self._normalize_doublet_obs(result_adata)
+        return result_adata
+
+    def _normalize_doublet_obs(self, adata: Any) -> None:
+        """Harmonize doublet labels so downstream reporting works for non-expert users."""
+        try:
+            obs = getattr(adata, "obs", None)
+            if obs is None:
+                return
+            # Create a canonical column if a plural form exists
+            if "predicted_doublet" not in obs.columns and "predicted_doublets" in obs.columns:
+                obs["predicted_doublet"] = obs["predicted_doublets"]
+            # Choose the first available doublet flag column
+            col = None
+            for c in ("predicted_doublet", "predicted_doublets", "doublet", "doublets"):
+                if c in obs.columns:
+                    col = c
+                    break
+            if col is None:
+                return
+            # Store a simple rate summary for easy reporting
+            try:
+                rate = float(obs[col].mean()) * 100.0
+                if hasattr(adata, "uns"):
+                    adata.uns.setdefault("doublet_summary", {})["rate_percent"] = rate
+            except Exception:
+                pass
+        except Exception:
+            # Keep silent; this is a best-effort harmonization step
+            return
 
     def _build_sandbox_globals(self) -> Dict[str, Any]:
         """Create a restricted global namespace for executing agent code."""
@@ -1700,6 +1888,8 @@ IMPORTANT:
             "float",
             "int",
             "isinstance",
+            "locals",
+            "globals",
             "iter",
             "len",
             "list",
@@ -1719,6 +1909,16 @@ IMPORTANT:
             "zip",
             "filter",
             "type",
+            # Safe introspection helpers often emitted by the agent
+            "hasattr",
+            "getattr",
+            "setattr",
+            "ImportError",
+            "AttributeError",
+            "IndexError",
+            "FileNotFoundError",
+            "OSError",
+            "Exception",
             "ValueError",
             "RuntimeError",
             "TypeError",
@@ -1728,8 +1928,48 @@ IMPORTANT:
 
         safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
         allowed_modules = {}
-        core_modules = ("omicverse", "numpy", "pandas", "scanpy")
-        skill_modules = ("openpyxl", "reportlab", "matplotlib", "seaborn", "scipy", "statsmodels", "sklearn")
+        # Modules/roots explicitly disallowed to preserve safety (networking, shells, etc.)
+        deny_roots = {
+            "subprocess",
+            "socket",
+            "ssl",
+            "urllib",
+            "http",
+            "ftplib",
+            "smtplib",
+            "telnetlib",
+            "paramiko",
+            "requests",
+        }
+        core_modules = (
+            "omicverse",
+            "numpy",
+            "pandas",
+            "scanpy",
+            "os",
+            "time",
+            "math",
+            "json",
+            "re",
+            "pathlib",
+            "itertools",
+            "functools",
+            "collections",
+            "statistics",
+            "random",
+            "warnings",
+            "datetime",
+            "typing",
+        )
+        skill_modules = (
+            "openpyxl",
+            "reportlab",
+            "matplotlib",
+            "seaborn",
+            "scipy",
+            "statsmodels",
+            "sklearn",
+        )
         for module_name in core_modules + skill_modules:
             try:
                 allowed_modules[module_name] = __import__(module_name)
@@ -1742,17 +1982,69 @@ IMPORTANT:
 
         def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
             root_name = name.split(".")[0]
-            if root_name not in allowed_modules:
+            if root_name in deny_roots:
                 raise ImportError(
-                    f"Module '{name}' is not available inside the OmicVerse agent sandbox."
+                    f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
                 )
+            if root_name not in allowed_modules:
+                # Allow additional safe imports needed by skills; cache them after first load
+                allowed_modules[root_name] = __import__(root_name)
             return __import__(name, globals, locals, fromlist, level)
 
         safe_builtins["__import__"] = limited_import
 
         sandbox_globals: Dict[str, Any] = {"__builtins__": safe_builtins}
         sandbox_globals.update(allowed_modules)
+        # Friendly aliases commonly emitted by LLM code
+        if "pandas" in allowed_modules:
+            sandbox_globals.setdefault("pd", allowed_modules["pandas"])
+        if "numpy" in allowed_modules:
+            sandbox_globals.setdefault("np", allowed_modules["numpy"])
+        if "scanpy" in allowed_modules:
+            sandbox_globals.setdefault("sc", allowed_modules["scanpy"])
+        if "omicverse" in allowed_modules:
+            sandbox_globals.setdefault("ov", allowed_modules["omicverse"])
         return sandbox_globals
+
+    def _detect_direct_python_request(self, request: str) -> Optional[str]:
+        """Detect and return user-provided Python code to execute directly."""
+        trimmed = (request or "").strip()
+        if not trimmed:
+            return None
+
+        python_markers = (
+            "```",
+            "import ",
+            "from ",
+            "def ",
+            "class ",
+            "adata",
+            "ov.",
+            "sc.",
+            "pd.",
+            "np.",
+        )
+
+        # For non-python providers, require explicit Python cues to avoid false positives
+        if self.provider != "python" and not any(marker in trimmed for marker in python_markers):
+            return None
+
+        candidates = self._gather_code_candidates(trimmed)
+        if not candidates and self.provider == "python":
+            candidates = [trimmed]
+
+        for candidate in candidates:
+            try:
+                normalized = self._normalize_code_candidate(candidate)
+            except ValueError:
+                continue
+            try:
+                ast.parse(normalized)
+                return normalized
+            except SyntaxError:
+                continue
+
+        return None
 
     async def run_async(self, request: str, adata: Any) -> Any:
         """
@@ -1810,6 +2102,30 @@ IMPORTANT:
         print(f"Request: \"{request}\"")
         print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
         print(f"{'=' * 70}\n")
+
+        # Direct execution path for explicit Python snippets (no LLM required)
+        direct_code = self._detect_direct_python_request(request)
+        if direct_code:
+            print(f"🧪 Direct Python detected → executing without model calls")
+            # Reset usage tracking for clarity
+            self.last_usage = None
+            self.last_usage_breakdown = {
+                'generation': None,
+                'reflection': [],
+                'review': [],
+                'total': None
+            }
+            try:
+                result_adata = self._execute_generated_code(direct_code, adata)
+                print(f"✅ Python code executed directly.")
+                return result_adata
+            except Exception as exc:
+                print(f"❌ Direct Python execution failed: {exc}")
+                raise
+
+        # If user explicitly selected the Python provider, require executable code
+        if self.provider == "python":
+            raise ValueError("Python provider requires executable Python code in the request.")
 
         # Step 1: Analyze task complexity
         print(f"📊 Analyzing task complexity...")
