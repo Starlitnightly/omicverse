@@ -1256,8 +1256,12 @@ def _get_color_source_vector(
     
     # Safe checks for obs and var
     in_obs = _safe_check_obs_columns(adata, value_to_plot)
-    in_var = _safe_check_var_names(adata, value_to_plot)
-    
+    # When use_raw is True, check raw.var_names; otherwise check var_names
+    if use_raw and adata.raw is not None:
+        in_var = _safe_check_var_names(adata.raw, value_to_plot)
+    else:
+        in_var = _safe_check_var_names(adata, value_to_plot)
+
     # Handle gene symbols - convert to actual gene names if needed
     if (
         gene_symbols is not None
@@ -1266,11 +1270,15 @@ def _get_color_source_vector(
     ):
         # We should probably just make an index for this, and share it over runs
         try:
-            value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][0]
-            in_var = _safe_check_var_names(adata, value_to_plot)  # Update after conversion
+            if use_raw and adata.raw is not None:
+                value_to_plot = adata.raw.var.index[adata.raw.var[gene_symbols] == value_to_plot][0]
+                in_var = _safe_check_var_names(adata.raw, value_to_plot)  # Update after conversion
+            else:
+                value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][0]
+                in_var = _safe_check_var_names(adata, value_to_plot)  # Update after conversion
         except (IndexError, KeyError):
             pass  # Will be handled in the error case below
-    
+
     # Determine the source of the data
     if in_obs:
         # Data is in adata.obs (metadata)

@@ -187,6 +187,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              color_map: Union[str, None] = None,
              figsize: Union[int, None] = None,
              vector_friendly: bool = True,
+             show_monitor=True,
              ):
     r"""Configure plotting settings for OmicVerse.
     
@@ -208,6 +209,9 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         None: The function configures global plotting settings and displays initialization information.
     """
     global _has_printed_logo
+
+    from .._monitor import set_monitor_display
+    set_monitor_display(show_monitor)
 
     print(f"{EMOJI['start']} Starting plot initialization...")
 
@@ -385,7 +389,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
 # Create aliases for backward compatibility
 plotset = plot_set
 ov_plot_set = plot_set
-
+style=plot_set
 
 
 

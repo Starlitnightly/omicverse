@@ -82,7 +82,7 @@ except ImportError:
 
 # Essential utilities - keep these as direct imports for compatibility
 from .utils._data import read
-from .utils._plot import palette, ov_plot_set, plot_set
+from .utils._plot import palette, ov_plot_set, plot_set, style
 
 # Function registry system for discovery and search
 from .utils.registry import (

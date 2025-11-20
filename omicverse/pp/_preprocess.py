@@ -17,6 +17,7 @@ from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from ..utils.registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
+from .._monitor import monitor
 
 
 from ._normalization import normalize_total,log1p
@@ -633,14 +634,23 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data in gpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
 
-    if not is_rust:
-        adata.var = adata.var.drop(columns=['highly_variable_features'])
-        adata.var['highly_variable_features'] = adata.var['highly_variable']
-        adata.var = adata.var.drop(columns=['highly_variable'])
+    # Update highly_variable_features from the HVG selection result
+    if 'highly_variable' in adata.var.columns:
+        if not is_rust:
+            adata.var = adata.var.drop(columns=['highly_variable_features'])
+            adata.var['highly_variable_features'] = adata.var['highly_variable']
+            adata.var = adata.var.drop(columns=['highly_variable'])
+        else:
+            adata.var['highly_variable_features'] = adata.var['highly_variable']
     else:
-        #adata.var = adata.var.drop(columns=['highly_variable_features'])
-        adata.var['highly_variable_features'] = adata.var['highly_variable']
-        #adata.var = adata.var.drop(columns=['highly_variable'])
+        # If highly_variable doesn't exist, it means HVG selection didn't run or failed
+        # Keep the existing highly_variable_features (from robust genes) as a fallback
+        import warnings
+        warnings.warn(
+            "Could not find 'highly_variable' column after HVG selection. "
+            "The 'highly_variable_features' column may contain all robust genes instead of selected HVGs.",
+            UserWarning
+        )
     #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
     print(f"{EMOJI['done']} Preprocessing completed successfully.")
     print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
