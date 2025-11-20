@@ -17,6 +17,7 @@ from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from ..utils.registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
+from .._monitor import monitor
 
 
 from ._normalization import normalize_total,log1p
