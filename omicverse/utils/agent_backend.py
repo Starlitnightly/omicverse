@@ -21,11 +21,15 @@ introduce any runtime dependency on Pantheon.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import json
 import logging
 import os
 import random
 import ssl
+import textwrap
+import traceback
 import warnings
 import sys
 import time
@@ -400,6 +404,8 @@ class OmicVerseLLMBackend:
         if provider in OPENAI_COMPAT_BASE_URLS:
             async for chunk in self._stream_openai_compatible(user_prompt):
                 yield chunk
+        elif provider == "python":
+            yield await asyncio.to_thread(self._run_python_local, user_prompt)
         elif provider == "anthropic":
             async for chunk in self._stream_anthropic(user_prompt):
                 yield chunk
@@ -423,6 +429,8 @@ class OmicVerseLLMBackend:
         # Prefer OpenAI-compatible path when possible (simplest integration)
         if provider in OPENAI_COMPAT_BASE_URLS:
             return self._chat_via_openai_compatible(user_prompt)
+        if provider == "python":
+            return self._run_python_local(user_prompt)
 
         # Provider-specific fallbacks (SDKs) with clear guidance if missing
         if provider == "anthropic":
@@ -969,6 +977,64 @@ class OmicVerseLLMBackend:
             jitter=self.config.retry_jitter
         )
 
+    # ------------------------------- Local Python executor -------------------------------
+    def _run_python_local(self, user_prompt: str) -> str:
+        """Execute Python code locally when provider is set to 'python'."""
+
+        code = (user_prompt or "").strip()
+
+        # Strip simple markdown fences to mirror LLM responses
+        if code.startswith("```"):
+            lines = code.splitlines()
+            if lines and lines[0].lstrip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            code = "\n".join(lines).strip()
+
+        code = textwrap.dedent(code).strip()
+        if not code:
+            raise ValueError("No Python code provided for execution")
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        sandbox_globals: Dict[str, Any] = {"__name__": "__main__"}
+        sandbox_locals: Dict[str, Any] = {}
+
+        try:
+            compiled = compile(code, "<ov-agent-python>", "exec")
+        except SyntaxError as exc:
+            raise RuntimeError(f"Python execution failed: {exc}") from exc
+
+        try:
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exec(compiled, sandbox_globals, sandbox_locals)
+        except Exception as exc:
+            tb = traceback.format_exc()
+            raise RuntimeError(f"Python execution raised {type(exc).__name__}: {exc}\n{tb}") from exc
+
+        stderr_output = stderr.getvalue().strip()
+        stdout_output = stdout.getvalue().strip()
+        if stderr_output:
+            raise RuntimeError(f"Python execution wrote to stderr:\n{stderr_output}")
+
+        if not stdout_output:
+            for key in ("result", "output", "res"):
+                if key in sandbox_locals:
+                    stdout_output = repr(sandbox_locals[key])
+                    break
+
+        # Track a zero-usage record for parity with network providers
+        self.last_usage = Usage(
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            model=self.config.model,
+            provider=self.config.provider
+        )
+
+        return stdout_output
+
     # ------------------------------- Anthropic SDK -------------------------------
     def _chat_via_anthropic(self, user_prompt: str) -> str:
         api_key = self._resolve_api_key()
@@ -1068,7 +1134,20 @@ class OmicVerseLLMBackend:
                             provider=self.config.provider
                         )
 
-                return getattr(resp, "text", "") or ""
+                # Extract text robustly; Gemini may omit parts when finish_reason != 1
+                text = ""
+                try:
+                    text = getattr(resp, "text", "") or ""
+                except Exception:
+                    text = ""
+                if not text and getattr(resp, "candidates", None):
+                    for cand in resp.candidates or []:
+                        parts = getattr(getattr(cand, "content", None), "parts", None) or []
+                        piece = "".join(str(getattr(p, "text", "") or "") for p in parts)
+                        if piece:
+                            text += piece
+                    text = text.strip()
+                return text
 
             return _retry_with_backoff(
                 _make_gemini_call,

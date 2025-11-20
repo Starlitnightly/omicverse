@@ -9,6 +9,9 @@ import sys
 
 # Available models configuration - based on pantheon-cli
 AVAILABLE_MODELS = {
+    # Local execution (no LLM, direct Python)
+    "python": "Local Python executor (no LLM)",
+
     # OpenAI Models - GPT-5 Series (Latest)
     "gpt-5": "OpenAI GPT-5 (Latest)",
     "gpt-5-mini": "OpenAI GPT-5 Mini",
@@ -156,6 +159,7 @@ PROVIDER_ENDPOINTS = {
     "moonshot": "https://api.moonshot.cn/v1",
     "xai": "https://api.x.ai/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "python": "local-python",
 }
 
 # Provider-level default API keys (fallback when a specific model isn't mapped)
@@ -172,6 +176,11 @@ PROVIDER_DEFAULT_KEYS = {
 
 # Model ID aliases for backward compatibility
 _RAW_MODEL_ALIASES = {
+    # Local execution aliases
+    "local-python": "python",
+    "python-local": "python",
+    "py-local": "python",
+
     # Claude 4.5 variations
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
@@ -249,6 +258,8 @@ class ModelConfig:
         """Determine provider from model name"""
         # Normalize first to handle aliases/unprefixed
         model = ModelConfig.normalize_model_id(model)
+        if model.startswith("python"):
+            return "python"
         if model.startswith("anthropic/"):
             return "anthropic"
         elif model.startswith(("qwq-", "qwen-", "qvq-")) or model.startswith("qwen/"):
