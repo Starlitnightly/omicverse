@@ -1238,7 +1238,7 @@ Now generate a complete workflow for: "{request}"
 
         candidates = self._gather_code_candidates(response_text)
         if not candidates:
-            # Provide detailed diagnostic information
+            # Provide detailed diagnostic information and raise
             error_msg = (
                 f"Could not extract executable code: no code candidates found in the response.\n"
                 f"Response length: {len(response_text)} characters\n"
@@ -1246,28 +1246,7 @@ Now generate a complete workflow for: "{request}"
                 f"Response preview (last 300 chars):\n...{response_text[-300:]}"
             )
             logger.error(error_msg)
-            # Fallback: return a minimal safe workflow to keep execution moving
-            return textwrap.dedent(
-                """
-                import omicverse as ov
-                import scanpy as sc
-                # Fallback minimal workflow when code extraction fails
-                adata = adata
-                sc.pp.normalize_total(adata, target_sum=1e4)
-                sc.pp.log1p(adata)
-                sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
-                sc.pp.pca(adata)
-                sc.pp.neighbors(adata)
-                try:
-                    sc.tl.leiden(adata)
-                except Exception:
-                    pass
-                try:
-                    sc.tl.umap(adata)
-                except Exception:
-                    pass
-                """
-            ).strip()
+            raise ValueError("Could not extract executable code: no code candidates found in the response.")
 
         logger.debug(f"Found {len(candidates)} code candidate(s) to validate")
 
@@ -1300,27 +1279,7 @@ Now generate a complete workflow for: "{request}"
             f"Errors:\n" + "\n".join(f"  - {err}" for err in syntax_errors)
         )
         logger.error(error_msg)
-        # Fallback to the same minimal safe workflow
-        return textwrap.dedent(
-            """
-            import omicverse as ov
-            import scanpy as sc
-            adata = adata
-            sc.pp.normalize_total(adata, target_sum=1e4)
-            sc.pp.log1p(adata)
-            sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
-            sc.pp.pca(adata)
-            sc.pp.neighbors(adata)
-            try:
-                sc.tl.leiden(adata)
-            except Exception:
-                pass
-            try:
-                sc.tl.umap(adata)
-            except Exception:
-                pass
-            """
-        ).strip()
+        raise ValueError(error_msg)
 
     def _gather_code_candidates(self, response_text: str) -> List[str]:
         """Enhanced code extraction with multiple strategies to handle various formats."""
