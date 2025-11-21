@@ -54,19 +54,44 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
-# Core submodules - direct imports
-from . import alignment
-from . import bulk
-from . import single
-from . import utils
-from . import bulk2single
-from . import pp
-from . import space
-from . import pl
-from . import datasets
+import importlib
+import warnings
 
-# External modules
-from . import external
+def _optional_import(module_name: str, alias: str = None):
+    """Import a module but tolerate missing optional dependencies.
+
+    Parameters
+    ----------
+    module_name: str
+        Fully qualified module name to import.
+    alias: str, optional
+        Global name to assign the imported module. Defaults to the final path component.
+    """
+
+    public_name = alias or module_name.rsplit(".", 1)[-1]
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as exc:  # pragma: no cover - defensive guard for optional deps
+        warnings.warn(
+            f"Optional module '{module_name}' could not be imported ({exc}). Some features may be unavailable.",
+            RuntimeWarning,
+        )
+        module = None
+
+    globals()[public_name] = module
+    return module
+
+# Core submodules - tolerate missing optional dependencies instead of using lazy imports
+alignment = _optional_import("omicverse.alignment", "alignment")
+bulk = _optional_import("omicverse.bulk", "bulk")
+single = _optional_import("omicverse.single", "single")
+utils = _optional_import("omicverse.utils", "utils")
+bulk2single = _optional_import("omicverse.bulk2single", "bulk2single")
+pp = _optional_import("omicverse.pp", "pp")
+space = _optional_import("omicverse.space", "space")
+pl = _optional_import("omicverse.pl", "pl")
+datasets = _optional_import("omicverse.datasets", "datasets")
+external = _optional_import("omicverse.external", "external")
 
 # Optional modules
 try:

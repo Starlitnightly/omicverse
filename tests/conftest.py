@@ -5,6 +5,8 @@ This file contains common fixtures and configuration that are shared across
 all test modules in the OmicVerse project.
 """
 
+import asyncio
+import inspect
 import pytest
 import numpy as np
 import pandas as pd
@@ -110,3 +112,27 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "requires_gpu: marks tests that require GPU"
     )
+    config.addinivalue_line(
+        "markers", "asyncio: marks tests that should run in an event loop"
+    )
+
+
+def pytest_pyfunc_call(pyfuncitem):
+    """Provide lightweight asyncio support without external plugins.
+
+    Tests marked with ``@pytest.mark.asyncio`` will be executed inside a fresh
+    event loop using ``asyncio.run`` semantics. This avoids the need for
+    pytest-asyncio while keeping the test behavior consistent.
+    """
+
+    if pyfuncitem.get_closest_marker("asyncio"):
+        async_fn = pyfuncitem.obj
+        fn_params = inspect.signature(async_fn).parameters
+        bound_args = {name: pyfuncitem.funcargs[name] for name in fn_params}
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(async_fn(**bound_args))
+        finally:
+            loop.close()
+        return True
