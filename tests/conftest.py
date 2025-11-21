@@ -6,6 +6,7 @@ all test modules in the OmicVerse project.
 """
 
 import asyncio
+import importlib
 import inspect
 import pytest
 import numpy as np
@@ -117,13 +118,23 @@ def pytest_configure(config):
     )
 
 
-def pytest_pyfunc_call(pyfuncitem):
-    """Provide lightweight asyncio support without external plugins.
+_has_pytest_asyncio = importlib.util.find_spec("pytest_asyncio") is not None
 
-    Tests marked with ``@pytest.mark.asyncio`` will be executed inside a fresh
-    event loop using ``asyncio.run`` semantics. This avoids the need for
-    pytest-asyncio while keeping the test behavior consistent.
+
+def pytest_pyfunc_call(pyfuncitem):
+    """Run ``@pytest.mark.asyncio`` tests when pytest-asyncio is unavailable.
+
+    The repository originally provided its own minimal asyncio runner because
+    pytest-asyncio was not a hard dependency. When the plugin *is* installed we
+    defer to its implementation to avoid double-scheduling the coroutine (which
+    leads to ``TypeError: An asyncio.Future, a coroutine or an awaitable is
+    required``). If the plugin is missing, we fall back to the lightweight
+    runner below so async tests still execute correctly.
     """
+
+    if _has_pytest_asyncio:
+        # Let pytest-asyncio manage event loop lifecycle
+        return None
 
     if pyfuncitem.get_closest_marker("asyncio"):
         async_fn = pyfuncitem.obj
