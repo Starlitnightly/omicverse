@@ -61,6 +61,8 @@ Examples:
     >>> ov.utils.data_downloader('pbmc3k')
 """
 
+import sys
+
 # All functions imported via wildcard imports from submodules
 from ._data import *
 from ._plot import *
@@ -84,6 +86,8 @@ from ._neighboors import neighbors
 # Store verifier with a private name first to ensure reference is preserved
 from . import agent_backend, smart_agent
 from . import verifier as _verifier_module
+# Ensure verifier is registered on the module object for Python 3.10 attribute lookups
+sys.modules[__name__].verifier = _verifier_module
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
 
