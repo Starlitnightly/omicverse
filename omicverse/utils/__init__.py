@@ -107,3 +107,9 @@ verifier = _verifier_module
 __all__ = [name for name in globals() if not name.startswith("_")]
 if 'verifier' not in __all__:
     __all__.append('verifier')
+
+
+def __dir__():
+    """Expose verifier in directory listings for introspection tools."""
+
+    return sorted(__all__)
