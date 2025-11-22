@@ -63,6 +63,30 @@ Examples:
 
 import sys
 
+# Import the verifier submodule early so it can be registered on the package
+# namespace for Python 3.10 compatibility (mock.patch relies on getattr).
+from . import verifier as _verifier_module
+
+
+def __getattr__(name):
+    """Dynamically return module attributes for Python 3.10 compatibility.
+
+    unittest.mock.patch uses getattr() to resolve dotted paths. On Python 3.10,
+    submodules aren't automatically attached to their parent packages, so we
+    expose the verifier submodule explicitly here.
+    """
+
+    if name == "verifier":
+        return _verifier_module
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+# Also make verifier accessible via normal attribute access
+verifier = _verifier_module
+# Ensure verifier is registered on the module object for Python 3.10 attribute lookups
+sys.modules[__name__].verifier = _verifier_module
+
+
 # All functions imported via wildcard imports from submodules
 from ._data import *
 from ._plot import *
@@ -83,34 +107,15 @@ from ._lsi import *
 from ._neighboors import neighbors
 
 # Import smart_agent module to make it accessible and expose key entrypoints
-# Store verifier with a private name first to ensure reference is preserved
 from . import agent_backend, smart_agent
-from . import verifier as _verifier_module
-# Ensure verifier is registered on the module object for Python 3.10 attribute lookups
-sys.modules[__name__].verifier = _verifier_module
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
 
-# Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
-# This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
-def __getattr__(name):
-    """Dynamically return module attributes for Python 3.10 compatibility.
-
-    This is required because unittest.mock.patch uses getattr() to resolve
-    module paths, and in Python 3.10 submodule imports don't automatically
-    become accessible as attributes of the parent module.
-    """
-    if name == 'verifier':
-        return _verifier_module
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
-# Also make verifier accessible via normal attribute access
-verifier = _verifier_module
 
 # Build __all__ dynamically and ensure verifier is included
 __all__ = [name for name in globals() if not name.startswith("_")]
-if 'verifier' not in __all__:
-    __all__.append('verifier')
+if "verifier" not in __all__:
+    __all__.append("verifier")
 
 
 def __dir__():
