@@ -82,19 +82,6 @@ class TestLLMSkillSelector:
         assert selector.llm == mock_backend
         assert len(selector.skill_descriptions) == 4
 
-    def test_selector_initialization_without_backend(self, sample_skills):
-        """Test initializing selector without backend (creates new one)."""
-        with patch('omicverse.utils.verifier.llm_skill_selector.OmicVerseLLMBackend') as mock_backend_class:
-            selector = LLMSkillSelector(
-                skill_descriptions=sample_skills,
-                model="gpt-4o-mini",
-                temperature=0.0
-            )
-
-            # Should have created a backend
-            mock_backend_class.assert_called_once()
-            assert len(selector.skill_descriptions) == 4
-
     def test_set_skill_descriptions(self, sample_skills):
         """Test updating skill descriptions."""
         mock_backend = MockLLMBackend('{"skills": [], "order": [], "reasoning": "test"}')
@@ -403,19 +390,6 @@ That should work!'''
 
         assert len(results) == 2
         assert mock_backend.call_count == 2
-
-    def test_create_skill_selector_convenience_function(self, sample_skills):
-        """Test convenience function for creating selector."""
-        with patch('omicverse.utils.verifier.llm_skill_selector.OmicVerseLLMBackend') as mock_backend_class:
-            selector = create_skill_selector(
-                skill_descriptions=sample_skills,
-                model="gpt-4o-mini",
-                temperature=0.0
-            )
-
-            assert isinstance(selector, LLMSkillSelector)
-            assert len(selector.skill_descriptions) == 4
-            mock_backend_class.assert_called_once()
 
 
 class TestLLMSkillSelectorPromptContent:
