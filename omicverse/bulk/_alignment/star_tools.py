@@ -534,12 +534,41 @@ def _infer_sample_id_from_fq(fq1: Path) -> str:
     s = re.sub(r"(_|\.)(R?1|R?2|clean)$", "", s, flags=re.I)
     return s
 
+def _parse_memory_limit_to_bytes(value: Union[str, int, float]) -> int:
+    """
+    Convert human-readable memory like '48G' or '800M' into integer bytes.
+    STAR expects --limitBAMsortRAM as a byte count; passing '100G' directly
+    would otherwise be interpreted incorrectly and can trigger false
+    'not enough memory for BAM sorting' errors.
+    """
+    if isinstance(value, (int, float)):
+        return int(value)
+
+    s = str(value).strip().upper()
+    # Accept bare integers (already bytes).
+    if s.isdigit():
+        return int(s)
+
+    import re
+    m = re.match(r"^(\d+)([KMG])B?$", s)
+    if not m:
+        # Fallback: keep numeric portion or 0.
+        digits = "".join(ch for ch in s if ch.isdigit())
+        return int(digits) if digits else 0
+
+    num = int(m.group(1))
+    unit = m.group(2)
+    factor = {"K": 1024, "M": 1024**2, "G": 1024**3}[unit]
+    return num * factor
+
+
 def run_star(
     fq1: Path,
     fq2: Optional[Path],
     index_dir: Path,
     out_prefix: Path,
     threads: int = 12,
+    memory_limit: Union[str, int, float] = "100G",  # BAM sorting memory limit
     extra_args: Optional[List[str]] = None,
     sample: Optional[str] = None,
 ) -> Path:
@@ -547,6 +576,7 @@ def run_star(
     Run STAR, writing outputs to <base>/<sample>/<sample>.* and return the BAM path.
     - out_prefix: accept the legacy "work/star/sample." prefix (used to derive the per-sample prefix).
     - sample: optionally pass an SRR; otherwise infer from fq1.
+    - memory_limit: memory limit for BAM sorting (e.g., "100G", "85899345920" for bytes)
     """
     # Skip when results already exist.
 
@@ -577,11 +607,15 @@ def run_star(
     if str(fq1).endswith(".gz") or (fq2 and str(fq2).endswith(".gz")):
         cmd += ["--readFilesCommand", "gunzip", "-c"]
 
+    # Ensure memory_limit is passed as a byte count, not "100G".
+    mem_bytes = _parse_memory_limit_to_bytes(memory_limit)
+
     cmd += [
         "--outSAMtype", "BAM", "SortedByCoordinate",
         "--outFileNamePrefix", str(star_prefix),
         "--outTmpDir", str(out_dir / "tmp"),
-        "--outSAMattrRGline", f"ID:{sample}", f"SM:{sample}", "PL:ILLUMINA"
+        "--outSAMattrRGline", f"ID:{sample}", f"SM:{sample}", "PL:ILLUMINA",
+        "--limitBAMsortRAM", str(mem_bytes),
     ]
     if extra_args:
         cmd += list(extra_args)
@@ -602,6 +636,7 @@ def star_align_auto(
     gencode_release: str = "v44",
     sjdb_overhang: Optional[int] = 149,
     sample: Optional[str] = None,           # Optional explicit SRR value.
+    memory_limit: str = "100G",             # BAM sorting memory limit
 ) -> Path:
     species, build = detect_species_build_from_geo(accession)
     print(f"[INFO] Detected: species={species}, build={build}")
@@ -620,6 +655,7 @@ def star_align_auto(
         index_dir=idx,
         out_prefix=Path(out_prefix),
         threads=threads,
+        memory_limit=memory_limit,  # Add memory limit for BAM sorting
         sample=sample  # Propagate the SRR (infer from fq1 when not provided).
     )
     print(f"[OK] STAR alignment finished. BAM -> {bam}")

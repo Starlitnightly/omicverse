@@ -45,6 +45,35 @@ __all__ = [
 ]
 
 
+def _ensure_required_tools() -> None:
+    """
+    Best-effort runtime check for critical tools.
+    - If featureCounts is missing, try automatic installation via the
+      configured helper, but do NOT raise or interrupt the workflow.
+    - This keeps the pipeline running (you may simply get no counts
+      if installation ultimately fails).
+    """
+    try:
+        from .tools_check import check_featurecounts
+    except ImportError:
+        # Older deployments without this helper: skip silently.
+        return
+
+    try:
+        ok, msg = check_featurecounts()
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"[tools] featureCounts check failed: {e}")
+        return
+
+    if not ok:
+        # Automatic installation already attempted inside check_featurecounts
+        # (when supported). Log a warning but do not raise.
+        logger.warning(
+            "featureCounts not available after automatic check/installation attempt: %s",
+            msg,
+        )
+
+
 def _register_alignment_namespace() -> None:
     """Expose alignment helpers under the public ``<package>.alignment.bulk`` path."""
     root_pkg = __name__.split(".", 1)[0]
@@ -152,6 +181,7 @@ def geo_data_preprocess(
     *,
     config=None,
     input_type: str = "auto",
+    library_layout: str = "auto",  # Library layout: "auto", "single", "paired"
     with_align: bool = True,
     work_dir: str = "work",
     threads: int = 8,
@@ -173,6 +203,7 @@ def geo_data_preprocess(
         input_data: Input payload.
         config: Configuration object or source.
         input_type: Input type string.
+        library_layout: Library layout - "auto" (detect automatically), "single" (single-end), "paired" (paired-end).
         with_align: Whether to perform alignment.
         work_dir: Working directory.
         threads: Thread count.
@@ -197,6 +228,7 @@ def geo_data_preprocess(
             work_root=Path(work_dir),
             threads=threads,
             genome=genome,
+            library_layout=library_layout,  # User-specified library layout
             download_method=download_method,  # Download method selection.
             # iseq-specific configuration.
             iseq_gzip=iseq_gzip,
@@ -209,27 +241,32 @@ def geo_data_preprocess(
     elif isinstance(config, (str, Path)):
         from .pipeline_config import load_config
         pipeline_config = load_config(config)
-        # Ensure the download method attribute exists.
+        # Ensure required attributes exist.
         if not hasattr(pipeline_config, 'download_method'):
             pipeline_config.download_method = download_method
+        if not hasattr(pipeline_config, 'library_layout'):
+            pipeline_config.library_layout = library_layout
     else:
         pipeline_config = config
-        # Ensure the download method attribute exists.
+        # Ensure required attributes exist.
         if not hasattr(pipeline_config, 'download_method'):
             pipeline_config.download_method = download_method
+        if not hasattr(pipeline_config, 'library_layout'):
+            pipeline_config.library_layout = library_layout
 
     # Create the pipeline.
     pipeline = Alignment(pipeline_config)
 
-    # Check tool availability.
-    if not check_all_tools():
-        raise RuntimeError("Required tools are not available. Please install missing tools.")
+    # Check tool availability (with explicit featureCounts hint) only
+    # when alignment + counting are requested.
+    if with_align:
+        _ensure_required_tools()
 
-    # When using the iseq download method, ensure axel is available (Jupyter Lab compatibility).
+    # When using the iseq download method, check if axel is available.
     if download_method == "iseq":
         from . import tools_check as _tools_check
         logger.info("Detected download_method=iseq; verifying axel dependency…")
-        axel_available, axel_path = _tools_check.check_axel(auto_install=True)
+        axel_available, axel_path = _tools_check.check_axel(auto_install=False)  # No automatic installation
         if not axel_available:
             logger.warning(f"axel unavailable: {axel_path}. iseq may not function fully, continuing anyway…")
         else:
@@ -251,7 +288,31 @@ def get_config_template():
             "work_dir": "work_sra",
             "threads": 16,
             "genome": "human",
-            "input_type": "sra"
+            "input_type": "sra",
+            "library_layout": "auto"  # Auto-detect from data
+        },
+        "Skip re-processing - single-end files exist": {
+            "work_dir": "work_sra_skip",
+            "threads": 16,
+            "genome": "human",
+            "input_type": "sra",
+            "library_layout": "single",  # Skip if single fastq already exists
+        },
+        "Single-end GEO data (prefetch)": {
+            "work_dir": "work_se",
+            "threads": 12,
+            "genome": "human",
+            "input_type": "sra",
+            "library_layout": "single",  # Explicitly specify single-end for GEO prefetch
+            "download_method": "prefetch"
+        },
+        "Paired-end GEO data (prefetch)": {
+            "work_dir": "work_pe",
+            "threads": 12,
+            "genome": "human",
+            "input_type": "sra",
+            "library_layout": "paired",  # Explicitly specify paired-end for GEO prefetch
+            "download_method": "prefetch"
         },
         "FASTQ file analysis": {
             "work_dir": "work_fastq",
@@ -278,6 +339,8 @@ def get_version_info():
             "Supports vendor FASTQ data",
             "Supports direct FASTQ file input",
             "Automatic input type detection",
+            "User-configurable library layout (single/paired/auto)",
+            "Unifies SRA download methods (prefetch and iseq)",
             "Unified sample ID management",
             "Enhanced tool checks and installation guidance",
             "Flexible configuration system"
@@ -413,20 +476,26 @@ def fq_data_preprocess(
     # Parameters + kwargs -> override AlignmentConfig, same strategy as geo
     overrides = dict(
         work_root=Path(work_dir),
-        threads=threads,
         genome=genome,
         # kwargs can override fastp_enabled / memory / gtf / simple_counts, etc.
     )
     overrides.update(kwargs or {})
+
+    # When config is not provided, honour the function-level threads argument
+    # as the initial AlignmentConfig.threads; when a config is supplied, keep
+    # its own threads setting unless explicitly overridden via kwargs.
+    if config is None:
+        overrides.setdefault("threads", threads)
 
     # Resolve final configuration
     pipeline_config, unknown = _resolve_acfg(config, **overrides)
     if unknown:
         logger.warning(f"[fq_data_preprocess] Ignored unknown config keys: {unknown}")
 
-    # Tool check (aligned with geo)
-    if not check_all_tools():
-        raise RuntimeError("Required tools are not available. Please install missing tools.")
+    # Tool check (aligned with geo, with explicit featureCounts hint) only
+    # when alignment + counting are requested.
+    if with_align:
+        _ensure_required_tools()
 
     # Create pipeline
     pipeline = Alignment(pipeline_config)

@@ -102,49 +102,24 @@ def check_samtools() -> tuple[bool, str]:
     )
 
 def check_axel(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure axel (download accelerator) is available; auto-install for Jupyter Lab setups."""
+    """Check if axel (download accelerator) is available."""
     tool_path = resolve_tool("axel")
     if tool_path:
         return True, tool_path
 
-    # Tool still unavailable.
-    if auto_install:
-        logger.warning("axel not found. Attempting automatic installation...")
-
-        # Try multiple installation methods.
-        install_commands = [
-            "conda install -c conda-forge axel -y",
-            "mamba install -c conda-forge axel -y"
-        ]
-
-        for cmd in install_commands:
-            try:
-                logger.info(f"Trying installation: {cmd}")
-                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-
-                # Check again after installation.
-                tool_path = resolve_tool("axel")
-                if tool_path:
-                    logger.info(f"Successfully installed axel using: {cmd}")
-                    return True, tool_path
-
-            except subprocess.CalledProcessError as e:
-                logger.warning(f"Installation failed with {cmd}: {e.stderr}")
-                continue
-
-        # All installation attempts failed.
-        error_msg = "Failed to install axel automatically. Please install manually: conda install -c conda-forge axel -y"
-        logger.error(error_msg)
-        return False, error_msg
-    else:
-        error_msg = "axel not found. Please install: conda install -c conda-forge axel -y"
-        logger.error(error_msg)
-        return False, error_msg
+    # Tool unavailable - no automatic installation
+    error_msg = "axel not found. Please install axel manually: e.g., conda install -c conda-forge axel -y or brew install axel"
+    logger.info(error_msg)
+    return False, error_msg
 
 def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure the iseq downloader is available, optionally auto-installing it."""
-    # First ensure axel is available (dependency for iseq).
-    axel_available, axel_path = check_axel(auto_install)
+    """Ensure the iseq downloader is available with manual installation guidance.
+
+    Note: auto_install parameter is kept for backward compatibility but is ignored.
+    Automatic installation has been removed - only manual installation guidance is provided.
+    """
+    # First check if axel is available (dependency for iseq). No auto installation.
+    axel_available, axel_path = check_axel(auto_install=False)
     if not axel_available:
         logger.warning(f"axel is not available, which may cause issues with iseq: {axel_path}")
 
@@ -153,38 +128,10 @@ def check_iseq(auto_install: bool = True) -> tuple[bool, str]:
     if tool_path:
         return True, tool_path
 
-    # iseq missing; attempt installation.
-    if auto_install:
-        logger.warning("iseq not found. Attempting automatic installation...")
-
-        install_commands = [
-            "conda install -c bioconda iseq -y",
-            "mamba install -c bioconda iseq -y"
-        ]
-
-        for cmd in install_commands:
-            try:
-                logger.info(f"Trying installation: {cmd}")
-                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-
-                # Check again after installation.
-                tool_path = resolve_tool("iseq")
-                if tool_path:
-                    logger.info(f"Successfully installed iseq using: {cmd}")
-                    return True, tool_path
-
-            except subprocess.CalledProcessError as e:
-                logger.warning(f"Installation failed with {cmd}: {e.stderr}")
-                continue
-
-        # All installation attempts failed.
-        error_msg = "Failed to install iseq automatically. Please install manually: conda install -c bioconda iseq -y"
-        logger.error(error_msg)
-        return False, error_msg
-    else:
-        error_msg = "iseq not found. Please install: conda install -c bioconda iseq -y"
-        logger.error(error_msg)
-        return False, error_msg
+    # iseq missing; provide manual installation guidance.
+    error_msg = "iseq not found. Please install manually with: conda install -c bioconda iseq -y or mamba install -c bioconda iseq -y"
+    logger.error(error_msg)
+    return False, error_msg
 
 def check_edirect() -> tuple[bool, str]:
     """Ensure EDirect (esearch/efetch) is available."""
@@ -288,9 +235,30 @@ def which_or_find(cmd: str) -> str:
         if os.path.exists(c) and os.access(c, os.X_OK):
             return c
 
+    # Provide a more accurate installation hint per tool.
+    install_hints = {
+        # SRA toolkit family
+        "prefetch": "conda install -c bioconda sra-tools",
+        "fastq-dump": "conda install -c bioconda sra-tools",
+        "fasterq-dump": "conda install -c bioconda sra-tools",
+        # Core tools in this pipeline
+        "fastp": "conda install -c bioconda fastp",
+        "STAR": "conda install -c bioconda star",
+        "samtools": "conda install -c bioconda samtools",
+        "featureCounts": "conda install -c bioconda subread",
+        "esearch": "conda install -c bioconda entrez-direct",
+        "iseq": "conda install -c bioconda iseq",
+        "axel": "conda install -c conda-forge axel",
+    }
+    hint = install_hints.get(cmd)
+    if hint:
+        suggestion = f"Try: `{hint}` "
+    else:
+        suggestion = "Please install the corresponding package (e.g., via bioconda) "
+
     raise FileNotFoundError(
         f"'{cmd}' not found in PATH. "
-        f"Try: `conda install -c bioconda sra-tools` "
+        f"{suggestion}"
         f"or ensure your Jupyter kernel is the same env as your shell.\n"
         f"Python: {os.sys.executable}\nPATH: {os.environ.get('PATH','')}\n"
     )

@@ -98,6 +98,7 @@ def _align_one(
     gencode_release: str,
     sjdb_overhang: Optional[int],
     accession_for_species: Optional[str],
+    memory_limit: str = "100G",  # BAM sorting memory limit
 ) -> Tuple[str, str, Optional[str]]:
     """
     Align a single sample; return (srr, bam_path, index_dir|None).
@@ -129,6 +130,7 @@ def _align_one(
         gencode_release=gencode_release,
         sjdb_overhang=sjdb_overhang,
         sample=srr,
+        memory_limit=memory_limit,  # Add memory limit for BAM sorting
     )
 
     # Extract the BAM path from the return value.
@@ -154,6 +156,7 @@ def make_star_step(
     sjdb_overhang: int | None = 149,
     accession_for_species: str | None = None,  # Provide a shared accession when all samples belong to the same GSE.
     max_workers: int | None = None,            # Batch concurrency control; None keeps execution serial.
+    memory_limit: str = "100G",                 # BAM sorting memory limit
 ):
     """
     Input: [(srr, fq1_clean, fq2_clean), ...]
@@ -173,6 +176,7 @@ def make_star_step(
                     threads=threads, gencode_release=gencode_release,
                     sjdb_overhang=sjdb_overhang,
                     accession_for_species=accession_for_species,
+                    memory_limit=memory_limit,
                 )
                 products.append(rec)  # (srr, bam, index_dir|None)
             return products
@@ -190,6 +194,7 @@ def make_star_step(
                 threads=threads, gencode_release=gencode_release,
                 sjdb_overhang=sjdb_overhang,
                 accession_for_species=accession_for_species,
+                memory_limit=memory_limit,
             )
 
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
