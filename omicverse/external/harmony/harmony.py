@@ -56,7 +56,8 @@ def run_harmony(
     cluster_prior = None,
     random_state = 0,
     cluster_fn = 'kmeans',
-    use_gpu = True
+    use_gpu = True,
+    **kwargs
 ):
     """Run Harmony batch correction algorithm with GPU acceleration.
     
