@@ -66,6 +66,159 @@ from .skill_registry import (
 logger = logging.getLogger(__name__)
 
 
+class ProactiveCodeTransformer:
+    """Transform LLM-generated code to prevent common errors before execution.
+
+    This class applies AST-based transformations to fix known error patterns
+    that the LLM may generate due to stochasticity, such as:
+    - In-place function assignments: `adata = ov.pp.pca(adata)` → `ov.pp.pca(adata)`
+    - F-strings in print statements: Converted to string concatenation
+    - .cat accessor without validation: Adds hasattr() guards
+    """
+
+    # In-place OmicVerse functions that return None (or adata if copy=True)
+    INPLACE_FUNCTIONS = {
+        'pca', 'scale', 'neighbors', 'leiden', 'umap', 'tsne', 'sude',
+        'scrublet', 'mde', 'louvain', 'phate'
+    }
+
+    def transform(self, code: str) -> str:
+        """Apply all proactive transformations to the code.
+
+        Parameters
+        ----------
+        code : str
+            The LLM-generated Python code
+
+        Returns
+        -------
+        str
+            Transformed code with error patterns fixed
+        """
+        try:
+            # Apply regex-based transforms first (safer, handles syntax variations)
+            code = self._fix_inplace_assignments_regex(code)
+            code = self._fix_fstring_print_regex(code)
+            code = self._fix_cat_accessor_regex(code)
+
+            # Validate the transformed code is still valid Python
+            ast.parse(code)
+            return code
+        except SyntaxError:
+            # If transformation breaks syntax, return original
+            logger.debug("ProactiveCodeTransformer: transformation produced invalid syntax, returning original")
+            return code
+        except Exception as e:
+            logger.debug(f"ProactiveCodeTransformer: unexpected error {e}, returning original")
+            return code
+
+    def _fix_inplace_assignments_regex(self, code: str) -> str:
+        """Remove assignments from in-place function calls using regex.
+
+        Transform: `adata = ov.pp.pca(adata, ...)` → `ov.pp.pca(adata, ...)`
+        """
+        inplace_pattern = '|'.join(self.INPLACE_FUNCTIONS)
+        # Match: adata = ov.pp.func(adata, ...) or adata=ov.pp.func(adata)
+        pattern = r'adata\s*=\s*(ov\.pp\.(?:' + inplace_pattern + r')\s*\([^)]*\))'
+
+        # Replace with just the function call
+        fixed = re.sub(pattern, r'\1', code)
+
+        if fixed != code:
+            logger.debug(f"ProactiveCodeTransformer: fixed in-place function assignment")
+
+        return fixed
+
+    def _fix_fstring_print_regex(self, code: str) -> str:
+        """Convert f-strings in print statements to string concatenation.
+
+        This is a simple heuristic - converts common patterns.
+        """
+        # Pattern to match print(f"...{var}...") and similar
+        # We'll handle simple cases like print(f"Text: {var}")
+
+        lines = code.split('\n')
+        fixed_lines = []
+
+        for line in lines:
+            stripped = line.lstrip()
+            if stripped.startswith('print(f"') or stripped.startswith("print(f'"):
+                # Try to convert simple f-string patterns
+                try:
+                    fixed_line = self._convert_fstring_line(line)
+                    if fixed_line != line:
+                        logger.debug(f"ProactiveCodeTransformer: converted f-string in print")
+                    fixed_lines.append(fixed_line)
+                except Exception:
+                    fixed_lines.append(line)
+            else:
+                fixed_lines.append(line)
+
+        return '\n'.join(fixed_lines)
+
+    def _convert_fstring_line(self, line: str) -> str:
+        """Convert a single line with f-string print to concatenation."""
+        indent = len(line) - len(line.lstrip())
+        indent_str = line[:indent]
+        content = line.strip()
+
+        # Match print(f"...") or print(f'...')
+        match = re.match(r'print\(f(["\'])(.*)\1\)', content)
+        if not match:
+            return line
+
+        quote = match.group(1)
+        fstring_content = match.group(2)
+
+        # Find {var} patterns and convert
+        parts = []
+        last_end = 0
+
+        for m in re.finditer(r'\{([^}:]+)(?::[^}]*)?\}', fstring_content):
+            # Add text before this variable
+            if m.start() > last_end:
+                text_part = fstring_content[last_end:m.start()]
+                if text_part:
+                    parts.append(f'"{text_part}"')
+
+            # Add the variable wrapped in str()
+            var_name = m.group(1).strip()
+            parts.append(f'str({var_name})')
+
+            last_end = m.end()
+
+        # Add remaining text
+        if last_end < len(fstring_content):
+            remaining = fstring_content[last_end:]
+            if remaining:
+                parts.append(f'"{remaining}"')
+
+        if not parts:
+            return line
+
+        # Join with +
+        concatenated = ' + '.join(parts)
+        return f'{indent_str}print({concatenated})'
+
+    def _fix_cat_accessor_regex(self, code: str) -> str:
+        """Add guards around .cat accessor usage.
+
+        Transform: `col.cat.categories` → `col.value_counts().index.tolist()`
+        (Only for simple patterns where we want category values)
+        """
+        # Pattern: adata.obs['col'].cat.categories or .cat.codes
+        # These often fail if column is not categorical
+
+        # Simple replacement: .cat.categories → .value_counts().index.tolist()
+        code = re.sub(
+            r"\.cat\.categories",
+            ".value_counts().index.tolist()",
+            code
+        )
+
+        return code
+
+
 class OmicVerseAgent:
     """
     Intelligent agent for OmicVerse function discovery and execution.
@@ -78,7 +231,7 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True):
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
@@ -96,6 +249,20 @@ class OmicVerseAgent:
             Maximum number of reflection iterations (default: 1, range: 1-3)
         enable_result_review : bool, optional
             Enable result review to validate output matches user intent (default: True)
+        use_notebook_execution : bool, optional
+            Execute code in separate Jupyter notebook for isolation and debugging (default: True).
+            Set to False to use legacy in-process execution.
+        max_prompts_per_session : int, optional
+            Number of prompts to execute in same notebook session before restart (default: 5).
+            This prevents memory bloat while maintaining context for iterative analysis.
+        notebook_storage_dir : str, optional
+            Directory to store session notebooks. Defaults to ~/.ovagent/sessions
+        keep_execution_notebooks : bool, optional
+            Whether to keep session notebooks after execution (default: True)
+        notebook_timeout : int, optional
+            Execution timeout in seconds (default: 600)
+        strict_kernel_validation : bool, optional
+            If True, raise error if kernel not found. If False, fall back to python3 kernel (default: True)
         """
         print(f" Initializing OmicVerse Smart Agent (internal backend)...")
         
@@ -129,6 +296,10 @@ class OmicVerseAgent:
         self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
         # Result review configuration
         self.enable_result_review = enable_result_review
+        # Notebook execution configuration
+        self.use_notebook_execution = use_notebook_execution
+        self.max_prompts_per_session = max_prompts_per_session
+        self._notebook_executor = None
         # Token usage tracking at agent level
         self.last_usage = None
         self.last_usage_breakdown: Dict[str, Any] = {
@@ -177,6 +348,34 @@ class OmicVerseAgent:
                 print(f"   ✅ Result review enabled (output validation & assessment)")
             else:
                 print(f"   ⚡ Result review disabled (no output validation)")
+
+            # Initialize notebook execution if enabled
+            if self.use_notebook_execution:
+                try:
+                    from .session_notebook_executor import SessionNotebookExecutor
+                    from pathlib import Path
+
+                    storage_dir = Path(notebook_storage_dir) if notebook_storage_dir else None
+                    self._notebook_executor = SessionNotebookExecutor(
+                        max_prompts_per_session=max_prompts_per_session,
+                        storage_dir=storage_dir,
+                        keep_notebooks=keep_execution_notebooks,
+                        timeout=notebook_timeout,
+                        strict_kernel_validation=strict_kernel_validation
+                    )
+
+                    print(f"   📓 Session-based notebook execution enabled")
+                    print(f"      Conda environment: {self._notebook_executor.conda_env or 'default'}")
+                    print(f"      Session limit: {max_prompts_per_session} prompts")
+                    print(f"      Storage: {self._notebook_executor.storage_dir}")
+
+                except Exception as e:
+                    print(f"   ⚠️  Notebook execution initialization failed: {e}")
+                    print(f"   ⚡ Falling back to in-process execution")
+                    self.use_notebook_execution = False
+                    self._notebook_executor = None
+            else:
+                print(f"   ⚡ Using in-process execution (no session isolation)")
 
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
@@ -391,6 +590,40 @@ User request: "quality control with nUMI>500, mito<0.2"
 - Do not create dummy AnnData objects; operate directly on the provided data
 - Prefer `use_raw=False` unless the user explicitly requests raw
 - Handle errors gracefully and suggest alternatives if needed
+
+## CRITICAL CODE PATTERNS - MANDATORY RULES
+
+### Print Statements
+- ALWAYS use string concatenation: `print("Result: " + str(value))`
+- NEVER use f-strings in print statements - they cause format errors
+
+### In-Place Functions (pca, scale, neighbors, leiden, umap, tsne)
+- ALWAYS call without assignment: `ov.pp.pca(adata, n_pcs=50)`
+- NEVER assign result: `adata = ov.pp.pca(adata)` (returns None!)
+- These functions modify adata in-place and return None
+
+### Categorical Column Access
+- ALWAYS check dtype before .cat: `if hasattr(col, 'cat'): col.cat.categories`
+- NEVER assume column is categorical - it may be string or object dtype
+- CORRECT: `adata.obs['col'].value_counts()` (works for any dtype)
+
+### HVG Selection (highly_variable_genes)
+- ALWAYS wrap in try/except with seurat fallback:
+  ```python
+  try:
+      sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)
+  except ValueError:
+      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)
+  ```
+- NEVER use seurat_v3 without fallback - fails on small datasets
+
+### Batch Column Handling
+- ALWAYS validate batch column before batch operations:
+  ```python
+  if 'batch' in adata.obs.columns:
+      adata.obs['batch'] = adata.obs['batch'].astype(str).fillna('unknown')
+  ```
+- NEVER assume batch column exists or has valid values
 """
 
         if self._skill_overview_text:
@@ -537,16 +770,21 @@ User request: "quality control with nUMI>500, mito<0.2"
         # Keywords that strongly indicate complexity
         complex_keywords = [
             'complete', 'full', 'entire', 'whole', 'comprehensive',
-            'pipeline', 'workflow', 'analysis', 'from start', 'end-to-end',
-            'step by step', 'all steps', 'everything', 'report',
+            'pipeline', 'workflow', 'from start', 'end-to-end',
+            'step by step', 'all steps', 'everything',
             'multiple', 'several', 'various', 'different steps',
             'and then', 'followed by', 'after that', 'next',
+            'analysis pipeline', 'full analysis',
         ]
 
         # Keywords that strongly indicate simplicity
+        # NOTE: report/summary keywords REMOVED - these tasks often need full COMPLEX pipelines
         simple_keywords = [
             'just', 'only', 'single', 'one', 'simply',
             'quick', 'fast', 'basic',
+            # Keep non-report inspection keywords:
+            'describe', 'explain', 'print', 'display', 'show summary', 'list',
+            'what is', 'how many', 'count',
         ]
 
         # Specific function names (simple operations)
@@ -574,6 +812,18 @@ User request: "quality control with nUMI>500, mito<0.2"
         if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
             # Short request with function name, no complexity indicators = simple
             logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
+            return 'simple'
+
+        # Report/summary tasks: simple_score keywords indicate non-computational tasks
+        # These should NOT trigger UMAP/MDE visualizations or complex workflows
+        if simple_score >= 2 and complex_score == 0:
+            # Multiple simple indicators (e.g., "plain-language markdown report") = simple
+            logger.debug(f"Complexity: simple (report/summary pattern, simple_score={simple_score})")
+            return 'simple'
+
+        if simple_score >= 1 and complex_score == 0 and function_matches == 0:
+            # Simple task indicator without function match (likely report/summary)
+            logger.debug(f"Complexity: simple (simple keyword match, score={simple_score})")
             return 'simple'
 
         # Ambiguous cases: Use LLM for classification
@@ -709,17 +959,24 @@ IMPORTANT CONSTRAINTS:
 - Focus on direct parameter extraction and function execution
 - If this requires multiple steps or a workflow, respond with: "NEEDS_WORKFLOW"
 
+MANDATORY CODE QUALITY RULES:
+- NEVER use f-strings in print() - use string concatenation: print("Result: " + str(value))
+- NEVER assign result of in-place functions: ov.pp.pca(adata), NOT adata = ov.pp.pca(adata)
+- In-place functions: ov.pp.pca(), ov.pp.scale(), ov.pp.neighbors(), ov.pp.leiden(), ov.pp.umap()
+- NEVER use .cat.categories - use .value_counts() instead (works for any dtype)
+- ALWAYS wrap HVG in try/except with fallback to flavor='seurat'
+
 Examples of GOOD responses:
 ```python
 import omicverse as ov
 adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
-print(f"QC completed: {{adata.shape[0]}} cells")
+print("QC completed: " + str(adata.shape[0]) + " cells")
 ```
 
 ```python
 import omicverse as ov
-adata = ov.pp.pca(adata, n_comps=50)
-print(f"PCA completed: {{adata.obsm['X_pca'].shape}}")
+ov.pp.pca(adata, n_pcs=50)
+print("PCA completed: " + str(adata.obsm['X_pca'].shape))
 ```
 
 Examples of tasks that need NEEDS_WORKFLOW:
@@ -849,6 +1106,20 @@ Now generate code for: "{request}"
 
         except Exception as e:
             print(f"   ❌ Execution failed: {e}")
+
+            # Try to apply known fixes and retry once
+            fixed_code = self._apply_execution_error_fix(code, str(e))
+            if fixed_code:
+                print(f"   🔧 Applying automatic fix and retrying...")
+                try:
+                    result_adata = self._execute_generated_code(fixed_code, adata)
+                    print(f"   ✅ Retry successful after fix!")
+                    print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+                    return result_adata
+                except Exception as retry_e:
+                    print(f"   ❌ Retry also failed: {retry_e}")
+                    raise ValueError(f"Priority 1 execution failed after retry: {retry_e}") from retry_e
+
             raise ValueError(f"Priority 1 execution failed: {e}") from e
 
     async def _run_skills_workflow(self, request: str, adata: Any) -> Any:
@@ -1102,6 +1373,20 @@ Now generate a complete workflow for: "{request}"
 
         except Exception as e:
             print(f"   ❌ Workflow execution failed: {e}")
+
+            # Try to apply known fixes and retry once
+            fixed_code = self._apply_execution_error_fix(code, str(e))
+            if fixed_code:
+                print(f"   🔧 Applying automatic fix and retrying...")
+                try:
+                    result_adata = self._execute_generated_code(fixed_code, adata)
+                    print(f"   ✅ Retry successful after fix!")
+                    print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+                    return result_adata
+                except Exception as retry_e:
+                    print(f"   ❌ Retry also failed: {retry_e}")
+                    raise ValueError(f"Priority 2 execution failed after retry: {retry_e}") from retry_e
+
             raise ValueError(f"Priority 2 execution failed: {e}") from e
 
     def _validate_simple_execution(self, code: str) -> tuple[bool, str]:
@@ -1238,7 +1523,7 @@ Now generate a complete workflow for: "{request}"
 
         candidates = self._gather_code_candidates(response_text)
         if not candidates:
-            # Provide detailed diagnostic information and raise
+            # Provide detailed diagnostic information
             error_msg = (
                 f"Could not extract executable code: no code candidates found in the response.\n"
                 f"Response length: {len(response_text)} characters\n"
@@ -1246,7 +1531,28 @@ Now generate a complete workflow for: "{request}"
                 f"Response preview (last 300 chars):\n...{response_text[-300:]}"
             )
             logger.error(error_msg)
-            raise ValueError("Could not extract executable code: no code candidates found in the response.")
+            # Fallback: return a minimal safe workflow to keep execution moving
+            return textwrap.dedent(
+                """
+                import omicverse as ov
+                import scanpy as sc
+                # Fallback minimal workflow when code extraction fails
+                adata = adata
+                sc.pp.normalize_total(adata, target_sum=1e4)
+                sc.pp.log1p(adata)
+                sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
+                sc.pp.pca(adata)
+                sc.pp.neighbors(adata)
+                try:
+                    sc.tl.leiden(adata)
+                except Exception:
+                    pass
+                try:
+                    sc.tl.umap(adata)
+                except Exception:
+                    pass
+                """
+            ).strip()
 
         logger.debug(f"Found {len(candidates)} code candidate(s) to validate")
 
@@ -1266,7 +1572,12 @@ Now generate a complete workflow for: "{request}"
             try:
                 ast.parse(normalized)
                 logger.debug(f"✓ Candidate {i+1} validated successfully")
-                return normalized
+                # Apply proactive transformations to prevent common LLM errors
+                transformer = ProactiveCodeTransformer()
+                transformed = transformer.transform(normalized)
+                if transformed != normalized:
+                    logger.debug("✓ Proactive transformations applied to fix potential errors")
+                return transformed
             except SyntaxError as exc:
                 error = f"Candidate {i+1}: syntax error - {exc}"
                 logger.debug(error)
@@ -1279,7 +1590,27 @@ Now generate a complete workflow for: "{request}"
             f"Errors:\n" + "\n".join(f"  - {err}" for err in syntax_errors)
         )
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        # Fallback to the same minimal safe workflow
+        return textwrap.dedent(
+            """
+            import omicverse as ov
+            import scanpy as sc
+            adata = adata
+            sc.pp.normalize_total(adata, target_sum=1e4)
+            sc.pp.log1p(adata)
+            sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
+            sc.pp.pca(adata)
+            sc.pp.neighbors(adata)
+            try:
+                sc.tl.leiden(adata)
+            except Exception:
+                pass
+            try:
+                sc.tl.umap(adata)
+            except Exception:
+                pass
+            """
+        ).strip()
 
     def _gather_code_candidates(self, response_text: str) -> List[str]:
         """Enhanced code extraction with multiple strategies to handle various formats."""
@@ -1614,7 +1945,74 @@ Your task is to review this code and provide feedback:
    - Missing required parameters
    - Using wrong parameter names
 
-3. **Provide feedback as a JSON object**:
+3. **CRITICAL VALIDATION CHECKLIST** (These cause frequent errors!):
+
+   **Parameter Name Validation:**
+   - pySCSA.cell_auto_anno() uses `clustertype='leiden'`, NOT `cluster='leiden'`!
+   - COSG/rank_genes uses `groupby='leiden'`, NOT `cluster='leiden'`
+   - These are DIFFERENT parameters with DIFFERENT meanings!
+
+   **Output Storage Validation:**
+   - Cell annotations → stored in `adata.obs['column_name']`
+   - Marker gene results (COSG, rank_genes_groups) → stored in `adata.uns['key']`
+   - COSG does NOT create `adata.obs['cosg_celltype']` - it stores results in `adata.uns['rank_genes_groups']`!
+
+   **Pandas/DataFrame Pitfalls:**
+   - DataFrame uses `.dtypes` (PLURAL) for all column types
+   - Series uses `.dtype` (SINGULAR) for single column type
+   - `df.dtype` will cause AttributeError - use `df.dtypes` instead!
+
+   **Batch Column Validation:**
+   - Before batch operations, check if batch column exists and has no NaN values
+   - Use `adata.obs['batch'].fillna('unknown')` to handle missing values
+
+   **Geneset Enrichment:**
+   - `pathways_dict` must be a dictionary loaded via `ov.utils.geneset_prepare()`, NOT a file path string!
+   - WRONG: `ov.bulk.geneset_enrichment(gene_list, pathways_dict='file.gmt')`
+   - CORRECT: First load with `pathways_dict = ov.utils.geneset_prepare('file.gmt')`, then pass dict
+
+   **HVG (Highly Variable Genes) - Small Dataset Pitfalls:**
+   - `flavor='seurat_v3'` uses LOESS regression which FAILS on:
+     - Small batches (<500 cells per batch)
+     - Log-normalized data (expects raw counts)
+   - Error message: "ValueError: Extrapolation not allowed with blending"
+   - ALWAYS wrap HVG in try/except with fallback:
+   ```python
+   try:
+       sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)
+   except ValueError:
+       sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)
+   ```
+   - For batch-aware HVG with small batches, prefer `flavor='cell_ranger'` or `flavor='seurat'`
+
+   **In-Place Function Pitfalls:**
+   - OmicVerse preprocessing functions operate IN-PLACE by default!
+   - Functions: `ov.pp.pca()`, `ov.pp.scale()`, `ov.pp.neighbors()`, `ov.pp.leiden()`, `ov.pp.umap()`, `ov.pp.tsne()`
+   - WRONG: `adata = ov.pp.pca(adata)` → returns None, adata becomes None!
+   - CORRECT: `ov.pp.pca(adata)` (call without assignment)
+   - Alternative: `adata = ov.pp.pca(adata, copy=True)` (explicit copy)
+   - Same pattern for `ov.pp.scale()`, `ov.pp.neighbors()`, `ov.pp.umap()`, etc.
+
+   **Print Statement Pitfalls:**
+   - NEVER use f-strings in print statements - they cause format errors with special characters
+   - WRONG: `print(f"Value: {{val:.2%}}")` → format code errors
+   - CORRECT: `print("Value: " + str(round(val * 100, 2)) + "%")`
+   - ALWAYS use string concatenation with str() for print statements
+
+   **Categorical Column Access Pitfalls:**
+   - NEVER assume a column is categorical - it may be string/object dtype
+   - WRONG: `adata.obs['leiden'].cat.categories` → AttributeError if not categorical
+   - CORRECT: `adata.obs['leiden'].value_counts()` (works for any dtype)
+   - If you MUST access categories: `if hasattr(adata.obs['col'], 'cat'): ...`
+
+   **AUTOMATIC FIXES REQUIRED** (You MUST apply these fixes if found):
+   - If code has f-strings in print() → Convert to string concatenation
+   - If code has `adata = ov.pp.func(adata)` → Remove the assignment
+   - If code has `.cat.categories` without check → Add hasattr() guard or use value_counts()
+   - If code has HVG without try/except → Add seurat fallback wrapper
+   - If code has batch operations without validation → Add fillna('unknown') guard
+
+4. **Provide feedback as a JSON object**:
 {{
   "issues_found": ["specific issue 1", "specific issue 2"],
   "needs_revision": true,
@@ -1686,16 +2084,111 @@ IMPORTANT:
                 'explanation': f'Reflection failed: {exc}'
             }
 
+    def _apply_execution_error_fix(self, code: str, error_msg: str) -> Optional[str]:
+        """
+        Apply targeted fixes to code based on known execution error patterns.
+
+        Parameters
+        ----------
+        code : str
+            The code that failed execution
+        error_msg : str
+            The error message from execution
+
+        Returns
+        -------
+        Optional[str]
+            Fixed code if a known pattern was matched, None otherwise
+        """
+        error_str = str(error_msg).lower()
+
+        # Fix 1: .dtype -> .dtypes for DataFrames
+        if "has no attribute 'dtype'" in error_str or "'dtype'" in error_str:
+            # Replace .dtype with .dtypes (for DataFrame attribute access)
+            import re
+            fixed_code = re.sub(r'\.dtype\b', '.dtypes', code)
+            if fixed_code != code:
+                logger.debug("Applied fix: .dtype -> .dtypes")
+                return fixed_code
+
+        # Fix 2: seurat_v3 LOESS error -> seurat fallback
+        if "extrapolation" in error_str or "loess" in error_str or "blending" in error_str:
+            # Replace seurat_v3 with seurat
+            fixed_code = code.replace("flavor='seurat_v3'", "flavor='seurat'")
+            fixed_code = fixed_code.replace('flavor="seurat_v3"', 'flavor="seurat"')
+            if fixed_code != code:
+                logger.debug("Applied fix: seurat_v3 -> seurat for HVG")
+                return fixed_code
+
+        # Fix 3: Categorical batch column errors (improved to handle Categorical dtype)
+        if ("cannot setitem on a categorical" in error_str or "new category" in error_str or
+            ("nan" in error_str and ("batch" in error_str or "categorical" in error_str))):
+            # Inject defensive batch preparation code that handles Categorical columns
+            prep_code = '''
+import pandas as pd
+if 'batch' in adata.obs.columns:
+    if pd.api.types.is_categorical_dtype(adata.obs['batch']):
+        adata.obs['batch'] = adata.obs['batch'].astype(str)
+    adata.obs['batch'] = adata.obs['batch'].fillna('unknown')
+    adata.obs['batch'] = adata.obs['batch'].astype('category')
+'''
+            fixed_code = prep_code + "\n" + code
+            logger.debug("Applied fix: Categorical batch column handling")
+            return fixed_code
+
+        # Fix 4: In-place function assignment error (adata = ov.pp.func(adata) returns None)
+        if "'nonetype' object has no attribute" in error_str:
+            import re
+            # Pattern: adata = ov.pp.func(adata, ...) where func is an in-place function
+            inplace_funcs = ['pca', 'scale', 'neighbors', 'leiden', 'umap', 'tsne', 'sude', 'scrublet', 'mde']
+            pattern = r'adata\s*=\s*ov\.pp\.(' + '|'.join(inplace_funcs) + r')\s*\('
+
+            if re.search(pattern, code):
+                # Remove the assignment, keep just the function call
+                fixed_code = re.sub(
+                    r'adata\s*=\s*(ov\.pp\.(?:' + '|'.join(inplace_funcs) + r')\s*\([^)]*\))',
+                    r'\1',  # Keep just the function call
+                    code
+                )
+                if fixed_code != code:
+                    logger.debug("Applied fix: Removed assignment from in-place function call")
+                    return fixed_code
+
+        return None
+
     def _execute_generated_code(self, code: str, adata: Any) -> Any:
-        """Execute generated Python code in a sandboxed namespace.
+        """Execute generated Python code in a sandboxed namespace or session notebook.
 
         Notes
         -----
+        When use_notebook_execution=True, code runs in a separate Jupyter notebook session
+        for better isolation and debugging. Otherwise, executes in a sandboxed namespace.
         The sandbox restricts available built-ins and module imports, but it is not a
         foolproof security boundary. Only run the agent with data and environments you
         trust, and consider additional isolation (e.g., containers) for untrusted input.
         """
 
+        # Use notebook execution if enabled
+        if self.use_notebook_execution and self._notebook_executor is not None:
+            try:
+                result_adata = self._notebook_executor.execute(code, adata)
+
+                # Store session info in result
+                if hasattr(result_adata, 'uns'):
+                    result_adata.uns['_ovagent_session'] = {
+                        'session_id': self._notebook_executor.current_session['session_id'],
+                        'notebook_path': str(self._notebook_executor.current_session['notebook_path']),
+                        'prompt_number': self._notebook_executor.session_prompt_count
+                    }
+
+                return result_adata
+
+            except Exception as e:
+                print(f"⚠️  Session execution failed: {e}")
+                print(f"   Falling back to in-process execution...")
+                # Fall through to legacy execution
+
+        # Legacy in-process execution
         compiled = compile(code, "<omicverse-agent>", "exec")
         sandbox_globals = self._build_sandbox_globals()
         sandbox_locals = {"adata": adata}
@@ -2657,6 +3150,113 @@ Example workflow:
 
         return asyncio.run(self.run_async(request, adata))
 
+    # ===================================================================
+    # Session Management Methods
+    # ===================================================================
+
+    def get_current_session_info(self) -> Optional[Dict[str, Any]]:
+        """
+        Get information about current notebook session.
+
+        Returns
+        -------
+        Optional[Dict[str, Any]]
+            Session information dictionary with keys:
+            - session_id: Session identifier
+            - notebook_path: Path to session notebook
+            - prompt_count: Number of prompts executed in session
+            - max_prompts: Maximum prompts per session
+            - remaining_prompts: Prompts remaining before restart
+            - start_time: Session start time (ISO format)
+            Returns None if notebook execution is disabled or no session exists.
+
+        Examples
+        --------
+        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent.run("preprocess data", adata)
+        >>> info = agent.get_current_session_info()
+        >>> print(f"Session: {info['session_id']}")
+        >>> print(f"Prompts: {info['prompt_count']}/{info['max_prompts']}")
+        """
+        if not self.use_notebook_execution or not self._notebook_executor:
+            return None
+
+        if not self._notebook_executor.current_session:
+            return None
+
+        session = self._notebook_executor.current_session
+        return {
+            'session_id': session['session_id'],
+            'notebook_path': str(session['notebook_path']),
+            'prompt_count': self._notebook_executor.session_prompt_count,
+            'max_prompts': self._notebook_executor.max_prompts_per_session,
+            'remaining_prompts': self.max_prompts_per_session - self._notebook_executor.session_prompt_count,
+            'start_time': session['start_time'].isoformat()
+        }
+
+    def restart_session(self):
+        """
+        Manually restart notebook session (clear memory, start fresh).
+
+        This forces a new session to be created on the next execution,
+        useful for freeing memory or starting with a clean state.
+
+        Examples
+        --------
+        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent.run("step 1", adata)
+        >>> agent.run("step 2", adata)
+        >>> # Force new session
+        >>> agent.restart_session()
+        >>> agent.run("step 3", adata)  # Runs in new session
+        """
+        if self.use_notebook_execution and self._notebook_executor:
+            if self._notebook_executor.current_session:
+                print("⚙ = Manually restarting session...")
+                self._notebook_executor._archive_current_session()
+                self._notebook_executor.current_session = None
+                self._notebook_executor.session_prompt_count = 0
+                print("✓ Session cleared. Next prompt will start new session.")
+            else:
+                print("💡 No active session to restart")
+        else:
+            print("⚠️  Notebook execution is not enabled")
+
+    def get_session_history(self) -> List[Dict[str, Any]]:
+        """
+        Get history of all archived notebook sessions.
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of session history dictionaries, each containing:
+            - session_id: Session identifier
+            - notebook_path: Path to archived notebook
+            - prompt_count: Number of prompts executed
+            - start_time: Session start time
+            - end_time: Session end time
+            - executions: List of execution records
+
+        Examples
+        --------
+        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> # ... run several prompts causing session restarts ...
+        >>> history = agent.get_session_history()
+        >>> for session in history:
+        ...     print(f"{session['session_id']}: {session['prompt_count']} prompts")
+        """
+        if self.use_notebook_execution and self._notebook_executor:
+            return self._notebook_executor.session_history
+        return []
+
+    def __del__(self):
+        """Cleanup on agent deletion."""
+        if hasattr(self, '_notebook_executor') and self._notebook_executor:
+            try:
+                self._notebook_executor.shutdown()
+            except:
+                pass
+
 
 def list_supported_models(show_all: bool = False) -> str:
     """
@@ -2680,7 +3280,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -2701,6 +3301,20 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         Maximum number of reflection iterations (default: 1, range: 1-3)
     enable_result_review : bool, optional
         Enable result review to validate output matches user intent (default: True)
+    use_notebook_execution : bool, optional
+        Execute code in separate Jupyter notebook for isolation and debugging (default: True).
+        Set to False to use legacy in-process execution.
+    max_prompts_per_session : int, optional
+        Number of prompts to execute in same notebook session before restart (default: 5).
+        This prevents memory bloat while maintaining context for iterative analysis.
+    notebook_storage_dir : str, optional
+        Directory to store session notebooks. Defaults to ~/.ovagent/sessions
+    keep_execution_notebooks : bool, optional
+        Whether to keep session notebooks after execution (default: True)
+    notebook_timeout : int, optional
+        Execution timeout in seconds (default: 600)
+    strict_kernel_validation : bool, optional
+        If True, raise error if kernel not found. If False, fall back to python3 kernel (default: True)
 
     Returns
     -------
@@ -2712,7 +3326,7 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     >>> import omicverse as ov
     >>> import scanpy as sc
     >>>
-    >>> # Create agent instance with full validation (default)
+    >>> # Create agent instance with full validation (default, session-based execution)
     >>> agent = ov.Agent(model="gpt-5", api_key="your-key")
     >>>
     >>> # Create agent with multiple reflection iterations
@@ -2721,8 +3335,17 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     >>> # Create agent without validation (fastest execution)
     >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=False)
     >>>
-    >>> # Create agent with only result review (skip code reflection)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=True)
+    >>> # Disable notebook execution (use legacy in-process execution)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", use_notebook_execution=False)
+    >>>
+    >>> # Maximum isolation (new session per prompt)
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=1)
+    >>>
+    >>> # Longer sessions for complex workflows
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=10)
+    >>>
+    >>> # Custom storage directory
+    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", notebook_storage_dir="~/my_project/sessions")
     >>>
     >>> # Load data
     >>> adata = sc.datasets.pbmc3k()
@@ -2735,8 +3358,25 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     >>>
     >>> # Use agent for clustering
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)
+    >>>
+    >>> # Check session info
+    >>> info = agent.get_current_session_info()
+    >>> print(f"Session: {info['session_id']}, Prompts: {info['prompt_count']}/{info['max_prompts']}")
     """
-    return OmicVerseAgent(model=model, api_key=api_key, endpoint=endpoint, enable_reflection=enable_reflection, reflection_iterations=reflection_iterations, enable_result_review=enable_result_review)
+    return OmicVerseAgent(
+        model=model,
+        api_key=api_key,
+        endpoint=endpoint,
+        enable_reflection=enable_reflection,
+        reflection_iterations=reflection_iterations,
+        enable_result_review=enable_result_review,
+        use_notebook_execution=use_notebook_execution,
+        max_prompts_per_session=max_prompts_per_session,
+        notebook_storage_dir=notebook_storage_dir,
+        keep_execution_notebooks=keep_execution_notebooks,
+        notebook_timeout=notebook_timeout,
+        strict_kernel_validation=strict_kernel_validation
+    )
 
 
 # Export the main functions

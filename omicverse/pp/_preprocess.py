@@ -17,7 +17,6 @@ from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from ..utils.registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
-from .._monitor import monitor
 
 
 from ._normalization import normalize_total,log1p
@@ -548,6 +547,10 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         adata: The preprocessed data matrix. 
     """
 
+    # Track the original object so we can propagate changes even if callers
+    # forget to use the returned value.
+    original_adata = adata
+
     # Log-normalization, HVGs identification
     from ._qc import _is_rust_backend
     is_rust = _is_rust_backend(adata)
@@ -634,24 +637,25 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data in gpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
 
-    # Update highly_variable_features from the HVG selection result
-    if 'highly_variable' in adata.var.columns:
-        if not is_rust:
-            adata.var = adata.var.drop(columns=['highly_variable_features'])
-            adata.var['highly_variable_features'] = adata.var['highly_variable']
-            adata.var = adata.var.drop(columns=['highly_variable'])
-        else:
-            adata.var['highly_variable_features'] = adata.var['highly_variable']
-    else:
-        # If highly_variable doesn't exist, it means HVG selection didn't run or failed
-        # Keep the existing highly_variable_features (from robust genes) as a fallback
-        import warnings
-        warnings.warn(
-            "Could not find 'highly_variable' column after HVG selection. "
-            "The 'highly_variable_features' column may contain all robust genes instead of selected HVGs.",
-            UserWarning
-        )
-    #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
+    # Normalize HVG column naming across backends and keep both aliases available
+    hv = adata.var['highly_variable'] if 'highly_variable' in adata.var.columns else None
+    hv_features = adata.var['highly_variable_features'] if 'highly_variable_features' in adata.var.columns else None
+    if hv is not None and hv_features is None:
+        adata.var['highly_variable_features'] = hv
+    elif hv_features is not None and hv is None:
+        adata.var['highly_variable'] = hv_features
+    elif hv is None and hv_features is None:
+        # Fallback: create a False vector if nothing is present
+        adata.var['highly_variable'] = False
+        adata.var['highly_variable_features'] = adata.var['highly_variable']
+
+    # Ensure PCA is available for downstream steps that expect it
+    try:
+        if 'X_pca' not in adata.obsm:
+            sc.tl.pca(adata, n_comps=min(50, adata.n_vars - 1))
+    except Exception as exc:  # pragma: no cover - runtime safeguard
+        print(f"{Colors.WARNING}⚠️  PCA computation skipped: {exc}{Colors.ENDC}")
+
     print(f"{EMOJI['done']} Preprocessing completed successfully.")
     print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
     print(f"{Colors.CYAN}        'highly_variable_features', boolean vector (adata.var){Colors.ENDC}")
@@ -672,6 +676,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         'organism':organism,
     }
     add_reference(adata,'scanpy','size normalization with scanpy')
+
+    # If we created a sliced copy above, mirror the updated state back onto
+    # the original object so callers get the processed data even when they
+    # forget to assign the returned adata.
+    if adata is not original_adata:
+        original_adata.__dict__.update(adata.__dict__)
+        adata = original_adata
+
     return adata
 def normalize_pearson_residuals(adata,**kwargs):
     '''
@@ -1084,6 +1096,17 @@ def neighbors(
     and in later versions it will become a hard dependency.
     
     """
+    # Ensure PCA exists; compute a default if missing so downstream code can proceed
+    if "X_pca" not in adata.obsm:
+        try:
+            sc.tl.pca(adata, n_comps=n_pcs or min(50, adata.n_vars - 1))
+        except Exception as exc:
+            warnings.warn(
+                f"PCA not found and automatic computation failed before neighbors(): {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         from ._neighbors import neighbors as _neighbors
