@@ -242,6 +242,8 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         rcParams["axes.facecolor"] = facecolor
     if scanpy:
         set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
+    if isinstance(figsize, (int, float)):
+        figsize = (figsize, figsize)
     if figsize is not None:
         rcParams["figure.figsize"] = figsize
     

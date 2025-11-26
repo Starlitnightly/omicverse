@@ -40,6 +40,83 @@ Use this skill to reproduce and adapt the single-cell annotation playbook captur
    - *Preprocessing & model fit*: Load both modalities, optionally concatenate for QC plots, and compute a shared low-dimensional embedding with `ov.utils.mde`. Train a neighbour model using `ov.utils.weighted_knn_trainer(train_adata=rna, train_adata_emb='X_glue', n_neighbors=15)`.
    - *Inference & interpretation*: Transfer labels via `labels, uncert = ov.utils.weighted_knn_transfer(query_adata=atac, query_adata_emb='X_glue', label_keys='major_celltype', knn_model=knn_transformer, ref_adata_obs=rna.obs)`. Store predictions in `atac.obs['transf_celltype']` and uncertainties in `atac.obs['transf_celltype_unc']`; copy to `major_celltype` if you want consistent naming. Visualise (`ov.utils.embedding`) and inspect uncertainty to flag ambiguous cells.
 
+## Critical API Reference - EXACT Function Signatures
+
+### pySCSA - IMPORTANT: Parameter is `clustertype`, NOT `cluster`
+
+**CORRECT usage:**
+```python
+# Step 1: Initialize pySCSA
+scsa = ov.single.pySCSA(
+    adata,
+    foldchange=1.5,
+    pvalue=0.01,
+    species='Human',
+    tissue='All',
+    target='cellmarker'  # or 'panglaodb'
+)
+
+# Step 2: Run annotation - NOTE: use clustertype='leiden', NOT cluster='leiden'!
+anno_result = scsa.cell_anno(clustertype='leiden', cluster='all')
+
+# Step 3: Add cell type labels to adata.obs
+scsa.cell_auto_anno(adata, clustertype='leiden', key='scsa_celltype')
+# Results are stored in adata.obs['scsa_celltype']
+```
+
+**WRONG - DO NOT USE:**
+```python
+# WRONG! 'cluster' is NOT a valid parameter for cell_auto_anno!
+# scsa.cell_auto_anno(adata, cluster='leiden')  # ERROR!
+```
+
+### COSG Marker Genes - Results stored in adata.uns, NOT adata.obs
+
+**CORRECT usage:**
+```python
+# Step 1: Run COSG marker gene identification
+ov.single.cosg(adata, groupby='leiden', n_genes_user=50)
+
+# Step 2: Access results from adata.uns (NOT adata.obs!)
+marker_names = adata.uns['rank_genes_groups']['names']  # DataFrame with cluster columns
+marker_scores = adata.uns['rank_genes_groups']['scores']
+
+# Step 3: Get top markers for specific cluster
+cluster_0_markers = adata.uns['rank_genes_groups']['names']['0'][:10].tolist()
+
+# Step 4: To create celltype column, manually map clusters to cell types
+cluster_to_celltype = {
+    '0': 'T cells',
+    '1': 'B cells',
+    '2': 'Monocytes',
+}
+adata.obs['cosg_celltype'] = adata.obs['leiden'].map(cluster_to_celltype)
+```
+
+**WRONG - DO NOT USE:**
+```python
+# WRONG! COSG does NOT create adata.obs columns directly!
+# adata.obs['cosg_celltype']  # This key does NOT exist after running COSG!
+# adata.uns['cosg_celltype']  # This key also does NOT exist!
+```
+
+### Common Pitfalls to Avoid
+
+1. **pySCSA parameter confusion**:
+   - `clustertype` = which obs column contains cluster labels (e.g., 'leiden')
+   - `cluster` = which specific clusters to annotate ('all' or specific cluster IDs)
+   - These are DIFFERENT parameters!
+
+2. **COSG result access**:
+   - COSG is a marker gene finder, NOT a cell type annotator
+   - Results are per-cluster gene rankings stored in `adata.uns['rank_genes_groups']`
+   - To assign cell types, you must manually map clusters to cell types based on markers
+
+3. **Result storage patterns in OmicVerse**:
+   - Cell type annotations → `adata.obs['<key>']`
+   - Marker gene results → `adata.uns['<key>']` (includes 'names', 'scores', 'logfoldchanges')
+   - Differential expression → `adata.uns['rank_genes_groups']`
+
 ## Examples
 - "Run SCSA with both CellMarker and PanglaoDB references on PBMC3k, then benchmark against manual marker assignments before feeding the results into CellVote."
 - "Annotate tumour microenvironment states in the MetaTiME Figshare dataset, highlight Major_MetaTiME classes, and export the label distribution per patient."

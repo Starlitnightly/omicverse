@@ -11,6 +11,33 @@ from ..utils import plot_text_set
 from ..utils.registry import register_function
 import matplotlib
 
+@register_function(
+    aliases=["基因集富集", "geneset_enrichment", "enrichr_analysis", "pathway_enrichment", "富集分析"],
+    category="bulk",
+    description="Perform gene set enrichment analysis. IMPORTANT: pathways_dict must be a dictionary loaded via ov.utils.geneset_prepare(), NOT a file path string!",
+    prerequisites={
+        'optional_functions': ['download_pathway_database', 'geneset_prepare']
+    },
+    examples=[
+        "# STEP 1: Download pathway database (run once)",
+        "ov.utils.download_pathway_database()",
+        "",
+        "# STEP 2: Load geneset into dictionary - REQUIRED!",
+        "pathways_dict = ov.utils.geneset_prepare('genesets/GO_Biological_Process_2021.txt', organism='Human')",
+        "",
+        "# STEP 3: Run enrichment with the DICTIONARY (NOT file path!)",
+        "enr = ov.bulk.geneset_enrichment(",
+        "    gene_list=deg_genes,",
+        "    pathways_dict=pathways_dict,  # Must be dict, NOT string path!",
+        "    pvalue_type='auto',",
+        "    organism='Human'",
+        ")",
+        "",
+        "# WRONG - DO NOT DO THIS:",
+        "# enr = ov.bulk.geneset_enrichment(gene_list=genes, pathways_dict='file.gmt')  # ERROR!"
+    ],
+    related=["utils.geneset_prepare", "utils.download_pathway_database", "bulk.geneset_plot", "bulk.pyGSEA"]
+)
 def geneset_enrichment(gene_list:list,pathways_dict:dict,
                        pvalue_threshold:float=0.05,pvalue_type:str='auto',
                        organism:str='Human',description:str='None',

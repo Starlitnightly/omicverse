@@ -502,6 +502,64 @@ merged = pd.merge(df1, df2, on='gene')
 df_combined = pd.concat([df1, df2], ignore_index=True)
 ```
 
+## Critical API Reference - DataFrame vs Series Attributes
+
+### IMPORTANT: `.dtype` vs `.dtypes` - Common Pitfall!
+
+**CORRECT usage:**
+```python
+# For DataFrame - use .dtypes (PLURAL) to get all column types
+df.dtypes  # Returns Series with column names as index, dtypes as values
+
+# For a single column (Series) - use .dtype (SINGULAR)
+df['column_name'].dtype  # Returns single dtype object
+
+# Check specific column type
+if df['expression'].dtype == 'float64':
+    print("Expression is float64")
+
+# Check all column types
+print(df.dtypes)  # Shows dtype for each column
+```
+
+**WRONG - DO NOT USE:**
+```python
+# WRONG! DataFrame does NOT have .dtype (singular)
+# df.dtype  # AttributeError: 'DataFrame' object has no attribute 'dtype'
+
+# WRONG! This will fail
+# if df.dtype == 'float64':  # ERROR!
+```
+
+### DataFrame Type Inspection Methods
+
+```python
+# Get dtypes for all columns
+df.dtypes
+
+# Get detailed info including dtypes
+df.info()
+
+# Check if column is numeric
+pd.api.types.is_numeric_dtype(df['column'])
+
+# Check if column is categorical
+pd.api.types.is_categorical_dtype(df['column'])
+
+# Select columns by dtype
+numeric_cols = df.select_dtypes(include=['number'])
+string_cols = df.select_dtypes(include=['object', 'string'])
+```
+
+### Series vs DataFrame - Key Differences
+
+| Attribute/Method | Series | DataFrame |
+|-----------------|--------|-----------|
+| `.dtype` | ✅ Returns single dtype | ❌ AttributeError |
+| `.dtypes` | ❌ AttributeError | ✅ Returns Series of dtypes |
+| `.shape` | `(n,)` tuple | `(n, m)` tuple |
+| `.values` | 1D array | 2D array |
+
 ## Technical Notes
 
 - **Libraries**: Uses `pandas` (1.x+), `numpy`, `scikit-learn` (widely supported)
