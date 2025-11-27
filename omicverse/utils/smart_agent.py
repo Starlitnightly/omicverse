@@ -62,6 +62,10 @@ from .skill_registry import (
     build_multi_path_skill_registry,
 )
 
+# Import filesystem context management for context engineering
+# Reference: https://blog.langchain.com/how-agents-can-use-filesystems-for-context-engineering/
+from .filesystem_context import FilesystemContextManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +235,7 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True):
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None):
         """
         Initialize the OmicVerse Smart Agent.
 
@@ -263,6 +267,12 @@ class OmicVerseAgent:
             Execution timeout in seconds (default: 600)
         strict_kernel_validation : bool, optional
             If True, raise error if kernel not found. If False, fall back to python3 kernel (default: True)
+        enable_filesystem_context : bool, optional
+            Enable filesystem-based context management for offloading intermediate results,
+            plans, and notes to disk. This reduces context window usage and enables
+            selective context retrieval. Default: True.
+        context_storage_dir : str, optional
+            Directory for storing context files. Defaults to ~/.ovagent/context/
         """
         print(f" Initializing OmicVerse Smart Agent (internal backend)...")
         
@@ -376,6 +386,25 @@ class OmicVerseAgent:
                     self._notebook_executor = None
             else:
                 print(f"   ⚡ Using in-process execution (no session isolation)")
+
+            # Initialize filesystem context management
+            self.enable_filesystem_context = enable_filesystem_context
+            self._filesystem_context: Optional[FilesystemContextManager] = None
+
+            if enable_filesystem_context:
+                try:
+                    base_dir = Path(context_storage_dir) if context_storage_dir else None
+                    self._filesystem_context = FilesystemContextManager(base_dir=base_dir)
+                    print(f"   📁 Filesystem context enabled")
+                    print(f"      Session: {self._filesystem_context.session_id}")
+                    print(f"      Storage: {self._filesystem_context._workspace_dir}")
+                except Exception as e:
+                    logger.warning(f"Filesystem context initialization failed: {e}")
+                    self.enable_filesystem_context = False
+                    self._filesystem_context = None
+                    print(f"   ⚠️  Filesystem context disabled (init failed: {e})")
+            else:
+                print(f"   ⚡ Filesystem context disabled")
 
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
@@ -3249,11 +3278,281 @@ Example workflow:
             return self._notebook_executor.session_history
         return []
 
+    # ===================================================================
+    # Filesystem Context Management Methods
+    # ===================================================================
+
+    @property
+    def filesystem_context(self) -> Optional[FilesystemContextManager]:
+        """Get the filesystem context manager.
+
+        Returns
+        -------
+        FilesystemContextManager or None
+            The context manager if enabled, None otherwise.
+        """
+        return self._filesystem_context if self.enable_filesystem_context else None
+
+    def write_note(
+        self,
+        key: str,
+        content: Union[str, Dict[str, Any]],
+        category: str = "notes",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Write a note to the filesystem context workspace.
+
+        Use this to offload intermediate results, observations, or decisions
+        from the context window to persistent storage. This reduces token usage
+        and enables selective context retrieval.
+
+        Parameters
+        ----------
+        key : str
+            Unique identifier for this note. Used for later retrieval.
+        content : str or dict
+            The note content. Can be free-form text or structured data.
+        category : str, optional
+            Category for organizing notes (default: "notes").
+            Options: notes, results, decisions, snapshots, figures, errors
+        metadata : dict, optional
+            Additional metadata to store with the note.
+
+        Returns
+        -------
+        str or None
+            Path to the stored note, or None if filesystem context is disabled.
+
+        Examples
+        --------
+        >>> agent.write_note("qc_stats", {"n_cells": 5000, "mito_pct": 0.05}, category="results")
+        >>> agent.write_note("observation", "Cluster 3 shows high mitochondrial content")
+        """
+        if not self._filesystem_context:
+            return None
+
+        try:
+            return self._filesystem_context.write_note(key, content, category, metadata)
+        except Exception as e:
+            logger.warning(f"Failed to write note: {e}")
+            return None
+
+    def search_context(
+        self,
+        pattern: str,
+        match_type: str = "glob",
+        max_results: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Search the filesystem context for relevant notes.
+
+        Use glob patterns to find notes by key, or grep patterns to search
+        within note content.
+
+        Parameters
+        ----------
+        pattern : str
+            Search pattern. For glob: "pca*", "cluster_*". For grep: regex pattern.
+        match_type : str, optional
+            Type of search: "glob" (filename pattern) or "grep" (content search).
+            Default: "glob".
+        max_results : int, optional
+            Maximum number of results to return (default: 10).
+
+        Returns
+        -------
+        list of dict
+            Matching results with key, category, and content preview.
+
+        Examples
+        --------
+        >>> results = agent.search_context("cluster*", match_type="glob")
+        >>> results = agent.search_context("resolution", match_type="grep")
+        """
+        if not self._filesystem_context:
+            return []
+
+        try:
+            results = self._filesystem_context.search_context(pattern, match_type, max_results=max_results)
+            return [
+                {
+                    "key": r.key,
+                    "category": r.category,
+                    "preview": r.content_preview,
+                    "relevance": r.relevance_score,
+                }
+                for r in results
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to search context: {e}")
+            return []
+
+    def get_relevant_context(
+        self,
+        query: str,
+        max_tokens: int = 1000,
+    ) -> str:
+        """Get context relevant to a query, formatted for LLM injection.
+
+        This method searches the filesystem context for notes relevant to
+        the given query and formats them for inclusion in prompts.
+
+        Parameters
+        ----------
+        query : str
+            The current task or query to find relevant context for.
+        max_tokens : int, optional
+            Approximate maximum tokens to return (default: 1000).
+
+        Returns
+        -------
+        str
+            Formatted context string ready for LLM injection.
+
+        Examples
+        --------
+        >>> context = agent.get_relevant_context("clustering")
+        >>> # Use context in custom prompts
+        """
+        if not self._filesystem_context:
+            return ""
+
+        try:
+            return self._filesystem_context.get_relevant_context(query, max_tokens)
+        except Exception as e:
+            logger.warning(f"Failed to get relevant context: {e}")
+            return ""
+
+    def save_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
+        """Save an execution plan to the filesystem context.
+
+        Plans are persisted and can be tracked across prompts.
+
+        Parameters
+        ----------
+        steps : list of dict
+            List of step definitions. Each step should have:
+            - description: What this step does
+            - status: pending, in_progress, completed, failed
+            - optional: function, parameters, expected_output
+
+        Returns
+        -------
+        str or None
+            Path to the plan file, or None if filesystem context is disabled.
+
+        Examples
+        --------
+        >>> agent.save_plan([
+        ...     {"description": "Run QC", "status": "pending"},
+        ...     {"description": "Normalize data", "status": "pending"},
+        ...     {"description": "Cluster cells", "status": "pending"},
+        ... ])
+        """
+        if not self._filesystem_context:
+            return None
+
+        try:
+            return self._filesystem_context.write_plan(steps)
+        except Exception as e:
+            logger.warning(f"Failed to save plan: {e}")
+            return None
+
+    def update_plan_step(
+        self,
+        step_index: int,
+        status: str,
+        result: Optional[str] = None,
+    ) -> None:
+        """Update the status of a plan step.
+
+        Parameters
+        ----------
+        step_index : int
+            Index of the step to update (0-based).
+        status : str
+            New status: pending, in_progress, completed, failed.
+        result : str, optional
+            Result or notes for this step.
+
+        Examples
+        --------
+        >>> agent.update_plan_step(0, "completed", "QC removed 500 low-quality cells")
+        >>> agent.update_plan_step(1, "in_progress")
+        """
+        if not self._filesystem_context:
+            return
+
+        try:
+            self._filesystem_context.update_plan_step(step_index, status, result)
+        except Exception as e:
+            logger.warning(f"Failed to update plan step: {e}")
+
+    def get_workspace_summary(self) -> str:
+        """Get a summary of the filesystem context workspace.
+
+        Returns
+        -------
+        str
+            Markdown-formatted workspace summary including:
+            - Session ID
+            - Plan progress (if a plan exists)
+            - Notes by category
+            - Recent activity
+
+        Examples
+        --------
+        >>> print(agent.get_workspace_summary())
+        """
+        if not self._filesystem_context:
+            return "Filesystem context is disabled."
+
+        try:
+            return self._filesystem_context.get_session_summary()
+        except Exception as e:
+            logger.warning(f"Failed to get workspace summary: {e}")
+            return f"Error getting workspace summary: {e}"
+
+    def get_context_stats(self) -> Dict[str, Any]:
+        """Get statistics about the filesystem context workspace.
+
+        Returns
+        -------
+        dict
+            Workspace statistics including:
+            - session_id: Current session ID
+            - workspace_dir: Path to workspace directory
+            - categories: Notes count and size by category
+            - total_notes: Total number of notes
+            - total_size_bytes: Total size in bytes
+
+        Examples
+        --------
+        >>> stats = agent.get_context_stats()
+        >>> print(f"Total notes: {stats['total_notes']}")
+        """
+        if not self._filesystem_context:
+            return {"enabled": False}
+
+        try:
+            stats = self._filesystem_context.get_workspace_stats()
+            stats["enabled"] = True
+            return stats
+        except Exception as e:
+            logger.warning(f"Failed to get context stats: {e}")
+            return {"enabled": True, "error": str(e)}
+
     def __del__(self):
         """Cleanup on agent deletion."""
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()
+            except:
+                pass
+
+        # Cleanup filesystem context if needed
+        if hasattr(self, '_filesystem_context') and self._filesystem_context:
+            try:
+                self._filesystem_context.cleanup_session(keep_summary=True)
             except:
                 pass
 
@@ -3280,7 +3579,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -3315,6 +3614,12 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         Execution timeout in seconds (default: 600)
     strict_kernel_validation : bool, optional
         If True, raise error if kernel not found. If False, fall back to python3 kernel (default: True)
+    enable_filesystem_context : bool, optional
+        Enable filesystem-based context management for offloading intermediate results,
+        plans, and notes to disk. This reduces context window usage and enables
+        selective context retrieval. Default: True.
+    context_storage_dir : str, optional
+        Directory for storing context files. Defaults to ~/.ovagent/context/
 
     Returns
     -------
@@ -3375,7 +3680,9 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         notebook_storage_dir=notebook_storage_dir,
         keep_execution_notebooks=keep_execution_notebooks,
         notebook_timeout=notebook_timeout,
-        strict_kernel_validation=strict_kernel_validation
+        strict_kernel_validation=strict_kernel_validation,
+        enable_filesystem_context=enable_filesystem_context,
+        context_storage_dir=context_storage_dir,
     )
 
 
