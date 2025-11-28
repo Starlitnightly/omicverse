@@ -2,16 +2,27 @@
 AgentContextInjector - Inject prerequisite state into LLM system prompts.
 
 This module provides the AgentContextInjector class which enhances LLM system
-prompts with current data state, executed functions, and prerequisite information,
-making the agent context-aware and proactive.
+prompts with current data state, executed functions, prerequisite information,
+and filesystem-based context, making the agent context-aware and proactive.
+
+The filesystem context integration follows LangChain's context engineering principles:
+- Write: Offload information to external storage early and often
+- Select: Pull in only relevant context when needed (glob/grep)
+- Compress: Summarize using structured schema-driven approaches
+- Isolate: Use sub-agent architecture with shared workspaces
+
+Reference: https://blog.langchain.com/how-agents-can-use-filesystems-for-context-engineering/
 """
 
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
 from anndata import AnnData
 
 from .inspector import DataStateInspector
+
+if TYPE_CHECKING:
+    from ..filesystem_context import FilesystemContextManager
 
 
 @dataclass
@@ -23,11 +34,15 @@ class ConversationState:
         execution_history: List of execution events with timestamps.
         data_snapshots: Snapshots of data state at different points.
         current_context: Current context string injected into system prompt.
+        filesystem_notes: References to notes written to filesystem context.
+        filesystem_session_id: Session ID for filesystem context workspace.
     """
     executed_functions: Set[str] = field(default_factory=set)
     execution_history: List[Dict[str, Any]] = field(default_factory=list)
     data_snapshots: List[Dict[str, Any]] = field(default_factory=list)
     current_context: str = ""
+    filesystem_notes: List[str] = field(default_factory=list)
+    filesystem_session_id: Optional[str] = None
 
     def add_execution(self, function_name: str, timestamp: Optional[datetime] = None):
         """Record a function execution.
@@ -67,10 +82,18 @@ class AgentContextInjector:
     - Executed functions (what's been run, with confidence scores)
     - Prerequisite chains (what's required, what's missing)
     - Function-specific context (for targeted operations)
+    - Filesystem-based context (notes, plans, intermediate results)
 
     The injected context makes the LLM agent aware of the current data state
     and enables it to generate complete, working code that handles prerequisites
     automatically.
+
+    Filesystem Context Integration:
+        The injector can optionally use a FilesystemContextManager to:
+        - Offload intermediate results to disk (reducing context window usage)
+        - Search for relevant context using glob/grep patterns
+        - Share context between parent and sub-agents
+        - Persist execution plans across sessions
 
     Example:
         >>> injector = AgentContextInjector(adata, registry)
@@ -78,23 +101,76 @@ class AgentContextInjector:
         >>> enhanced = injector.inject_context(system_prompt)
         >>> # Enhanced prompt now includes data state and prerequisite info
         >>> # Agent knows what's been executed and what's missing
+
+    Example with filesystem context:
+        >>> from omicverse.utils.filesystem_context import FilesystemContextManager
+        >>> fs_ctx = FilesystemContextManager()
+        >>> injector = AgentContextInjector(adata, registry, filesystem_context=fs_ctx)
+        >>> # Now context can be offloaded and selectively retrieved
     """
 
-    def __init__(self, adata: AnnData, registry: Any):
+    def __init__(
+        self,
+        adata: AnnData,
+        registry: Any,
+        filesystem_context: Optional['FilesystemContextManager'] = None,
+        enable_filesystem_context: bool = True,
+    ):
         """Initialize the context injector.
 
         Args:
             adata: AnnData object to inspect and track.
             registry: Function registry with prerequisite metadata.
+            filesystem_context: Optional FilesystemContextManager for persistent context.
+                If not provided and enable_filesystem_context is True, one will be created.
+            enable_filesystem_context: Whether to enable filesystem-based context management.
+                Default is True. Set to False for lightweight usage without filesystem I/O.
         """
         self.adata = adata
         self.registry = registry
         self.inspector = DataStateInspector(adata, registry)
         self.conversation_state = ConversationState()
 
+        # Filesystem context management
+        self.enable_filesystem_context = enable_filesystem_context
+        self._filesystem_context: Optional['FilesystemContextManager'] = None
+
+        if enable_filesystem_context:
+            if filesystem_context is not None:
+                self._filesystem_context = filesystem_context
+            else:
+                # Lazy initialization - create on first use
+                pass
+
         # Take initial snapshot
         initial_state = self._get_current_state()
         self.conversation_state.snapshot_data_state(initial_state)
+
+        # Store session ID if filesystem context is available
+        if self._filesystem_context is not None:
+            self.conversation_state.filesystem_session_id = self._filesystem_context.session_id
+
+    @property
+    def filesystem_context(self) -> Optional['FilesystemContextManager']:
+        """Get the filesystem context manager, creating one if needed.
+
+        Returns:
+            FilesystemContextManager or None if filesystem context is disabled.
+        """
+        if not self.enable_filesystem_context:
+            return None
+
+        if self._filesystem_context is None:
+            # Lazy initialization
+            try:
+                from ..filesystem_context import FilesystemContextManager
+                self._filesystem_context = FilesystemContextManager()
+                self.conversation_state.filesystem_session_id = self._filesystem_context.session_id
+            except ImportError:
+                self.enable_filesystem_context = False
+                return None
+
+        return self._filesystem_context
 
     def inject_context(
         self,
@@ -103,6 +179,9 @@ class AgentContextInjector:
         include_general_state: bool = True,
         include_function_specific: bool = True,
         include_instructions: bool = True,
+        include_filesystem_context: bool = True,
+        filesystem_query: Optional[str] = None,
+        max_filesystem_tokens: int = 1000,
     ) -> str:
         """Inject prerequisite context into system prompt.
 
@@ -112,6 +191,10 @@ class AgentContextInjector:
             include_general_state: Include general data state summary.
             include_function_specific: Include function-specific context.
             include_instructions: Include prerequisite handling instructions.
+            include_filesystem_context: Include relevant filesystem context.
+            filesystem_query: Query to search filesystem context. If None, uses
+                target_function or a default search.
+            max_filesystem_tokens: Maximum tokens for filesystem context section.
 
         Returns:
             Enhanced system prompt with injected context.
@@ -123,6 +206,7 @@ class AgentContextInjector:
             >>> # - Current data state (what's been executed)
             >>> # - leiden prerequisites and requirements
             >>> # - Instructions for handling missing prerequisites
+            >>> # - Relevant filesystem context (notes, plan, etc.)
         """
         sections = [system_prompt, "\n"]
 
@@ -133,6 +217,16 @@ class AgentContextInjector:
         if include_function_specific and target_function:
             sections.append(self._build_function_specific_section(target_function))
             sections.append("\n")
+
+        # Include filesystem context if enabled
+        if include_filesystem_context and self.enable_filesystem_context:
+            fs_section = self._build_filesystem_context_section(
+                query=filesystem_query or target_function,
+                max_tokens=max_filesystem_tokens,
+            )
+            if fs_section:
+                sections.append(fs_section)
+                sections.append("\n")
 
         if include_instructions:
             sections.append(self._build_prerequisite_instructions())
@@ -400,3 +494,244 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         # Take fresh snapshot
         initial_state = self._get_current_state()
         self.conversation_state.snapshot_data_state(initial_state)
+
+    # =========================================================================
+    # Filesystem Context Methods
+    # =========================================================================
+
+    def _build_filesystem_context_section(
+        self,
+        query: Optional[str] = None,
+        max_tokens: int = 1000,
+    ) -> str:
+        """Build filesystem context section for prompt injection.
+
+        Args:
+            query: Query to search for relevant context.
+            max_tokens: Maximum tokens for this section.
+
+        Returns:
+            Formatted filesystem context section, or empty string if none available.
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return ""
+
+        try:
+            # Get relevant context based on query
+            if query:
+                context = fs_ctx.get_relevant_context(
+                    query=query,
+                    max_tokens=max_tokens,
+                    include_plan=True,
+                    include_recent=3,
+                )
+            else:
+                context = fs_ctx.get_relevant_context(
+                    query="analysis preprocessing clustering",
+                    max_tokens=max_tokens,
+                    include_plan=True,
+                    include_recent=5,
+                )
+
+            if not context or len(context.strip()) < 10:
+                return ""
+
+            return f"## Workspace Context\n\n{context}"
+
+        except Exception:
+            # Silently fail - filesystem context is optional
+            return ""
+
+    def write_to_context(
+        self,
+        key: str,
+        content: Any,
+        category: str = "notes",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Write information to the filesystem context.
+
+        Use this to offload intermediate results, observations, or decisions
+        from the context window to persistent storage.
+
+        Args:
+            key: Unique identifier for this note.
+            content: Content to store (string or dict).
+            category: Category for organization (notes, results, decisions, etc.).
+            metadata: Additional metadata to store.
+
+        Returns:
+            Path to the stored note, or None if filesystem context is disabled.
+
+        Example:
+            >>> injector.write_to_context(
+            ...     "clustering_result",
+            ...     {"n_clusters": 8, "resolution": 1.0},
+            ...     category="results"
+            ... )
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return None
+
+        try:
+            path = fs_ctx.write_note(key, content, category, metadata)
+            self.conversation_state.filesystem_notes.append(f"{category}/{key}")
+            return path
+        except Exception:
+            return None
+
+    def search_context(
+        self,
+        pattern: str,
+        match_type: str = "glob",
+        max_results: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Search the filesystem context for relevant notes.
+
+        Args:
+            pattern: Search pattern (glob pattern or regex for grep).
+            match_type: "glob" for filename matching, "grep" for content search.
+            max_results: Maximum results to return.
+
+        Returns:
+            List of matching results with key, category, and content preview.
+
+        Example:
+            >>> results = injector.search_context("cluster*", match_type="glob")
+            >>> results = injector.search_context("resolution", match_type="grep")
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return []
+
+        try:
+            results = fs_ctx.search_context(pattern, match_type, max_results=max_results)
+            return [
+                {
+                    "key": r.key,
+                    "category": r.category,
+                    "preview": r.content_preview,
+                    "relevance": r.relevance_score,
+                }
+                for r in results
+            ]
+        except Exception:
+            return []
+
+    def save_execution_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
+        """Save an execution plan to the filesystem context.
+
+        Args:
+            steps: List of step definitions with description and status.
+
+        Returns:
+            Path to the plan file, or None if filesystem context is disabled.
+
+        Example:
+            >>> injector.save_execution_plan([
+            ...     {"description": "Run QC", "status": "pending"},
+            ...     {"description": "Normalize data", "status": "pending"},
+            ...     {"description": "Cluster cells", "status": "pending"},
+            ... ])
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return None
+
+        try:
+            return fs_ctx.write_plan(steps)
+        except Exception:
+            return None
+
+    def update_plan_step(
+        self,
+        step_index: int,
+        status: str,
+        result: Optional[str] = None,
+    ) -> None:
+        """Update the status of a plan step.
+
+        Args:
+            step_index: Index of the step (0-based).
+            status: New status (pending, in_progress, completed, failed).
+            result: Optional result or notes for this step.
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return
+
+        try:
+            fs_ctx.update_plan_step(step_index, status, result)
+        except Exception:
+            pass
+
+    def save_data_snapshot(
+        self,
+        step_number: Optional[int] = None,
+        description: Optional[str] = None,
+    ) -> Optional[str]:
+        """Save a snapshot of the current AnnData state to filesystem.
+
+        Args:
+            step_number: Optional step number for ordering.
+            description: Human-readable description of the snapshot.
+
+        Returns:
+            Path to the snapshot file.
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return None
+
+        try:
+            state = self._get_current_state()
+            return fs_ctx.write_snapshot(state, step_number, description)
+        except Exception:
+            return None
+
+    def get_workspace_summary(self) -> str:
+        """Get a summary of the filesystem workspace.
+
+        Returns:
+            Markdown-formatted workspace summary.
+        """
+        fs_ctx = self.filesystem_context
+        if fs_ctx is None:
+            return "Filesystem context is disabled."
+
+        try:
+            return fs_ctx.get_session_summary()
+        except Exception:
+            return "Error getting workspace summary."
+
+    def create_sub_agent_injector(
+        self,
+        adata: Optional[AnnData] = None,
+    ) -> 'AgentContextInjector':
+        """Create a context injector for a sub-agent that shares the workspace.
+
+        Args:
+            adata: AnnData to use for the sub-agent. If None, uses the same adata.
+
+        Returns:
+            New AgentContextInjector that shares the filesystem workspace.
+
+        Example:
+            >>> sub_injector = injector.create_sub_agent_injector()
+            >>> # sub_injector shares the same filesystem workspace
+        """
+        sub_adata = adata if adata is not None else self.adata
+
+        if self.filesystem_context is not None:
+            sub_fs_ctx = self.filesystem_context.create_sub_agent_context()
+        else:
+            sub_fs_ctx = None
+
+        return AgentContextInjector(
+            adata=sub_adata,
+            registry=self.registry,
+            filesystem_context=sub_fs_ctx,
+            enable_filesystem_context=self.enable_filesystem_context,
+        )
