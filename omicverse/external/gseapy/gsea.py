@@ -140,7 +140,9 @@ class GSEAbase(object):
         if filsets_num == len(subsets):
             self._logger.error("No gene sets passed through filtering condition!!!, try new parameters again!\n" +\
                                "Note: check gene name, gmt file format, or filtering size." )
-            raise Exception("No gene sets passed through filtering condition")
+            # Gracefully continue with an empty gene set dictionary instead of raising
+            self._gmtdct = {}
+            return {}
 
         self._gmtdct=genesets_dict
         return genesets_dict

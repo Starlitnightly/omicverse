@@ -81,5 +81,29 @@ from ._lsi import *
 from ._neighboors import neighbors
 
 # Import smart_agent module to make it accessible and expose key entrypoints
-from . import smart_agent
+# Store verifier with a private name first to ensure reference is preserved
+from . import agent_backend, smart_agent
+from . import verifier as _verifier_module
+from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
+
+# Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
+# This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
+def __getattr__(name):
+    """Dynamically return module attributes for Python 3.10 compatibility.
+
+    This is required because unittest.mock.patch uses getattr() to resolve
+    module paths, and in Python 3.10 submodule imports don't automatically
+    become accessible as attributes of the parent module.
+    """
+    if name == 'verifier':
+        return _verifier_module
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+# Also make verifier accessible via normal attribute access
+verifier = _verifier_module
+
+# Build __all__ dynamically and ensure verifier is included
+__all__ = [name for name in globals() if not name.startswith("_")]
+if 'verifier' not in __all__:
+    __all__.append('verifier')

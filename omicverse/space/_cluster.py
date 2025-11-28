@@ -16,6 +16,17 @@ from ..utils.registry import register_function
     aliases=["STAGATE空间聚类", "pySTAGATE", "STAGATE", "空间聚类模型", "图注意力自编码器"],
     category="space",
     description="PyTorch implementation of STAGATE for spatial transcriptomics analysis using graph attention autoencoder",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obs': []  # Requires spatial coordinates in obs (user-specified spatial_key)
+    },
+    produces={
+        'obsm': ['STAGATE'],
+        'layers': ['STAGATE_ReX']
+    },
+    auto_fix='none',
     examples=[
         "# Basic STAGATE analysis",
         "stagate = ov.space.pySTAGATE(adata, num_batch_x=3, num_batch_y=2,",
@@ -266,6 +277,17 @@ class pySTAGATE:
     aliases=["空间聚类分析", "clusters", "spatial_clustering", "多方法聚类", "空间域聚类"],
     category="space",
     description="Perform spatial clustering using multiple methods (STAGATE, GraphST, CAST, BINARY)",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obs': []  # Requires spatial coordinates (user-specified)
+    },
+    produces={
+        'obsm': [],  # Dynamic: depends on method (STAGATE, GraphST_embedding, CAST, BINARY)
+        'uns': []    # Dynamic: may produce Spatial_Graph
+    },
+    auto_fix='none',
     examples=[
         "# Multiple clustering methods",
         "methods = ['STAGATE', 'GraphST']",
@@ -511,6 +533,17 @@ def clusters(adata,
     aliases=["合并类群", "merge_cluster", "cluster_merge", "类群合并", "合并空间类群"],
     category="space",
     description="Merge spatial clusters based on hierarchical clustering of their representation",
+    prerequisites={
+        'functions': []  # Requires prior clustering but method is flexible
+    },
+    requires={
+        'obs': [],    # Dynamic: requires groupby column (user-specified)
+        'obsm': []    # Dynamic: requires use_rep (user-specified)
+    },
+    produces={
+        'obs': []  # Dynamic: creates {groupby}_tree column
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic cluster merging",
         "result = ov.space.merge_cluster(adata, groupby='mclust_GraphST',",

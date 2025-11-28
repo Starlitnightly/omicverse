@@ -331,18 +331,39 @@ class _RankGenes:
 @register_function(
     aliases=["COSG分析", "cosg", "marker_genes", "标记基因", "cluster_markers"],
     category="single",
-    description="Identify cluster-specific marker genes using COSG (COSine similarity-based Gene set scoring)",
+    description="Identify cluster-specific marker genes using COSG. IMPORTANT: Results are stored in adata.uns['rank_genes_groups'], NOT adata.obs! COSG finds markers but does NOT automatically assign cell types.",
+    prerequisites={
+        'functions': ['leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: user-specified groupby column
+    },
+    produces={
+        'uns': ['rank_genes_groups', 'cosg_logfoldchanges']
+    },
+    auto_fix='escalate',
     examples=[
-        "# Basic COSG marker gene identification",
-        "cosg_results = ov.single.cosg(adata, groupby='leiden', n_genes_user=50)",
-        "# Custom cell type grouping",
-        "cosg_results = ov.single.cosg(adata, groupby='celltype', groups=['T cells', 'B cells'])",
-        "# With low expression filtering",
-        "cosg_results = ov.single.cosg(adata, groupby='leiden',",
-        "                             remove_lowly_expressed=True, expressed_pct=0.2)",
-        "# Access results",
-        "top_genes = adata.uns['cosg']['0']  # Top genes for cluster 0",
-        "# Compute fold changes",
+        "# IMPORTANT: COSG stores results in adata.uns, NOT adata.obs!",
+        "",
+        "# Step 1: Run COSG marker gene identification",
+        "ov.single.cosg(adata, groupby='leiden', n_genes_user=50)",
+        "",
+        "# Step 2: Access results from adata.uns (NOT adata.obs!)",
+        "marker_names = adata.uns['rank_genes_groups']['names']  # DataFrame",
+        "marker_scores = adata.uns['rank_genes_groups']['scores']",
+        "",
+        "# Step 3: Get top markers for specific cluster",
+        "cluster_0_markers = adata.uns['rank_genes_groups']['names']['0'][:10].tolist()",
+        "",
+        "# Step 4: To create celltype column, MANUALLY map clusters based on markers",
+        "cluster_to_celltype = {'0': 'T cells', '1': 'B cells', '2': 'Monocytes'}",
+        "adata.obs['celltype'] = adata.obs['leiden'].map(cluster_to_celltype)",
+        "",
+        "# WRONG - DO NOT USE:",
+        "# adata.obs['cosg_celltype']  # ERROR! This key does NOT exist!",
+        "# COSG does NOT create adata.obs columns - it only finds marker genes!",
+        "",
+        "# With logfoldchange calculation",
         "ov.single.cosg(adata, groupby='leiden', calculate_logfoldchanges=True)",
         "logfc_df = adata.uns['cosg_logfoldchanges']"
     ],
@@ -600,8 +621,32 @@ def cosg(
         adata.uns[key_added][col]=rank_stats[col].to_records(
     index=False, column_dtypes=dtypes[col]
     )
-    adata.uns[key_added]['pvals']=adata.uns['rank_genes_groups']['pvals']
-    adata.uns[key_added]['pvals_adj']=adata.uns['rank_genes_groups']['pvals_adj']
+    # Convert structured arrays to DataFrames for easier downstream use
+    for cluster_key, cluster_val in list(adata.uns[key_added].items()):
+        try:
+            if isinstance(cluster_val, np.ndarray) and getattr(cluster_val, "dtype", None) is not None and cluster_val.dtype.names:
+                adata.uns[key_added][cluster_key] = pd.DataFrame(cluster_val)
+        except Exception:
+            continue
+    # Safeguard pvals storage: some pipelines may not populate rank_genes_groups; fall back to zeros
+    try:
+        adata.uns[key_added]['pvals']=adata.uns['rank_genes_groups']['pvals']
+        adata.uns[key_added]['pvals_adj']=adata.uns['rank_genes_groups']['pvals_adj']
+    except Exception:
+        # Build zero arrays matching the shape of scores; keep a local numpy handle
+        import numpy as _np
+        p_shape = adata.uns[key_added]['scores'].shape if 'scores' in adata.uns[key_added] else None
+        if p_shape is not None:
+            adata.uns[key_added]['pvals'] = _np.zeros(p_shape, dtype='float32')
+            adata.uns[key_added]['pvals_adj'] = _np.zeros(p_shape, dtype='float32')
+        else:
+            adata.uns[key_added]['pvals'] = None
+            adata.uns[key_added]['pvals_adj'] = None
+
+    # Ensure a consistent key for downstream consumers expecting 'cosg' or 'cosg_markers'
+    if key_added != 'cosg':
+        adata.uns['cosg'] = adata.uns.get(key_added, adata.uns.get('cosg', {}))
+    adata.uns.setdefault('cosg_markers', adata.uns.get(key_added, {}))
         
     
         

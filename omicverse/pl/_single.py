@@ -315,7 +315,8 @@ def embedding(
 def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        groupby_li=None,figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,ax=None,
-                       legend:bool=False,legend_awargs={'ncol':1},transpose:bool=False):
+                       legend:bool=False,legend_awargs=None,transpose:bool=False,
+                       save:str=None,**kwargs):
     r"""Plot cell proportion of each cell type in each visual cluster.
 
     Arguments:
@@ -343,6 +344,17 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
         adata.obs[visual_clusters]=adata.obs[visual_clusters].astype('category')
         visual_li=adata.obs[visual_clusters].cat.categories
     
+    # Ensure color palettes exist for the requested categories
+    import matplotlib
+    if f'{celltype_clusters}_colors' not in adata.uns:
+        palette = matplotlib.colormaps.get_cmap('tab20')
+        colors = [matplotlib.colors.to_hex(palette(i % palette.N)) for i in range(len(adata.obs[celltype_clusters].cat.categories))]
+        adata.uns[f'{celltype_clusters}_colors'] = colors
+    if f'{visual_clusters}_colors' not in adata.uns:
+        palette = matplotlib.colormaps.get_cmap('tab20')
+        colors = [matplotlib.colors.to_hex(palette(i % palette.N)) for i in range(len(adata.obs[visual_clusters].cat.categories))]
+        adata.uns[f'{visual_clusters}_colors'] = colors
+
     for i in visual_li:
         b1=pd.DataFrame()
         test=adata.obs.loc[adata.obs[visual_clusters]==i,celltype_clusters].value_counts()
@@ -359,6 +371,9 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     b['cell_type_color'] = b['cell_type'].map(plot_data2_color_dict)
     b['stage_color']=b['Week'].map(plot_data3_color_dict)
     
+    if legend_awargs is None:
+        legend_awargs = {'ncol':1}
+
     if ax==None:
         fig, ax = plt.subplots(figsize=figsize)
     #用ax控制图片
@@ -384,7 +399,10 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
             bottoms+=test1['value'].values
         n+=1
     if legend!=False:
-        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10,**legend_awargs)
+        # Merge defaults with user-supplied legend kwargs to avoid duplicate bbox_to_anchor
+        legend_kw = {'bbox_to_anchor': (1.05, -0.05), 'loc': 3, 'borderaxespad': 0, 'fontsize': 10}
+        legend_kw.update(legend_awargs or {})
+        plt.legend(**legend_kw)
     
     plt.grid(False)
     
@@ -415,6 +433,8 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
         plt.xlabel(groupby,fontsize=labels_fontsize)
         plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
     #fig.tight_layout()
+    if save:
+        plt.savefig(save, bbox_inches="tight")
     if ax==None:
         return fig,ax
     

@@ -76,6 +76,7 @@ dependencies = [
     'transformers>=0.30',
     'marsilea',
     'wandb',
+    'openai>=1.0',
     #'cvxpy>=1.3',
 
 ]
@@ -102,6 +103,11 @@ skillseeker = [
   "PyMuPDF>=1.24",
 ]
 
+tests = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.23",
+]
+
 
 [project.urls]
 Github = 'https://github.com/Starlitnightly/omicverse'
@@ -111,3 +117,11 @@ exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
 
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

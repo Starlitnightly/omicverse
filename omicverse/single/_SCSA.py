@@ -9,6 +9,7 @@ import sys
 import argparse
 import gzip
 import os
+import warnings
 
 import numpy as np
 from numpy import asarray,arange,minimum,abs,sum,power,mean,array,std,log2,log10
@@ -40,6 +41,23 @@ except ImportError:
         "check_mark": "✅",
         "warning": "⚠️",
     }
+
+# ---------------------------------------------------------------------------
+# pandas >=2 compatibility: ensure legacy index modules resolve for pickled DBs
+# ---------------------------------------------------------------------------
+if pd.__version__ > "1.5.3":
+    try:
+        _pbase = pd.core.indexes.base
+        # pandas 2 removed pandas.core.indexes.numeric; pySCSA pickles still reference it
+        sys.modules['pandas.core.indexes.numeric'] = _pbase
+        if not hasattr(_pbase, "Int64Index"):
+            _pbase.Int64Index = _pbase.Index
+    except Exception as exc:  # pragma: no cover - defensive
+        warnings.warn(
+            f"Failed to install pandas>=2 legacy index shims ({exc}); "
+            "pySCSA database unpickling may fail.",
+            RuntimeWarning,
+        )
 
 class Annotator(object):
     def __init__(self,foldchange,weight,
@@ -140,7 +158,15 @@ class Annotator(object):
                     return ''.join(c for c in value if c.isprintable())
                 return value
             h_values = h_values.applymap(clean_non_printable_chars)
-            h_values.to_csv(wb,sep="\t",quotechar = "\t",index=False,header=False,encoding='gbk')
+            # Use a safe quote character distinct from the tab separator to avoid CSV errors
+            h_values.to_csv(
+                wb,
+                sep="\t",
+                quotechar='"',
+                index=False,
+                header=False,
+                encoding='gbk',
+            )
 
     @staticmethod
     def translate_go(name="go.obo"):
@@ -1230,8 +1256,27 @@ class Annotator(object):
         if '2023' in db:
             self.year=2023
             if pd.__version__ > "1.5.3":
-                print("2023 database build on pandas<2, please downgrade your pandas version!")
-                raise ValueError("2023 database build on pandas<2, please downgrade your pandas version!")
+                # The 2023 database was generated with pandas<2. Apply a small
+                # compatibility shim so pandas>=2 can still unpickle it.
+                try:
+                    import pandas
+                    _pbase = pandas.core.indexes.base
+                    # pandas 2 moved Int64Index; ensure old import paths keep working
+                    sys.modules['pandas.core.indexes.numeric'] = _pbase
+                    if not hasattr(_pbase, "Int64Index"):
+                        _pbase.Int64Index = _pbase.Index
+                except Exception as exc:  # pragma: no cover - defensive shim
+                    warnings.warn(
+                        f"Compatibility shim for pandas>=2 failed ({exc}); "
+                        "falling back to default unpickle behaviour.",
+                        RuntimeWarning,
+                    )
+                else:
+                    warnings.warn(
+                        f"2023 database built on pandas<2; applied pandas<2 "
+                        f"compatibility shims for pandas {pd.__version__}.",
+                        RuntimeWarning,
+                    )
         elif '2024' in db:
             self.year=2024
             if pd.__version__ > "1.5.3":

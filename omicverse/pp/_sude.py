@@ -40,6 +40,16 @@ def _choose_representation(adata, use_rep=None, n_pcs=None):
     aliases=["SUDE降维", "sude", "SUDE", "sude_embedding", "SUDE嵌入"],
     category="preprocessing",
     description="SUDE dimensionality reduction for scalable single-cell visualization (CPU implementation).",
+    prerequisites={
+        'optional_functions': ['scale', 'preprocess']
+    },
+    requires={
+        'layers': ['scaled']
+    },
+    produces={
+        'obsm': ['X_sude']
+    },
+    auto_fix='escalate',
     examples=[
         "# Compute SUDE embedding",
         "ov.pp.sude(adata, n_pcs=50, no_dims=2, k1=20)",

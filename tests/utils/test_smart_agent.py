@@ -1,3 +1,4 @@
+import ast
 import asyncio
 import importlib.machinery
 import importlib.util
@@ -54,6 +55,28 @@ def _build_agent(return_value):
 
     agent.run_async = MethodType(_fake_run_async, agent)
     return agent
+
+
+def test_extract_python_code_includes_function_defs():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    response_text = """
+LLM response:
+import numpy as np
+def summarize_counts(adata):
+    counts = []
+    for value in np.sum(adata.X, axis=1):
+        counts.append(float(value))
+    return counts
+for _ in range(1):
+    totals = summarize_counts(adata)
+    print(min(totals))
+"""
+
+    code = agent._extract_python_code(response_text)
+
+    assert "def summarize_counts" in code
+    assert "counts.append" in code
+    ast.parse(code)
 
 
 def test_run_outside_event_loop(monkeypatch):

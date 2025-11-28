@@ -265,6 +265,12 @@ class CellVote(object):
     aliases=["获取集群细胞类型", "get_cluster_celltype", "cluster_celltype", "集群类型获取", "LLM细胞注释"],
     category="single",
     description="LLM-powered cluster cell type determination with retry mechanism and error handling",
+    prerequisites={
+        'functions': ['get_celltype_marker']
+    },
+    requires={},
+    produces={},
+    auto_fix='escalate',
     examples=[
         "# Basic cluster cell type determination",
         "cluster_celltypes = {'0': ['T cell', 'B cell'], '1': ['NK', 'T cell']}",
@@ -273,7 +279,7 @@ class CellVote(object):
         "                                        'human', 'PBMC', 'gpt-4', None, 'openai')",
         "# With custom API settings",
         "result = ov.single.get_cluster_celltype(cluster_celltypes, cluster_markers,",
-        "                                        'mouse', 'Brain', 'qwen-plus',", 
+        "                                        'mouse', 'Brain', 'qwen-plus',",
         "                                        'https://custom.api.com/v1', 'qwen')",
         "# With retry configuration",
         "result = ov.single.get_cluster_celltype(cluster_celltypes, cluster_markers,",

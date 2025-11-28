@@ -104,8 +104,29 @@ class SkillInstructionFormatter:
 
 
 @dataclass
+class SkillMetadata:
+    """Lightweight skill metadata for progressive disclosure (name + description only).
+
+    This is loaded at startup to enable LLM-based skill matching without loading full content.
+    """
+    name: str
+    slug: str
+    description: str
+    path: Path
+    metadata: Dict[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, str]:
+        """Convert metadata to dictionary for LLM consumption."""
+        return {
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+        }
+
+
+@dataclass
 class SkillDefinition:
-    """Represents a single Agent Skill discovered on disk.
+    """Represents a single Agent Skill with full content loaded.
 
     name: display title; slug: lowercase-hyphen identifier for routing.
     """
@@ -163,36 +184,163 @@ class SkillMatch:
 
 
 class SkillRegistry:
-    """Loads skills from the filesystem and stores their metadata."""
+    """Loads skills from the filesystem with progressive disclosure.
 
-    def __init__(self, skill_root: Path):
+    At startup, only loads name + description (SkillMetadata) for fast LLM-based matching.
+    Full skill content (SkillDefinition with body) is loaded on-demand when needed.
+    """
+
+    def __init__(self, skill_root: Path, progressive_disclosure: bool = True):
         self.skill_root = skill_root
-        self._skills: Dict[str, SkillDefinition] = {}
+        self.progressive_disclosure = progressive_disclosure
+        self._skill_metadata: Dict[str, SkillMetadata] = {}
+        self._full_skills_cache: Dict[str, SkillDefinition] = {}
 
     @property
     def skills(self) -> Dict[str, SkillDefinition]:
-        return self._skills
+        """Backward compatibility: return full skills, loading them if needed."""
+        if not self.progressive_disclosure:
+            return self._full_skills_cache
+
+        # If using progressive disclosure, load all skills on first access
+        for slug in self._skill_metadata:
+            if slug not in self._full_skills_cache:
+                self.load_full_skill(slug)
+        return self._full_skills_cache
+
+    @property
+    def skill_metadata(self) -> Dict[str, SkillMetadata]:
+        """Get lightweight skill metadata (name + description only) for LLM matching."""
+        return self._skill_metadata
 
     def load(self) -> None:
-        """Discover every SKILL.md under the configured skill root."""
+        """Discover skills under the configured skill root.
+
+        With progressive_disclosure=True (default): Only loads name + description.
+        With progressive_disclosure=False: Loads full skill content.
+        """
 
         if not self.skill_root.exists():
             logger.warning("Skill root %s does not exist; no skills loaded.", self.skill_root)
-            self._skills = {}
+            self._skill_metadata = {}
+            self._full_skills_cache = {}
             return
 
-        discovered: Dict[str, SkillDefinition] = {}
-        for skill_file in sorted(self.skill_root.glob("*/SKILL.md")):
-            definition = self._parse_skill_file(skill_file)
-            if not definition:
-                continue
-            key = definition.slug.lower()
-            if key in discovered:
-                logger.warning("Duplicate skill name '%s' found; keeping first occurrence.", definition.name)
-                continue
-            discovered[key] = definition
-            logger.info("Loaded skill '%s' from %s", definition.name, skill_file)
-        self._skills = discovered
+        if self.progressive_disclosure:
+            # Load only metadata (name + description) for fast startup
+            discovered_metadata: Dict[str, SkillMetadata] = {}
+            for skill_file in sorted(self.skill_root.glob("*/SKILL.md")):
+                metadata = self._parse_skill_metadata(skill_file)
+                if not metadata:
+                    continue
+                key = metadata.slug.lower()
+                if key in discovered_metadata:
+                    logger.warning("Duplicate skill name '%s' found; keeping first occurrence.", metadata.name)
+                    continue
+                discovered_metadata[key] = metadata
+                logger.info("Loaded skill metadata '%s' from %s", metadata.name, skill_file)
+            self._skill_metadata = discovered_metadata
+        else:
+            # Load full skill content (backward compatibility mode)
+            discovered: Dict[str, SkillDefinition] = {}
+            for skill_file in sorted(self.skill_root.glob("*/SKILL.md")):
+                definition = self._parse_skill_file(skill_file)
+                if not definition:
+                    continue
+                key = definition.slug.lower()
+                if key in discovered:
+                    logger.warning("Duplicate skill name '%s' found; keeping first occurrence.", definition.name)
+                    continue
+                discovered[key] = definition
+                logger.info("Loaded skill '%s' from %s", definition.name, skill_file)
+            self._full_skills_cache = discovered
+            # Also populate metadata
+            self._skill_metadata = {
+                slug: SkillMetadata(
+                    name=skill.name,
+                    slug=skill.slug,
+                    description=skill.description,
+                    path=skill.path,
+                    metadata=skill.metadata
+                )
+                for slug, skill in discovered.items()
+            }
+
+    def load_full_skill(self, slug: str) -> Optional[SkillDefinition]:
+        """Lazy-load full skill content (body) for a specific skill.
+
+        This is called on-demand when the LLM decides to use a skill.
+
+        Args:
+            slug: Skill slug identifier
+
+        Returns:
+            SkillDefinition with full body, or None if not found
+        """
+        slug_lower = slug.lower()
+
+        # Return from cache if already loaded
+        if slug_lower in self._full_skills_cache:
+            return self._full_skills_cache[slug_lower]
+
+        # Get metadata to find the skill file
+        metadata = self._skill_metadata.get(slug_lower)
+        if not metadata:
+            logger.warning("Skill '%s' not found in registry", slug)
+            return None
+
+        # Parse the full skill file
+        skill_file = metadata.path / "SKILL.md"
+        definition = self._parse_skill_file(skill_file)
+        if definition:
+            self._full_skills_cache[slug_lower] = definition
+            logger.info("Loaded full skill content for '%s'", metadata.name)
+        return definition
+
+    def _parse_skill_metadata(self, skill_file: Path) -> Optional[SkillMetadata]:
+        """Parse only the frontmatter (name + description) without loading full body.
+
+        This enables fast startup with progressive disclosure.
+        """
+        try:
+            content = skill_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.error("Unable to read skill file %s: %s", skill_file, exc)
+            return None
+
+        lines = content.splitlines()
+        if not lines or lines[0].strip() != "---":
+            logger.warning("Skill file %s is missing YAML frontmatter.", skill_file)
+            return None
+
+        try:
+            closing_index = lines.index("---", 1)
+        except ValueError:
+            logger.warning("Skill file %s has unterminated YAML frontmatter.", skill_file)
+            return None
+
+        frontmatter_lines = lines[1:closing_index]
+        metadata = self._parse_frontmatter(frontmatter_lines)
+        raw_name = metadata.get("name")
+        description = metadata.get("description")
+        # Determine display title and slug with backward compatibility
+        title = metadata.get("title") or metadata.get("display_title") or raw_name
+        slug_value = metadata.get("slug")
+        if not slug_value:
+            # If name is slug-like, use it; otherwise slugify the title
+            slug_value = raw_name if self._looks_like_slug(raw_name) else self._slugify(title)
+        if not (title and description and slug_value):
+            logger.warning("Skill file %s is missing required title/description/slug metadata.", skill_file)
+            return None
+
+        skill_path = skill_file.parent
+        return SkillMetadata(
+            name=str(title),
+            slug=str(slug_value),
+            description=str(description),
+            path=skill_path,
+            metadata=metadata
+        )
 
     def _parse_skill_file(self, skill_file: Path) -> Optional[SkillDefinition]:
         try:
@@ -399,15 +547,28 @@ def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> SkillRegis
     if not merged:
         logger.warning("No skills discovered in package or CWD")
         reg = SkillRegistry(skill_root=package_skill_root)
-        reg._skills = {}
+        reg._full_skills_cache = {}
+        reg._skill_metadata = {}
         return reg
 
     reg = SkillRegistry(skill_root=package_skill_root)
-    reg._skills = merged
+    reg._full_skills_cache = merged
+    # Also populate _skill_metadata so that skill_metadata property works correctly
+    reg._skill_metadata = {
+        slug: SkillMetadata(
+            name=skill.name,
+            slug=skill.slug,
+            description=skill.description,
+            path=skill.path,
+            metadata=skill.metadata
+        )
+        for slug, skill in merged.items()
+    }
     return reg
 
 __all__ = [
     "SkillInstructionFormatter",
+    "SkillMetadata",
     "SkillDefinition",
     "SkillMatch",
     "SkillRegistry",

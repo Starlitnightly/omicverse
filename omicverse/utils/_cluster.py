@@ -85,6 +85,18 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
     aliases=["聚类", "cluster", "clustering", "细胞聚类", "单细胞聚类"],
     category="utils",
     description="Perform clustering using various algorithms including Leiden, Louvain, GMM, K-means, and scICE",
+    prerequisites={
+        'functions': ['neighbors'],
+        'optional_functions': ['pca']
+    },
+    requires={
+        'obsp': ['connectivities', 'distances'],
+        'obsm': []
+    },
+    produces={
+        'obs': ['leiden', 'louvain', 'kmeans', 'mclust', 'scICE_cluster']
+    },
+    auto_fix='escalate',
     examples=[
         "# Leiden clustering (recommended)",
         "sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50)",
@@ -97,7 +109,7 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
         "                         resolution_range=(5,20), n_boot=50)",
         "# K-means clustering",
         "ov.utils.cluster(adata, method='kmeans', n_components=8)",
-        "# Louvain clustering", 
+        "# Louvain clustering",
         "ov.utils.cluster(adata, method='louvain', resolution=0.8)"
     ],
     related=["pp.neighbors", "pl.embedding", "utils.refine_label"]
@@ -208,6 +220,18 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     aliases=["精化标签", "refine_label", "label_refinement", "标签优化", "邻域投票"],
     category="utils",
     description="Optimize cluster labels by majority voting in spatial neighborhood",
+    prerequisites={
+        'functions': [],
+        'optional_functions': ['leiden', 'cluster']
+    },
+    requires={
+        'obsm': ['spatial'],
+        'obs': []
+    },
+    produces={
+        'obs': ['label_refined']
+    },
+    auto_fix='none',
     examples=[
         "# Basic label refinement for spatial data",
         "adata.obs['refined_clusters'] = ov.utils.refine_label(",

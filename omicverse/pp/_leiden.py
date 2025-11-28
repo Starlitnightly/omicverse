@@ -252,6 +252,13 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         adata.obs[key_added] = pd.Categorical(values=lab_np.astype("U"), categories=cats)
     except Exception:
         adata.obs[key_added] = labels
+    # Ensure a canonical 'leiden' column exists for downstream tools that expect it
+    if key_added != "leiden" and "leiden" not in adata.obs.columns:
+        try:
+            adata.obs["leiden"] = adata.obs[key_added]
+        except Exception:
+            # Fall back to a plain array if categorical copy fails
+            adata.obs["leiden"] = pd.Categorical(values=lab_np.astype("U"), categories=cats)
 
     # store information on the clustering parameters
     adata.uns[key_added] = {}
