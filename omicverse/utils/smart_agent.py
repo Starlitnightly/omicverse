@@ -520,6 +520,132 @@ class OmicVerseAgent:
             "allowed libs: omicverse/scanpy/matplotlib."
         )
 
+    def _build_filesystem_context_instructions(self) -> str:
+        """Build instructions for using the filesystem context workspace.
+
+        This teaches LLMs how to use the filesystem-based context management
+        system for offloading intermediate results, plans, and notes.
+
+        Returns
+        -------
+        str
+            Instructions for filesystem context usage.
+        """
+        session_id = self._filesystem_context.session_id if self._filesystem_context else "N/A"
+
+        return f"""
+
+## Context Engineering with Filesystem Workspace
+
+You have access to a **filesystem-based context workspace** that allows you to:
+- Offload intermediate results to reduce memory/context usage
+- Save and track execution plans across multiple steps
+- Search for relevant context using patterns
+- Share context with sub-agents
+
+**Current Session**: `{session_id}`
+
+### Why Use the Workspace?
+
+1. **Reduce Context Window Usage**: Instead of keeping all results in memory, write them to disk
+2. **Track Multi-Step Workflows**: Save plans and update progress as you complete steps
+3. **Retrieve Relevant Context**: Search for notes when you need specific information
+4. **Debug and Audit**: All notes are persisted for later review
+
+### Available Context Operations
+
+#### 1. Writing Notes (Offload Results)
+Use `# CONTEXT_WRITE:` comments in your code to indicate what should be saved:
+
+```python
+# After completing a step, offload the result
+# CONTEXT_WRITE: qc_result -> {{"n_cells_before": original_count, "n_cells_after": adata.n_obs, "removed": removed_count}}
+
+# Example: Save intermediate statistics
+qc_stats = {{
+    "n_cells": adata.n_obs,
+    "n_genes": adata.n_vars,
+    "mito_pct_mean": float(adata.obs['pct_counts_mt'].mean()) if 'pct_counts_mt' in adata.obs else None
+}}
+# CONTEXT_WRITE: qc_stats -> qc_stats
+```
+
+#### 2. Saving Execution Plans
+For multi-step workflows, define a plan upfront:
+
+```python
+# CONTEXT_PLAN:
+# - Step 1: Quality Control [pending]
+# - Step 2: Normalization [pending]
+# - Step 3: Feature Selection [pending]
+# - Step 4: Dimensionality Reduction [pending]
+# - Step 5: Clustering [pending]
+```
+
+#### 3. Updating Plan Progress
+As you complete steps, update the plan:
+
+```python
+# CONTEXT_UPDATE: step=0, status=completed, result="QC removed 500 low-quality cells"
+```
+
+#### 4. Searching for Context
+When you need to reference previous results:
+
+```python
+# CONTEXT_SEARCH: pattern="qc*", type="glob"
+# Or for content search:
+# CONTEXT_SEARCH: pattern="resolution", type="grep"
+```
+
+### Context Categories
+
+Organize your notes by category:
+- **notes**: General observations and comments
+- **results**: Computation results (statistics, parameters)
+- **decisions**: Important choices and their rationale
+- **snapshots**: Data state at key points
+- **errors**: Error logs and debugging information
+
+### Best Practices
+
+1. **Write Early, Write Often**: Offload results as soon as they're computed
+2. **Use Descriptive Keys**: `clustering_leiden_res1.0` is better than `result1`
+3. **Include Metadata**: Add function names, parameters, timestamps
+4. **Reference Previous Context**: Check workspace before repeating computations
+5. **Update Plans Promptly**: Mark steps complete immediately after finishing
+
+### Example: Multi-Step Workflow with Context
+
+```python
+import omicverse as ov
+
+# CONTEXT_PLAN:
+# - Step 1: Quality Control [in_progress]
+# - Step 2: Preprocessing [pending]
+# - Step 3: Clustering [pending]
+
+# Step 1: QC
+original_cells = adata.n_obs
+adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
+removed = original_cells - adata.n_obs
+
+# CONTEXT_WRITE: qc_result -> {{"original": original_cells, "remaining": adata.n_obs, "removed": removed}}
+# CONTEXT_UPDATE: step=0, status=completed, result="Removed " + str(removed) + " cells"
+
+print("QC completed: " + str(adata.n_obs) + " cells remaining")
+```
+
+### Automatic Context Injection
+
+The workspace context is automatically searched and injected into prompts when relevant.
+You can reference previous results without explicitly searching:
+
+- Recent notes are included automatically
+- Plan status is always visible
+- Relevant context is retrieved based on the current task
+"""
+
     @contextmanager
     def _temporary_api_keys(self):
         """Temporarily inject API keys into the environment and clean up afterwards."""
@@ -664,6 +790,10 @@ User request: "quality control with nUMI>500, mito<0.2"
                 "execution.\n\n"
                 f"{self._skill_overview_text}"
             )
+
+        # Add filesystem context instructions if enabled
+        if self.enable_filesystem_context and self._filesystem_context:
+            instructions += self._build_filesystem_context_instructions()
         
         # Prepare API key environment pin if passed (non-destructive)
         if self.api_key:
@@ -2210,6 +2340,12 @@ if 'batch' in adata.obs.columns:
                         'prompt_number': self._notebook_executor.session_prompt_count
                     }
 
+                # Process context directives from the code (notebook execution path)
+                if self.enable_filesystem_context and self._filesystem_context:
+                    # For notebook execution, we don't have access to local vars
+                    # but we can still process plan and update directives
+                    self._process_context_directives(code, {})
+
                 return result_adata
 
             except Exception as e:
@@ -2325,6 +2461,11 @@ if 'batch' in adata.obs.columns:
 
         result_adata = sandbox_locals.get("adata", adata)
         self._normalize_doublet_obs(result_adata)
+
+        # Process context directives from the code
+        if self.enable_filesystem_context and self._filesystem_context:
+            self._process_context_directives(code, sandbox_locals)
+
         return result_adata
 
     def _normalize_doublet_obs(self, adata: Any) -> None:
@@ -2354,6 +2495,180 @@ if 'batch' in adata.obs.columns:
         except Exception:
             # Keep silent; this is a best-effort harmonization step
             return
+
+    def _process_context_directives(self, code: str, local_vars: Dict[str, Any]) -> None:
+        """Process context directives from generated code.
+
+        This method parses special comments in the code that instruct the agent
+        to write notes, save plans, or update plan status.
+
+        Supported directives:
+        - # CONTEXT_WRITE: key -> value
+        - # CONTEXT_PLAN: list of steps
+        - # CONTEXT_UPDATE: step=N, status=S, result=R
+
+        Parameters
+        ----------
+        code : str
+            The generated code containing context directives.
+        local_vars : dict
+            The local namespace after code execution, for resolving variable references.
+        """
+        if not self._filesystem_context:
+            return
+
+        try:
+            lines = code.split('\n')
+
+            # Track if we're collecting a multi-line plan
+            collecting_plan = False
+            plan_steps = []
+
+            for line in lines:
+                stripped = line.strip()
+
+                # Handle CONTEXT_WRITE directives
+                if stripped.startswith('# CONTEXT_WRITE:'):
+                    self._handle_context_write(stripped, local_vars)
+
+                # Handle CONTEXT_PLAN directives
+                elif stripped.startswith('# CONTEXT_PLAN:'):
+                    collecting_plan = True
+                    plan_steps = []
+
+                elif collecting_plan:
+                    if stripped.startswith('# - '):
+                        # Parse plan step: "# - Step N: Description [status]"
+                        step_text = stripped[4:]  # Remove "# - "
+                        step_info = self._parse_plan_step(step_text)
+                        if step_info:
+                            plan_steps.append(step_info)
+                    elif stripped.startswith('#'):
+                        # Continue collecting if it's still a comment
+                        if not stripped.startswith('# CONTEXT_'):
+                            continue
+                        else:
+                            # New directive, stop collecting plan
+                            if plan_steps:
+                                self._filesystem_context.write_plan(plan_steps)
+                                logger.debug(f"Saved plan with {len(plan_steps)} steps")
+                            collecting_plan = False
+                            plan_steps = []
+                    else:
+                        # Non-comment line, stop collecting plan
+                        if plan_steps:
+                            self._filesystem_context.write_plan(plan_steps)
+                            logger.debug(f"Saved plan with {len(plan_steps)} steps")
+                        collecting_plan = False
+                        plan_steps = []
+
+                # Handle CONTEXT_UPDATE directives
+                elif stripped.startswith('# CONTEXT_UPDATE:'):
+                    self._handle_context_update(stripped)
+
+            # Save any remaining plan
+            if collecting_plan and plan_steps:
+                self._filesystem_context.write_plan(plan_steps)
+                logger.debug(f"Saved plan with {len(plan_steps)} steps")
+
+        except Exception as e:
+            logger.debug(f"Error processing context directives: {e}")
+
+    def _handle_context_write(self, directive: str, local_vars: Dict[str, Any]) -> None:
+        """Handle a CONTEXT_WRITE directive.
+
+        Format: # CONTEXT_WRITE: key -> value
+        where value can be a variable name or a literal dict/string.
+        """
+        try:
+            # Extract the part after "# CONTEXT_WRITE:"
+            content = directive.replace('# CONTEXT_WRITE:', '').strip()
+
+            if ' -> ' in content:
+                key, value_expr = content.split(' -> ', 1)
+                key = key.strip()
+                value_expr = value_expr.strip()
+
+                # Try to evaluate the value expression
+                try:
+                    # First, try as a variable reference
+                    if value_expr in local_vars:
+                        value = local_vars[value_expr]
+                    else:
+                        # Try to evaluate as a Python expression
+                        value = eval(value_expr, {"__builtins__": {}}, local_vars)
+                except Exception:
+                    # Fall back to string literal
+                    value = value_expr
+
+                # Determine category based on key pattern
+                category = "notes"
+                if any(kw in key.lower() for kw in ['result', 'stats', 'metrics', 'output']):
+                    category = "results"
+                elif any(kw in key.lower() for kw in ['decision', 'choice', 'why']):
+                    category = "decisions"
+                elif any(kw in key.lower() for kw in ['error', 'fail', 'exception']):
+                    category = "errors"
+
+                self._filesystem_context.write_note(key, value, category)
+                logger.debug(f"Context write: {key} -> {category}")
+
+        except Exception as e:
+            logger.debug(f"Failed to process CONTEXT_WRITE: {e}")
+
+    def _handle_context_update(self, directive: str) -> None:
+        """Handle a CONTEXT_UPDATE directive.
+
+        Format: # CONTEXT_UPDATE: step=N, status=S, result=R
+        """
+        try:
+            content = directive.replace('# CONTEXT_UPDATE:', '').strip()
+
+            # Parse key=value pairs
+            parts = {}
+            for part in content.split(','):
+                if '=' in part:
+                    k, v = part.split('=', 1)
+                    parts[k.strip()] = v.strip().strip('"').strip("'")
+
+            step = int(parts.get('step', 0))
+            status = parts.get('status', 'completed')
+            result = parts.get('result')
+
+            self._filesystem_context.update_plan_step(step, status, result)
+            logger.debug(f"Context update: step {step} -> {status}")
+
+        except Exception as e:
+            logger.debug(f"Failed to process CONTEXT_UPDATE: {e}")
+
+    def _parse_plan_step(self, step_text: str) -> Optional[Dict[str, Any]]:
+        """Parse a plan step from text.
+
+        Format: "Step N: Description [status]" or just "Description [status]"
+        """
+        try:
+            # Extract status if present
+            status = "pending"
+            if '[' in step_text and ']' in step_text:
+                status_start = step_text.rfind('[')
+                status_end = step_text.rfind(']')
+                status = step_text[status_start + 1:status_end].strip().lower()
+                step_text = step_text[:status_start].strip()
+
+            # Remove "Step N:" prefix if present
+            if step_text.lower().startswith('step '):
+                # Find the colon after step number
+                colon_idx = step_text.find(':')
+                if colon_idx > 0:
+                    step_text = step_text[colon_idx + 1:].strip()
+
+            return {
+                "description": step_text,
+                "status": status,
+            }
+
+        except Exception:
+            return None
 
     def _build_sandbox_globals(self) -> Dict[str, Any]:
         """Create a restricted global namespace for executing agent code."""
