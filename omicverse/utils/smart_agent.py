@@ -310,6 +310,9 @@ class OmicVerseAgent:
         self.use_notebook_execution = use_notebook_execution
         self.max_prompts_per_session = max_prompts_per_session
         self._notebook_executor = None
+        # Filesystem context configuration (set early to avoid AttributeError)
+        self.enable_filesystem_context = enable_filesystem_context
+        self._filesystem_context: Optional[FilesystemContextManager] = None
         # Token usage tracking at agent level
         self.last_usage = None
         self.last_usage_breakdown: Dict[str, Any] = {
@@ -387,11 +390,8 @@ class OmicVerseAgent:
             else:
                 print(f"   ⚡ Using in-process execution (no session isolation)")
 
-            # Initialize filesystem context management
-            self.enable_filesystem_context = enable_filesystem_context
-            self._filesystem_context: Optional[FilesystemContextManager] = None
-
-            if enable_filesystem_context:
+            # Initialize filesystem context management (attributes already set early in __init__)
+            if self.enable_filesystem_context:
                 try:
                     base_dir = Path(context_storage_dir) if context_storage_dir else None
                     self._filesystem_context = FilesystemContextManager(base_dir=base_dir)
