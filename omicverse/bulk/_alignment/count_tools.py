@@ -82,31 +82,30 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
     if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
         return srr, out_file
 
-    # -------------- Enhanced featureCounts detection --------------
-    from .tools_check import resolve_tool, merged_env
-    import shutil
+    # -------------- Enhanced featureCounts detection (best-effort) --------------
+    from .tools_check import resolve_tool, merged_env, check_featurecounts
+    import shutil, logging
+
+    logger = logging.getLogger(__name__)
 
     featurecounts_path = resolve_tool("featureCounts")
     if not featurecounts_path:
-        # Detailed diagnostic information for the environment.
-        env_path = os.environ.get("PATH", "Not set")
-        jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
+        # Try automatic installation via the helper; do not raise on failure.
+        try:
+            ok, path_or_msg = check_featurecounts()
+        except Exception as e:  # pragma: no cover - defensive
+            ok, path_or_msg = False, f"check_featurecounts failed: {e}"
+        if ok:
+            featurecounts_path = path_or_msg
 
-        raise RuntimeError(
-            f"[featureCounts] Unable to locate the featureCounts executable.\n"
-            f"This often indicates the Jupyter Lab kernel environment differs from the shell.\n\n"
-            f"Diagnostics:\n"
-            f"  - Current Python: {sys.executable}\n"
-            f"  - Jupyter kernel path: {jupyter_kernel_path}\n"
-            f"  - PATH contains 'omicverse': {'omicverse' in env_path}\n"
-            f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
-            f"Suggested fixes:\n"
-            f"  1. In a Jupyter cell run: !which featureCounts\n"
-            f"  2. If missing, install: !conda install -c bioconda subread -y\n"
-            f"  3. Or prepend the env bin: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
-            f"Note: 'No such file or directory' refers to the missing featureCounts binary,\n"
-            f"      not the directory; do not create directories manually."
+    if not featurecounts_path:
+        logger.warning(
+            "[featureCounts] featureCounts executable not available; "
+            "skipping counting for this BAM. "
+            "You can install it with: conda install -c bioconda subread -y"
         )
+        # Return a placeholder so callers can continue without counts.
+        return srr, out_file
 
     # Use the resolved absolute path rather than relying on PATH.
     cmd = [
@@ -177,31 +176,33 @@ def feature_counts_batch(
             "Ensure the pipeline infers the GTF or pass one explicitly."
         )
 
-    # -------------- Enhanced featureCounts detection --------------
-    from .tools_check import resolve_tool, merged_env
-    import shutil
+    # -------------- Enhanced featureCounts detection (best-effort) --------------
+    from .tools_check import resolve_tool, merged_env, check_featurecounts
+    import shutil, logging
+
+    logger = logging.getLogger(__name__)
 
     featurecounts_path = resolve_tool("featureCounts")
     if not featurecounts_path:
-        # Detailed diagnostic information.
-        env_path = os.environ.get("PATH", "Not set")
-        jupyter_kernel_path = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else "Unknown"
+        # Try automatic installation; do not raise if it fails.
+        try:
+            ok, path_or_msg = check_featurecounts()
+        except Exception as e:  # pragma: no cover
+            ok, path_or_msg = False, f"check_featurecounts failed: {e}"
+        if ok:
+            featurecounts_path = path_or_msg
 
-        raise RuntimeError(
-            f"[featureCounts_batch] Unable to locate the featureCounts executable.\n"
-            f"This often indicates the Jupyter Lab kernel environment differs from the shell.\n\n"
-            f"Diagnostics:\n"
-            f"  - Current Python: {sys.executable}\n"
-            f"  - Jupyter kernel path: {jupyter_kernel_path}\n"
-            f"  - PATH contains 'omicverse': {'omicverse' in env_path}\n"
-            f"  - shutil.which('featureCounts'): {shutil.which('featureCounts')}\n\n"
-            f"Suggested fixes:\n"
-            f"  1. In a Jupyter cell run: !which featureCounts\n"
-            f"  2. If missing, install: !conda install -c bioconda subread -y\n"
-            f"  3. Or prepend the env bin: os.environ['PATH'] = '/path/to/conda/envs/omicverse/bin:' + os.environ['PATH']\n\n"
-            f"Note: 'No such file or directory' refers to the missing featureCounts binary,\n"
-            f"      not the directory; avoid creating directories manually."
+    if not featurecounts_path:
+        logger.warning(
+            "[featureCounts_batch] featureCounts executable not available; "
+            "skipping counting for all BAMs. "
+            "You can install it with: conda install -c bioconda subread -y"
         )
+        return {
+            "tables": [],
+            "matrix": None,
+            "failed": [(srr, "featureCounts not available") for srr, _ in bam_items],
+        }
     # -----------------------------------------
 
     results, errors = [], []

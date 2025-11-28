@@ -9,7 +9,7 @@ except ImportError:
 import os, subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Sequence, Tuple, List, Dict
+from typing import Sequence, Tuple, List, Dict, Optional
 
 try:
     from .tools_check import which_or_find, merged_env
@@ -34,13 +34,14 @@ def _ext(p: Path) -> str:
 def _fastp_one(
     srr: str,
     fq1: Path,
-    fq2: Path,
+    fq2: Optional[Path],
     out_root: Path,
     threads: int = 8,
-) -> Tuple[str, Path, Path, Path, Path]:
+) -> Tuple[str, Path, Optional[Path], Path, Path]:
     """
-    Run fastp for a single paired-end sample.
+    Run fastp for a single sample (single-end or paired-end).
     Returns (srr, clean1, clean2, json, html).
+    For single-end: clean2 will be None.
     """
     env = merged_env()
     fastp_bin = which_or_find("fastp")  # Resolve the executable path.
@@ -49,27 +50,45 @@ def _fastp_one(
     # Compose output filenames (respect the input suffix behaviour).
     oext = _ext(fq1)
     clean1 = out_dir / f"{srr}_clean_1{oext.replace('.fastq', '')}"
-    clean2 = out_dir / f"{srr}_clean_2{oext.replace('.fastq', '')}"
+    clean2 = out_dir / f"{srr}_clean_2{oext.replace('.fastq', '')}" if fq2 else None
     json = out_dir / f"{srr}.fastp.json"
     html = out_dir / f"{srr}.fastp.html"
 
-    # Skip when outputs already exist (override if you prefer forced rewrites).
-    if clean1.exists() and clean2.exists() and json.exists() and html.exists():
+    # Check if processing is needed
+    if fq2:  # Paired-end
+        outputs_exist = (clean1.exists() and clean2.exists() and json.exists() and html.exists())
+    else:  # Single-end
+        outputs_exist = (clean1.exists() and json.exists() and html.exists())
+
+    if outputs_exist:
         return srr, clean1, clean2, json, html
 
-    cmd = [
-        fastp_bin,
-        "-i", str(fq1),
-        "-I", str(fq2),
-        "-o", str(clean1),
-        "-O", str(clean2),
-        "-w", str(threads),
-        "-j", str(json),
-        "-h", str(html),
-        "--detect_adapter_for_pe",
-        "--thread", str(threads),   # Some versions accept --thread in addition to -w.
-        "--overrepresentation_analysis",
-    ]
+    # Build command based on single-end vs paired-end
+    if fq2:  # Paired-end processing
+        cmd = [
+            fastp_bin,
+            "-i", str(fq1),
+            "-I", str(fq2),
+            "-o", str(clean1),
+            "-O", str(clean2),
+            "-w", str(threads),
+            "-j", str(json),
+            "-h", str(html),
+            "--detect_adapter_for_pe",
+            "--thread", str(threads),
+            "--overrepresentation_analysis",
+        ]
+    else:  # Single-end processing
+        cmd = [
+            fastp_bin,
+            "-i", str(fq1),
+            "-o", str(clean1),
+            "-w", str(threads),
+            "-j", str(json),
+            "-h", str(html),
+            "--thread", str(threads),
+            "--overrepresentation_analysis",
+        ]
 
     # fastp compresses automatically when the suffix is .gz.
     # Optional stricter filtering parameters (quality, unqualified %, minimum length):
@@ -77,22 +96,28 @@ def _fastp_one(
 
     _run(cmd, env=env)
 
-    # Basic validation.
-    if not (clean1.exists() and clean1.stat().st_size > 0 and clean2.exists() and clean2.stat().st_size > 0):
-        raise RuntimeError(f"fastp outputs missing/empty for {srr} in {out_dir}")
+    # Basic validation
+    if fq2:  # Paired-end validation
+        if not (clean1.exists() and clean1.stat().st_size > 0 and clean2.exists() and clean2.stat().st_size > 0):
+            raise RuntimeError(f"fastp outputs missing/empty for {srr} in {out_dir}")
+    else:  # Single-end validation
+        if not (clean1.exists() and clean1.stat().st_size > 0):
+            raise RuntimeError(f"fastp output missing/empty for {srr} in {out_dir}")
 
     return srr, clean1, clean2, json, html
 
 
 def fastp_batch(
-    pairs: Sequence[Tuple[str, Path, Path]],  # [(srr, fq1, fq2), ...]
+    pairs: Sequence[Tuple[str, Path, Optional[Path]]],  # [(srr, fq1,>Optional[fq2]), ...]
     out_root: str | Path,
     threads: int = 12,          # fastp threads per sample.
     max_workers: int | None = None,  # Number of samples processed concurrently; None lets us auto-select.
-) -> List[Tuple[str, Path, Path, Path, Path]]:
+) -> List[Tuple[str, Path, Optional[Path], Path, Path]]:
     """
     Execute fastp concurrently for multiple samples.
+    Supports both single-end (fq2=None) and paired-end processing.
     Returns [(srr, clean1, clean2, json, html), ...] in the original ordering.
+    For single-end samples, clean2 will be None.
     """
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
@@ -102,12 +127,12 @@ def fastp_batch(
         import os, math
         max_workers = max(1, min(threads, (os.cpu_count() or 8) // 2))
 
-    results: Dict[str, Tuple[str, Path, Path, Path, Path]] = {}
+    results: Dict[str, Tuple[str, Path, Optional[Path], Path, Path]] = {}
     errors: List[Tuple[str, str]] = []
 
-    def _worker(item: Tuple[str, Path, Path]):
+    def _worker(item: Tuple[str, Path, Optional[Path]]):
         srr, fq1, fq2 = item
-        return _fastp_one(srr, Path(fq1), Path(fq2), out_root=out_root, threads=threads)
+        return _fastp_one(srr, Path(fq1), Path(fq2) if fq2 else None, out_root=out_root, threads=threads)
 
     with ThreadPoolExecutor(max_workers=int(max_workers)) as ex:
         futs = {ex.submit(_worker, it): it[0] for it in pairs}
