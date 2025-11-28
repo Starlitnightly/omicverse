@@ -196,6 +196,13 @@ class AlignmentConfig:
     star_index_root: Path = field(init=False)        # Index root (aligned with star_tools).
     star_align_root: Path  = field(init=False)   # STAR output root.
 
+    # STAR alignment configuration
+    star_memory_limit: str = "100G"            # BAM sorting memory limit (e.g., "100G", "85899345920" for bytes)
+    star_extra_args: List[str] = field(default_factory=list)  # Additional STAR arguments
+
+    # Library layout configuration for GEO prefetch data
+    library_layout: Literal["auto", "single", "paired"] = "auto"  # "auto" = detect, "single", "paired"
+
     # Basic prefetch configuration (no mirror switching)
     prefetch_config: Dict[str, Any] = field(default_factory=lambda: {
         "enabled": True,                    # Enable prefetch
@@ -205,7 +212,7 @@ class AlignmentConfig:
     })
 
     def __post_init__(self):
-        
+
         if not isinstance(self.work_root, Path):
             self.work_root = Path(self.work_root)
         self.meta_root = self.work_root / "meta"
@@ -216,6 +223,17 @@ class AlignmentConfig:
         self.counts_root = self.work_root / "counts"
         self.star_align_root = self.work_root / "star"
         self.star_index_root = self.work_root / "index"
+
+        # Keep STAR BAM sort memory aligned with the generic memory setting
+        # unless the user has explicitly overridden star_memory_limit.
+        # Heuristic: if star_memory_limit is still at its class default ("100G")
+        # and memory was customized from its default ("8G"), propagate it.
+        try:
+            if self.star_memory_limit == "100G" and self.memory != "8G":
+                self.star_memory_limit = self.memory
+        except AttributeError:
+            # In case older configs lack one of these attributes, fail silently.
+            pass
 
         # Automatically enable iseq if download_method is set to "iseq"
         if self.download_method == "iseq":
@@ -729,20 +747,29 @@ class Alignment:
         )
 
     # ---------- SRA: fasterq-dump ----------
-    def fasterq(self, srr_list: Sequence[str]) -> Sequence[Tuple[str, Path, Path]]:
+    def fasterq(self, srr_list: Sequence[str]) -> Sequence[Tuple[str, Path, Optional[Path]]]:
         """
-        Convert SRA to paired FASTQ(.gz).
-        Returns: list of tuples (srr, fq1_path, fq2_path).
+        Convert SRA to FASTQ(.gz) with library layout awareness.
+        Supports both paired-end and single-end library layouts.
+        Returns: list of tuples (srr, fq1_path, fq2_path) where fq2_path is None for single-end.
         """
         if not hasattr(_sra_fasterq, "fasterq_batch"):
             raise RuntimeError("sra_fasterq.fasterq_batch(...) not found. Please expose it.")
+
+        # Adjust fasterq behavior based on library layout configuration
+        if self.cfg.library_layout != "auto":
+            # User specified library layout, pass hint to fasterq processing
+            logger.info(f"Using user-specified library layout: {self.cfg.library_layout}")
+
+        # Pass the library layout configuration to fasterq processing
         return _sra_fasterq.fasterq_batch(
             srr_list=srr_list,
             out_root=str(self.cfg.fasterq_root),
             threads=self.cfg.threads,
-            mem = self.cfg.memory,
+            mem=self.cfg.memory,
             gzip_output=self.cfg.gzip_fastq,
-            tmp_root=str(self.cfg.fasterq_root / "tmp")  # Use proper tmp directory within fasterq_root
+            tmp_root=str(self.cfg.fasterq_root / "tmp"),
+            library_layout=self.cfg.library_layout  # Pass the library layout configuration
         )
 
     # ---------- QC: fastp ----------
@@ -766,7 +793,7 @@ class Alignment:
     # ---------- Alignment (placeholder) ----------
     def star_align(
         self,
-        clean_fastqs: Sequence[Tuple[str, Path, Path]],
+        clean_fastqs: Sequence[Tuple[str, Path, Path | None]],  # [(srr, fq1, fq2 | None)] - fq2 is None for single-end
         *,
         gencode_release: str = "v44",
         sjdb_overhang: Optional[int] = 149,
@@ -792,13 +819,17 @@ class Alignment:
             sjdb_overhang=sjdb_overhang,
             accession_for_species=accession_for_species,
             max_workers=max_workers,   # None = serial; callers can opt-in to 2/4/etc concurrent runs.
+            memory_limit=str(self.cfg.star_memory_limit),  # BAM sorting memory limit from configuration
         )
 
-        # Normalize inputs as [(srr, str(fq1), str(fq2)), ...].
-        # fastq_qc returns 5-tuples (srr, fq1, fq2, json, html); only the first three entries are required here.
-        pairs: List[Tuple[str, str, str]] = [
-            (srr, str(Path(fq1)), str(Path(fq2))) for srr, fq1, fq2, *_ in clean_fastqs
-        ]
+        # Normalize inputs as [(srr, str(fq1), str(fq2)), ...] handling single-end (fq2=None) cases.
+        # fastq_qc returns 5-tuples (srr, fq1, fq2, json, html); fq2 is None for single-end data.
+        pairs: List[Tuple[str, str, str]] = []
+        for entry in clean_fastqs:
+            srr, fq1, fq2_or_none, *_ = entry  # fq2_or_none is None for single-end
+            # Handle single-end case where fq2 is None
+            fq2 = str(Path(fq2_or_none)) if fq2_or_none is not None else ""  # Empty string for STAR single-end
+            pairs.append((srr, str(Path(fq1)), fq2))
 
         # Execute the batch command to obtain [(srr, bam, index_dir|None), ...].
         products = step["command"](pairs, logger=None)

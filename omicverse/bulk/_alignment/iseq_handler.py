@@ -91,8 +91,15 @@ class ISeqHandler:
 
     def _auto_extract_sample_id(self, file_path: Path) -> str:
         """Automatically derive a sample ID."""
-        # Try several patterns.
-        filename = file_path.stem  # Remove extension.
+        # Special case: honour explicit SRA-style IDs (SRR/ERR/DRR) anywhere
+        # in the filename, so that FASTQ-based workflows stay consistent with
+        # GEO/SRA-based naming (e.g. "SRR123456.fastq.gz" → "SRR123456").
+        sra_match = re.search(r"(SRR\d+|ERR\d+|DRR\d+)", file_path.name)
+        if sra_match:
+            return sra_match.group(1)
+
+        # Generic heuristics for vendor-style filenames.
+        filename = file_path.stem  # Remove only the last extension.
 
         # Pattern 1: remove common sequencing suffixes (_R1, _R2, .R1, .R2, _1, _2).
         cleaned = re.sub(r'[._][Rr]?[12]$', '', filename)
