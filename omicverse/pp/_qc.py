@@ -605,7 +605,8 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.subset(obs_indices=selected_cells)
 
         selected_genes = True
-        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        # Count number of cells where gene is detected (non-zero), not sum of counts
+        adata.var["n_cell"] = np.array((adata.X[:] > 0).sum(axis=0)).reshape(-1)
         if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
         if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
         selected_genes = np.flatnonzero(selected_genes)
@@ -937,7 +938,8 @@ def qc_cpu(
         selected_cells = np.flatnonzero(selected_cells)
         adata.subset(obs_indices=selected_cells)
         selected_genes = True
-        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        # Count number of cells where gene is detected (non-zero), not sum of counts
+        adata.var["n_cell"] = np.array((adata.X[:] > 0).sum(axis=0)).reshape(-1)
         if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
         if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
         selected_genes = np.flatnonzero(selected_genes)
