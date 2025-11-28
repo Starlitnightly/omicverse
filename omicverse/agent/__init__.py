@@ -41,7 +41,7 @@ def _zip_dir(skill_dir: Path, zip_path: Path) -> Path:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for p in sorted(skill_dir.rglob("*")):
             if p.is_file():
-                if p.name in {".DS_Store"} or "__pycache__" in p.parts:
+                if p.name in {".DS_Store"} or "__pycache__" in p.parts or p.suffix == ".zip":
                     continue
                 zf.write(p, p.relative_to(skill_dir))
     return zip_path

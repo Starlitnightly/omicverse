@@ -9,6 +9,9 @@ import sys
 
 # Available models configuration - based on pantheon-cli
 AVAILABLE_MODELS = {
+    # Local execution (no LLM, direct Python)
+    "python": "Local Python executor (no LLM)",
+
     # OpenAI Models - GPT-5 Series (Latest)
     "gpt-5": "OpenAI GPT-5 (Latest)",
     "gpt-5-mini": "OpenAI GPT-5 Mini",
@@ -156,6 +159,7 @@ PROVIDER_ENDPOINTS = {
     "moonshot": "https://api.moonshot.cn/v1",
     "xai": "https://api.x.ai/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "python": "local-python",
 }
 
 # Provider-level default API keys (fallback when a specific model isn't mapped)
@@ -172,6 +176,11 @@ PROVIDER_DEFAULT_KEYS = {
 
 # Model ID aliases for backward compatibility
 _RAW_MODEL_ALIASES = {
+    # Local execution aliases
+    "local-python": "python",
+    "python-local": "python",
+    "py-local": "python",
+
     # Claude 4.5 variations
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
@@ -249,6 +258,8 @@ class ModelConfig:
         """Determine provider from model name"""
         # Normalize first to handle aliases/unprefixed
         model = ModelConfig.normalize_model_id(model)
+        if model.startswith("python"):
+            return "python"
         if model.startswith("anthropic/"):
             return "anthropic"
         elif model.startswith(("qwq-", "qwen-", "qvq-")) or model.startswith("qwen/"):
@@ -329,12 +340,36 @@ class ModelConfig:
         return result
     
     @staticmethod
+    def requires_responses_api(model: str) -> bool:
+        """Check if model requires OpenAI Responses API instead of Chat Completions API.
+
+        OpenAI's GPT-5 series and some newer models use the Responses API (/v1/responses)
+        instead of the traditional Chat Completions API (/v1/chat/completions).
+
+        Arguments:
+            model: Model identifier
+
+        Returns:
+            True if model requires Responses API, False otherwise
+        """
+        normalized = ModelConfig.normalize_model_id(model)
+
+        # GPT-5 series models require Responses API
+        if normalized.startswith("gpt-5"):
+            return True
+
+        # Future models may be added here as OpenAI migrates more models
+        # to the Responses API
+
+        return False
+
+    @staticmethod
     def validate_model_setup(model: str, api_key: Optional[str] = None) -> Tuple[bool, str]:
         """Validate if model can be used with current setup"""
         normalized = ModelConfig.normalize_model_id(model)
         if not ModelConfig.is_model_supported(normalized):
             return False, f"Model '{model}' is not supported. Use ov.list_supported_models() to see available models."
-        
+
         # Check API key if needed (model mapping or provider default)
         required_key = PROVIDER_API_KEYS.get(normalized)
         if not required_key:
@@ -346,5 +381,5 @@ class ModelConfig:
             else:
                 provider = ModelConfig.get_provider_from_model(normalized)
                 return False, f"❌ Model {normalized} requires {required_key}. Set environment variable or pass api_key parameter."
-        
+
         return True, f"✅ Model {normalized} ready to use"

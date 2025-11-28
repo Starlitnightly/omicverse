@@ -12,6 +12,7 @@ recommonmark
 sphinx_markdown_tables
 sphinx_copybutton
 nbsphinx
+pytest-asyncio>=0.23
 IPython
 ipywidgets
 lifelines
@@ -49,3 +50,4 @@ requests
 wandb
 munch
 datasets
+openai

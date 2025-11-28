@@ -94,8 +94,9 @@ from .utils.registry import (
     import_registry
 )
 
-# Smart Agent system using Pantheon
+# Smart Agent system (internal backend)
 from .utils.smart_agent import Agent, list_supported_models
+from .utils.session_notebook_executor import setup_kernel_for_env
 
 name = "omicverse"
 try:

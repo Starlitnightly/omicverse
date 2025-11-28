@@ -107,8 +107,8 @@ def _zip_skill(defn: SkillDefinition, out_dir: Path) -> Path:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(defn.path.rglob("*")):
             if path.is_file():
-                # Skip macOS artifacts and Python caches
-                if path.name in {".DS_Store"} or "__pycache__" in path.parts:
+                # Skip macOS artifacts, Python caches, and existing zip files
+                if path.name in {".DS_Store"} or "__pycache__" in path.parts or path.suffix == ".zip":
                     continue
                 arcname = path.relative_to(defn.path)
                 zf.write(path, arcname)
