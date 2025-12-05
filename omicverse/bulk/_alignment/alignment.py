@@ -839,7 +839,7 @@ class Alignment:
     # ---------- Counting via featureCounts ----------
     def featurecounts(
         self,
-        bam_triples: Sequence[Tuple[str, str | Path, Optional[str]]],   # [(srr, bam, index_dir|None)]
+        bam_triples: Sequence[Tuple[str, str | Path, Optional[str]] | Tuple[str, str | Path, Optional[str], Optional[bool]]],   # [(srr, bam, index_dir|None[, is_paired])]
         *,
         gtf: Optional[str | Path] = None,         # Explicit GTF path takes highest priority.
         simple: Optional[bool] = None,            # None→cfg.featurecounts_simple
@@ -859,9 +859,10 @@ class Alignment:
         out_root.mkdir(parents=True, exist_ok=True)
 
         # ---------- Built-in GTF inference ----------
-        def _infer_gtf_from_bams(triples: Sequence[Tuple[str, str | Path, Optional[str]]]) -> Optional[str]:
+        def _infer_gtf_from_bams(triples: Sequence[Tuple[str, str | Path, Optional[str]] | Tuple[str, str | Path, Optional[str], Optional[bool]]]) -> Optional[str]:
             # 1) Prefer GTF discovery from each sample's index_dir when available.
-            for _srr, _bam, idx_dir in triples:
+            for rec in triples:
+                _srr, _bam, idx_dir = rec[:3]
                 if not idx_dir:
                     continue
                 idx = Path(idx_dir)
@@ -920,21 +921,39 @@ class Alignment:
             return out_root / srr / f"{srr}.counts.txt"
 
         # Idempotent shortcut: skip when every output already exists.
-        outs_by_srr: List[Tuple[str, Path]] = [(str(srr), _table_path_for(str(srr))) for srr, _bam, _ in bam_triples]
+        outs_by_srr: List[Tuple[str, Path]] = [
+            (str(rec[0]), _table_path_for(str(rec[0]))) for rec in bam_triples
+        ]
         if all(step["validation"]([str(p)]) for _, p in outs_by_srr):
             print("[SKIP] featureCounts for all")
             tables = [(srr, str(p)) for srr, p in outs_by_srr]
             return {"tables": tables, "matrix": None, "failed": []}
 
-        # Assemble (srr, bam) pairs and execute.
-        bam_pairs = [(str(srr), str(bam)) for (srr, bam, _idx) in bam_triples]
+        # Assemble (srr, bam[, is_paired]) pairs and execute.
+        layout_hint = None if self.cfg.library_layout == "auto" else (self.cfg.library_layout == "paired")
+        bam_pairs = []
+        for rec in bam_triples:
+            if len(rec) == 4:
+                srr, bam, _idx, is_paired = rec  # type: ignore[misc]
+            elif len(rec) == 3:
+                srr, bam, _idx = rec  # type: ignore[misc]
+                is_paired = None
+            else:
+                raise ValueError(f"featurecounts expects (srr, bam, idx_dir[, is_paired]) tuples; got {rec}")
+
+            # User hint overrides auto detection.
+            if layout_hint is not None:
+                is_paired = layout_hint
+
+            bam_pairs.append((str(srr), str(bam), is_paired))
+
         ret = step["command"](
             bam_pairs,
             logger=None,
             gtf=str(gtf),  # Explicit runtime GTF has top priority.
         )
 
-        tables = [(srr, str(_table_path_for(str(srr)))) for srr, _ in bam_pairs]
+        tables = [(rec[0], str(_table_path_for(str(rec[0])))) for rec in bam_pairs]
         matrix_path = ret.get("matrix") if isinstance(ret, dict) else None
         return {"tables": tables, "matrix": matrix_path, "failed": []}
 
@@ -1340,6 +1359,9 @@ class Alignment:
             bam_triples = self.star_align(fastqs_qc)
             # Extract BAM paths from the bam_triples structure [(srr, bam_path, index_dir), ...].
             bams = [(srr, Path(bam_path)) for srr, bam_path, _ in bam_triples]
+            # Pass paired-end hints forward to featureCounts when available.
+            paired_flags = {srr: bool(fq2) for srr, _c1, fq2, *_rest in fastqs_qc}
+            bam_triples = [(srr, bam_path, idx_dir, paired_flags.get(srr)) for srr, bam_path, idx_dir in bam_triples]
         else:
             # Skip the alignment step and return an empty result.
             logger.info("Skipping alignment step because with_align=False")

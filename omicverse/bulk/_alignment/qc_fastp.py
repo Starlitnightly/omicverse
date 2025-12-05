@@ -164,7 +164,7 @@ def make_fastp_step(
     Output: work/fastp/{SRR}_1.clean.fq.gz, {SRR}_2.clean.fq.gz
     Validation: cleaned FASTQ files exist and have size > 0.
     """
-    def _cmd(fastq_triplets: Sequence[tuple[str, str, str]], logger=None):
+    def _cmd(fastq_triplets: Sequence[tuple[str, str, str | None]], logger=None):
         # Forward triplets directly to fastp_clean_parallel.
         # outdir is unused in triplet mode; provide a reasonable placeholder.
         os.makedirs(out_root, exist_ok=True)
@@ -179,7 +179,7 @@ def make_fastp_step(
         # so choose work_dir = dirname(out_root).
         work_dir = os.path.dirname(out_root) or "."
 
-        return fastp_clean_parallel(
+        ret = fastp_clean_parallel(
             samples=list(fastq_triplets),           # Triplet mode [(srr, fq1, fq2), ...]
             outdir=first_fq1_dir,                   # Ignored in triplet mode.
             work_dir=work_dir,                      # Ensures outputs land in {work_dir}/fastp = out_root.
@@ -189,12 +189,28 @@ def make_fastp_step(
             backend=backend
         )
 
+        if ret.get("failed"):
+            msgs = "; ".join([f"{s}: {m}" for s, m in ret["failed"]])
+            if logger:
+                logger.error(f"[fastp] failed samples: {msgs}")
+            raise RuntimeError(f"fastp failed for {len(ret['failed'])} sample(s): {msgs}")
+
+        successes = ret.get("success", [])
+        # Preserve caller order when possible.
+        order = {srr: idx for idx, (srr, *_rest) in enumerate(fastq_triplets)}
+        successes.sort(key=lambda x: order.get(x[0], 0))
+        return [(srr, out1, out2 if out2 else None) for (srr, out1, out2, _status) in successes]
+
     return {
         "name": "fastp",
         "command": _cmd,  # Accepts [(srr, fq1, fq2), ...].
         "outputs": [f"{out_root}" + "/{SRR}_1.clean.fq.gz",
                     f"{out_root}" + "/{SRR}_2.clean.fq.gz"],
-        "validation": lambda fs: all(os.path.exists(f) and os.path.getsize(f) > 0 for f in fs),
+        "validation": lambda fs: (
+            bool(fs)
+            and os.path.exists(fs[0]) and os.path.getsize(fs[0]) > 0
+            and (len(fs) < 2 or not fs[1] or (os.path.exists(fs[1]) and os.path.getsize(fs[1]) > 0))
+        ),
         "takes": "FASTQ_PATHS",
         "yields": "CLEAN_FASTQ_PATHS"
     }

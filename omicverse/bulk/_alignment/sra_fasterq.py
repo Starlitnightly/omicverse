@@ -585,7 +585,7 @@ def make_fasterq_step(
     Outputs: work/fasterq/{SRR}_1.fastq.gz and {SRR}_2.fastq.gz.
     Validation: both FASTQ files must exist and be non-empty.
     """
-    def _cmd(srr_list: List[str], logger=None) -> List[Tuple[str, str, str]]:
+    def _cmd(srr_list: List[str], logger=None) -> List[Tuple[str, str, str | None]]:
         os.makedirs(outdir_pattern, exist_ok=True)
 
         # Map parameters to the newer fasterq_dump_parallel helper.
@@ -602,11 +602,17 @@ def make_fasterq_step(
         )
         # Normalize outputs into [(srr, fq1, fq2), ...] for pipeline consumption.
         by_srr = ret.get("by_srr", {})
-        products = [(srr, paths[0], paths[1]) for srr, paths in by_srr.items()]
+        order = {s: i for i, s in enumerate(srr_list)}
+        products = sorted(
+            [(srr, paths[0], paths[1]) for srr, paths in by_srr.items()],
+            key=lambda x: order.get(x[0], 0),
+        )
         # Optionally surface ret["failed"] to the logs.
         if logger and ret.get("failed"):
             for srr, err in ret["failed"]:
                 logger.error(f"[fasterq] {srr} failed: {err}")
+        if ret.get("failed"):
+            raise RuntimeError(f"fasterq failed for {len(ret['failed'])} sample(s)")
         return products
 
     return {
@@ -614,7 +620,11 @@ def make_fasterq_step(
         "command": _cmd,  # Accepts a list of SRRs.
         "outputs": [f"{outdir_pattern}" + "/{SRR}_1.fastq.gz",
                     f"{outdir_pattern}" + "/{SRR}_2.fastq.gz"],
-        "validation": lambda fs: all(os.path.exists(f) and os.path.getsize(f) > 0 for f in fs),
+        "validation": lambda fs: (
+            bool(fs)
+            and os.path.exists(fs[0]) and os.path.getsize(fs[0]) > 0
+            and (len(fs) < 2 or not fs[1] or (os.path.exists(fs[1]) and os.path.getsize(fs[1]) > 0))
+        ),
         "takes": "SRR_LIST",
         "yields": "FASTQ_PATHS"
     }
