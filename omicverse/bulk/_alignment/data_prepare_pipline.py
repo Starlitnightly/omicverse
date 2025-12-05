@@ -100,31 +100,29 @@ def run_pipeline(srr_list_or_csv):
 
     # Step 1: fasterq (batch mode).
     fasterq_step = STEPS[1]
-    outs_by_srr = []
-    for srr in srr_list:
-        outs = _render_paths(fasterq_step["outputs"], SRR=srr)
-        outs_by_srr.append((srr, outs))
-    # Skip when everything already exists.
-    if all(fasterq_step["validation"](outs) for _, outs in outs_by_srr):
-        logger.info("[SKIP] fasterq for all")
-        fastq_paths = [(srr, outs[0], outs[1]) for srr, outs in outs_by_srr]
-    else:
-        ret = fasterq_step["command"]([s for s,_ in outs_by_srr], logger=logger)
-        # Normalize to [(srr, fq1, fq2)]; you can unpack ret["success"], here we follow the template.
-        fastq_paths = [(srr, outs[0], outs[1]) for srr, outs in outs_by_srr]
+    fq_products = fasterq_step["command"](srr_list, logger=logger)
+    order = {s: i for i, s in enumerate(srr_list)}
+    fastq_paths = []
+    for rec in sorted(fq_products, key=lambda x: order.get(x[0], 0)):
+        if not isinstance(rec, (list, tuple)) or len(rec) < 2:
+            raise ValueError(f"Unexpected fasterq record: {rec}")
+        srr, fq1 = rec[0], rec[1]
+        fq2 = rec[2] if len(rec) > 2 else None
+        fastq_paths.append((srr, str(fq1), str(fq2) if fq2 else None))
 
     # Step 2: fastp (batch mode).
     fastp_step = STEPS[2]
-    outs_by_srr = []
-    for srr, fq1, fq2 in fastq_paths:
-        outs = _render_paths(fastp_step["outputs"], SRR=srr)
-        outs_by_srr.append((srr, fq1, fq2, outs))
-    if all(fastp_step["validation"](o) for *_, o in outs_by_srr):
-        logger.info("[SKIP] fastp for all")
-        clean_fastqs = [(srr, o[0], o[1]) for srr, _, _, o in outs_by_srr]
-    else:
-        ret = fastp_step["command"]([(srr, fq1, fq2) for srr, fq1, fq2, _ in outs_by_srr], logger=logger)
-        clean_fastqs = [(srr, o[0], o[1]) for srr, _, _, o in outs_by_srr]
+    fp_products = fastp_step["command"](fastq_paths, logger=logger)
+    order_fp = {s: i for i, (s, *_rest) in enumerate(fastq_paths)}
+    clean_fastqs = []
+    for rec in sorted(fp_products, key=lambda x: order_fp.get(x[0], 0)):
+        if not isinstance(rec, (list, tuple)) or len(rec) < 2:
+            raise ValueError(f"Unexpected fastp record: {rec}")
+        srr, c1 = rec[0], rec[1]
+        c2 = rec[2] if len(rec) > 2 else None
+        clean_fastqs.append((srr, str(c1), str(c2) if c2 else None))
+
+    paired_flags = {srr: bool(c2) for srr, _c1, c2 in clean_fastqs}
 
     # Step 3: STAR (per sample; parallelizable, shown sequentially for clarity).
     star_step = STEPS[3]
@@ -219,16 +217,18 @@ def run_pipeline(srr_list_or_csv):
     # Step 4: featureCounts (batch mode).
     fc_step = STEPS[4]
     outs_by_srr = []
+    fc_inputs = []
     for srr, bam, _idx in bam_paths:  # Note bam_paths now contains triplets.
         outs = _render_paths(fc_step["outputs"], SRR=srr)
         outs_by_srr.append((srr, bam, outs))
-    
+        fc_inputs.append((srr, bam, paired_flags.get(srr)))
+
     if all(fc_step["validation"](o) for _, _, o in outs_by_srr):
         logger.info("[SKIP] featureCounts for all")
         count_tables = [o[0] for _, _, o in outs_by_srr]
     else:
         # Explicitly pass gtf to the featureCounts command function  ← NEW.
-        ret = fc_step["command"]([(srr, bam) for srr, bam, _ in outs_by_srr],
+        ret = fc_step["command"](fc_inputs,
                                  logger=logger,
                                  gtf=inferred_gtf)
         count_tables = [o[0] for _, _, o in outs_by_srr]
