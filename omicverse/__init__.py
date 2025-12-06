@@ -71,8 +71,9 @@ from . import external
 # Optional modules
 try:
     from . import llm
-except ImportError:
+except Exception:
     llm = None
+
 
 # Optional datacollect module
 try:
