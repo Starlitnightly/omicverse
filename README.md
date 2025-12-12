@@ -58,6 +58,9 @@
 
 ## `1` [Introduction][docs-feat-provider]
 
+[![Run in Smithery](https://smithery.ai/badge/skills/starlitnightly)](https://smithery.ai/skills?ns=starlitnightly&utm_source=github&utm_medium=badge)
+
+
 The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to **`OmicVerse`**, it aimed to solve all task in RNA-seq.
 
 > [!NOTE]
