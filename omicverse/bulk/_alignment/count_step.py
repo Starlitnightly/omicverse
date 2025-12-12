@@ -16,15 +16,15 @@ def make_featurecounts_step(
     gtf_path: str | None = None,
 ):
     """
-    Input: BAM list [(srr, bam), ...]
+    Input: BAM list [(srr, bam) | (srr, bam, is_paired), ...]
     Output:
       - Per-sample counts: work/counts/{SRR}/{SRR}.counts.txt (or .csv)
       - Optional aggregate matrix: work/counts/matrix.{by}.csv
     Validation: per-sample count files exist and contain rows.
     """
-    def _cmd(bam_pairs: Sequence[tuple[str, str]], logger=None, gtf: str | None = None):
+    def _cmd(bam_pairs: Sequence[tuple[str, str] | tuple[str, str, bool]], logger=None, gtf: str | None = None):
         """
-        bam_pairs: [(srr, bam_path), ...]
+        bam_pairs: [(srr, bam_path[, is_paired]), ...]
         gtf:       Optional runtime GTF override (takes highest priority).
         """
         os.makedirs(out_root, exist_ok=True)

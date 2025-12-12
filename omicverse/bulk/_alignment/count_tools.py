@@ -1,16 +1,69 @@
 # count_tools.py featureCounts batch utilities
 from __future__ import annotations
-import os, subprocess, sys
+import os, subprocess, sys, logging
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 from datetime import datetime
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
-def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads: int = 8, simple: bool = True, featurecounts_path: str = None):
+def _infer_paired_end_from_bam(bam_path: str) -> Optional[bool]:
+    """
+    Best-effort detection of paired-end BAMs.
+    - Try pysam first (fast, minimal IO).
+    - Fallback to `samtools view -c -f 1` when pysam is unavailable.
+    Returns True/False when detected, or None when detection is inconclusive.
+    """
+    try:
+        import pysam  # type: ignore
+        with pysam.AlignmentFile(bam_path, "rb") as bam:
+            for rec in bam.fetch(until_eof=True):
+                return bool(rec.is_paired)
+    except Exception:
+        pass
+
+    try:
+        from .tools_check import resolve_tool, merged_env
+        samtools = resolve_tool("samtools")
+        env = merged_env()
+    except Exception:
+        samtools, env = None, None
+
+    if samtools:
+        try:
+            proc = subprocess.run(
+                [samtools, "view", "-c", "-f", "1", bam_path],
+                capture_output=True,
+                text=True,
+                check=True,
+                env=env,
+            )
+            paired_count = int(proc.stdout.strip() or 0)
+            return paired_count > 0
+        except Exception as e:  # pragma: no cover - defensive
+            logger.debug(f"[featureCounts] samtools paired detection failed for {bam_path}: {e}")
+
+    return None
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+def _feature_counts_one_with_path(
+    bam_path: str,
+    out_dir: str,
+    gtf: str,
+    threads: int = 8,
+    simple: bool = True,
+    featurecounts_path: str = None,
+    is_paired: Optional[bool] = None,
+):
     """Helper function that accepts a pre-resolved featureCounts path"""
     if featurecounts_path is None:
-        return _feature_counts_one(bam_path, out_dir, gtf, threads, simple)
+        return _feature_counts_one(bam_path, out_dir, gtf, threads, simple, is_paired=is_paired)
 
     # Use the provided path directly
     srr = Path(bam_path).stem.replace(".bam", "")
@@ -20,13 +73,20 @@ def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads
     if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
         return srr, out_file
 
+    if is_paired is None:
+        is_paired = _infer_paired_end_from_bam(bam_path)
+    if is_paired:
+        logger.info(f"[featureCounts] Detected paired-end BAM for {srr}; enabling -p.")
+
     cmd = [
         featurecounts_path,
         "-T", str(threads),
         "-a", gtf,
         "-o", out_file,
-        bam_path
     ]
+    if is_paired:
+        cmd.extend(["-p", "-B", "-C"])
+    cmd.append(bam_path)
 
     # Use proper environment
     from .tools_check import merged_env
@@ -64,7 +124,14 @@ def _feature_counts_one_with_path(bam_path: str, out_dir: str, gtf: str, threads
 
     return srr, out_file
 
-def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8, simple: bool = True):
+def _feature_counts_one(
+    bam_path: str,
+    out_dir: str,
+    gtf: str,
+    threads: int = 8,
+    simple: bool = True,
+    is_paired: Optional[bool] = None,
+):
     # -------------- Safety guard for missing GTF --------------
     if gtf is None:
         gtf = os.environ.get("FC_GTF_HINT")
@@ -82,11 +149,14 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
     if os.path.exists(out_file) and os.path.getsize(out_file) > 0:
         return srr, out_file
 
+    if is_paired is None:
+        is_paired = _infer_paired_end_from_bam(bam_path)
+    if is_paired:
+        logger.info(f"[featureCounts] Detected paired-end BAM for {srr}; enabling -p.")
+
     # -------------- Enhanced featureCounts detection (best-effort) --------------
     from .tools_check import resolve_tool, merged_env, check_featurecounts
-    import shutil, logging
-
-    logger = logging.getLogger(__name__)
+    import shutil
 
     featurecounts_path = resolve_tool("featureCounts")
     if not featurecounts_path:
@@ -113,8 +183,10 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
         "-T", str(threads),
         "-a", gtf,
         "-o", out_file,
-        bam_path
     ]
+    if is_paired:
+        cmd.extend(["-p", "-B", "-C"])
+    cmd.append(bam_path)
 
     # Use the merged environment to ensure featureCounts is discoverable.
     env = merged_env()
@@ -155,7 +227,7 @@ def _feature_counts_one(bam_path: str, out_dir: str, gtf: str, threads: int = 8,
 
 
 def feature_counts_batch(
-    bam_items: list[tuple[str, str]],  # [(srr, bam_path)]
+    bam_items: list[tuple[str, str] | tuple[str, str, Optional[bool]]],  # [(srr, bam_path[, is_paired])]
     out_dir: str,
     gtf: str | None = None,
     simple: bool = True,
@@ -198,10 +270,11 @@ def feature_counts_batch(
             "skipping counting for all BAMs. "
             "You can install it with: conda install -c bioconda subread -y"
         )
+        failed_list = [(item[0], "featureCounts not available") for item in bam_items]
         return {
             "tables": [],
             "matrix": None,
-            "failed": [(srr, "featureCounts not available") for srr, _ in bam_items],
+            "failed": failed_list,
         }
     # -----------------------------------------
 
@@ -213,10 +286,31 @@ def feature_counts_batch(
         # Ensure each worker has enough CPU resources.
         max_workers = min(4, cpu_count // max(1, threads // 4))
 
+    # Normalize to (srr, bam, is_paired|None) tuples to propagate layout hints.
+    normalized_items: list[tuple[str, str, Optional[bool]]] = []
+    for item in bam_items:
+        if len(item) == 3:
+            srr, bam, is_paired = item  # type: ignore[misc]
+        elif len(item) == 2:
+            srr, bam = item  # type: ignore[misc]
+            is_paired = None
+        else:
+            raise ValueError(f"feature_counts_batch expected (srr, bam[, is_paired]) tuples, got: {item}")
+        normalized_items.append((str(srr), str(bam), is_paired))
+
     with ProcessPoolExecutor(max_workers=max_workers) as ex:
         futures = {
-            ex.submit(_feature_counts_one_with_path, bam, out_dir, gtf, threads, simple, featurecounts_path): srr
-            for srr, bam in bam_items
+            ex.submit(
+                _feature_counts_one_with_path,
+                bam,
+                out_dir,
+                gtf,
+                threads,
+                simple,
+                featurecounts_path,
+                is_paired,
+            ): srr
+            for srr, bam, is_paired in normalized_items
         }
         for fut in as_completed(futures):
             srr = futures[fut]
