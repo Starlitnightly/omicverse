@@ -1,7 +1,7 @@
 # star_step.py — batch STAR step (compatible with existing star_tools).
 from __future__ import annotations
 from pathlib import Path
-from typing import Sequence, Tuple, List, Optional
+from typing import Sequence, Tuple, List, Optional, Union
 import os, shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import subprocess
@@ -90,8 +90,8 @@ def _try_parse_index_dir(ret) -> Optional[Path]:
 
 def _align_one(
     srr: str,
-    fq1: str | Path,
-    fq2: str | Path,
+    fq1: Union[str, Path],
+    fq2: Union[str, Path, None],
     index_root: str,
     out_root: str,
     threads: int,
@@ -103,6 +103,8 @@ def _align_one(
     """
     Align a single sample; return (srr, bam_path, index_dir|None).
     """
+    fq1_path = Path(fq1)
+    fq2_path = Path(fq2) if fq2 else None
     sample_dir = Path(out_root) / srr
     sample_dir.mkdir(parents=True, exist_ok=True)
     # Normalize expected output paths (used for idempotency and downstream validation).
@@ -122,8 +124,8 @@ def _align_one(
     # Call the existing wrapper.
     ret = star_align_auto(
         accession=acc,
-        fq1=str(fq1),
-        fq2=str(fq2),
+        fq1=str(fq1_path),
+        fq2=str(fq2_path) if fq2_path else None,
         index_root=index_root,
         out_prefix=str(out_prefix),
         threads=threads,
@@ -163,7 +165,7 @@ def make_star_step(
     Output: work/star/{SRR}/Aligned.sortedByCoord.out.bam (one subdirectory per sample).
     Validation: BAM exists and is larger than 1 MB.
     """
-    def _cmd(clean_fastqs: Sequence[Tuple[str, str | Path, str | Path]], logger=None) -> List[Tuple[str, str, Optional[str]]]:
+    def _cmd(clean_fastqs: Sequence[Tuple[str, str | Path, str | Path | None]], logger=None) -> List[Tuple[str, str, Optional[str]]]:
         os.makedirs(out_root, exist_ok=True)
 
         # Default to serial execution when concurrency is unspecified (keeps logs orderly).
