@@ -1,0 +1,41 @@
+/* Colored capability tags for GPU support matrix */
+.tag {
+  display: inline-block;
+  padding: 0 .45em;
+  margin: 0 .05em;
+  border-radius: 9999px;
+  font-size: .85em;
+  line-height: 1.6;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.tag-rapids {
+  color: #0b874b;
+  background-color: rgba(11, 135, 75, 0.10);
+  border-color: rgba(11, 135, 75, 0.20);
+}
+
+.tag-mixed {
+  color: #6c4cff; /* violet */
+  background-color: rgba(108, 76, 255, 0.10);
+  border-color: rgba(108, 76, 255, 0.20);
+}
+
+.tag-torch {
+  color: #d8402a; /* torch red */
+  background-color: rgba(216, 64, 42, 0.10);
+  border-color: rgba(216, 64, 42, 0.20);
+}
+
+.tag-mlx {
+  color: #246bff; /* apple mlx blue */
+  background-color: rgba(36, 107, 255, 0.10);
+  border-color: rgba(36, 107, 255, 0.20);
+}
+
+.tag-all {
+  color: #64748b; /* slate */
+  background-color: rgba(100, 116, 139, 0.10);
+  border-color: rgba(100, 116, 139, 0.20);
+}
