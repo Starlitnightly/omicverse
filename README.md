@@ -11,7 +11,7 @@
 | CI/CD   |  [![pre-commit.ci status][precommit-badge]][precommit-link]               |
 | Docs    | [![Documentation Status][readthedocs-badge]][readthedocs-link] [![Preprint][preprint-badge]][preprint-link]                                            |
 | Package | [![PyPI - Version][pypi-badge]][pypi-link] [![pypi download][pypi-download-badge]][pypi-download-link] [![Conda-forge badge][conda-forge-badge]][anaconda-link] [![Docker image][docker-badge]][docker-link] |
-| Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link]            |
+| Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link] [![Star][star-badge]][star-link]            |
 
 
 [precommit-badge]: https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg
@@ -32,6 +32,8 @@
 [license-link]: https://img.shields.io/apm/l/vim-mode
 [scverse-badge]: https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow
 [scverse-link]: https://scverse.org/
+[star-badge]:https://img.shields.io/github/stars/Starlitnightly/omicverse
+[star-link]:https://github.com/Starlitnightly/omicverse
 
 </div>
 
