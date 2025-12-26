@@ -43,10 +43,69 @@
         .feather-search:before { content: "\f002"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-maximize:before { content: "\f31e"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-minimize:before { content: "\f2d1"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+
+        /* Code Editor Styles */
+        .code-cell {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+        .code-cell-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #e9ecef;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .code-cell-input {
+            padding: 0;
+        }
+        .code-cell-input textarea {
+            width: 100%;
+            min-height: 100px;
+            border: none;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 13px;
+            resize: vertical;
+            background: #fff;
+        }
+        .code-cell-output {
+            padding: 12px;
+            background: #fff;
+            border-top: 1px solid #dee2e6;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            display: none;
+        }
+        .code-cell-output.has-content {
+            display: block;
+        }
+        .code-cell-output.error {
+            color: #dc3545;
+            background: #f8d7da;
+        }
+        .code-cell-output.success {
+            color: #198754;
+        }
+        .cell-number {
+            color: #6c757d;
+            font-weight: bold;
+            font-size: 12px;
+        }
         .feather-moon:before { content: "\f186"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-sun:before { content: "\f185"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-bell:before { content: "\f0f3"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-check:before { content: "\f00c"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-code:before { content: "\f121"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-bar-chart:before { content: "\f080"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-play:before { content: "\f04b"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-trash-2:before { content: "\f2ed"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-plus:before { content: "\f067"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        .feather-file-text:before { content: "\f15c"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-check-circle:before { content: "\f058"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-x:before { content: "\f00d"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         .feather-user:before { content: "\f007"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
@@ -209,6 +268,18 @@
                         </div>
                     </div>
                     
+                    <!-- View Switcher -->
+                    <div class="nxl-h-item d-none d-sm-flex">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-primary" id="view-viz-btn" onclick="singleCellApp.switchView('visualization')">
+                                <i class="feather-bar-chart me-1"></i>可视化
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-code-btn" onclick="singleCellApp.switchView('code')">
+                                <i class="feather-code me-1"></i>代码编辑器
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Full Screen -->
                     <div class="nxl-h-item d-none d-sm-flex">
                         <div class="full-screen-switcher">
@@ -354,6 +425,8 @@
 
             <!-- Main Content -->
             <div class="main-content">
+                <!-- Visualization View -->
+                <div id="visualization-view" class="content-view">
                 <div class="row">
                     <!-- Main Analysis Panel -->
                     <div class="col-lg-8 col-xl-9">
@@ -514,6 +587,45 @@
                         </div>
                     </div>
                 </div>
+                </div>
+                </div>
+                <!-- End Visualization View -->
+
+                <!-- Code Editor View -->
+                <div id="code-editor-view" class="content-view" style="display: none;">
+                    <div class="row h-100">
+                        <div class="col-12">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="feather-code me-2"></i>Python 代码编辑器
+                                        <span class="badge bg-info ms-2">交互式执行</span>
+                                    </h5>
+                                </div>
+                                <div class="card-body d-flex flex-column p-0" style="height: calc(100vh - 200px);">
+                                    <!-- Cells Container -->
+                                    <div id="code-cells-container" class="flex-grow-1 overflow-auto p-3">
+                                        <!-- Code cells will be added here -->
+                                    </div>
+
+                                    <!-- Add Cell Button -->
+                                    <div class="border-top p-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="singleCellApp.addCodeCell()">
+                                            <i class="feather-plus me-1"></i>添加代码单元
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="singleCellApp.clearAllCells()">
+                                            <i class="feather-trash-2 me-1"></i>清空所有
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-info ms-2" onclick="singleCellApp.insertTemplate()">
+                                            <i class="feather-file-text me-1"></i>插入模板
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Code Editor View -->
             </div>
         </div>
     </main>

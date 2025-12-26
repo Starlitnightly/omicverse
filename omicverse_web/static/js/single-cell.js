@@ -7,6 +7,9 @@ class SingleCellAnalysis {
         this.currentData = null;
         this.currentTool = null;
         this.currentTheme = 'light';
+        this.currentView = 'visualization';
+        this.codeCells = [];
+        this.cellCounter = 0;
 
         // Initialize high-performance components
         this.dataManager = new DataManager();
@@ -1823,6 +1826,198 @@ class SingleCellAnalysis {
 
     showComingSoon() {
         alert('该功能正在开发中，敬请期待！');
+    }
+
+    // View switching
+    switchView(view) {
+        this.currentView = view;
+
+        const vizView = document.getElementById('visualization-view');
+        const codeView = document.getElementById('code-editor-view');
+        const vizBtn = document.getElementById('view-viz-btn');
+        const codeBtn = document.getElementById('view-code-btn');
+
+        if (view === 'visualization') {
+            vizView.style.display = 'block';
+            codeView.style.display = 'none';
+            vizBtn.classList.remove('btn-outline-primary');
+            vizBtn.classList.add('btn-primary');
+            codeBtn.classList.remove('btn-primary');
+            codeBtn.classList.add('btn-outline-primary');
+        } else if (view === 'code') {
+            vizView.style.display = 'none';
+            codeView.style.display = 'block';
+            vizBtn.classList.remove('btn-primary');
+            vizBtn.classList.add('btn-outline-primary');
+            codeBtn.classList.remove('btn-outline-primary');
+            codeBtn.classList.add('btn-primary');
+
+            // Add a default cell if none exists
+            if (this.codeCells.length === 0) {
+                this.addCodeCell();
+            }
+        }
+    }
+
+    // Code cell management
+    addCodeCell(code = '') {
+        this.cellCounter++;
+        const cellId = `cell-${this.cellCounter}`;
+
+        const cellHtml = `
+            <div class="code-cell" id="${cellId}">
+                <div class="code-cell-header">
+                    <span class="cell-number">In [${this.cellCounter}]:</span>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-success me-1" onclick="singleCellApp.runCodeCell('${cellId}')">
+                            <i class="feather-play"></i> 运行
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')">
+                            <i class="feather-trash-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="code-cell-input">
+                    <textarea class="code-input" placeholder="# 输入Python代码...
+# 可用变量:
+#   adata - 当前AnnData对象
+#
+# 示例:
+#   print(adata)
+#   print(adata.obs.columns)
+#   print(adata.var_names[:10])">${code}</textarea>
+                </div>
+                <div class="code-cell-output" id="${cellId}-output"></div>
+            </div>
+        `;
+
+        const container = document.getElementById('code-cells-container');
+        container.insertAdjacentHTML('beforeend', cellHtml);
+
+        this.codeCells.push(cellId);
+
+        // Add keyboard shortcut (Shift+Enter to run)
+        const textarea = document.querySelector(`#${cellId} .code-input`);
+        textarea.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.key === 'Enter') {
+                e.preventDefault();
+                this.runCodeCell(cellId);
+            }
+        });
+    }
+
+    runCodeCell(cellId) {
+        const cell = document.getElementById(cellId);
+        const textarea = cell.querySelector('.code-input');
+        const outputDiv = cell.querySelector('.code-cell-output');
+        const code = textarea.value.trim();
+
+        if (!code) {
+            return;
+        }
+
+        // Show loading
+        outputDiv.className = 'code-cell-output has-content';
+        outputDiv.textContent = '执行中...';
+
+        // Execute code on backend
+        fetch('/api/execute_code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                code: code
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputDiv.className = 'code-cell-output has-content error';
+                outputDiv.textContent = data.error;
+            } else {
+                outputDiv.className = 'code-cell-output has-content success';
+                let output = '';
+                if (data.output) {
+                    output += data.output;
+                }
+                if (data.result !== null && data.result !== undefined) {
+                    if (output) output += '\n';
+                    output += `Out: ${data.result}`;
+                }
+                if (data.data_updated) {
+                    if (output) output += '\n';
+                    output += '\n✓ AnnData对象已更新';
+                    // Refresh data info
+                    this.checkStatus();
+                }
+                outputDiv.textContent = output || '(执行成功，无输出)';
+            }
+        })
+        .catch(error => {
+            outputDiv.className = 'code-cell-output has-content error';
+            outputDiv.textContent = `错误: ${error.message}`;
+        });
+    }
+
+    deleteCodeCell(cellId) {
+        if (confirm('确定要删除这个代码单元吗？')) {
+            const cell = document.getElementById(cellId);
+            cell.remove();
+            this.codeCells = this.codeCells.filter(id => id !== cellId);
+        }
+    }
+
+    clearAllCells() {
+        if (confirm('确定要清空所有代码单元吗？')) {
+            const container = document.getElementById('code-cells-container');
+            container.innerHTML = '';
+            this.codeCells = [];
+            this.cellCounter = 0;
+            // Add one empty cell
+            this.addCodeCell();
+        }
+    }
+
+    insertTemplate() {
+        const templates = {
+            'basic_info': `# 查看基本信息
+print(adata)
+print(f"细胞数: {adata.n_obs}")
+print(f"基因数: {adata.n_vars}")`,
+            'obs_info': `# 查看观测值列
+print(adata.obs.columns)
+print(adata.obs.head())`,
+            'filter': `# 过滤细胞
+# 保留基因数在200-5000之间的细胞
+import scanpy as sc
+sc.pp.filter_cells(adata, min_genes=200)
+sc.pp.filter_cells(adata, max_genes=5000)
+print(f"过滤后细胞数: {adata.n_obs}")`,
+            'normalize': `# 标准化
+import scanpy as sc
+sc.pp.normalize_total(adata, target_sum=1e4)
+sc.pp.log1p(adata)
+print("标准化完成")`,
+            'hvg': `# 高变基因选择
+import scanpy as sc
+sc.pp.highly_variable_genes(adata, n_top_genes=2000)
+print(f"高变基因数: {adata.var.highly_variable.sum()}")`,
+        };
+
+        const templateKeys = Object.keys(templates);
+        let options = templateKeys.map((key, idx) =>
+            `${idx + 1}. ${key.replace('_', ' ')}`
+        ).join('\n');
+
+        const choice = prompt(`选择模板:\n${options}\n\n输入编号 (1-${templateKeys.length}):`);
+        if (choice) {
+            const idx = parseInt(choice) - 1;
+            if (idx >= 0 && idx < templateKeys.length) {
+                const templateKey = templateKeys[idx];
+                this.addCodeCell(templates[templateKey]);
+            }
+        }
     }
 
     // 测试legend显示的方法

@@ -860,6 +860,85 @@ def get_data_info():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/execute_code', methods=['POST'])
+def execute_code():
+    """Execute Python code with access to current_adata"""
+    global current_adata
+
+    if current_adata is None:
+        return jsonify({'error': '没有加载数据。请先上传H5AD文件。'}), 400
+
+    try:
+        code = request.json.get('code', '')
+        if not code:
+            return jsonify({'error': '没有提供代码'}), 400
+
+        # Create a restricted execution environment
+        import io
+        import sys
+        from contextlib import redirect_stdout, redirect_stderr
+
+        # Capture output
+        output_buffer = io.StringIO()
+        error_buffer = io.StringIO()
+
+        # Create namespace with current_adata
+        namespace = {
+            'adata': current_adata,
+            '__builtins__': __builtins__,
+            'sc': sc,
+            'pd': pd,
+            'np': np,
+        }
+
+        result = None
+        data_updated = False
+
+        try:
+            with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
+                # Compile code first to catch syntax errors
+                compiled = compile(code, '<string>', 'exec')
+                # Execute code
+                exec(compiled, namespace)
+
+                # Check if adata was modified
+                if 'adata' in namespace and namespace['adata'] is not current_adata:
+                    # If a new adata was assigned, update global
+                    current_adata = namespace['adata']
+                    data_updated = True
+                elif current_adata is not None:
+                    # Data might have been modified in-place
+                    data_updated = True
+
+                # Try to get the last expression result if any
+                if namespace.get('_'):
+                    result = str(namespace['_'])
+
+        except Exception as e:
+            import traceback
+            error_msg = traceback.format_exc()
+            return jsonify({
+                'error': error_msg,
+                'output': output_buffer.getvalue()
+            }), 200
+
+        output = output_buffer.getvalue()
+        stderr = error_buffer.getvalue()
+
+        if stderr:
+            output = output + '\n' + stderr if output else stderr
+
+        return jsonify({
+            'output': output,
+            'result': result,
+            'data_updated': data_updated,
+            'success': True
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': traceback.format_exc()}), 500
+
 @app.route('/api/export_plot_data', methods=['POST'])
 def export_plot_data():
     """Export current plot data as CSV"""
