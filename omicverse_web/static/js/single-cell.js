@@ -14,6 +14,7 @@ class SingleCellAnalysis {
         this.currentBrowsePath = '';
         this.openTabs = [];
         this.activeTabId = null;
+        this.codeFontSize = 13;
 
         // Initialize high-performance components
         this.dataManager = new DataManager();
@@ -31,6 +32,7 @@ class SingleCellAnalysis {
         this.setupNotebookManager();
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
+        this.applyCodeFontSize();
     }
 
     setupFileUpload() {
@@ -196,18 +198,10 @@ class SingleCellAnalysis {
 
     setupThemeToggle() {
         // Setup click handlers for existing theme toggle buttons
-        const darkButton = document.getElementById('dark-button');
-        const lightButton = document.getElementById('light-button');
+        const themeToggle = document.getElementById('theme-toggle');
 
-        if (darkButton) {
-            darkButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleTheme();
-            });
-        }
-
-        if (lightButton) {
-            lightButton.addEventListener('click', (e) => {
+        if (themeToggle) {
+            themeToggle.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.toggleTheme();
             });
@@ -378,23 +372,26 @@ class SingleCellAnalysis {
 
     toggleTheme() {
         const html = document.documentElement;
-        const darkButton = document.getElementById('dark-button');
-        const lightButton = document.getElementById('light-button');
+        const icon = document.getElementById('theme-toggle-icon');
         
         if (html.classList.contains('app-skin-dark')) {
             // Switch to light mode
             html.classList.remove('app-skin-dark');
-            darkButton.style.display = 'none';
-            lightButton.style.display = 'block';
             localStorage.setItem('app-skin-dark', 'app-skin-light');
             this.currentTheme = 'light';
+            if (icon) {
+                icon.classList.remove('feather-sun');
+                icon.classList.add('feather-moon');
+            }
         } else {
             // Switch to dark mode
             html.classList.add('app-skin-dark');
-            darkButton.style.display = 'block';
-            lightButton.style.display = 'none';
             localStorage.setItem('app-skin-dark', 'app-skin-dark');
             this.currentTheme = 'dark';
+            if (icon) {
+                icon.classList.remove('feather-moon');
+                icon.classList.add('feather-sun');
+            }
         }
         
         // Update Plotly theme and status bar theme
@@ -1994,7 +1991,7 @@ class SingleCellAnalysis {
         const vizBtn = document.getElementById('view-viz-btn');
         const codeBtn = document.getElementById('view-code-btn');
         const vizToolbar = document.getElementById('viz-toolbar');
-        const codeToolbar = document.getElementById('code-editor-toolbar');
+        const codeToolbarRow = document.getElementById('code-editor-toolbar-row');
         const pageTitle = document.getElementById('page-title');
         const breadcrumbTitle = document.getElementById('breadcrumb-title');
         const navMenu = document.querySelector('.navbar-content .nxl-navbar');
@@ -2010,7 +2007,7 @@ class SingleCellAnalysis {
 
             // Toggle toolbars
             if (vizToolbar) vizToolbar.style.display = 'flex';
-            if (codeToolbar) codeToolbar.style.display = 'none';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
 
             // Update page title
             if (pageTitle) pageTitle.textContent = '单细胞分析';
@@ -2034,7 +2031,7 @@ class SingleCellAnalysis {
 
             // Toggle toolbars
             if (vizToolbar) vizToolbar.style.display = 'none';
-            if (codeToolbar) codeToolbar.style.display = 'block';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'flex';
 
             // Update page title
             if (pageTitle) pageTitle.innerHTML = '<i class="feather-code me-2"></i>Python 代码编辑器';
@@ -2072,6 +2069,7 @@ class SingleCellAnalysis {
                     </div>
                 </div>
                 <div class="code-cell-input">
+                    <pre class="code-highlight language-python"><code class="language-python"></code></pre>
                     <textarea class="code-input" placeholder="# 输入Python代码 (可用变量: adata, sc, pd, np)
 # Shift+Enter 运行代码">${code}</textarea>
                 </div>
@@ -2086,11 +2084,16 @@ class SingleCellAnalysis {
 
         // Add keyboard shortcut (Shift+Enter to run)
         const textarea = document.querySelector(`#${cellId} .code-input`);
+        const highlight = document.querySelector(`#${cellId} .code-highlight code`);
 
         // Auto-resize textarea based on content
         const autoResize = () => {
             textarea.style.height = 'auto';
             textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+            const highlightContainer = document.querySelector(`#${cellId} .code-highlight`);
+            if (highlightContainer) {
+                highlightContainer.style.height = textarea.style.height;
+            }
         };
 
         textarea.addEventListener('input', autoResize);
@@ -2100,9 +2103,19 @@ class SingleCellAnalysis {
                 this.runCodeCell(cellId);
             }
         });
+        textarea.addEventListener('input', () => this.updateCodeHighlight(textarea, highlight));
+        textarea.addEventListener('scroll', () => {
+            const highlightContainer = document.querySelector(`#${cellId} .code-highlight`);
+            if (highlightContainer) {
+                highlightContainer.scrollTop = textarea.scrollTop;
+                highlightContainer.scrollLeft = textarea.scrollLeft;
+            }
+        });
 
         // Initial resize
         setTimeout(autoResize, 0);
+        this.updateCodeHighlight(textarea, highlight);
+        this.applyCodeFontSize();
 
         if (outputs && outputs.length > 0) {
             const outputDiv = document.getElementById(`${cellId}-output`);
@@ -2154,8 +2167,6 @@ class SingleCellAnalysis {
                     output += `Out: ${data.result}`;
                 }
                 if (data.data_updated) {
-                    if (output) output += '\n';
-                    output += '\n✓ AnnData对象已更新';
                     this.refreshDataFromKernel(data.data_info);
                 }
                 this.renderCodeOutput(outputDiv, {
@@ -2505,9 +2516,50 @@ class SingleCellAnalysis {
                 img.className = 'code-output-figure';
                 img.src = `data:image/png;base64,${fig}`;
                 img.alt = 'plot';
+                img.onload = () => {
+                    if (img.naturalWidth) {
+                        img.style.width = `${Math.round(img.naturalWidth * 0.5)}px`;
+                    }
+                };
                 outputDiv.appendChild(img);
             });
         }
+    }
+
+    updateCodeHighlight(textarea, highlight) {
+        if (!highlight || !textarea) return;
+        const code = textarea.value || '';
+        if (window.Prism && Prism.languages && Prism.languages.python) {
+            highlight.innerHTML = Prism.highlight(code, Prism.languages.python, 'python') + '\n';
+        } else {
+            highlight.textContent = code;
+        }
+    }
+
+    applyCodeFontSize() {
+        const size = `${this.codeFontSize}px`;
+        document.querySelectorAll('.code-input').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-highlight').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-highlight code').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-cell-output').forEach(el => {
+            el.style.fontSize = size;
+        });
+        const textEditor = document.getElementById('text-file-editor');
+        if (textEditor) {
+            textEditor.style.fontSize = size;
+        }
+    }
+
+    adjustFontSize(delta) {
+        const next = Math.min(20, Math.max(10, this.codeFontSize + delta));
+        this.codeFontSize = next;
+        this.applyCodeFontSize();
     }
 
     deleteCodeCell(cellId) {
@@ -2784,18 +2836,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load saved theme - based on moban7855 template
     const savedTheme = localStorage.getItem('app-skin-dark') || 'app-skin-light';
     const html = document.documentElement;
-    const darkButton = document.getElementById('dark-button');
-    const lightButton = document.getElementById('light-button');
+    const toggleIcon = document.getElementById('theme-toggle-icon');
     
     if (savedTheme === 'app-skin-dark') {
         html.classList.add('app-skin-dark');
-        if (darkButton) darkButton.style.display = 'block';
-        if (lightButton) lightButton.style.display = 'none';
+        if (toggleIcon) {
+            toggleIcon.classList.remove('feather-moon');
+            toggleIcon.classList.add('feather-sun');
+        }
         singleCellApp.currentTheme = 'dark';
     } else {
         html.classList.remove('app-skin-dark');
-        if (darkButton) darkButton.style.display = 'none';
-        if (lightButton) lightButton.style.display = 'block';
+        if (toggleIcon) {
+            toggleIcon.classList.remove('feather-sun');
+            toggleIcon.classList.add('feather-moon');
+        }
         singleCellApp.currentTheme = 'light';
     }
 });

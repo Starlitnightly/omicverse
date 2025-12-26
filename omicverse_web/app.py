@@ -1286,7 +1286,7 @@ def execute_code():
         if new_adata is not None:
             current_adata = new_adata
 
-        data_updated = current_adata is not None
+        data_updated = new_adata is not None
         sync_adaptor_with_adata()
         try:
             kernel_executor.sync_adata(current_adata)
