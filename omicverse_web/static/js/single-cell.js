@@ -15,6 +15,7 @@ class SingleCellAnalysis {
         this.openTabs = [];
         this.activeTabId = null;
         this.codeFontSize = 13;
+        this.fileTreeLoaded = false;
 
         // Initialize high-performance components
         this.dataManager = new DataManager();
@@ -33,6 +34,7 @@ class SingleCellAnalysis {
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
         this.applyCodeFontSize();
+        this.fetchKernelVars();
     }
 
     setupFileUpload() {
@@ -116,16 +118,9 @@ class SingleCellAnalysis {
             this.importNotebookFile(files[0]);
             fileInput.value = '';
         });
-        const upButton = document.getElementById('file-browser-up');
-        if (upButton) {
-            upButton.addEventListener('click', () => {
-                if (!this.currentBrowsePath) return;
-                const parts = this.currentBrowsePath.split('/').filter(Boolean);
-                parts.pop();
-                const next = parts.join('/');
-                this.fetchFileList(next);
-            });
-        }
+        this.fetchFileTree();
+        this.fetchKernelStats();
+        this.fetchKernelVars();
     }
 
     triggerNotebookUpload() {
@@ -133,66 +128,86 @@ class SingleCellAnalysis {
         if (fileInput) fileInput.click();
     }
 
-    fetchFileList(path = '') {
+    fetchFileTree() {
+        const tree = document.getElementById('file-tree');
+        if (!tree) return;
+        tree.innerHTML = '<li class="file-tree-node">加载中...</li>';
+        this.loadTreeNode('', tree);
+    }
+
+    loadTreeNode(path, container) {
         const url = new URL('/api/files/list', window.location.origin);
         if (path) url.searchParams.set('path', path);
         fetch(url.toString())
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`获取目录失败: ${data.error}`);
+                container.innerHTML = `<li class="file-tree-node">${data.error}</li>`;
                 return;
             }
             this.currentBrowsePath = data.path || '';
-            this.renderFileList(data.entries || [], data.path || '', data.parent || '');
+            this.renderFileTree(container, data.entries || [], data.path || '');
+            const rootLabel = document.getElementById('file-browser-root');
+            if (rootLabel) {
+                rootLabel.textContent = data.path ? `./${data.path}` : './';
+            }
         })
         .catch(error => {
-            alert(`获取目录失败: ${error.message}`);
+            container.innerHTML = `<li class="file-tree-node">${error.message}</li>`;
         });
     }
 
-    renderFileList(entries, path, parent) {
-        const list = document.getElementById('notebook-list');
-        const pathLabel = document.getElementById('file-browser-path');
-        const upButton = document.getElementById('file-browser-up');
-        if (!list) return;
-        list.innerHTML = '';
-        if (pathLabel) {
-            pathLabel.textContent = path ? `./${path}` : './';
-        }
-        if (upButton) {
-            upButton.style.display = parent !== '' ? 'block' : 'none';
-        }
+    renderFileTree(container, entries, path) {
+        container.innerHTML = '';
         if (!entries.length) {
-            const li = document.createElement('li');
-            li.className = 'file-manager-item';
-            li.innerHTML = '<span>未发现文件</span><span class="file-manager-meta">—</span>';
-            list.appendChild(li);
+            const empty = document.createElement('li');
+            empty.className = 'file-tree-node';
+            empty.textContent = '空目录';
+            container.appendChild(empty);
             return;
         }
         entries.forEach(entry => {
             const li = document.createElement('li');
-            li.className = `file-manager-item ${entry.type === 'dir' ? 'is-dir' : ''}`;
-            const left = document.createElement('span');
+            const node = document.createElement('div');
+            node.className = 'file-tree-node';
+            const toggle = document.createElement('span');
+            toggle.className = 'node-toggle';
+            toggle.textContent = entry.type === 'dir' ? '▸' : '';
             const icon = document.createElement('i');
-            icon.className = `file-icon ${entry.type === 'dir' ? 'feather-folder' : 'feather-file-text'}`;
-            left.appendChild(icon);
-            left.appendChild(document.createTextNode(entry.name));
-            const right = document.createElement('span');
-            right.className = 'file-manager-meta';
-            right.textContent = entry.type === 'dir' ? '进入' : '打开';
-            li.appendChild(left);
-            li.appendChild(right);
-            li.addEventListener('click', () => {
-                if (entry.type === 'dir') {
-                    const next = path ? `${path}/${entry.name}` : entry.name;
-                    this.fetchFileList(next);
-                } else {
+            icon.className = entry.type === 'dir' ? 'feather-folder' : 'feather-file-text';
+            node.appendChild(toggle);
+            node.appendChild(icon);
+            node.appendChild(document.createTextNode(entry.name));
+            li.appendChild(node);
+            if (entry.type === 'dir') {
+                const children = document.createElement('ul');
+                children.className = 'file-tree-children';
+                li.appendChild(children);
+                node.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isOpen = children.classList.contains('open');
+                    if (isOpen) {
+                        children.classList.remove('open');
+                        toggle.textContent = '▸';
+                        return;
+                    }
+                    toggle.textContent = '▾';
+                    children.classList.add('open');
+                    if (!children.dataset.loaded) {
+                        children.innerHTML = '<li class="file-tree-node">加载中...</li>';
+                        const nextPath = path ? `${path}/${entry.name}` : entry.name;
+                        this.loadTreeNode(nextPath, children);
+                        children.dataset.loaded = '1';
+                    }
+                });
+            } else {
+                node.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const filePath = path ? `${path}/${entry.name}` : entry.name;
                     this.openFileFromServer(filePath);
-                }
-            });
-            list.appendChild(li);
+                });
+            }
+            container.appendChild(li);
         });
     }
 
@@ -2038,7 +2053,12 @@ class SingleCellAnalysis {
             if (breadcrumbTitle) breadcrumbTitle.textContent = 'Python 代码编辑器';
             if (navMenu) navMenu.style.display = 'none';
             if (fileManager) fileManager.style.display = 'block';
-            this.fetchFileList(this.currentBrowsePath);
+            if (!this.fileTreeLoaded) {
+                this.fetchFileTree();
+                this.fileTreeLoaded = true;
+            }
+            this.fetchKernelStats();
+            this.fetchKernelVars();
             if (this.openTabs.length === 0) {
                 this.openFileFromServer('default.ipynb');
             }
@@ -2269,6 +2289,8 @@ class SingleCellAnalysis {
         this.cellCounter = 0;
         const textView = document.getElementById('text-file-view');
         if (textView) textView.style.display = 'none';
+        const varView = document.getElementById('var-detail-view');
+        if (varView) varView.style.display = 'none';
         container.style.display = 'block';
         if (!cells.length) {
             this.addCodeCell();
@@ -2363,6 +2385,8 @@ class SingleCellAnalysis {
             this.loadNotebookCells(tab.cells || []);
         } else if (tab.type === 'text') {
             this.showTextFile(tab.content || '');
+        } else if (tab.type === 'var') {
+            this.showVarDetail(tab.detail || {});
         }
     }
 
@@ -2424,6 +2448,7 @@ class SingleCellAnalysis {
         const container = document.getElementById('code-cells-container');
         const textView = document.getElementById('text-file-view');
         const textEditor = document.getElementById('text-file-editor');
+        const varView = document.getElementById('var-detail-view');
         if (container) container.style.display = 'none';
         if (textView) {
             textView.style.display = 'block';
@@ -2431,6 +2456,201 @@ class SingleCellAnalysis {
         if (textEditor) {
             textEditor.value = content;
         }
+        if (varView) {
+            varView.style.display = 'none';
+        }
+    }
+
+    showVarDetail(detail) {
+        const container = document.getElementById('code-cells-container');
+        const textView = document.getElementById('text-file-view');
+        const varView = document.getElementById('var-detail-view');
+        if (container) container.style.display = 'none';
+        if (textView) textView.style.display = 'none';
+        if (!varView) return;
+        varView.style.display = 'block';
+        varView.innerHTML = '';
+        const meta = document.createElement('div');
+        meta.className = 'var-detail-meta';
+        if (detail.type === 'dataframe') {
+            meta.textContent = `${detail.name} · DataFrame ${detail.shape[0]}x${detail.shape[1]} (预览 50x50)`;
+        } else if (detail.type === 'anndata') {
+            meta.textContent = `${detail.name} · AnnData ${detail.summary.shape.join('x')}`;
+        } else {
+            meta.textContent = `${detail.name}`;
+        }
+        varView.appendChild(meta);
+
+        if (detail.type === 'dataframe' && detail.table) {
+            const table = document.createElement('table');
+            table.className = 'var-table-view';
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            const corner = document.createElement('th');
+            corner.textContent = '';
+            headRow.appendChild(corner);
+            detail.table.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            detail.table.data.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                const idxCell = document.createElement('td');
+                idxCell.textContent = detail.table.index[idx];
+                tr.appendChild(idxCell);
+                row.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            varView.appendChild(table);
+            return;
+        }
+
+        if (detail.type === 'anndata') {
+            const list = document.createElement('div');
+            list.className = 'var-detail-meta';
+            list.innerHTML = `
+                obs columns: ${detail.summary.obs_columns.length}<br/>
+                var columns: ${detail.summary.var_columns.length}<br/>
+                obsm: ${(detail.summary.obsm_keys || []).join(', ') || '—'}<br/>
+                layers: ${(detail.summary.layers || []).join(', ') || '—'}
+            `;
+            varView.appendChild(list);
+            return;
+        }
+
+        const pre = document.createElement('pre');
+        pre.className = 'code-output-text';
+        pre.textContent = detail.content || '';
+        varView.appendChild(pre);
+    }
+
+    toggleSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        const toggle = document.getElementById(`${sectionId}-toggle`);
+        if (!section || !toggle) return;
+        const isHidden = section.style.display === 'none';
+        section.style.display = isHidden ? 'block' : 'none';
+        toggle.textContent = isHidden ? '收起' : '展开';
+    }
+
+    fetchKernelStats() {
+        fetch('/api/kernel/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                return;
+            }
+            const mem = document.getElementById('kernel-memory-value');
+            if (mem) {
+                mem.textContent = data.memory_mb ? `${data.memory_mb.toFixed(1)} MB` : '--';
+            }
+            const list = document.getElementById('kernel-var-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const vars = data.vars || [];
+            if (!vars.length) {
+                const li = document.createElement('li');
+                li.className = 'kernel-var-item';
+                li.textContent = '暂无数据';
+                list.appendChild(li);
+                return;
+            }
+            const max = Math.max(...vars.map(v => v.size_mb || 0), 1);
+            vars.forEach(v => {
+                const li = document.createElement('li');
+                li.className = 'kernel-var-item';
+                const label = document.createElement('span');
+                label.textContent = v.name;
+                const bar = document.createElement('div');
+                bar.className = 'kernel-var-bar';
+                const fill = document.createElement('span');
+                fill.style.width = `${Math.round((v.size_mb / max) * 100)}%`;
+                bar.appendChild(fill);
+                const size = document.createElement('span');
+                size.textContent = `${v.size_mb.toFixed(1)} MB`;
+                li.appendChild(label);
+                li.appendChild(bar);
+                li.appendChild(size);
+                list.appendChild(li);
+            });
+        })
+        .catch(() => {});
+    }
+
+    fetchKernelVars() {
+        fetch('/api/kernel/vars')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                return;
+            }
+            const table = document.getElementById('kernel-vars-table');
+            if (!table) return;
+            table.innerHTML = '';
+            const vars = data.vars || [];
+            if (!vars.length) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="3" class="text-muted">暂无数据</td>';
+                table.appendChild(row);
+                return;
+            }
+            vars.forEach(v => {
+                const row = document.createElement('tr');
+                row.className = `var-row ${v.is_child ? 'var-child' : ''}`;
+                const name = document.createElement('td');
+                name.textContent = v.name;
+                const type = document.createElement('td');
+                type.textContent = v.type;
+                const preview = document.createElement('td');
+                preview.className = 'var-preview';
+                preview.textContent = v.preview || '';
+                preview.title = v.preview || '';
+                row.appendChild(name);
+                row.appendChild(type);
+                row.appendChild(preview);
+                row.addEventListener('click', () => this.openVarTab(v.name));
+                table.appendChild(row);
+            });
+        })
+        .catch(() => {});
+    }
+
+    openVarTab(name) {
+        if (!name) return;
+        const existing = this.openTabs.find(t => t.type === 'var' && t.name === name);
+        if (existing) {
+            this.setActiveTab(existing.id);
+            return;
+        }
+        fetch(`/api/kernel/var_detail?name=${encodeURIComponent(name)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`打开失败: ${data.error}`);
+                return;
+            }
+            const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            this.openTabs.push({
+                id,
+                name: data.name || name,
+                path: data.name || name,
+                type: 'var',
+                detail: data
+            });
+            this.setActiveTab(id);
+        })
+        .catch(error => {
+            alert(`打开失败: ${error.message}`);
+        });
     }
 
     getTextEditorContent() {

@@ -20,6 +20,7 @@ import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
+import sys
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -162,6 +163,115 @@ def is_allowed_text_file(path_obj):
         '.ini', '.toml', '.js', '.css', '.html'
     }
     return path_obj.suffix.lower() in allowed
+
+
+def estimate_var_size(obj):
+    try:
+        import numpy as np
+        if isinstance(obj, np.ndarray):
+            return obj.nbytes
+    except Exception:
+        pass
+    try:
+        import pandas as pd
+        if isinstance(obj, pd.DataFrame) or isinstance(obj, pd.Series):
+            return int(obj.memory_usage(deep=True).sum())
+    except Exception:
+        pass
+    try:
+        if obj.__class__.__name__ == 'AnnData':
+            size = 0
+            try:
+                size += obj.X.data.nbytes if hasattr(obj.X, 'data') else obj.X.nbytes
+            except Exception:
+                pass
+            try:
+                size += int(obj.obs.memory_usage(deep=True).sum())
+            except Exception:
+                pass
+            try:
+                size += int(obj.var.memory_usage(deep=True).sum())
+            except Exception:
+                pass
+            return size
+    except Exception:
+        pass
+    try:
+        return sys.getsizeof(obj)
+    except Exception:
+        return 0
+
+
+def get_process_memory_mb():
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / (1024 * 1024)
+    except Exception:
+        pass
+    try:
+        import resource
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if rss > 10**7:
+            return rss / (1024 * 1024)
+        return rss / 1024
+    except Exception:
+        return None
+
+
+def summarize_var(name, value):
+    summary = {
+        'name': name,
+        'type': type(value).__name__,
+        'preview': ''
+    }
+    try:
+        import numpy as np
+        if isinstance(value, np.ndarray):
+            summary['preview'] = f'ndarray shape={value.shape} dtype={value.dtype}'
+            return summary
+    except Exception:
+        pass
+    try:
+        import pandas as pd
+        if isinstance(value, pd.DataFrame):
+            summary['preview'] = f'DataFrame shape={value.shape}'
+            return summary
+        if isinstance(value, pd.Series):
+            summary['preview'] = f'Series len={len(value)} dtype={value.dtype}'
+            return summary
+    except Exception:
+        pass
+    try:
+        if value.__class__.__name__ == 'AnnData':
+            shape = getattr(value, 'shape', None)
+            summary['preview'] = f'AnnData shape={shape}'
+            return summary
+    except Exception:
+        pass
+    try:
+        preview = repr(value)
+        preview = preview.replace('\n', ' ')
+        summary['preview'] = preview[:160]
+        return summary
+    except Exception:
+        summary['preview'] = '<unavailable>'
+        return summary
+
+
+def resolve_var_path(name, ns):
+    if not name or name.startswith('_') or '__' in name:
+        raise KeyError('Invalid variable name')
+    parts = name.split('.')
+    if parts[0] not in ns:
+        raise KeyError('Variable not found')
+    obj = ns[parts[0]]
+    for part in parts[1:]:
+        if part in ('obs', 'var', 'uns', 'obsm', 'layers', 'X'):
+            obj = getattr(obj, part)
+        else:
+            raise KeyError('Unsupported attribute')
+    return obj
 
 
 def sync_adaptor_with_adata():
@@ -493,6 +603,144 @@ def save_file():
         return jsonify({'error': 'Invalid file type'}), 400
     except Exception as e:
         logging.error(f"File save failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/kernel/stats', methods=['GET'])
+def kernel_stats():
+    try:
+        kernel_executor._ensure_kernel()
+        ns = kernel_executor.shell.user_ns
+        vars_info = []
+        for name, value in ns.items():
+            if name.startswith('_'):
+                continue
+            if callable(value):
+                continue
+            module_name = getattr(value, '__module__', '')
+            if module_name.startswith('builtins'):
+                continue
+            size_bytes = estimate_var_size(value)
+            vars_info.append({
+                'name': name,
+                'type': type(value).__name__,
+                'size_mb': round(size_bytes / (1024 * 1024), 3)
+            })
+        vars_info.sort(key=lambda x: x['size_mb'], reverse=True)
+        return jsonify({
+            'memory_mb': get_process_memory_mb(),
+            'vars': vars_info[:10]
+        })
+    except Exception as e:
+        logging.error(f"Kernel stats failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/kernel/vars', methods=['GET'])
+def kernel_vars():
+    try:
+        kernel_executor._ensure_kernel()
+        ns = kernel_executor.shell.user_ns
+        vars_info = []
+        for name, value in ns.items():
+            if name.startswith('_'):
+                continue
+            if callable(value):
+                continue
+            module_name = getattr(value, '__module__', '')
+            if module_name.startswith('builtins'):
+                continue
+            vars_info.append(summarize_var(name, value))
+            try:
+                if value.__class__.__name__ == 'AnnData':
+                    obs_summary = summarize_var(f'{name}.obs', value.obs)
+                    obs_summary['is_child'] = True
+                    var_summary = summarize_var(f'{name}.var', value.var)
+                    var_summary['is_child'] = True
+                    vars_info.append(obs_summary)
+                    vars_info.append(var_summary)
+            except Exception:
+                pass
+        vars_info.sort(key=lambda x: x['name'].lower())
+        return jsonify({'vars': vars_info[:50]})
+    except Exception as e:
+        logging.error(f"Kernel vars failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/kernel/var_detail', methods=['GET'])
+def kernel_var_detail():
+    name = request.args.get('name', '')
+    try:
+        kernel_executor._ensure_kernel()
+        ns = kernel_executor.shell.user_ns
+        value = resolve_var_path(name, ns)
+        try:
+            import pandas as pd
+            if isinstance(value, pd.DataFrame):
+                df = value.iloc[:50, :50]
+                return jsonify({
+                    'type': 'dataframe',
+                    'name': name,
+                    'shape': list(value.shape),
+                    'table': df.to_dict(orient='split')
+                })
+            if isinstance(value, pd.Series):
+                df = value.to_frame().iloc[:50, :1]
+                return jsonify({
+                    'type': 'dataframe',
+                    'name': name,
+                    'shape': [len(value), 1],
+                    'table': df.to_dict(orient='split')
+                })
+        except Exception:
+            pass
+        try:
+            import numpy as np
+            if isinstance(value, np.ndarray):
+                preview = f'ndarray shape={value.shape} dtype={value.dtype}'
+                return jsonify({
+                    'type': 'text',
+                    'name': name,
+                    'content': preview
+                })
+        except Exception:
+            pass
+        try:
+            if value.__class__.__name__ == 'AnnData':
+                obs_cols = []
+                var_cols = []
+                try:
+                    obs_cols = list(value.obs.columns)
+                except Exception:
+                    pass
+                try:
+                    var_cols = list(value.var.columns)
+                except Exception:
+                    pass
+                summary = {
+                    'shape': list(getattr(value, 'shape', [])),
+                    'obs_columns': obs_cols,
+                    'var_columns': var_cols,
+                    'obsm_keys': list(getattr(value, 'obsm', {}).keys()),
+                    'layers': list(getattr(value, 'layers', {}).keys())
+                }
+                return jsonify({
+                    'type': 'anndata',
+                    'name': name,
+                    'summary': summary
+                })
+        except Exception:
+            pass
+        content = repr(value)
+        content = content[:4000]
+        return jsonify({
+            'type': 'text',
+            'name': name,
+            'content': content
+        })
+    except Exception as e:
+        logging.error(f"Kernel var detail failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 # New high-performance data endpoints using FlatBuffers

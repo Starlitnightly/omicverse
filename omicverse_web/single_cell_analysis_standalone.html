@@ -212,6 +212,32 @@
             padding: 12px;
             border-top: 1px solid #e5e7eb;
         }
+        .fm-section {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+        .fm-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+        .fm-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .fm-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #111827;
+        }
+        .fm-section-toggle {
+            font-size: 12px;
+            color: #9ca3af;
+        }
         .file-manager-header {
             display: flex;
             align-items: center;
@@ -266,6 +292,138 @@
         .file-manager-meta {
             font-size: 11px;
             color: #9ca3af;
+        }
+        .file-tree {
+            list-style: none;
+            padding-left: 12px;
+            margin: 0;
+        }
+        .file-tree-node {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #374151;
+        }
+        .file-tree-node:hover {
+            background: #f3f4f6;
+        }
+        .file-tree-node .node-toggle {
+            font-size: 10px;
+            color: #9ca3af;
+            width: 10px;
+            text-align: center;
+        }
+        .file-tree-children {
+            list-style: none;
+            margin: 4px 0 4px 14px;
+            padding-left: 0;
+            display: none;
+        }
+        .file-tree-children.open {
+            display: block;
+        }
+
+        .kernel-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .kernel-metric {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .kernel-metric-title {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+        .kernel-metric-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+        }
+        .kernel-var-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0 0;
+        }
+        .kernel-var-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 12px;
+            padding: 6px 6px;
+            border-radius: 6px;
+        }
+        .kernel-var-bar {
+            flex: 1;
+            height: 6px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+        .kernel-var-bar span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #60a5fa, #34d399);
+            border-radius: 999px;
+        }
+        .var-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .var-table th,
+        .var-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+        .var-table th {
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .var-preview {
+            color: #6b7280;
+            max-width: 180px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        .var-row {
+            cursor: pointer;
+        }
+        .var-child td:first-child {
+            padding-left: 20px;
+        }
+        .var-detail-view {
+            display: none;
+            padding: 12px;
+            background: #fff;
+        }
+        .var-detail-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .var-table-view {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .var-table-view th,
+        .var-table-view td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 6px 8px;
+            text-align: left;
         }
 
         .page-header-right-items-wrapper {
@@ -432,6 +590,46 @@
         html.app-skin-dark .file-manager-item.is-dir .file-icon {
             color: #60a5fa;
         }
+        html.app-skin-dark .fm-section-title {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .file-tree-node {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .file-tree-node:hover {
+            background: #111827;
+        }
+        html.app-skin-dark .kernel-metric {
+            background: #111827;
+            border-color: #1f2937;
+        }
+        html.app-skin-dark .kernel-metric-title {
+            color: #9ca3af;
+        }
+        html.app-skin-dark .kernel-metric-value {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .kernel-var-bar {
+            background: #1f2937;
+        }
+        html.app-skin-dark .var-table th,
+        html.app-skin-dark .var-table td {
+            border-bottom-color: #1f2937;
+        }
+        html.app-skin-dark .var-table th,
+        html.app-skin-dark .var-preview {
+            color: #94a3b8;
+        }
+        html.app-skin-dark .var-detail-view {
+            background: #0f172a;
+        }
+        html.app-skin-dark .var-detail-meta {
+            color: #94a3b8;
+        }
+        html.app-skin-dark .var-table-view th,
+        html.app-skin-dark .var-table-view td {
+            border-bottom-color: #1f2937;
+        }
         html.app-skin-dark .page-toolbar {
             background: #0f172a;
             border-bottom-color: #1f2937;
@@ -570,25 +768,72 @@
                     </li>
                 </ul>
                 <div class="file-manager" id="file-manager">
-                    <div class="file-manager-header">
-                        <div class="file-manager-title">工作目录笔记本</div>
-                        <div class="file-manager-actions">
-                            <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.fetchFileList(singleCellApp.currentBrowsePath)" title="刷新">
-                                <i class="feather-refresh-cw"></i>
-                            </button>
-                            <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.triggerNotebookUpload()">
-                                <i class="feather-file-text"></i>
-                            </button>
+                    <div class="fm-section">
+                        <div class="fm-section-header" onclick="singleCellApp.toggleSection('file-browser-section')">
+                            <div class="fm-section-title">文件浏览器</div>
+                            <div class="fm-section-toggle" id="file-browser-section-toggle">收起</div>
+                        </div>
+                        <div id="file-browser-section">
+                            <div class="file-manager-header">
+                                <div class="file-manager-title" id="file-browser-root">运行目录</div>
+                                <div class="file-manager-actions">
+                                    <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.fetchFileTree()" title="刷新">
+                                        <i class="feather-refresh-cw"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.triggerNotebookUpload()">
+                                        <i class="feather-file-text"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <ul class="file-tree" id="file-tree">
+                                <li class="file-tree-node">加载中...</li>
+                            </ul>
                         </div>
                     </div>
-                    <div class="file-manager-path" id="file-browser-path">运行目录</div>
-                    <div class="file-manager-up" id="file-browser-up" style="display: none;">返回上级</div>
-                    <ul class="file-manager-list" id="notebook-list">
-                        <li class="file-manager-item">
-                            <span>未发现文件</span>
-                            <span class="file-manager-meta">—</span>
-                        </li>
-                    </ul>
+                    <div class="fm-section">
+                        <div class="fm-section-header" onclick="singleCellApp.toggleSection('kernel-monitor-section')">
+                            <div class="fm-section-title">Kernel 监控</div>
+                            <div class="fm-section-toggle" id="kernel-monitor-section-toggle">收起</div>
+                        </div>
+                        <div id="kernel-monitor-section">
+                            <div class="kernel-metrics">
+                                <div class="kernel-metric">
+                                    <div class="kernel-metric-title">内存占用</div>
+                                    <div class="kernel-metric-value" id="kernel-memory-value">--</div>
+                                </div>
+                                <div class="kernel-metric">
+                                    <div class="kernel-metric-title">变量占用 Top 10</div>
+                                    <ul class="kernel-var-list" id="kernel-var-list">
+                                        <li class="kernel-var-item">暂无数据</li>
+                                    </ul>
+                                </div>
+                                <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelStats()">刷新</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fm-section">
+                        <div class="fm-section-header" onclick="singleCellApp.toggleSection('kernel-vars-section')">
+                            <div class="fm-section-title">变量查看器</div>
+                            <div class="fm-section-toggle" id="kernel-vars-section-toggle">收起</div>
+                        </div>
+                        <div id="kernel-vars-section">
+                            <table class="var-table">
+                                <thead>
+                                    <tr>
+                                        <th>变量</th>
+                                        <th>类型</th>
+                                        <th>预览</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="kernel-vars-table">
+                                    <tr>
+                                        <td colspan="3" class="text-muted">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelVars()">刷新</button>
+                        </div>
+                    </div>
                     <input type="file" id="notebook-file-input" accept=".ipynb" style="display: none;">
                 </div>
             </div>
@@ -1029,6 +1274,7 @@
                             <div id="text-file-view" class="text-file-view">
                                 <textarea id="text-file-editor" spellcheck="false"></textarea>
                             </div>
+                            <div id="var-detail-view" class="var-detail-view"></div>
                         </div>
                     </div>
                 </div>
