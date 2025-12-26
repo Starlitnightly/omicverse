@@ -1836,6 +1836,10 @@ class SingleCellAnalysis {
         const codeView = document.getElementById('code-editor-view');
         const vizBtn = document.getElementById('view-viz-btn');
         const codeBtn = document.getElementById('view-code-btn');
+        const vizToolbar = document.getElementById('viz-toolbar');
+        const codeToolbar = document.getElementById('code-editor-toolbar');
+        const pageTitle = document.getElementById('page-title');
+        const breadcrumbTitle = document.getElementById('breadcrumb-title');
 
         if (view === 'visualization') {
             vizView.style.display = 'block';
@@ -1844,6 +1848,14 @@ class SingleCellAnalysis {
             vizBtn.classList.add('btn-primary');
             codeBtn.classList.remove('btn-primary');
             codeBtn.classList.add('btn-outline-primary');
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'flex';
+            if (codeToolbar) codeToolbar.style.display = 'none';
+
+            // Update page title
+            if (pageTitle) pageTitle.textContent = '单细胞分析';
+            if (breadcrumbTitle) breadcrumbTitle.textContent = '单细胞分析';
         } else if (view === 'code') {
             vizView.style.display = 'none';
             codeView.style.display = 'block';
@@ -1851,6 +1863,14 @@ class SingleCellAnalysis {
             vizBtn.classList.add('btn-outline-primary');
             codeBtn.classList.remove('btn-outline-primary');
             codeBtn.classList.add('btn-primary');
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'none';
+            if (codeToolbar) codeToolbar.style.display = 'block';
+
+            // Update page title
+            if (pageTitle) pageTitle.innerHTML = '<i class="feather-code me-2"></i>Python 代码编辑器';
+            if (breadcrumbTitle) breadcrumbTitle.textContent = 'Python 代码编辑器';
 
             // Add a default cell if none exists
             if (this.codeCells.length === 0) {
@@ -1868,24 +1888,18 @@ class SingleCellAnalysis {
             <div class="code-cell" id="${cellId}">
                 <div class="code-cell-header">
                     <span class="cell-number">In [${this.cellCounter}]:</span>
-                    <div>
-                        <button type="button" class="btn btn-sm btn-success me-1" onclick="singleCellApp.runCodeCell('${cellId}')">
+                    <div class="cell-toolbar">
+                        <button type="button" class="btn btn-sm btn-success" onclick="singleCellApp.runCodeCell('${cellId}')" title="运行 (Shift+Enter)">
                             <i class="feather-play"></i> 运行
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')" title="删除">
                             <i class="feather-trash-2"></i>
                         </button>
                     </div>
                 </div>
                 <div class="code-cell-input">
-                    <textarea class="code-input" placeholder="# 输入Python代码...
-# 可用变量:
-#   adata - 当前AnnData对象
-#
-# 示例:
-#   print(adata)
-#   print(adata.obs.columns)
-#   print(adata.var_names[:10])">${code}</textarea>
+                    <textarea class="code-input" placeholder="# 输入Python代码 (可用变量: adata, sc, pd, np)
+# Shift+Enter 运行代码">${code}</textarea>
                 </div>
                 <div class="code-cell-output" id="${cellId}-output"></div>
             </div>
@@ -1898,12 +1912,23 @@ class SingleCellAnalysis {
 
         // Add keyboard shortcut (Shift+Enter to run)
         const textarea = document.querySelector(`#${cellId} .code-input`);
+
+        // Auto-resize textarea based on content
+        const autoResize = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+        };
+
+        textarea.addEventListener('input', autoResize);
         textarea.addEventListener('keydown', (e) => {
             if (e.shiftKey && e.key === 'Enter') {
                 e.preventDefault();
                 this.runCodeCell(cellId);
             }
         });
+
+        // Initial resize
+        setTimeout(autoResize, 0);
     }
 
     runCodeCell(cellId) {

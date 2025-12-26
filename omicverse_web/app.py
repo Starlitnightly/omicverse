@@ -896,10 +896,33 @@ def execute_code():
 
         try:
             with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
-                # Compile code first to catch syntax errors
-                compiled = compile(code, '<string>', 'exec')
-                # Execute code
-                exec(compiled, namespace)
+                # Split code into lines to handle last expression
+                code_lines = code.strip().split('\n')
+
+                # Try to evaluate last line as expression (Jupyter-style auto-print)
+                if code_lines:
+                    # Execute all but last line
+                    if len(code_lines) > 1:
+                        exec('\n'.join(code_lines[:-1]), namespace)
+
+                    # Try to evaluate last line as expression
+                    last_line = code_lines[-1].strip()
+                    if last_line and not last_line.startswith(('#', 'import', 'from', 'def', 'class', 'if', 'for', 'while', 'with', 'try')):
+                        try:
+                            # Try to evaluate as expression
+                            result = eval(last_line, namespace)
+                            # Don't show None results
+                            if result is not None:
+                                result = str(result)
+                            else:
+                                result = None
+                        except:
+                            # If it's not an expression, execute it normally
+                            exec(last_line, namespace)
+                    else:
+                        # Execute last line normally
+                        if last_line:
+                            exec(last_line, namespace)
 
                 # Check if adata was modified
                 if 'adata' in namespace and namespace['adata'] is not current_adata:
@@ -909,10 +932,6 @@ def execute_code():
                 elif current_adata is not None:
                     # Data might have been modified in-place
                     data_updated = True
-
-                # Try to get the last expression result if any
-                if namespace.get('_'):
-                    result = str(namespace['_'])
 
         except Exception as e:
             import traceback
