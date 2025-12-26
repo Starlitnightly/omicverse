@@ -4,9 +4,9 @@ import numpy as np
 import anndata
 
 import torch
-from typing import Union
+from typing import Union, Optional, Any
 
-from ..bulk import data_drop_duplicates_index,deseq2_normalize
+from ..bulk import data_drop_duplicates_index, deseq2_normalize
 from ..bulk2single import Bulk2Single
 from ..single import scnocd
 from ._vae import train_vae, generate_vae, load_vae
@@ -26,9 +26,9 @@ class BulkTrajBlend(object):
     dynamics that bridge bulk expression profiles with single-cell resolution.
     """
 
-    def __init__(self,bulk_seq:pd.DataFrame,single_seq:anndata.AnnData,
-                 celltype_key:str,bulk_group=None,max_single_cells:int=5000,
-                 top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0) -> None:
+    def __init__(self, bulk_seq: pd.DataFrame, single_seq: anndata.AnnData,
+                 celltype_key: str, bulk_group: Optional[Any] = None, max_single_cells: int = 5000,
+                 top_marker_num: int = 500, ratio_num: int = 1, gpu: Union[int, str] = 0) -> None:
         r"""
         Initialize BulkTrajBlend for trajectory inference and cell blending.
 
@@ -36,12 +36,12 @@ class BulkTrajBlend(object):
             bulk_seq: Bulk RNA-seq data with genes as rows and samples as columns
             single_seq: Single-cell RNA-seq reference data as AnnData object
             celltype_key: Column name in single_seq.obs containing cell type annotations
-            bulk_group: Column names in bulk_seq for sample grouping (None)
-            max_single_cells: Maximum number of single cells to use (5000)
-            top_marker_num: Number of top marker genes per cell type (500)
-            ratio_num: Cell selection ratio for each cell type (1)
-            gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon (0)
-            
+            bulk_group: Column names in bulk_seq for sample grouping. Default: None
+            max_single_cells: Maximum number of single cells to use. Default: 5000
+            top_marker_num: Number of top marker genes per cell type. Default: 500
+            ratio_num: Cell selection ratio for each cell type. Default: 1
+            gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon. Default: 0
+
         Returns:
             None
         """
@@ -119,19 +119,19 @@ class BulkTrajBlend(object):
         log1p(self.single_seq)
         return None
     
-    def vae_configure(self,cell_target_num=None,**kwargs):
+    def vae_configure(self, cell_target_num: Optional[int] = None, **kwargs: Any) -> None:
         r"""
         Configure the VAE model for bulk-to-single-cell generation.
-        
+
         Sets up the Bulk2Single model with cell-type target numbers either from
         deconvolution prediction or manual specification.
 
         Arguments:
-            cell_target_num: Number of cells per type to generate (None for auto-prediction)
+            cell_target_num: Number of cells per type to generate. Default: None for auto-prediction
             **kwargs: Additional arguments passed to predicted_fraction method
-            
+
         Returns:
-            None: Initializes self.vae_model and preprocessing steps
+            None
         """
         self.vae_model=Bulk2Single(bulk_data=self.bulk_seq,single_data=self.single_seq,
                                    celltype_key=self.celltype_key,bulk_group=self.group,
@@ -252,41 +252,41 @@ class BulkTrajBlend(object):
         self.generate_adata=generate_adata.copy()
         return generate_adata.raw.to_adata()
     
-    def gnn_configure(self,use_rep='X',neighbor_rep='X_pca',
-                      gpu=0,hidden_size:int=128,
-                     weight_decay:int=1e-2,
-                     dropout:float=0.5,
-                     batch_norm:bool=True,
-                     lr:int=1e-3,
-                     max_epochs:int=500,
-                     display_step:int=25,
-                     balance_loss:bool=True,
-                     stochastic_loss:bool=True,
-                     batch_size:int=2000,num_workers:int=5,):
+    def gnn_configure(self, use_rep: str = 'X', neighbor_rep: str = 'X_pca',
+                      gpu: Union[int, str] = 0, hidden_size: int = 128,
+                     weight_decay: float = 1e-2,
+                     dropout: float = 0.5,
+                     batch_norm: bool = True,
+                     lr: float = 1e-3,
+                     max_epochs: int = 500,
+                     display_step: int = 25,
+                     balance_loss: bool = True,
+                     stochastic_loss: bool = True,
+                     batch_size: int = 2000, num_workers: int = 5) -> None:
         r"""
         Configure Graph Neural Network for trajectory and transition state analysis.
-        
+
         Sets up the NOCD (Non-Overlapping Cell-type Decomposition) GNN model
         for identifying cellular trajectories and intermediate states.
 
         Arguments:
-            use_rep: Representation to use for GNN input ('X')
-            neighbor_rep: Representation for neighbor graph construction ('X_pca')
-            gpu: GPU device ID for training (0)
-            hidden_size: Hidden layer dimensions in GNN (128)
-            weight_decay: L2 regularization strength (1e-2)
-            dropout: Dropout probability (0.5)
-            batch_norm: Whether to use batch normalization (True)
-            lr: Learning rate for GNN training (1e-3)
-            max_epochs: Maximum training epochs (500)
-            display_step: Frequency of progress updates (25)
-            balance_loss: Whether to use balanced loss function (True)
-            stochastic_loss: Whether to use stochastic loss (True)
-            batch_size: Training batch size (2000)
-            num_workers: Number of data loading workers (5)
-            
+            use_rep: Representation to use for GNN input. Default: 'X'
+            neighbor_rep: Representation for neighbor graph construction. Default: 'X_pca'
+            gpu: GPU device ID for training. Default: 0
+            hidden_size: Hidden layer dimensions in GNN. Default: 128
+            weight_decay: L2 regularization strength. Default: 1e-2
+            dropout: Dropout probability. Default: 0.5
+            batch_norm: Whether to use batch normalization. Default: True
+            lr: Learning rate for GNN training. Default: 1e-3
+            max_epochs: Maximum training epochs. Default: 500
+            display_step: Frequency of progress updates. Default: 25
+            balance_loss: Whether to use balanced loss function. Default: True
+            stochastic_loss: Whether to use stochastic loss. Default: True
+            batch_size: Training batch size. Default: 2000
+            num_workers: Number of data loading workers. Default: 5
+
         Returns:
-            None: Initializes self.nocd_obj with configured GNN model
+            None
         """
         nocd_obj=scnocd(self.generate_adata,use_rep=use_rep,
                         neighbor_rep=neighbor_rep,gpu=gpu)
