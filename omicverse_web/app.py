@@ -322,6 +322,8 @@ def plot_data_legacy():
         color_by = data.get('color_by', '')
         palette = data.get('palette', None)  # Get continuous palette parameter
         category_palette = data.get('category_palette', None)  # Get category palette parameter
+        vmin = data.get('vmin', None)  # Get vmin parameter
+        vmax = data.get('vmax', None)  # Get vmax parameter
 
         if not embedding:
             return jsonify({'error': 'No embedding specified'}), 400
@@ -349,9 +351,22 @@ def plot_data_legacy():
                 if col_name in obs_df.columns:
                     values = obs_df[col_name]
                     if pd.api.types.is_numeric_dtype(values):
-                        plot_data['colors'] = values.tolist()
+                        # Apply vmin/vmax clipping if specified
+                        colors_array = values.values
+                        if vmin is not None or vmax is not None:
+                            colors_array = np.clip(colors_array,
+                                                   vmin if vmin is not None else colors_array.min(),
+                                                   vmax if vmax is not None else colors_array.max())
+
+                        plot_data['colors'] = colors_array.tolist()
                         plot_data['colorscale'] = palette if palette else 'Viridis'
                         plot_data['color_label'] = col_name
+
+                        # Add vmin/vmax to plot data for Plotly
+                        if vmin is not None:
+                            plot_data['cmin'] = vmin
+                        if vmax is not None:
+                            plot_data['cmax'] = vmax
                     else:
                         # Categorical handling
                         if pd.api.types.is_categorical_dtype(values):
@@ -376,10 +391,23 @@ def plot_data_legacy():
                     expr_df = decode_matrix_fbs(expr_fbs)
 
                     if gene_name in expr_df.columns:
-                        expression = expr_df[gene_name]
+                        expression = expr_df[gene_name].values
+
+                        # Apply vmin/vmax clipping if specified
+                        if vmin is not None or vmax is not None:
+                            expression = np.clip(expression,
+                                               vmin if vmin is not None else expression.min(),
+                                               vmax if vmax is not None else expression.max())
+
                         plot_data['colors'] = expression.tolist()
                         plot_data['colorscale'] = palette if palette else 'Viridis'
                         plot_data['color_label'] = f'{gene_name} expression'
+
+                        # Add vmin/vmax to plot data for Plotly
+                        if vmin is not None:
+                            plot_data['cmin'] = vmin
+                        if vmax is not None:
+                            plot_data['cmax'] = vmax
                 except Exception as e:
                     logging.warning(f"Gene expression retrieval failed for {gene_name}: {e}")
 

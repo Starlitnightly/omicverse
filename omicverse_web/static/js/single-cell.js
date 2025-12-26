@@ -449,18 +449,31 @@ class SingleCellAnalysis {
 
     updatePaletteVisibility(colorBy) {
         const categoryPaletteRow = document.getElementById('category-palette-row');
+        const vminmaxRow = document.getElementById('vminmax-row');
         const paletteLabel = document.getElementById('palette-label');
 
         if (!colorBy || colorBy.startsWith('gene:')) {
-            // Continuous data - show continuous palette, hide category palette
+            // Continuous data - show continuous palette and vmin/vmax, hide category palette
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
+            if (vminmaxRow) vminmaxRow.style.display = 'flex';
             if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
         } else if (colorBy.startsWith('obs:')) {
             // Check if it's categorical by trying to detect from obs columns
             // We'll let the backend determine this, but show category palette for now
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'flex';
+            // Also show vmin/vmax for now - backend will determine if it's continuous
+            if (vminmaxRow) vminmaxRow.style.display = 'flex';
             if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
+        } else {
+            // No coloring
+            if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
+            if (vminmaxRow) vminmaxRow.style.display = 'none';
         }
+    }
+
+    applyVMinMax() {
+        // Just trigger an update
+        this.updatePlot();
     }
 
     createNewPlot(embedding, colorBy) {
@@ -473,6 +486,12 @@ class SingleCellAnalysis {
         const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
         const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
 
+        // Get vmin/vmax values
+        const vminInput = document.getElementById('vmin-input');
+        const vmaxInput = document.getElementById('vmax-input');
+        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
+        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
+
         fetch('/api/plot', {
             method: 'POST',
             headers: {
@@ -482,7 +501,9 @@ class SingleCellAnalysis {
                 embedding: embedding,
                 color_by: colorBy,
                 palette: palette,
-                category_palette: categoryPalette
+                category_palette: categoryPalette,
+                vmin: vmin,
+                vmax: vmax
             })
         })
         .then(response => response.json())
@@ -514,6 +535,12 @@ class SingleCellAnalysis {
         const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
         const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
 
+        // Get vmin/vmax values
+        const vminInput = document.getElementById('vmin-input');
+        const vmaxInput = document.getElementById('vmax-input');
+        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
+        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
+
         fetch('/api/plot', {
             method: 'POST',
             headers: {
@@ -523,7 +550,9 @@ class SingleCellAnalysis {
                 embedding: embedding,
                 color_by: colorBy,
                 palette: palette,
-                category_palette: categoryPalette
+                category_palette: categoryPalette,
+                vmin: vmin,
+                vmax: vmax
             })
         })
         .then(response => response.json())
@@ -923,26 +952,26 @@ class SingleCellAnalysis {
             size: data.size || 3,
             opacity: 0.7
         };
-        
+
         let traces = [];
-        
+
         if (data.colors) {
             // 处理分类数据的颜色条
             if (data.category_labels && data.category_codes) {
                 // 分类数据：为每个类别创建单独的trace，使用plotly默认legend
                 const uniqueCategories = data.category_labels;
                 const uniqueColors = data.discrete_colors;
-                
+
                 for (let i = 0; i < uniqueCategories.length; i++) {
                     const category = uniqueCategories[i];
                     const color = uniqueColors[i];
-                    
+
                     // 找到属于当前类别的点
                     const categoryIndices = [];
                     const categoryX = [];
                     const categoryY = [];
                     const categoryText = [];
-                    
+
                     for (let j = 0; j < data.category_codes.length; j++) {
                         if (data.category_codes[j] === i) {
                             categoryIndices.push(j);
@@ -951,7 +980,7 @@ class SingleCellAnalysis {
                             categoryText.push(data.hover_text[j]);
                         }
                     }
-                    
+
                     // 只有当该类别有数据点时才创建trace
                     if (categoryX.length > 0) {
                         const trace = {
@@ -969,7 +998,7 @@ class SingleCellAnalysis {
                             hovertemplate: '%{text}<extra></extra>',
                             showlegend: true // 启用legend显示
                         };
-                        
+
                         traces.push(trace);
                     }
                 }
@@ -979,7 +1008,15 @@ class SingleCellAnalysis {
                 markerConfig.colorscale = data.colorscale || 'Viridis';
                 markerConfig.showscale = true;
                 markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
-                
+
+                // Apply cmin/cmax if specified
+                if (data.cmin !== undefined) {
+                    markerConfig.cmin = data.cmin;
+                }
+                if (data.cmax !== undefined) {
+                    markerConfig.cmax = data.cmax;
+                }
+
                 const trace = {
                     x: data.x,
                     y: data.y,
@@ -990,14 +1027,14 @@ class SingleCellAnalysis {
                     hovertemplate: '%{text}<extra></extra>',
                     showlegend: false // 数值数据不显示legend
                 };
-                
+
                 traces.push(trace);
             }
         } else {
             // 没有颜色数据时使用默认颜色
             markerConfig.color = 'blue';
             markerConfig.showscale = false;
-            
+
             const trace = {
                 x: data.x,
                 y: data.y,
@@ -1008,7 +1045,7 @@ class SingleCellAnalysis {
                 hovertemplate: '%{text}<extra></extra>',
                 showlegend: false
             };
-            
+
             traces.push(trace);
         }
 
@@ -1136,6 +1173,12 @@ class SingleCellAnalysis {
         const paletteSelect = document.getElementById('palette-select');
         const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
 
+        // Get vmin/vmax values
+        const vminInput = document.getElementById('vmin-input');
+        const vmaxInput = document.getElementById('vmax-input');
+        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
+        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
+
         fetch('/api/plot', {
             method: 'POST',
             headers: {
@@ -1145,7 +1188,9 @@ class SingleCellAnalysis {
                 embedding: embedding,
                 color_by: 'gene:' + gene,
                 palette: palette,
-                category_palette: null
+                category_palette: null,
+                vmin: vmin,
+                vmax: vmax
             })
         })
         .then(response => response.json())
@@ -1624,9 +1669,18 @@ class SingleCellAnalysis {
             const categoryPaletteSelect = document.getElementById('category-palette-select');
             if (categoryPaletteSelect) categoryPaletteSelect.value = 'default';
 
-            // Hide category palette row
+            // Clear vmin/vmax inputs
+            const vminInput = document.getElementById('vmin-input');
+            const vmaxInput = document.getElementById('vmax-input');
+            if (vminInput) vminInput.value = '';
+            if (vmaxInput) vmaxInput.value = '';
+
+            // Hide category palette row and vmin/vmax row
             const categoryPaletteRow = document.getElementById('category-palette-row');
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
+
+            const vminmaxRow = document.getElementById('vminmax-row');
+            if (vminmaxRow) vminmaxRow.style.display = 'none';
         }
     }
 

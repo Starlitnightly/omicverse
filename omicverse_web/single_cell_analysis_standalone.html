@@ -453,6 +453,21 @@
                                     </select>
                                 </div>
                             </div>
+                            <div class="row g-3 mt-1" id="vminmax-row" style="display: none;">
+                                <div class="col-md-4">
+                                    <label for="vmin-input" class="form-label">最小值 (vmin)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmin-input" placeholder="自动" step="0.01">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="vmax-input" class="form-label">最大值 (vmax)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmax-input" placeholder="自动" step="0.01">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="singleCellApp.applyVMinMax()">
+                                        <i class="fas fa-sync-alt me-1"></i>应用
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Visualization Panel -->
