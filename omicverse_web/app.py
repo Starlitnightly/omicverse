@@ -19,6 +19,7 @@ import base64
 import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
+from pathlib import Path
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -110,6 +111,57 @@ class InProcessKernelExecutor:
 
 
 kernel_executor = InProcessKernelExecutor()
+notebook_root = os.getcwd()
+file_root = Path(notebook_root).resolve()
+
+
+def ensure_default_notebook():
+    default_path = file_root / 'default.ipynb'
+    if default_path.exists():
+        return
+    try:
+        try:
+            import nbformat
+            nb = nbformat.v4.new_notebook()
+            nb.cells = [nbformat.v4.new_code_cell(source='')]
+            with open(default_path, 'w', encoding='utf-8') as handle:
+                nbformat.write(nb, handle)
+        except ImportError:
+            minimal = {
+                "cells": [{
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": []
+                }],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5
+            }
+            with open(default_path, 'w', encoding='utf-8') as handle:
+                handle.write(json.dumps(minimal))
+    except Exception as e:
+        logging.error(f"Default notebook creation failed: {e}")
+
+
+ensure_default_notebook()
+
+
+def resolve_browse_path(rel_path):
+    rel_path = rel_path or ''
+    target = (file_root / rel_path).resolve()
+    if target != file_root and file_root not in target.parents:
+        raise ValueError('Invalid path')
+    return target
+
+
+def is_allowed_text_file(path_obj):
+    allowed = {
+        '.txt', '.py', '.md', '.json', '.csv', '.tsv', '.yaml', '.yml', '.log',
+        '.ini', '.toml', '.js', '.css', '.html'
+    }
+    return path_obj.suffix.lower() in allowed
 
 
 def sync_adaptor_with_adata():
@@ -193,6 +245,254 @@ def upload_file():
 
     except Exception as e:
         logging.error(f"Upload failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notebooks/upload', methods=['POST'])
+def upload_notebook():
+    file = request.files.get('file')
+    if file is None or file.filename == '':
+        return jsonify({'error': 'No file provided'}), 400
+    if not file.filename.endswith('.ipynb'):
+        return jsonify({'error': 'File must be .ipynb format'}), 400
+
+    try:
+        try:
+            import nbformat
+        except ImportError:
+            return jsonify({'error': '需要安装 nbformat 才能导入 .ipynb 文件'}), 400
+
+        raw = file.read().decode('utf-8', errors='ignore')
+        nb = nbformat.reads(raw, as_version=4)
+        cells = []
+        for cell in nb.cells:
+            if cell.cell_type not in ('code', 'markdown'):
+                continue
+            source = cell.source
+            if isinstance(source, list):
+                source = ''.join(source)
+            outputs = []
+            if cell.cell_type == 'code':
+                for output in cell.get('outputs', []):
+                    outputs.append(output)
+            cells.append({
+                'cell_type': cell.cell_type,
+                'source': source,
+                'outputs': outputs
+            })
+
+        return jsonify({
+            'filename': secure_filename(file.filename),
+            'cells': cells
+        })
+    except Exception as e:
+        logging.error(f"Notebook import failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notebooks/list', methods=['GET'])
+def list_notebooks():
+    try:
+        files = []
+        for name in os.listdir(notebook_root):
+            if name.endswith('.ipynb') and os.path.isfile(os.path.join(notebook_root, name)):
+                files.append(name)
+        files.sort()
+        return jsonify({'files': files, 'root': notebook_root})
+    except Exception as e:
+        logging.error(f"Notebook list failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notebooks/open', methods=['POST'])
+def open_notebook():
+    data = request.json if request.json else {}
+    filename = data.get('filename', '')
+    if not filename or not filename.endswith('.ipynb'):
+        return jsonify({'error': 'Invalid filename'}), 400
+    safe_name = secure_filename(filename)
+    notebook_path = os.path.abspath(os.path.join(notebook_root, safe_name))
+    if not notebook_path.startswith(os.path.abspath(notebook_root) + os.sep):
+        return jsonify({'error': 'Invalid path'}), 400
+    if not os.path.exists(notebook_path):
+        return jsonify({'error': 'Notebook not found'}), 404
+
+    try:
+        try:
+            import nbformat
+        except ImportError:
+            return jsonify({'error': '需要安装 nbformat 才能导入 .ipynb 文件'}), 400
+
+        with open(notebook_path, 'r', encoding='utf-8', errors='ignore') as handle:
+            nb = nbformat.read(handle, as_version=4)
+        cells = []
+        for cell in nb.cells:
+            if cell.cell_type not in ('code', 'markdown'):
+                continue
+            source = cell.source
+            if isinstance(source, list):
+                source = ''.join(source)
+            outputs = []
+            if cell.cell_type == 'code':
+                for output in cell.get('outputs', []):
+                    outputs.append(output)
+            cells.append({
+                'cell_type': cell.cell_type,
+                'source': source,
+                'outputs': outputs
+            })
+        return jsonify({
+            'filename': os.path.basename(notebook_path),
+            'cells': cells
+        })
+    except Exception as e:
+        logging.error(f"Notebook open failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/list', methods=['GET'])
+def list_files():
+    rel_path = request.args.get('path', '')
+    try:
+        target = resolve_browse_path(rel_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+
+    if not target.exists() or not target.is_dir():
+        return jsonify({'error': 'Directory not found'}), 404
+
+    entries = []
+    for entry in target.iterdir():
+        try:
+            item = {
+                'name': entry.name,
+                'type': 'dir' if entry.is_dir() else 'file',
+                'size': entry.stat().st_size if entry.is_file() else None,
+                'ext': entry.suffix.lower() if entry.is_file() else None
+            }
+            entries.append(item)
+        except Exception:
+            continue
+
+    entries.sort(key=lambda x: (0 if x['type'] == 'dir' else 1, x['name'].lower()))
+    rel = '' if target == file_root else str(target.relative_to(file_root))
+    parent = '' if target == file_root else str(target.parent.relative_to(file_root))
+    return jsonify({'path': rel, 'parent': parent, 'entries': entries})
+
+
+@app.route('/api/files/open', methods=['POST'])
+def open_file():
+    data = request.json if request.json else {}
+    rel_path = data.get('path', '')
+    try:
+        target = resolve_browse_path(rel_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+
+    if not target.exists() or not target.is_file():
+        return jsonify({'error': 'File not found'}), 404
+
+    try:
+        if target.suffix.lower() == '.ipynb':
+            try:
+                import nbformat
+            except ImportError:
+                return jsonify({'error': '需要安装 nbformat 才能导入 .ipynb 文件'}), 400
+            with open(target, 'r', encoding='utf-8', errors='ignore') as handle:
+                raw = handle.read()
+            if not raw.strip():
+                nb = nbformat.v4.new_notebook()
+                nb.cells = [nbformat.v4.new_code_cell(source='')]
+                with open(target, 'w', encoding='utf-8') as handle:
+                    nbformat.write(nb, handle)
+            else:
+                nb = nbformat.reads(raw, as_version=4)
+            cells = []
+            for cell in nb.cells:
+                if cell.cell_type not in ('code', 'markdown'):
+                    continue
+                source = cell.source
+                if isinstance(source, list):
+                    source = ''.join(source)
+                outputs = []
+                if cell.cell_type == 'code':
+                    for output in cell.get('outputs', []):
+                        outputs.append(output)
+                cells.append({
+                    'cell_type': cell.cell_type,
+                    'source': source,
+                    'outputs': outputs
+                })
+            return jsonify({
+                'type': 'notebook',
+                'name': target.name,
+                'path': str(target.relative_to(file_root)),
+                'cells': cells
+            })
+
+        if not is_allowed_text_file(target):
+            return jsonify({'error': 'Unsupported file type'}), 400
+
+        with open(target, 'r', encoding='utf-8', errors='ignore') as handle:
+            content = handle.read()
+
+        return jsonify({
+            'type': 'text',
+            'name': target.name,
+            'path': str(target.relative_to(file_root)),
+            'content': content
+        })
+    except Exception as e:
+        logging.error(f"File open failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/save', methods=['POST'])
+def save_file():
+    data = request.json if request.json else {}
+    rel_path = data.get('path', '')
+    file_type = data.get('type', '')
+
+    try:
+        target = resolve_browse_path(rel_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+
+    try:
+        if file_type == 'notebook':
+            if target.suffix.lower() != '.ipynb':
+                return jsonify({'error': 'Notebook must be .ipynb'}), 400
+            try:
+                import nbformat
+            except ImportError:
+                return jsonify({'error': '需要安装 nbformat 才能保存 .ipynb 文件'}), 400
+
+            cells_payload = data.get('cells', [])
+            nb = nbformat.v4.new_notebook()
+            nb_cells = []
+            for cell in cells_payload:
+                cell_type = cell.get('cell_type', 'code')
+                source = cell.get('source', '')
+                if cell_type == 'markdown':
+                    nb_cells.append(nbformat.v4.new_markdown_cell(source=source))
+                else:
+                    nb_cells.append(nbformat.v4.new_code_cell(source=source))
+            nb.cells = nb_cells
+            with open(target, 'w', encoding='utf-8') as handle:
+                nbformat.write(nb, handle)
+            return jsonify({'success': True})
+
+        if file_type == 'text':
+            if not is_allowed_text_file(target):
+                return jsonify({'error': 'Unsupported file type'}), 400
+            content = data.get('content', '')
+            with open(target, 'w', encoding='utf-8') as handle:
+                handle.write(content)
+            return jsonify({'success': True})
+
+        return jsonify({'error': 'Invalid file type'}), 400
+    except Exception as e:
+        logging.error(f"File save failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 # New high-performance data endpoints using FlatBuffers

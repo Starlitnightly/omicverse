@@ -11,6 +11,9 @@ class SingleCellAnalysis {
         this.codeCells = [];
         this.cellCounter = 0;
         this.pendingPlotRefresh = false;
+        this.currentBrowsePath = '';
+        this.openTabs = [];
+        this.activeTabId = null;
 
         // Initialize high-performance components
         this.dataManager = new DataManager();
@@ -25,6 +28,7 @@ class SingleCellAnalysis {
         this.setupThemeToggle();
         this.setupGeneAutocomplete();
         this.setupBeforeUnloadWarning();
+        this.setupNotebookManager();
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
     }
@@ -99,6 +103,95 @@ class SingleCellAnalysis {
                 this.toggleMiniMenu();
             });
         }
+    }
+
+    setupNotebookManager() {
+        const fileInput = document.getElementById('notebook-file-input');
+        if (!fileInput) return;
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            this.importNotebookFile(files[0]);
+            fileInput.value = '';
+        });
+        const upButton = document.getElementById('file-browser-up');
+        if (upButton) {
+            upButton.addEventListener('click', () => {
+                if (!this.currentBrowsePath) return;
+                const parts = this.currentBrowsePath.split('/').filter(Boolean);
+                parts.pop();
+                const next = parts.join('/');
+                this.fetchFileList(next);
+            });
+        }
+    }
+
+    triggerNotebookUpload() {
+        const fileInput = document.getElementById('notebook-file-input');
+        if (fileInput) fileInput.click();
+    }
+
+    fetchFileList(path = '') {
+        const url = new URL('/api/files/list', window.location.origin);
+        if (path) url.searchParams.set('path', path);
+        fetch(url.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`获取目录失败: ${data.error}`);
+                return;
+            }
+            this.currentBrowsePath = data.path || '';
+            this.renderFileList(data.entries || [], data.path || '', data.parent || '');
+        })
+        .catch(error => {
+            alert(`获取目录失败: ${error.message}`);
+        });
+    }
+
+    renderFileList(entries, path, parent) {
+        const list = document.getElementById('notebook-list');
+        const pathLabel = document.getElementById('file-browser-path');
+        const upButton = document.getElementById('file-browser-up');
+        if (!list) return;
+        list.innerHTML = '';
+        if (pathLabel) {
+            pathLabel.textContent = path ? `./${path}` : './';
+        }
+        if (upButton) {
+            upButton.style.display = parent !== '' ? 'block' : 'none';
+        }
+        if (!entries.length) {
+            const li = document.createElement('li');
+            li.className = 'file-manager-item';
+            li.innerHTML = '<span>未发现文件</span><span class="file-manager-meta">—</span>';
+            list.appendChild(li);
+            return;
+        }
+        entries.forEach(entry => {
+            const li = document.createElement('li');
+            li.className = `file-manager-item ${entry.type === 'dir' ? 'is-dir' : ''}`;
+            const left = document.createElement('span');
+            const icon = document.createElement('i');
+            icon.className = `file-icon ${entry.type === 'dir' ? 'feather-folder' : 'feather-file-text'}`;
+            left.appendChild(icon);
+            left.appendChild(document.createTextNode(entry.name));
+            const right = document.createElement('span');
+            right.className = 'file-manager-meta';
+            right.textContent = entry.type === 'dir' ? '进入' : '打开';
+            li.appendChild(left);
+            li.appendChild(right);
+            li.addEventListener('click', () => {
+                if (entry.type === 'dir') {
+                    const next = path ? `${path}/${entry.name}` : entry.name;
+                    this.fetchFileList(next);
+                } else {
+                    const filePath = path ? `${path}/${entry.name}` : entry.name;
+                    this.openFileFromServer(filePath);
+                }
+            });
+            list.appendChild(li);
+        });
     }
 
     setupThemeToggle() {
@@ -1904,6 +1997,8 @@ class SingleCellAnalysis {
         const codeToolbar = document.getElementById('code-editor-toolbar');
         const pageTitle = document.getElementById('page-title');
         const breadcrumbTitle = document.getElementById('breadcrumb-title');
+        const navMenu = document.querySelector('.navbar-content .nxl-navbar');
+        const fileManager = document.getElementById('file-manager');
 
         if (view === 'visualization') {
             vizView.style.display = 'block';
@@ -1920,6 +2015,8 @@ class SingleCellAnalysis {
             // Update page title
             if (pageTitle) pageTitle.textContent = '单细胞分析';
             if (breadcrumbTitle) breadcrumbTitle.textContent = '单细胞分析';
+            if (navMenu) navMenu.style.display = 'block';
+            if (fileManager) fileManager.style.display = 'none';
             if (this.pendingPlotRefresh) {
                 const embeddingSelect = document.getElementById('embedding-select');
                 if (embeddingSelect && embeddingSelect.value) {
@@ -1942,6 +2039,12 @@ class SingleCellAnalysis {
             // Update page title
             if (pageTitle) pageTitle.innerHTML = '<i class="feather-code me-2"></i>Python 代码编辑器';
             if (breadcrumbTitle) breadcrumbTitle.textContent = 'Python 代码编辑器';
+            if (navMenu) navMenu.style.display = 'none';
+            if (fileManager) fileManager.style.display = 'block';
+            this.fetchFileList(this.currentBrowsePath);
+            if (this.openTabs.length === 0) {
+                this.openFileFromServer('default.ipynb');
+            }
 
             // Add a default cell if none exists
             if (this.codeCells.length === 0) {
@@ -1951,7 +2054,7 @@ class SingleCellAnalysis {
     }
 
     // Code cell management
-    addCodeCell(code = '') {
+    addCodeCell(code = '', outputs = []) {
         this.cellCounter++;
         const cellId = `cell-${this.cellCounter}`;
 
@@ -2000,16 +2103,25 @@ class SingleCellAnalysis {
 
         // Initial resize
         setTimeout(autoResize, 0);
+
+        if (outputs && outputs.length > 0) {
+            const outputDiv = document.getElementById(`${cellId}-output`);
+            this.renderNotebookOutputs(outputDiv, outputs);
+        }
     }
 
     runCodeCell(cellId) {
+        return this.runCodeCellPromise(cellId);
+    }
+
+    runCodeCellPromise(cellId) {
         const cell = document.getElementById(cellId);
         const textarea = cell.querySelector('.code-input');
         const outputDiv = cell.querySelector('.code-cell-output');
         const code = textarea.value.trim();
 
         if (!code) {
-            return;
+            return Promise.resolve();
         }
 
         // Show loading
@@ -2017,7 +2129,7 @@ class SingleCellAnalysis {
         outputDiv.textContent = '执行中...';
 
         // Execute code on backend
-        fetch('/api/execute_code', {
+        return fetch('/api/execute_code', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2061,6 +2173,322 @@ class SingleCellAnalysis {
             });
         });
     }
+
+    runAllCells() {
+        if (this.codeCells.length === 0) {
+            return;
+        }
+        let chain = Promise.resolve();
+        this.codeCells.forEach(cellId => {
+            chain = chain.then(() => this.runCodeCellPromise(cellId));
+        });
+    }
+
+    importNotebookFile(file) {
+        if (!file.name.endsWith('.ipynb')) {
+            alert('请选择 .ipynb 文件');
+            return;
+        }
+        const hasCells = this.codeCells.length > 0;
+        if (hasCells) {
+            const ok = confirm('导入笔记本会替换当前代码单元，是否继续？');
+            if (!ok) return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/api/notebooks/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`导入失败: ${data.error}`);
+                return;
+            }
+            this.openNotebookTab({
+                name: data.filename || file.name,
+                path: data.filename || file.name,
+                cells: data.cells || []
+            });
+            this.fetchFileList(this.currentBrowsePath);
+        })
+        .catch(error => {
+            alert(`导入失败: ${error.message}`);
+        });
+    }
+
+    openFileFromServer(path) {
+        if (!path) return;
+        fetch('/api/files/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`打开失败: ${data.error}`);
+                return;
+            }
+            if (data.type === 'notebook') {
+                this.openNotebookTab({
+                    name: data.name,
+                    path: data.path,
+                    cells: data.cells || []
+                });
+            } else if (data.type === 'text') {
+                this.openTextTab({
+                    name: data.name,
+                    path: data.path,
+                    content: data.content || ''
+                });
+            }
+        })
+        .catch(error => {
+            alert(`打开失败: ${error.message}`);
+        });
+    }
+
+    loadNotebookCells(cells) {
+        const container = document.getElementById('code-cells-container');
+        if (!container) return;
+        container.innerHTML = '';
+        this.codeCells = [];
+        this.cellCounter = 0;
+        const textView = document.getElementById('text-file-view');
+        if (textView) textView.style.display = 'none';
+        container.style.display = 'block';
+        if (!cells.length) {
+            this.addCodeCell();
+            return;
+        }
+        cells.forEach(cell => {
+            let source = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
+            if (cell.cell_type === 'markdown') {
+                const lines = source.split('\n').map(line => `# ${line}`);
+                source = ['# %% [markdown]', ...lines].join('\n');
+            }
+            this.addCodeCell(source, cell.outputs || []);
+        });
+    }
+
+    renderNotebookOutputs(outputDiv, outputs) {
+        if (!outputDiv) return;
+        let textBuffer = '';
+        const images = [];
+        let hasError = false;
+        outputs.forEach(output => {
+            if (output.output_type === 'stream') {
+                textBuffer += output.text || '';
+            } else if (output.output_type === 'error') {
+                const traceback = output.traceback ? output.traceback.join('\n') : (output.ename || 'Error');
+                textBuffer += traceback + '\n';
+                hasError = true;
+            } else if (output.output_type === 'execute_result' || output.output_type === 'display_data') {
+                const data = output.data || {};
+                if (data['text/plain']) {
+                    textBuffer += Array.isArray(data['text/plain']) ? data['text/plain'].join('') : data['text/plain'];
+                    textBuffer += '\n';
+                }
+                if (data['image/png']) {
+                    images.push(Array.isArray(data['image/png']) ? data['image/png'].join('') : data['image/png']);
+                }
+            }
+        });
+        this.renderCodeOutput(outputDiv, {
+            text: textBuffer.trim(),
+            isError: hasError,
+            figures: images
+        });
+    }
+
+    openNotebookTab(tab) {
+        const hasCells = this.codeCells.length > 0;
+        const activeTab = this.getActiveTab();
+        if (hasCells && this.activeTabId && activeTab && activeTab.type !== 'notebook') {
+            const ok = confirm('打开笔记本会替换当前代码单元，是否继续？');
+            if (!ok) return;
+        }
+        const existing = this.openTabs.find(t => t.path === tab.path);
+        if (existing) {
+            this.setActiveTab(existing.id);
+            return;
+        }
+        const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        this.openTabs.push({
+            id,
+            name: tab.name,
+            path: tab.path,
+            type: 'notebook',
+            cells: tab.cells
+        });
+        this.setActiveTab(id);
+    }
+
+    openTextTab(tab) {
+        const existing = this.openTabs.find(t => t.path === tab.path);
+        if (existing) {
+            this.setActiveTab(existing.id);
+            return;
+        }
+        const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        this.openTabs.push({
+            id,
+            name: tab.name,
+            path: tab.path,
+            type: 'text',
+            content: tab.content
+        });
+        this.setActiveTab(id);
+    }
+
+    setActiveTab(tabId) {
+        this.activeTabId = tabId;
+        const tab = this.getActiveTab();
+        this.renderTabs();
+        if (!tab) return;
+        if (tab.type === 'notebook') {
+            this.loadNotebookCells(tab.cells || []);
+        } else if (tab.type === 'text') {
+            this.showTextFile(tab.content || '');
+        }
+    }
+
+    getActiveTab() {
+        return this.openTabs.find(t => t.id === this.activeTabId);
+    }
+
+    renderTabs() {
+        const tabs = document.getElementById('editor-tabs');
+        if (!tabs) return;
+        if (this.openTabs.length === 0) {
+            tabs.style.display = 'none';
+            return;
+        }
+        tabs.style.display = 'flex';
+        tabs.innerHTML = '';
+        this.openTabs.forEach(tab => {
+            const item = document.createElement('div');
+            item.className = `editor-tab ${tab.id === this.activeTabId ? 'active' : ''}`;
+            const name = document.createElement('span');
+            name.textContent = tab.name;
+            const close = document.createElement('span');
+            close.className = 'tab-close';
+            close.textContent = '×';
+            close.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeTab(tab.id);
+            });
+            item.appendChild(name);
+            item.appendChild(close);
+            item.addEventListener('click', () => this.setActiveTab(tab.id));
+            tabs.appendChild(item);
+        });
+    }
+
+    closeTab(tabId) {
+        const index = this.openTabs.findIndex(t => t.id === tabId);
+        if (index === -1) return;
+        this.openTabs.splice(index, 1);
+        if (this.activeTabId === tabId) {
+            const next = this.openTabs[index] || this.openTabs[index - 1];
+            this.activeTabId = next ? next.id : null;
+            if (next) {
+                this.setActiveTab(next.id);
+            } else {
+                this.renderTabs();
+                this.showTextFile('');
+                const container = document.getElementById('code-cells-container');
+                if (container) container.innerHTML = '';
+                this.codeCells = [];
+                this.cellCounter = 0;
+            }
+        } else {
+            this.renderTabs();
+        }
+    }
+
+    showTextFile(content) {
+        const container = document.getElementById('code-cells-container');
+        const textView = document.getElementById('text-file-view');
+        const textEditor = document.getElementById('text-file-editor');
+        if (container) container.style.display = 'none';
+        if (textView) {
+            textView.style.display = 'block';
+        }
+        if (textEditor) {
+            textEditor.value = content;
+        }
+    }
+
+    getTextEditorContent() {
+        const textEditor = document.getElementById('text-file-editor');
+        return textEditor ? textEditor.value : '';
+    }
+
+    buildNotebookCellsFromUI() {
+        const cells = [];
+        this.codeCells.forEach(cellId => {
+            const cell = document.getElementById(cellId);
+            if (!cell) return;
+            const textarea = cell.querySelector('.code-input');
+            if (!textarea) return;
+            cells.push({
+                cell_type: 'code',
+                source: textarea.value
+            });
+        });
+        if (cells.length === 0) {
+            cells.push({ cell_type: 'code', source: '' });
+        }
+        return cells;
+    }
+
+    saveActiveFile() {
+        const activeTab = this.getActiveTab();
+        let targetPath = activeTab ? activeTab.path : 'default.ipynb';
+        let payload = null;
+        if (!activeTab || activeTab.type === 'notebook') {
+            payload = {
+                path: targetPath,
+                type: 'notebook',
+                cells: this.buildNotebookCellsFromUI()
+            };
+        } else if (activeTab.type === 'text') {
+            payload = {
+                path: targetPath,
+                type: 'text',
+                content: this.getTextEditorContent()
+            };
+        }
+
+        if (!payload) {
+            alert('没有可保存的内容');
+            return;
+        }
+
+        fetch('/api/files/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`保存失败: ${data.error}`);
+                return;
+            }
+            if (activeTab && activeTab.type === 'notebook') {
+                activeTab.cells = payload.cells;
+            }
+            alert('保存成功');
+        })
+        .catch(error => {
+            alert(`保存失败: ${error.message}`);
+        });
+    }
+
 
     renderCodeOutput(outputDiv, payload) {
         outputDiv.className = `code-cell-output has-content ${payload.isError ? 'error' : 'success'}`;
