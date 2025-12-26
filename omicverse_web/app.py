@@ -12,6 +12,8 @@ import logging
 from http import HTTPStatus
 from concurrent.futures import ThreadPoolExecutor
 from werkzeug.exceptions import RequestEntityTooLarge
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -318,6 +320,8 @@ def plot_data_legacy():
         data = request.json
         embedding = data.get('embedding', '')
         color_by = data.get('color_by', '')
+        palette = data.get('palette', None)  # Get continuous palette parameter
+        category_palette = data.get('category_palette', None)  # Get category palette parameter
 
         if not embedding:
             return jsonify({'error': 'No embedding specified'}), 400
@@ -346,7 +350,7 @@ def plot_data_legacy():
                     values = obs_df[col_name]
                     if pd.api.types.is_numeric_dtype(values):
                         plot_data['colors'] = values.tolist()
-                        plot_data['colorscale'] = 'Viridis'
+                        plot_data['colorscale'] = palette if palette else 'Viridis'
                         plot_data['color_label'] = col_name
                     else:
                         # Categorical handling
@@ -360,7 +364,8 @@ def plot_data_legacy():
                         plot_data['category_codes'] = categories.cat.codes.tolist()
 
                         n_categories = len(categories.cat.categories)
-                        discrete_colors = get_discrete_colors(n_categories)
+                        # Use category palette if specified
+                        discrete_colors = get_discrete_colors(n_categories, category_palette)
                         plot_data['colors'] = [discrete_colors[code] for code in categories.cat.codes]
                         plot_data['discrete_colors'] = discrete_colors
 
@@ -373,7 +378,7 @@ def plot_data_legacy():
                     if gene_name in expr_df.columns:
                         expression = expr_df[gene_name]
                         plot_data['colors'] = expression.tolist()
-                        plot_data['colorscale'] = 'Viridis'
+                        plot_data['colorscale'] = palette if palette else 'Viridis'
                         plot_data['color_label'] = f'{gene_name} expression'
                 except Exception as e:
                     logging.warning(f"Gene expression retrieval failed for {gene_name}: {e}")
@@ -660,7 +665,7 @@ def run_tool(tool):
             msg = '需要安装 scrublet 包才能运行双细胞检测（pip install scrublet）'
         return jsonify({'error': msg}), 500
 
-def get_discrete_colors(n_categories):
+def get_discrete_colors(n_categories, palette_name=None):
     """获取离散分类颜色"""
     # 预定义的颜色调色板
     color_palettes = {
@@ -668,23 +673,53 @@ def get_discrete_colors(n_categories):
         'set2': ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3'],
         'set3': ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd'],
         'paired': ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', '#6a3d9a', '#ffff99', '#b15928'],
-        'plotly3': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        'plotly3': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'],
+        'pastel1': ['#fbb4ae', '#b3cde3', '#ccebc5', '#decbe4', '#fed9a6', '#ffffcc', '#e5d8bd', '#fddaec', '#f2f2f2'],
+        'pastel2': ['#b3e2cd', '#fdcdac', '#cbd5e8', '#f4cae4', '#e6f5c9', '#fff2ae', '#f1e2cc', '#cccccc'],
+        'dark2': ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666'],
+        'accent': ['#7fc97f', '#beaed4', '#fdc086', '#ffff99', '#386cb0', '#f0027f', '#bf5b17', '#666666']
     }
-    
-    # 根据类别数量选择合适的调色板
-    if n_categories <= 5:
-        palette = color_palettes['set1']
-    elif n_categories <= 8:
-        palette = color_palettes['set2']
-    elif n_categories <= 10:
-        palette = color_palettes['set3']
-    elif n_categories <= 12:
-        palette = color_palettes['paired']
-    elif n_categories <= 20:
-        palette = color_palettes['set3']
+
+    # Use matplotlib colormaps if available
+    matplotlib_palettes = {
+        'tab10': 'tab10',
+        'tab20': 'tab20',
+        'tab20b': 'tab20b',
+        'tab20c': 'tab20c'
+    }
+
+    # If a specific palette is requested
+    if palette_name and palette_name in matplotlib_palettes:
+        cmap = plt.get_cmap(matplotlib_palettes[palette_name])
+        # Get colors from the colormap
+        n_cmap = cmap.N if hasattr(cmap, 'N') else 256
+        base_colors = []
+        for i in range(min(n_categories, n_cmap)):
+            rgba = cmap(i / n_cmap if n_cmap > 20 else i)
+            base_colors.append(mcolors.rgb2hex(rgba))
+        # Extend if needed by cycling
+        colors = base_colors.copy()
+        while len(colors) < n_categories:
+            idx = len(colors) % len(base_colors)
+            colors.append(base_colors[idx])
+        return colors[:n_categories]
+    elif palette_name and palette_name in color_palettes:
+        palette = color_palettes[palette_name]
     else:
-        palette = color_palettes['plotly3']
-    
+        # Default palette selection based on number of categories
+        if n_categories <= 5:
+            palette = color_palettes['set1']
+        elif n_categories <= 8:
+            palette = color_palettes['set2']
+        elif n_categories <= 10:
+            palette = color_palettes['set3']
+        elif n_categories <= 12:
+            palette = color_palettes['paired']
+        elif n_categories <= 20:
+            palette = color_palettes['set3']
+        else:
+            palette = color_palettes['plotly3']
+
     # 如果需要的颜色数量超过调色板长度，循环使用
     if n_categories > len(palette):
         colors = []
@@ -722,29 +757,43 @@ def get_status():
         'genes': current_adata.n_vars if current_adata else 0,
     })
 
+@app.route('/api/genes', methods=['GET'])
+def get_genes():
+    """Get all gene names"""
+    global current_adata
+
+    if current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        genes = list(current_adata.var_names)
+        return jsonify({'genes': genes})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/gene_search', methods=['POST'])
 def search_genes():
     """Search for genes by name pattern"""
     global current_adata
-    
+
     if current_adata is None:
         return jsonify({'error': 'No data loaded'}), 400
-    
+
     try:
         data = request.json
         pattern = data.get('pattern', '').upper()
-        
+
         if not pattern:
             return jsonify({'genes': []})
-        
+
         # Search genes that match the pattern
         matching_genes = [gene for gene in current_adata.var_names if pattern in gene.upper()]
-        
+
         # Limit results to avoid too many matches
         matching_genes = matching_genes[:20]
-        
+
         return jsonify({'genes': matching_genes})
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

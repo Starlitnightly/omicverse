@@ -359,12 +359,12 @@
                     <div class="col-lg-8 col-xl-9">
                         <!-- File Upload Area -->
                         <div id="upload-section" class="mb-4">
-                            <div class="file-upload-area" id="dropZone">
+                            <div class="file-upload-area" id="dropZone" style="cursor: pointer;">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
                                 <h5>上传H5AD文件</h5>
                                 <p class="text-muted">拖拽文件到此处或点击选择文件</p>
                                 <input type="file" id="fileInput" accept=".h5ad" style="display: none;">
-                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                <button type="button" class="btn btn-primary" style="pointer-events: none;">
                                     <i class="fas fa-folder-open me-2"></i>选择文件
                                 </button>
                             </div>
@@ -393,22 +393,64 @@
 
                         <!-- Visualization Controls -->
                         <div id="viz-controls" class="control-panel" style="display: none;">
-                            <div class="row">
-                                <div class="col-md-4">
+                            <div class="row g-3">
+                                <div class="col-md-3">
                                     <label for="embedding-select" class="form-label">降维方法</label>
                                     <select class="form-select" id="embedding-select" onchange="updatePlot()">
                                         <option value="">选择降维方法</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="color-select" class="form-label">着色方式</label>
                                     <select class="form-select" id="color-select" onchange="updatePlot()">
                                         <option value="">无着色</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="gene-input" class="form-label">基因表达</label>
-                                    <input type="text" class="form-control" id="gene-input" placeholder="输入基因名" onchange="colorByGene()">
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="gene-input" placeholder="输入基因名" autocomplete="off">
+                                        <div id="gene-autocomplete" class="list-group position-absolute w-100" style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="palette-select" class="form-label">
+                                        <span id="palette-label">调色板（连续）</span>
+                                    </label>
+                                    <select class="form-select" id="palette-select" onchange="updatePlot()">
+                                        <option value="default">默认</option>
+                                        <option value="Viridis">Viridis</option>
+                                        <option value="Plasma">Plasma</option>
+                                        <option value="Inferno">Inferno</option>
+                                        <option value="Magma">Magma</option>
+                                        <option value="Cividis">Cividis</option>
+                                        <option value="Blues">Blues</option>
+                                        <option value="Reds">Reds</option>
+                                        <option value="YlOrRd">YlOrRd</option>
+                                        <option value="YlGnBu">YlGnBu</option>
+                                        <option value="RdBu">RdBu (发散)</option>
+                                        <option value="Spectral">Spectral (发散)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-1" id="category-palette-row" style="display: none;">
+                                <div class="col-md-12">
+                                    <label for="category-palette-select" class="form-label">分类调色板</label>
+                                    <select class="form-select" id="category-palette-select" onchange="updatePlot()">
+                                        <option value="default">默认（Scanpy）</option>
+                                        <option value="tab10">Tab10 (10色)</option>
+                                        <option value="tab20">Tab20 (20色)</option>
+                                        <option value="tab20b">Tab20b (20色)</option>
+                                        <option value="tab20c">Tab20c (20色)</option>
+                                        <option value="set1">Set1 (9色，鲜艳)</option>
+                                        <option value="set2">Set2 (8色，柔和)</option>
+                                        <option value="set3">Set3 (12色，淡雅)</option>
+                                        <option value="paired">Paired (12色，成对)</option>
+                                        <option value="pastel1">Pastel1 (9色，粉彩)</option>
+                                        <option value="pastel2">Pastel2 (8色，粉彩)</option>
+                                        <option value="dark2">Dark2 (8色，深色)</option>
+                                        <option value="accent">Accent (8色，强调)</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>

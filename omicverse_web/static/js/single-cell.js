@@ -19,6 +19,8 @@ class SingleCellAnalysis {
         this.setupFileUpload();
         this.setupNavigation();
         this.setupThemeToggle();
+        this.setupGeneAutocomplete();
+        this.setupBeforeUnloadWarning();
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
     }
@@ -56,10 +58,8 @@ class SingleCellAnalysis {
             }
         });
 
-        // Click to upload - prevent event bubbling
+        // Click anywhere in the dropZone to upload
         dropZone.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
             fileInput.click();
         });
     }
@@ -101,20 +101,154 @@ class SingleCellAnalysis {
         // Setup click handlers for existing theme toggle buttons
         const darkButton = document.getElementById('dark-button');
         const lightButton = document.getElementById('light-button');
-        
+
         if (darkButton) {
             darkButton.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.toggleTheme();
             });
         }
-        
+
         if (lightButton) {
             lightButton.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.toggleTheme();
             });
         }
+    }
+
+    setupGeneAutocomplete() {
+        const geneInput = document.getElementById('gene-input');
+        const autocompleteDiv = document.getElementById('gene-autocomplete');
+
+        if (!geneInput || !autocompleteDiv) return;
+
+        let geneList = [];
+        let selectedIndex = -1;
+
+        // Fetch gene list when data is loaded
+        const fetchGeneList = () => {
+            if (!this.currentData) return;
+
+            fetch('/api/genes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.genes) {
+                        geneList = data.genes;
+                    }
+                })
+                .catch(error => {
+                    console.log('Failed to fetch gene list:', error);
+                });
+        };
+
+        // Input event listener
+        geneInput.addEventListener('input', (e) => {
+            const value = e.target.value.trim().toLowerCase();
+            selectedIndex = -1;
+
+            if (value.length < 1) {
+                autocompleteDiv.style.display = 'none';
+                return;
+            }
+
+            if (geneList.length === 0) {
+                fetchGeneList();
+                return;
+            }
+
+            // Filter genes
+            const matches = geneList.filter(gene =>
+                gene.toLowerCase().includes(value)
+            ).slice(0, 20); // Limit to 20 results
+
+            if (matches.length === 0) {
+                autocompleteDiv.style.display = 'none';
+                return;
+            }
+
+            // Display matches
+            autocompleteDiv.innerHTML = matches.map((gene, index) =>
+                `<button type="button" class="list-group-item list-group-item-action" data-index="${index}" data-gene="${gene}">
+                    ${gene}
+                </button>`
+            ).join('');
+            autocompleteDiv.style.display = 'block';
+
+            // Add click handlers
+            autocompleteDiv.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const gene = e.currentTarget.getAttribute('data-gene');
+                    geneInput.value = gene;
+                    autocompleteDiv.style.display = 'none';
+                    this.colorByGene();
+                });
+            });
+        });
+
+        // Keyboard navigation
+        geneInput.addEventListener('keydown', (e) => {
+            const items = autocompleteDiv.querySelectorAll('button');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    const gene = items[selectedIndex].getAttribute('data-gene');
+                    geneInput.value = gene;
+                    autocompleteDiv.style.display = 'none';
+                    this.colorByGene();
+                } else {
+                    this.colorByGene();
+                }
+            } else if (e.key === 'Escape') {
+                autocompleteDiv.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
+
+        const updateSelection = (items) => {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        };
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!geneInput.contains(e.target) && !autocompleteDiv.contains(e.target)) {
+                autocompleteDiv.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
+
+        // Store reference for later use
+        this.fetchGeneList = fetchGeneList;
+    }
+
+    setupBeforeUnloadWarning() {
+        // Warn user before leaving/refreshing if data is loaded
+        window.addEventListener('beforeunload', (e) => {
+            if (this.currentData) {
+                // Modern browsers require returnValue to be set
+                e.preventDefault();
+                // Chrome requires returnValue to be set
+                e.returnValue = '';
+                // Some browsers show a custom message (though most modern browsers ignore it)
+                return '您有未保存的数据，刷新页面将丢失所有分析结果。确定要离开吗？';
+            }
+        });
     }
 
     toggleSubmenu(item) {
@@ -234,7 +368,7 @@ class SingleCellAnalysis {
     updateUI(data) {
         // Hide upload section
         document.getElementById('upload-section').style.display = 'none';
-        
+
         // Show data status
         const statusDiv = document.getElementById('data-status');
         statusDiv.classList.remove('d-none');
@@ -269,6 +403,11 @@ class SingleCellAnalysis {
         // Update parameter panel to enable buttons
         this.updateParameterPanel();
 
+        // Fetch gene list for autocomplete
+        if (this.fetchGeneList) {
+            this.fetchGeneList();
+        }
+
         // Auto-select first embedding and update plot
         if (data.embeddings.length > 0) {
             embeddingSelect.value = data.embeddings[0];
@@ -292,6 +431,9 @@ class SingleCellAnalysis {
 
         if (!embedding) return;
 
+        // Update palette visibility based on color type
+        this.updatePaletteVisibility(colorBy);
+
         // 检查是否已经有图表存在
         const plotDiv = document.getElementById('plotly-div');
         const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
@@ -305,9 +447,31 @@ class SingleCellAnalysis {
         }
     }
 
+    updatePaletteVisibility(colorBy) {
+        const categoryPaletteRow = document.getElementById('category-palette-row');
+        const paletteLabel = document.getElementById('palette-label');
+
+        if (!colorBy || colorBy.startsWith('gene:')) {
+            // Continuous data - show continuous palette, hide category palette
+            if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
+            if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
+        } else if (colorBy.startsWith('obs:')) {
+            // Check if it's categorical by trying to detect from obs columns
+            // We'll let the backend determine this, but show category palette for now
+            if (categoryPaletteRow) categoryPaletteRow.style.display = 'flex';
+            if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
+        }
+    }
+
     createNewPlot(embedding, colorBy) {
         this.currentEmbedding = this.currentEmbedding;
         this.showStatus('正在生成图表...', true);
+
+        // Get selected palettes
+        const paletteSelect = document.getElementById('palette-select');
+        const categoryPaletteSelect = document.getElementById('category-palette-select');
+        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
+        const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
 
         fetch('/api/plot', {
             method: 'POST',
@@ -316,7 +480,9 @@ class SingleCellAnalysis {
             },
             body: JSON.stringify({
                 embedding: embedding,
-                color_by: colorBy
+                color_by: colorBy,
+                palette: palette,
+                category_palette: categoryPalette
             })
         })
         .then(response => response.json())
@@ -342,6 +508,12 @@ class SingleCellAnalysis {
         const isEmbeddingChange = (this.currentEmbedding !== embedding);
         this.showStatus(isEmbeddingChange ? '正在切换降维方法...' : '正在更新着色...', true);
 
+        // Get selected palettes
+        const paletteSelect = document.getElementById('palette-select');
+        const categoryPaletteSelect = document.getElementById('category-palette-select');
+        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
+        const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
+
         fetch('/api/plot', {
             method: 'POST',
             headers: {
@@ -349,7 +521,9 @@ class SingleCellAnalysis {
             },
             body: JSON.stringify({
                 embedding: embedding,
-                color_by: colorBy
+                color_by: colorBy,
+                palette: palette,
+                category_palette: categoryPalette
             })
         })
         .then(response => response.json())
@@ -945,6 +1119,9 @@ class SingleCellAnalysis {
             return;
         }
 
+        // Update palette visibility for gene expression (continuous)
+        this.updatePaletteVisibility('gene:' + gene);
+
         // 检查是否已经有图表存在
         const plotDiv = document.getElementById('plotly-div');
         const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
@@ -955,6 +1132,10 @@ class SingleCellAnalysis {
             this.showStatus('正在加载基因表达...', true);
         }
 
+        // Get selected palette (only continuous for gene expression)
+        const paletteSelect = document.getElementById('palette-select');
+        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
+
         fetch('/api/plot', {
             method: 'POST',
             headers: {
@@ -962,7 +1143,9 @@ class SingleCellAnalysis {
             },
             body: JSON.stringify({
                 embedding: embedding,
-                color_by: 'gene:' + gene
+                color_by: 'gene:' + gene,
+                palette: palette,
+                category_palette: null
             })
         })
         .then(response => response.json())
@@ -1421,7 +1604,7 @@ class SingleCellAnalysis {
     }
 
     resetData() {
-        if (confirm('确定要重置所有数据吗？')) {
+        if (confirm('确定要重置所有数据吗？所有未保存的分析结果将丢失。')) {
             this.currentData = null;
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('data-status').classList.add('d-none');
@@ -1429,6 +1612,21 @@ class SingleCellAnalysis {
             document.getElementById('viz-panel').style.display = 'none';
             document.getElementById('analysis-log').innerHTML = '<div class="text-muted">等待上传数据...</div>';
             document.getElementById('fileInput').value = '';
+
+            // Clear gene input
+            const geneInput = document.getElementById('gene-input');
+            if (geneInput) geneInput.value = '';
+
+            // Reset palettes to default
+            const paletteSelect = document.getElementById('palette-select');
+            if (paletteSelect) paletteSelect.value = 'default';
+
+            const categoryPaletteSelect = document.getElementById('category-palette-select');
+            if (categoryPaletteSelect) categoryPaletteSelect.value = 'default';
+
+            // Hide category palette row
+            const categoryPaletteRow = document.getElementById('category-palette-row');
+            if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
         }
     }
 
