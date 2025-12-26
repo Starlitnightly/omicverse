@@ -14,6 +14,11 @@ from concurrent.futures import ThreadPoolExecutor
 from werkzeug.exceptions import RequestEntityTooLarge
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import threading
+import base64
+import io
+import traceback
+from contextlib import redirect_stdout, redirect_stderr
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -35,6 +40,89 @@ current_adaptor = None
 current_adata = None
 current_filename = None
 thread_pool = ThreadPoolExecutor(max_workers=4)
+kernel_lock = threading.Lock()
+
+
+class InProcessKernelExecutor:
+    """Lightweight in-process ipykernel executor for shared state."""
+    def __init__(self):
+        self.kernel_manager = None
+        self.shell = None
+
+    def _ensure_kernel(self):
+        if self.kernel_manager is not None:
+            return
+        try:
+            from ipykernel.inprocess import InProcessKernelManager
+        except ImportError as exc:
+            raise RuntimeError('ipykernel is required for code execution') from exc
+        self.kernel_manager = InProcessKernelManager()
+        self.kernel_manager.start_kernel()
+        self.shell = self.kernel_manager.kernel.shell
+        plt.switch_backend('Agg')
+        self.shell.user_ns.update({
+            'sc': sc,
+            'pd': pd,
+            'np': np,
+            'plt': plt,
+        })
+
+    def sync_adata(self, adata):
+        self._ensure_kernel()
+        self.shell.user_ns['adata'] = adata
+
+    def execute(self, code, adata):
+        self._ensure_kernel()
+        with kernel_lock:
+            self.shell.user_ns['adata'] = adata
+            stdout_buf = io.StringIO()
+            stderr_buf = io.StringIO()
+            before_figs = set(plt.get_fignums())
+            result = None
+            error_msg = None
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                result = self.shell.run_cell(code, store_history=True)
+            if result.error_before_exec or result.error_in_exec:
+                err = result.error_before_exec or result.error_in_exec
+                error_msg = ''.join(traceback.format_exception(err.__class__, err, err.__traceback__))
+            output = stdout_buf.getvalue()
+            stderr = stderr_buf.getvalue()
+
+            figures = []
+            after_figs = set(plt.get_fignums())
+            new_figs = [num for num in after_figs if num not in before_figs]
+            for fig_num in new_figs:
+                fig = plt.figure(fig_num)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight')
+                figures.append(base64.b64encode(buf.getvalue()).decode('ascii'))
+                plt.close(fig)
+
+            last_result = result.result if result else None
+            return {
+                'output': output,
+                'stderr': stderr,
+                'error': error_msg,
+                'result': last_result,
+                'figures': figures,
+                'adata': self.shell.user_ns.get('adata')
+            }
+
+
+kernel_executor = InProcessKernelExecutor()
+
+
+def sync_adaptor_with_adata():
+    """Keep adaptor in sync after kernel or tool updates."""
+    if current_adaptor is None or current_adata is None:
+        return
+    try:
+        current_adaptor.adata = current_adata
+        current_adaptor.n_obs = current_adata.n_obs
+        current_adaptor.n_vars = current_adata.n_vars
+        current_adaptor._build_indexes()
+    except Exception:
+        pass
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -71,6 +159,10 @@ def upload_file():
         # Expose underlying AnnData for tool endpoints
         current_adata = current_adaptor.adata
         current_filename = filename
+        try:
+            kernel_executor.sync_adata(current_adata)
+        except Exception:
+            pass
 
         # Get schema and summary
         schema = current_adaptor.get_schema()
@@ -663,14 +755,10 @@ def run_tool(tool):
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
 
-        # Sync adaptor with modified AnnData so plot endpoints can see new embeddings
+        # Sync adaptor and kernel with modified AnnData
+        sync_adaptor_with_adata()
         try:
-            if current_adaptor is not None:
-                current_adaptor.adata = current_adata
-                current_adaptor.n_obs = current_adata.n_obs
-                current_adaptor.n_vars = current_adata.n_vars
-                # Rebuild indexes/embeddings list
-                current_adaptor._build_indexes()
+            kernel_executor.sync_adata(current_adata)
         except Exception:
             pass
 
@@ -873,84 +961,55 @@ def execute_code():
         if not code:
             return jsonify({'error': '没有提供代码'}), 400
 
-        # Create a restricted execution environment
-        import io
-        import sys
-        from contextlib import redirect_stdout, redirect_stderr
-
-        # Capture output
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
-
-        # Create namespace with current_adata
-        namespace = {
-            'adata': current_adata,
-            '__builtins__': __builtins__,
-            'sc': sc,
-            'pd': pd,
-            'np': np,
-        }
-
-        result = None
-        data_updated = False
-
         try:
-            with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
-                # Split code into lines to handle last expression
-                code_lines = code.strip().split('\n')
+            execution = kernel_executor.execute(code, current_adata)
+        except Exception as exc:
+            return jsonify({'error': str(exc)}), 500
 
-                # Try to evaluate last line as expression (Jupyter-style auto-print)
-                if code_lines:
-                    # Execute all but last line
-                    if len(code_lines) > 1:
-                        exec('\n'.join(code_lines[:-1]), namespace)
-
-                    # Try to evaluate last line as expression
-                    last_line = code_lines[-1].strip()
-                    if last_line and not last_line.startswith(('#', 'import', 'from', 'def', 'class', 'if', 'for', 'while', 'with', 'try')):
-                        try:
-                            # Try to evaluate as expression
-                            result = eval(last_line, namespace)
-                            # Don't show None results
-                            if result is not None:
-                                result = str(result)
-                            else:
-                                result = None
-                        except:
-                            # If it's not an expression, execute it normally
-                            exec(last_line, namespace)
-                    else:
-                        # Execute last line normally
-                        if last_line:
-                            exec(last_line, namespace)
-
-                # Check if adata was modified
-                if 'adata' in namespace and namespace['adata'] is not current_adata:
-                    # If a new adata was assigned, update global
-                    current_adata = namespace['adata']
-                    data_updated = True
-                elif current_adata is not None:
-                    # Data might have been modified in-place
-                    data_updated = True
-
-        except Exception as e:
-            import traceback
-            error_msg = traceback.format_exc()
-            return jsonify({
-                'error': error_msg,
-                'output': output_buffer.getvalue()
-            }), 200
-
-        output = output_buffer.getvalue()
-        stderr = error_buffer.getvalue()
-
+        output = execution.get('output') or ''
+        stderr = execution.get('stderr') or ''
         if stderr:
             output = output + '\n' + stderr if output else stderr
+
+        if execution.get('error'):
+            return jsonify({
+                'error': execution['error'],
+                'output': output,
+                'figures': execution.get('figures', [])
+            }), 200
+
+        result = execution.get('result')
+        if result is not None:
+            result = str(result)
+
+        new_adata = execution.get('adata')
+        if new_adata is not None:
+            current_adata = new_adata
+
+        data_updated = current_adata is not None
+        sync_adaptor_with_adata()
+        try:
+            kernel_executor.sync_adata(current_adata)
+        except Exception:
+            pass
+
+        data_info = None
+        if data_updated:
+            data_info = {
+                'filename': current_filename,
+                'n_cells': current_adata.n_obs,
+                'n_genes': current_adata.n_vars,
+                'embeddings': [emb.replace('X_', '') for emb in current_adata.obsm.keys()],
+                'obs_columns': list(current_adata.obs.columns),
+                'var_columns': list(current_adata.var.columns)
+            }
 
         return jsonify({
             'output': output,
             'result': result,
+            'figures': execution.get('figures', []),
             'data_updated': data_updated,
+            'data_info': data_info,
             'success': True
         })
 

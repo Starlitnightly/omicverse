@@ -10,6 +10,7 @@ class SingleCellAnalysis {
         this.currentView = 'visualization';
         this.codeCells = [];
         this.cellCounter = 0;
+        this.pendingPlotRefresh = false;
 
         // Initialize high-performance components
         this.dataManager = new DataManager();
@@ -405,6 +406,9 @@ class SingleCellAnalysis {
 
         // Update parameter panel to enable buttons
         this.updateParameterPanel();
+        if (this.fetchGeneList) {
+            this.fetchGeneList();
+        }
 
         // Fetch gene list for autocomplete
         if (this.fetchGeneList) {
@@ -415,6 +419,66 @@ class SingleCellAnalysis {
         if (data.embeddings.length > 0) {
             embeddingSelect.value = data.embeddings[0];
             this.updatePlot();
+        }
+    }
+
+    refreshDataFromKernel(data) {
+        if (!data) return;
+        this.currentData = data;
+        const statusDiv = document.getElementById('data-status');
+        if (statusDiv) statusDiv.classList.remove('d-none');
+        const filenameDisplay = document.getElementById('filename-display');
+        if (filenameDisplay) filenameDisplay.textContent = data.filename || '';
+        const cellCount = document.getElementById('cell-count');
+        if (cellCount) cellCount.textContent = data.n_cells;
+        const geneCount = document.getElementById('gene-count');
+        if (geneCount) geneCount.textContent = data.n_genes;
+
+        const embeddingSelect = document.getElementById('embedding-select');
+        const colorSelect = document.getElementById('color-select');
+        const prevEmbedding = embeddingSelect ? embeddingSelect.value : '';
+        const prevColor = colorSelect ? colorSelect.value : '';
+
+        if (embeddingSelect) {
+            embeddingSelect.innerHTML = '<option value="">选择降维方法</option>';
+            data.embeddings.forEach(emb => {
+                const option = document.createElement('option');
+                option.value = emb;
+                option.textContent = emb.toUpperCase();
+                embeddingSelect.appendChild(option);
+            });
+            if (data.embeddings.includes(prevEmbedding)) {
+                embeddingSelect.value = prevEmbedding;
+            } else if (data.embeddings.length > 0) {
+                embeddingSelect.value = data.embeddings[0];
+            }
+        }
+
+        if (colorSelect) {
+            colorSelect.innerHTML = '<option value="">无着色</option>';
+            data.obs_columns.forEach(col => {
+                const option = document.createElement('option');
+                option.value = 'obs:' + col;
+                option.textContent = col;
+                colorSelect.appendChild(option);
+            });
+            if (prevColor && prevColor.startsWith('obs:')) {
+                const rawCol = prevColor.replace('obs:', '');
+                if (data.obs_columns.includes(rawCol)) {
+                    colorSelect.value = prevColor;
+                }
+            }
+        }
+
+        this.updateParameterPanel();
+
+        if (embeddingSelect && embeddingSelect.value) {
+            if (this.currentView === 'visualization') {
+                this.updatePlot();
+                this.pendingPlotRefresh = false;
+            } else {
+                this.pendingPlotRefresh = true;
+            }
         }
     }
 
@@ -1856,6 +1920,13 @@ class SingleCellAnalysis {
             // Update page title
             if (pageTitle) pageTitle.textContent = '单细胞分析';
             if (breadcrumbTitle) breadcrumbTitle.textContent = '单细胞分析';
+            if (this.pendingPlotRefresh) {
+                const embeddingSelect = document.getElementById('embedding-select');
+                if (embeddingSelect && embeddingSelect.value) {
+                    this.updatePlot();
+                }
+                this.pendingPlotRefresh = false;
+            }
         } else if (view === 'code') {
             vizView.style.display = 'none';
             codeView.style.display = 'block';
@@ -1958,14 +2029,14 @@ class SingleCellAnalysis {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                outputDiv.className = 'code-cell-output has-content error';
-                outputDiv.textContent = data.error;
+                this.renderCodeOutput(outputDiv, {
+                    text: data.error,
+                    isError: true,
+                    figures: data.figures || []
+                });
             } else {
-                outputDiv.className = 'code-cell-output has-content success';
                 let output = '';
-                if (data.output) {
-                    output += data.output;
-                }
+                if (data.output) output += data.output;
                 if (data.result !== null && data.result !== undefined) {
                     if (output) output += '\n';
                     output += `Out: ${data.result}`;
@@ -1973,16 +2044,42 @@ class SingleCellAnalysis {
                 if (data.data_updated) {
                     if (output) output += '\n';
                     output += '\n✓ AnnData对象已更新';
-                    // Refresh data info
-                    this.checkStatus();
+                    this.refreshDataFromKernel(data.data_info);
                 }
-                outputDiv.textContent = output || '(执行成功，无输出)';
+                this.renderCodeOutput(outputDiv, {
+                    text: output || '(执行成功，无输出)',
+                    isError: false,
+                    figures: data.figures || []
+                });
             }
         })
         .catch(error => {
-            outputDiv.className = 'code-cell-output has-content error';
-            outputDiv.textContent = `错误: ${error.message}`;
+            this.renderCodeOutput(outputDiv, {
+                text: `错误: ${error.message}`,
+                isError: true,
+                figures: []
+            });
         });
+    }
+
+    renderCodeOutput(outputDiv, payload) {
+        outputDiv.className = `code-cell-output has-content ${payload.isError ? 'error' : 'success'}`;
+        outputDiv.innerHTML = '';
+        if (payload.text) {
+            const pre = document.createElement('pre');
+            pre.className = 'code-output-text';
+            pre.textContent = payload.text;
+            outputDiv.appendChild(pre);
+        }
+        if (payload.figures && payload.figures.length > 0) {
+            payload.figures.forEach(fig => {
+                const img = document.createElement('img');
+                img.className = 'code-output-figure';
+                img.src = `data:image/png;base64,${fig}`;
+                img.alt = 'plot';
+                outputDiv.appendChild(img);
+            });
+        }
     }
 
     deleteCodeCell(cellId) {

@@ -6,7 +6,7 @@
 
 ### 1. 安装依赖
 ```bash
-pip install flask flask_cors scanpy numpy pandas werkzeug
+pip install flask flask_cors scanpy numpy pandas werkzeug ipykernel
 ```
 
 ### 2. 启动服务器

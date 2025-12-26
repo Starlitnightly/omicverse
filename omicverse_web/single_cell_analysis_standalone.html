@@ -102,7 +102,6 @@
             border-top: 1px solid #dee2e6;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
             font-size: 12px;
-            white-space: pre-wrap;
             display: none;
         }
         .code-cell-output.has-content {
@@ -114,6 +113,19 @@
         }
         .code-cell-output.success {
             color: #198754;
+        }
+        .code-output-text {
+            margin: 0 0 8px 0;
+            white-space: pre-wrap;
+        }
+        .code-output-figure {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #fff;
+            margin-top: 8px;
         }
         .cell-number {
             color: #6c757d;
