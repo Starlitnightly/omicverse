@@ -21,6 +21,8 @@ import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 import sys
+import mimetypes
+import shutil
 
 # Import our high-performance data adaptor
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
@@ -163,6 +165,10 @@ def is_allowed_text_file(path_obj):
         '.ini', '.toml', '.js', '.css', '.html'
     }
     return path_obj.suffix.lower() in allowed
+
+
+def is_image_file(path_obj):
+    return path_obj.suffix.lower() in {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'}
 
 
 def estimate_var_size(obj):
@@ -541,6 +547,17 @@ def open_file():
             })
 
         if not is_allowed_text_file(target):
+            if is_image_file(target):
+                mime_type = mimetypes.guess_type(target.name)[0] or 'image/png'
+                with open(target, 'rb') as handle:
+                    encoded = base64.b64encode(handle.read()).decode('ascii')
+                return jsonify({
+                    'type': 'image',
+                    'name': target.name,
+                    'path': str(target.relative_to(file_root)),
+                    'mime': mime_type,
+                    'content': encoded
+                })
             return jsonify({'error': 'Unsupported file type'}), 400
 
         with open(target, 'r', encoding='utf-8', errors='ignore') as handle:
@@ -550,6 +567,7 @@ def open_file():
             'type': 'text',
             'name': target.name,
             'path': str(target.relative_to(file_root)),
+            'ext': target.suffix.lower(),
             'content': content
         })
     except Exception as e:
@@ -633,6 +651,130 @@ def kernel_stats():
         })
     except Exception as e:
         logging.error(f"Kernel stats failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/create', methods=['POST'])
+def create_file_or_folder():
+    data = request.json if request.json else {}
+    rel_path = data.get('path', '')
+    item_type = data.get('type', 'file')
+
+    try:
+        target = resolve_browse_path(rel_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+
+    if target.exists():
+        return jsonify({'error': 'Path already exists'}), 400
+
+    try:
+        if item_type == 'folder':
+            target.mkdir(parents=True, exist_ok=False)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch(exist_ok=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Create failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/delete', methods=['POST'])
+def delete_file_or_folder():
+    data = request.json if request.json else {}
+    rel_path = data.get('path', '')
+
+    try:
+        target = resolve_browse_path(rel_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+
+    if not target.exists():
+        return jsonify({'error': 'Path not found'}), 404
+
+    if target == file_root or str(target).startswith(str(file_root / '.')):
+        return jsonify({'error': 'Refusing to delete'}), 400
+
+    try:
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Delete failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/rename', methods=['POST'])
+def rename_file_or_folder():
+    data = request.json if request.json else {}
+    src_path = data.get('src', '')
+    dst_path = data.get('dst', '')
+    try:
+        src = resolve_browse_path(src_path)
+        dst = resolve_browse_path(dst_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+    if not src.exists():
+        return jsonify({'error': 'Source not found'}), 404
+    if dst.exists():
+        return jsonify({'error': 'Target exists'}), 400
+    try:
+        src.rename(dst)
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Rename failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/copy', methods=['POST'])
+def copy_file_or_folder():
+    data = request.json if request.json else {}
+    src_path = data.get('src', '')
+    dst_path = data.get('dst', '')
+    try:
+        src = resolve_browse_path(src_path)
+        dst = resolve_browse_path(dst_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+    if not src.exists():
+        return jsonify({'error': 'Source not found'}), 404
+    if dst.exists():
+        return jsonify({'error': 'Target exists'}), 400
+    try:
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Copy failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/files/move', methods=['POST'])
+def move_file_or_folder():
+    data = request.json if request.json else {}
+    src_path = data.get('src', '')
+    dst_path = data.get('dst', '')
+    try:
+        src = resolve_browse_path(src_path)
+        dst = resolve_browse_path(dst_path)
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 400
+    if not src.exists():
+        return jsonify({'error': 'Source not found'}), 404
+    if dst.exists():
+        return jsonify({'error': 'Target exists'}), 400
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dst))
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"Move failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 

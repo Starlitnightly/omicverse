@@ -86,7 +86,7 @@
         }
         .code-cell-input textarea {
             resize: none;
-            overflow: hidden;
+            overflow: auto;
             background: transparent;
             color: transparent !important;
             -webkit-text-fill-color: transparent;
@@ -95,6 +95,47 @@
             caret-color: #111827;
             position: relative;
             z-index: 2;
+            max-height: 420px;
+        }
+        .code-cell.cell-markdown .code-input,
+        .code-cell.cell-raw .code-input {
+            color: #111827 !important;
+            -webkit-text-fill-color: #111827;
+            text-shadow: none;
+            max-height: 420px;
+            overflow: auto;
+        }
+        .markdown-render {
+            display: none;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: text;
+            color: #111827;
+            user-select: none;
+            pointer-events: auto;
+        }
+        .markdown-render h1,
+        .markdown-render h2,
+        .markdown-render h3 {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
+        }
+        .markdown-render code {
+            background: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+        }
+        .markdown-render pre {
+            background: #f6f8fa;
+            padding: 10px;
+            border-radius: 6px;
+            overflow: auto;
+        }
+        .markdown-render blockquote {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 10px;
+            color: #6b7280;
         }
         .code-cell-input .code-highlight {
             position: absolute;
@@ -120,6 +161,11 @@
             font-size: 12px;
             display: none;
             overflow: auto;
+        }
+        .code-cell-output.markdown {
+            font-family: inherit;
+            background: #fff;
+            color: #111827;
         }
         .code-cell-output.has-content {
             display: block;
@@ -157,12 +203,53 @@
             opacity: 0.7;
             transition: opacity 0.2s;
         }
+        .cell-toolbar .form-select {
+            height: 22px;
+            font-size: 11px;
+            padding: 0 6px;
+            border-radius: 4px;
+        }
         .code-cell:hover .cell-toolbar {
             opacity: 1;
         }
         .cell-toolbar .btn {
             padding: 2px 8px;
             font-size: 11px;
+        }
+        .code-cell-output.collapsed {
+            display: none;
+        }
+        .code-cell-output.partial {
+            max-height: 140px;
+            overflow: auto;
+        }
+        .output-hidden-note {
+            display: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #6b7280;
+            background: #f3f4f6;
+            border-top: 1px dashed #e5e7eb;
+        }
+        .output-hidden-note.visible {
+            display: block;
+        }
+        .code-toolbar-group .btn[data-label] {
+            position: relative;
+        }
+        .code-toolbar-group .btn[data-label]:hover::after {
+            content: attr(data-label);
+            position: absolute;
+            top: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: #111827;
+            color: #fff;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            z-index: 10;
         }
 
         /* Prism.js code highlighting integration */
@@ -326,6 +413,39 @@
         .file-tree-children.open {
             display: block;
         }
+        .file-tree-spacer {
+            height: 32px;
+        }
+
+        .file-context-menu {
+            position: fixed;
+            z-index: 2000;
+            min-width: 180px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 6px;
+            display: none;
+        }
+        .file-context-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            font-size: 12px;
+            color: #111827;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .file-context-menu-item:hover {
+            background: #f3f4f6;
+        }
+        .file-context-menu-sep {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 6px 0;
+        }
 
         .kernel-metrics {
             display: flex;
@@ -445,14 +565,91 @@
             white-space: pre;
             resize: vertical;
         }
+        .md-file-view {
+            display: none;
+            padding: 12px;
+            gap: 12px;
+        }
+        .md-editor {
+            flex: 1;
+            min-width: 0;
+        }
+        .md-editor textarea {
+            width: 100%;
+            min-height: 480px;
+            border: none;
+            outline: none;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            resize: vertical;
+        }
+        .md-preview {
+            flex: 1;
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            overflow: auto;
+            line-height: 1.6;
+            color: #111827;
+        }
+        .md-preview h1 {
+            font-size: 20px;
+        }
+        .md-preview h2 {
+            font-size: 18px;
+        }
+        .md-preview h3 {
+            font-size: 16px;
+        }
+        .md-preview ul {
+            padding-left: 20px;
+        }
+        .md-preview blockquote {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 10px;
+            color: #6b7280;
+        }
+        .md-preview h1, .md-preview h2, .md-preview h3 {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 6px;
+        }
+        .md-preview code {
+            background: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+        }
+        .md-preview pre {
+            background: #f6f8fa;
+            color: #111827;
+            padding: 10px;
+            border-radius: 6px;
+            overflow: auto;
+        }
+        .image-file-view {
+            display: none;
+            padding: 12px;
+            background: #fff;
+        }
+        .image-file-view img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            background: #fff;
+        }
 
         .editor-tabs {
             display: none;
             align-items: center;
             gap: 6px;
-            padding: 6px 12px;
+            padding: 6px 12px 0 12px;
             border-bottom: 1px solid #e5e7eb;
             background: #f8fafc;
+            margin-top: 0;
         }
         .editor-tab {
             display: inline-flex;
@@ -486,6 +683,40 @@
             padding: 8px 16px;
             border-bottom: 1px solid #e5e7eb;
             background: #f8fafc;
+            position: sticky;
+            top: 120px;
+            z-index: 1020;
+        }
+        .header-pagebar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 30px;
+            border-top: 1px solid #e5e7eb;
+            background: #fff;
+        }
+        .nxl-container {
+            top: 120px;
+        }
+        .header-pagebar .page-header-title h5 {
+            margin-bottom: 0;
+            margin-right: 8px;
+            padding-right: 10px;
+            color: #283c50;
+            font-weight: 600;
+            border-right: 1px solid #cdd4e8;
+        }
+        .header-pagebar .breadcrumb {
+            padding: 0;
+            display: inline-flex;
+            margin-bottom: 0;
+            background: none;
+            font-size: 13px;
+            color: #7587a7;
+            font-weight: 800;
+        }
+        .header-pagebar .breadcrumb a {
+            color: #283c50;
         }
 
         html.app-skin-dark .code-cell {
@@ -500,6 +731,7 @@
         }
         html.app-skin-dark .code-cell-input .code-highlight {
             color: #e5e7eb;
+            background: transparent !important;
         }
         html.app-skin-dark .code-cell-input pre[class*="language-"] {
             background: #0f172a;
@@ -509,8 +741,12 @@
             color: #e5e7eb;
             text-shadow: none;
         }
+        html.app-skin-dark .code-cell-input .code-highlight code {
+            background: transparent !important;
+        }
         html.app-skin-dark .token {
             text-shadow: none;
+            background: transparent !important;
         }
         html.app-skin-dark .token.comment,
         html.app-skin-dark .token.prolog,
@@ -560,6 +796,10 @@
             color: #e5e7eb;
             border-top-color: #1f2937;
         }
+        html.app-skin-dark .code-cell-output.markdown {
+            background: #0f172a;
+            color: #e5e7eb;
+        }
         html.app-skin-dark .code-cell-output.error {
             background: #3f1d1d;
             color: #fca5a5;
@@ -570,6 +810,63 @@
         html.app-skin-dark .text-file-view textarea {
             background: #0f172a;
             color: #e5e7eb;
+        }
+        html.app-skin-dark .md-preview {
+            background: #0f172a;
+            border-color: #1f2937;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .md-preview a {
+            color: #93c5fd;
+        }
+        html.app-skin-dark .md-preview pre {
+            background: #111827;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .md-preview blockquote {
+            border-left-color: #1f2937;
+            color: #94a3b8;
+        }
+        html.app-skin-dark .markdown-render {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .markdown-render h1,
+        html.app-skin-dark .markdown-render h2,
+        html.app-skin-dark .markdown-render h3 {
+            border-bottom-color: #1f2937;
+        }
+        html.app-skin-dark .markdown-render code {
+            background: #111827;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .markdown-render pre {
+            background: #111827;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .markdown-render blockquote {
+            border-left-color: #1f2937;
+            color: #94a3b8;
+        }
+        html.app-skin-dark .code-cell.cell-markdown .code-input,
+        html.app-skin-dark .code-cell.cell-raw .code-input {
+            color: #e5e7eb !important;
+            -webkit-text-fill-color: #e5e7eb;
+        }
+        html.app-skin-dark .md-preview h1,
+        html.app-skin-dark .md-preview h2,
+        html.app-skin-dark .md-preview h3 {
+            border-bottom-color: #1f2937;
+        }
+        html.app-skin-dark .md-preview code {
+            background: #111827;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .md-editor textarea {
+            background: #0f172a;
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .image-file-view {
+            background: #0f172a;
         }
         html.app-skin-dark .file-manager-title {
             color: #e5e7eb;
@@ -620,6 +917,16 @@
         html.app-skin-dark .var-preview {
             color: #94a3b8;
         }
+        html.app-skin-dark .file-context-menu {
+            background: #0f172a;
+            border-color: #1f2937;
+        }
+        html.app-skin-dark .file-context-menu-item {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .file-context-menu-item:hover {
+            background: #111827;
+        }
         html.app-skin-dark .var-detail-view {
             background: #0f172a;
         }
@@ -633,6 +940,18 @@
         html.app-skin-dark .page-toolbar {
             background: #0f172a;
             border-bottom-color: #1f2937;
+        }
+        html.app-skin-dark .header-pagebar {
+            background: #0f172a;
+            border-top-color: #1f2937;
+        }
+        html.app-skin-dark .header-pagebar .page-header-title h5 {
+            color: #e5e7eb;
+            border-right-color: #1f2937;
+        }
+        html.app-skin-dark .header-pagebar .breadcrumb,
+        html.app-skin-dark .header-pagebar .breadcrumb a {
+            color: #9ca3af;
         }
         html.app-skin-dark .code-toolbar-group {
             background: #111827;
@@ -788,6 +1107,7 @@
                             <ul class="file-tree" id="file-tree">
                                 <li class="file-tree-node">加载中...</li>
                             </ul>
+                            <div class="file-tree-spacer"></div>
                         </div>
                     </div>
                     <div class="fm-section">
@@ -839,6 +1159,17 @@
             </div>
         </div>
     </nav>
+    <div class="file-context-menu" id="file-context-menu">
+        <div class="file-context-menu-item" data-action="new-file" onclick="singleCellApp.contextNewFile()">新建文件</div>
+        <div class="file-context-menu-item" data-action="new-folder" onclick="singleCellApp.contextNewFolder()">新建文件夹</div>
+        <div class="file-context-menu-item" data-action="rename" onclick="singleCellApp.contextRename()">重命名</div>
+        <div class="file-context-menu-item" data-action="copy" onclick="singleCellApp.contextCopy()">复制</div>
+        <div class="file-context-menu-item" data-action="paste" onclick="singleCellApp.contextPaste()">粘贴</div>
+        <div class="file-context-menu-item" data-action="move" onclick="singleCellApp.contextMove()">移动</div>
+        <div class="file-context-menu-sep"></div>
+        <div class="file-context-menu-item" data-action="refresh" onclick="singleCellApp.contextRefresh()">刷新</div>
+        <div class="file-context-menu-item" data-action="delete" onclick="singleCellApp.contextDelete()">删除</div>
+    </div>
 
     <!-- Header -->
     <header class="nxl-header">
@@ -1006,88 +1337,58 @@
                 </div>
             </div>
         </div>
+        <div class="header-pagebar">
+            <div class="page-header-left d-flex align-items-center">
+                <div class="page-header-title">
+                    <h5 class="m-b-10" id="page-title">单细胞分析</h5>
+                </div>
+                <ul class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="index.html">主页</a></li>
+                    <li class="breadcrumb-item" id="breadcrumb-title">单细胞分析</li>
+                </ul>
+            </div>
+            <div class="page-header-right ms-auto">
+                <div class="page-header-right-items">
+                    <div class="d-flex align-items-center gap-2 page-header-right-items-wrapper">
+                        <div id="viz-toolbar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <!-- Main Content -->
     <main class="nxl-container">
         <div class="nxl-content">
-            <!-- Page Header -->
-            <div class="page-header">
-                <div class="page-header-left d-flex align-items-center">
-                    <div class="page-header-title">
-                        <h5 class="m-b-10" id="page-title">单细胞分析</h5>
-                    </div>
-                    <ul class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="index.html">主页</a></li>
-                        <li class="breadcrumb-item" id="breadcrumb-title">单细胞分析</li>
-                    </ul>
-                </div>
-                <div class="page-header-right ms-auto">
-                    <div class="page-header-right-items">
-                        <div class="d-flex align-items-center gap-2 page-header-right-items-wrapper">
-                            <!-- Visualization Toolbar (shown in viz view) -->
-                            <div id="viz-toolbar">
-                                <div id="reportrange" class="reportrange-picker d-flex align-items-center">
-                                    <span class="reportrange-picker-field">今天</span>
-                                </div>
-                                <div class="dropdown filter-dropdown ms-2">
-                                    <a class="btn btn-md btn-light-brand" data-bs-toggle="dropdown" data-bs-offset="0, 10" data-bs-auto-close="outside">
-                                        <i class="feather-filter me-2"></i>
-                                        <span>分析工具</span>
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-end">
-                                        <a href="javascript:selectAnalysisCategory('preprocessing')" class="dropdown-item">
-                                            <i class="feather-filter me-3"></i>
-                                            <span>数据预处理</span>
-                                        </a>
-                                        <a href="javascript:selectAnalysisCategory('dimreduction')" class="dropdown-item">
-                                            <i class="feather-layers me-3"></i>
-                                            <span>降维分析</span>
-                                        </a>
-                                        <a href="javascript:selectAnalysisCategory('clustering')" class="dropdown-item">
-                                            <i class="feather-grid me-3"></i>
-                                            <span>聚类分析</span>
-                                        </a>
-                                        <a href="javascript:selectAnalysisCategory('omicverse')" class="dropdown-item">
-                                            <i class="feather-dna me-3"></i>
-                                            <span>OmicVerse工具</span>
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             <div class="page-toolbar" id="code-editor-toolbar-row">
                 <div id="code-editor-toolbar">
                     <span class="code-toolbar-label">Python</span>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runAllCells()" title="运行全部">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runAllCells()" title="运行全部" data-label="运行全部">
                             <i class="feather-play"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCell()" title="新增单元">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCell()" title="新增单元" data-label="新增单元">
                             <i class="feather-plus"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.saveActiveFile()" title="保存">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.saveActiveFile()" title="保存" data-label="保存">
                             <i class="feather-save"></i>
                         </button>
                     </div>
                     <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.insertTemplate()" title="插入模板">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.insertTemplate()" title="插入模板" data-label="插入模板">
                             <i class="feather-file-text"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.clearAllCells()" title="清空所有">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.clearAllCells()" title="清空所有" data-label="清空所有">
                             <i class="feather-trash-2"></i>
                         </button>
                     </div>
                     <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(-1)" title="减小字号">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(-1)" title="减小字号" data-label="减小字号">
                             A-
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(1)" title="增大字号">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(1)" title="增大字号" data-label="增大字号">
                             A+
                         </button>
                     </div>
@@ -1274,7 +1575,16 @@
                             <div id="text-file-view" class="text-file-view">
                                 <textarea id="text-file-editor" spellcheck="false"></textarea>
                             </div>
+                            <div id="md-file-view" class="md-file-view">
+                                <div class="md-editor">
+                                    <textarea id="md-file-editor" spellcheck="false"></textarea>
+                                </div>
+                                <div class="md-preview" id="md-file-preview"></div>
+                            </div>
                             <div id="var-detail-view" class="var-detail-view"></div>
+                            <div id="image-file-view" class="image-file-view">
+                                <img id="image-file-content" alt="image preview">
+                            </div>
                         </div>
                     </div>
                 </div>
