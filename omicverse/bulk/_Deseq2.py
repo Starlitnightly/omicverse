@@ -10,7 +10,7 @@ import anndata as ad
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib
-from typing import Union,Tuple
+from typing import Union, Tuple, Optional, Any
 from ..utils import plot_boxplot
 from ..utils.registry import register_function
 from ..pl import volcano
@@ -96,10 +96,7 @@ def deseq2_normalize(data:pd.DataFrame)->pd.DataFrame:
     return data/scale
 
 
-def normalize_bulk(df_counts, df_lengths, normalization_type):
-    counts = df_counts.values
-    lengths = df_lengths['feature_length'].astype(float).values.reshape(1, -1)  # Ensure lengths is a column vector
-    
+def normalize_bulk(df_counts: pd.DataFrame, df_lengths: pd.DataFrame, normalization_type: str) -> pd.DataFrame:
     r"""Normalize the count data.
 
     Arguments:
@@ -110,6 +107,8 @@ def normalize_bulk(df_counts, df_lengths, normalization_type):
     Returns:
         normalized_data: Normalized data as DataFrame
     """
+    counts = df_counts.values
+    lengths = df_lengths['feature_length'].astype(float).values.reshape(1, -1)  # Ensure lengths is a column vector
     
     if normalization_type == 'CPM':
         # Counts Per Million
@@ -252,7 +251,7 @@ class pyDEG(object):
         self.data=deseq2_normalize(self.data)
         return self.data
     
-    def foldchange_set(self,fc_threshold:int=-1,pval_threshold:float=0.05,logp_max:int=6,fold_threshold:int=0):
+    def foldchange_set(self, fc_threshold: int = -1, pval_threshold: float = 0.05, logp_max: int = 6, fold_threshold: int = 0) -> None:
         r"""Set fold-change and p-value thresholds to classify differentially expressed genes as up-regulated, down-regulated, or not significant.
 
         Arguments:
@@ -280,13 +279,13 @@ class pyDEG(object):
         self.logp_max=logp_max
     
 
-    def plot_volcano(self,figsize:tuple=(4,4),pval_name='qvalue',fc_name='log2FC',
-                     title:str='',titlefont:dict={'weight':'normal','size':14,},
-                     up_color:str='#e25d5d',down_color:str='#7388c1',normal_color:str='#d7d7d7',
-                     up_fontcolor:str='#e25d5d',down_fontcolor:str='#7388c1',normal_fontcolor:str='#d7d7d7',
-                     legend_bbox:tuple=(0.8, -0.2),legend_ncol:int=2,legend_fontsize:int=12,
-                     plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
-                     ticks_fontsize:int=12,ax=None):
+    def plot_volcano(self, figsize: tuple = (4, 4), pval_name: str = 'qvalue', fc_name: str = 'log2FC',
+                     title: str = '', titlefont: dict = {'weight': 'normal', 'size': 14},
+                     up_color: str = '#e25d5d', down_color: str = '#7388c1', normal_color: str = '#d7d7d7',
+                     up_fontcolor: str = '#e25d5d', down_fontcolor: str = '#7388c1', normal_fontcolor: str = '#d7d7d7',
+                     legend_bbox: tuple = (0.8, -0.2), legend_ncol: int = 2, legend_fontsize: int = 12,
+                     plot_genes: Optional[list] = None, plot_genes_num: int = 10, plot_genes_fontsize: int = 10,
+                     ticks_fontsize: int = 12, ax: Optional[matplotlib.axes._axes.Axes] = None) -> matplotlib.axes._axes.Axes:
         r"""Generate a volcano plot for the differential gene expression analysis results.
 
         Arguments:
@@ -422,12 +421,12 @@ class pyDEG(object):
         return fig,ax
         '''
     
-    def plot_boxplot(self,genes:list,treatment_groups:list,control_groups:list,
-                     log:bool=True,
-                     treatment_name:str='Treatment',control_name:str='Control',
-                     figsize:tuple=(4,3),palette:list=["#a64d79","#674ea7"],
-                     title:str='Gene Expression',fontsize:int=12,legend_bbox:tuple=(1, 0.55),legend_ncol:int=1,
-                     **kwarg)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
+    def plot_boxplot(self, genes: list, treatment_groups: list, control_groups: list,
+                     log: bool = True,
+                     treatment_name: str = 'Treatment', control_name: str = 'Control',
+                     figsize: tuple = (4, 3), palette: list = ["#a64d79", "#674ea7"],
+                     title: str = 'Gene Expression', fontsize: int = 12, legend_bbox: tuple = (1, 0.55), legend_ncol: int = 1,
+                     **kwarg: Any) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
         r"""
         Plot the boxplot of genes from dds data
 
