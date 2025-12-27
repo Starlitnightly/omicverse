@@ -318,6 +318,114 @@
             color: #6b7280;
             margin-right: 8px;
         }
+        .agent-view {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .agent-panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            min-height: 520px;
+        }
+        .agent-panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .agent-panel-title {
+            font-weight: 600;
+            color: #283c50;
+        }
+        .agent-messages {
+            flex: 1;
+            padding: 18px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+        .agent-message {
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            max-width: 75%;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .agent-message p {
+            margin: 0 0 8px;
+        }
+        .agent-message p:last-child {
+            margin-bottom: 0;
+        }
+        .agent-message ul {
+            padding-left: 18px;
+            margin: 8px 0;
+        }
+        .agent-message blockquote {
+            margin: 8px 0;
+            padding-left: 10px;
+            border-left: 2px solid rgba(148, 163, 184, 0.5);
+            color: #64748b;
+        }
+        .agent-message code {
+            background: rgba(15, 23, 42, 0.08);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .agent-message h1,
+        .agent-message h2,
+        .agent-message h3 {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+        .agent-message.user {
+            background: #dbeafe;
+            color: #1e3a8a;
+            margin-left: auto;
+        }
+        .agent-message.assistant {
+            background: #ecfdf3;
+            color: #065f46;
+            margin-right: auto;
+        }
+        .agent-message pre {
+            background: #0f172a;
+            color: #e5e7eb;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 8px 0 0;
+        }
+        .agent-input {
+            border-top: 1px solid #e5e7eb;
+            padding: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #ffffff;
+        }
+        .agent-input textarea {
+            flex: 1;
+            resize: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-height: 44px;
+            font-size: 14px;
+        }
+        .agent-input .btn {
+            white-space: nowrap;
+        }
 
         .file-manager {
             display: none;
@@ -993,6 +1101,39 @@
         html.app-skin-dark .code-toolbar-label {
             color: #9ca3af;
         }
+        html.app-skin-dark .agent-panel {
+            background: #0f172a;
+            border-color: #1f2937;
+        }
+        html.app-skin-dark .agent-panel-header {
+            border-bottom-color: #1f2937;
+        }
+        html.app-skin-dark .agent-panel-title {
+            color: #e5e7eb;
+        }
+        html.app-skin-dark .agent-messages {
+            background: #0b1220;
+        }
+        html.app-skin-dark .agent-message.user {
+            background: #1e3a8a;
+            color: #e0e7ff;
+        }
+        html.app-skin-dark .agent-message.assistant {
+            background: #064e3b;
+            color: #d1fae5;
+        }
+        html.app-skin-dark .agent-message pre {
+            background: #0b1220;
+        }
+        html.app-skin-dark .agent-input {
+            border-top-color: #1f2937;
+            background: #0f172a;
+        }
+        html.app-skin-dark .agent-input textarea {
+            background: #111827;
+            border-color: #1f2937;
+            color: #e5e7eb;
+        }
         html.app-skin-dark .editor-tabs {
             background: #0f172a;
             border-bottom-color: #1f2937;
@@ -1053,7 +1194,7 @@
                 </a>
             </div>
             <div class="navbar-content">
-                <ul class="nxl-navbar">
+                <ul class="nxl-navbar" id="analysis-nav">
                     <li class="nxl-item nxl-caption">
                         <label>单细胞分析</label>
                     </li>
@@ -1113,6 +1254,52 @@
                             <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择差异分析工具">差异分析</a></li>
                             <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择功能富集工具">功能富集</a></li>
                         </ul>
+                    </li>
+                </ul>
+                <ul class="nxl-navbar" id="agent-config-nav" style="display: none;">
+                    <li class="nxl-item nxl-caption">
+                        <label>Agent 配置</label>
+                    </li>
+                    <li class="nxl-item">
+                        <div class="px-3">
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-api-base">API Base URL</label>
+                                <input type="text" class="form-control form-control-sm" id="agent-api-base" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-api-key">API Key</label>
+                                <input type="password" class="form-control form-control-sm" id="agent-api-key" placeholder="sk-...">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-model">模型</label>
+                                <input type="text" class="form-control form-control-sm" id="agent-model" placeholder="模型名称" value="gpt-5">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-temperature">Temperature</label>
+                                <input type="number" class="form-control form-control-sm" id="agent-temperature" min="0" max="2" step="0.1" value="0.3">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-top-p">Top P</label>
+                                <input type="number" class="form-control form-control-sm" id="agent-top-p" min="0" max="1" step="0.05" value="1">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-max-tokens">Max Tokens</label>
+                                <input type="number" class="form-control form-control-sm" id="agent-max-tokens" min="1" step="1" value="2048">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-timeout">Timeout (s)</label>
+                                <input type="number" class="form-control form-control-sm" id="agent-timeout" min="1" step="1" value="60">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label mb-1" for="agent-system-prompt">System Prompt</label>
+                                <textarea class="form-control form-control-sm" id="agent-system-prompt" rows="3" placeholder="你是一个单细胞分析助手..."></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary" type="button" onclick="singleCellApp.saveAgentConfig()">保存</button>
+                                <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.resetAgentConfig()">重置</button>
+                            </div>
+                            <small class="text-muted d-block mt-2">配置保存在浏览器本地</small>
+                        </div>
                     </li>
                 </ul>
                 <div class="file-manager" id="file-manager">
@@ -1273,6 +1460,9 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-code-btn" onclick="singleCellApp.switchView('code')">
                                 <i class="feather-code me-1"></i>代码编辑器
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')">
+                                <i class="feather-message-circle me-1"></i>Agent
                             </button>
                         </div>
                     </div>
@@ -1623,6 +1813,26 @@
                     </div>
                 </div>
                 <!-- End Code Editor View -->
+
+                <!-- Agent View -->
+                <div id="agent-view" class="content-view" style="display: none;">
+                    <div class="agent-view">
+                        <div class="agent-panel">
+                            <div class="agent-panel-header">
+                                <div class="agent-panel-title">单细胞分析 Agent</div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.showAgentConfig()">配置模型</button>
+                            </div>
+                            <div class="agent-messages" id="agent-messages">
+                                <div class="agent-message assistant">你好，我可以帮你分析单细胞数据。告诉我你想做什么分析。</div>
+                            </div>
+                            <div class="agent-input">
+                                <textarea id="agent-input" placeholder="输入你的问题，比如：帮我做细胞类型注释建议"></textarea>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="singleCellApp.sendAgentMessage()">发送</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Agent View -->
             </div>
         </div>
     </main>

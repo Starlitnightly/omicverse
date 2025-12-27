@@ -34,6 +34,8 @@ class SingleCellAnalysis {
         this.setupGeneAutocomplete();
         this.setupBeforeUnloadWarning();
         this.setupNotebookManager();
+        this.setupAgentConfig();
+        this.setupAgentChat();
         this.setupKernelSelector();
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
@@ -142,6 +144,205 @@ class SingleCellAnalysis {
             }
             this.changeKernel(activeTab, selected, kernelSelect);
         });
+    }
+
+    setupAgentConfig() {
+        const fields = this.getAgentConfigFields();
+        if (!fields) return;
+        this.loadAgentConfig();
+        Object.values(fields).forEach(field => {
+            field.addEventListener('change', () => this.saveAgentConfig(true));
+        });
+    }
+
+    setupAgentChat() {
+        const input = document.getElementById('agent-input');
+        if (!input) return;
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                this.sendAgentMessage();
+            }
+        });
+    }
+
+    getAgentConfigFields() {
+        const fields = {
+            apiBase: document.getElementById('agent-api-base'),
+            apiKey: document.getElementById('agent-api-key'),
+            model: document.getElementById('agent-model'),
+            temperature: document.getElementById('agent-temperature'),
+            topP: document.getElementById('agent-top-p'),
+            maxTokens: document.getElementById('agent-max-tokens'),
+            timeout: document.getElementById('agent-timeout'),
+            systemPrompt: document.getElementById('agent-system-prompt')
+        };
+        const hasAll = Object.values(fields).every(Boolean);
+        return hasAll ? fields : null;
+    }
+
+    loadAgentConfig() {
+        const fields = this.getAgentConfigFields();
+        if (!fields) return;
+        let stored = null;
+        try {
+            stored = JSON.parse(localStorage.getItem('omicverse.agentConfig') || 'null');
+        } catch (e) {
+            stored = null;
+        }
+        if (!stored) {
+            fields.apiBase.value = fields.apiBase.value || 'https://api.openai.com/v1';
+            fields.model.value = fields.model.value || 'gpt-5';
+            return;
+        }
+        fields.apiBase.value = stored.apiBase || fields.apiBase.value || 'https://api.openai.com/v1';
+        fields.apiKey.value = stored.apiKey || '';
+        fields.model.value = stored.model || fields.model.value || 'gpt-5';
+        fields.temperature.value = stored.temperature ?? fields.temperature.value;
+        fields.topP.value = stored.topP ?? fields.topP.value;
+        fields.maxTokens.value = stored.maxTokens ?? fields.maxTokens.value;
+        fields.timeout.value = stored.timeout ?? fields.timeout.value;
+        fields.systemPrompt.value = stored.systemPrompt || '';
+    }
+
+    saveAgentConfig(silent = false) {
+        const fields = this.getAgentConfigFields();
+        if (!fields) return;
+        const payload = {
+            apiBase: fields.apiBase.value.trim(),
+            apiKey: fields.apiKey.value.trim(),
+            model: fields.model.value.trim(),
+            temperature: fields.temperature.value,
+            topP: fields.topP.value,
+            maxTokens: fields.maxTokens.value,
+            timeout: fields.timeout.value,
+            systemPrompt: fields.systemPrompt.value.trim()
+        };
+        localStorage.setItem('omicverse.agentConfig', JSON.stringify(payload));
+        if (!silent) {
+            this.showStatus('Agent 配置已保存', false);
+            setTimeout(() => this.hideStatus(), 1200);
+        }
+    }
+
+    resetAgentConfig() {
+        const fields = this.getAgentConfigFields();
+        if (!fields) return;
+        localStorage.removeItem('omicverse.agentConfig');
+        fields.apiBase.value = 'https://api.openai.com/v1';
+        fields.apiKey.value = '';
+        fields.model.value = 'gpt-5';
+        fields.temperature.value = 0.3;
+        fields.topP.value = 1;
+        fields.maxTokens.value = 2048;
+        fields.timeout.value = 60;
+        fields.systemPrompt.value = '';
+        this.showStatus('Agent 配置已重置', false);
+        setTimeout(() => this.hideStatus(), 1200);
+    }
+
+    getAgentConfig() {
+        let stored = null;
+        try {
+            stored = JSON.parse(localStorage.getItem('omicverse.agentConfig') || 'null');
+        } catch (e) {
+            stored = null;
+        }
+        if (stored) {
+            return stored;
+        }
+        const fields = this.getAgentConfigFields();
+        if (!fields) return {};
+        return {
+            apiBase: fields.apiBase.value.trim(),
+            apiKey: fields.apiKey.value.trim(),
+            model: fields.model.value.trim(),
+            temperature: fields.temperature.value,
+            topP: fields.topP.value,
+            maxTokens: fields.maxTokens.value,
+            timeout: fields.timeout.value,
+            systemPrompt: fields.systemPrompt.value.trim()
+        };
+    }
+
+    appendAgentMessage(text, role = 'assistant', useMarkdown = false) {
+        const container = document.getElementById('agent-messages');
+        if (!container) return null;
+        const item = document.createElement('div');
+        item.className = `agent-message ${role}`;
+        if (useMarkdown) {
+            item.innerHTML = this.renderMarkdown(text);
+        } else {
+            item.textContent = text;
+        }
+        container.appendChild(item);
+        container.scrollTop = container.scrollHeight;
+        return item;
+    }
+
+    updateAgentMessageContent(target, text, code) {
+        if (!target) return;
+        target.innerHTML = this.renderMarkdown(text || '');
+        if (code) {
+            const pre = document.createElement('pre');
+            pre.textContent = code;
+            target.appendChild(pre);
+        }
+    }
+
+    sendAgentMessage() {
+        const input = document.getElementById('agent-input');
+        if (!input) return;
+        const message = input.value.trim();
+        if (!message) return;
+        input.value = '';
+        this.appendAgentMessage(message, 'user');
+        const pending = this.appendAgentMessage('正在分析...', 'assistant');
+        fetch('/api/agent/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message,
+                config: this.getAgentConfig()
+            })
+        })
+        .then(async response => {
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (e) {
+                data = null;
+            }
+            if (!response.ok) {
+                const message = (data && data.error) ? data.error : `HTTP ${response.status}`;
+                throw new Error(message);
+            }
+            return data || {};
+        })
+        .then(data => {
+            if (data.error) {
+                this.updateAgentMessageContent(pending, `失败: ${data.error}`);
+                return;
+            }
+            this.updateAgentMessageContent(pending, data.reply || '已完成分析。', data.code);
+            if (data.data_updated) {
+                this.refreshDataFromKernel(data.data_info);
+            }
+        })
+        .catch(error => {
+            const detail = error && error.message ? error.message : '未知错误';
+            const message = detail === 'Failed to fetch'
+                ? '无法连接后端，请确认服务已启动并允许访问。'
+                : detail;
+            this.updateAgentMessageContent(pending, `失败: ${message}`);
+        });
+    }
+
+    showAgentConfig() {
+        const panel = document.getElementById('agent-config-nav');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     loadKernelOptions(kernelSelect, tab) {
@@ -2106,22 +2307,30 @@ class SingleCellAnalysis {
 
         const vizView = document.getElementById('visualization-view');
         const codeView = document.getElementById('code-editor-view');
+        const agentView = document.getElementById('agent-view');
         const vizBtn = document.getElementById('view-viz-btn');
         const codeBtn = document.getElementById('view-code-btn');
+        const agentBtn = document.getElementById('view-agent-btn');
         const vizToolbar = document.getElementById('viz-toolbar');
         const codeToolbarRow = document.getElementById('code-editor-toolbar-row');
         const pageTitle = document.getElementById('page-title');
         const breadcrumbTitle = document.getElementById('breadcrumb-title');
-        const navMenu = document.querySelector('.navbar-content .nxl-navbar');
+        const analysisNav = document.getElementById('analysis-nav');
+        const agentConfigNav = document.getElementById('agent-config-nav');
         const fileManager = document.getElementById('file-manager');
 
         if (view === 'visualization') {
             vizView.style.display = 'block';
             codeView.style.display = 'none';
+            if (agentView) agentView.style.display = 'none';
             vizBtn.classList.remove('btn-outline-primary');
             vizBtn.classList.add('btn-primary');
             codeBtn.classList.remove('btn-primary');
             codeBtn.classList.add('btn-outline-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-primary');
+                agentBtn.classList.add('btn-outline-primary');
+            }
 
             // Toggle toolbars
             if (vizToolbar) vizToolbar.style.display = 'flex';
@@ -2130,7 +2339,8 @@ class SingleCellAnalysis {
             // Update page title
             if (pageTitle) pageTitle.textContent = '单细胞分析';
             if (breadcrumbTitle) breadcrumbTitle.textContent = '单细胞分析';
-            if (navMenu) navMenu.style.display = 'block';
+            if (analysisNav) analysisNav.style.display = 'block';
+            if (agentConfigNav) agentConfigNav.style.display = 'none';
             if (fileManager) fileManager.style.display = 'none';
             if (this.pendingPlotRefresh) {
                 const embeddingSelect = document.getElementById('embedding-select');
@@ -2142,10 +2352,15 @@ class SingleCellAnalysis {
         } else if (view === 'code') {
             vizView.style.display = 'none';
             codeView.style.display = 'block';
+            if (agentView) agentView.style.display = 'none';
             vizBtn.classList.remove('btn-primary');
             vizBtn.classList.add('btn-outline-primary');
             codeBtn.classList.remove('btn-outline-primary');
             codeBtn.classList.add('btn-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-outline-primary');
+                agentBtn.classList.add('btn-primary');
+            }
 
             // Toggle toolbars
             if (vizToolbar) vizToolbar.style.display = 'none';
@@ -2154,7 +2369,8 @@ class SingleCellAnalysis {
             // Update page title
             if (pageTitle) pageTitle.innerHTML = '<i class="feather-code me-2"></i>Python 代码编辑器';
             if (breadcrumbTitle) breadcrumbTitle.textContent = 'Python 代码编辑器';
-            if (navMenu) navMenu.style.display = 'none';
+            if (analysisNav) analysisNav.style.display = 'none';
+            if (agentConfigNav) agentConfigNav.style.display = 'none';
             if (fileManager) fileManager.style.display = 'block';
             if (!this.fileTreeLoaded) {
                 this.fetchFileTree();
@@ -2170,6 +2386,29 @@ class SingleCellAnalysis {
             if (this.codeCells.length === 0) {
                 this.addCodeCell();
             }
+        } else if (view === 'agent') {
+            vizView.style.display = 'none';
+            codeView.style.display = 'none';
+            if (agentView) agentView.style.display = 'block';
+            vizBtn.classList.remove('btn-primary');
+            vizBtn.classList.add('btn-outline-primary');
+            codeBtn.classList.remove('btn-primary');
+            codeBtn.classList.add('btn-outline-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-outline-primary');
+                agentBtn.classList.add('btn-primary');
+            }
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'none';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+
+            // Update page title
+            if (pageTitle) pageTitle.innerHTML = '<i class="feather-message-circle me-2"></i>Agent 对话';
+            if (breadcrumbTitle) breadcrumbTitle.textContent = 'Agent 对话';
+            if (analysisNav) analysisNav.style.display = 'none';
+            if (agentConfigNav) agentConfigNav.style.display = 'block';
+            if (fileManager) fileManager.style.display = 'none';
         }
     }
 
@@ -2686,6 +2925,9 @@ class SingleCellAnalysis {
         const tab = this.getActiveTab();
         if (tab && tab.type === 'notebook') {
             return tab.kernelId || tab.path || 'default.ipynb';
+        }
+        if (tab && tab.type === 'var') {
+            return tab.kernelId || 'default.ipynb';
         }
         return null;
     }

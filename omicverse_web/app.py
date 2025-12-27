@@ -18,6 +18,8 @@ import threading
 import base64
 import io
 import traceback
+import asyncio
+
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 import sys
@@ -137,6 +139,8 @@ kernel_executor = InProcessKernelExecutor()
 current_kernel_name = 'python3'
 kernel_names = {}
 kernel_sessions = {}
+agent_instance = None
+agent_config_signature = None
 notebook_root = os.getcwd()
 file_root = Path(notebook_root).resolve()
 
@@ -168,6 +172,124 @@ def reset_kernel_namespace(kernel_id):
     kernel_sessions[kernel_id] = {
         'user_ns': build_kernel_namespace()
     }
+
+
+def get_agent_instance(config):
+    import omicverse as ov
+    global agent_instance, agent_config_signature
+    if config is None:
+        config = {}
+    signature_payload = {
+        'model': config.get('model') or 'gpt-5',
+        'api_key': config.get('apiKey') or '',
+        'endpoint': config.get('apiBase') or None,
+    }
+    signature = json.dumps(signature_payload, sort_keys=True)
+    if agent_instance is None or signature != agent_config_signature:
+        agent_instance = ov.Agent(
+            model=signature_payload['model'],
+            api_key=signature_payload['api_key'] or None,
+            endpoint=signature_payload['endpoint'] or None,
+            use_notebook_execution=False
+        )
+        agent_config_signature = signature
+    return agent_instance
+
+
+def run_agent_stream(agent, prompt, adata):
+    async def _runner():
+        code = None
+        result_adata = None
+        result_shape = None
+        llm_text = ''
+        async for event in agent.stream_async(prompt, adata):
+            if event.get('type') == 'llm_chunk':
+                llm_text += event.get('content', '')
+            elif event.get('type') == 'code':
+                code = event.get('content')
+            elif event.get('type') == 'result':
+                result_adata = event.get('content')
+                result_shape = event.get('shape')
+            elif event.get('type') == 'error':
+                raise RuntimeError(event.get('content', 'Agent error'))
+        return {
+            'code': code,
+            'llm_text': llm_text,
+            'result_adata': result_adata,
+            'result_shape': result_shape
+        }
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        result_container = {}
+        error_container = {}
+
+        def _run_in_thread():
+            try:
+                result_container['value'] = asyncio.run(_runner())
+            except BaseException as exc:
+                error_container['error'] = exc
+
+        thread = threading.Thread(target=_run_in_thread, name='OmicVerseAgentRunner')
+        thread.start()
+        thread.join()
+        if 'error' in error_container:
+            raise error_container['error']
+        return result_container.get('value')
+
+    return asyncio.run(_runner())
+
+
+def run_agent_chat(agent, prompt):
+    async def _runner():
+        if not agent._llm:
+            raise RuntimeError("LLM backend is not initialized")
+        chat_prompt = (
+            "You are an OmicVerse assistant. Answer in natural language only, "
+            "avoid code unless explicitly requested.\n\nUser: " + prompt
+        )
+        return await agent._llm.run(chat_prompt)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        result_container = {}
+        error_container = {}
+
+        def _run_in_thread():
+            try:
+                result_container['value'] = asyncio.run(_runner())
+            except BaseException as exc:
+                error_container['error'] = exc
+
+        thread = threading.Thread(target=_run_in_thread, name='OmicVerseAgentChatRunner')
+        thread.start()
+        thread.join()
+        if 'error' in error_container:
+            raise error_container['error']
+        return result_container.get('value')
+
+    return asyncio.run(_runner())
+
+
+def agent_requires_adata(prompt):
+    if not prompt:
+        return False
+    lowered = prompt.lower()
+    keywords = [
+        'adata', 'qc', 'quality', 'cluster', 'clustering', 'umap', 'tsne', 'pca',
+        'embedding', 'neighbors', 'leiden', 'louvain', 'marker', 'differential',
+        'hvg', 'highly variable', 'preprocess', 'normalize', 'visualize', 'plot',
+        '降维', '聚类', '可视化', '差异', '标记', '质控', '预处理'
+    ]
+    return any(keyword in lowered for keyword in keywords)
 
 
 def get_kernel_context(kernel_id):
@@ -1884,6 +2006,66 @@ def export_plot_data():
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/agent/run', methods=['POST'])
+def agent_run():
+    """Run OmicVerse Agent on current adata."""
+    global current_adata
+    payload = request.json if request.json else {}
+    prompt = (payload.get('message') or '').strip()
+    if not prompt:
+        return jsonify({'error': '没有提供问题'}), 400
+    config = payload.get('config') or {}
+    system_prompt = (config.get('systemPrompt') or '').strip()
+    if system_prompt:
+        prompt = f"{system_prompt}\n\n{prompt}"
+    try:
+        agent = get_agent_instance(config)
+        if current_adata is None:
+            reply = run_agent_chat(agent, prompt)
+            return jsonify({
+                'reply': reply,
+                'code': None,
+                'data_updated': False,
+                'data_info': None
+            })
+        result = run_agent_stream(agent, prompt, current_adata)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+    new_adata = result.get('result_adata')
+    data_updated = False
+    if new_adata is not None:
+        current_adata = new_adata
+        data_updated = True
+        sync_adaptor_with_adata()
+        try:
+            kernel_executor.sync_adata(current_adata)
+        except Exception:
+            pass
+
+    data_info = None
+    if data_updated:
+        data_info = {
+            'filename': current_filename,
+            'n_cells': current_adata.n_obs,
+            'n_genes': current_adata.n_vars,
+            'embeddings': [emb.replace('X_', '') for emb in current_adata.obsm.keys()],
+            'obs_columns': list(current_adata.obs.columns),
+            'var_columns': list(current_adata.var.columns)
+        }
+
+    reply = '已完成分析。'
+    if result.get('result_shape'):
+        shape = result.get('result_shape')
+        reply = f'已完成分析，结果数据维度为 {shape[0]} × {shape[1]}。'
+
+    return jsonify({
+        'reply': reply,
+        'code': result.get('code'),
+        'data_updated': data_updated,
+        'data_info': data_info
+    })
 
 @app.route('/')
 def index():
