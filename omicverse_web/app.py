@@ -71,51 +71,117 @@ class InProcessKernelExecutor:
             'plt': plt,
         })
 
+    def restart(self):
+        with kernel_lock:
+            if self.kernel_manager is not None:
+                try:
+                    self.kernel_manager.shutdown_kernel(now=True)
+                except Exception:
+                    pass
+            self.kernel_manager = None
+            self.shell = None
+            self._ensure_kernel()
+
     def sync_adata(self, adata):
         self._ensure_kernel()
         self.shell.user_ns['adata'] = adata
 
-    def execute(self, code, adata):
+    def execute(self, code, adata=None, user_ns=None):
         self._ensure_kernel()
         with kernel_lock:
-            self.shell.user_ns['adata'] = adata
+            original_ns = self.shell.user_ns
+            if user_ns is not None:
+                self.shell.user_ns = user_ns
+            if adata is not None:
+                self.shell.user_ns['adata'] = adata
             stdout_buf = io.StringIO()
             stderr_buf = io.StringIO()
             before_figs = set(plt.get_fignums())
-            result = None
-            error_msg = None
-            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-                result = self.shell.run_cell(code, store_history=True)
-            if result.error_before_exec or result.error_in_exec:
-                err = result.error_before_exec or result.error_in_exec
-                error_msg = ''.join(traceback.format_exception(err.__class__, err, err.__traceback__))
-            output = stdout_buf.getvalue()
-            stderr = stderr_buf.getvalue()
+            try:
+                result = None
+                error_msg = None
+                with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                    result = self.shell.run_cell(code, store_history=True)
+                if result.error_before_exec or result.error_in_exec:
+                    err = result.error_before_exec or result.error_in_exec
+                    error_msg = ''.join(traceback.format_exception(err.__class__, err, err.__traceback__))
+                output = stdout_buf.getvalue()
+                stderr = stderr_buf.getvalue()
 
-            figures = []
-            after_figs = set(plt.get_fignums())
-            new_figs = [num for num in after_figs if num not in before_figs]
-            for fig_num in new_figs:
-                fig = plt.figure(fig_num)
-                buf = io.BytesIO()
-                fig.savefig(buf, format='png', bbox_inches='tight')
-                figures.append(base64.b64encode(buf.getvalue()).decode('ascii'))
-                plt.close(fig)
+                figures = []
+                after_figs = set(plt.get_fignums())
+                new_figs = [num for num in after_figs if num not in before_figs]
+                for fig_num in new_figs:
+                    fig = plt.figure(fig_num)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format='png', bbox_inches='tight')
+                    figures.append(base64.b64encode(buf.getvalue()).decode('ascii'))
+                    plt.close(fig)
 
-            last_result = result.result if result else None
-            return {
-                'output': output,
-                'stderr': stderr,
-                'error': error_msg,
-                'result': last_result,
-                'figures': figures,
-                'adata': self.shell.user_ns.get('adata')
-            }
+                last_result = result.result if result else None
+                adata_value = self.shell.user_ns.get('adata')
+                return {
+                    'output': output,
+                    'stderr': stderr,
+                    'error': error_msg,
+                    'result': last_result,
+                    'figures': figures,
+                    'adata': adata_value
+                }
+            finally:
+                if user_ns is not None:
+                    self.shell.user_ns = original_ns
 
 
 kernel_executor = InProcessKernelExecutor()
+current_kernel_name = 'python3'
+kernel_names = {}
+kernel_sessions = {}
 notebook_root = os.getcwd()
 file_root = Path(notebook_root).resolve()
+
+
+def normalize_kernel_id(kernel_id):
+    if not kernel_id:
+        return 'default.ipynb'
+    return str(kernel_id)
+
+def build_kernel_namespace(include_adata=False):
+    namespace = {
+        'sc': sc,
+        'pd': pd,
+        'np': np,
+        'plt': plt,
+    }
+    if include_adata:
+        namespace['adata'] = current_adata
+    return namespace
+
+
+def reset_kernel_namespace(kernel_id):
+    kernel_id = normalize_kernel_id(kernel_id)
+    if kernel_id == 'default.ipynb':
+        kernel_executor.restart()
+        if current_adata is not None:
+            kernel_executor.sync_adata(current_adata)
+        return
+    kernel_sessions[kernel_id] = {
+        'user_ns': build_kernel_namespace()
+    }
+
+
+def get_kernel_context(kernel_id):
+    kernel_id = normalize_kernel_id(kernel_id)
+    if kernel_id == 'default.ipynb':
+        kernel_executor._ensure_kernel()
+        return kernel_executor, kernel_executor.shell.user_ns
+    session = kernel_sessions.get(kernel_id)
+    if session is None:
+        session = {
+            'user_ns': build_kernel_namespace()
+        }
+        kernel_sessions[kernel_id] = session
+    return kernel_executor, session['user_ns']
 
 
 def ensure_default_notebook():
@@ -636,8 +702,9 @@ def save_file():
 @app.route('/api/kernel/stats', methods=['GET'])
 def kernel_stats():
     try:
-        kernel_executor._ensure_kernel()
-        ns = kernel_executor.shell.user_ns
+        kernel_id = request.args.get('kernel_id')
+        executor, ns = get_kernel_context(kernel_id)
+        executor._ensure_kernel()
         vars_info = []
         for name, value in ns.items():
             if name.startswith('_'):
@@ -656,7 +723,8 @@ def kernel_stats():
         vars_info.sort(key=lambda x: x['size_mb'], reverse=True)
         return jsonify({
             'memory_mb': get_process_memory_mb(),
-            'vars': vars_info[:10]
+            'vars': vars_info[:10],
+            'kernel_id': normalize_kernel_id(kernel_id)
         })
     except Exception as e:
         logging.error(f"Kernel stats failed: {e}")
@@ -790,8 +858,9 @@ def move_file_or_folder():
 @app.route('/api/kernel/vars', methods=['GET'])
 def kernel_vars():
     try:
-        kernel_executor._ensure_kernel()
-        ns = kernel_executor.shell.user_ns
+        kernel_id = request.args.get('kernel_id')
+        executor, ns = get_kernel_context(kernel_id)
+        executor._ensure_kernel()
         vars_info = []
         for name, value in ns.items():
             if name.startswith('_'):
@@ -813,7 +882,7 @@ def kernel_vars():
             except Exception:
                 pass
         vars_info.sort(key=lambda x: x['name'].lower())
-        return jsonify({'vars': vars_info[:50]})
+        return jsonify({'vars': vars_info[:50], 'kernel_id': normalize_kernel_id(kernel_id)})
     except Exception as e:
         logging.error(f"Kernel vars failed: {e}")
         return jsonify({'error': str(e)}), 500
@@ -823,8 +892,9 @@ def kernel_vars():
 def kernel_var_detail():
     name = request.args.get('name', '')
     try:
-        kernel_executor._ensure_kernel()
-        ns = kernel_executor.shell.user_ns
+        kernel_id = request.args.get('kernel_id')
+        executor, ns = get_kernel_context(kernel_id)
+        executor._ensure_kernel()
         value = resolve_var_path(name, ns)
         try:
             import pandas as pd
@@ -1652,16 +1722,19 @@ def execute_code():
     """Execute Python code with access to current_adata"""
     global current_adata
 
-    if current_adata is None:
-        return jsonify({'error': '没有加载数据。请先上传H5AD文件。'}), 400
-
     try:
-        code = request.json.get('code', '')
+        payload = request.json if request.json else {}
+        code = payload.get('code', '')
         if not code:
             return jsonify({'error': '没有提供代码'}), 400
+        kernel_id = normalize_kernel_id(payload.get('kernel_id'))
+        executor, ns = get_kernel_context(kernel_id)
+        if kernel_id == 'default.ipynb' and current_adata is None:
+            return jsonify({'error': '没有加载数据。请先上传H5AD文件。'}), 400
 
         try:
-            execution = kernel_executor.execute(code, current_adata)
+            shared_adata = current_adata if kernel_id == 'default.ipynb' else None
+            execution = executor.execute(code, shared_adata, user_ns=ns)
         except Exception as exc:
             return jsonify({'error': str(exc)}), 500
 
@@ -1682,15 +1755,15 @@ def execute_code():
             result = str(result)
 
         new_adata = execution.get('adata')
-        if new_adata is not None:
+        data_updated = False
+        if kernel_id == 'default.ipynb' and new_adata is not None:
             current_adata = new_adata
-
-        data_updated = new_adata is not None
-        sync_adaptor_with_adata()
-        try:
-            kernel_executor.sync_adata(current_adata)
-        except Exception:
-            pass
+            data_updated = True
+            sync_adaptor_with_adata()
+            try:
+                kernel_executor.sync_adata(current_adata)
+            except Exception:
+                pass
 
         data_info = None
         if data_updated:
@@ -1709,12 +1782,49 @@ def execute_code():
             'figures': execution.get('figures', []),
             'data_updated': data_updated,
             'data_info': data_info,
+            'kernel_id': kernel_id,
             'success': True
         })
 
     except Exception as e:
         import traceback
         return jsonify({'error': traceback.format_exc()}), 500
+
+@app.route('/api/kernel/list', methods=['GET'])
+def kernel_list():
+    kernel_id = normalize_kernel_id(request.args.get('kernel_id'))
+    current_name = current_kernel_name if kernel_id == 'default.ipynb' else kernel_names.get(kernel_id, 'python3')
+    return jsonify({
+        'kernels': [
+            {
+                'name': 'python3',
+                'display_name': 'Python 3 (ipykernel)'
+            }
+        ],
+        'default': 'python3',
+        'current': current_name,
+        'kernel_id': kernel_id
+    })
+
+@app.route('/api/kernel/select', methods=['POST'])
+def kernel_select():
+    global current_kernel_name, current_adata
+    payload = request.get_json(silent=True) or {}
+    name = payload.get('name')
+    kernel_id = normalize_kernel_id(payload.get('kernel_id'))
+    if not name:
+        return jsonify({'error': '缺少内核名称'}), 400
+    if name != 'python3':
+        return jsonify({'error': '当前仅支持 Python 3 (ipykernel)'}), 400
+    try:
+        reset_kernel_namespace(kernel_id)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+    if kernel_id == 'default.ipynb':
+        current_kernel_name = name
+    else:
+        kernel_names[kernel_id] = name
+    return jsonify({'current': name, 'kernel_id': kernel_id})
 
 @app.route('/api/export_plot_data', methods=['POST'])
 def export_plot_data():

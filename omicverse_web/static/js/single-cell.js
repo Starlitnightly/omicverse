@@ -34,6 +34,7 @@ class SingleCellAnalysis {
         this.setupGeneAutocomplete();
         this.setupBeforeUnloadWarning();
         this.setupNotebookManager();
+        this.setupKernelSelector();
         this.checkStatus();
         this.selectAnalysisCategory('preprocessing');
         this.applyCodeFontSize();
@@ -125,6 +126,90 @@ class SingleCellAnalysis {
         this.fetchKernelStats();
         this.fetchKernelVars();
         document.addEventListener('click', () => this.hideContextMenu());
+    }
+
+    setupKernelSelector() {
+        const kernelSelect = document.getElementById('kernel-select');
+        if (!kernelSelect) return;
+        kernelSelect.addEventListener('change', () => {
+            const activeTab = this.getActiveTab();
+            if (!activeTab || activeTab.type !== 'notebook') {
+                return;
+            }
+            const selected = kernelSelect.value;
+            if (selected === activeTab.kernelName) {
+                return;
+            }
+            this.changeKernel(activeTab, selected, kernelSelect);
+        });
+    }
+
+    loadKernelOptions(kernelSelect, tab) {
+        const kernelId = tab?.kernelId || 'default.ipynb';
+        fetch(`/api/kernel/list?kernel_id=${encodeURIComponent(kernelId)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                return;
+            }
+            const kernels = data.kernels || [];
+            if (!kernels.length) {
+                return;
+            }
+            kernelSelect.innerHTML = '';
+            kernels.forEach(kernel => {
+                const option = document.createElement('option');
+                option.value = kernel.name;
+                option.textContent = kernel.display_name || kernel.name;
+                kernelSelect.appendChild(option);
+            });
+            const current = data.current || data.default;
+            if (current) {
+                kernelSelect.value = current;
+            }
+            if (tab) {
+                tab.kernelName = kernelSelect.value;
+            }
+        })
+        .catch(() => {});
+    }
+
+    changeKernel(tab, name, kernelSelect) {
+        const previous = tab.kernelName || kernelSelect.value;
+        const label = kernelSelect.options[kernelSelect.selectedIndex]?.text || name;
+        this.showStatus(`正在切换内核到 ${label}...`, true);
+        fetch('/api/kernel/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, kernel_id: tab.kernelId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            tab.kernelName = data.current || name;
+            this.updateStatus(`内核已切换: ${label}`);
+            setTimeout(() => this.hideStatus(), 1200);
+            this.fetchKernelStats(tab.kernelId);
+            this.fetchKernelVars(tab.kernelId);
+        })
+        .catch(error => {
+            kernelSelect.value = previous;
+            this.updateStatus(`切换内核失败: ${error.message}`);
+            setTimeout(() => this.hideStatus(), 2000);
+        });
+    }
+
+    updateKernelSelectorForTab(tab) {
+        const kernelSelect = document.getElementById('kernel-select');
+        if (!kernelSelect) return;
+        if (!tab || tab.type !== 'notebook') {
+            kernelSelect.disabled = true;
+            return;
+        }
+        kernelSelect.disabled = false;
+        this.loadKernelOptions(kernelSelect, tab);
     }
 
     triggerNotebookUpload() {
@@ -2245,13 +2330,15 @@ class SingleCellAnalysis {
         outputDiv.textContent = '执行中...';
 
         // Execute code on backend
+        const kernelId = this.getActiveKernelId();
         return fetch('/api/execute_code', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                code: code
+                code: code,
+                kernel_id: kernelId
             })
         })
         .then(response => response.json())
@@ -2491,12 +2578,16 @@ class SingleCellAnalysis {
             return;
         }
         const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const kernelId = tab.path || 'default.ipynb';
+        const kernelName = tab.kernelName || 'python3';
         this.openTabs.push({
             id,
             name: tab.name,
             path: tab.path,
             type: 'notebook',
-            cells: tab.cells
+            cells: tab.cells,
+            kernelId,
+            kernelName
         });
         this.setActiveTab(id);
     }
@@ -2569,19 +2660,34 @@ class SingleCellAnalysis {
             if (tab.outputs) {
                 this.restoreNotebookOutputs(tab.outputs);
             }
+            this.updateKernelSelectorForTab(tab);
+            this.fetchKernelStats(tab.kernelId);
+            this.fetchKernelVars(tab.kernelId);
         } else if (tab.type === 'text') {
             this.showTextFile(tab.content || '');
+            this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'markdown') {
             this.showMarkdownFile(tab.content || '');
+            this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'image') {
             this.showImageFile(tab);
+            this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'var') {
             this.showVarDetail(tab.detail || {});
+            this.updateKernelSelectorForTab(null);
         }
     }
 
     getActiveTab() {
         return this.openTabs.find(t => t.id === this.activeTabId);
+    }
+
+    getActiveKernelId() {
+        const tab = this.getActiveTab();
+        if (tab && tab.type === 'notebook') {
+            return tab.kernelId || tab.path || 'default.ipynb';
+        }
+        return null;
     }
 
     renderTabs() {
@@ -2631,6 +2737,7 @@ class SingleCellAnalysis {
                 if (container) container.innerHTML = '';
                 this.codeCells = [];
                 this.cellCounter = 0;
+                this.updateKernelSelectorForTab(null);
             }
         } else {
             this.renderTabs();
@@ -2784,11 +2891,16 @@ class SingleCellAnalysis {
         toggle.textContent = isHidden ? '收起' : '展开';
     }
 
-    fetchKernelStats() {
-        fetch('/api/kernel/stats')
+    fetchKernelStats(kernelId = null) {
+        const activeKernelId = kernelId || this.getActiveKernelId();
+        if (!activeKernelId) return;
+        fetch(`/api/kernel/stats?kernel_id=${encodeURIComponent(activeKernelId)}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
+                return;
+            }
+            if (activeKernelId !== this.getActiveKernelId()) {
                 return;
             }
             const mem = document.getElementById('kernel-memory-value');
@@ -2828,11 +2940,16 @@ class SingleCellAnalysis {
         .catch(() => {});
     }
 
-    fetchKernelVars() {
-        fetch('/api/kernel/vars')
+    fetchKernelVars(kernelId = null) {
+        const activeKernelId = kernelId || this.getActiveKernelId();
+        if (!activeKernelId) return;
+        fetch(`/api/kernel/vars?kernel_id=${encodeURIComponent(activeKernelId)}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
+                return;
+            }
+            if (activeKernelId !== this.getActiveKernelId()) {
                 return;
             }
             const table = document.getElementById('kernel-vars-table');
@@ -2868,12 +2985,14 @@ class SingleCellAnalysis {
 
     openVarTab(name) {
         if (!name) return;
-        const existing = this.openTabs.find(t => t.type === 'var' && t.name === name);
+        const kernelId = this.getActiveKernelId();
+        if (!kernelId) return;
+        const existing = this.openTabs.find(t => t.type === 'var' && t.name === name && t.kernelId === kernelId);
         if (existing) {
             this.setActiveTab(existing.id);
             return;
         }
-        fetch(`/api/kernel/var_detail?name=${encodeURIComponent(name)}`)
+        fetch(`/api/kernel/var_detail?name=${encodeURIComponent(name)}&kernel_id=${encodeURIComponent(kernelId)}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -2886,7 +3005,8 @@ class SingleCellAnalysis {
                 name: data.name || name,
                 path: data.name || name,
                 type: 'var',
-                detail: data
+                detail: data,
+                kernelId
             });
             this.setActiveTab(id);
         })

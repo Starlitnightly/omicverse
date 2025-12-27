@@ -287,6 +287,16 @@
             overflow: hidden;
             background: #fff;
         }
+        .code-toolbar-group .form-select {
+            border: none;
+            border-radius: 0;
+            padding: 6px 30px 6px 10px;
+            font-size: 12px;
+            min-width: 180px;
+        }
+        .code-toolbar-group .form-select:focus {
+            box-shadow: none;
+        }
         .code-toolbar-group .btn {
             border-radius: 0;
             border: none;
@@ -976,6 +986,10 @@
             border-right-color: #1f2937;
             color: #e5e7eb;
         }
+        html.app-skin-dark .code-toolbar-group .form-select {
+            background-color: #111827;
+            color: #e5e7eb;
+        }
         html.app-skin-dark .code-toolbar-label {
             color: #9ca3af;
         }
@@ -1377,7 +1391,13 @@
         <div class="nxl-content">
             <div class="page-toolbar" id="code-editor-toolbar-row">
                 <div id="code-editor-toolbar">
-                    <span class="code-toolbar-label">Python</span>
+                    <span class="code-toolbar-label">内核</span>
+                    <div class="code-toolbar-group">
+                        <select class="form-select form-select-sm" id="kernel-select">
+                            <option value="python3">Python 3 (ipykernel)</option>
+                        </select>
+                    </div>
+                    <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
                         <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runAllCells()" title="运行全部" data-label="运行全部">
                             <i class="feather-play"></i>
