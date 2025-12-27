@@ -1,0 +1,5 @@
+recursive-include . *.html *.js *.css *.png *.svg *.ico *.json *.txt *.md *.woff *.woff2 *.ttf *.eot
+prune node_modules
+prune backend
+prune moban7855
+prune genesets

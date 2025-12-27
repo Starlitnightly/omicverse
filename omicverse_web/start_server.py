@@ -73,10 +73,7 @@ def check_files():
     current_dir = Path(__file__).parent
     required_files = [
         'app.py',
-        'single_cell_analysis.html',
-        'moban7855/static/css/bootstrap.min.css',
-        'moban7855/static/js/jquery.min.js',
-        'moban7855/static/js/bootstrap.bundle.min.js'
+        'single_cell_analysis_standalone.html',
     ]
     
     print("\n🔍 检查必需文件...")
@@ -157,7 +154,7 @@ def main():
         # Import and run the Flask app
         sys.path.insert(0, str(Path(__file__).parent))
         from app import app
-        app.run(debug=True, host='0.0.0.0', port=port)
+        app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
     except KeyboardInterrupt:
         print("\n\n👋 服务器已停止")
         return 0

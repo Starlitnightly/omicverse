@@ -1,0 +1,2 @@
+[console_scripts]
+omicverse-web = omicverse_web.start_server:main

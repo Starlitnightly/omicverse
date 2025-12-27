@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omicverseweb"
+version = "0.1.0"
+description = "OmicVerse web interface for single-cell analysis"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+  {name = "Zehua Zeng", email = "starlitnightly@gmail.com"},
+]
+dependencies = [
+  "flask",
+  "flask_cors",
+  "werkzeug",
+  "ipykernel",
+  "nbformat",
+  "scanpy>=1.9",
+  "numpy>=1.23",
+  "pandas>=1.5",
+  "matplotlib>3.6",
+  "plotly",
+]
+
+[project.urls]
+Homepage = "https://github.com/Starlitnightly/omicverse"
+
+
+[project.scripts]
+omicverse-web = "omicverse_web.start_server:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-dir]
+omicverse_web = "."
+
+[tool.setuptools.package-data]
+omicverse_web = [
+  "single_cell_analysis_standalone.html",
+  "server/**",
+  "static/**",
+  "fbs/**",
+]
