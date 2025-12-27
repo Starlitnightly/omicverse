@@ -601,10 +601,19 @@ def save_file():
             for cell in cells_payload:
                 cell_type = cell.get('cell_type', 'code')
                 source = cell.get('source', '')
+                outputs = cell.get('outputs', []) if isinstance(cell.get('outputs', []), list) else []
+                nb_outputs = []
+                for output in outputs:
+                    try:
+                        nb_outputs.append(nbformat.from_dict(output))
+                    except Exception:
+                        continue
                 if cell_type == 'markdown':
                     nb_cells.append(nbformat.v4.new_markdown_cell(source=source))
+                elif cell_type == 'raw':
+                    nb_cells.append(nbformat.v4.new_raw_cell(source=source))
                 else:
-                    nb_cells.append(nbformat.v4.new_code_cell(source=source))
+                    nb_cells.append(nbformat.v4.new_code_cell(source=source, outputs=nb_outputs, execution_count=None))
             nb.cells = nb_cells
             with open(target, 'w', encoding='utf-8') as handle:
                 nbformat.write(nb, handle)

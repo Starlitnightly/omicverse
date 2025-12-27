@@ -2326,6 +2326,10 @@ class SingleCellAnalysis {
         if (!output) return;
         output.innerHTML = '';
         output.className = 'code-cell-output';
+        const cell = document.getElementById(cellId);
+        if (cell) {
+            delete cell.dataset.outputPayload;
+        }
         if (hiddenNote) {
             hiddenNote.classList.remove('visible');
         }
@@ -2367,6 +2371,7 @@ class SingleCellAnalysis {
 
     openFileFromServer(path) {
         if (!path) return;
+        this.persistActiveTab();
         fetch('/api/files/open', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2465,9 +2470,15 @@ class SingleCellAnalysis {
             isError: hasError,
             figures: images
         });
+        this.storeCellOutputPayload(outputDiv, {
+            text: textBuffer.trim(),
+            isError: hasError,
+            figures: images
+        });
     }
 
     openNotebookTab(tab) {
+        this.persistActiveTab();
         const hasCells = this.codeCells.length > 0;
         const activeTab = this.getActiveTab();
         if (hasCells && this.activeTabId && activeTab && activeTab.type !== 'notebook') {
@@ -2491,6 +2502,7 @@ class SingleCellAnalysis {
     }
 
     openTextTab(tab) {
+        this.persistActiveTab();
         const existing = this.openTabs.find(t => t.path === tab.path);
         if (existing) {
             this.setActiveTab(existing.id);
@@ -2508,6 +2520,7 @@ class SingleCellAnalysis {
     }
 
     openMarkdownTab(tab) {
+        this.persistActiveTab();
         const existing = this.openTabs.find(t => t.path === tab.path);
         if (existing) {
             this.setActiveTab(existing.id);
@@ -2525,6 +2538,7 @@ class SingleCellAnalysis {
     }
 
     openImageTab(tab) {
+        this.persistActiveTab();
         const existing = this.openTabs.find(t => t.path === tab.path);
         if (existing) {
             this.setActiveTab(existing.id);
@@ -2542,13 +2556,19 @@ class SingleCellAnalysis {
         this.setActiveTab(id);
     }
 
-    setActiveTab(tabId) {
+    setActiveTab(tabId, shouldPersist = true) {
+        if (shouldPersist) {
+            this.persistActiveTab();
+        }
         this.activeTabId = tabId;
         const tab = this.getActiveTab();
         this.renderTabs();
         if (!tab) return;
         if (tab.type === 'notebook') {
             this.loadNotebookCells(tab.cells || []);
+            if (tab.outputs) {
+                this.restoreNotebookOutputs(tab.outputs);
+            }
         } else if (tab.type === 'text') {
             this.showTextFile(tab.content || '');
         } else if (tab.type === 'markdown') {
@@ -2595,12 +2615,15 @@ class SingleCellAnalysis {
     closeTab(tabId) {
         const index = this.openTabs.findIndex(t => t.id === tabId);
         if (index === -1) return;
+        if (this.activeTabId === tabId) {
+            this.persistActiveTab();
+        }
         this.openTabs.splice(index, 1);
         if (this.activeTabId === tabId) {
             const next = this.openTabs[index] || this.openTabs[index - 1];
             this.activeTabId = next ? next.id : null;
             if (next) {
-                this.setActiveTab(next.id);
+                this.setActiveTab(next.id, false);
             } else {
                 this.renderTabs();
                 this.showTextFile('');
@@ -3143,6 +3166,60 @@ class SingleCellAnalysis {
         return textEditor ? textEditor.value : '';
     }
 
+    persistActiveTab() {
+        const active = this.getActiveTab();
+        if (!active) return;
+        if (active.type === 'notebook') {
+            active.cells = this.buildNotebookCellsFromUI();
+            active.outputs = this.captureNotebookOutputs();
+            return;
+        }
+        if (active.type === 'markdown' || active.type === 'text') {
+            active.content = this.getTextEditorContent();
+            return;
+        }
+    }
+
+    captureNotebookOutputs() {
+        const outputs = [];
+        this.codeCells.forEach(cellId => {
+            const outputDiv = document.getElementById(`${cellId}-output`);
+            const hiddenNote = document.getElementById(`${cellId}-output-hidden`);
+            if (!outputDiv) {
+                outputs.push(null);
+                return;
+            }
+            outputs.push({
+                html: outputDiv.innerHTML || '',
+                collapsed: outputDiv.classList.contains('collapsed'),
+                partial: outputDiv.classList.contains('partial'),
+                hidden: hiddenNote ? hiddenNote.classList.contains('visible') : false
+            });
+        });
+        return outputs;
+    }
+
+    restoreNotebookOutputs(outputs) {
+        if (!outputs || !outputs.length) return;
+        this.codeCells.forEach((cellId, idx) => {
+            const state = outputs[idx];
+            if (!state) return;
+            const outputDiv = document.getElementById(`${cellId}-output`);
+            const hiddenNote = document.getElementById(`${cellId}-output-hidden`);
+            if (!outputDiv) return;
+            outputDiv.innerHTML = state.html || '';
+            outputDiv.className = 'code-cell-output';
+            if (state.html) {
+                outputDiv.classList.add('has-content');
+            }
+            if (state.partial) outputDiv.classList.add('partial');
+            if (state.collapsed) outputDiv.classList.add('collapsed');
+            if (hiddenNote) {
+                hiddenNote.classList.toggle('visible', !!state.hidden);
+            }
+        });
+    }
+
     buildNotebookCellsFromUI() {
         const cells = [];
         this.codeCells.forEach(cellId => {
@@ -3151,15 +3228,58 @@ class SingleCellAnalysis {
             const textarea = cell.querySelector('.code-input');
             if (!textarea) return;
             const cellType = cell.dataset.cellType || 'code';
+            const outputs = this.getNotebookOutputsFromCell(cell);
             cells.push({
                 cell_type: cellType,
-                source: textarea.value
+                source: textarea.value,
+                outputs: outputs
             });
         });
         if (cells.length === 0) {
-            cells.push({ cell_type: 'code', source: '' });
+            cells.push({ cell_type: 'code', source: '', outputs: [] });
         }
         return cells;
+    }
+
+    getNotebookOutputsFromCell(cell) {
+        if (!cell || cell.dataset.cellType !== 'code') return [];
+        if (!cell.dataset.outputPayload) return [];
+        let payload = null;
+        try {
+            payload = JSON.parse(cell.dataset.outputPayload);
+        } catch (e) {
+            return [];
+        }
+        if (!payload) return [];
+        const outputs = [];
+        if (payload.text) {
+            if (payload.isError) {
+                outputs.push({
+                    output_type: 'error',
+                    ename: 'Error',
+                    evalue: '',
+                    traceback: payload.text.split('\n')
+                });
+            } else {
+                outputs.push({
+                    output_type: 'stream',
+                    name: 'stdout',
+                    text: payload.text
+                });
+            }
+        }
+        if (payload.figures && payload.figures.length > 0) {
+            payload.figures.forEach(fig => {
+                outputs.push({
+                    output_type: 'display_data',
+                    data: {
+                        'image/png': fig
+                    },
+                    metadata: {}
+                });
+            });
+        }
+        return outputs;
     }
 
     saveActiveFile() {
@@ -3214,7 +3334,7 @@ class SingleCellAnalysis {
         if (payload.text) {
             const pre = document.createElement('pre');
             pre.className = 'code-output-text';
-            pre.textContent = payload.text;
+            pre.innerHTML = this.ansiToHtml(payload.text);
             outputDiv.appendChild(pre);
         }
         if (payload.figures && payload.figures.length > 0) {
@@ -3231,12 +3351,78 @@ class SingleCellAnalysis {
                 outputDiv.appendChild(img);
             });
         }
+        this.storeCellOutputPayload(outputDiv, payload);
         outputDiv.classList.remove('collapsed');
         outputDiv.classList.remove('partial');
         const hiddenNote = document.getElementById(`${outputDiv.id}-hidden`);
         if (hiddenNote) {
             hiddenNote.classList.remove('visible');
         }
+    }
+
+    storeCellOutputPayload(outputDiv, payload) {
+        if (!outputDiv || !payload) return;
+        const cellId = outputDiv.id.replace('-output', '');
+        const cell = document.getElementById(cellId);
+        if (!cell) return;
+        const outputPayload = {
+            text: payload.text || '',
+            figures: payload.figures || [],
+            isError: !!payload.isError
+        };
+        cell.dataset.outputPayload = JSON.stringify(outputPayload);
+    }
+
+    ansiToHtml(text) {
+        const escapeHtml = (value) => value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        const ansiRegex = /\x1b\[([0-9;]*)m/g;
+        const colorMap = {
+            30: 'ansi-black',
+            31: 'ansi-red',
+            32: 'ansi-green',
+            33: 'ansi-yellow',
+            34: 'ansi-blue',
+            35: 'ansi-magenta',
+            36: 'ansi-cyan',
+            37: 'ansi-white',
+            90: 'ansi-bright-black',
+            91: 'ansi-bright-red',
+            92: 'ansi-bright-green',
+            93: 'ansi-bright-yellow',
+            94: 'ansi-bright-blue',
+            95: 'ansi-bright-magenta',
+            96: 'ansi-bright-cyan',
+            97: 'ansi-bright-white'
+        };
+
+        let result = '';
+        let lastIndex = 0;
+        let openSpan = null;
+        let match;
+        while ((match = ansiRegex.exec(text)) !== null) {
+            const chunk = text.slice(lastIndex, match.index);
+            if (chunk) {
+                result += openSpan ? `<span class="${openSpan}">${escapeHtml(chunk)}</span>` : escapeHtml(chunk);
+            }
+            const codes = match[1].split(';').map(c => parseInt(c, 10)).filter(Number.isFinite);
+            if (codes.includes(0)) {
+                openSpan = null;
+            } else {
+                const colorCode = codes.find(code => colorMap[code]);
+                if (colorCode !== undefined) {
+                    openSpan = colorMap[colorCode];
+                }
+            }
+            lastIndex = ansiRegex.lastIndex;
+        }
+        const tail = text.slice(lastIndex);
+        if (tail) {
+            result += openSpan ? `<span class="${openSpan}">${escapeHtml(tail)}</span>` : escapeHtml(tail);
+        }
+        return result;
     }
 
     updateCodeHighlight(textarea, highlight) {
