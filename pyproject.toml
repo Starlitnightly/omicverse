@@ -97,6 +97,10 @@ full = [
   'memento-de'
 ]
 
+web = [
+  "omicverseweb",
+]
+
 skillseeker = [
   "beautifulsoup4>=4.12",
   "PyGithub>=2.2",
