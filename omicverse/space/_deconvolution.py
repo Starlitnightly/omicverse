@@ -12,6 +12,7 @@ class Deconvolution(object):
         self.adata_cell2location=None
         self.adata_impute=None
         self.tangram_model=None
+        self.flashdeconv_params=None
         self.method=None
 
         self._check_layer()
@@ -77,6 +78,8 @@ class Deconvolution(object):
         N_cells_per_location=30,
         detection_alpha=200,
         sample_kwargs=None,
+        # FlashDeconv parameters
+        flashdeconv_kwargs=None,
 
     ):
         if method=='Tangram':
@@ -198,9 +201,67 @@ class Deconvolution(object):
             print(f"{Colors.GREEN}✓ cell2location is done{Colors.ENDC}")
             print(f"The cell2location result is saved in self.adata_cell2location")
 
-            
+        elif method=='FlashDeconv':
+            self.method='FlashDeconv'
+            try:
+                import flashdeconv as fd
+            except ImportError:
+                raise ImportError(
+                    "FlashDeconv is not installed. Install it with: pip install flashdeconv"
+                )
+
+            # Set default kwargs for FlashDeconv
+            if flashdeconv_kwargs is None:
+                flashdeconv_kwargs = {
+                    'sketch_dim': 512,
+                    'lambda_spatial': 5000.0,
+                    'n_hvg': 2000,
+                    'n_markers_per_type': 50,
+                }
+
+            # Determine spatial coordinate key
+            spatial_key = 'spatial'
+            if spatial_key not in self.adata_sp.obsm:
+                # Try alternative keys
+                for alt_key in ['X_spatial', 'spatial_coords']:
+                    if alt_key in self.adata_sp.obsm:
+                        spatial_key = alt_key
+                        break
+
+            # Run FlashDeconv deconvolution
+            print(f"Running FlashDeconv with parameters: {flashdeconv_kwargs}")
+            fd.tl.deconvolve(
+                self.adata_sp,
+                self.adata_sc,
+                cell_type_key=celltype_key_sc,
+                spatial_key=spatial_key,
+                key_added='flashdeconv',
+                **flashdeconv_kwargs
+            )
+
+            # Convert results to match omicverse API format
+            # Create adata_cell2location from the deconvolution results
+            proportions_df = self.adata_sp.obsm['flashdeconv']
+            adata_cell2location = sc.AnnData(proportions_df)
+            adata_cell2location.var_names = proportions_df.columns.tolist()
+            adata_cell2location.obs_names = proportions_df.index.tolist()
+
+            # Copy spatial information
+            adata_cell2location.obsm = self.adata_sp.obsm.copy()
+            adata_cell2location.obs = self.adata_sp.obs.copy()
+            if hasattr(self.adata_sp, 'obsp') and self.adata_sp.obsp:
+                adata_cell2location.obsp = self.adata_sp.obsp.copy()
+            adata_cell2location.uns = self.adata_sp.uns.copy()
+
+            self.adata_cell2location = adata_cell2location
+            self.flashdeconv_params = self.adata_sp.uns.get('flashdeconv_params', flashdeconv_kwargs)
+
+            print(f"{Colors.GREEN}✓ FlashDeconv deconvolution is done{Colors.ENDC}")
+            print(f"The deconvolution result is saved in self.adata_cell2location")
+            print(f"Cell type proportions are also stored in self.adata_sp.obsm['flashdeconv']")
+
         else:
-            raise ValueError(f"Method {method} is not supported")
+            raise ValueError(f"Method {method} is not supported. Choose from: 'Tangram', 'cell2location', 'FlashDeconv'")
 
     def impute(self,method='Tangram'):
         if method=='Tangram':
