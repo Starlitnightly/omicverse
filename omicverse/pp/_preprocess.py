@@ -648,6 +648,8 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         # Fallback: create a False vector if nothing is present
         adata.var['highly_variable'] = False
         adata.var['highly_variable_features'] = adata.var['highly_variable']
+    else:
+        adata.var['highly_variable_features'] = adata.var['highly_variable']
 
     # Ensure PCA is available for downstream steps that expect it
     try:
