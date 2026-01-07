@@ -634,6 +634,23 @@ Added and fixed the `anndata-rs` to support million size's datasets (#336)
 - Added `ov.single.Annotation` and `ov.single.AnnotationRef` to annotate the cell type automatically.
 - Added `ov.alignment.single` to alignment the scRNA-seq to counts directly.
 
+## v 1.7.9
+
+### PP Module
+- Fixed an HVG issue on `ov.pp.preprocess`.
+
+### Single Module
+- Added `CONCORD` to integrate the single-cell data in `ov.single.batch_correction`
+
+### Space Module
+- Added `FlashDeconv` to perform deconvolution in Visium profile.
+
+### Web Module
+- Added `Omicverse-Notebook` and `Omicverse-Web` to analysis data without code.
+
+### Agent Module
+- Added `ov.Agent` to perform the analysis using LLM.
+
 
 
 
