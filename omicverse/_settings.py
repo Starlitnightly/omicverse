@@ -474,6 +474,7 @@ reference_dict = {
     'pymde':'Agrawal, A., Ali, A., & Boyd, S. (2021). Minimum-distortion embedding. Foundations and Trends® in Machine Learning, 14(3), 211-378.',
     'tsne':'Van der Maaten, L., & Hinton, G. (2008). Visualizing data using t-SNE. Journal of machine learning research, 9(11).',
     'sctour':'Qian Li, scTour: a deep learning architecture for robust inference and accurate prediction of cellular dynamics, 2023, Genome Biology',
+    'Concord':'Zhu, Q., Jiang, Z., Zuckerman, B. et al. Revealing a coherent cell-state landscape across single-cell datasets with CONCORD. Nat Biotechnol (2026).',
 }
 
 def generate_reference_table(adata):
