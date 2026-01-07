@@ -8,7 +8,8 @@
     <meta name="description" content="OmicVerse Single Cell Analysis Platform">
     <meta name="keyword" content="single cell, analysis, omicverse, scanpy">
     <meta name="author" content="OmicVerse Team">
-    <title>OmicVerse || 单细胞分析平台</title>
+    <link rel="icon" href="static/picture/favicon.ico" type="image/x-icon">
+    <title>OmicVerse || Single-cell Analysis</title>
     
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" type="text/css" href="static/css/bootstrap.min.css">
@@ -1196,123 +1197,123 @@
             <div class="navbar-content">
                 <ul class="nxl-navbar" id="analysis-nav">
                     <li class="nxl-item nxl-caption">
-                        <label>单细胞分析</label>
+                        <label data-i18n="nav.singleCell">Single-cell Analysis</label>
                     </li>
                     
-                    <!-- 数据预处理 -->
+                    <!-- Preprocessing -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-filter"></i></span>
-                            <span class="nxl-mtext">数据预处理</span>
+                            <span class="nxl-mtext" data-i18n="nav.preprocessing">Preprocessing</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('preprocessing')" title="选择数据预处理工具">标准化处理</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('qc')" title="选择质量控制工具">质量控制</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('feature')" title="选择特征选择工具">特征选择</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('preprocessing')" data-i18n="nav.normalization">Normalization</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('qc')" data-i18n="nav.qc">Quality Control</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('feature')" data-i18n="nav.featureSelection">Feature Selection</a></li>
                         </ul>
                     </li>
                     
-                    <!-- 降维分析 -->
+                    <!-- Dimensionality Reduction -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-layers"></i></span>
-                            <span class="nxl-mtext">降维分析</span>
+                            <span class="nxl-mtext" data-i18n="nav.dimReduction">Dimensionality Reduction</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择线性降维工具">线性降维</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择非线性降维工具">非线性降维</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" title="选择可视化工具">可视化</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.linearDR">Linear DR</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.nonlinearDR">Nonlinear DR</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.visualization">Visualization</a></li>
                         </ul>
                     </li>
                     
-                    <!-- 聚类分析 -->
+                    <!-- Clustering -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-grid"></i></span>
-                            <span class="nxl-mtext">聚类分析</span>
+                            <span class="nxl-mtext" data-i18n="nav.clustering">Clustering</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择社区检测工具">社区检测</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择细胞类型识别工具">细胞类型识别</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" title="选择聚类验证工具">聚类验证</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.communityDetection">Community Detection</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.cellTypeId">Cell Type ID</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.clusterValidation">Cluster Validation</a></li>
                         </ul>
                     </li>
                     
-                    <!-- OmicVerse工具 -->
+                    <!-- OmicVerse -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-dna"></i></span>
-                            <span class="nxl-mtext">OmicVerse</span>
+                            <span class="nxl-mtext" data-i18n="nav.omicverse">OmicVerse</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择细胞注释工具">细胞注释</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择轨迹分析工具">轨迹分析</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择差异分析工具">差异分析</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" title="选择功能富集工具">功能富集</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.cellAnnotation">Cell Annotation</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.trajectory">Trajectory Analysis</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.diffAnalysis">Differential Analysis</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.enrichment">Functional Enrichment</a></li>
                         </ul>
                     </li>
                 </ul>
                 <ul class="nxl-navbar" id="agent-config-nav" style="display: none;">
                     <li class="nxl-item nxl-caption">
-                        <label>Agent 配置</label>
+                        <label data-i18n="agent.configTitle">Agent Configuration</label>
                     </li>
                     <li class="nxl-item">
                         <div class="px-3">
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-api-base">API Base URL</label>
+                                <label class="form-label mb-1" for="agent-api-base" data-i18n="agent.apiBase">API Base URL</label>
                                 <input type="text" class="form-control form-control-sm" id="agent-api-base" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-api-key">API Key</label>
+                                <label class="form-label mb-1" for="agent-api-key" data-i18n="agent.apiKey">API Key</label>
                                 <input type="password" class="form-control form-control-sm" id="agent-api-key" placeholder="sk-...">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-model">模型</label>
-                                <input type="text" class="form-control form-control-sm" id="agent-model" placeholder="模型名称" value="gpt-5">
+                                <label class="form-label mb-1" for="agent-model" data-i18n="agent.model">Model</label>
+                                <input type="text" class="form-control form-control-sm" id="agent-model" placeholder="Model name" data-i18n-placeholder="agent.modelPlaceholder" value="gpt-5">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-temperature">Temperature</label>
+                                <label class="form-label mb-1" for="agent-temperature" data-i18n="agent.temperature">Temperature</label>
                                 <input type="number" class="form-control form-control-sm" id="agent-temperature" min="0" max="2" step="0.1" value="0.3">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-top-p">Top P</label>
+                                <label class="form-label mb-1" for="agent-top-p" data-i18n="agent.topP">Top P</label>
                                 <input type="number" class="form-control form-control-sm" id="agent-top-p" min="0" max="1" step="0.05" value="1">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-max-tokens">Max Tokens</label>
+                                <label class="form-label mb-1" for="agent-max-tokens" data-i18n="agent.maxTokens">Max Tokens</label>
                                 <input type="number" class="form-control form-control-sm" id="agent-max-tokens" min="1" step="1" value="2048">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-timeout">Timeout (s)</label>
+                                <label class="form-label mb-1" for="agent-timeout" data-i18n="agent.timeout">Timeout (s)</label>
                                 <input type="number" class="form-control form-control-sm" id="agent-timeout" min="1" step="1" value="60">
                             </div>
                             <div class="mb-2">
-                                <label class="form-label mb-1" for="agent-system-prompt">System Prompt</label>
-                                <textarea class="form-control form-control-sm" id="agent-system-prompt" rows="3" placeholder="你是一个单细胞分析助手..."></textarea>
+                                <label class="form-label mb-1" for="agent-system-prompt" data-i18n="agent.systemPrompt">System Prompt</label>
+                                <textarea class="form-control form-control-sm" id="agent-system-prompt" rows="3" placeholder="You are a single-cell analysis assistant..." data-i18n-placeholder="agent.systemPromptPlaceholder"></textarea>
                             </div>
                             <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-primary" type="button" onclick="singleCellApp.saveAgentConfig()">保存</button>
-                                <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.resetAgentConfig()">重置</button>
+                                <button class="btn btn-sm btn-primary" type="button" onclick="singleCellApp.saveAgentConfig()" data-i18n="agent.save">Save</button>
+                                <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.resetAgentConfig()" data-i18n="agent.reset">Reset</button>
                             </div>
-                            <small class="text-muted d-block mt-2">配置保存在浏览器本地</small>
+                            <small class="text-muted d-block mt-2" data-i18n="agent.localNotice">Saved in browser storage</small>
                         </div>
                     </li>
                 </ul>
                 <div class="file-manager" id="file-manager">
                     <div class="fm-section">
                         <div class="fm-section-header" onclick="singleCellApp.toggleSection('file-browser-section')">
-                            <div class="fm-section-title">文件浏览器</div>
-                            <div class="fm-section-toggle" id="file-browser-section-toggle">收起</div>
+                            <div class="fm-section-title" data-i18n="file.browser">File Browser</div>
+                            <div class="fm-section-toggle" id="file-browser-section-toggle" data-i18n="common.collapse">Collapse</div>
                         </div>
                         <div id="file-browser-section">
                             <div class="file-manager-header">
-                                <div class="file-manager-title" id="file-browser-root">运行目录</div>
+                                <div class="file-manager-title" id="file-browser-root" data-i18n="file.root">Working Directory</div>
                                 <div class="file-manager-actions">
-                                    <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.fetchFileTree()" title="刷新">
+                                    <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.fetchFileTree()" title="Refresh" data-i18n-title="common.refresh">
                                         <i class="feather-refresh-cw"></i>
                                     </button>
                                     <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.triggerNotebookUpload()">
@@ -1321,53 +1322,53 @@
                                 </div>
                             </div>
                             <ul class="file-tree" id="file-tree">
-                                <li class="file-tree-node">加载中...</li>
+                                <li class="file-tree-node" data-i18n="common.loading">Loading...</li>
                             </ul>
                             <div class="file-tree-spacer"></div>
                         </div>
                     </div>
                     <div class="fm-section">
                         <div class="fm-section-header" onclick="singleCellApp.toggleSection('kernel-monitor-section')">
-                            <div class="fm-section-title">Kernel 监控</div>
-                            <div class="fm-section-toggle" id="kernel-monitor-section-toggle">收起</div>
+                            <div class="fm-section-title" data-i18n="kernel.monitor">Kernel Monitor</div>
+                            <div class="fm-section-toggle" id="kernel-monitor-section-toggle" data-i18n="common.collapse">Collapse</div>
                         </div>
                         <div id="kernel-monitor-section">
                             <div class="kernel-metrics">
                                 <div class="kernel-metric">
-                                    <div class="kernel-metric-title">内存占用</div>
+                                    <div class="kernel-metric-title" data-i18n="kernel.memory">Memory Usage</div>
                                     <div class="kernel-metric-value" id="kernel-memory-value">--</div>
                                 </div>
                                 <div class="kernel-metric">
-                                    <div class="kernel-metric-title">变量占用 Top 10</div>
+                                    <div class="kernel-metric-title" data-i18n="kernel.topVars">Top Variables</div>
                                     <ul class="kernel-var-list" id="kernel-var-list">
-                                        <li class="kernel-var-item">暂无数据</li>
+                                        <li class="kernel-var-item" data-i18n="common.noData">No data</li>
                                     </ul>
                                 </div>
-                                <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelStats()">刷新</button>
+                                <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelStats()" data-i18n="common.refresh">Refresh</button>
                             </div>
                         </div>
                     </div>
                     <div class="fm-section">
                         <div class="fm-section-header" onclick="singleCellApp.toggleSection('kernel-vars-section')">
-                            <div class="fm-section-title">变量查看器</div>
-                            <div class="fm-section-toggle" id="kernel-vars-section-toggle">收起</div>
+                            <div class="fm-section-title" data-i18n="kernel.vars">Variable Viewer</div>
+                            <div class="fm-section-toggle" id="kernel-vars-section-toggle" data-i18n="common.collapse">Collapse</div>
                         </div>
                         <div id="kernel-vars-section">
                             <table class="var-table">
                                 <thead>
                                     <tr>
-                                        <th>变量</th>
-                                        <th>类型</th>
-                                        <th>预览</th>
+                                        <th data-i18n="kernel.varName">Variable</th>
+                                        <th data-i18n="kernel.varType">Type</th>
+                                        <th data-i18n="kernel.varPreview">Preview</th>
                                     </tr>
                                 </thead>
                                 <tbody id="kernel-vars-table">
                                     <tr>
-                                        <td colspan="3" class="text-muted">暂无数据</td>
+                                        <td colspan="3" class="text-muted" data-i18n="common.noData">No data</td>
                                     </tr>
                                 </tbody>
                             </table>
-                            <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelVars()">刷新</button>
+                            <button class="btn btn-sm btn-light mt-2" type="button" onclick="singleCellApp.fetchKernelVars()" data-i18n="common.refresh">Refresh</button>
                         </div>
                     </div>
                     <input type="file" id="notebook-file-input" accept=".ipynb" style="display: none;">
@@ -1376,15 +1377,15 @@
         </div>
     </nav>
     <div class="file-context-menu" id="file-context-menu">
-        <div class="file-context-menu-item" data-action="new-file" onclick="singleCellApp.contextNewFile()">新建文件</div>
-        <div class="file-context-menu-item" data-action="new-folder" onclick="singleCellApp.contextNewFolder()">新建文件夹</div>
-        <div class="file-context-menu-item" data-action="rename" onclick="singleCellApp.contextRename()">重命名</div>
-        <div class="file-context-menu-item" data-action="copy" onclick="singleCellApp.contextCopy()">复制</div>
-        <div class="file-context-menu-item" data-action="paste" onclick="singleCellApp.contextPaste()">粘贴</div>
-        <div class="file-context-menu-item" data-action="move" onclick="singleCellApp.contextMove()">移动</div>
+        <div class="file-context-menu-item" data-action="new-file" onclick="singleCellApp.contextNewFile()" data-i18n="context.newFile">New File</div>
+        <div class="file-context-menu-item" data-action="new-folder" onclick="singleCellApp.contextNewFolder()" data-i18n="context.newFolder">New Folder</div>
+        <div class="file-context-menu-item" data-action="rename" onclick="singleCellApp.contextRename()" data-i18n="context.rename">Rename</div>
+        <div class="file-context-menu-item" data-action="copy" onclick="singleCellApp.contextCopy()" data-i18n="context.copy">Copy</div>
+        <div class="file-context-menu-item" data-action="paste" onclick="singleCellApp.contextPaste()" data-i18n="context.paste">Paste</div>
+        <div class="file-context-menu-item" data-action="move" onclick="singleCellApp.contextMove()" data-i18n="context.move">Move</div>
         <div class="file-context-menu-sep"></div>
-        <div class="file-context-menu-item" data-action="refresh" onclick="singleCellApp.contextRefresh()">刷新</div>
-        <div class="file-context-menu-item" data-action="delete" onclick="singleCellApp.contextDelete()">删除</div>
+        <div class="file-context-menu-item" data-action="refresh" onclick="singleCellApp.contextRefresh()" data-i18n="common.refresh">Refresh</div>
+        <div class="file-context-menu-item" data-action="delete" onclick="singleCellApp.contextDelete()" data-i18n="context.delete">Delete</div>
     </div>
 
     <!-- Header -->
@@ -1432,7 +1433,7 @@
                                 <span class="input-group-text">
                                     <i class="feather-search fs-6 text-muted"></i>
                                 </span>
-                                <input type="text" class="form-control search-input-field" placeholder="搜索基因、细胞类型...">
+                                <input type="text" class="form-control search-input-field" placeholder="Search genes, cell types..." data-i18n-placeholder="search.placeholder">
                                 <span class="input-group-text">
                                     <button type="button" class="btn-close"></button>
                                 </span>
@@ -1440,12 +1441,12 @@
                             <div class="dropdown-divider mt-0"></div>
                             <div class="search-items-wrapper">
                                 <div class="searching-for px-4 py-2">
-                                    <p class="fs-11 fw-medium text-muted">搜索内容...</p>
+                                    <p class="fs-11 fw-medium text-muted" data-i18n="search.hint">Searching...</p>
                                     <div class="d-flex flex-wrap gap-1">
-                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">基因</a>
-                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">细胞类型</a>
-                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">通路</a>
-                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold">分析</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold" data-i18n="search.genes">Genes</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold" data-i18n="search.cellTypes">Cell Types</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold" data-i18n="search.pathways">Pathways</a>
+                                        <a href="javascript:void(0);" class="flex-fill border rounded py-1 px-2 text-center fs-11 fw-semibold" data-i18n="search.analysis">Analysis</a>
                                     </div>
                                 </div>
                             </div>
@@ -1456,10 +1457,10 @@
                     <div class="nxl-h-item d-none d-sm-flex">
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-sm btn-primary" id="view-viz-btn" onclick="singleCellApp.switchView('visualization')">
-                                <i class="feather-bar-chart me-1"></i>可视化
+                                <i class="feather-bar-chart me-1"></i><span data-i18n="view.visualization">Visualization</span>
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-code-btn" onclick="singleCellApp.switchView('code')">
-                                <i class="feather-code me-1"></i>代码编辑器
+                                <i class="feather-code me-1"></i><span data-i18n="view.codeEditor">Code Editor</span>
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')" style="display: none;">
                                 <i class="feather-message-circle me-1"></i>Agent
@@ -1483,41 +1484,22 @@
                             <i class="feather-moon" id="theme-toggle-icon"></i>
                         </a>
                     </div>
+
+                    <!-- Language Toggle -->
+                    <div class="nxl-h-item d-none d-sm-flex">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0" id="lang-toggle" data-i18n="lang.toggle">中文</a>
+                    </div>
                     
                     <!-- Notifications -->
                     <div class="dropdown nxl-h-item">
                         <a class="nxl-head-link me-3" data-bs-toggle="dropdown" href="#" role="button" data-bs-auto-close="outside">
                             <i class="feather-bell"></i>
-                            <span class="badge bg-danger nxl-h-badge">3</span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-notifications-menu">
                             <div class="d-flex justify-content-between align-items-center notifications-head">
-                                <h6 class="fw-bold text-dark mb-0">分析通知</h6>
-                                <a href="javascript:void(0);" class="fs-11 text-success text-end ms-auto" data-bs-toggle="tooltip" title="标记为已读">
-                                    <i class="feather-check"></i>
-                                    <span>标记为已读</span>
-                                </a>
+                                <h6 class="fw-bold text-dark mb-0" data-i18n="notify.title">Analysis Notifications</h6>
                             </div>
-                            <div class="notifications-item">
-                                <div class="avatar-text rounded me-3 border">
-                                    <i class="feather-check-circle"></i>
-                                </div>
-                                <div class="notifications-desc">
-                                    <a href="javascript:void(0);" class="font-body text-truncate-2-line"> <span class="fw-semibold text-dark">数据预处理</span> 已完成标准化处理</a>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="notifications-date text-muted border-bottom border-bottom-dashed">2分钟前</div>
-                                        <div class="d-flex align-items-center float-end gap-2">
-                                            <a href="javascript:void(0);" class="d-block wd-8 ht-8 rounded-circle bg-gray-300" data-bs-toggle="tooltip" title="标记为已读"></a>
-                                            <a href="javascript:void(0);" class="text-danger" data-bs-toggle="tooltip" title="删除">
-                                                <i class="feather-x fs-12"></i>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-center notifications-footer">
-                                <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">所有通知</a>
-                            </div>
+                            <div class="notifications-empty text-muted text-center py-4" data-i18n="notify.empty">No notifications</div>
                         </div>
                     </div>
                     
@@ -1530,25 +1512,25 @@
                         </a>
                         <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-menu">
                             <div class="d-flex justify-content-between align-items-center user-head">
-                                <h6 class="fw-bold text-dark mb-0">用户菜单</h6>
+                                <h6 class="fw-bold text-dark mb-0" data-i18n="user.menu">User Menu</h6>
                             </div>
                             <div class="user-body">
                                 <a href="javascript:void(0);" class="dropdown-item">
                                     <i class="feather-user me-3"></i>
-                                    <span>个人资料</span>
+                                    <span data-i18n="user.profile">Profile</span>
                                 </a>
                                 <a href="javascript:void(0);" class="dropdown-item">
                                     <i class="feather-settings me-3"></i>
-                                    <span>设置</span>
+                                    <span data-i18n="user.settings">Settings</span>
                                 </a>
                                 <a href="javascript:void(0);" class="dropdown-item">
                                     <i class="feather-help-circle me-3"></i>
-                                    <span>帮助</span>
+                                    <span data-i18n="user.help">Help</span>
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <a href="javascript:void(0);" class="dropdown-item">
                                     <i class="feather-log-out me-3"></i>
-                                    <span>退出</span>
+                                    <span data-i18n="user.logout">Sign out</span>
                                 </a>
                             </div>
                         </div>
@@ -1559,11 +1541,11 @@
         <div class="header-pagebar">
             <div class="page-header-left d-flex align-items-center">
                 <div class="page-header-title">
-                    <h5 class="m-b-10" id="page-title">单细胞分析</h5>
+                    <h5 class="m-b-10" id="page-title" data-i18n="breadcrumb.title">Single-cell Analysis</h5>
                 </div>
                 <ul class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="index.html">主页</a></li>
-                    <li class="breadcrumb-item" id="breadcrumb-title">单细胞分析</li>
+                    <li class="breadcrumb-item"><a href="index.html" data-i18n="breadcrumb.home">Home</a></li>
+                    <li class="breadcrumb-item" id="breadcrumb-title" data-i18n="breadcrumb.title">Single-cell Analysis</li>
                 </ul>
             </div>
             <div class="page-header-right ms-auto">
@@ -1581,7 +1563,7 @@
         <div class="nxl-content">
             <div class="page-toolbar" id="code-editor-toolbar-row">
                 <div id="code-editor-toolbar">
-                    <span class="code-toolbar-label">内核</span>
+                    <span class="code-toolbar-label" data-i18n="toolbar.kernel">Kernel</span>
                     <div class="code-toolbar-group">
                         <select class="form-select form-select-sm" id="kernel-select">
                             <option value="python3">Python 3 (ipykernel)</option>
@@ -1589,31 +1571,31 @@
                     </div>
                     <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runAllCells()" title="运行全部" data-label="运行全部">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runAllCells()" title="Run all" data-i18n-title="toolbar.runAll">
                             <i class="feather-play"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCell()" title="新增单元" data-label="新增单元">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCell()" title="Add cell" data-i18n-title="toolbar.addCell">
                             <i class="feather-plus"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.saveActiveFile()" title="保存" data-label="保存">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.saveActiveFile()" title="Save" data-i18n-title="toolbar.save">
                             <i class="feather-save"></i>
                         </button>
                     </div>
                     <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.insertTemplate()" title="插入模板" data-label="插入模板">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.insertTemplate()" title="Insert template" data-i18n-title="toolbar.insertTemplate">
                             <i class="feather-file-text"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.clearAllCells()" title="清空所有" data-label="清空所有">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.clearAllCells()" title="Clear all" data-i18n-title="toolbar.clearAll">
                             <i class="feather-trash-2"></i>
                         </button>
                     </div>
                     <div class="code-toolbar-separator"></div>
                     <div class="code-toolbar-group">
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(-1)" title="减小字号" data-label="减小字号">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(-1)" title="Decrease font" data-i18n-title="toolbar.fontDown">
                             A-
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(1)" title="增大字号" data-label="增大字号">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.adjustFontSize(1)" title="Increase font" data-i18n-title="toolbar.fontUp">
                             A+
                         </button>
                     </div>
@@ -1631,11 +1613,11 @@
                         <div id="upload-section" class="mb-4">
                             <div class="file-upload-area" id="dropZone" style="cursor: pointer;">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                <h5>上传H5AD文件</h5>
-                                <p class="text-muted">拖拽文件到此处或点击选择文件</p>
+                                <h5 data-i18n="upload.title">Upload H5AD File</h5>
+                                <p class="text-muted" data-i18n="upload.subtitle">Drag & drop or click to select a file</p>
                                 <input type="file" id="fileInput" accept=".h5ad" style="display: none;">
                                 <button type="button" class="btn btn-primary" style="pointer-events: none;">
-                                    <i class="fas fa-folder-open me-2"></i>选择文件
+                                    <i class="fas fa-folder-open me-2"></i><span data-i18n="upload.button">Select File</span>
                                 </button>
                             </div>
                         </div>
@@ -1644,18 +1626,18 @@
                         <div id="data-status" class="status-info d-none">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1" id="filename-display">文件名</h6>
+                                    <h6 class="mb-1" id="filename-display" data-i18n="status.filename">Filename</h6>
                                     <small class="text-muted">
-                                        <span id="cell-count">0</span> 细胞 •
-                                        <span id="gene-count">0</span> 基因
+                                        <span id="cell-count">0</span> <span data-i18n="status.cells">cells</span> •
+                                        <span id="gene-count">0</span> <span data-i18n="status.genes">genes</span>
                                     </small>
                                 </div>
                                 <div>
                                     <button type="button" class="btn btn-sm btn-success me-2" onclick="saveData()">
-                                        <i class="fas fa-download me-1"></i>保存
+                                        <i class="fas fa-download me-1"></i><span data-i18n="status.save">Save</span>
                                     </button>
                                     <button type="button" class="btn btn-sm btn-secondary" onclick="resetData()">
-                                        <i class="fas fa-refresh me-1"></i>重置
+                                        <i class="fas fa-refresh me-1"></i><span data-i18n="status.reset">Reset</span>
                                     </button>
                                 </div>
                             </div>
@@ -1665,30 +1647,30 @@
                         <div id="viz-controls" class="control-panel" style="display: none;">
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label for="embedding-select" class="form-label">降维方法</label>
+                                    <label for="embedding-select" class="form-label" data-i18n="controls.embedding">Embedding</label>
                                     <select class="form-select" id="embedding-select" onchange="updatePlot()">
-                                        <option value="">选择降维方法</option>
+                                        <option value="" data-i18n="controls.embeddingPlaceholder">Select embedding</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="color-select" class="form-label">着色方式</label>
+                                    <label for="color-select" class="form-label" data-i18n="controls.colorBy">Color by</label>
                                     <select class="form-select" id="color-select" onchange="updatePlot()">
-                                        <option value="">无着色</option>
+                                        <option value="" data-i18n="controls.colorNone">None</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="gene-input" class="form-label">基因表达</label>
+                                    <label for="gene-input" class="form-label" data-i18n="controls.gene">Gene Expression</label>
                                     <div class="position-relative">
-                                        <input type="text" class="form-control" id="gene-input" placeholder="输入基因名" autocomplete="off">
+                                        <input type="text" class="form-control" id="gene-input" placeholder="Enter gene name" data-i18n-placeholder="controls.genePlaceholder" autocomplete="off">
                                         <div id="gene-autocomplete" class="list-group position-absolute w-100" style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <label for="palette-select" class="form-label">
-                                        <span id="palette-label">调色板（连续）</span>
+                                        <span id="palette-label" data-i18n="controls.paletteContinuous">Palette (continuous)</span>
                                     </label>
                                     <select class="form-select" id="palette-select" onchange="updatePlot()">
-                                        <option value="default">默认</option>
+                                        <option value="default" data-i18n="controls.paletteDefault">Default</option>
                                         <option value="Viridis">Viridis</option>
                                         <option value="Plasma">Plasma</option>
                                         <option value="Inferno">Inferno</option>
@@ -1698,43 +1680,43 @@
                                         <option value="Reds">Reds</option>
                                         <option value="YlOrRd">YlOrRd</option>
                                         <option value="YlGnBu">YlGnBu</option>
-                                        <option value="RdBu">RdBu (发散)</option>
-                                        <option value="Spectral">Spectral (发散)</option>
+                                        <option value="RdBu" data-i18n="controls.paletteDiverging">RdBu (diverging)</option>
+                                        <option value="Spectral" data-i18n="controls.paletteSpectral">Spectral (diverging)</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="row g-3 mt-1" id="category-palette-row" style="display: none;">
                                 <div class="col-md-12">
-                                    <label for="category-palette-select" class="form-label">分类调色板</label>
+                                    <label for="category-palette-select" class="form-label" data-i18n="controls.categoryPalette">Categorical palette</label>
                                     <select class="form-select" id="category-palette-select" onchange="updatePlot()">
-                                        <option value="default">默认（Scanpy）</option>
-                                        <option value="tab10">Tab10 (10色)</option>
-                                        <option value="tab20">Tab20 (20色)</option>
-                                        <option value="tab20b">Tab20b (20色)</option>
-                                        <option value="tab20c">Tab20c (20色)</option>
-                                        <option value="set1">Set1 (9色，鲜艳)</option>
-                                        <option value="set2">Set2 (8色，柔和)</option>
-                                        <option value="set3">Set3 (12色，淡雅)</option>
-                                        <option value="paired">Paired (12色，成对)</option>
-                                        <option value="pastel1">Pastel1 (9色，粉彩)</option>
-                                        <option value="pastel2">Pastel2 (8色，粉彩)</option>
-                                        <option value="dark2">Dark2 (8色，深色)</option>
-                                        <option value="accent">Accent (8色，强调)</option>
+                                        <option value="default" data-i18n="controls.paletteDefaultScanpy">Default (Scanpy)</option>
+                                        <option value="tab10" data-i18n="controls.tab10">Tab10 (10 colors)</option>
+                                        <option value="tab20" data-i18n="controls.tab20">Tab20 (20 colors)</option>
+                                        <option value="tab20b" data-i18n="controls.tab20b">Tab20b (20 colors)</option>
+                                        <option value="tab20c" data-i18n="controls.tab20c">Tab20c (20 colors)</option>
+                                        <option value="set1" data-i18n="controls.set1">Set1 (9, vivid)</option>
+                                        <option value="set2" data-i18n="controls.set2">Set2 (8, soft)</option>
+                                        <option value="set3" data-i18n="controls.set3">Set3 (12, gentle)</option>
+                                        <option value="paired" data-i18n="controls.paired">Paired (12)</option>
+                                        <option value="pastel1" data-i18n="controls.pastel1">Pastel1 (9)</option>
+                                        <option value="pastel2" data-i18n="controls.pastel2">Pastel2 (8)</option>
+                                        <option value="dark2" data-i18n="controls.dark2">Dark2 (8)</option>
+                                        <option value="accent" data-i18n="controls.accent">Accent (8)</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="row g-3 mt-1" id="vminmax-row" style="display: none;">
                                 <div class="col-md-4">
-                                    <label for="vmin-input" class="form-label">最小值 (vmin)</label>
-                                    <input type="number" class="form-control form-control-sm" id="vmin-input" placeholder="自动" step="0.01">
+                                    <label for="vmin-input" class="form-label" data-i18n="controls.vmin">Min (vmin)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmin-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
                                 </div>
                                 <div class="col-md-4">
-                                    <label for="vmax-input" class="form-label">最大值 (vmax)</label>
-                                    <input type="number" class="form-control form-control-sm" id="vmax-input" placeholder="自动" step="0.01">
+                                    <label for="vmax-input" class="form-label" data-i18n="controls.vmax">Max (vmax)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmax-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
                                 </div>
                                 <div class="col-md-4 d-flex align-items-end">
                                     <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="singleCellApp.applyVMinMax()">
-                                        <i class="fas fa-sync-alt me-1"></i>应用
+                                        <i class="fas fa-sync-alt me-1"></i><span data-i18n="controls.apply">Apply</span>
                                     </button>
                                 </div>
                             </div>
@@ -1749,7 +1731,7 @@
                                             <span class="visually-hidden">Loading...</span>
                                         </div>
                                         <div class="mt-2">
-                                            <small class="text-muted" id="loading-text">正在处理数据...</small>
+                                            <small class="text-muted" id="loading-text" data-i18n="loading.processing">Processing data...</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1763,12 +1745,12 @@
                         <!-- Parameter Settings Section -->
                         <div class="parameter-section" id="parameter-panel">
                             <h6>
-                                <i class="fas fa-cog"></i>参数设置
+                                <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
                             </h6>
                             <div id="parameter-content">
                                 <div class="text-muted text-center py-4">
                                     <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
-                                    <p>请从左侧菜单选择分析类型</p>
+                                    <p data-i18n="panel.selectAnalysis">Select an analysis type from the left menu</p>
                                 </div>
                             </div>
                         </div>
@@ -1776,10 +1758,10 @@
                         <!-- Analysis Status Section -->
                         <div class="analysis-log-section">
                             <h6>
-                                <i class="fas fa-info-circle"></i>分析状态
+                                <i class="fas fa-info-circle"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
                             </h6>
                             <div id="analysis-log" class="bg-light p-3 rounded analysis-log">
-                                <div class="text-muted">等待上传数据...</div>
+                                <div class="text-muted" data-i18n="panel.waitingUpload">Waiting for data upload...</div>
                             </div>
                         </div>
                     </div>
@@ -1819,15 +1801,15 @@
                     <div class="agent-view">
                         <div class="agent-panel">
                             <div class="agent-panel-header">
-                                <div class="agent-panel-title">单细胞分析 Agent</div>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.showAgentConfig()">配置模型</button>
+                                <div class="agent-panel-title" data-i18n="agent.title">Single-cell Agent</div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.showAgentConfig()" data-i18n="agent.configButton">Configure</button>
                             </div>
                             <div class="agent-messages" id="agent-messages">
-                                <div class="agent-message assistant">你好，我可以帮你分析单细胞数据。告诉我你想做什么分析。</div>
+                                <div class="agent-message assistant" data-i18n="agent.greeting">Hi, I can help analyze single-cell data. Tell me what you want to do.</div>
                             </div>
                             <div class="agent-input">
-                                <textarea id="agent-input" placeholder="输入你的问题，比如：帮我做细胞类型注释建议"></textarea>
-                                <button type="button" class="btn btn-sm btn-primary" onclick="singleCellApp.sendAgentMessage()">发送</button>
+                                <textarea id="agent-input" placeholder="Ask a question, e.g. suggest cell type annotation" data-i18n-placeholder="agent.inputPlaceholder"></textarea>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="singleCellApp.sendAgentMessage()" data-i18n="agent.send">Send</button>
                             </div>
                         </div>
                     </div>
@@ -1846,7 +1828,7 @@
                         <div class="spinner-border spinner-border-sm text-primary me-2" role="status" id="status-spinner" style="display: none;">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <span id="status-text">就绪</span>
+                        <span id="status-text" data-i18n="status.ready">Ready</span>
                     </div>
                 </div>
                 <div class="col-md-4 text-end">
@@ -1861,15 +1843,15 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="parameterModalTitle">参数设置</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                    <h5 class="modal-title" id="parameterModalTitle" data-i18n="panel.parameters">Parameters</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" data-i18n-title="common.close"></button>
                 </div>
                 <div class="modal-body" id="parameterModalBody">
                     <!-- Dynamic parameter inputs will be inserted here -->
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="runToolBtn">运行</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="runToolBtn" data-i18n="common.run">Run</button>
                 </div>
             </div>
         </div>

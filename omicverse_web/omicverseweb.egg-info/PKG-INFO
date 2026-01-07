@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: omicverseweb
-Version: 0.1.0
+Version: 0.1.0rc1
 Summary: OmicVerse web interface for single-cell analysis
 Author-email: Zehua Zeng <starlitnightly@gmail.com>
 License-Expression: MIT

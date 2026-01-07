@@ -8,6 +8,7 @@ class SingleCellAnalysis {
         this.currentTool = null;
         this.currentTheme = 'light';
         this.currentView = 'visualization';
+        this.currentLang = 'en';
         this.codeCells = [];
         this.cellCounter = 0;
         this.pendingPlotRefresh = false;
@@ -28,6 +29,7 @@ class SingleCellAnalysis {
     }
 
     init() {
+        this.setupLanguageToggle();
         this.setupFileUpload();
         this.setupNavigation();
         this.setupThemeToggle();
@@ -41,6 +43,635 @@ class SingleCellAnalysis {
         this.selectAnalysisCategory('preprocessing');
         this.applyCodeFontSize();
         this.fetchKernelVars();
+    }
+
+    setupLanguageToggle() {
+        const stored = localStorage.getItem('omicverse.lang');
+        this.currentLang = stored || 'en';
+        const toggle = document.getElementById('lang-toggle');
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                this.currentLang = this.currentLang === 'en' ? 'zh' : 'en';
+                localStorage.setItem('omicverse.lang', this.currentLang);
+                this.applyLanguage(this.currentLang);
+            });
+        }
+        this.applyLanguage(this.currentLang);
+    }
+
+    t(key) {
+        const dict = {
+            en: {
+                'lang.toggle': '中文',
+                'nav.singleCell': 'Single-cell Analysis',
+                'nav.preprocessing': 'Preprocessing',
+                'nav.normalization': 'Normalization',
+                'nav.qc': 'Quality Control',
+                'nav.featureSelection': 'Feature Selection',
+                'nav.dimReduction': 'Dimensionality Reduction',
+                'nav.linearDR': 'Linear DR',
+                'nav.nonlinearDR': 'Nonlinear DR',
+                'nav.visualization': 'Visualization',
+                'nav.clustering': 'Clustering',
+                'nav.communityDetection': 'Community Detection',
+                'nav.cellTypeId': 'Cell Type ID',
+                'nav.clusterValidation': 'Cluster Validation',
+                'nav.omicverse': 'OmicVerse',
+                'nav.cellAnnotation': 'Cell Annotation',
+                'nav.trajectory': 'Trajectory Analysis',
+                'nav.diffAnalysis': 'Differential Analysis',
+                'nav.enrichment': 'Functional Enrichment',
+                'search.placeholder': 'Search genes, cell types...',
+                'search.hint': 'Searching...',
+                'search.genes': 'Genes',
+                'search.cellTypes': 'Cell Types',
+                'search.pathways': 'Pathways',
+                'search.analysis': 'Analysis',
+                'view.visualization': 'Visualization',
+                'view.codeEditor': 'Code Editor',
+                'breadcrumb.home': 'Home',
+                'breadcrumb.title': 'Single-cell Analysis',
+                'upload.title': 'Upload H5AD File',
+                'upload.subtitle': 'Drag & drop or click to select a file',
+                'upload.button': 'Select File',
+                'upload.invalidFormat': 'Please upload a .h5ad file',
+                'upload.uploading': 'Uploading file...',
+                'upload.start': 'Starting upload',
+                'upload.htmlError': 'Server returned HTML error page',
+                'upload.invalidResponse': 'Server returned non-JSON response',
+                'upload.failed': 'Upload failed',
+                'upload.success': 'Upload successful',
+                'upload.successDetail': 'Upload successful',
+                'status.filename': 'Filename',
+                'status.cells': 'cells',
+                'status.genes': 'genes',
+                'status.save': 'Save',
+                'status.reset': 'Reset',
+                'controls.embedding': 'Embedding',
+                'controls.embeddingPlaceholder': 'Select embedding',
+                'controls.colorBy': 'Color by',
+                'controls.colorNone': 'None',
+                'controls.gene': 'Gene Expression',
+                'controls.genePlaceholder': 'Enter gene name',
+                'controls.paletteContinuous': 'Palette (continuous)',
+                'controls.paletteDefault': 'Default',
+                'controls.paletteDiverging': 'RdBu (diverging)',
+                'controls.paletteSpectral': 'Spectral (diverging)',
+                'controls.categoryPalette': 'Categorical palette',
+                'controls.paletteDefaultScanpy': 'Default (Scanpy)',
+                'controls.tab10': 'Tab10 (10 colors)',
+                'controls.tab20': 'Tab20 (20 colors)',
+                'controls.tab20b': 'Tab20b (20 colors)',
+                'controls.tab20c': 'Tab20c (20 colors)',
+                'controls.set1': 'Set1 (9, vivid)',
+                'controls.set2': 'Set2 (8, soft)',
+                'controls.set3': 'Set3 (12, gentle)',
+                'controls.paired': 'Paired (12)',
+                'controls.pastel1': 'Pastel1 (9)',
+                'controls.pastel2': 'Pastel2 (8)',
+                'controls.dark2': 'Dark2 (8)',
+                'controls.accent': 'Accent (8)',
+                'controls.vmin': 'Min (vmin)',
+                'controls.vmax': 'Max (vmax)',
+                'controls.auto': 'Auto',
+                'controls.apply': 'Apply',
+                'loading.processing': 'Processing data...',
+                'panel.parameters': 'Parameters',
+                'panel.selectAnalysis': 'Select an analysis type from the left menu',
+                'panel.analysisStatus': 'Analysis Status',
+                'panel.waitingUpload': 'Waiting for data upload...',
+                'toolbar.kernel': 'Kernel',
+                'toolbar.runAll': 'Run all',
+                'toolbar.addCell': 'Add cell',
+                'toolbar.save': 'Save',
+                'toolbar.insertTemplate': 'Insert template',
+                'toolbar.clearAll': 'Clear all',
+                'toolbar.fontDown': 'Decrease font',
+                'toolbar.fontUp': 'Increase font',
+                'file.browser': 'File Browser',
+                'file.root': 'Working Directory',
+                'file.empty': 'Empty folder',
+                'kernel.monitor': 'Kernel Monitor',
+                'kernel.memory': 'Memory Usage',
+                'kernel.topVars': 'Top Variables',
+                'kernel.vars': 'Variable Viewer',
+                'kernel.varName': 'Variable',
+                'kernel.varType': 'Type',
+                'kernel.varPreview': 'Preview',
+                'kernel.switching': 'Switching kernel to',
+                'kernel.switched': 'Kernel switched:',
+                'kernel.switchFailed': 'Kernel switch failed:',
+                'common.refresh': 'Refresh',
+                'common.loading': 'Loading...',
+                'common.noData': 'No data',
+                'common.collapse': 'Collapse',
+                'common.expand': 'Expand',
+                'common.close': 'Close',
+                'common.cancel': 'Cancel',
+                'common.run': 'Run',
+                'common.failed': 'Failed',
+                'common.error': 'Error',
+                'common.unknownError': 'Unknown error',
+                'agent.configTitle': 'Agent Configuration',
+                'agent.apiBase': 'API Base URL',
+                'agent.apiKey': 'API Key',
+                'agent.model': 'Model',
+                'agent.modelPlaceholder': 'Model name',
+                'agent.temperature': 'Temperature',
+                'agent.topP': 'Top P',
+                'agent.maxTokens': 'Max Tokens',
+                'agent.timeout': 'Timeout (s)',
+                'agent.systemPrompt': 'System Prompt',
+                'agent.systemPromptPlaceholder': 'You are a single-cell analysis assistant...',
+                'agent.save': 'Save',
+                'agent.reset': 'Reset',
+                'agent.localNotice': 'Saved in browser storage',
+                'agent.title': 'Single-cell Agent',
+                'agent.configButton': 'Configure',
+                'agent.greeting': 'Hi, I can help analyze single-cell data. Tell me what you want to do.',
+                'agent.inputPlaceholder': 'Ask a question, e.g. suggest cell type annotation',
+                'agent.send': 'Send',
+                'agent.analyzing': 'Analyzing...',
+                'agent.done': 'Analysis completed.',
+                'status.ready': 'Ready',
+                'status.agentSaved': 'Agent settings saved',
+                'status.agentReset': 'Agent settings reset',
+                'status.downloadingData': 'Downloading processed data...',
+                'status.downloadStart': 'Starting download...',
+                'status.saveFailed': 'Save failed',
+                'status.dataSaved': 'Data saved',
+                'status.resetConfirm': 'Reset all data? Unsaved results will be lost.',
+                'status.importFailed': 'Import failed',
+                'status.openFailed': 'Open failed',
+                'status.saveSuccess': 'Saved successfully',
+                'status.uploadFirst': 'Please upload data first',
+                'status.executing': 'Running...',
+                'status.noOutput': '(Success, no output)',
+                'status.beforeLeave': 'You have unsaved data. Leave the page?',
+                'status.backendUnavailable': 'Cannot reach backend. Ensure the server is running.',
+                'status.createFailed': 'Create failed',
+                'status.deleteFailed': 'Delete failed',
+                'status.renameFailed': 'Rename failed',
+                'status.pasteFailed': 'Paste failed',
+                'status.moveFailed': 'Move failed',
+                'prompt.newFile': 'New file name',
+                'prompt.newFolder': 'New folder name',
+                'prompt.deleteConfirm': 'Delete',
+                'prompt.renameTo': 'Rename to',
+                'prompt.moveTo': 'Move to (relative path)',
+                'common.comingSoon': 'Coming soon',
+                'panel.categorySelected': 'Selected category:',
+                'tools.normalize': 'Normalize',
+                'tools.normalizeDesc': 'Total-count normalization',
+                'tools.log1p': 'Log transform',
+                'tools.log1pDesc': 'Natural log1p',
+                'tools.scale': 'Scale',
+                'tools.scaleDesc': 'Z-score scaling',
+                'tools.filterCells': 'Filter cells',
+                'tools.filterCellsDesc': 'Filter by UMI/gene thresholds',
+                'tools.filterGenes': 'Filter genes',
+                'tools.filterGenesDesc': 'Filter by expressing cells/UMI thresholds',
+                'tools.filterOutliers': 'Filter outliers',
+                'tools.filterOutliersDesc': 'QC then filter by mitochondrial ratios, etc.',
+                'tools.doublets': 'Remove doublets',
+                'tools.doubletsDesc': 'Detect potential doublets (Scrublet)',
+                'tools.hvg': 'Highly variable genes',
+                'tools.hvgDesc': 'Select HVGs',
+                'tools.pca': 'PCA',
+                'tools.pcaDesc': 'Principal component analysis',
+                'tools.umap': 'UMAP',
+                'tools.umapDesc': 'Uniform Manifold Approximation',
+                'tools.tsne': 't-SNE',
+                'tools.tsneDesc': 't-distributed Stochastic Neighbor Embedding',
+                'tools.neighbors': 'Neighbors',
+                'tools.neighborsDesc': 'KNN graph construction',
+                'tools.leiden': 'Leiden',
+                'tools.leidenDesc': 'Community detection',
+                'tools.louvain': 'Louvain',
+                'tools.louvainDesc': 'Community detection',
+                'tools.cellAnnotation': 'Cell annotation',
+                'tools.cellAnnotationDesc': 'Automatic cell type annotation',
+                'tools.trajectory': 'Trajectory',
+                'tools.trajectoryDesc': 'Cell developmental trajectory',
+                'tools.diff': 'Differential analysis',
+                'tools.diffDesc': 'Differential expression genes',
+                'tools.enrichment': 'Enrichment',
+                'tools.enrichmentDesc': 'GO/KEGG enrichment',
+                'gene.error': 'Gene expression error',
+                'gene.notFound': 'Gene not found',
+                'gene.showing': 'Showing gene expression',
+                'gene.loaded': 'Gene expression loaded',
+                'gene.loadFailed': 'Failed to load gene expression',
+                'gene.updating': 'Updating gene expression...',
+                'gene.loading': 'Loading gene expression...',
+                'plot.generating': 'Generating plot...',
+                'plot.errorPrefix': 'Plot error',
+                'plot.failedPrefix': 'Plot failed',
+                'plot.done': 'Plot generated',
+                'plot.switchEmbedding': 'Switching embedding...',
+                'plot.updateColor': 'Updating colors...',
+                'plot.colorUpdated': 'Color updated',
+                'plot.embeddingSwitched': 'Embedding switched',
+                'tool.running': 'Running',
+                'tool.start': 'Started',
+                'tool.failed': 'failed',
+                'tool.completed': 'completed',
+                'tool.execFailed': 'failed to run',
+                'notebook.selectIpynb': 'Please select a .ipynb file',
+                'notebook.importConfirm': 'Importing a notebook will replace current cells. Continue?',
+                'notebook.openConfirm': 'Opening a notebook will replace current cells. Continue?',
+                'file.noSaveContent': 'Nothing to save',
+                'cell.placeholderMarkdown': 'Enter Markdown...',
+                'cell.placeholderRaw': 'Enter raw text...',
+                'cell.deleteConfirm': 'Delete this code cell?',
+                'cell.clearConfirm': 'Clear all code cells?',
+                'template.chooseTitle': 'Choose a template:',
+                'template.chooseIndex': 'Enter a number',
+                'var.preview50': 'Preview 50x50',
+                'var.dataframeLabel': 'DataFrame',
+                'var.anndataLabel': 'AnnData',
+                'parameter.none': 'No parameters required.',
+                'view.agentTitle': 'Agent Chat',
+                'view.codeTitle': 'Python Code Editor',
+                'breadcrumb.agent': 'Agent Chat',
+                'breadcrumb.code': 'Python Code Editor',
+                'code.placeholder': '# Enter Python code (variables: adata, sc, pd, np)\n# Shift+Enter to run',
+                'cell.typeCode': 'Code',
+                'cell.typeMarkdown': 'Markdown',
+                'cell.typeRaw': 'Raw',
+                'cell.run': 'Run (Shift+Enter)',
+                'cell.toggleOutput': 'Toggle output',
+                'cell.hideOutput': 'Hide output',
+                'cell.clearOutput': 'Clear output',
+                'cell.delete': 'Delete'
+                , 'cell.outputHidden': 'Output hidden'
+                , 'context.newFile': 'New File'
+                , 'context.newFolder': 'New Folder'
+                , 'context.rename': 'Rename'
+                , 'context.copy': 'Copy'
+                , 'context.paste': 'Paste'
+                , 'context.move': 'Move'
+                , 'context.delete': 'Delete'
+                , 'notify.title': 'Analysis Notifications'
+                , 'notify.markRead': 'Mark as read'
+                , 'notify.preprocessing': 'Preprocessing'
+                , 'notify.preprocessingDone': 'normalization completed'
+                , 'notify.timeAgo': '2 minutes ago'
+                , 'notify.empty': 'No notifications'
+                , 'notify.all': 'All notifications'
+                , 'user.menu': 'User Menu'
+                , 'user.profile': 'Profile'
+                , 'user.settings': 'Settings'
+                , 'user.help': 'Help'
+                , 'user.logout': 'Sign out'
+            },
+            zh: {
+                'lang.toggle': 'EN',
+                'nav.singleCell': '单细胞分析',
+                'nav.preprocessing': '数据预处理',
+                'nav.normalization': '标准化处理',
+                'nav.qc': '质量控制',
+                'nav.featureSelection': '特征选择',
+                'nav.dimReduction': '降维分析',
+                'nav.linearDR': '线性降维',
+                'nav.nonlinearDR': '非线性降维',
+                'nav.visualization': '可视化',
+                'nav.clustering': '聚类分析',
+                'nav.communityDetection': '社区检测',
+                'nav.cellTypeId': '细胞类型识别',
+                'nav.clusterValidation': '聚类验证',
+                'nav.omicverse': 'OmicVerse',
+                'nav.cellAnnotation': '细胞注释',
+                'nav.trajectory': '轨迹分析',
+                'nav.diffAnalysis': '差异分析',
+                'nav.enrichment': '功能富集',
+                'search.placeholder': '搜索基因、细胞类型...',
+                'search.hint': '搜索内容...',
+                'search.genes': '基因',
+                'search.cellTypes': '细胞类型',
+                'search.pathways': '通路',
+                'search.analysis': '分析',
+                'view.visualization': '可视化',
+                'view.codeEditor': '代码编辑器',
+                'breadcrumb.home': '主页',
+                'breadcrumb.title': '单细胞分析',
+                'upload.title': '上传H5AD文件',
+                'upload.subtitle': '拖拽文件到此处或点击选择文件',
+                'upload.button': '选择文件',
+                'upload.invalidFormat': '请上传.h5ad格式的文件',
+                'upload.uploading': '正在上传文件...',
+                'upload.start': '开始上传文件',
+                'upload.htmlError': '服务器返回HTML错误页面',
+                'upload.invalidResponse': '服务器返回非JSON',
+                'upload.failed': '上传失败',
+                'upload.success': '文件上传成功',
+                'upload.successDetail': '文件上传成功',
+                'status.filename': '文件名',
+                'status.cells': '细胞',
+                'status.genes': '基因',
+                'status.save': '保存',
+                'status.reset': '重置',
+                'controls.embedding': '降维方法',
+                'controls.embeddingPlaceholder': '选择降维方法',
+                'controls.colorBy': '着色方式',
+                'controls.colorNone': '无着色',
+                'controls.gene': '基因表达',
+                'controls.genePlaceholder': '输入基因名',
+                'controls.paletteContinuous': '调色板（连续）',
+                'controls.paletteDefault': '默认',
+                'controls.paletteDiverging': 'RdBu（发散）',
+                'controls.paletteSpectral': 'Spectral（发散）',
+                'controls.categoryPalette': '分类调色板',
+                'controls.paletteDefaultScanpy': '默认（Scanpy）',
+                'controls.tab10': 'Tab10（10色）',
+                'controls.tab20': 'Tab20（20色）',
+                'controls.tab20b': 'Tab20b（20色）',
+                'controls.tab20c': 'Tab20c（20色）',
+                'controls.set1': 'Set1（9色，鲜艳）',
+                'controls.set2': 'Set2（8色，柔和）',
+                'controls.set3': 'Set3（12色，淡雅）',
+                'controls.paired': 'Paired（12色）',
+                'controls.pastel1': 'Pastel1（9色）',
+                'controls.pastel2': 'Pastel2（8色）',
+                'controls.dark2': 'Dark2（8色）',
+                'controls.accent': 'Accent（8色）',
+                'controls.vmin': '最小值 (vmin)',
+                'controls.vmax': '最大值 (vmax)',
+                'controls.auto': '自动',
+                'controls.apply': '应用',
+                'loading.processing': '正在处理数据...',
+                'panel.parameters': '参数设置',
+                'panel.selectAnalysis': '请从左侧菜单选择分析类型',
+                'panel.analysisStatus': '分析状态',
+                'panel.waitingUpload': '等待上传数据...',
+                'toolbar.kernel': '内核',
+                'toolbar.runAll': '运行全部',
+                'toolbar.addCell': '新增单元',
+                'toolbar.save': '保存',
+                'toolbar.insertTemplate': '插入模板',
+                'toolbar.clearAll': '清空所有',
+                'toolbar.fontDown': '减小字号',
+                'toolbar.fontUp': '增大字号',
+                'file.browser': '文件浏览器',
+                'file.root': '运行目录',
+                'file.empty': '空目录',
+                'kernel.monitor': 'Kernel 监控',
+                'kernel.memory': '内存占用',
+                'kernel.topVars': '变量占用 Top 10',
+                'kernel.vars': '变量查看器',
+                'kernel.varName': '变量',
+                'kernel.varType': '类型',
+                'kernel.varPreview': '预览',
+                'kernel.switching': '正在切换内核到',
+                'kernel.switched': '内核已切换:',
+                'kernel.switchFailed': '切换内核失败:',
+                'common.refresh': '刷新',
+                'common.loading': '加载中...',
+                'common.noData': '暂无数据',
+                'common.collapse': '收起',
+                'common.expand': '展开',
+                'common.close': '关闭',
+                'common.cancel': '取消',
+                'common.run': '运行',
+                'common.failed': '失败',
+                'common.error': '错误',
+                'common.unknownError': '未知错误',
+                'agent.configTitle': 'Agent 配置',
+                'agent.apiBase': 'API Base URL',
+                'agent.apiKey': 'API Key',
+                'agent.model': '模型',
+                'agent.modelPlaceholder': '模型名称',
+                'agent.temperature': 'Temperature',
+                'agent.topP': 'Top P',
+                'agent.maxTokens': 'Max Tokens',
+                'agent.timeout': 'Timeout (s)',
+                'agent.systemPrompt': 'System Prompt',
+                'agent.systemPromptPlaceholder': '你是一个单细胞分析助手...',
+                'agent.save': '保存',
+                'agent.reset': '重置',
+                'agent.localNotice': '配置保存在浏览器本地',
+                'agent.title': '单细胞分析 Agent',
+                'agent.configButton': '配置模型',
+                'agent.greeting': '你好，我可以帮你分析单细胞数据。告诉我你想做什么分析。',
+                'agent.inputPlaceholder': '输入你的问题，比如：帮我做细胞类型注释建议',
+                'agent.send': '发送',
+                'agent.analyzing': '正在分析...',
+                'agent.done': '已完成分析。',
+                'status.ready': '就绪',
+                'status.agentSaved': 'Agent 配置已保存',
+                'status.agentReset': 'Agent 配置已重置',
+                'status.downloadingData': '正在下载处理后的数据...',
+                'status.downloadStart': '开始下载处理后的数据...',
+                'status.saveFailed': '保存失败',
+                'status.dataSaved': '数据保存成功',
+                'status.resetConfirm': '确定要重置所有数据吗？所有未保存的分析结果将丢失。',
+                'status.importFailed': '导入失败',
+                'status.openFailed': '打开失败',
+                'status.saveSuccess': '保存成功',
+                'status.uploadFirst': '请先上传数据',
+                'status.executing': '执行中...',
+                'status.noOutput': '(执行成功，无输出)',
+                'status.beforeLeave': '您有未保存的数据，刷新页面将丢失所有分析结果。确定要离开吗？',
+                'status.backendUnavailable': '无法连接后端，请确认服务已启动并允许访问。',
+                'status.createFailed': '创建失败',
+                'status.deleteFailed': '删除失败',
+                'status.renameFailed': '重命名失败',
+                'status.pasteFailed': '粘贴失败',
+                'status.moveFailed': '移动失败',
+                'prompt.newFile': '新建文件名',
+                'prompt.newFolder': '新建文件夹名',
+                'prompt.deleteConfirm': '确认删除',
+                'prompt.renameTo': '重命名为',
+                'prompt.moveTo': '移动到 (相对路径)',
+                'common.comingSoon': '该功能正在开发中，敬请期待！',
+                'panel.categorySelected': '选择分析类别:',
+                'tools.normalize': '归一化',
+                'tools.normalizeDesc': 'Total-count 归一化',
+                'tools.log1p': '对数转换',
+                'tools.log1pDesc': '自然对数 log1p',
+                'tools.scale': '数据缩放',
+                'tools.scaleDesc': 'Z-score 标准化',
+                'tools.filterCells': '过滤细胞',
+                'tools.filterCellsDesc': '按UMI/基因数上下限过滤',
+                'tools.filterGenes': '过滤基因',
+                'tools.filterGenesDesc': '按表达细胞数/UMI上下限过滤',
+                'tools.filterOutliers': '过滤异常细胞',
+                'tools.filterOutliersDesc': '先计算QC，再按线粒体比例等过滤',
+                'tools.doublets': '去除双细胞',
+                'tools.doubletsDesc': '识别并去除潜在双细胞（Scrublet）',
+                'tools.hvg': '高变基因',
+                'tools.hvgDesc': '选择高变基因',
+                'tools.pca': 'PCA分析',
+                'tools.pcaDesc': '主成分分析',
+                'tools.umap': 'UMAP降维',
+                'tools.umapDesc': '统一流形近似投影',
+                'tools.tsne': 't-SNE降维',
+                'tools.tsneDesc': 't-分布随机邻域嵌入',
+                'tools.neighbors': '邻域计算',
+                'tools.neighborsDesc': 'K近邻图构建',
+                'tools.leiden': 'Leiden聚类',
+                'tools.leidenDesc': '高质量社区检测',
+                'tools.louvain': 'Louvain聚类',
+                'tools.louvainDesc': '经典社区检测',
+                'tools.cellAnnotation': '细胞注释',
+                'tools.cellAnnotationDesc': '自动细胞类型注释',
+                'tools.trajectory': '轨迹分析',
+                'tools.trajectoryDesc': '细胞发育轨迹',
+                'tools.diff': '差异分析',
+                'tools.diffDesc': '差异表达基因',
+                'tools.enrichment': '功能富集',
+                'tools.enrichmentDesc': 'GO/KEGG富集分析',
+                'gene.error': '基因表达错误',
+                'gene.notFound': '基因未找到',
+                'gene.showing': '显示基因表达',
+                'gene.loaded': '基因表达加载完成',
+                'gene.loadFailed': '基因表达加载失败',
+                'gene.updating': '正在更新基因表达...',
+                'gene.loading': '正在加载基因表达...',
+                'plot.generating': '正在生成图表...',
+                'plot.errorPrefix': '绘图错误',
+                'plot.failedPrefix': '绘图失败',
+                'plot.done': '图表生成完成',
+                'plot.switchEmbedding': '正在切换降维方法...',
+                'plot.updateColor': '正在更新着色...',
+                'plot.colorUpdated': '着色更新完成',
+                'plot.embeddingSwitched': '降维方法切换完成',
+                'tool.running': '正在执行',
+                'tool.start': '开始执行',
+                'tool.failed': '失败',
+                'tool.completed': '完成',
+                'tool.execFailed': '执行失败',
+                'notebook.selectIpynb': '请选择 .ipynb 文件',
+                'notebook.importConfirm': '导入笔记本会替换当前代码单元，是否继续？',
+                'notebook.openConfirm': '打开笔记本会替换当前代码单元，是否继续？',
+                'file.noSaveContent': '没有可保存的内容',
+                'cell.placeholderMarkdown': '输入 Markdown...',
+                'cell.placeholderRaw': '输入原始文本...',
+                'cell.deleteConfirm': '确定要删除这个代码单元吗？',
+                'cell.clearConfirm': '确定要清空所有代码单元吗？',
+                'template.chooseTitle': '选择模板:',
+                'template.chooseIndex': '输入编号',
+                'var.preview50': '预览 50x50',
+                'var.dataframeLabel': 'DataFrame',
+                'var.anndataLabel': 'AnnData',
+                'parameter.none': '该工具无需参数设置',
+                'view.agentTitle': 'Agent 对话',
+                'view.codeTitle': 'Python 代码编辑器',
+                'breadcrumb.agent': 'Agent 对话',
+                'breadcrumb.code': 'Python 代码编辑器',
+                'code.placeholder': '# 输入Python代码 (可用变量: adata, sc, pd, np)\n# Shift+Enter 运行代码',
+                'cell.typeCode': 'Code',
+                'cell.typeMarkdown': 'Markdown',
+                'cell.typeRaw': 'Raw',
+                'cell.run': '运行 (Shift+Enter)',
+                'cell.toggleOutput': '折叠输出',
+                'cell.hideOutput': '隐藏输出',
+                'cell.clearOutput': '清空输出',
+                'cell.delete': '删除'
+                , 'cell.outputHidden': '输出已隐藏'
+                , 'context.newFile': '新建文件'
+                , 'context.newFolder': '新建文件夹'
+                , 'context.rename': '重命名'
+                , 'context.copy': '复制'
+                , 'context.paste': '粘贴'
+                , 'context.move': '移动'
+                , 'context.delete': '删除'
+                , 'notify.title': '分析通知'
+                , 'notify.markRead': '标记为已读'
+                , 'notify.preprocessing': '数据预处理'
+                , 'notify.preprocessingDone': '已完成标准化处理'
+                , 'notify.timeAgo': '2分钟前'
+                , 'notify.empty': '暂无通知'
+                , 'notify.all': '所有通知'
+                , 'user.menu': '用户菜单'
+                , 'user.profile': '个人资料'
+                , 'user.settings': '设置'
+                , 'user.help': '帮助'
+                , 'user.logout': '退出'
+            }
+        };
+        return (dict[this.currentLang] && dict[this.currentLang][key]) || key;
+    }
+
+    applyLanguage(lang) {
+        this.currentLang = lang;
+        const elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (key) {
+                el.textContent = this.t(key);
+            }
+        });
+        const placeholders = document.querySelectorAll('[data-i18n-placeholder]');
+        placeholders.forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (key) {
+                el.setAttribute('placeholder', this.t(key));
+            }
+        });
+        const titles = document.querySelectorAll('[data-i18n-title]');
+        titles.forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            if (key) {
+                el.setAttribute('title', this.t(key));
+            }
+        });
+        const langToggle = document.getElementById('lang-toggle');
+        if (langToggle) {
+            langToggle.textContent = this.t('lang.toggle');
+        }
+        this.refreshParameterFormLanguage();
+        this.updateCodeCellPlaceholders();
+    }
+
+    translateFormHtml(html) {
+        if (this.currentLang !== 'en') {
+            return html;
+        }
+        const replacements = [
+            ['最小UMI数', 'Min UMI'],
+            ['最小基因数', 'Min genes'],
+            ['最大UMI数', 'Max UMI'],
+            ['最大基因数', 'Max genes'],
+            ['最少表达细胞数', 'Min expressed cells'],
+            ['最多表达细胞数', 'Max expressed cells'],
+            ['可留空', 'Optional'],
+            ['留空表示不限制。仅填写需要的阈值即可。', 'Leave blank for no limit.'],
+            ['可选：设置上下限阈值，未填表示不限制。', 'Optional: set min/max thresholds; blank means no limit.'],
+            ['将先计算线粒体/核糖体/血红蛋白等QC指标，再按阈值过滤。', 'QC metrics will be computed first, then filtered by thresholds.'],
+            ['最大线粒体比例', 'Max mitochondrial'],
+            ['线粒体基因前缀 (自动检测)', 'Mito gene prefixes (auto-detect)'],
+            ['例如', 'e.g.'],
+            ['最大核糖体基因比例', 'Max ribosomal'],
+            ['最大血红蛋白基因比例', 'Max hemoglobin'],
+            ['(百分比)', '(%)'],
+            ['未填写的阈值不生效；线粒体前缀自动检测可编辑。', 'Unfilled thresholds are ignored; prefix can be edited.'],
+            ['无', 'None'],
+            ['批次列', 'Batch column'],
+            ['模拟双细胞比', 'Simulated doublet ratio'],
+            ['期望双细胞率', 'Expected doublet rate'],
+            ['双细胞率标准差', 'Doublet rate stdev'],
+            ['UMI子采样', 'UMI subsampling'],
+            ['KNN距离度量', 'KNN distance metric'],
+            ['PCA主成分数', 'PCA components'],
+            ['目标总数', 'Target sum'],
+            ['最大值', 'Max value'],
+            ['基因数量', 'Gene count'],
+            ['方法', 'Method'],
+            ['主成分数量', 'Number of PCs'],
+            ['邻居数量', 'Number of neighbors'],
+            ['最小距离', 'Min distance'],
+            ['困惑度', 'Perplexity'],
+            ['分辨率', 'Resolution'],
+            ['该工具无需参数设置', 'No parameters required.'],
+            ['返回工具列表', 'Back to tools'],
+            ['运行', 'Run']
+        ];
+        let output = html;
+        replacements.forEach(([from, to]) => {
+            output = output.split(from).join(to);
+        });
+        return output;
     }
 
     setupFileUpload() {
@@ -220,7 +851,7 @@ class SingleCellAnalysis {
         };
         localStorage.setItem('omicverse.agentConfig', JSON.stringify(payload));
         if (!silent) {
-            this.showStatus('Agent 配置已保存', false);
+            this.showStatus(this.t('status.agentSaved'), false);
             setTimeout(() => this.hideStatus(), 1200);
         }
     }
@@ -237,7 +868,7 @@ class SingleCellAnalysis {
         fields.maxTokens.value = 2048;
         fields.timeout.value = 60;
         fields.systemPrompt.value = '';
-        this.showStatus('Agent 配置已重置', false);
+        this.showStatus(this.t('status.agentReset'), false);
         setTimeout(() => this.hideStatus(), 1200);
     }
 
@@ -297,7 +928,7 @@ class SingleCellAnalysis {
         if (!message) return;
         input.value = '';
         this.appendAgentMessage(message, 'user');
-        const pending = this.appendAgentMessage('正在分析...', 'assistant');
+        const pending = this.appendAgentMessage(this.t('agent.analyzing'), 'assistant');
         fetch('/api/agent/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -321,20 +952,20 @@ class SingleCellAnalysis {
         })
         .then(data => {
             if (data.error) {
-                this.updateAgentMessageContent(pending, `失败: ${data.error}`);
+                this.updateAgentMessageContent(pending, `${this.t('common.failed')}: ${data.error}`);
                 return;
             }
-            this.updateAgentMessageContent(pending, data.reply || '已完成分析。', data.code);
+            this.updateAgentMessageContent(pending, data.reply || this.t('agent.done'), data.code);
             if (data.data_updated) {
                 this.refreshDataFromKernel(data.data_info);
             }
         })
         .catch(error => {
-            const detail = error && error.message ? error.message : '未知错误';
+            const detail = error && error.message ? error.message : this.t('common.unknownError');
             const message = detail === 'Failed to fetch'
-                ? '无法连接后端，请确认服务已启动并允许访问。'
+                ? this.t('status.backendUnavailable')
                 : detail;
-            this.updateAgentMessageContent(pending, `失败: ${message}`);
+            this.updateAgentMessageContent(pending, `${this.t('common.failed')}: ${message}`);
         });
     }
 
@@ -378,7 +1009,7 @@ class SingleCellAnalysis {
     changeKernel(tab, name, kernelSelect) {
         const previous = tab.kernelName || kernelSelect.value;
         const label = kernelSelect.options[kernelSelect.selectedIndex]?.text || name;
-        this.showStatus(`正在切换内核到 ${label}...`, true);
+        this.showStatus(this.t('kernel.switching') + ` ${label}...`, true);
         fetch('/api/kernel/select', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -390,14 +1021,14 @@ class SingleCellAnalysis {
                 throw new Error(data.error);
             }
             tab.kernelName = data.current || name;
-            this.updateStatus(`内核已切换: ${label}`);
+            this.updateStatus(this.t('kernel.switched') + ` ${label}`);
             setTimeout(() => this.hideStatus(), 1200);
             this.fetchKernelStats(tab.kernelId);
             this.fetchKernelVars(tab.kernelId);
         })
         .catch(error => {
             kernelSelect.value = previous;
-            this.updateStatus(`切换内核失败: ${error.message}`);
+            this.updateStatus(this.t('kernel.switchFailed') + ` ${error.message}`);
             setTimeout(() => this.hideStatus(), 2000);
         });
     }
@@ -425,7 +1056,7 @@ class SingleCellAnalysis {
             e.preventDefault();
             this.openContextMenu(e.clientX, e.clientY, this.currentBrowsePath || '', true);
         };
-        tree.innerHTML = '<li class="file-tree-node">加载中...</li>';
+        tree.innerHTML = `<li class="file-tree-node">${this.t('common.loading')}</li>`;
         this.loadTreeNode('', tree);
     }
 
@@ -456,7 +1087,7 @@ class SingleCellAnalysis {
         if (!entries.length) {
             const empty = document.createElement('li');
             empty.className = 'file-tree-node';
-            empty.textContent = '空目录';
+            empty.textContent = this.t('file.empty');
             container.appendChild(empty);
             return;
         }
@@ -488,7 +1119,7 @@ class SingleCellAnalysis {
                     toggle.textContent = '▾';
                     children.classList.add('open');
                     if (!children.dataset.loaded) {
-                        children.innerHTML = '<li class="file-tree-node">加载中...</li>';
+                        children.innerHTML = `<li class="file-tree-node">${this.t('common.loading')}</li>`;
                         const nextPath = path ? `${path}/${entry.name}` : entry.name;
                         this.loadTreeNode(nextPath, children);
                         children.dataset.loaded = '1';
@@ -656,7 +1287,7 @@ class SingleCellAnalysis {
                 // Chrome requires returnValue to be set
                 e.returnValue = '';
                 // Some browsers show a custom message (though most modern browsers ignore it)
-                return '您有未保存的数据，刷新页面将丢失所有分析结果。确定要离开吗？';
+                return this.t('status.beforeLeave');
             }
         });
     }
@@ -720,15 +1351,15 @@ class SingleCellAnalysis {
 
     handleFileUpload(file) {
         if (!file.name.endsWith('.h5ad')) {
-            alert('请上传.h5ad格式的文件');
+            alert(this.t('upload.invalidFormat'));
             return;
         }
 
         const formData = new FormData();
         formData.append('file', file);
 
-        this.showStatus('正在上传文件...', true);
-        this.addToLog('开始上传文件: ' + file.name);
+        this.showStatus(this.t('upload.uploading'), true);
+        this.addToLog(this.t('upload.start') + ': ' + file.name);
 
         fetch('/api/upload', {
             method: 'POST',
@@ -745,7 +1376,7 @@ class SingleCellAnalysis {
                     throw new Error(js.error || text || `HTTP ${response.status}`);
                 } catch (e) {
                     if (text && text.trim().startsWith('<!DOCTYPE')) {
-                        throw new Error(`服务器返回HTML错误页面 (HTTP ${response.status})`);
+                        throw new Error(this.t('upload.htmlError') + ` (HTTP ${response.status})`);
                     }
                     throw new Error(text || `HTTP ${response.status}`);
                 }
@@ -755,26 +1386,26 @@ class SingleCellAnalysis {
             }
             // Fallback: try parse text as JSON
             const text = await response.text();
-            try { return JSON.parse(text); } catch (e) { throw new Error('服务器返回非JSON'); }
+            try { return JSON.parse(text); } catch (e) { throw new Error(this.t('upload.invalidResponse')); }
         })
         .then(data => {
             this.hideStatus();
             if (data.error) {
-                this.addToLog('错误: ' + data.error, 'error');
-                this.showStatus('上传失败: ' + data.error, false);
-                alert('上传失败: ' + data.error);
+                this.addToLog(this.t('common.error') + ': ' + data.error, 'error');
+                this.showStatus(this.t('upload.failed') + ': ' + data.error, false);
+                alert(this.t('upload.failed') + ': ' + data.error);
             } else {
                 this.currentData = data;
                 this.updateUI(data);
-                this.addToLog('文件上传成功: ' + data.n_cells + ' 细胞, ' + data.n_genes + ' 基因');
-                this.showStatus('文件上传成功', false);
+                this.addToLog(this.t('upload.successDetail') + ': ' + data.n_cells + ' ' + this.t('status.cells') + ', ' + data.n_genes + ' ' + this.t('status.genes'));
+                this.showStatus(this.t('upload.success'), false);
             }
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog('上传失败: ' + error.message, 'error');
-            this.showStatus('上传失败: ' + error.message, false);
-            alert('上传失败: ' + error.message);
+            this.addToLog(this.t('upload.failed') + ': ' + error.message, 'error');
+            this.showStatus(this.t('upload.failed') + ': ' + error.message, false);
+            alert(this.t('upload.failed') + ': ' + error.message);
         });
     }
 
@@ -795,7 +1426,7 @@ class SingleCellAnalysis {
 
         // Update embedding options
         const embeddingSelect = document.getElementById('embedding-select');
-        embeddingSelect.innerHTML = '<option value="">选择降维方法</option>';
+        embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
         data.embeddings.forEach(emb => {
             const option = document.createElement('option');
             option.value = emb;
@@ -805,7 +1436,7 @@ class SingleCellAnalysis {
 
         // Update color options
         const colorSelect = document.getElementById('color-select');
-        colorSelect.innerHTML = '<option value="">无着色</option>';
+        colorSelect.innerHTML = `<option value="">${this.t('controls.colorNone')}</option>`;
         data.obs_columns.forEach(col => {
             const option = document.createElement('option');
             option.value = 'obs:' + col;
@@ -849,7 +1480,7 @@ class SingleCellAnalysis {
         const prevColor = colorSelect ? colorSelect.value : '';
 
         if (embeddingSelect) {
-            embeddingSelect.innerHTML = '<option value="">选择降维方法</option>';
+            embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
             data.embeddings.forEach(emb => {
                 const option = document.createElement('option');
                 option.value = emb;
@@ -864,7 +1495,7 @@ class SingleCellAnalysis {
         }
 
         if (colorSelect) {
-            colorSelect.innerHTML = '<option value="">无着色</option>';
+            colorSelect.innerHTML = `<option value="">${this.t('controls.colorNone')}</option>`;
             data.obs_columns.forEach(col => {
                 const option = document.createElement('option');
                 option.value = 'obs:' + col;
@@ -932,14 +1563,14 @@ class SingleCellAnalysis {
             // Continuous data - show continuous palette and vmin/vmax, hide category palette
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
             if (vminmaxRow) vminmaxRow.style.display = 'flex';
-            if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
+            if (paletteLabel) paletteLabel.textContent = this.t('controls.paletteContinuous');
         } else if (colorBy.startsWith('obs:')) {
             // Check if it's categorical by trying to detect from obs columns
             // We'll let the backend determine this, but show category palette for now
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'flex';
             // Also show vmin/vmax for now - backend will determine if it's continuous
             if (vminmaxRow) vminmaxRow.style.display = 'flex';
-            if (paletteLabel) paletteLabel.textContent = '调色板（连续）';
+            if (paletteLabel) paletteLabel.textContent = this.t('controls.paletteContinuous');
         } else {
             // No coloring
             if (categoryPaletteRow) categoryPaletteRow.style.display = 'none';
@@ -954,7 +1585,7 @@ class SingleCellAnalysis {
 
     createNewPlot(embedding, colorBy) {
         this.currentEmbedding = this.currentEmbedding;
-        this.showStatus('正在生成图表...', true);
+        this.showStatus(this.t('plot.generating'), true);
 
         // Get selected palettes
         const paletteSelect = document.getElementById('palette-select');
@@ -986,24 +1617,27 @@ class SingleCellAnalysis {
         .then(data => {
             this.hideStatus();
             if (data.error) {
-                this.addToLog('绘图错误: ' + data.error, 'error');
-                this.showStatus('绘图失败: ' + data.error, false);
+                this.addToLog(`${this.t('plot.errorPrefix')}: ${data.error}`, 'error');
+                this.showStatus(`${this.t('plot.failedPrefix')}: ${data.error}`, false);
             } else {
                 this.plotData(data);
                 this.currentEmbedding = embedding;
-                this.showStatus('图表生成完成', false);
+                this.showStatus(this.t('plot.done'), false);
             }
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog('绘图失败: ' + error.message, 'error');
-            this.showStatus('绘图失败: ' + error.message, false);
+            this.addToLog(`${this.t('plot.failedPrefix')}: ${error.message}`, 'error');
+            this.showStatus(`${this.t('plot.failedPrefix')}: ${error.message}`, false);
         });
     }
 
     updatePlotWithAnimation(embedding, colorBy) {
         const isEmbeddingChange = (this.currentEmbedding !== embedding);
-        this.showStatus(isEmbeddingChange ? '正在切换降维方法...' : '正在更新着色...', true);
+        this.showStatus(
+            isEmbeddingChange ? this.t('plot.switchEmbedding') : this.t('plot.updateColor'),
+            true
+        );
 
         // Get selected palettes
         const paletteSelect = document.getElementById('palette-select');
@@ -1035,8 +1669,8 @@ class SingleCellAnalysis {
         .then(data => {
             this.hideStatus();
             if (data.error) {
-                this.addToLog('绘图错误: ' + data.error, 'error');
-                this.showStatus('绘图失败: ' + data.error, false);
+                this.addToLog(`${this.t('plot.errorPrefix')}: ${data.error}`, 'error');
+                this.showStatus(`${this.t('plot.failedPrefix')}: ${data.error}`, false);
             } else {
                 if (!isEmbeddingChange) {
                     // 仅着色变化：不做位置动画
@@ -1053,7 +1687,7 @@ class SingleCellAnalysis {
                             this.updateColorsOnly(data);
                         }
                     }
-                    this.showStatus('着色更新完成', false);
+                    this.showStatus(this.t('plot.colorUpdated'), false);
                 } else {
                     const plotDiv = document.getElementById('plotly-div');
                     let curX = [], curY = [];
@@ -1074,14 +1708,14 @@ class SingleCellAnalysis {
                     const minLen = Math.min(curX.length, (data.x||[]).length);
                     this.animatePositionTransitionForAnyData(curX, curY, data, minLen);
                     this.currentEmbedding = embedding;
-                    this.showStatus('降维方法切换完成', false);
+                    this.showStatus(this.t('plot.embeddingSwitched'), false);
                 }
             }
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog('绘图失败: ' + error.message, 'error');
-            this.showStatus('绘图失败: ' + error.message, false);
+            this.addToLog(`${this.t('plot.failedPrefix')}: ${error.message}`, 'error');
+            this.showStatus(`${this.t('plot.failedPrefix')}: ${error.message}`, false);
         });
     }
 
@@ -1628,7 +2262,7 @@ class SingleCellAnalysis {
 
         const embedding = document.getElementById('embedding-select').value;
         if (!embedding) {
-            alert('请先选择降维方法');
+            alert(this.t('controls.embeddingPlaceholder'));
             return;
         }
 
@@ -1640,9 +2274,9 @@ class SingleCellAnalysis {
         const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
 
         if (hasExistingPlot) {
-            this.showStatus('正在更新基因表达...', true);
+            this.showStatus(this.t('gene.updating'), true);
         } else {
-            this.showStatus('正在加载基因表达...', true);
+            this.showStatus(this.t('gene.loading'), true);
         }
 
         // Get selected palette (only continuous for gene expression)
@@ -1673,19 +2307,19 @@ class SingleCellAnalysis {
         .then(data => {
             this.hideStatus();
             if (data.error) {
-                this.addToLog('基因表达错误: ' + data.error, 'error');
-                this.showStatus('基因未找到: ' + gene, false);
-                alert('基因未找到: ' + gene);
+                this.addToLog(this.t('gene.error') + ': ' + data.error, 'error');
+                this.showStatus(this.t('gene.notFound') + ': ' + gene, false);
+                alert(this.t('gene.notFound') + ': ' + gene);
             } else {
                 this.plotData(data);
-                this.addToLog('显示基因表达: ' + gene);
-                this.showStatus('基因表达加载完成', false);
+                this.addToLog(this.t('gene.showing') + ': ' + gene);
+                this.showStatus(this.t('gene.loaded'), false);
             }
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog('基因表达加载失败: ' + error.message, 'error');
-            this.showStatus('基因表达加载失败: ' + error.message, false);
+            this.addToLog(this.t('gene.loadFailed') + ': ' + error.message, 'error');
+            this.showStatus(this.t('gene.loadFailed') + ': ' + error.message, false);
         });
     }
 
@@ -1698,40 +2332,35 @@ class SingleCellAnalysis {
         
         // Generate category-specific tools
         const categoryTools = {
-            // 预处理：归一化、对数化、缩放
             'preprocessing': [
-                { id: 'normalize', name: '归一化', icon: 'fas fa-balance-scale', desc: 'Total-count 归一化' },
-                { id: 'log1p', name: '对数转换', icon: 'fas fa-calculator', desc: '自然对数 log1p' },
-                { id: 'scale', name: '数据缩放', icon: 'fas fa-expand-arrows-alt', desc: 'Z-score 标准化' }
+                { id: 'normalize', nameKey: 'tools.normalize', icon: 'fas fa-balance-scale', descKey: 'tools.normalizeDesc' },
+                { id: 'log1p', nameKey: 'tools.log1p', icon: 'fas fa-calculator', descKey: 'tools.log1pDesc' },
+                { id: 'scale', nameKey: 'tools.scale', icon: 'fas fa-expand-arrows-alt', descKey: 'tools.scaleDesc' }
             ],
-            // 质量控制：过滤细胞、过滤基因、过滤异常细胞、去除双细胞
             'qc': [
-                { id: 'filter_cells', name: '过滤细胞', icon: 'fas fa-filter', desc: '按UMI/基因数上下限过滤' },
-                { id: 'filter_genes', name: '过滤基因', icon: 'fas fa-tasks', desc: '按表达细胞数/UMI上下限过滤' },
-                { id: 'filter_outliers', name: '过滤异常细胞', icon: 'fas fa-exclamation-triangle', desc: '先计算QC，再按线粒体比例等过滤' },
-                { id: 'doublets', name: '去除双细胞', icon: 'fas fa-user-times', desc: '识别并去除潜在双细胞（Scrublet）' }
+                { id: 'filter_cells', nameKey: 'tools.filterCells', icon: 'fas fa-filter', descKey: 'tools.filterCellsDesc' },
+                { id: 'filter_genes', nameKey: 'tools.filterGenes', icon: 'fas fa-tasks', descKey: 'tools.filterGenesDesc' },
+                { id: 'filter_outliers', nameKey: 'tools.filterOutliers', icon: 'fas fa-exclamation-triangle', descKey: 'tools.filterOutliersDesc' },
+                { id: 'doublets', nameKey: 'tools.doublets', icon: 'fas fa-user-times', descKey: 'tools.doubletsDesc' }
             ],
-            // 特征选择：高变基因
             'feature': [
-                { id: 'hvg', name: '高变基因', icon: 'fas fa-dna', desc: '选择高变基因' }
+                { id: 'hvg', nameKey: 'tools.hvg', icon: 'fas fa-dna', descKey: 'tools.hvgDesc' }
             ],
-            // 降维
             'dimreduction': [
-                { id: 'pca', name: 'PCA分析', icon: 'fas fa-chart-line', desc: '主成分分析' },
-                { id: 'umap', name: 'UMAP降维', icon: 'fas fa-map', desc: '统一流形近似投影' },
-                { id: 'tsne', name: 't-SNE降维', icon: 'fas fa-dot-circle', desc: 't-分布随机邻域嵌入' }
+                { id: 'pca', nameKey: 'tools.pca', icon: 'fas fa-chart-line', descKey: 'tools.pcaDesc' },
+                { id: 'umap', nameKey: 'tools.umap', icon: 'fas fa-map', descKey: 'tools.umapDesc' },
+                { id: 'tsne', nameKey: 'tools.tsne', icon: 'fas fa-dot-circle', descKey: 'tools.tsneDesc' }
             ],
-            // 聚类
             'clustering': [
-                { id: 'neighbors', name: '邻域计算', icon: 'fas fa-network-wired', desc: 'K近邻图构建' },
-                { id: 'leiden', name: 'Leiden聚类', icon: 'fas fa-object-group', desc: '高质量社区检测' },
-                { id: 'louvain', name: 'Louvain聚类', icon: 'fas fa-layer-group', desc: '经典社区检测' }
+                { id: 'neighbors', nameKey: 'tools.neighbors', icon: 'fas fa-network-wired', descKey: 'tools.neighborsDesc' },
+                { id: 'leiden', nameKey: 'tools.leiden', icon: 'fas fa-object-group', descKey: 'tools.leidenDesc' },
+                { id: 'louvain', nameKey: 'tools.louvain', icon: 'fas fa-layer-group', descKey: 'tools.louvainDesc' }
             ],
             'omicverse': [
-                { id: 'coming_soon', name: '细胞注释', icon: 'fas fa-tag', desc: '自动细胞类型注释' },
-                { id: 'coming_soon', name: '轨迹分析', icon: 'fas fa-route', desc: '细胞发育轨迹' },
-                { id: 'coming_soon', name: '差异分析', icon: 'fas fa-not-equal', desc: '差异表达基因' },
-                { id: 'coming_soon', name: '功能富集', icon: 'fas fa-sitemap', desc: 'GO/KEGG富集分析' }
+                { id: 'coming_soon', nameKey: 'tools.cellAnnotation', icon: 'fas fa-tag', descKey: 'tools.cellAnnotationDesc' },
+                { id: 'coming_soon', nameKey: 'tools.trajectory', icon: 'fas fa-route', descKey: 'tools.trajectoryDesc' },
+                { id: 'coming_soon', nameKey: 'tools.diff', icon: 'fas fa-not-equal', descKey: 'tools.diffDesc' },
+                { id: 'coming_soon', nameKey: 'tools.enrichment', icon: 'fas fa-sitemap', descKey: 'tools.enrichmentDesc' }
             ]
         };
         
@@ -1743,29 +2372,29 @@ class SingleCellAnalysis {
             toolDiv.innerHTML = `
                 <div class="d-flex align-items-center mb-2">
                     <i class="${tool.icon} me-2 text-primary"></i>
-                    <strong>${tool.name}</strong>
+                    <strong>${this.t(tool.nameKey)}</strong>
                 </div>
-                <p class="text-muted small mb-0">${tool.desc}</p>`;
+                <p class="text-muted small mb-0">${this.t(tool.descKey)}</p>`;
             if (tool.id === 'coming_soon') {
                 toolDiv.onclick = () => this.showComingSoon();
             } else if (this.currentData) {
-                toolDiv.onclick = () => this.renderParameterForm(tool.id, tool.name, tool.desc, category);
+                toolDiv.onclick = () => this.renderParameterForm(tool.id, tool.nameKey, tool.descKey, category);
             } else {
                 toolDiv.style.opacity = 0.6;
-                toolDiv.title = '请先上传数据';
+                toolDiv.title = this.t('status.uploadFirst');
             }
             parameterContent.appendChild(toolDiv);
         });
         
-        this.addToLog(`选择分析类别: ${this.getCategoryName(category)}`);
+        this.addToLog(this.t('panel.categorySelected') + ` ${this.getCategoryName(category)}`);
     }
 
     getCategoryName(category) {
         const names = {
-            'preprocessing': '数据预处理',
-            'dimreduction': '降维分析',
-            'clustering': '聚类分析',
-            'omicverse': 'OmicVerse工具'
+            'preprocessing': this.t('nav.preprocessing'),
+            'dimreduction': this.t('nav.dimReduction'),
+            'clustering': this.t('nav.clustering'),
+            'omicverse': this.t('nav.omicverse')
         };
         return names[category] || category;
     }
@@ -1774,21 +2403,27 @@ class SingleCellAnalysis {
 
     renderParameterForm(tool, toolName = '', toolDesc = '') {
         this.currentTool = tool;
+        const resolvedName = toolName && toolName.startsWith('tools.') ? this.t(toolName) : toolName;
+        const resolvedDesc = toolDesc && toolDesc.startsWith('tools.') ? this.t(toolDesc) : toolDesc;
+        this.currentToolLabelKey = toolName && toolName.startsWith('tools.') ? toolName : '';
+        this.currentToolDescKey = toolDesc && toolDesc.startsWith('tools.') ? toolDesc : '';
+        this.currentToolLabel = resolvedName;
+        this.currentToolDesc = resolvedDesc;
         const parameterContent = document.getElementById('parameter-content');
         const toolNames = {
-            'normalize': '标准化',
-            'scale': '数据缩放',
-            'hvg': '高变基因选择',
-            'pca': 'PCA分析',
-            'umap': 'UMAP降维',
-            'tsne': 't-SNE降维',
-            'neighbors': '邻域计算',
-            'leiden': 'Leiden聚类',
-            'louvain': 'Louvain聚类',
-            'log1p': '对数转换'
+            'normalize': this.t('tools.normalize'),
+            'scale': this.t('tools.scale'),
+            'hvg': this.t('tools.hvg'),
+            'pca': this.t('tools.pca'),
+            'umap': this.t('tools.umap'),
+            'tsne': this.t('tools.tsne'),
+            'neighbors': this.t('tools.neighbors'),
+            'leiden': this.t('tools.leiden'),
+            'louvain': this.t('tools.louvain'),
+            'log1p': this.t('tools.log1p')
         };
-        const title = toolName || toolNames[tool] || '参数设置';
-        const desc = toolDesc || '';
+        const title = resolvedName || toolNames[tool] || this.t('panel.parameters');
+        const desc = resolvedDesc || '';
 
         const formHTML = `
             <div class="mb-3">
@@ -1806,7 +2441,7 @@ class SingleCellAnalysis {
                     </div>
                 </div>
             </div>`;
-        parameterContent.innerHTML = formHTML;
+        parameterContent.innerHTML = this.translateFormHtml(formHTML);
 
         const runBtn = document.getElementById('inlineRunBtn');
         if (runBtn) {
@@ -1840,6 +2475,48 @@ class SingleCellAnalysis {
                     .catch(() => {});
             }
         }
+    }
+
+    refreshParameterFormLanguage() {
+        const parameterContent = document.getElementById('parameter-content');
+        if (!parameterContent || !this.currentTool) return;
+        const inputs = parameterContent.querySelectorAll('input, select');
+        const values = {};
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                values[input.id] = input.checked;
+            } else {
+                values[input.id] = input.value;
+            }
+        });
+        const nameKeyOrLabel = this.currentToolLabelKey || this.currentToolLabel;
+        const descKeyOrLabel = this.currentToolDescKey || this.currentToolDesc;
+        this.renderParameterForm(this.currentTool, nameKeyOrLabel, descKeyOrLabel);
+        Object.entries(values).forEach(([id, value]) => {
+            const target = parameterContent.querySelector(`#${CSS.escape(id)}`);
+            if (!target) return;
+            if (target.type === 'checkbox') {
+                target.checked = !!value;
+            } else {
+                target.value = value;
+            }
+        });
+    }
+
+    updateCodeCellPlaceholders() {
+        const cells = document.querySelectorAll('.code-cell');
+        cells.forEach(cell => {
+            const type = cell.dataset.cellType || 'code';
+            const textarea = cell.querySelector('.code-input');
+            if (!textarea) return;
+            if (type === 'markdown') {
+                textarea.placeholder = this.t('cell.placeholderMarkdown');
+            } else if (type === 'raw') {
+                textarea.placeholder = this.t('cell.placeholderRaw');
+            } else {
+                textarea.placeholder = this.t('code.placeholder');
+            }
+        });
     }
 
     getParameterHTML(tool) {
@@ -2024,34 +2701,43 @@ class SingleCellAnalysis {
             `
         };
 
-        return parameters[tool] || '<p>该工具无需参数设置</p>';
+        return parameters[tool] || `<p>${this.t('parameter.none')}</p>`;
+    }
+
+    formatToolMessage(toolName, suffix, error) {
+        const spacer = this.currentLang === 'zh' ? '' : ' ';
+        const base = `${toolName}${spacer}${suffix}`;
+        return error ? `${base}: ${error}` : base;
     }
 
     runTool(tool, params = {}) {
         if (!this.currentData) {
-            alert('请先上传数据');
+            alert(this.t('status.uploadFirst'));
             return;
         }
 
         const toolNames = {
-            'normalize': '标准化',
-            'log1p': '对数转换',
-            'scale': '数据缩放',
-            'hvg': '高变基因选择',
-            'pca': 'PCA分析',
-            'umap': 'UMAP降维',
-            'tsne': 't-SNE降维',
-            'neighbors': '邻域计算',
-            'leiden': 'Leiden聚类',
-            'louvain': 'Louvain聚类',
-            'filter_cells': '过滤细胞',
-            'filter_genes': '过滤基因',
-            'filter_outliers': '过滤异常细胞',
-            'doublets': '去除双细胞'
+            'normalize': this.t('tools.normalize'),
+            'log1p': this.t('tools.log1p'),
+            'scale': this.t('tools.scale'),
+            'hvg': this.t('tools.hvg'),
+            'pca': this.t('tools.pca'),
+            'umap': this.t('tools.umap'),
+            'tsne': this.t('tools.tsne'),
+            'neighbors': this.t('tools.neighbors'),
+            'leiden': this.t('tools.leiden'),
+            'louvain': this.t('tools.louvain'),
+            'filter_cells': this.t('tools.filterCells'),
+            'filter_genes': this.t('tools.filterGenes'),
+            'filter_outliers': this.t('tools.filterOutliers'),
+            'doublets': this.t('tools.doublets')
         };
         const toolName = toolNames[tool] || tool;
-        this.showStatus(`正在执行${toolName}...`, true);
-        this.addToLog(`开始执行: ${toolName}`);
+        const runningText = this.currentLang === 'zh'
+            ? `${this.t('tool.running')}${toolName}...`
+            : `${this.t('tool.running')} ${toolName}...`;
+        this.showStatus(runningText, true);
+        this.addToLog(`${this.t('tool.start')}: ${toolName}`);
 
         fetch(`/api/tools/${tool}`, {
             method: 'POST',
@@ -2064,14 +2750,14 @@ class SingleCellAnalysis {
         .then(data => {
             this.hideStatus();
             if (data.error) {
-                this.addToLog(`${toolName}失败: ${data.error}`, 'error');
-                this.showStatus(`${toolName}执行失败: ${data.error}`, false);
-                alert(`执行失败: ${data.error}`);
+                this.addToLog(this.formatToolMessage(toolName, this.t('tool.failed'), data.error), 'error');
+                this.showStatus(this.formatToolMessage(toolName, this.t('tool.execFailed'), data.error), false);
+                alert(this.formatToolMessage(toolName, this.t('tool.execFailed'), data.error));
             } else {
                 this.currentData = data;
                 this.updateUI(data);
-                this.addToLog(`${toolName}完成`);
-                this.showStatus(`${toolName}执行完成`, false);
+                this.addToLog(this.formatToolMessage(toolName, this.t('tool.completed')));
+                this.showStatus(this.formatToolMessage(toolName, this.t('tool.completed')), false);
                 
                 // Auto-update plot if embedding is available
                 const embeddingSelect = document.getElementById('embedding-select');
@@ -2082,17 +2768,17 @@ class SingleCellAnalysis {
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog(`${toolName}失败: ${error.message}`, 'error');
-            this.showStatus(`${toolName}执行失败: ${error.message}`, false);
-            alert(`执行失败: ${error.message}`);
+            this.addToLog(this.formatToolMessage(toolName, this.t('tool.failed'), error.message), 'error');
+            this.showStatus(this.formatToolMessage(toolName, this.t('tool.execFailed'), error.message), false);
+            alert(this.formatToolMessage(toolName, this.t('tool.execFailed'), error.message));
         });
     }
 
     saveData() {
         if (!this.currentData) return;
         
-        this.showStatus('正在下载处理后的数据...', true);
-        this.addToLog('开始下载处理后的数据...');
+        this.showStatus(this.t('status.downloadingData'), true);
+        this.addToLog(this.t('status.downloadStart'));
         
         fetch('/api/save', {
             method: 'POST'
@@ -2101,7 +2787,7 @@ class SingleCellAnalysis {
             if (response.ok) {
                 return response.blob();
             } else {
-                throw new Error('保存失败');
+                throw new Error(this.t('status.saveFailed'));
             }
         })
         .then(blob => {
@@ -2114,24 +2800,24 @@ class SingleCellAnalysis {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             this.hideStatus();
-            this.addToLog('数据保存成功');
-            this.showStatus('数据保存成功', false);
+            this.addToLog(this.t('status.dataSaved'));
+            this.showStatus(this.t('status.dataSaved'), false);
         })
         .catch(error => {
             this.hideStatus();
-            this.addToLog('保存失败: ' + error.message, 'error');
-            this.showStatus('保存失败: ' + error.message, false);
+            this.addToLog(this.t('status.saveFailed') + ': ' + error.message, 'error');
+            this.showStatus(this.t('status.saveFailed') + ': ' + error.message, false);
         });
     }
 
     resetData() {
-        if (confirm('确定要重置所有数据吗？所有未保存的分析结果将丢失。')) {
+        if (confirm(this.t('status.resetConfirm'))) {
             this.currentData = null;
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('data-status').classList.add('d-none');
             document.getElementById('viz-controls').style.display = 'none';
             document.getElementById('viz-panel').style.display = 'none';
-            document.getElementById('analysis-log').innerHTML = '<div class="text-muted">等待上传数据...</div>';
+            document.getElementById('analysis-log').innerHTML = `<div class="text-muted">${this.t('panel.waitingUpload')}</div>`;
             document.getElementById('fileInput').value = '';
 
             // Clear gene input
@@ -2179,11 +2865,12 @@ class SingleCellAnalysis {
         });
     }
 
-    showLoading(text = '正在处理...') {
+    showLoading(text = null) {
         const loadingText = document.getElementById('loading-text');
         const loadingOverlay = document.getElementById('loading-overlay');
-        
-        if (loadingText) loadingText.textContent = text;
+
+        const resolved = text || this.t('loading.processing');
+        if (loadingText) loadingText.textContent = resolved;
         if (loadingOverlay) loadingOverlay.style.display = 'flex';
     }
 
@@ -2298,7 +2985,7 @@ class SingleCellAnalysis {
     }
 
     showComingSoon() {
-        alert('该功能正在开发中，敬请期待！');
+        alert(this.t('common.comingSoon'));
     }
 
     // View switching
@@ -2337,8 +3024,8 @@ class SingleCellAnalysis {
             if (codeToolbarRow) codeToolbarRow.style.display = 'none';
 
             // Update page title
-            if (pageTitle) pageTitle.textContent = '单细胞分析';
-            if (breadcrumbTitle) breadcrumbTitle.textContent = '单细胞分析';
+            if (pageTitle) pageTitle.textContent = this.t('breadcrumb.title');
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.title');
             if (analysisNav) analysisNav.style.display = 'block';
             if (agentConfigNav) agentConfigNav.style.display = 'none';
             if (fileManager) fileManager.style.display = 'none';
@@ -2367,8 +3054,8 @@ class SingleCellAnalysis {
             if (codeToolbarRow) codeToolbarRow.style.display = 'flex';
 
             // Update page title
-            if (pageTitle) pageTitle.innerHTML = '<i class="feather-code me-2"></i>Python 代码编辑器';
-            if (breadcrumbTitle) breadcrumbTitle.textContent = 'Python 代码编辑器';
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-code me-2"></i>${this.t('view.codeTitle')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.code');
             if (analysisNav) analysisNav.style.display = 'none';
             if (agentConfigNav) agentConfigNav.style.display = 'none';
             if (fileManager) fileManager.style.display = 'block';
@@ -2404,8 +3091,8 @@ class SingleCellAnalysis {
             if (codeToolbarRow) codeToolbarRow.style.display = 'none';
 
             // Update page title
-            if (pageTitle) pageTitle.innerHTML = '<i class="feather-message-circle me-2"></i>Agent 对话';
-            if (breadcrumbTitle) breadcrumbTitle.textContent = 'Agent 对话';
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-message-circle me-2"></i>${this.t('view.agentTitle')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.agent');
             if (analysisNav) analysisNav.style.display = 'none';
             if (agentConfigNav) agentConfigNav.style.display = 'block';
             if (fileManager) fileManager.style.display = 'none';
@@ -2423,23 +3110,23 @@ class SingleCellAnalysis {
                     <span class="cell-number">In [${this.cellCounter}]:</span>
                     <div class="cell-toolbar">
                         <select class="form-select form-select-sm" onchange="singleCellApp.changeCellType('${cellId}', this.value)">
-                            <option value="code">Code</option>
-                            <option value="markdown">Markdown</option>
-                            <option value="raw">Raw</option>
+                            <option value="code" data-i18n="cell.typeCode">Code</option>
+                            <option value="markdown" data-i18n="cell.typeMarkdown">Markdown</option>
+                            <option value="raw" data-i18n="cell.typeRaw">Raw</option>
                         </select>
-                        <button type="button" class="btn btn-sm btn-success" onclick="singleCellApp.runCodeCell('${cellId}')" title="运行 (Shift+Enter)">
-                            <i class="feather-play"></i> 运行
+                        <button type="button" class="btn btn-sm btn-success" onclick="singleCellApp.runCodeCell('${cellId}')" title="Run (Shift+Enter)" data-i18n-title="cell.run">
+                            <i class="feather-play"></i> <span data-i18n="cell.run">Run</span>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutput('${cellId}')" title="折叠输出">
-                            输出
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutput('${cellId}')" title="Toggle output" data-i18n-title="cell.toggleOutput">
+                            <span data-i18n="cell.toggleOutput">Toggle output</span>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutputFull('${cellId}')" title="隐藏输出">
-                            隐藏
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutputFull('${cellId}')" title="Hide output" data-i18n-title="cell.hideOutput">
+                            <span data-i18n="cell.hideOutput">Hide output</span>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.clearCellOutput('${cellId}')" title="清空输出">
-                            清除
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.clearCellOutput('${cellId}')" title="Clear output" data-i18n-title="cell.clearOutput">
+                            <span data-i18n="cell.clearOutput">Clear output</span>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')" title="删除">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')" title="Delete" data-i18n-title="cell.delete">
                             <i class="feather-trash-2"></i>
                         </button>
                     </div>
@@ -2447,16 +3134,17 @@ class SingleCellAnalysis {
                 <div class="code-cell-input">
                     <pre class="code-highlight language-python"><code class="language-python"></code></pre>
                     <div class="markdown-render" id="${cellId}-markdown"></div>
-                    <textarea class="code-input" placeholder="# 输入Python代码 (可用变量: adata, sc, pd, np)
-# Shift+Enter 运行代码">${code}</textarea>
+                    <textarea class="code-input" placeholder="# Enter Python code (variables: adata, sc, pd, np)
+# Shift+Enter to run" data-i18n-placeholder="code.placeholder">${code}</textarea>
                 </div>
                 <div class="code-cell-output" id="${cellId}-output"></div>
-                <div class="output-hidden-note" id="${cellId}-output-hidden">输出已隐藏</div>
+                <div class="output-hidden-note" id="${cellId}-output-hidden" data-i18n="cell.outputHidden">Output hidden</div>
             </div>
         `;
 
         const container = document.getElementById('code-cells-container');
         container.insertAdjacentHTML('beforeend', cellHtml);
+        this.applyLanguage(this.currentLang);
 
         this.codeCells.push(cellId);
         this.setCellType(cellId, cellType);
@@ -2566,7 +3254,7 @@ class SingleCellAnalysis {
 
         // Show loading
         outputDiv.className = 'code-cell-output has-content';
-        outputDiv.textContent = '执行中...';
+        outputDiv.textContent = this.t('status.executing');
 
         // Execute code on backend
         const kernelId = this.getActiveKernelId();
@@ -2599,7 +3287,7 @@ class SingleCellAnalysis {
                     this.refreshDataFromKernel(data.data_info);
                 }
                 this.renderCodeOutput(outputDiv, {
-                    text: output || '(执行成功，无输出)',
+                    text: output || this.t('status.noOutput'),
                     isError: false,
                     figures: data.figures || []
                 });
@@ -2607,7 +3295,7 @@ class SingleCellAnalysis {
         })
         .catch(error => {
             this.renderCodeOutput(outputDiv, {
-                text: `错误: ${error.message}`,
+                text: `${this.t('common.error')}: ${error.message}`,
                 isError: true,
                 figures: []
             });
@@ -2663,12 +3351,12 @@ class SingleCellAnalysis {
 
     importNotebookFile(file) {
         if (!file.name.endsWith('.ipynb')) {
-            alert('请选择 .ipynb 文件');
+            alert(this.t('notebook.selectIpynb'));
             return;
         }
         const hasCells = this.codeCells.length > 0;
         if (hasCells) {
-            const ok = confirm('导入笔记本会替换当前代码单元，是否继续？');
+            const ok = confirm(this.t('notebook.importConfirm'));
             if (!ok) return;
         }
         const formData = new FormData();
@@ -2680,7 +3368,7 @@ class SingleCellAnalysis {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`导入失败: ${data.error}`);
+                alert(`${this.t('status.importFailed')}: ${data.error}`);
                 return;
             }
             this.openNotebookTab({
@@ -2691,7 +3379,7 @@ class SingleCellAnalysis {
             this.fetchFileList(this.currentBrowsePath);
         })
         .catch(error => {
-            alert(`导入失败: ${error.message}`);
+            alert(`${this.t('status.importFailed')}: ${error.message}`);
         });
     }
 
@@ -2706,7 +3394,7 @@ class SingleCellAnalysis {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`打开失败: ${data.error}`);
+                alert(`${this.t('status.openFailed')}: ${data.error}`);
                 return;
             }
             if (data.type === 'notebook') {
@@ -2739,7 +3427,7 @@ class SingleCellAnalysis {
             }
         })
         .catch(error => {
-            alert(`打开失败: ${error.message}`);
+            alert(`${this.t('status.openFailed')}: ${error.message}`);
         });
     }
 
@@ -2808,7 +3496,7 @@ class SingleCellAnalysis {
         const hasCells = this.codeCells.length > 0;
         const activeTab = this.getActiveTab();
         if (hasCells && this.activeTabId && activeTab && activeTab.type !== 'notebook') {
-            const ok = confirm('打开笔记本会替换当前代码单元，是否继续？');
+            const ok = confirm(this.t('notebook.openConfirm'));
             if (!ok) return;
         }
         const existing = this.openTabs.find(t => t.path === tab.path);
@@ -3064,9 +3752,9 @@ class SingleCellAnalysis {
         const meta = document.createElement('div');
         meta.className = 'var-detail-meta';
         if (detail.type === 'dataframe') {
-            meta.textContent = `${detail.name} · DataFrame ${detail.shape[0]}x${detail.shape[1]} (预览 50x50)`;
+            meta.textContent = `${detail.name} · ${this.t('var.dataframeLabel')} ${detail.shape[0]}x${detail.shape[1]} (${this.t('var.preview50')})`;
         } else if (detail.type === 'anndata') {
-            meta.textContent = `${detail.name} · AnnData ${detail.summary.shape.join('x')}`;
+            meta.textContent = `${detail.name} · ${this.t('var.anndataLabel')} ${detail.summary.shape.join('x')}`;
         } else {
             meta.textContent = `${detail.name}`;
         }
@@ -3130,7 +3818,7 @@ class SingleCellAnalysis {
         if (!section || !toggle) return;
         const isHidden = section.style.display === 'none';
         section.style.display = isHidden ? 'block' : 'none';
-        toggle.textContent = isHidden ? '收起' : '展开';
+        toggle.textContent = isHidden ? this.t('common.collapse') : this.t('common.expand');
     }
 
     fetchKernelStats(kernelId = null) {
@@ -3156,7 +3844,7 @@ class SingleCellAnalysis {
             if (!vars.length) {
                 const li = document.createElement('li');
                 li.className = 'kernel-var-item';
-                li.textContent = '暂无数据';
+                li.textContent = this.t('common.noData');
                 list.appendChild(li);
                 return;
             }
@@ -3200,7 +3888,7 @@ class SingleCellAnalysis {
             const vars = data.vars || [];
             if (!vars.length) {
                 const row = document.createElement('tr');
-                row.innerHTML = '<td colspan="3" class="text-muted">暂无数据</td>';
+                row.innerHTML = `<td colspan="3" class="text-muted">${this.t('common.noData')}</td>`;
                 table.appendChild(row);
                 return;
             }
@@ -3238,7 +3926,7 @@ class SingleCellAnalysis {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`打开失败: ${data.error}`);
+                alert(`${this.t('status.openFailed')}: ${data.error}`);
                 return;
             }
             const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -3253,7 +3941,7 @@ class SingleCellAnalysis {
             this.setActiveTab(id);
         })
         .catch(error => {
-            alert(`打开失败: ${error.message}`);
+            alert(`${this.t('status.openFailed')}: ${error.message}`);
         });
     }
 
@@ -3283,7 +3971,7 @@ class SingleCellAnalysis {
     }
 
     contextNewFile() {
-        const name = prompt('新建文件名');
+        const name = prompt(this.t('prompt.newFile'));
         if (!name) return;
         const base = this.contextTargetIsDir ? this.contextTargetPath : (this.contextTargetPath.split('/').slice(0, -1).join('/'));
         const path = base ? `${base}/${name}` : name;
@@ -3295,16 +3983,16 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`创建失败: ${data.error}`);
+                alert(`${this.t('status.createFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`创建失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.createFailed')}: ${err.message}`));
     }
 
     contextNewFolder() {
-        const name = prompt('新建文件夹名');
+        const name = prompt(this.t('prompt.newFolder'));
         if (!name) return;
         const base = this.contextTargetIsDir ? this.contextTargetPath : (this.contextTargetPath.split('/').slice(0, -1).join('/'));
         const path = base ? `${base}/${name}` : name;
@@ -3316,12 +4004,12 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`创建失败: ${data.error}`);
+                alert(`${this.t('status.createFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`创建失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.createFailed')}: ${err.message}`));
     }
 
     contextRefresh() {
@@ -3330,7 +4018,7 @@ class SingleCellAnalysis {
 
     contextDelete() {
         if (!this.contextTargetPath) return;
-        const ok = confirm(`确认删除 ${this.contextTargetPath} ?`);
+        const ok = confirm(this.t('prompt.deleteConfirm') + ` ${this.contextTargetPath}?`);
         if (!ok) return;
         fetch('/api/files/delete', {
             method: 'POST',
@@ -3340,19 +4028,19 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`删除失败: ${data.error}`);
+                alert(`${this.t('status.deleteFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`删除失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.deleteFailed')}: ${err.message}`));
     }
 
     contextRename() {
         if (!this.contextTargetPath) return;
         const base = this.contextTargetPath.split('/').slice(0, -1).join('/');
         const currentName = this.contextTargetPath.split('/').pop();
-        const name = prompt('重命名为', currentName);
+        const name = prompt(this.t('prompt.renameTo'), currentName);
         if (!name || name === currentName) return;
         const dst = base ? `${base}/${name}` : name;
         fetch('/api/files/rename', {
@@ -3363,12 +4051,12 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`重命名失败: ${data.error}`);
+                alert(`${this.t('status.renameFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`重命名失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.renameFailed')}: ${err.message}`));
     }
 
     contextCopy() {
@@ -3389,17 +4077,17 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`粘贴失败: ${data.error}`);
+                alert(`${this.t('status.pasteFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`粘贴失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.pasteFailed')}: ${err.message}`));
     }
 
     contextMove() {
         if (!this.contextTargetPath) return;
-        const dst = prompt('移动到 (相对路径)', this.contextTargetPath);
+        const dst = prompt(this.t('prompt.moveTo'), this.contextTargetPath);
         if (!dst || dst === this.contextTargetPath) return;
         fetch('/api/files/move', {
             method: 'POST',
@@ -3409,12 +4097,12 @@ class SingleCellAnalysis {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                alert(`移动失败: ${data.error}`);
+                alert(`${this.t('status.moveFailed')}: ${data.error}`);
                 return;
             }
             this.fetchFileTree();
         })
-        .catch(err => alert(`移动失败: ${err.message}`));
+        .catch(err => alert(`${this.t('status.moveFailed')}: ${err.message}`));
     }
 
     renderMarkdown(input) {
@@ -3663,7 +4351,7 @@ class SingleCellAnalysis {
         }
 
         if (!payload) {
-            alert('没有可保存的内容');
+            alert(this.t('file.noSaveContent'));
             return;
         }
 
@@ -3675,16 +4363,16 @@ class SingleCellAnalysis {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`保存失败: ${data.error}`);
+                alert(`${this.t('status.saveFailed')}: ${data.error}`);
                 return;
             }
             if (activeTab && activeTab.type === 'notebook') {
                 activeTab.cells = payload.cells;
             }
-            alert('保存成功');
+            alert(this.t('status.saveSuccess'));
         })
         .catch(error => {
-            alert(`保存失败: ${error.message}`);
+            alert(`${this.t('status.saveFailed')}: ${error.message}`);
         });
     }
 
@@ -3839,11 +4527,11 @@ class SingleCellAnalysis {
         const textarea = cell.querySelector('.code-input');
         if (textarea) {
             if (type === 'markdown') {
-                textarea.placeholder = '输入 Markdown...';
+                textarea.placeholder = this.t('cell.placeholderMarkdown');
             } else if (type === 'raw') {
-                textarea.placeholder = '输入原始文本...';
+                textarea.placeholder = this.t('cell.placeholderRaw');
             } else {
-                textarea.placeholder = '# 输入Python代码 (可用变量: adata, sc, pd, np)\n# Shift+Enter 运行代码';
+                textarea.placeholder = this.t('code.placeholder');
             }
         }
         const highlight = cell.querySelector('.code-highlight');
@@ -3889,7 +4577,7 @@ class SingleCellAnalysis {
     }
 
     deleteCodeCell(cellId) {
-        if (confirm('确定要删除这个代码单元吗？')) {
+        if (confirm(this.t('cell.deleteConfirm'))) {
             const cell = document.getElementById(cellId);
             cell.remove();
             this.codeCells = this.codeCells.filter(id => id !== cellId);
@@ -3897,7 +4585,7 @@ class SingleCellAnalysis {
     }
 
     clearAllCells() {
-        if (confirm('确定要清空所有代码单元吗？')) {
+        if (confirm(this.t('cell.clearConfirm'))) {
             const container = document.getElementById('code-cells-container');
             container.innerHTML = '';
             this.codeCells = [];
@@ -3908,37 +4596,62 @@ class SingleCellAnalysis {
     }
 
     insertTemplate() {
-        const templates = {
-            'basic_info': `# 查看基本信息
+        const templates = this.currentLang === 'zh'
+            ? {
+                'basic_info': `# 查看基本信息
 print(adata)
 print(f"细胞数: {adata.n_obs}")
 print(f"基因数: {adata.n_vars}")`,
-            'obs_info': `# 查看观测值列
+                'obs_info': `# 查看观测值列
 print(adata.obs.columns)
 print(adata.obs.head())`,
-            'filter': `# 过滤细胞
+                'filter': `# 过滤细胞
 # 保留基因数在200-5000之间的细胞
 import scanpy as sc
 sc.pp.filter_cells(adata, min_genes=200)
 sc.pp.filter_cells(adata, max_genes=5000)
 print(f"过滤后细胞数: {adata.n_obs}")`,
-            'normalize': `# 标准化
+                'normalize': `# 标准化
 import scanpy as sc
 sc.pp.normalize_total(adata, target_sum=1e4)
 sc.pp.log1p(adata)
 print("标准化完成")`,
-            'hvg': `# 高变基因选择
+                'hvg': `# 高变基因选择
 import scanpy as sc
 sc.pp.highly_variable_genes(adata, n_top_genes=2000)
 print(f"高变基因数: {adata.var.highly_variable.sum()}")`,
-        };
+            }
+            : {
+                'basic_info': `# Basic info
+print(adata)
+print(f"Cells: {adata.n_obs}")
+print(f"Genes: {adata.n_vars}")`,
+                'obs_info': `# Observation columns
+print(adata.obs.columns)
+print(adata.obs.head())`,
+                'filter': `# Filter cells
+# Keep cells with 200-5000 genes
+import scanpy as sc
+sc.pp.filter_cells(adata, min_genes=200)
+sc.pp.filter_cells(adata, max_genes=5000)
+print(f"Cells after filter: {adata.n_obs}")`,
+                'normalize': `# Normalize
+import scanpy as sc
+sc.pp.normalize_total(adata, target_sum=1e4)
+sc.pp.log1p(adata)
+print("Normalization done")`,
+                'hvg': `# Highly variable genes
+import scanpy as sc
+sc.pp.highly_variable_genes(adata, n_top_genes=2000)
+print(f"HVG count: {adata.var.highly_variable.sum()}")`,
+            };
 
         const templateKeys = Object.keys(templates);
         let options = templateKeys.map((key, idx) =>
             `${idx + 1}. ${key.replace('_', ' ')}`
         ).join('\n');
 
-        const choice = prompt(`选择模板:\n${options}\n\n输入编号 (1-${templateKeys.length}):`);
+        const choice = prompt(`${this.t('template.chooseTitle')}\n${options}\n\n${this.t('template.chooseIndex')} (1-${templateKeys.length}):`);
         if (choice) {
             const idx = parseInt(choice) - 1;
             if (idx >= 0 && idx < templateKeys.length) {
