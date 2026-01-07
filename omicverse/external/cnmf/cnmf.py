@@ -228,10 +228,10 @@ class cNMF():
 
     def __init__(self, adata, components, n_iter = 100, densify=False, tpm_fn=None, seed=None,
                         beta_loss='frobenius',num_highvar_genes=2000, genes_file=None,
-                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir="./tmp", name=None):
+                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir=None, name=None):
         """
         Arguments:
-            output_dir: path, optional (default="."). Output directory for analysis files.
+            output_dir: path, optional (default=None). Output directory for analysis files. If None, all analysis is done in memory.
             name: string, optional (default=None). A name for this analysis. Will be prefixed to all output files. If set to None, will be automatically generated from date (and random string).
         """
 
@@ -243,7 +243,20 @@ class cNMF():
             name = '%s_%s' % (now.strftime("%Y_%m_%d"), rand_hash)
         self.name = name
         self.paths = None
-        self._initialize_dirs()
+
+        # In-memory storage
+        self.tpm = None
+        self.tpm_stats = None
+        self.norm_counts = None
+        self.replicate_params = None
+        self.run_params = None
+        self.highvar_genes = None
+        self.iter_spectra = {}  # {(k, iter): spectra_df}
+        self.merged_spectra_dict = {}  # {k: merged_spectra_df}
+        self.consensus_results = {}  # {(k, density_threshold): result_dict}
+
+        if self.output_dir is not None:
+            self._initialize_dirs()
         self.prepare(adata, components, n_iter, densify, tpm_fn, seed,
                         beta_loss, num_highvar_genes, genes_file,
                         alpha_usage, alpha_spectra, init)
@@ -322,25 +335,27 @@ class cNMF():
  
         if tpm_fn is None:
             tpm = compute_tpm(input_counts)
-            sc.write(self.paths['tpm'], tpm)
         elif tpm_fn.endswith('.h5ad'):
-            subprocess.call('cp %s %s' % (tpm_fn, self.paths['tpm']), shell=True)
-            tpm = sc.read(self.paths['tpm'])
+            tpm = sc.read(tpm_fn)
         else:
             if tpm_fn.endswith('.npz'):
                 tpm = load_df_from_npz(tpm_fn)
             else:
                 tpm = pd.read_csv(tpm_fn, sep='\t', index_col=0)
-            
+
             if densify:
                 tpm = sc.AnnData(X=tpm.values,
                             obs=pd.DataFrame(index=tpm.index),
-                            var=pd.DataFrame(index=tpm.columns)) 
+                            var=pd.DataFrame(index=tpm.columns))
             else:
                 tpm = sc.AnnData(X=sp.csr_matrix(tpm.values),
                             obs=pd.DataFrame(index=tpm.index),
-                            var=pd.DataFrame(index=tpm.columns)) 
+                            var=pd.DataFrame(index=tpm.columns))
 
+        # Store in memory
+        self.tpm = tpm
+        # Optionally save to disk
+        if self.output_dir is not None:
             sc.write(self.paths['tpm'], tpm)
         
         if sp.issparse(tpm.X):
@@ -353,8 +368,13 @@ class cNMF():
             
         input_tpm_stats = pd.DataFrame([gene_tpm_mean, gene_tpm_stddev],
              index = ['__mean', '__std'], columns = tpm.var.index).T
-        save_df_to_npz(input_tpm_stats, self.paths['tpm_stats'])
-        
+
+        # Store in memory
+        self.tpm_stats = input_tpm_stats
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(input_tpm_stats, self.paths['tpm_stats'])
+
         if genes_file is not None:
             highvargenes = open(genes_file).read().rstrip().split('\n')
         else:
@@ -363,11 +383,22 @@ class cNMF():
         norm_counts = self.get_norm_counts(input_counts, tpm, num_highvar_genes=num_highvar_genes,
                                                high_variance_genes_filter=highvargenes)
 
-        self.save_norm_counts(norm_counts)
+        # Store in memory
+        self.norm_counts = norm_counts
+        # Optionally save to disk
+        if self.output_dir is not None:
+            self.save_norm_counts(norm_counts)
+
         (replicate_params, run_params) = self.get_nmf_iter_params(ks=components, n_iter=n_iter, random_state_seed=seed,
                                                                   beta_loss=beta_loss, alpha_usage=alpha_usage,
                                                                   alpha_spectra=alpha_spectra, init=init)
-        self.save_nmf_iter_params(replicate_params, run_params)
+
+        # Store in memory
+        self.replicate_params = replicate_params
+        self.run_params = run_params
+        # Optionally save to disk
+        if self.output_dir is not None:
+            self.save_nmf_iter_params(replicate_params, run_params)
         
     
     def combine(self, components=None, skip_missing_files=False):
@@ -385,7 +416,8 @@ class cNMF():
         if type(components) is int:
             ks = [components]
         elif components is None:
-            run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+            # Use in-memory data
+            run_params = self.replicate_params
             ks = sorted(set(run_params.n_components))
         else:
             ks = components
@@ -453,8 +485,11 @@ class cNMF():
             if np.isnan(norm_counts.X).sum().sum() > 0:
                 print('Warning NaNs in normalized counts matrix')                    
         
-        ## Save a \n-delimited list of the high-variance genes used for factorization
-        open(self.paths['nmf_genes_list'], 'w').write('\n'.join(high_variance_genes_filter))
+        ## Save high-variance genes list in memory
+        self.highvar_genes = high_variance_genes_filter
+        ## Optionally save to disk
+        if self.output_dir is not None:
+            open(self.paths['nmf_genes_list'], 'w').write('\n'.join(high_variance_genes_filter))
 
         ## Check for any cells that have 0 counts of the overdispersed genes
         zerocells = np.array(norm_counts.X.sum(axis=1)==0).reshape(-1)
@@ -577,7 +612,7 @@ class cNMF():
 
         Use the `worker_i` and `total_workers` parameters for parallelization.
 
-        Generic kwargs for NMF are loaded from self.paths['nmf_run_parameters'], defaults below::
+        Generic kwargs for NMF are loaded from self.run_params, defaults below::
 
             ``non_negative_factorization`` default arguments:
                 alpha=0.0
@@ -588,27 +623,49 @@ class cNMF():
                 max_iter=200
                 regularization=None
                 init='random'
-                random_state, n_components are both set by the prespecified self.paths['nmf_replicate_parameters'].
+                random_state, n_components are both set by the prespecified self.replicate_params.
 
 
         Parameters
         ----------
-        norm_counts : pandas.DataFrame,
-            Normalized counts dataFrame to be factorized.
-            (Output of ``normalize_counts``)
+        worker_i : int, optional (default=0)
+            Worker index for parallelization. When using multiple workers, each worker
+            should have a unique index from 0 to total_workers-1.
 
-        run_params : pandas.DataFrame,
-            Parameters for NMF iterations.
-            (Output of ``prepare_nmf_iter_params``)
+        total_workers : int, optional (default=1)
+            Total number of workers for parallelization.
+
+            IMPORTANT: If you set total_workers > 1, you MUST run factorize() for each
+            worker separately:
+                cnmf_obj.factorize(worker_i=0, total_workers=2)
+                cnmf_obj.factorize(worker_i=1, total_workers=2)
+
+            For in-memory mode (output_dir=None), it's recommended to use total_workers=1
+            and run all iterations in a single call.
 
         """
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
-        norm_counts = sc.read(self.paths['normalized_counts'])
-        _nmf_kwargs = yaml.load(open(self.paths['nmf_run_parameters']), Loader=yaml.FullLoader)
+        # Use in-memory data
+        run_params = self.replicate_params
+        norm_counts = self.norm_counts
+        _nmf_kwargs = self.run_params.copy()
+
+        # Warning for multi-worker setup in memory mode
+        if total_workers > 1 and self.output_dir is None:
+            print(f'⚠️  Using total_workers={total_workers} in memory mode.')
+            print(f'⚠️  You MUST run factorize() for ALL workers (0 to {total_workers-1}), otherwise iterations will be missing!')
+            print(f'⚠️  Currently running worker {worker_i}/{total_workers-1}')
 
         jobs_for_this_worker = worker_filter(range(len(run_params)), worker_i, total_workers)
         from tqdm import tqdm
-        for idx in tqdm(jobs_for_this_worker):
+        jobs_list = list(jobs_for_this_worker)
+
+        if len(jobs_list) == 0:
+            print(f'⚠️  No jobs assigned to worker {worker_i}. Check your worker_i and total_workers settings.')
+            return
+
+        print(f'Running {len(jobs_list)} factorization iterations for worker {worker_i}...')
+
+        for idx in tqdm(jobs_list):
 
             p = run_params.iloc[idx, :]
             #print('[Worker %d]. Starting task %d.' % (worker_i, idx))
@@ -619,32 +676,69 @@ class cNMF():
             spectra = pd.DataFrame(spectra,
                                    index=np.arange(1, _nmf_kwargs['n_components']+1),
                                    columns=norm_counts.var.index)
-            save_df_to_npz(spectra, self.paths['iter_spectra'] % (p['n_components'], p['iter']))
+
+            # Store in memory
+            self.iter_spectra[(p['n_components'], p['iter'])] = spectra
+            # Optionally save to disk
+            if self.output_dir is not None:
+                save_df_to_npz(spectra, self.paths['iter_spectra'] % (p['n_components'], p['iter']))
+
+        print(f'✓ Worker {worker_i} completed {len(jobs_list)} iterations. Total in memory: {len(self.iter_spectra)}')
 
 
     def combine_nmf(self, k, skip_missing_files=False, remove_individual_iterations=False):
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+        # Use in-memory data
+        run_params = self.replicate_params
         print('Combining factorizations for k=%d.'%k)
 
         run_params_subset = run_params[run_params.n_components==k].sort_values('iter')
         combined_spectra = []
+        missing_count = 0
+        total_expected = len(run_params_subset)
 
         for i,p in run_params_subset.iterrows():
-            current_file = self.paths['iter_spectra'] % (p['n_components'], p['iter'])
-            if not os.path.exists(current_file):
-                if not skip_missing_files:
-                    print('Missing file: %s, run with skip_missing=True to override' % current_file)
-                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), current_file)
-                else:
-                    print('Missing file: %s. Skipping.' % current_file)
-            else:
-                spectra = load_df_from_npz(current_file)
+            spectra_key = (p['n_components'], p['iter'])
+            # First try to get from memory
+            if spectra_key in self.iter_spectra:
+                spectra = self.iter_spectra[spectra_key]
                 spectra.index = ['iter%d_topic%d' % (p['iter'], t+1) for t in range(k)]
                 combined_spectra.append(spectra)
-                
-        if len(combined_spectra)>0:        
+            # Fall back to disk if output_dir is set and file exists
+            elif self.output_dir is not None:
+                current_file = self.paths['iter_spectra'] % (p['n_components'], p['iter'])
+                if not os.path.exists(current_file):
+                    missing_count += 1
+                    if not skip_missing_files:
+                        print('Missing spectra: %s, run with skip_missing=True to override' % str(spectra_key))
+                        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(spectra_key))
+                else:
+                    spectra = load_df_from_npz(current_file)
+                    spectra.index = ['iter%d_topic%d' % (p['iter'], t+1) for t in range(k)]
+                    combined_spectra.append(spectra)
+            else:
+                missing_count += 1
+                if not skip_missing_files:
+                    print('Missing spectra: %s, run with skip_missing=True to override' % str(spectra_key))
+                    raise KeyError(f"Spectra not found for {spectra_key}")
+
+        # Print summary
+        found_count = len(combined_spectra)
+        if missing_count > 0:
+            print(f'  Found {found_count}/{total_expected} iterations for k={k} ({missing_count} missing)')
+            if missing_count == total_expected // 2:
+                print(f'  ⚠️  WARNING: Exactly half the iterations are missing!')
+                print(f'  ⚠️  This usually means you used total_workers>1 but only ran one worker.')
+                print(f'  ⚠️  Solution: Either run factorize() with total_workers=1, or run all workers.')
+        else:
+            print(f'  Found all {found_count} iterations for k={k}')
+
+        if len(combined_spectra)>0:
             combined_spectra = pd.concat(combined_spectra, axis=0)
-            save_df_to_npz(combined_spectra, self.paths['merged_spectra']%k)
+            # Store in memory
+            self.merged_spectra_dict[k] = combined_spectra
+            # Optionally save to disk
+            if self.output_dir is not None:
+                save_df_to_npz(combined_spectra, self.paths['merged_spectra']%k)
         else:
             print('No spectra found for k=%d' % k)
         return combined_spectra
@@ -653,7 +747,7 @@ class cNMF():
     def refit_usage(self, X, spectra):
         """
         Takes an input data matrix and a fixed spectra and uses NNLS to find the optimal
-        usage matrix. Generic kwargs for NMF are loaded from self.paths['nmf_run_parameters'].
+        usage matrix. Generic kwargs for NMF are loaded from self.run_params.
         If input data are pandas.DataFrame, returns a DataFrame with row index matching X and
         columns index matching index of spectra
 
@@ -666,16 +760,17 @@ class cNMF():
             Non-negative spectra of expression programs
         """
 
-        refit_nmf_kwargs = yaml.load(open(self.paths['nmf_run_parameters']), Loader=yaml.FullLoader)
+        # Use in-memory run_params
+        refit_nmf_kwargs = self.run_params.copy()
         if type(spectra) is pd.DataFrame:
             refit_nmf_kwargs.update(dict(n_components = spectra.shape[0], H = spectra.values, update_H = False))
         else:
             refit_nmf_kwargs.update(dict(n_components = spectra.shape[0], H = spectra, update_H = False))
-            
+
         _, rf_usages = self._nmf(X, nmf_kwargs=refit_nmf_kwargs)
         if (type(X) is pd.DataFrame) and (type(spectra) is pd.DataFrame):
             rf_usages = pd.DataFrame(rf_usages, index=X.index, columns=spectra.index)
-          
+
         return(rf_usages)
     
     
@@ -740,11 +835,21 @@ class cNMF():
             Speed up calculation of k_selection_plot by avoiding reloading norm_counts for each K. Should not be used by
             most users
         """
-        
-        
-        merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+
+
+        # Use in-memory data
+        if k not in self.merged_spectra_dict:
+            # Try loading from disk if output_dir is set
+            if self.output_dir is not None and os.path.exists(self.paths['merged_spectra']%k):
+                merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+                self.merged_spectra_dict[k] = merged_spectra
+            else:
+                raise ValueError(f"Merged spectra for k={k} not found. Run combine() first.")
+        else:
+            merged_spectra = self.merged_spectra_dict[k]
+
         if norm_counts is None:
-            norm_counts = sc.read(self.paths['normalized_counts'])
+            norm_counts = self.norm_counts
 
         density_threshold_str = str(density_threshold)
         if skip_density_and_return_after_stats:
@@ -758,8 +863,17 @@ class cNMF():
         if not skip_density_and_return_after_stats:
             # Compute the local density matrix (if not previously cached)
             topics_dist = None
-            if os.path.isfile(self.paths['local_density_cache'] % k):
+            # Check in-memory cache first
+            cache_key = f'local_density_{k}'
+            if not hasattr(self, '_local_density_cache'):
+                self._local_density_cache = {}
+
+            if cache_key in self._local_density_cache:
+                local_density = self._local_density_cache[cache_key]
+            # Then check disk cache if output_dir is set
+            elif self.output_dir is not None and os.path.isfile(self.paths['local_density_cache'] % k):
                 local_density = load_df_from_npz(self.paths['local_density_cache'] % k)
+                self._local_density_cache[cache_key] = local_density
             else:
                 #   first find the full distance matrix
                 topics_dist = euclidean_distances(l2_spectra.values)
@@ -770,7 +884,11 @@ class cNMF():
                 local_density = pd.DataFrame(distance_to_nearest_neighbors.sum(1)/(n_neighbors),
                                              columns=['local_density'],
                                              index=l2_spectra.index)
-                save_df_to_npz(local_density, self.paths['local_density_cache'] % k)
+                # Cache in memory
+                self._local_density_cache[cache_key] = local_density
+                # Optionally save to disk
+                if self.output_dir is not None:
+                    save_df_to_npz(local_density, self.paths['local_density_cache'] % k)
                 del(partitioning_order)
                 del(distance_to_nearest_neighbors)
 
@@ -835,8 +953,8 @@ class cNMF():
         
         # Convert spectra to TPM units, and obtain results for all genes by running last step of NMF
         # with usages fixed and TPM as the input matrix
-        tpm = sc.read(self.paths['tpm'])
-        tpm_stats = load_df_from_npz(self.paths['tpm_stats'])
+        tpm = self.tpm
+        tpm_stats = self.tpm_stats
         spectra_tpm = self.refit_spectra(tpm.X, norm_usages.astype(tpm.X.dtype))
         spectra_tpm = pd.DataFrame(spectra_tpm, index=rf_usages.columns, columns=tpm.var.index)
         if normalize_tpm_spectra:
@@ -855,28 +973,39 @@ class cNMF():
         if refit_usage:
             ## Re-fitting usage a final time on std-scaled HVG TPM seems to
             ## increase accuracy on simulated data
-            hvgs = open(self.paths['nmf_genes_list']).read().split('\n')
+            hvgs = self.highvar_genes
             norm_tpm = tpm[:, hvgs]
             if sp.issparse(norm_tpm.X):
-                sc.pp.scale(norm_tpm, zero_center=False)                       
+                sc.pp.scale(norm_tpm, zero_center=False)
             else:
                 norm_tpm.X /= norm_tpm.X.std(axis=0, ddof=1)
-                
+
             spectra_tpm_rf = spectra_tpm.loc[:,hvgs]
 
             spectra_tpm_rf = spectra_tpm_rf.div(tpm_stats.loc[hvgs, '__std'], axis=1)
             rf_usages = self.refit_usage(norm_tpm.X, spectra_tpm_rf.astype(norm_tpm.X.dtype))
-            rf_usages = pd.DataFrame(rf_usages, index=norm_counts.obs.index, columns=spectra_tpm_rf.index)                                                                  
-               
-        save_df_to_npz(median_spectra, self.paths['consensus_spectra']%(k, density_threshold_repl))
-        save_df_to_npz(rf_usages, self.paths['consensus_usages']%(k, density_threshold_repl))
-        #save_df_to_npz(consensus_stats, self.paths['consensus_stats']%(k, density_threshold_repl))
-        save_df_to_text(median_spectra, self.paths['consensus_spectra__txt']%(k, density_threshold_repl))
-        save_df_to_text(rf_usages, self.paths['consensus_usages__txt']%(k, density_threshold_repl))
-        save_df_to_npz(spectra_tpm, self.paths['gene_spectra_tpm']%(k, density_threshold_repl))
-        save_df_to_text(spectra_tpm, self.paths['gene_spectra_tpm__txt']%(k, density_threshold_repl))
-        save_df_to_npz(usage_coef, self.paths['gene_spectra_score']%(k, density_threshold_repl))
-        save_df_to_text(usage_coef, self.paths['gene_spectra_score__txt']%(k, density_threshold_repl))
+            rf_usages = pd.DataFrame(rf_usages, index=norm_counts.obs.index, columns=spectra_tpm_rf.index)
+
+        # Store consensus results in memory
+        consensus_key = (k, density_threshold)
+        self.consensus_results[consensus_key] = {
+            'median_spectra': median_spectra,
+            'rf_usages': rf_usages,
+            'spectra_tpm': spectra_tpm,
+            'usage_coef': usage_coef
+        }
+
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(median_spectra, self.paths['consensus_spectra']%(k, density_threshold_repl))
+            save_df_to_npz(rf_usages, self.paths['consensus_usages']%(k, density_threshold_repl))
+            #save_df_to_npz(consensus_stats, self.paths['consensus_stats']%(k, density_threshold_repl))
+            save_df_to_text(median_spectra, self.paths['consensus_spectra__txt']%(k, density_threshold_repl))
+            save_df_to_text(rf_usages, self.paths['consensus_usages__txt']%(k, density_threshold_repl))
+            save_df_to_npz(spectra_tpm, self.paths['gene_spectra_tpm']%(k, density_threshold_repl))
+            save_df_to_text(spectra_tpm, self.paths['gene_spectra_tpm__txt']%(k, density_threshold_repl))
+            save_df_to_npz(usage_coef, self.paths['gene_spectra_score']%(k, density_threshold_repl))
+            save_df_to_text(usage_coef, self.paths['gene_spectra_score__txt']%(k, density_threshold_repl))
         if show_clustering:
             if topics_dist is None:
                 topics_dist = euclidean_distances(l2_spectra.values)
@@ -969,14 +1098,20 @@ class cNMF():
             #hist_ax.hist(local_density.values, bins=np.linspace(0, 1, 50))
             #hist_ax.yaxis.tick_right()            
 
-            fig.savefig(self.paths['clustering_plot']%(k, density_threshold_repl), dpi=250)
+            if self.output_dir is not None:
+                fig.savefig(self.paths['clustering_plot']%(k, density_threshold_repl), dpi=250)
             if close_clustergram_fig:
                 plt.close(fig)
 
-        self.topic_dist = topics_dist
-        self.spectra_order=spectra_order
-        self.local_density = local_density
-        self.kmeans_cluster_labels=kmeans_cluster_labels
+            # Store clustering results
+            self.topic_dist = topics_dist
+            self.spectra_order = spectra_order
+            self.local_density = local_density
+            self.kmeans_cluster_labels = kmeans_cluster_labels
+        else:
+            # When show_clustering=False, still store what we have
+            self.local_density = local_density if not skip_density_and_return_after_stats else None
+            self.kmeans_cluster_labels = kmeans_cluster_labels
 
 
     def k_selection_plot(self, close_fig=False):
@@ -984,9 +1119,10 @@ class cNMF():
         Borrowed from Alexandrov Et Al. 2013 Deciphering Mutational Signatures
         publication in Cell Reports
         '''
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+        # Use in-memory data
+        run_params = self.replicate_params
         stats = []
-        norm_counts = sc.read(self.paths['normalized_counts'])
+        norm_counts = self.norm_counts
         for k in sorted(set(run_params.n_components)):
             stats.append(self.consensus(k, skip_density_and_return_after_stats=True,
                                         show_clustering=False, close_clustergram_fig=True,
@@ -995,7 +1131,9 @@ class cNMF():
         stats = pd.DataFrame(stats)
         stats.reset_index(drop = True, inplace = True)
 
-        save_df_to_npz(stats, self.paths['k_selection_stats'])
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(stats, self.paths['k_selection_stats'])
 
         fig = plt.figure(figsize=(6, 4))
         ax1 = fig.add_subplot(111)
@@ -1016,17 +1154,18 @@ class cNMF():
         ax1.set_xlabel('Number of Components', fontsize=15)
         ax1.grid('on')
         plt.tight_layout()
-        fig.savefig(self.paths['k_selection_plot'], dpi=250)
+        if self.output_dir is not None:
+            fig.savefig(self.paths['k_selection_plot'], dpi=250)
         if close_fig:
             plt.close(fig)
             
             
     def load_results(self, K, density_threshold, n_top_genes=100, norm_usage = True):
         """
-        Loads normalized usages and gene_spectra_scores for a given choice of K and 
+        Loads normalized usages and gene_spectra_scores for a given choice of K and
         local_density_threshold for the cNMF run. Additionally returns a DataFrame of
         the top genes linked to each program
-        
+
         Parameters
         ----------
         K : int
@@ -1040,7 +1179,7 @@ class cNMF():
 
         norm_usage : boolean, optional (default=True)
             If True, normalize cNMF usages to sum to 1
-        
+
         Returns
         ----------
         usage - cNMF usages (cells X K)
@@ -1049,13 +1188,23 @@ class cNMF():
         spectra_tpm - Coeffecients for contribution of each gene to each program (K x genes) in TPM units
         top_genes - ranked list of marker genes per GEP (n_top_genes X K)
         """
-        scorefn = self.paths['gene_spectra_score__txt'] % (K, str(density_threshold).replace('.', '_'))
-        tpmfn = self.paths['gene_spectra_tpm__txt'] % (K, str(density_threshold).replace('.', '_'))
-        usagefn = self.paths['consensus_usages__txt'] % (K, str(density_threshold).replace('.', '_'))
-        spectra_scores = pd.read_csv(scorefn, sep='\t', index_col=0).T
-        spectra_tpm = pd.read_csv(tpmfn, sep='\t', index_col=0).T
-
-        usage = pd.read_csv(usagefn, sep='\t', index_col=0)
+        # First try to load from memory
+        consensus_key = (K, density_threshold)
+        if consensus_key in self.consensus_results:
+            consensus_data = self.consensus_results[consensus_key]
+            spectra_scores = consensus_data['usage_coef'].T
+            spectra_tpm = consensus_data['spectra_tpm'].T
+            usage = consensus_data['rf_usages']
+        # Fall back to disk if output_dir is set
+        elif self.output_dir is not None:
+            scorefn = self.paths['gene_spectra_score__txt'] % (K, str(density_threshold).replace('.', '_'))
+            tpmfn = self.paths['gene_spectra_tpm__txt'] % (K, str(density_threshold).replace('.', '_'))
+            usagefn = self.paths['consensus_usages__txt'] % (K, str(density_threshold).replace('.', '_'))
+            spectra_scores = pd.read_csv(scorefn, sep='\t', index_col=0).T
+            spectra_tpm = pd.read_csv(tpmfn, sep='\t', index_col=0).T
+            usage = pd.read_csv(usagefn, sep='\t', index_col=0)
+        else:
+            raise ValueError(f"Results for K={K}, density_threshold={density_threshold} not found. Run consensus() first.")
         
         if norm_usage:
             usage = usage.div(usage.sum(axis=1), axis=0)
