@@ -644,6 +644,7 @@ Added and fixed the `anndata-rs` to support million size's datasets (#336)
 
 ### Space Module
 - Added `FlashDeconv` to perform deconvolution in Visium profile.
+- Added `Banksy` to perform the spatial cluster
 
 ### Web Module
 - Added `Omicverse-Notebook` and `Omicverse-Web` to analysis data without code.
