@@ -24,7 +24,9 @@ import matplotlib.pyplot as plt
 
 import scanpy as sc
 
-from multiprocessing import Pool 
+from multiprocessing import Pool
+
+
 
 
 def save_df_to_npz(obj, filename):
@@ -228,11 +230,14 @@ class cNMF():
 
     def __init__(self, adata, components, n_iter = 100, densify=False, tpm_fn=None, seed=None,
                         beta_loss='frobenius',num_highvar_genes=2000, genes_file=None,
-                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir=None, name=None):
+                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir=None, name=None,
+                        use_gpu=True, gpu_id=0):
         """
         Arguments:
             output_dir: path, optional (default=None). Output directory for analysis files. If None, all analysis is done in memory.
             name: string, optional (default=None). A name for this analysis. Will be prefixed to all output files. If set to None, will be automatically generated from date (and random string).
+            use_gpu: bool, optional (default=True). If True and GPU is available, use GPU acceleration for NMF factorization.
+            gpu_id: int, optional (default=0). GPU device ID to use when multiple GPUs are available.
         """
 
         self.output_dir = output_dir
@@ -243,6 +248,13 @@ class cNMF():
             name = '%s_%s' % (now.strftime("%Y_%m_%d"), rand_hash)
         self.name = name
         self.paths = None
+
+        # GPU configuration
+        self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
+        if use_gpu:
+            import torch
+            self.device = torch.device(f'cuda:{gpu_id}' if self.use_gpu else 'cpu')
 
         # In-memory storage
         self.tpm = None
@@ -577,18 +589,123 @@ class cNMF():
 
     def _nmf(self, X, nmf_kwargs):
         """
+        GPU-accelerated NMF with automatic fallback to CPU.
+
         Parameters
         ----------
-        X : pandas.DataFrame,
+        X : pandas.DataFrame or scipy.sparse matrix,
             Normalized counts dataFrame to be factorized.
 
         nmf_kwargs : dict,
-            Arguments to be passed to ``non_negative_factorization``
+            Arguments to be passed to NMF
 
+        Returns
+        -------
+        spectra : numpy.ndarray
+            Gene expression programs (components x genes)
+        usages : numpy.ndarray
+            Usage matrix (cells x components)
         """
-        (usages, spectra, niter) = non_negative_factorization(X, **nmf_kwargs)
+        if self.use_gpu:
+            try:
+                return self._nmf_torch(X, nmf_kwargs)
+            except Exception as e:
+                print(f"⚠️  GPU NMF failed: {e}")
+                print("⚠️  Falling back to CPU mode")
+                # Fall through to CPU mode
 
+        # CPU mode (original sklearn implementation)
+        (usages, spectra, niter) = non_negative_factorization(X, **nmf_kwargs)
         return(spectra, usages)
+
+    def _nmf_torch(self, X, nmf_kwargs):
+        """
+        PyTorch GPU-accelerated NMF implementation.
+
+        Parameters
+        ----------
+        X : scipy.sparse or numpy.ndarray
+            Input matrix to factorize
+        nmf_kwargs : dict
+            NMF parameters from sklearn
+
+        Returns
+        -------
+        spectra : numpy.ndarray
+        usages : numpy.ndarray
+        """
+        # Convert sparse matrix to dense if needed
+        # GPU acceleration support
+        try:
+            import torch
+            from torchnmf.nmf import NMF as TorchNMF
+            TORCH_AVAILABLE = True
+            CUDA_AVAILABLE = torch.cuda.is_available()
+        except ImportError:
+            TORCH_AVAILABLE = False
+            CUDA_AVAILABLE = False
+            print("⚠ torchnmf not available. Install with: pip install torchnmf") 
+        if sp.issparse(X):
+            X_dense = X.toarray()
+        else:
+            X_dense = np.array(X)
+
+        # Convert to PyTorch tensor and move to GPU
+        X_tensor = torch.FloatTensor(X_dense).to(self.device)
+
+        # Extract parameters
+        n_components = nmf_kwargs['n_components']
+        max_iter = nmf_kwargs.get('max_iter', 200)
+        tol = nmf_kwargs.get('tol', 1e-4)
+        beta_loss = nmf_kwargs.get('beta_loss', 'frobenius')
+        random_state = nmf_kwargs.get('random_state', None)
+
+        # Map beta_loss to torchnmf beta parameter
+        # sklearn: 'frobenius' (beta=2), 'kullback-leibler' (beta=1)
+        # torchnmf: beta parameter directly
+        if beta_loss == 'frobenius':
+            beta = 2.0
+        elif beta_loss == 'kullback-leibler':
+            beta = 1.0
+        else:
+            beta = 2.0  # default to Frobenius
+
+        # Set random seed if provided
+        if random_state is not None:
+            torch.manual_seed(random_state)
+            if self.use_gpu:
+                torch.cuda.manual_seed(random_state)
+
+        # Initialize torchnmf model
+        # Note: Only shape and rank are passed to __init__()
+        # Beta, tol, max_iter are passed to fit() method
+        model = TorchNMF(
+            X_tensor.shape,
+            rank=n_components
+        ).to(self.device)
+
+        # Fit the model with all training parameters
+        model.fit(
+            X_tensor,
+            beta=beta,
+            tol=tol,
+            max_iter=max_iter,
+            verbose=False
+        )
+
+        # Extract results and move back to CPU
+        # IMPORTANT: torchnmf uses V ≈ H @ W^T (not W @ H like sklearn)
+        # - H: (cells, components) - this is usages
+        # - W: (genes, components) - need to transpose for spectra
+        usages = model.H.detach().cpu().numpy()  # (cells, components)
+        spectra = model.W.T.detach().cpu().numpy()  # (components, genes) - transposed!
+
+        # Clear GPU memory
+        del X_tensor, model
+        if self.use_gpu:
+            torch.cuda.empty_cache()
+
+        return (spectra, usages)
 
     def factorize_multi_process(self, total_workers):
         """
@@ -648,6 +765,12 @@ class cNMF():
         run_params = self.replicate_params
         norm_counts = self.norm_counts
         _nmf_kwargs = self.run_params.copy()
+
+        # Display compute mode
+        if self.use_gpu:
+            print(f'🚀 Running NMF on GPU (device {self.gpu_id})')
+        else:
+            print(f'💻 Running NMF on CPU')
 
         # Warning for multi-worker setup in memory mode
         if total_workers > 1 and self.output_dir is None:
