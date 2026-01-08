@@ -15,7 +15,7 @@ from .local_stats import compute_hs
 from .local_stats_pairs import compute_hs_pairs, compute_hs_pairs_centered_cond
 
 from . import modules
-from .plots import local_correlation_plot
+from .plots import local_correlation_plot, local_correlation_plot_marsilea, MARSILEA_AVAILABLE
 from tqdm import tqdm
 
 
@@ -575,7 +575,10 @@ class Hotspot:
         return self.module_scores
 
     def plot_local_correlations(
-        self, mod_cmap="tab10", vmin=-8, vmax=8, z_cmap="RdBu_r", yticklabels=False
+        self, mod_cmap="tab10", vmin=-8, vmax=8, z_cmap="RdBu_r", yticklabels=False,
+        use_marsilea=False, width=10, height=10, font_size=10,
+        add_dendrogram=True, add_module_colors=True, add_module_labels=True,
+        show_values=False, value_fontsize=6, title="Local Gene Correlations"
     ):
         """Plots a clustergrid of the local correlation values
 
@@ -590,19 +593,90 @@ class Hotspot:
         z_cmap: valid matplotlib colormap str or object
             continuous colormap for correlation Z-scores
         yticklabels: bool
-            Whether or not to plot all gene labels
+            Whether or not to plot all gene labels (seaborn mode only)
             Default is false as there are too many.  However
             if using this plot interactively you may with to set
             to true so you can zoom in and read gene names
+        use_marsilea: bool, optional (default=False)
+            If True, uses marsilea for enhanced visualization.
+            If False, uses the default seaborn clustermap.
+            Requires marsilea package: pip install marsilea
+        width: float, optional (default=10)
+            Figure width (marsilea mode only)
+        height: float, optional (default=10)
+            Figure height (marsilea mode only)
+        font_size: int, optional (default=10)
+            Font size for labels (marsilea mode only)
+        add_dendrogram: bool, optional (default=True)
+            Whether to add dendrogram (marsilea mode only)
+        add_module_colors: bool, optional (default=True)
+            Whether to add module color bars (marsilea mode only)
+        add_module_labels: bool, optional (default=True)
+            Whether to add module labels (marsilea mode only)
+        show_values: bool, optional (default=False)
+            Whether to show correlation values in cells (marsilea mode only)
+        value_fontsize: int, optional (default=6)
+            Font size for cell values (marsilea mode only)
+        title: str, optional (default="Local Gene Correlations")
+            Plot title (marsilea mode only)
+
+        Returns
+        -------
+        ClusterGrid or marsilea Heatmap object
+            Seaborn ClusterGrid if use_marsilea=False
+            Marsilea Heatmap object if use_marsilea=True
+
+        Examples
+        --------
+        >>> # Default seaborn visualization
+        >>> hs.plot_local_correlations()
+        >>>
+        >>> # Enhanced marsilea visualization
+        >>> hs.plot_local_correlations(use_marsilea=True, width=12, height=12)
+        >>>
+        >>> # Marsilea with custom settings
+        >>> hs.plot_local_correlations(
+        ...     use_marsilea=True,
+        ...     show_values=True,
+        ...     add_module_labels=True,
+        ...     title="Hotspot Local Correlations"
+        ... )
         """
 
-        return local_correlation_plot(
-            self.local_correlation_z,
-            self.modules,
-            self.linkage,
-            mod_cmap=mod_cmap,
-            vmin=vmin,
-            vmax=vmax,
-            z_cmap=z_cmap,
-            yticklabels=yticklabels,
-        )
+        if use_marsilea:
+            if not MARSILEA_AVAILABLE:
+                print("Warning: marsilea package is not available.")
+                print("Install it with: pip install marsilea")
+                print("Falling back to default seaborn visualization.")
+                use_marsilea = False
+
+        if use_marsilea:
+            return local_correlation_plot_marsilea(
+                self.local_correlation_z,
+                self.modules,
+                self.linkage,
+                mod_cmap=mod_cmap,
+                vmin=vmin,
+                vmax=vmax,
+                z_cmap=z_cmap,
+                width=width,
+                height=height,
+                font_size=font_size,
+                add_dendrogram=add_dendrogram,
+                add_module_colors=add_module_colors,
+                add_module_labels=add_module_labels,
+                show_values=show_values,
+                value_fontsize=value_fontsize,
+                title=title
+            )
+        else:
+            return local_correlation_plot(
+                self.local_correlation_z,
+                self.modules,
+                self.linkage,
+                mod_cmap=mod_cmap,
+                vmin=vmin,
+                vmax=vmax,
+                z_cmap=z_cmap,
+                yticklabels=yticklabels,
+            )
