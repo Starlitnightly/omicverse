@@ -62,7 +62,7 @@
 - [x] `ov.single.Fate`: TimeFateKernel (<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]).
 - [x] `ov.single.pyCEFCON`: CEFCON driver discovery (<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]).
 - [x] `ov.single.gptcelltype_local`: Local LLM annotation (<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]).
-- [ ] `ov.single.cNMF`: cNMF (CPU implementation).
+- [x] `ov.single.cNMF`: cNMF (<span class="tag tag-all">all</span>[<span class="tag tag-torch">torch</span>]).
 - [ ] `ov.single.CellVote`: Multi-method voting.
   * [ ] `scsa_anno` (SCSA, CPU).
   * [ ] `gpt_anno` (online GPT, CPU/network).
