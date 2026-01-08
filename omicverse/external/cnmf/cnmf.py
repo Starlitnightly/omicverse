@@ -1114,16 +1114,318 @@ class cNMF():
             self.kmeans_cluster_labels = kmeans_cluster_labels
 
 
-    def k_selection_plot(self, close_fig=False):
+    def calculate_silhouette_k(self, k, density_threshold=2.0, use_l2_spectra=True):
+        """
+        Calculate silhouette scores for a given k value.
+
+        Parameters
+        ----------
+        k : int
+            Number of programs
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        use_l2_spectra : bool, optional (default=True)
+            If True, use L2-normalized spectra for distance calculation.
+            If False, use consensus usages from cells.
+
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - 'avg_silhouette': Average silhouette score
+            - 'silhouette_values': Per-sample silhouette scores
+            - 'cluster_labels': Cluster labels
+            - 'n_clusters': Number of clusters
+        """
+        from sklearn.metrics import silhouette_score, silhouette_samples
+
+        # Get merged spectra
+        if k not in self.merged_spectra_dict:
+            if self.output_dir is not None and os.path.exists(self.paths['merged_spectra']%k):
+                merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+                self.merged_spectra_dict[k] = merged_spectra
+            else:
+                raise ValueError(f"Merged spectra for k={k} not found. Run combine() first.")
+        else:
+            merged_spectra = self.merged_spectra_dict[k]
+
+        # L2 normalize spectra
+        l2_spectra = (merged_spectra.T/np.sqrt((merged_spectra**2).sum(axis=1))).T
+
+        # Apply density filtering if needed
+        if density_threshold < 2.0:
+            cache_key = f'local_density_{k}'
+            if not hasattr(self, '_local_density_cache'):
+                self._local_density_cache = {}
+
+            if cache_key in self._local_density_cache:
+                local_density = self._local_density_cache[cache_key]
+            elif self.output_dir is not None and os.path.isfile(self.paths['local_density_cache'] % k):
+                local_density = load_df_from_npz(self.paths['local_density_cache'] % k)
+                self._local_density_cache[cache_key] = local_density
+            else:
+                # Calculate local density
+                from sklearn.metrics.pairwise import euclidean_distances
+                local_neighborhood_size = 0.30
+                n_neighbors = int(local_neighborhood_size * merged_spectra.shape[0]/k)
+                topics_dist = euclidean_distances(l2_spectra.values)
+                partitioning_order = np.argpartition(topics_dist, n_neighbors+1)[:, :n_neighbors+1]
+                distance_to_nearest_neighbors = topics_dist[np.arange(topics_dist.shape[0])[:, None], partitioning_order]
+                local_density = pd.DataFrame(distance_to_nearest_neighbors.sum(1)/(n_neighbors),
+                                             columns=['local_density'],
+                                             index=l2_spectra.index)
+                self._local_density_cache[cache_key] = local_density
+
+            density_filter = local_density.iloc[:, 0] < density_threshold
+            l2_spectra = l2_spectra.loc[density_filter, :]
+
+        # Perform K-means clustering
+        from sklearn.cluster import KMeans
+        kmeans_model = KMeans(n_clusters=k, n_init=10, random_state=1)
+        cluster_labels = kmeans_model.fit_predict(l2_spectra.values)
+
+        # Calculate silhouette scores
+        avg_silhouette = silhouette_score(l2_spectra.values, cluster_labels, metric='euclidean')
+        silhouette_values = silhouette_samples(l2_spectra.values, cluster_labels, metric='euclidean')
+
+        return {
+            'avg_silhouette': avg_silhouette,
+            'silhouette_values': silhouette_values,
+            'cluster_labels': cluster_labels,
+            'n_clusters': k,
+            'l2_spectra': l2_spectra
+        }
+
+
+    def plot_silhouette_for_k(self, k, density_threshold=2.0, ax=None, show_avg=True,
+                              cmap='Spectral', figsize=(8, 6)):
+        """
+        Plot detailed silhouette plot for a single k value.
+
+        Parameters
+        ----------
+        k : int
+            Number of programs
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on. If None, creates new figure.
+
+        show_avg : bool, optional (default=True)
+            If True, shows average silhouette score line
+
+        cmap : str, optional (default='Spectral')
+            Colormap for clusters
+
+        figsize : tuple, optional (default=(8, 6))
+            Figure size if creating new figure
+
+        Returns
+        -------
+        fig, ax
+            Figure and axes objects
+        """
+        # Calculate silhouette scores
+        sil_data = self.calculate_silhouette_k(k, density_threshold)
+
+        silhouette_values = sil_data['silhouette_values']
+        cluster_labels = sil_data['cluster_labels']
+        avg_silhouette = sil_data['avg_silhouette']
+
+        # Create figure if needed
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        else:
+            fig = ax.get_figure()
+
+        # Set up y-axis
+        y_lower = 10
+
+        # Get colormap - compatible with different matplotlib versions
+        import matplotlib.pyplot as plt
+        try:
+            # Try matplotlib.pyplot.get_cmap (works in most versions)
+            cmap_obj = plt.get_cmap(cmap)
+        except AttributeError:
+            try:
+                # Try new API (matplotlib >= 3.7)
+                import matplotlib as mpl
+                cmap_obj = mpl.colormaps[cmap]
+            except (AttributeError, KeyError):
+                # Last resort: direct import
+                from matplotlib.colors import get_cmap
+                cmap_obj = get_cmap(cmap)
+
+        colors = cmap_obj(np.linspace(0, 1, k))
+
+        for i in range(k):
+            # Aggregate silhouette scores for samples in cluster i
+            ith_cluster_silhouette_values = silhouette_values[cluster_labels == i]
+            ith_cluster_silhouette_values.sort()
+
+            size_cluster_i = ith_cluster_silhouette_values.shape[0]
+            y_upper = y_lower + size_cluster_i
+
+            ax.fill_betweenx(np.arange(y_lower, y_upper),
+                            0, ith_cluster_silhouette_values,
+                            facecolor=colors[i], edgecolor=colors[i], alpha=0.7)
+
+            # Label the silhouette plots with their cluster numbers at the middle
+            ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i+1))
+
+            # Compute the new y_lower for next plot
+            y_lower = y_upper + 10  # 10 for the 0 samples
+
+        ax.set_title(f'Silhouette Plot for k={k}')
+        ax.set_xlabel('Silhouette Coefficient')
+        ax.set_ylabel('Cluster Label')
+
+        # The vertical line for average silhouette score of all the values
+        if show_avg:
+            ax.axvline(x=avg_silhouette, color="red", linestyle="--", linewidth=2,
+                      label=f'Avg: {avg_silhouette:.3f}')
+            ax.legend(loc='best')
+
+        ax.set_yticks([])  # Clear the yaxis labels / ticks
+        ax.set_xticks(np.arange(-0.2, 1.0, 0.2))
+        ax.set_xlim([-0.2, 1])
+
+        return fig, ax
+
+
+    def plot_silhouette_survey(self, k_range=None, density_threshold=2.0,
+                               ncols=3, figsize=None, cmap='Spectral',
+                               show_avg=True, title=None, save_path=None):
+        """
+        Generate a grid of silhouette plots for multiple k values for easy comparison.
+
+        This automated visualization method generates detailed silhouette plots for each
+        k value in the range and arranges them in a grid layout, allowing easy visual
+        comparison of clustering quality across different factorization ranks.
+
+        Parameters
+        ----------
+        k_range : list or range, optional
+            Range of k values to plot. If None, uses all k values from run_params.
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        ncols : int, optional (default=3)
+            Number of columns in the grid
+
+        figsize : tuple, optional
+            Figure size. If None, automatically calculated based on grid size.
+
+        cmap : str, optional (default='Spectral')
+            Colormap for clusters
+
+        show_avg : bool, optional (default=True)
+            If True, shows average silhouette score line on each subplot
+
+        title : str, optional
+            Overall figure title. If None, uses default.
+
+        save_path : str, optional
+            If provided, saves the figure to this path
+
+        Returns
+        -------
+        fig, axes
+            Figure and axes array
+
+        Examples
+        --------
+        >>> # Compare silhouette plots for k=3 to k=10
+        >>> fig, axes = cnmf_obj.plot_silhouette_survey(k_range=range(3, 11))
+        >>>
+        >>> # Custom layout with 2 columns
+        >>> fig, axes = cnmf_obj.plot_silhouette_survey(k_range=[5, 6, 7, 8], ncols=2)
+        """
+        # Determine k values to plot
+        if k_range is None:
+            run_params = self.replicate_params
+            k_range = sorted(set(run_params.n_components))
+        else:
+            k_range = list(k_range)
+
+        n_plots = len(k_range)
+        nrows = int(np.ceil(n_plots / ncols))
+
+        # Auto-calculate figure size if not provided
+        if figsize is None:
+            figsize = (6 * ncols, 5 * nrows)
+
+        # Create figure and axes
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+        if n_plots == 1:
+            axes = np.array([axes])
+        axes = axes.flatten()
+
+        # Plot each k
+        for idx, k in enumerate(k_range):
+            try:
+                self.plot_silhouette_for_k(k, density_threshold=density_threshold,
+                                          ax=axes[idx], show_avg=show_avg, cmap=cmap)
+            except Exception as e:
+                axes[idx].text(0.5, 0.5, f'Error for k={k}:\n{str(e)}',
+                              ha='center', va='center', transform=axes[idx].transAxes)
+                axes[idx].set_title(f'k={k} (Error)')
+
+        # Hide extra subplots
+        for idx in range(n_plots, len(axes)):
+            axes[idx].set_visible(False)
+
+        # Set overall title
+        if title is None:
+            title = f'Silhouette Analysis Survey (density_threshold={density_threshold})'
+        fig.suptitle(title, fontsize=16, y=0.995)
+
+        plt.tight_layout()
+
+        # Save if requested
+        if save_path is not None:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f'Silhouette survey plot saved to: {save_path}')
+
+        return fig, axes
+
+
+    def k_selection_plot(self, close_fig=False, include_silhouette=True,
+                        density_threshold=2.0):
         '''
+        Plot stability, reconstruction error, and optionally silhouette scores for K selection.
+
         Borrowed from Alexandrov Et Al. 2013 Deciphering Mutational Signatures
-        publication in Cell Reports
+        publication in Cell Reports, with additional silhouette analysis option.
+
+        Parameters
+        ----------
+        close_fig : bool, optional (default=False)
+            If True, closes the figure after saving
+
+        include_silhouette : bool, optional (default=True)
+            If True, adds average silhouette score as a third metric on the plot
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra when calculating silhouette scores
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object
         '''
         # Use in-memory data
         run_params = self.replicate_params
         stats = []
         norm_counts = self.norm_counts
-        for k in sorted(set(run_params.n_components)):
+        k_values = sorted(set(run_params.n_components))
+
+        for k in k_values:
             stats.append(self.consensus(k, skip_density_and_return_after_stats=True,
                                         show_clustering=False, close_clustergram_fig=True,
                                         norm_counts=norm_counts).stats)
@@ -1131,33 +1433,97 @@ class cNMF():
         stats = pd.DataFrame(stats)
         stats.reset_index(drop = True, inplace = True)
 
+        # Calculate silhouette scores if requested
+        if include_silhouette:
+            print("Calculating silhouette scores for K selection...")
+            silhouette_scores = []
+            for k in k_values:
+                try:
+                    sil_data = self.calculate_silhouette_k(k, density_threshold=density_threshold)
+                    silhouette_scores.append(sil_data['avg_silhouette'])
+                except Exception as e:
+                    print(f"Warning: Could not calculate silhouette for k={k}: {e}")
+                    silhouette_scores.append(np.nan)
+            stats['avg_silhouette'] = silhouette_scores
+
         # Optionally save to disk
         if self.output_dir is not None:
             save_df_to_npz(stats, self.paths['k_selection_stats'])
 
-        fig = plt.figure(figsize=(6, 4))
-        ax1 = fig.add_subplot(111)
-        ax2 = ax1.twinx()
+        # Create figure with appropriate layout
+        if include_silhouette and not stats['avg_silhouette'].isna().all():
+            # Three metrics: use larger figure with three y-axes
+            fig = plt.figure(figsize=(10, 5))
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twinx()
+            ax3 = ax1.twinx()
 
+            # Offset the third axis
+            ax3.spines['right'].set_position(('outward', 60))
 
-        ax1.plot(stats.k, stats.silhouette, 'o-', color='b')
-        ax1.set_ylabel('Stability', color='b', fontsize=15)
-        for tl in ax1.get_yticklabels():
-            tl.set_color('b')
-        #ax1.set_xlabel('K', fontsize=15)
+            # Plot stability (silhouette from consensus - kept as "Stability")
+            p1 = ax1.plot(stats.k, stats.silhouette, 'o-', color='b', linewidth=2,
+                         markersize=8, label='Stability')
+            ax1.set_ylabel('Stability', color='b', fontsize=13)
+            ax1.tick_params(axis='y', labelcolor='b')
+            for tl in ax1.get_yticklabels():
+                tl.set_color('b')
 
-        ax2.plot(stats.k, stats.prediction_error, 'o-', color='r')
-        ax2.set_ylabel('Error', color='r', fontsize=15)
-        for tl in ax2.get_yticklabels():
-            tl.set_color('r')
+            # Plot reconstruction error
+            p2 = ax2.plot(stats.k, stats.prediction_error, 'o-', color='r', linewidth=2,
+                         markersize=8, label='Reconstruction Error')
+            ax2.set_ylabel('Reconstruction Error', color='r', fontsize=13)
+            ax2.tick_params(axis='y', labelcolor='r')
+            for tl in ax2.get_yticklabels():
+                tl.set_color('r')
 
-        ax1.set_xlabel('Number of Components', fontsize=15)
-        ax1.grid('on')
+            # Plot average silhouette score
+            p3 = ax3.plot(stats.k, stats.avg_silhouette, 's-', color='green', linewidth=2,
+                         markersize=8, label='Avg Silhouette')
+            ax3.set_ylabel('Average Silhouette Score', color='green', fontsize=13)
+            ax3.tick_params(axis='y', labelcolor='green')
+            ax3.set_ylim([max(0, stats.avg_silhouette.min() - 0.1),
+                         min(1, stats.avg_silhouette.max() + 0.1)])
+            for tl in ax3.get_yticklabels():
+                tl.set_color('green')
+
+            ax1.set_xlabel('Number of Components (K)', fontsize=13)
+            ax1.grid(True, alpha=0.3)
+
+            # Add legend
+            lines = p1 + p2 + p3
+            labels = [l.get_label() for l in lines]
+            ax1.legend(lines, labels, loc='best', fontsize=10)
+
+            fig.suptitle('cNMF K Selection Metrics', fontsize=14, fontweight='bold')
+        else:
+            # Two metrics only: original layout
+            fig = plt.figure(figsize=(8, 5))
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twinx()
+
+            ax1.plot(stats.k, stats.silhouette, 'o-', color='b', linewidth=2, markersize=8)
+            ax1.set_ylabel('Stability', color='b', fontsize=13)
+            for tl in ax1.get_yticklabels():
+                tl.set_color('b')
+
+            ax2.plot(stats.k, stats.prediction_error, 'o-', color='r', linewidth=2, markersize=8)
+            ax2.set_ylabel('Reconstruction Error', color='r', fontsize=13)
+            for tl in ax2.get_yticklabels():
+                tl.set_color('r')
+
+            ax1.set_xlabel('Number of Components (K)', fontsize=13)
+            ax1.grid(True, alpha=0.3)
+            fig.suptitle('cNMF K Selection Metrics', fontsize=14, fontweight='bold')
+
         plt.tight_layout()
+
         if self.output_dir is not None:
-            fig.savefig(self.paths['k_selection_plot'], dpi=250)
+            fig.savefig(self.paths['k_selection_plot'], dpi=250, bbox_inches='tight')
         if close_fig:
             plt.close(fig)
+
+        return fig
             
             
     def load_results(self, K, density_threshold, n_top_genes=100, norm_usage = True):
@@ -1333,3 +1699,136 @@ class cNMF():
         adata.obs['cNMF_cluster_clf']=[str(i) for i in clf.predict(adata.obsm[use_rep])]
         print('cNMF_cluster_rfc is added to adata.obs')
         print('cNMF_cluster_clf is added to adata.obs')
+
+    def save(self, filename):
+        """
+        Save the cNMF object to a file for later use.
+
+        This saves all in-memory data, parameters, and analysis results,
+        allowing you to resume analysis without re-running factorization.
+
+        Parameters
+        ----------
+        filename : str
+            Path to save the cNMF object. Recommended extension: .cnmf or .pkl
+
+        Examples
+        --------
+        >>> # Save after factorization
+        >>> cnmf_obj.factorize()
+        >>> cnmf_obj.combine()
+        >>> cnmf_obj.save('my_cnmf_analysis.cnmf')
+        >>>
+        >>> # Later, load and continue
+        >>> cnmf_obj = ov.single.cNMF.load('my_cnmf_analysis.cnmf')
+        >>> cnmf_obj.consensus(k=7, density_threshold=2.0)
+        """
+        import pickle
+
+        # Prepare state dictionary
+        state = {
+            # Basic parameters
+            'output_dir': self.output_dir,
+            'name': self.name,
+            'paths': self.paths,
+
+            # In-memory data
+            'tpm': self.tpm,
+            'tpm_stats': self.tpm_stats,
+            'norm_counts': self.norm_counts,
+            'replicate_params': self.replicate_params,
+            'run_params': self.run_params,
+            'highvar_genes': self.highvar_genes,
+
+            # Analysis results
+            'iter_spectra': self.iter_spectra,
+            'merged_spectra_dict': self.merged_spectra_dict,
+            'consensus_results': self.consensus_results,
+
+            # Optional results
+            '_local_density_cache': getattr(self, '_local_density_cache', None),
+            'topic_dist': getattr(self, 'topic_dist', None),
+            'spectra_order': getattr(self, 'spectra_order', None),
+            'local_density': getattr(self, 'local_density', None),
+            'kmeans_cluster_labels': getattr(self, 'kmeans_cluster_labels', None),
+        }
+
+        # Save to file
+        with open(filename, 'wb') as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        print(f"✓ cNMF object saved to: {filename}")
+        print(f"  - {len(self.iter_spectra)} factorization iterations")
+        print(f"  - {len(self.merged_spectra_dict)} merged spectra (K values)")
+        print(f"  - {len(self.consensus_results)} consensus results")
+
+
+    @classmethod
+    def load(cls, filename):
+        """
+        Load a saved cNMF object from file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the saved cNMF object file
+
+        Returns
+        -------
+        cnmf_obj : cNMF
+            Loaded cNMF object with all data and results restored
+
+        Examples
+        --------
+        >>> # Load saved analysis
+        >>> cnmf_obj = ov.single.cNMF.load('my_cnmf_analysis.cnmf')
+        >>>
+        >>> # Continue analysis
+        >>> cnmf_obj.consensus(k=7, density_threshold=2.0)
+        >>> result_dict = cnmf_obj.load_results(K=7, density_threshold=2.0)
+        """
+        import pickle
+
+        # Load state from file
+        with open(filename, 'rb') as f:
+            state = pickle.load(f)
+
+        # Create a minimal cNMF object (skip __init__ to avoid re-initialization)
+        obj = cls.__new__(cls)
+
+        # Restore basic parameters
+        obj.output_dir = state['output_dir']
+        obj.name = state['name']
+        obj.paths = state['paths']
+
+        # Restore in-memory data
+        obj.tpm = state['tpm']
+        obj.tpm_stats = state['tpm_stats']
+        obj.norm_counts = state['norm_counts']
+        obj.replicate_params = state['replicate_params']
+        obj.run_params = state['run_params']
+        obj.highvar_genes = state['highvar_genes']
+
+        # Restore analysis results
+        obj.iter_spectra = state['iter_spectra']
+        obj.merged_spectra_dict = state['merged_spectra_dict']
+        obj.consensus_results = state['consensus_results']
+
+        # Restore optional results
+        if state.get('_local_density_cache'):
+            obj._local_density_cache = state['_local_density_cache']
+        if state.get('topic_dist') is not None:
+            obj.topic_dist = state['topic_dist']
+        if state.get('spectra_order') is not None:
+            obj.spectra_order = state['spectra_order']
+        if state.get('local_density') is not None:
+            obj.local_density = state['local_density']
+        if state.get('kmeans_cluster_labels') is not None:
+            obj.kmeans_cluster_labels = state['kmeans_cluster_labels']
+
+        print(f"✓ cNMF object loaded from: {filename}")
+        print(f"  - {len(obj.iter_spectra)} factorization iterations")
+        print(f"  - {len(obj.merged_spectra_dict)} merged spectra (K values)")
+        print(f"  - {len(obj.consensus_results)} consensus results")
+
+        return obj

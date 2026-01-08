@@ -708,14 +708,21 @@ def register_function(aliases: List[str],
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        
+
         # Add registry info to function
         wrapper._registry_info = {
             'aliases': aliases,
             'category': category,
             'description': description
         }
-        
+
+        # If func is a class, copy over class methods and static methods
+        import inspect
+        if inspect.isclass(func):
+            for name, value in inspect.getmembers(func):
+                if isinstance(inspect.getattr_static(func, name), (classmethod, staticmethod)):
+                    setattr(wrapper, name, value)
+
         return wrapper
     
     return decorator
