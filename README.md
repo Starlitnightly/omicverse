@@ -284,9 +284,9 @@ Here are some other related packages, feel free to reference them if you use the
 
 > **CellOntologyMapper: Consensus mapping of cell type annotation**
 >
-> Zeng, Z., Wang, X., Du, H.
+> Zeng, Z., Wang, X., Du, H. et al.
 >
-> _bioRxiv_ 2025 Jun 20. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
+> _imetaomics_ 2025 Nov 06. doi: [10.1002/imo2.70064](https://doi.org/10.1002/imo2.70064).
 
 
 ## `8` [Other](#)

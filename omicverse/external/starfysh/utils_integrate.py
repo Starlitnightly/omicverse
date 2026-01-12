@@ -455,8 +455,8 @@ def run_starfysh(
         }
 
         # Initialize model params
-        if verbose:
-            LOGGER.info('Initializing model parameters...')
+        #if verbose:
+        #    LOGGER.info('Initializing model parameters...')
             
         model.apply(init_weights)
         optimizer = optim.Adam(model.parameters(), lr=lr)

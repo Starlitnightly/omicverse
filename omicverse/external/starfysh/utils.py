@@ -400,8 +400,8 @@ def run_starfysh(
         }
 
         # Initialize model params
-        if verbose:
-            LOGGER.info('Initializing model parameters...')
+        #if verbose:
+            #LOGGER.info('Initializing model parameters...')
             
         model.apply(init_weights)
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -444,6 +444,7 @@ def run_starfysh(
 
             count += 1
         except ValueError as ve: # Bad model initialization -> numerical instability
+            LOGGER.warning(f"Bad model initialization -> numerical instability: {ve}")
             continue
         
         if verbose:
@@ -725,7 +726,14 @@ def get_adata_wsig(adata, adata_norm, gene_sig):
     Select intersection of HVGs from dataset & signature annotations
     """
     # TODO: in-place operators for `adata`
-    hvgs = adata.var_names[adata.var.highly_variable]
+    if 'highly_variable' in adata.var.columns:
+        hvgs = adata.var_names[adata.var.highly_variable]
+    elif 'space_variable_features' in adata.var.columns:
+        hvgs = adata.var_names[adata.var.space_variable_features]
+    elif 'highly_variable_features' in adata.var.columns:
+        hvgs = adata.var_names[adata.var.highly_variable_features]
+    else:
+        raise ValueError("No highly variable genes found in adata.var.columns")
     unique_sigs = np.unique(gene_sig.values[~pd.isna(gene_sig)])
     genes_to_keep = np.union1d(
         hvgs,
