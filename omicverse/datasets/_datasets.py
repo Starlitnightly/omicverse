@@ -878,6 +878,18 @@ def decov_bulk_covid_single(
     adata = get_adata(url, filename)
     return adata
 
+def sc_ref_Lymph_Node(
+    url: str = "https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad",
+    filename: str = "sc_ref_Lymph_Node.h5ad"
+) -> AnnData:
+    """SC reference data for Lymph Node.
+    
+    This data consists of 10,000 cells × 15,000 genes.
+    """
+    print(f"{Colors.HEADER}🧬 Loading SC reference data for Lymph Node{Colors.ENDC}")
+    adata = get_adata(url, filename)
+    return adata
+
 
 def pbmc3k(processed: bool = False) -> AnnData:
     """

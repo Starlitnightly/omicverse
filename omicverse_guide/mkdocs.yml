@@ -78,7 +78,7 @@ nav:
             - Identifying Pseudo-Spatial Map: Tutorials-space/t_spaceflow.ipynb
             - Spatial deconvolution with reference scRNA-seq: Tutorials-space/t_decov.ipynb
             - FlashDeconv (fast, GPU-free deconvolution): Tutorials-space/t_flashdeconv.ipynb
-            - Spatial deconvolution without reference scRNA-seq: Tutorials-space/t_starfysh.ipynb
+            - Spatial deconvolution without reference scRNA-seq: Tutorials-space/t_starfysh_new.ipynb
         - Downstream:
             - Spatial transition tensor of single cells: Tutorials-space/t_stt.ipynb
             - Spatial Communication: Tutorials-space/t_commot_flowsig.ipynb

@@ -65,7 +65,7 @@ from ._cast import CAST
 from ._tools import *
 from ._gaston import GASTON
 from ._commot import create_communication_anndata,update_classification_from_database
-from ._deconvolution import Deconvolution
+from ._deconvolution import Deconvolution,calculate_gene_signature
 
 
 __all__ = [
@@ -98,4 +98,5 @@ __all__ = [
 
     # Spatial deconvolution
     'Deconvolution',
+    'calculate_gene_signature',
 ]
