@@ -210,6 +210,16 @@ def dotplot(
         var_names = var_names_list
     
     # Get expression matrix
+    # Auto-detect if we need to use raw data when use_raw is not explicitly set
+    if use_raw is None and adata.raw is not None:
+        # Check if any genes are only in raw
+        genes_not_in_var = [name for name in var_names if name not in adata.var_names]
+        genes_in_raw = [name for name in genes_not_in_var if name in adata.raw.var_names]
+
+        if genes_in_raw:
+            use_raw = True
+            print(f"Auto-detected: {len(genes_in_raw)} genes only in raw data, using raw data automatically")
+
     if use_raw and adata.raw is not None:
         matrix = adata.raw.X
         var_names_idx = [adata.raw.var_names.get_loc(name) for name in var_names]
@@ -565,7 +575,17 @@ def rank_genes_groups_dotplot(
 
     if groupby is None:
         groupby = str(adata.uns[key]["params"]["groupby"])
-    group_names = adata.uns[key]["names"].dtype.names if groups is None else groups
+
+    # Handle both DataFrame and numpy structured array
+    if groups is None:
+        names_data = adata.uns[key]["names"]
+        if isinstance(names_data, pd.DataFrame):
+            group_names = names_data.columns.tolist()
+        else:
+            # Assume it's a numpy structured array
+            group_names = names_data.dtype.names
+    else:
+        group_names = groups
 
     if var_names is not None:
         if isinstance(var_names, Mapping):
@@ -608,6 +628,22 @@ def rank_genes_groups_dotplot(
 
     # by default add dendrogram to plots
     kwds.setdefault("dendrogram", True)
+
+    # Auto-detect if we need to use raw data
+    # Check if genes are in adata.var_names or only in adata.raw.var_names
+    if 'use_raw' not in kwds and adata.raw is not None:
+        genes_in_var = [g for g in var_names_list if g in adata.var_names]
+        genes_in_raw = [g for g in var_names_list if g in adata.raw.var_names]
+
+        # If some genes are only in raw but not in var, use raw
+        if len(genes_in_raw) > len(genes_in_var):
+            kwds['use_raw'] = True
+            print(f"Auto-detected: {len(genes_in_raw) - len(genes_in_var)} genes only in raw data, using use_raw=True")
+        elif len(genes_in_var) < len(var_names_list):
+            # Some genes are missing entirely
+            missing_genes = [g for g in var_names_list if g not in adata.var_names and (adata.raw is None or g not in adata.raw.var_names)]
+            if missing_genes:
+                print(f"Warning: {len(missing_genes)} genes not found in adata: {missing_genes[:5]}")
 
     # Get values to plot if specified
     title = None
