@@ -210,6 +210,7 @@ class DEG:
                  ctrl_group: str,
                  test_group: str,
                  method: str='wilcoxon',
+                 use_raw: bool=None,
                  ):
         """
         Init the differential expression gene analysis
@@ -220,16 +221,38 @@ class DEG:
             ctrl_group: The control group name in the condition column
             test_group: The test group name in the condition column
             method: Method for differential expression analysis, either 'wilcoxon', 't-test', or 'memento-de'
+            use_raw: Whether to use adata.raw for DEG analysis. If None, will auto-detect (use raw if it exists)
 
         Returns:
             None
         """
-        self.adata=adata
+        # Auto-detect use_raw
+        if use_raw is None:
+            if adata.raw is not None:
+                use_raw = True
+                print(f"{EMOJI['bar']} Auto-detected adata.raw, will use raw data for DEG analysis")
+            else:
+                use_raw = False
+
+        self.use_raw = use_raw
+
+        # If using raw, create a copy with raw data as X
+        if self.use_raw and adata.raw is not None:
+            # Create a new AnnData with raw data
+            self.adata = AnnData(
+                X=adata.raw.X,
+                obs=adata.obs.copy(),
+                var=adata.raw.var.copy(),
+            )
+            print(f"{EMOJI['bar']} Using raw data with {self.adata.shape[1]} genes")
+        else:
+            self.adata = adata
+
         self.condition=condition
         self.ctrl_group=ctrl_group
         self.test_group=test_group
         self.method=method
-        
+
         from scipy.sparse import csr_matrix
         try:
             assert type(self.adata.X) == csr_matrix
