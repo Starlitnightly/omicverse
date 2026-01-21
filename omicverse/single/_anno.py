@@ -13,8 +13,50 @@ import anndata
 from ..pp._preprocess import scale
 from ..utils import gen_mpl_labels
 
-from .._settings import add_reference
+from .._settings import add_reference, Colors, EMOJI
 from ..utils.registry import register_function
+from ..datasets import download_data_requests
+
+DATA_DOWNLOAD_LINK_DICT = {
+    'whole':{
+        'figshare':'https://figshare.com/ndownloader/files/37262710',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pySCSA_2023.db',
+    },
+    'pySCSA_2023_v2_plus':{
+        'figshare':'https://figshare.com/ndownloader/files/41369037',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pySCSA_2023_v2_plus.db',
+    },
+
+}
+
+
+def get_anno_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
+    """Get URL for an annotation dataset by name, preferring Stanford over Figshare.
+
+    Args:
+        dataset_name: Name of the dataset (e.g., 'whole', 'pySCSA_2023_v2_plus').
+        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+
+    Returns:
+        URL string for the dataset.
+
+    Raises:
+        ValueError: If dataset name is not found.
+    """
+    if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
+        raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
+
+    dataset_urls = DATA_DOWNLOAD_LINK_DICT[dataset_name]
+
+    if prefer_stanford and 'stanford' in dataset_urls:
+        print(f"{Colors.CYAN}Using Stanford mirror for {dataset_name}{Colors.ENDC}")
+        return dataset_urls['stanford']
+    elif 'figshare' in dataset_urls:
+        if prefer_stanford:
+            print(f"{Colors.WARNING}{EMOJI['warning']} Stanford link not available for {dataset_name}, using Figshare{Colors.ENDC}")
+        return dataset_urls['figshare']
+    else:
+        raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
 
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
@@ -42,49 +84,8 @@ def check_metatime():
         )
 
 
-def data_downloader(url,path,title):
-    r"""Download datasets from URL.
-    
-    Arguments:
-        url: The download url of datasets
-        path: The save path of datasets
-        title: The name of datasets
-    
-    Returns:
-        path: The save path of datasets
-    """
-    if os.path.isfile(path):
-        print("......Loading dataset from {}".format(path))
-        return path
-    else:
-        print("......Downloading dataset save to {}".format(path))
-        
-    dirname, _ = os.path.split(path)
-    try:
-        if not os.path.isdir(dirname):
-            print("......Creating directory {}".format(dirname))
-            os.makedirs(dirname, exist_ok=True)
-    except OSError as e:
-        print("......Unable to create directory {}. Reason {}".format(dirname,e))
-    
-    
-    start = time.time()
-    size = 0
-    res = requests.get(url, stream=True)
-
-    chunk_size = 102400
-    content_size = int(res.headers["content-length"]) 
-    if res.status_code == 200:
-        print('......[%s Size of file]: %0.2f MB' % (title, content_size/chunk_size/10.24))
-        with open(path, 'wb') as f:
-            for data in res.iter_content(chunk_size=chunk_size):
-                f.write(data)
-                size += len(data) 
-                print('\r'+ '......[Downloader]: %s%.2f%%' % ('>'*int(size*50/content_size), float(size/content_size*100)), end='')
-        end = time.time()
-        print('\n' + ".......Finish！%s.2f s" % (end - start))
-    
-    return path
+# Deprecated: data_downloader has been replaced by download_data_requests
+# Use get_anno_dataset_url() and download_data_requests() instead
 
 
 def data_preprocess(adata,clustertype='leiden',
@@ -150,10 +151,10 @@ def __cell_annotate(data,
     """
     data.to_csv('temp/rna.csv')
 
-    #https://figshare.com/ndownloader/files/37262710
-    model_path = data_downloader(url='https://figshare.com/ndownloader/files/37262710',
-                                    path='temp/whole.db',title='whole')
-    print('......Auto annotate cell')
+    # Get URL from dataset dict and download using Stanford mirror
+    url = get_anno_dataset_url('whole')
+    model_path = download_data_requests(url=url, file_path='whole.db', dir='./temp')
+    print(f'{Colors.CYAN}......Auto annotate cell{Colors.ENDC}')
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-i', '--input', default = "temp/rna.csv")
     parser.add_argument('-o', '--output',default=output)
@@ -529,8 +530,8 @@ class pySCSA(object):
         self.target=target
         self.cellrange=cellrange
         if model_path =='':
-            self.model_path=data_downloader(url='https://figshare.com/ndownloader/files/41369037',
-                                            path='temp/pySCSA_2023_v2_plus.db',title='whole')
+            url = get_anno_dataset_url('pySCSA_2023_v2_plus')
+            self.model_path = download_data_requests(url=url, file_path='pySCSA_2023_v2_plus.db', dir='./temp')
         else:
             self.model_path=model_path
 

@@ -17,9 +17,143 @@ from ._enum import ModeEnum
 from scipy.sparse import diags, issparse, spmatrix, csr_matrix, isspmatrix_csr
 import warnings
 from scipy.stats import norm
-from .._settings import Colors  # Import Colors from settings
+from .._settings import Colors, EMOJI  # Import Colors and EMOJI from settings
 from .registry import register_function
-from ..datasets import download_data
+from ..datasets import download_data_requests
+
+
+DATA_DOWNLOAD_LINK_DICT = {
+    'cadrres-wo-sample-bias_output_dict_all_genes':{
+        'figshare':'https://figshare.com/ndownloader/files/39753568',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_output_dict_all_genes.pickle',
+    },
+    'cadrres-wo-sample-bias_output_dict_prism':{
+        'figshare':'https://figshare.com/ndownloader/files/39753571',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_output_dict_prism.pickle',
+    },
+    'cadrres-wo-sample-bias_param_dict_all_genes':{
+        'figshare':'https://figshare.com/ndownloader/files/39753574',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_param_dict_all_genes.pickle',
+    },
+    'cadrres-wo-sample-bias_param_dict_prism':{
+        'figshare':'https://figshare.com/ndownloader/files/39753577',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_param_dict_prism.pickle',
+    },
+    'GDSC_exp':{
+        'figshare':'https://figshare.com/ndownloader/files/39753580',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GDSC_exp.tsv.gz',
+    },
+    'masked_drugs':{
+        'figshare':'https://figshare.com/ndownloader/files/39753583',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/masked_drugs.csv',
+    },
+    'GO_Biological_Process_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820720',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Biological_Process_2021.txt',
+    },
+    'GO_Cellular_Component_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820714',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Cellular_Component_2021.txt',
+    },
+    'GO_Molecular_Function_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820711',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Molecular_Function_2021.txt',
+    },
+    'WikiPathway_2021_Human':{
+        'figshare':'https://figshare.com/ndownloader/files/39820705',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/WikiPathway_2021_Human.txt',
+    },
+    'WikiPathways_2019_Mouse':{
+        'figshare':'https://figshare.com/ndownloader/files/39820717',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/WikiPathways_2019_Mouse.txt',
+    },
+    'Reactome_2022':{
+        'figshare':'https://figshare.com/ndownloader/files/39820702',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/Reactome_2022.txt',
+    },
+    'pair_GRCm39':{
+        'figshare':'https://figshare.com/ndownloader/files/39820684',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCm39.tsv',
+    },
+    'pair_T2TCHM13':{
+        'figshare':'https://figshare.com/ndownloader/files/39820687',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_T2TCHM13.tsv',
+    },
+    'pair_GRCh38':{
+        'figshare':'https://figshare.com/ndownloader/files/39820690',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCh38.tsv',
+    },
+    'pair_GRCh37':{
+        'figshare':'https://figshare.com/ndownloader/files/39820693',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCh37.tsv',
+    },
+    'pair_danRer11':{
+        'figshare':'https://figshare.com/ndownloader/files/39820696',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_danRer11.tsv',
+    },
+    'pair_danRer7':{
+        'figshare':'https://figshare.com/ndownloader/files/39820699',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_danRer7.tsv',
+    },
+    'GO_bp':{
+        'figshare':'https://figshare.com/ndownloader/files/41460072',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_bp.gmt',
+    },
+    'TF':{
+        'figshare':'https://figshare.com/ndownloader/files/41460066',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/TF.gmt',
+    },
+    'reactome':{
+        'figshare':'https://figshare.com/ndownloader/files/41460051',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/reactome.gmt',
+    },
+    'm_GO_bp':{
+        'figshare':'https://figshare.com/ndownloader/files/41460060',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_GO_bp.gmt',
+    },
+    'm_TF':{
+        'figshare':'https://figshare.com/ndownloader/files/41460057',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_TF.gmt',
+    },
+    'm_reactome':{
+        'figshare':'https://figshare.com/ndownloader/files/41460054',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_reactome.gmt',
+    },
+    'immune':{
+        'figshare':'https://figshare.com/ndownloader/files/41460049',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/immune.gmt',
+    },
+
+}
+
+
+def get_utils_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
+    """Get URL for a dataset by name, preferring Stanford over Figshare.
+
+    Args:
+        dataset_name: Name of the dataset (e.g., 'GO_bp', 'GDSC_exp').
+        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+
+    Returns:
+        URL string for the dataset.
+
+    Raises:
+        ValueError: If dataset name is not found.
+    """
+    if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
+        raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
+
+    dataset_urls = DATA_DOWNLOAD_LINK_DICT[dataset_name]
+
+    if prefer_stanford and 'stanford' in dataset_urls:
+        print(f"{Colors.CYAN}Using Stanford mirror for {dataset_name}{Colors.ENDC}")
+        return dataset_urls['stanford']
+    elif 'figshare' in dataset_urls:
+        if prefer_stanford:
+            print(f"{Colors.WARNING}{EMOJI['warning']} Stanford link not available for {dataset_name}, using Figshare{Colors.ENDC}")
+        return dataset_urls['figshare']
+    else:
+        raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
 
 
 # Internal debug logger (opt-in via env OV_DEBUG/OMICVERSE_DEBUG)
@@ -1212,52 +1346,12 @@ def read_10x_h5(**kwargs):
     return sc.read_10x_h5(**kwargs)
 
 
-def data_downloader(url,path,title):
-    r"""Download datasets from URL.
-    
-    Arguments:
-        url: The download url of datasets
-        path: The save path of datasets
-        title: The name of datasets
-    
-    Returns:
-        path: The save path of datasets
-    """
-    if os.path.isfile(path):
-        print("......Loading dataset from {}".format(path))
-        return path
-    else:
-        print("......Downloading dataset save to {}".format(path))
-        
-    dirname, _ = os.path.split(path)
-    try:
-        if not os.path.isdir(dirname):
-            print("......Creating directory {}".format(dirname))
-            os.makedirs(dirname, exist_ok=True)
-    except OSError as e:
-        print("......Unable to create directory {}. Reason {}".format(dirname,e))
-    
-    start = time.time()
-    size = 0
-    res = requests.get(url, stream=True)
-
-    chunk_size = 1024000
-    content_size = int(res.headers["content-length"]) 
-    if res.status_code == 200:
-        print('......[%s Size of file]: %0.2f MB' % (title, content_size/chunk_size/10.24))
-        with open(path, 'wb') as f:
-            for data in res.iter_content(chunk_size=chunk_size):
-                f.write(data)
-                size += len(data) 
-                print('\r'+ '......[Downloader]: %s%.2f%%' % ('>'*int(size*50/content_size), float(size/content_size*100)), end='')
-        end = time.time()
-        print('\n' + ".......Finish！%s.2f s" % (end - start))
-    
-    return path
+# Deprecated: data_downloader has been replaced by download_data_requests from omicverse.datasets
+# All download functions now use download_data_requests for better error handling and progress display
 
 def download_CaDRReS_model():
     r"""load CaDRReS_model
-    
+
     Parameters
     ---------
 
@@ -1265,20 +1359,21 @@ def download_CaDRReS_model():
     -------
 
     """
-    _datasets = {
-        'cadrres-wo-sample-bias_output_dict_all_genes':'https://figshare.com/ndownloader/files/39753568',
-        'cadrres-wo-sample-bias_output_dict_prism':'https://figshare.com/ndownloader/files/39753571',
-        'cadrres-wo-sample-bias_param_dict_all_genes':'https://figshare.com/ndownloader/files/39753574',
-        'cadrres-wo-sample-bias_param_dict_prism':'https://figshare.com/ndownloader/files/39753577',
-    }
-    for datasets_name in _datasets.keys():
-        print('......CaDRReS model download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='models/{}.pickle'.format(datasets_name),title=datasets_name)
-    print('......CaDRReS model download finished!')
+    _datasets = [
+        'cadrres-wo-sample-bias_output_dict_all_genes',
+        'cadrres-wo-sample-bias_output_dict_prism',
+        'cadrres-wo-sample-bias_param_dict_all_genes',
+        'cadrres-wo-sample-bias_param_dict_prism',
+    ]
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......CaDRReS model download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        model_path = download_data_requests(url=url, file_path=f'{datasets_name}.pickle', dir='./models')
+    print(f'{Colors.GREEN}{EMOJI["done"]} CaDRReS model download finished!{Colors.ENDC}')
 
 def download_GDSC_data():
     r"""load GDSC_data
-    
+
     Parameters
     ---------
 
@@ -1287,16 +1382,14 @@ def download_GDSC_data():
 
     """
     _datasets = {
-        'masked_drugs':'https://figshare.com/ndownloader/files/39753580',
-        'GDSC_exp':'https://figshare.com/ndownloader/files/39744025',
+        'masked_drugs': '.csv',
+        'GDSC_exp': '.tsv.gz',
     }
-    for datasets_name in _datasets.keys():
-        print('......GDSC data download start:',datasets_name)
-        if datasets_name == 'masked_drugs':
-            data_downloader(url=_datasets[datasets_name],path='models/{}.csv'.format(datasets_name),title=datasets_name)
-        elif datasets_name == 'GDSC_exp':
-            data_downloader(url=_datasets[datasets_name],path='models/{}.tsv.gz'.format(datasets_name),title=datasets_name)
-    print('......GDSC data download finished!')
+    for datasets_name, ext in _datasets.items():
+        print(f'{Colors.CYAN}......GDSC data download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}{ext}', dir='./models')
+    print(f'{Colors.GREEN}{EMOJI["done"]} GDSC data download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["下载通路数据库", "download_pathway_database", "download_genesets", "通路数据下载"],
@@ -1323,22 +1416,21 @@ def download_pathway_database():
     Returns:
         None: The function downloads pathway databases to the genesets/ directory including GO_Biological_Process_2021, GO_Cellular_Component_2021, GO_Molecular_Function_2021, WikiPathway_2021_Human, WikiPathways_2019_Mouse, and Reactome_2022.
     """
-    _datasets = {
-        'GO_Biological_Process_2021':'https://figshare.com/ndownloader/files/39820720',
-        'GO_Cellular_Component_2021':'https://figshare.com/ndownloader/files/39820714',
-        'GO_Molecular_Function_2021':'https://figshare.com/ndownloader/files/39820711',
-        'WikiPathway_2021_Human':'https://figshare.com/ndownloader/files/39820705',
-        'WikiPathways_2019_Mouse':'https://figshare.com/ndownloader/files/39820717',
-        'Reactome_2022':'https://figshare.com/ndownloader/files/39820702',
-    }
-    from ..datasets import download_data
-     
-    for datasets_name in _datasets.keys():
-        print('......Pathway Geneset download start:',datasets_name)
-        #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
-        model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.txt',dir='./genesets')
-    print('......Pathway Geneset download finished!')
-    print('......Other Genesets can be dowload in `https://maayanlab.cloud/Enrichr/#libraries`')
+    _datasets = [
+        'GO_Biological_Process_2021',
+        'GO_Cellular_Component_2021',
+        'GO_Molecular_Function_2021',
+        'WikiPathway_2021_Human',
+        'WikiPathways_2019_Mouse',
+        'Reactome_2022',
+    ]
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......Pathway Geneset download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.txt', dir='./genesets')
+    print(f'{Colors.GREEN}{EMOJI["done"]} Pathway Geneset download finished!{Colors.ENDC}')
+    print(f'{Colors.CYAN}......Other Genesets can be downloaded from https://maayanlab.cloud/Enrichr/#libraries{Colors.ENDC}')
 
 @register_function(
     aliases=["下载基因ID注释", "download_geneid_annotation_pair", "download_gene_mapping", "基因ID映射下载"],
@@ -1363,31 +1455,36 @@ def download_geneid_annotation_pair():
     Returns:
         None: The function downloads mapping files to the genesets/ directory including pair_GRCm39.tsv (Mouse), pair_GRCh38.tsv (Human), pair_GRCh37.tsv (Human legacy), and pair_danRer11.tsv (Zebrafish).
     """
-    _datasets = {
-        'pair_GRCm39':'https://figshare.com/ndownloader/files/39820684',
-        'pair_T2TCHM13':'https://figshare.com/ndownloader/files/39820687',
-        'pair_GRCh38':'https://figshare.com/ndownloader/files/39820690',
-        'pair_GRCh37':'https://figshare.com/ndownloader/files/39820693',
-        'pair_danRer11':'https://figshare.com/ndownloader/files/39820696',
-        'pair_danRer7':'https://figshare.com/ndownloader/files/39820699',
-        'pair_hgnc_all':'https://github.com/Starlitnightly/omicverse/files/14664966/pair_hgnc_all.tsv.tar.gz',
+    _datasets = [
+        'pair_GRCm39',
+        'pair_T2TCHM13',
+        'pair_GRCh38',
+        'pair_GRCh37',
+        'pair_danRer11',
+        'pair_danRer7',
+    ]
+
+    # Add special handling for pair_hgnc_all
+    _special_datasets = {
+        'pair_hgnc_all': 'https://github.com/Starlitnightly/omicverse/files/14664966/pair_hgnc_all.tsv.tar.gz'
     }
-     
-    for datasets_name in _datasets.keys():
-        print('......Geneid Annotation Pair download start:',datasets_name)
-        if datasets_name == 'pair_hgnc_all':
-            # Handle the tar.gz file for HGNC mapping
-            import tarfile
-            #tar_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tar.gz'.format(datasets_name),title=datasets_name)
-            tar_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.tar.gz',dir='./genesets')
-            # Extract the TSV file from tar.gz
-            with tarfile.open(tar_path, 'r:gz') as tar:
-                tar.extractall(path='genesets/')
-            print('......Extracted pair_hgnc_all.tsv from tar.gz')
-        else:
-            #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
-            model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.tsv',dir='./genesets')
-    print('......Geneid Annotation Pair download finished!')
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......Geneid Annotation Pair download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.tsv', dir='./genesets')
+
+    # Handle special datasets not in DATA_DOWNLOAD_LINK_DICT
+    for datasets_name, url in _special_datasets.items():
+        print(f'{Colors.CYAN}......Geneid Annotation Pair download start: {datasets_name}{Colors.ENDC}')
+        import tarfile
+        tar_path = download_data_requests(url=url, file_path=f'{datasets_name}.tar.gz', dir='./genesets')
+        # Extract the TSV file from tar.gz
+        with tarfile.open(tar_path, 'r:gz') as tar:
+            tar.extractall(path='genesets/')
+        print(f'{Colors.GREEN}......Extracted {datasets_name}.tsv from tar.gz{Colors.ENDC}')
+
+    print(f'{Colors.GREEN}{EMOJI["done"]} Geneid Annotation Pair download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["GTF转换", "gtf_to_pair_tsv", "gtf_to_mapping", "GTF基因映射", "convert_gtf"],
@@ -1478,21 +1575,21 @@ def download_tosica_gmt():
     r"""load TOSICA gmt dataset
 
     """
-    _datasets = {
-        'GO_bp':'https://figshare.com/ndownloader/files/41460072',
-        'TF':'https://figshare.com/ndownloader/files/41460066',
-        'reactome':'https://figshare.com/ndownloader/files/41460051',
-        'm_GO_bp':'https://figshare.com/ndownloader/files/41460060',
-        'm_TF':'https://figshare.com/ndownloader/files/41460057',
-        'm_reactome':'https://figshare.com/ndownloader/files/41460054',
-        'immune':'https://figshare.com/ndownloader/files/41460063',
-    }
-     
-    for datasets_name in _datasets.keys():
-        print('......TOSICA gmt dataset download start:',datasets_name)
-        #model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
-        model_path = download_data(url=_datasets[datasets_name],file_path=f'{datasets_name}.gmt',dir='./genesets')
-    print('......TOSICA gmt dataset download finished!')
+    _datasets = [
+        'GO_bp',
+        'TF',
+        'reactome',
+        'm_GO_bp',
+        'm_TF',
+        'm_reactome',
+        'immune',
+    ]
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......TOSICA gmt dataset download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.gmt', dir='./genesets')
+    print(f'{Colors.GREEN}{EMOJI["done"]} TOSICA gmt dataset download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["基因集准备", "geneset_prepare", "pathway_prepare", "基因集加载", "load_geneset"],
@@ -2089,48 +2186,8 @@ def load(path,backend=None):
             raise ValueError(f"Invalid backend: {backend}")
 
 
-import os
-import requests
-from tqdm import tqdm
-from typing import Optional
-
-def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download data with headers and progress bar."""
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-
-    file_name = os.path.basename(url) if file_path is None else file_path
-    file_path = os.path.join(dir, file_name)
-
-    if os.path.exists(file_path):
-        print(f"File {file_path} already exists.")
-        return file_path
-
-    print(f"Downloading data to {file_path}...")
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://cf.10xgenomics.com/",
-    }
-
-    try:
-        with requests.get(url, headers=headers, stream=True) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get('Content-Length', 0))
-            chunk_size = 8192
-            with open(file_path, 'wb') as f, tqdm(
-                total=total_size, unit='B', unit_scale=True, desc=file_name, ncols=80
-            ) as pbar:
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    if chunk:
-                        f.write(chunk)
-                        pbar.update(len(chunk))
-    except Exception as e:
-        print(f"Download failed: {e}")
-        raise
-
-    return file_path
+# Note: download_data function has been removed.
+# Please use download_data_requests from omicverse.datasets instead.
 
 
 @register_function(
