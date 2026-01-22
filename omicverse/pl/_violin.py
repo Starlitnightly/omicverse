@@ -97,7 +97,7 @@ def violin(
     with additional customization options for enhanced visualization,
     implemented using pure matplotlib.
     
-    Arguments:
+    Args:
         adata: AnnData. Annotated data matrix.
         keys: str | Sequence[str]. Keys for accessing variables of `.var_names` or fields of `.obs`.
         groupby: str | None. The key of the observation grouping to consider. (None)
@@ -462,7 +462,7 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
     r"""
     Extract data from AnnData object for violin plotting.
 
-    Arguments:
+    Args:
         adata: AnnData object
         keys: list of str
             Variables to extract

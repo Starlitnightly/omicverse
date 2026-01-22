@@ -49,7 +49,7 @@ def mde(adata: AnnData, **kwargs):
     r"""
     Plot MDE embedding.
 
-    Arguments:
+    Args:
         adata: Annotated data matrix.
         **kwargs: Additional keyword arguments.
 
@@ -65,7 +65,7 @@ def tsne(adata: AnnData, **kwargs):
     r"""
     Plot t-SNE embedding.
 
-    Arguments:
+    Args:
         adata: Annotated data matrix.
         **kwargs: Additional keyword arguments.
 
@@ -81,7 +81,7 @@ def pca(adata: AnnData, **kwargs):
     r"""
     Plot PCA embedding.
 
-    Arguments:
+    Args:
         adata: Annotated data matrix.
         **kwargs: Additional keyword arguments.
     """
@@ -96,7 +96,7 @@ def umap(adata: AnnData, **kwargs):
     r"""
     Plot UMAP embedding.
 
-    Arguments:
+    Args:
         adata: Annotated data matrix.
         color: Keys for annotations of observations/cells or variables/genes. (None)
         gene_symbols: Key for field in `.var` that stores gene symbols. (None)
@@ -220,9 +220,11 @@ def embedding(
     marker: Union[str, Sequence[str]] = '.',
     **kwargs,
 ) -> Union[Figure, Axes, None]:
-    r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
+    r"""
+    Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
 
-    Arguments:
+
+    Args:
         adata: Annotated data matrix.
         basis: Name of the `obsm` basis to use.
         color: Keys for annotations of observations/cells or variables/genes. (None)
@@ -270,7 +272,8 @@ def embedding(
         return_fig: Return figure object. (None)
         marker: Marker style. ('.')
         **kwargs: Additional keyword arguments.
-        
+
+
     Returns:
         ax: If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
     """
@@ -319,7 +322,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
                        save:str=None,**kwargs):
     r"""Plot cell proportion of each cell type in each visual cluster.
 
-    Arguments:
+    Args:
         adata: AnnData object.
         celltype_clusters: Cell type clusters.
         groupby: Visual clusters.
@@ -464,7 +467,7 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     r"""
     Plot embedding with celltype color by omicverse.
 
-    Arguments:
+    Args:
         adata: AnnData object  
         figsize: tuple, optional (default=(6,4))
             Figure size
@@ -581,7 +584,7 @@ def ConvexHull(adata:AnnData,basis:str,cluster_key:str,
     r"""
     Plot the ConvexHull for a cluster in embedding.
 
-    Arguments:
+    Args:
         adata: AnnData object
         basis: str
             Embedding method in adata.obsm
@@ -649,7 +652,7 @@ def embedding_adjust(
     
     Borrowed from scanpy github forum.
 
-    Arguments:
+    Args:
         adata: AnnData object
         groupby: str
             Key in adata.obs for grouping
@@ -897,8 +900,8 @@ def single_group_boxplot(adata,
     scatter_kwargs (dict): Additional keyword arguments for customizing the scatter plot.
     ax (matplotlib.axes.Axes): A pre-existing axes object for plotting (optional).
     
-    Example:
-    ov.pl.single_group_boxplot(adata,groupby='clusters',
+    Examples:
+        ov.pl.single_group_boxplot(adata,groupby='clusters',
              color='Sox_aucell',
              type_color_dict=dict(zip(pd.Categorical(adata.obs['clusters']).categories, adata.uns['clusters_colors'])),
              x_ticks_plot=True,
@@ -909,10 +912,10 @@ def single_group_boxplot(adata,
              bbox_to_anchor=(1,1),
              title='Expression',
              scatter_kwargs={'alpha':0.8,'s':10,'marker':'o'},
-             point_number=15,
-             sort=False,
-             save=False,
-             )
+                 point_number=15,
+                 sort=False,
+                 save=False,
+                 )
     """
 
     if scatter_kwargs is None:
@@ -1132,7 +1135,7 @@ def plot_boxplots(  # pragma: no cover
 
         Returns:
             Depending on `plot_facets`, returns a :class:`~matplotlib.axes.Axes` (`plot_facets = False`)
-            or :class:`~sns.axisgrid.FacetGrid` (`plot_facets = True`) object
+            or: class:`~sns.axisgrid.FacetGrid` (`plot_facets = True`) object
 
         Examples:
             >>> import pertpy as pt
@@ -1142,8 +1145,8 @@ def plot_boxplots(  # pragma: no cover
                 sample_identifier="batch", covariate_obs=["condition"])
             >>> sccoda.plot_boxplots(mdata, feature_name="condition", add_dots=True)
 
-        Preview:
-            .. image:: /_static/docstring_previews/sccoda_boxplots.png
+            Preview:
+                .. image:: /_static/docstring_previews/sccoda_boxplots.png
         """
         if args_boxplot is None:
             args_boxplot = {}
@@ -1695,24 +1698,23 @@ def add_arrow(ax,adata,basis,fontsize=12,
               arrow_scale=5,arrow_width=0.01):
     r"""
     Add arrow and label to the axis
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        The axis to add the arrow and label to.
-    adata : AnnData
-        The AnnData object to add the arrow and label to.
-    basis : str
-        The basis to add the arrow and label to.
-    fontsize : int
-        The fontsize of the label.
-    arrow_scale : float
-        The scale of the arrow.
-    arrow_width : float
-        The width of the arrow.
-    x_label : str
-        The label of the x-axis.
-    y_label : str
-        The label of the y-axis.
+    Args:
+        ax: matplotlib.axes.Axes
+            The axis to add the arrow and label to.
+        adata: AnnData
+            The AnnData object to add the arrow and label to.
+        basis: str
+            The basis to add the arrow and label to.
+        fontsize: int
+            The fontsize of the label.
+        arrow_scale: float
+            The scale of the arrow.
+        arrow_width: float
+            The width of the arrow.
+        x_label: str
+            The label of the x-axis.
+        y_label: str
+            The label of the y-axis.
     """
     if x_label is None:
         x_label=basis+'1'

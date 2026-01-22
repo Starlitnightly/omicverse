@@ -11,7 +11,7 @@ def html_to_rgb(html_color):
     r"""
     Convert HTML hex color code to RGB tuple.
     
-    Arguments:
+    Args:
         html_color: HTML hex color string (e.g., '#FF0000' or 'FF0000')
         
     Returns:
@@ -40,7 +40,7 @@ def get_rgb_function(cmap, min_value, max_value):
     r"""
     Generate a function to map continuous values to RGB using colormap.
     
-    Arguments:
+    Args:
         cmap: Matplotlib colormap object
         min_value: Minimum value for color mapping
         max_value: Maximum value for color mapping
@@ -76,7 +76,7 @@ def rgb_to_ryb(rgb):
     r"""
     Convert colors from RGB colorspace to RYB (red-yellow-blue) colorspace.
     
-    Arguments:
+    Args:
         rgb: RGB color array with shape (N, 3) or (3,)
         
     Returns:
@@ -108,7 +108,7 @@ def ryb_to_rgb(ryb):
     r"""
     Convert colors from RYB (red-yellow-blue) colorspace to RGB colorspace.
     
-    Arguments:
+    Args:
         ryb: RYB color array with shape (N, 3) or (3,)
         
     Returns:
@@ -177,7 +177,7 @@ def plot_spatial_general(
     
     Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
     
-    Arguments:
+    Args:
         adata: Annotated data object
         value_df: DataFrame with cell abundances or features (max 7 columns) across locations
         coords: Array with x,y coordinates for plotting spots
@@ -430,7 +430,7 @@ def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
     
     Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
     
-    Arguments:
+    Args:
         adata: AnnData object with spatial coordinates in adata.obsm['spatial']
         color: List of column names from adata.obs to plot
         img_key: Image resolution key - 'hires' or 'lowres' ('hires')
@@ -471,7 +471,7 @@ def create_colormap(R, G, B):
     r"""
     Create a matplotlib colormap from RGB values with alpha gradient.
     
-    Arguments:
+    Args:
         R: Red component (0-255)
         G: Green component (0-255)
         B: Blue component (0-255)
@@ -507,7 +507,7 @@ def spatial_value(adata,color,library_id,
     r"""
     Plot spatial expression values for a single gene or feature on tissue image.
     
-    Arguments:
+    Args:
         adata: AnnData object with spatial data
         color: Gene name or obs column to visualize
         library_id: Spatial library identifier

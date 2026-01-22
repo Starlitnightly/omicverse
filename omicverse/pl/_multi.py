@@ -25,7 +25,7 @@ def embedding_multi(
     Produces scatter plots on specified embeddings, supporting cross-modality feature visualization.
     For modality-specific embeddings, use format 'modality:embedding' (e.g., 'rna:X_pca').
     
-    Arguments:
+    Args:
         data: AnnData or MuData object containing embedding and feature data
         basis: Name of embedding in obsm (e.g., 'X_umap') or modality-specific ('rna:X_pca')
         color: Gene names or obs columns to color points by (None)

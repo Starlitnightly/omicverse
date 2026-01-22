@@ -3,6 +3,8 @@ site_name: omicverse Readthedocs
 repo_url: https://github.com/Starlitnightly/omicverse
 site_author: "Zehua Zeng"
 copyright: "Copyright &copy; 2019-2025, 112 Lab, USTB"
+use_directory_urls: true
+#exclude_docs: api/**
 
 
 nav:
@@ -99,7 +101,7 @@ nav:
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
         - Color system: Tutorials-plotting/t_visualize_colorsystem.ipynb
 - GPU Support: GPU_supported_registry_functions.md
-- API documentation: api/index.md
+- API documentation: $api/omicverse.***
 - Release notes: Release_notes.md
 - Developer guild: Developer_guild.md
 
@@ -113,8 +115,23 @@ plugins:
   - mermaid2
   - glightbox
   - plotly
+  - mkapi:
+      config: mkapi_config.py
+      exclude:
+        - omicverse.external
+        - omicverse.external.*
+        - omicverse.llm
+        - omicverse.llm.*
+        - omicverse.nocd 
+        - omicverse.nocd.*
+        - omicverse.ov_skill_seeker
+        - omicverse.ov_skill_seeker.*
+        - omicverse.popv
+        - omicverse.popv.*
+        - omicverse.utils.*
+ 
   - mkdocstrings:
-      enabled: !ENV [ENABLE_MKDOCSTRINGS, true]
+      enabled: !ENV [ENABLE_MKDOCSTRINGS, false]
       custom_templates: templates
       default_handler: python
       handlers:

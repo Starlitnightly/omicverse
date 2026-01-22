@@ -36,7 +36,7 @@ def calculate_gene_density(
     Computes KDE for each feature using expression values as weights and stores
     density values in adata.obs as 'density_{feature}' columns.
     
-    Arguments:
+    Args:
         adata: Annotated data object with embedding coordinates
         features: List of gene names or feature names to process
         basis: Key in adata.obsm containing 2D embedding coordinates ('X_umap')
@@ -132,7 +132,7 @@ def add_density_contour(
     r"""
     Add KDE-based density contours to an existing matplotlib plot.
     
-    Arguments:
+    Args:
         ax: matplotlib.axes.Axes object to draw contours on
         embeddings: 2D coordinate array with shape (n_cells, 2)
         weights: 1D weight array for KDE, will be min-max normalized

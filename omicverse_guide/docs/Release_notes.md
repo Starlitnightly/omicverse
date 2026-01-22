@@ -652,7 +652,16 @@ Added and fixed the `anndata-rs` to support million size's datasets (#336)
 ### Agent Module
 - Added `ov.Agent` to perform the analysis using LLM.
 
+### Pl Module
+- Enhanced categorical legend handling for scatterplot embeddings, including `legend_loc='on data'`.
 
+### Datasets Module
+- Added dataset URLs and expanded data downloading utilities.
+- Improved dataset utilities and refreshed download behaviors.
+
+### Docs
+- Strengthened data handling notes in dotplot and DEG analysis.
+- Updated the scTour clustering tutorial and release notes.
 
 
 

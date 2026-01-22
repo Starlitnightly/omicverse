@@ -24,7 +24,7 @@ def add_palue(ax,line_x1,line_x2,line_y,
     r"""
     Add p-value annotation with connecting line to a matplotlib plot.
     
-    Arguments:
+    Args:
         ax: matplotlib.axes.Axes object to add annotation to
         line_x1: Starting x-coordinate of connecting line
         line_x2: Ending x-coordinate of connecting line
@@ -47,7 +47,7 @@ def create_transparent_gradient_colormap(color1, color2,N=100):
     r"""
     Create a gradient colormap from transparent color1 to opaque color2.
 
-    Arguments:
+    Args:
         color1: Starting color (transparent)
         color2: Ending color (opaque)
         N: Number of color steps (default: 100)
@@ -72,7 +72,7 @@ def create_custom_colormap(cell_color):
     r"""
     Create a custom colormap based on cell type color.
     
-    Arguments:
+    Args:
         cell_color: str
             Base color for the cell type
     

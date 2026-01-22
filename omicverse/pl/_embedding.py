@@ -14,7 +14,7 @@ def embedding_atlas(adata,basis,color,
     Uses Datashader to render embeddings at high resolution, suitable for datasets
     with millions of cells where standard scatter plots become ineffective.
     
-    Arguments:
+    Args:
         adata: Annotated data object with embedding coordinates
         basis: Key in adata.obsm containing embedding coordinates (e.g., 'X_umap')
         color: Gene name or obs column to color cells by

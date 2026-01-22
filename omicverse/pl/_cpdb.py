@@ -22,7 +22,7 @@ def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
     r"""
     Create a circular network plot of CellPhoneDB cell-cell interactions.
     
-    Arguments:
+    Args:
         adata: Annotated data object with cell type information
         interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
         celltype_key: Column name for cell type annotation
@@ -148,7 +148,7 @@ def cpdb_chord(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
     r"""
     Create a chord diagram visualization of CellPhoneDB interactions.
     
-    Arguments:
+    Args:
         adata: Annotated data object with cell type information
         interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
         celltype_key: Column name for cell type annotation
@@ -209,7 +209,7 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
     r"""
     Create a dot heatmap of CellPhoneDB interaction counts between cell types.
     
-    Arguments:
+    Args:
         adata: Annotated data object with cell type information
         interaction_edges: DataFrame with SOURCE, TARGET, and COUNT columns
         celltype_key: Column name for cell type annotation
@@ -469,7 +469,7 @@ def cpdb_interacting_heatmap(adata,
     r"""
     Create a detailed heatmap of specific interacting pairs with significance.
     
-    Arguments:
+    Args:
         adata: Annotated data object with cell type information
         celltype_key: Column name for cell type annotation
         means: CellPhoneDB means DataFrame with interaction data
@@ -695,7 +695,7 @@ def cpdb_group_heatmap(adata,
     r"""
     Create a grouped heatmap showing ligand and receptor expression by cell type.
     
-    Arguments:
+    Args:
         adata: Annotated data object with expression and cell type data
         celltype_key: Column name for cell type annotation
         means: CellPhoneDB means DataFrame with interaction data
@@ -853,7 +853,7 @@ def cpdb_interacting_network(adata,
     r"""
     Create a detailed network showing ligand-receptor interactions between cell types.
     
-    Arguments:
+    Args:
         adata: Annotated data object with cell type information
         celltype_key: Column name for cell type annotation
         means: CellPhoneDB means DataFrame with interaction data
@@ -969,7 +969,7 @@ def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
     r"""
     Generate points for a curved line between two coordinates using Bezier curves.
     
-    Arguments:
+    Args:
         x0: Starting x coordinate
         y0: Starting y coordinate
         x1: Ending x coordinate
@@ -1000,7 +1000,7 @@ def curved_graph(_graph, pos=None, eps=0.2, pointn=30,
     r"""
     Draw a network graph with curved edges and arrows.
     
-    Arguments:
+    Args:
         _graph: NetworkX graph object
         pos: Node position dictionary (None)
         eps: Curve control parameter (0.2)
@@ -1048,7 +1048,7 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
     r"""
     Create a network plot with curved edges and customizable node styling.
     
-    Arguments:
+    Args:
         G: NetworkX graph object
         G_type_dict: Dictionary mapping nodes to types
         G_color_dict: Dictionary mapping nodes to colors

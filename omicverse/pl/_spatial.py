@@ -144,7 +144,7 @@ def _get_library_id(
     r"""
     Get library IDs for spatial data processing.
     
-    Arguments:
+    Args:
         adata: AnnData object
         shape: str, optional (default=None)
             Shape parameter for spatial data
@@ -1445,42 +1445,40 @@ def _spatial_plot(
     ``size_key`` arguments to find values for ``img``, ``seg`` and ``size``.
     Alternatively, these values can be passed directly via ``img``.
 
-    Parameters
-    ----------
-    %(adata)s
-    %(shape)s
-    %(color)s
-    %(groups)s
-    %(library_id)s
-    %(library_key)s
-    %(spatial_key)s
-    %(plotting_image)s
-    %(plotting_segment)s
-    %(plotting_features)s
-    %(groups)s
-    palette
+    Args:
+        %(adata)s
+        %(shape)s
+        %(color)s
+        %(groups)s
+        %(library_id)s
+        %(library_key)s
+        %(spatial_key)s
+        %(plotting_image)s
+        %(plotting_segment)s
+        %(plotting_features)s
+        %(groups)s
+        palette
         Categorical colormap for the clusters.
-    norm
+        norm
         Colormap normalization, see :class:`matplotlib.colors.Normalize`.
-    na_color
-        Color to be used for NAs values, if present.
-    size
-        Size of the scatter point/shape. In case of segmentation it represents the
-        scaling factor for shape (accessed via ``size_key``).
-    size_key
+            na_color
+            Color to be used for NAs values, if present.
+            size
+            Size of the scatter point/shape. In case of segmentation it represents the
+            scaling factor for shape (accessed via ``size_key``).
+            size_key
         Key of pixel size of shapes to be plotted, stored in :attr:`anndata.AnnData.uns`.
-    scale_factor
-        Scaling factor used to map from coordinate space to pixel space.
-        Found by default if ``library_id`` can be resolved. Otherwise, defaults to 1.
-    crop_coord
-        Coordinates to use for cropping the image (left, right, top, bottom).
-        These coordinates are expected to be in pixel space and will be transformed by ``scale_factor``.
-    connectivity_key
-        Key for neighbors graph to plot.
+            scale_factor
+            Scaling factor used to map from coordinate space to pixel space.
+            Found by default if ``library_id`` can be resolved. Otherwise, defaults to 1.
+            crop_coord
+            Coordinates to use for cropping the image (left, right, top, bottom).
+            These coordinates are expected to be in pixel space and will be transformed by ``scale_factor``.
+            connectivity_key
+            Key for neighbors graph to plot.
 
-    Returns
-    -------
-    %(plotting_returns)s
+    Returns:
+        %(plotting_returns)s
     """
     from squidpy._docs import d
     from squidpy.gr._utils import _assert_spatial_basis
@@ -1739,21 +1737,19 @@ def spatial_scatter(
     .. seealso::
         - :func:`squidpy.pl.spatial_segment` on how to plot spatial data with segmentation masks on top.
 
-    Parameters
-    ----------
-    %(adata)s
-    %(shape)s
-    %(color)s
-    %(groups)s
-    %(library_id)s
-    %(library_key)s
-    %(spatial_key)s
-    %(plotting_image)s
-    %(plotting_features)s
+    Args:
+        %(adata)s
+        %(shape)s
+        %(color)s
+        %(groups)s
+        %(library_id)s
+        %(library_key)s
+        %(spatial_key)s
+        %(plotting_image)s
+        %(plotting_features)s
 
-    Returns
-    -------
-    %(spatial_plot.returns)s
+    Returns:
+        %(spatial_plot.returns)s
     """
     from squidpy._docs import d
     
@@ -1783,21 +1779,19 @@ def spatial_segment(
     .. seealso::
         - :func:`squidpy.pl.spatial_scatter` on how to plot spatial data with overlayed data on top.
 
-    Parameters
-    ----------
-    %(adata)s
-    %(plotting_segment)s
-    %(color)s
-    %(groups)s
-    %(library_id)s
-    %(library_key)s
-    %(spatial_key)s
-    %(plotting_image)s
-    %(plotting_features)s
+    Args:
+        %(adata)s
+        %(plotting_segment)s
+        %(color)s
+        %(groups)s
+        %(library_id)s
+        %(library_key)s
+        %(spatial_key)s
+        %(plotting_image)s
+        %(plotting_features)s
 
-    Returns
-    -------
-    %(spatial_plot.returns)s
+    Returns:
+        %(spatial_plot.returns)s
     """
     from squidpy._docs import d
     
@@ -1878,82 +1872,79 @@ def spatial_segment_overlay(
     This function allows visualization of multiple genes in the same spatial context,
     using different colors and transparency to show expression overlap and co-localization.
     
-    Parameters
-    ----------
-    %(adata)s
-    seg_cell_id
+    Args:
+        %(adata)s
+        seg_cell_id
         Key in :attr:`anndata.AnnData.obs` that contains unique cell IDs for segmentation.
-    color
-        Gene names or features to plot. Can be a single gene or list of genes.
-    seg
-        Segmentation mask. If `True`, uses segmentation from `adata.uns['spatial']`.
-    seg_key
-        Key for segmentation mask in `adata.uns['spatial'][library_id]['images']`.
-    seg_contourpx
-        Contour width in pixels. If specified, segmentation boundaries will be eroded.
-    seg_outline
-        If `True`, show segmentation boundaries.
-    alpha
-        Transparency level for gene expression overlay (0-1).
-    cmaps
-        Colormap(s) for each gene. If single string, uses same colormap for all genes.
-        If list, should match length of `color` parameter.
-    %(library_id)s
-    %(library_key)s  
-    %(spatial_key)s
-    %(plotting_image)s
-    %(plotting_features)s
-    groups
-        Categories to plot for categorical features.
-    palette
-        Color palette for categorical features.
-    norm
-        Colormap normalization.
-    na_color
-        Color for NA/missing values.
-    colorbar
-        Whether to show colorbars for each gene.
-    colorbar_position
+            color
+            Gene names or features to plot. Can be a single gene or list of genes.
+            seg
+            Segmentation mask. If `True`, uses segmentation from `adata.uns['spatial']`.
+            seg_key
+            Key for segmentation mask in `adata.uns['spatial'][library_id]['images']`.
+            seg_contourpx
+            Contour width in pixels. If specified, segmentation boundaries will be eroded.
+            seg_outline
+            If `True`, show segmentation boundaries.
+            alpha
+            Transparency level for gene expression overlay (0-1).
+            cmaps
+            Colormap(s) for each gene. If single string, uses same colormap for all genes.
+            If list, should match length of `color` parameter.
+            %(library_id)s
+            %(library_key)s  
+            %(spatial_key)s
+            %(plotting_image)s
+            %(plotting_features)s
+            groups
+            Categories to plot for categorical features.
+            palette
+            Color palette for categorical features.
+            norm
+            Colormap normalization.
+            na_color
+            Color for NA/missing values.
+            colorbar
+            Whether to show colorbars for each gene.
+            colorbar_position
         Position of colorbars: 'bottom', 'right', or 'none'.
-    colorbar_grid
-        Grid layout for colorbars as (rows, cols). If None, auto-determined.
-    colorbar_tick_size
-        Font size for colorbar tick labels.
-    colorbar_title_size
-        Font size for colorbar titles.
-    colorbar_width
-        Width of individual colorbars. If None, uses default values.
-    colorbar_height
-        Height of individual colorbars. If None, uses default values.
-    colorbar_spacing
+            colorbar_grid
+            Grid layout for colorbars as (rows, cols). If None, auto-determined.
+            colorbar_tick_size
+            Font size for colorbar tick labels.
+            colorbar_title_size
+            Font size for colorbar titles.
+            colorbar_width
+            Width of individual colorbars. If None, uses default values.
+            colorbar_height
+            Height of individual colorbars. If None, uses default values.
+            colorbar_spacing
         Dictionary with spacing parameters: 'hspace' (vertical gaps), 'wspace' (horizontal gaps).
-        If None, uses default spacing.
-    title
-        Plot title.
-    ax
-        Matplotlib axes object to plot on.
-    return_ax
-        Whether to return the axes object.
-    figsize
-        Figure size (width, height).
-    save
-        Path to save the figure.
+            If None, uses default spacing.
+            title
+            Plot title.
+            ax
+            Matplotlib axes object to plot on.
+            return_ax
+            Whether to return the axes object.
+            figsize
+            Figure size (width, height).
+            save
+            Path to save the figure.
     
-    Returns
-    -------
-    If `return_ax` is `True`, returns matplotlib axes object, otherwise `None`.
+    Returns:
+        If `return_ax` is `True`, returns matplotlib axes object, otherwise `None`.
     
-    Examples
-    --------
-    >>> import squidpy as sq
-    >>> # Overlay two genes with different colors
-    >>> sq.pl.spatial_segment_overlay(
-    ...     adata, 
-    ...     seg_cell_id='cell_id',
-    ...     color=['gene1', 'gene2'],
-    ...     cmaps=['Reds', 'Blues'],
-    ...     alpha=0.7
-    ... )
+    Examples:
+        >>> import squidpy as sq
+        >>> # Overlay two genes with different colors
+        >>> sq.pl.spatial_segment_overlay(
+        ...     adata, 
+        ...     seg_cell_id='cell_id',
+        ...     color=['gene1', 'gene2'],
+        ...     cmaps=['Reds', 'Blues'],
+        ...     alpha=0.7
+        ... )
     """
     from matplotlib.colors import LinearSegmentedColormap, to_rgb
     from matplotlib.gridspec import GridSpec

@@ -33,7 +33,7 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
     r"""
     Create a volcano plot for differential expression analysis.
     
-    Arguments:
+    Args:
         result: pandas.DataFrame
             Dataframe containing differential expression results with 'sig' column
         pval_name: str, optional (default='qvalue')
@@ -360,7 +360,7 @@ def venn(sets={}, out='./', palette='bgrc',
     r"""
     Create a Venn diagram to visualize set overlaps.
     
-    Arguments:
+    Args:
         sets: Dictionary with set names as keys and sets as values ({})
         out: Output directory path ('./')
         palette: Color palette for sets ('bgrc')
@@ -407,7 +407,7 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
     r"""
     Create a boxplot with jittered points to visualize data distribution across categories.
     
-    Arguments:
+    Args:
         data: DataFrame containing the data to plot
         hue: Column name for grouping variable (color coding)
         x_value: Column name for x-axis categories
@@ -463,17 +463,15 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
         """
         Calculate evenly distributed positions for boxes within the range [-0.5, 0.5].
         
-        Parameters
-        ----------
-        n_hues : int
-            Number of hue categories
-        spacing : float
-            Fraction of the total range to use for spacing boxes (0.8 means use 80% of [-0.5, 0.5])
+        Args:
+            n_hues: int
+                Number of hue categories
+            spacing: float
+                Fraction of the total range to use for spacing boxes (0.8 means use 80% of [-0.5, 0.5])
             
-        Returns
-        -------
-        positions : list
-            List of positions for each hue
+        Returns:
+            positions: list
+                List of positions for each hue
         """
         if n_hues == 1:
             return [0.0]
