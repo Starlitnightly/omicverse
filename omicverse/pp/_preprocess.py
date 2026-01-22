@@ -1189,16 +1189,21 @@ def umap(adata, **kwargs):
             print(f"{EMOJI['gpu']} Using torch GPU to calculate UMAP...")
             print_gpu_usage_color()
             from ._umap import umap as _umap
-            _umap(adata,method='mde', **kwargs)
+            _umap(adata,method='pumap', **kwargs)
             add_reference(adata,'pymde','UMAP with pymde')
             add_reference(adata,'umap','UMAP with pymde')
-            
-
         else:
-            print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
-            import rapids_singlecell as rsc
-            rsc.tl.umap(adata, **kwargs)
-            add_reference(adata,'umap','UMAP with RAPIDS')
+            try:
+                print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
+                import rapids_singlecell as rsc
+                rsc.tl.umap(adata, **kwargs)
+                add_reference(adata,'umap','UMAP with RAPIDS')
+            except Exception as e:
+                print(f"{EMOJI['error']} RAPIDS GPU UMAP failed: {e}")
+                print(f"{EMOJI['error']} Using pumap instead...")
+                from ._umap import umap as _umap
+                _umap(adata,method='pumap', **kwargs)
+                #add_reference(adata,'pumap','UMAP with pumap')
 
         print(f"{EMOJI['done']} UMAP completed successfully.")
     except Exception as e:
@@ -1242,7 +1247,7 @@ def louvain(adata, **kwargs):
 )
 def leiden(
     adata, resolution=1.0, random_state=0, 
-    key_added='leiden', local_iterations=100, max_levels=10, device='cpu',**kwargs):
+    key_added='leiden', local_iterations=100, max_levels=10, device='cpu', symmetrize=None, **kwargs):
     '''
     leiden clustering
     '''
@@ -1267,6 +1272,7 @@ def leiden(
             local_iterations=local_iterations,
             max_levels=max_levels,
             device=device,  # None -> auto-pick
+            symmetrize=symmetrize,
         )
         add_reference(adata,'leiden','Leiden clustering with omicverse')
     else:
