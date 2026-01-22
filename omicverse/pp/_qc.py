@@ -351,8 +351,9 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
 )
 def qc(adata,**kwargs):
     r'''
-    qc
-    Arguments:
+    Perform quality control on a dictionary of AnnData objects.
+
+    Args:
         adata : AnnData object
         mode : The filtering method to use. Valid options are 'seurat'
         and 'mads'. Default is 'seurat'.
@@ -842,6 +843,8 @@ def qc_cpu(
         adata.obs['nUMIs'] = np.array(adata.X[:].sum(axis=1)).reshape(-1)
         # Use subset method for Rust backend slicing
         mt_indices = np.where(adata.var["mt"])[0]
+        ribo_indices = np.where(adata.var["ribo"])[0]
+        hb_indices = np.where(adata.var["hb"])[0]
         if len(mt_indices) > 0:
             #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
             adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']

@@ -654,7 +654,8 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     # Ensure PCA is available for downstream steps that expect it
     try:
         if 'X_pca' not in adata.obsm:
-            sc.tl.pca(adata, n_comps=min(50, adata.n_vars - 1))
+            from ._pca import pca as _pca
+            _pca(adata, n_comps=min(50, adata.n_vars - 1), layer=None)
     except Exception as exc:  # pragma: no cover - runtime safeguard
         print(f"{Colors.WARNING}⚠️  PCA computation skipped: {exc}{Colors.ENDC}")
 
@@ -714,33 +715,59 @@ def highly_variable_genes(adata,**kwargs):
         'layers': ['scaled']
     },
     auto_fix='none',
-    examples=["ov.pp.scale(adata, max_value=10)"],
+    examples=["ov.pp.scale(adata, max_value=10)", "ov.pp.scale(adata, max_value=10, to_sparse=True)"],
     related=["normalize", "regress"]
 )
-def scale(adata,max_value=10,layers_add='scaled',**kwargs):
+def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
     """
     Scale the input AnnData object.
 
     Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape.
+        adata: Annotated data matrix with n_obs x n_vars shape.
+        max_value: Maximum value after scaling. Default: 10.
+        layers_add: Name of the layer to store the scaled data. Default: 'scaled'.
+        to_sparse: If True, convert the result to csr_matrix format. Default: True.
+        **kwargs: Additional arguments passed to scaling functions.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Adds a new layer called 'scaled' that stores
-            the expression matrix that has been scaled to unit variance and zero mean.
+        adata: Annotated data matrix with n_obs x n_vars shape.
+        Adds a new layer called 'scaled' that stores the expression matrix
+        that has been scaled to unit variance and zero mean.
 
+    Examples:
+        >>> import omicverse as ov
+        >>> # Scale data with default sparse output
+        >>> ov.pp.scale(adata, max_value=10)
+        >>> # Scale data keeping dense format
+        >>> ov.pp.scale(adata, max_value=10, to_sparse=False)
     """
-    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        from ._scale import scale_array
+        x = adata.X[:]
+        scaled_data = scale_array(
+            x, zero_center=True, max_value=max_value, copy=True, mask_obs=None
+        )
+    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         from ._scale import scale_anndata as scale
-        adata_mock = scale(adata, copy=True,max_value=max_value,**kwargs)
-        if _is_rust_backend(adata_mock):
-            adata.layers[layers_add] = adata_mock.X[:]
-        else:
-            adata.layers[layers_add] = adata_mock.X.copy()
+        adata_mock = scale(adata, copy=True, max_value=max_value, **kwargs)
+        scaled_data = adata_mock.X.copy()
         del adata_mock
     else:
         import rapids_singlecell as rsc
-        adata.layers['scaled']=rsc.pp.scale(adata, max_value=max_value,inplace=False)
+        scaled_data = rsc.pp.scale(adata, max_value=max_value, inplace=False)
+
+    # Convert to sparse format if requested
+    if to_sparse and not issparse(scaled_data):
+        print(f"{Colors.BLUE}    Converting scaled data to csr_matrix format...{Colors.ENDC}")
+        scaled_data = csr_matrix(scaled_data)
+    elif to_sparse and issparse(scaled_data):
+        # Ensure it's csr_matrix format
+        if not isinstance(scaled_data, csr_matrix):
+            print(f"{Colors.BLUE}    Converting scaled data to csr_matrix format...{Colors.ENDC}")
+            scaled_data = csr_matrix(scaled_data)
+
+    adata.layers[layers_add] = scaled_data
 
     if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}

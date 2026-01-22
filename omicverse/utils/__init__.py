@@ -63,6 +63,7 @@ Examples:
 
 # All functions imported via wildcard imports from submodules
 from ._data import *
+from ._anndata_rust_patch import *
 from ._plot import *
 #from ._genomics import *
 from ._mde import *
