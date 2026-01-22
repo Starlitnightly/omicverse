@@ -693,8 +693,18 @@ def normalize_total(
         n_excluded = (~gene_subset).sum()
         print(f"   {EMOJI['warning']} {Colors.WARNING}Excluding {Colors.BOLD}{n_excluded:,}{Colors.ENDC}{Colors.WARNING} highly-expressed genes from normalization computation{Colors.ENDC}")
         if n_excluded <= 10:  # Only show gene names if not too many
-            print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
-        counts_per_cell = axis_sum(x[:, gene_subset], axis=1)
+            if is_rust:
+                # Convert to numpy array for compatibility with Rust backend
+                excluded_genes = np.array(adata.var_names)[~gene_subset].tolist()
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{excluded_genes}{Colors.ENDC}")
+            else:
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
+        if is_rust:
+            # Use integer indexing for Rust backend
+            gene_indices = np.where(gene_subset)[0]
+            counts_per_cell = axis_sum(x[:, gene_indices], axis=1)
+        else:
+            counts_per_cell = axis_sum(x[:, gene_subset], axis=1)
     counts_per_cell = np.ravel(counts_per_cell)
 
     cell_subset = counts_per_cell > 0
@@ -720,7 +730,12 @@ def normalize_total(
     if layer_norm == "after":
         after = target_sum
     elif layer_norm == "X":
-        after = np.median(counts_per_cell[cell_subset])
+        if is_rust:
+            # Use integer indexing for Rust backend
+            cell_indices = np.where(cell_subset)[0]
+            after = np.median(counts_per_cell[cell_indices])
+        else:
+            after = np.median(counts_per_cell[cell_subset])
     elif layer_norm is None:
         after = None
     else:
