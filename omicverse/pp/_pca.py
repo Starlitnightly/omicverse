@@ -580,11 +580,11 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             from ._pca_mlx import MLXPCA, MockPCA
                             logg.info(f"   {EMOJI['gpu']} Using MLX PCA for Apple Silicon MPS acceleration")
                             print(f"   {Colors.GREEN}{EMOJI['gpu']} MLX PCA backend: Apple Silicon GPU acceleration{Colors.ENDC}")
-                            
+
                             # Create MLX PCA instance (use "metal" for MLX)
                             mlx_pca = MLXPCA(n_components=n_comps, device="metal")
-                            
-                            # Fit and transform
+
+                            # Fit and transform (MLX PCA handles sparse matrices internally)
                             X_pca = mlx_pca.fit_transform(X)
                             
                             # Create a mock PCA object with sklearn-compatible interface
@@ -619,7 +619,11 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         
                         # Prepare data for GPU compatibility (float32 requirement)
                         X = prepare_data_for_device(X, device, verbose=True)
-                        
+
+                        # TorchDR PCA requires dense arrays, convert sparse to dense
+                        if isinstance(X, CSBase):
+                            X = X.toarray()
+
                         pca_ = PCA(
                             n_components=n_comps,
                             device=device,

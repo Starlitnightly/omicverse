@@ -163,18 +163,24 @@ class MLXPCA:
     def fit(self, X: np.ndarray) -> 'MLXPCA':
         """
         Fit the PCA model.
-        
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data.
-            
+            Training data. Can be dense or sparse array.
+
         Returns
         -------
         self : MLXPCA
             Returns the instance itself.
         """
-        X = np.asarray(X)
+        # Handle sparse matrices
+        from scipy import sparse
+        if sparse.issparse(X):
+            X = X.toarray()
+        else:
+            X = np.asarray(X)
+
         self.n_samples_, self.n_features_ = X.shape
         
         # Determine number of components
