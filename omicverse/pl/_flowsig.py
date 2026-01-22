@@ -8,7 +8,7 @@ def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
     r"""
     Generate points for a curved line between two coordinates using Bezier curves.
     
-    Arguments:
+    Args:
         x0: Starting x coordinate
         y0: Starting y coordinate
         x1: Ending x coordinate
@@ -39,7 +39,7 @@ def curved_graph(_graph, pos=None, eps=0.2, pointn=30,
     r"""
     Draw a network graph with curved edges and arrows.
     
-    Arguments:
+    Args:
         _graph: NetworkX graph object
         pos: Node position dictionary (None)
         eps: Curve control parameter (0.2)
@@ -94,7 +94,7 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
     r"""
     Create a network plot with curved edges and customizable node styling.
     
-    Arguments:
+    Args:
         G: NetworkX graph object
         G_type_dict: Dictionary mapping nodes to types
         G_color_dict: Dictionary mapping nodes to colors
@@ -242,7 +242,7 @@ def plot_flowsig_network(flow_network,
     r"""
     Create a flowsig network visualization showing GEM modules and gene flows.
     
-    Arguments:
+    Args:
         flow_network: NetworkX graph with flow connections
         gem_plot: List of GEM modules to include in plot
         figsize: Figure dimensions as (width, height) ((8,4))

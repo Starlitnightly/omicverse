@@ -41,6 +41,7 @@ Examples:
 
 # Fix PyArrow compatibility issue
 # PyExtensionType was renamed to ExtensionType in newer versions
+import os
 try:
     import pyarrow
     if hasattr(pyarrow, 'ExtensionType') and not hasattr(pyarrow, 'PyExtensionType'):
@@ -69,10 +70,13 @@ from . import datasets
 from . import external
 
 # Optional modules
-try:
-    from . import llm
-except Exception:
+if os.environ.get("OMICVERSE_DISABLE_LLM") == "1":
     llm = None
+else:
+    try:
+        from . import llm
+    except Exception:
+        llm = None
 
 
 # Optional datacollect module

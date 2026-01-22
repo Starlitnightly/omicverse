@@ -232,51 +232,49 @@ def animate_streamplot(X_grid, V_grid, adata=None,
     """
     Create an animated streamplot visualization.
     
-    Parameters:
-    -----------
-    X_grid : array-like
-        Grid coordinates [X, Y] where X and Y are 2D arrays
-    V_grid : array-like  
-        Velocity field [U, V] where U and V are 2D arrays
-    adata : AnnData object, optional
-        Annotated data object for background scatter plot
-    n_frames : int, default=20
-        Number of animation frames
-    interval : int, default=40
-        Delay between frames in milliseconds
-    fps : int, default=25
-        Frames per second for saved animation
-    alpha_animate : float, default=0.7
-        Alpha transparency for streamlines
-    cmap_stream : str, default='Blues'
-        Colormap for streamlines
-    linewidth : float, default=0.5
-        Width of streamlines
-    segment_length : float, default=1
-        Length scaling for streamline segments
-    figsize : tuple, default=(4, 4)
-        Figure size
-    basis : str, default='X_umap'
-        Basis for background scatter plot
-    color : str, default='celltype'
-        Color variable for background scatter plot
-    palette : dict, optional
-        Color palette for background scatter plot
-    saveto : str, default='animation.gif'
-        Output filename for animation
-    show_plot : bool, default=True
-        Whether to display the plot
-    streamline_res : float, default=0.125
-        Resolution for streamline computation
-    streamline_spacing : int, default=2
-        Spacing for streamline computation
-    streamline_maxLen : int, default=2500
-        Maximum length for streamlines
+    Args:
+        X_grid: array-like
+            Grid coordinates [X, Y] where X and Y are 2D arrays
+        V_grid: array-like  
+            Velocity field [U, V] where U and V are 2D arrays
+        adata: AnnData object, optional
+            Annotated data object for background scatter plot
+        n_frames: int, default=20
+            Number of animation frames
+        interval: int, default=40
+            Delay between frames in milliseconds
+        fps: int, default=25
+            Frames per second for saved animation
+        alpha_animate: float, default=0.7
+            Alpha transparency for streamlines
+        cmap_stream: str, default='Blues'
+            Colormap for streamlines
+        linewidth: float, default=0.5
+            Width of streamlines
+        segment_length: float, default=1
+            Length scaling for streamline segments
+        figsize: tuple, default=(4, 4)
+            Figure size
+        basis: str, default='X_umap'
+            Basis for background scatter plot
+        color: str, default='celltype'
+            Color variable for background scatter plot
+        palette: dict, optional
+            Color palette for background scatter plot
+        saveto: str, default='animation.gif'
+            Output filename for animation
+        show_plot: bool, default=True
+            Whether to display the plot
+        streamline_res: float, default=0.125
+            Resolution for streamline computation
+        streamline_spacing: int, default=2
+            Spacing for streamline computation
+        streamline_maxLen: int, default=2500
+            Maximum length for streamlines
         
     Returns:
-    --------
-    animation : FuncAnimation
-        The matplotlib animation object
+        animation: FuncAnimation
+            The matplotlib animation object
     """
     
     print("Creating streamlines...")

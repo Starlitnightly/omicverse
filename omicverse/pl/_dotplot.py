@@ -81,7 +81,7 @@ def dotplot(
     (visualized by color) and fraction of cells expressing the `var_name` in the
     category (visualized by the size of the dot).
     
-    Arguments:
+    Args:
         adata: AnnData
             Annotated data matrix.
         var_names: str or list of str or dict
@@ -506,59 +506,56 @@ def rank_genes_groups_dotplot(
     """
     Create a dot plot from rank_genes_groups results.
     
-    Parameters
-    ----------
-    adata : AnnData
-        Annotated data matrix.
-    plot_type : str
-        Currently only 'dotplot' is supported.
-    groups : str or list of str, optional
-        Groups to include in the plot.
-    n_genes : int, optional
-        Number of genes to include in the plot.
-    groupby : str, optional
-        Key in `adata.obs` to group by.
-    values_to_plot : str, optional
-        Key in rank_genes_groups results to plot (e.g. 'logfoldchanges', 'scores').
-    var_names : str or list of str or dict, optional
-        Variables to include in the plot. Can be:
-        - A list of gene names: ['gene1', 'gene2', ...]
-        - A dictionary mapping group names to gene lists: {'group1': ['gene1', 'gene2'], 'group2': ['gene3', 'gene4']}
-        When a dictionary is provided, genes will be grouped and labeled accordingly in the plot.
-    min_logfoldchange : float, optional
-        Minimum log fold change to include in the plot.
-    key : str, optional
-        Key in `adata.uns` to use for rank_genes_groups results.
-    show : bool, optional
-        Whether to show the plot.
-    save : bool, optional
-        Whether to save the plot.
-    return_fig : bool
-        Whether to return the figure object.
-    gene_symbols : str, optional
-        Key for gene symbols in `adata.var`.
-    **kwds : dict
-        Additional keyword arguments to pass to dotplot.
+    Args:
+        adata: AnnData
+            Annotated data matrix.
+        plot_type: str
+            Currently only 'dotplot' is supported.
+        groups: str or list of str, optional
+            Groups to include in the plot.
+        n_genes: int, optional
+            Number of genes to include in the plot.
+        groupby: str, optional
+            Key in `adata.obs` to group by.
+        values_to_plot: str, optional
+            Key in rank_genes_groups results to plot (e.g. 'logfoldchanges', 'scores').
+        var_names: str or list of str or dict, optional
+            Variables to include in the plot. Can be:
+            - A list of gene names: ['gene1', 'gene2', ...]
+            - A dictionary mapping group names to gene lists: {'group1': ['gene1', 'gene2'], 'group2': ['gene3', 'gene4']}
+            When a dictionary is provided, genes will be grouped and labeled accordingly in the plot.
+        min_logfoldchange: float, optional
+            Minimum log fold change to include in the plot.
+        key: str, optional
+            Key in `adata.uns` to use for rank_genes_groups results.
+        show: bool, optional
+            Whether to show the plot.
+        save: bool, optional
+            Whether to save the plot.
+        return_fig: bool
+            Whether to return the figure object.
+        gene_symbols: str, optional
+            Key for gene symbols in `adata.var`.
+        **kwds: dict
+            Additional keyword arguments to pass to dotplot.
     
-    Returns
-    -------
-    If `return_fig` is True, returns the figure object.
-    If `show` is False, returns axes dictionary.
+    Returns:
+        If `return_fig` is True, returns the figure object.
+        If `show` is False, returns axes dictionary.
     
-    Examples
-    --------
-    >>> # Basic usage with top genes
-    >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5)
+    Examples:
+        >>> # Basic usage with top genes
+        >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5)
     
-    >>> # Using logfoldchanges for coloring
-    >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, values_to_plot='logfoldchanges')
+        >>> # Using logfoldchanges for coloring
+        >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, values_to_plot='logfoldchanges')
     
-    >>> # Grouping genes manually
-    >>> gene_groups = {
-    ...     'Group1': ['gene1', 'gene2'],
-    ...     'Group2': ['gene3', 'gene4']
-    ... }
-    >>> sc.pl.rank_genes_groups_dotplot(adata, var_names=gene_groups)
+        >>> # Grouping genes manually
+        >>> gene_groups = {
+        ...     'Group1': ['gene1', 'gene2'],
+        ...     'Group2': ['gene3', 'gene4']
+        ... }
+        >>> sc.pl.rank_genes_groups_dotplot(adata, var_names=gene_groups)
     """
     if plot_type != "dotplot":
         raise ValueError("Only 'dotplot' is currently supported")
