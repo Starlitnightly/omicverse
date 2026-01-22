@@ -339,7 +339,7 @@ def umap(  # noqa: PLR0913, PLR0915
 
         # Get neighbor parameters
         n_neighbors = neighbors["params"]["n_neighbors"]
-        n_epochs = 500 if maxiter is None else maxiter
+        n_epochs = 20 if maxiter is None else maxiter
 
         # Convert data to torch tensor
         X_contiguous = np.ascontiguousarray(X, dtype=np.float32)
@@ -409,7 +409,7 @@ def umap(  # noqa: PLR0913, PLR0915
 
         n_neighbors = neighbors["params"]["n_neighbors"]
         n_epochs = (
-            500 if maxiter is None else maxiter
+            100 if maxiter is None else maxiter
         )  # 0 is not a valid value for rapids, unlike original umap
         X_contiguous = np.ascontiguousarray(X, dtype=np.float32)
         umap = UMAP(
