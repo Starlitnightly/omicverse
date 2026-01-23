@@ -4,6 +4,13 @@ from sklearn.utils import check_random_state
 from umap.umap_ import fuzzy_simplicial_set
 import torch
 
+# Try to import PyG KNN
+try:
+    from ...pp.pyg_knn_implementation import pyg_knn_search
+    PYG_AVAILABLE = True
+except ImportError:
+    PYG_AVAILABLE = False
+
 def convert_distance_to_probability(distances, a=1.0, b=1.0):
     return -torch.log1p(a * distances ** (2 * b))
 
@@ -52,22 +59,84 @@ def umap_loss(embedding_to, embedding_from, _a, _b, batch_size, negative_sample_
     loss = torch.mean(ce_loss)
     return loss
 
-def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None):
+def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None, use_pyg='auto'):
+    """
+    Build UMAP graph with optional PyG KNN acceleration.
+
+    Arguments:
+        X: Input data (numpy array or torch tensor)
+        n_neighbors: Number of neighbors
+        metric: Distance metric (euclidean, cosine, etc.)
+        random_state: Random seed
+        use_pyg: Use PyTorch Geometric KNN
+                 'auto' - use PyG for euclidean metric if available (default)
+                 True - force PyG (fallback to PyNNDescent if fails)
+                 False - always use PyNNDescent
+
+    Returns:
+        umap_graph: Fuzzy simplicial set (sparse matrix)
+    """
     random_state = check_random_state(None) if random_state == None else random_state
 
     # Convert to numpy if it's a torch tensor
     if isinstance(X, torch.Tensor):
-        X = X.cpu().numpy()
+        X_np = X.cpu().numpy()
+    else:
+        X_np = X
+
+    # Determine whether to use PyG KNN
+    should_use_pyg = False
+    if use_pyg == 'auto':
+        # Auto: use PyG for euclidean metric if available
+        should_use_pyg = PYG_AVAILABLE and metric == 'euclidean'
+    elif use_pyg == True:
+        should_use_pyg = PYG_AVAILABLE
+
+    # Try PyG KNN first if enabled
+    if should_use_pyg:
+        try:
+            print(f"   🚀 Using PyTorch Geometric KNN (faster)")
+
+            # Flatten input for KNN
+            X_flat = X_np.reshape((len(X_np), np.product(np.shape(X_np)[1:])))
+            X_torch = torch.from_numpy(X_flat).float()
+
+            # Determine device
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+            # Get KNN using PyG
+            knn_indices, knn_dists = pyg_knn_search(
+                X_torch,
+                k=n_neighbors,
+                device=device
+            )
+
+            # Build fuzzy simplicial set
+            umap_graph, sigmas, rhos = fuzzy_simplicial_set(
+                X=X_np,
+                n_neighbors=n_neighbors,
+                metric=metric,
+                random_state=random_state,
+                knn_indices=knn_indices,
+                knn_dists=knn_dists,
+            )
+
+            return umap_graph
+
+        except Exception as e:
+            print(f"   ⚠️  PyG KNN failed ({str(e)}), falling back to PyNNDescent")
+
+    # Fallback to PyNNDescent
+    print(f"   📊 Using PyNNDescent KNN")
 
     # number of trees in random projection forest
-    n_trees = 5 + int(round((X.shape[0]) ** 0.5 / 20.0))
+    n_trees = 5 + int(round((X_np.shape[0]) ** 0.5 / 20.0))
     # max number of nearest neighbor iters to perform
-    n_iters = max(5, int(round(np.log2(X.shape[0]))))
-    # distance metric
+    n_iters = max(5, int(round(np.log2(X_np.shape[0]))))
 
     # get nearest neighbors
     nnd = NNDescent(
-        X.reshape((len(X), np.product(np.shape(X)[1:]))),
+        X_np.reshape((len(X_np), np.product(np.shape(X_np)[1:]))),
         n_neighbors=n_neighbors,
         metric=metric,
         n_trees=n_trees,
@@ -78,16 +147,14 @@ def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None):
     # get indices and distances
     knn_indices, knn_dists = nnd.neighbor_graph
 
-    # get indices and distances
-    knn_indices, knn_dists = nnd.neighbor_graph
     # build fuzzy_simplicial_set
     umap_graph, sigmas, rhos = fuzzy_simplicial_set(
-        X = X,
-        n_neighbors = n_neighbors,
-        metric = metric,
-        random_state = random_state,
-        knn_indices= knn_indices,
-        knn_dists = knn_dists,
+        X=X_np,
+        n_neighbors=n_neighbors,
+        metric=metric,
+        random_state=random_state,
+        knn_indices=knn_indices,
+        knn_dists=knn_dists,
     )
-    
+
     return umap_graph

@@ -83,7 +83,7 @@ def renamed_arg(old_name, new_name, *, pos_0: bool = False):
     return decorator
 
 
-def check_array_function_arguments(**kwargs):
+def _check_array_function_arguments(**kwargs):
     """Check for invalid arguments when an array is passed.
 
     Helper for functions that work on either AnnData objects or array-likes.
@@ -94,9 +94,54 @@ def check_array_function_arguments(**kwargs):
         raise TypeError(msg)
 
 
+# Alias for backwards compatibility
+check_array_function_arguments = _check_array_function_arguments
+
+
 def is_backed_type(x: object, /) -> bool:
     """Check if x is a backed type."""
     return isinstance(x, BaseCompressedSparseDataset | h5py.File | h5py.Dataset)
+
+
+@singledispatch
+def axis_sum(x: ArrayLike, /, *, axis: Literal[0, 1]) -> np.ndarray:
+    """
+    Sum array along an axis.
+
+    Arguments:
+        x: Array to sum.
+        axis: Axis along which to sum.
+
+    Returns:
+        Array of sums.
+    """
+    return np.sum(x, axis=axis)
+
+
+@axis_sum.register(sparse.csr_matrix)
+@axis_sum.register(sparse.csc_matrix)
+def _axis_sum_sparse(x: CSBase, /, *, axis: Literal[0, 1]) -> np.ndarray:
+    """Sum sparse matrix along an axis."""
+    return np.asarray(x.sum(axis=axis)).flatten()
+
+
+# Register for sparse array types (scipy >= 1.8)
+try:
+    @axis_sum.register(sparse.csr_array)
+    @axis_sum.register(sparse.csc_array)
+    def _axis_sum_sparse_array(x: CSBase, /, *, axis: Literal[0, 1]) -> np.ndarray:
+        """Sum sparse array along an axis."""
+        return np.asarray(x.sum(axis=axis)).flatten()
+except AttributeError:
+    # sparse arrays not available in older scipy versions
+    pass
+
+
+if da is not None:
+    @axis_sum.register(da.Array)
+    def _axis_sum_dask(x: DaskArray, /, *, axis: Literal[0, 1]) -> DaskArray:
+        """Sum dask array along an axis."""
+        return x.sum(axis=axis)
 
 
 def raise_not_implemented_error_if_backed_type(x: object, method_name: str, /) -> None:
