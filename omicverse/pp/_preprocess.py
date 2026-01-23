@@ -1262,7 +1262,9 @@ def leiden(
     elif settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate Leiden...")
         print_gpu_usage_color()
-        from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
+        #from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
+        from ._leiden_test import leiden_gpu_sparse_multilevel as _leiden
+        
         _leiden(
             adata,
             resolution=resolution,
@@ -1273,6 +1275,7 @@ def leiden(
             max_levels=max_levels,
             device=device,  # None -> auto-pick
             symmetrize=symmetrize,
+            **kwargs
         )
         add_reference(adata,'leiden','Leiden clustering with omicverse')
     else:
