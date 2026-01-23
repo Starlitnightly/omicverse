@@ -1126,16 +1126,7 @@ def neighbors(
     
     """
     # Ensure PCA exists; compute a default if missing so downstream code can proceed
-    if "X_pca" not in adata.obsm:
-        try:
-            sc.tl.pca(adata, n_comps=n_pcs or min(50, adata.n_vars - 1))
-        except Exception as exc:
-            warnings.warn(
-                f"PCA not found and automatic computation failed before neighbors(): {exc}",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
+    
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         from ._neighbors import neighbors as _neighbors
@@ -1264,7 +1255,7 @@ def leiden(
         print_gpu_usage_color()
         #from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
         from ._leiden_test import leiden_gpu_sparse_multilevel as _leiden
-        
+
         _leiden(
             adata,
             resolution=resolution,

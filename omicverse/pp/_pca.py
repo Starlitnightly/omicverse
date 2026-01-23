@@ -584,6 +584,13 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             # Create MLX PCA instance (use "metal" for MLX)
                             mlx_pca = MLXPCA(n_components=n_comps, device="metal")
 
+                            from scipy import sparse
+                            if sparse.issparse(X):
+                                print(f'    {Colors.GREEN}Converting sparse matrix to dense for MLX PCA{Colors.ENDC}')
+                                X = X.toarray()
+                            else:
+                                X = np.asarray(X)
+
                             # Fit and transform (MLX PCA handles sparse matrices internally)
                             X_pca = mlx_pca.fit_transform(X)
                             
