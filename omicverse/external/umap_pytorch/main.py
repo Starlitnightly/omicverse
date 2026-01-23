@@ -127,6 +127,7 @@ class PUMAP():
         early_stopping=True,
         patience=10,
         min_delta=1e-4,
+        use_pyg='auto',
     ):
         self.encoder = encoder
         self.decoder = decoder
@@ -146,6 +147,7 @@ class PUMAP():
         self.early_stopping = early_stopping
         self.patience = patience
         self.min_delta = min_delta
+        self.use_pyg = use_pyg
         
     def fit(self, X):
         # Set device
@@ -169,7 +171,7 @@ class PUMAP():
         if not self.match_nonparametric_umap:
             print(f"{Colors.GREEN}🔗 Building UMAP graph...{Colors.ENDC}")
             self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist, reconstruction_loss=self.reconstruction_loss)
-            graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
+            graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state, use_pyg=self.use_pyg)
             dataset = UMAPDataset(X, graph)
         else:
             print(f"{Colors.CYAN}🔍 Fitting Non-parametric UMAP...{Colors.ENDC}")
