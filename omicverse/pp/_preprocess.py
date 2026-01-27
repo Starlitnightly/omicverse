@@ -700,13 +700,12 @@ def normalize_pearson_residuals(adata,**kwargs):
     sc.experimental.pp.normalize_pearson_residuals(adata,**kwargs)
 
 @monitor
-def highly_variable_genes(adata,**kwargs):
+def highly_variable_genes(adata, **kwargs):
     '''
     highly_variable_genes calculation
     '''
-    sc.experimental.pp.highly_variable_genes(
-        adata, **kwargs,
-    )
+    from ._highly_variable_genes import highly_variable_genes as _hvg
+    return _hvg(adata, **kwargs)
 
 @monitor
 @register_function(
