@@ -11,9 +11,9 @@ from random import seed, sample
 from typing import Union, Optional, Sequence, Tuple, List, Dict
 import pandas as pd 
 import anndata
-import numpy as np 
-import scanpy as sc
-import matplotlib.pyplot as plt 
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import sparse 
 from matplotlib.backends.backend_pdf import PdfPages 
 from matplotlib import rcParams
 import seaborn as sns
@@ -22,6 +22,77 @@ from scipy.sparse import issparse
 from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Colors
 from ..utils.registry import register_function
 from .._monitor import monitor
+
+
+# Local implementations to replace scanpy filtering functions
+def _filter_cells_impl(
+    adata,
+    min_counts=None,
+    min_genes=None,
+    max_counts=None,
+    max_genes=None,
+    inplace=True
+):
+    """Internal implementation of cell filtering."""
+    X = adata.X
+    n_counts = np.asarray(X.sum(axis=1)).flatten() if sparse.issparse(X) else X.sum(axis=1)
+
+    if sparse.issparse(X):
+        n_genes = np.asarray((X > 0).sum(axis=1)).flatten()
+    else:
+        n_genes = (X > 0).sum(axis=1)
+
+    cell_subset = np.ones(adata.n_obs, dtype=bool)
+
+    if min_counts is not None:
+        cell_subset &= n_counts >= min_counts
+    if max_counts is not None:
+        cell_subset &= n_counts <= max_counts
+    if min_genes is not None:
+        cell_subset &= n_genes >= min_genes
+    if max_genes is not None:
+        cell_subset &= n_genes <= max_genes
+
+    if inplace:
+        adata._inplace_subset_obs(cell_subset)
+        return None
+    else:
+        return cell_subset, n_counts
+
+
+def _filter_genes_impl(
+    adata,
+    min_counts=None,
+    min_cells=None,
+    max_counts=None,
+    max_cells=None,
+    inplace=True
+):
+    """Internal implementation of gene filtering."""
+    X = adata.X
+    n_counts = np.asarray(X.sum(axis=0)).flatten() if sparse.issparse(X) else X.sum(axis=0)
+
+    if sparse.issparse(X):
+        n_cells = np.asarray((X > 0).sum(axis=0)).flatten()
+    else:
+        n_cells = (X > 0).sum(axis=0)
+
+    gene_subset = np.ones(adata.n_vars, dtype=bool)
+
+    if min_counts is not None:
+        gene_subset &= n_counts >= min_counts
+    if max_counts is not None:
+        gene_subset &= n_counts <= max_counts
+    if min_cells is not None:
+        gene_subset &= n_cells >= min_cells
+    if max_cells is not None:
+        gene_subset &= n_cells <= max_cells
+
+    if inplace:
+        adata._inplace_subset_var(gene_subset)
+        return None
+    else:
+        return gene_subset, n_counts
 
 
 # Helper function to detect Rust backend
@@ -603,10 +674,10 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     genes_before_final = adata.shape[1]
     
     if not is_rust:
-        sc.pp.filter_cells(adata, min_genes=min_genes)
-        sc.pp.filter_genes(adata, min_cells=min_cells)
-        sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
-        sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+        _filter_cells_impl(adata, min_genes=min_genes)
+        _filter_genes_impl(adata, min_cells=min_cells)
+        _filter_cells_impl(adata, max_genes=int(max_genes_ratio*adata.shape[1]))
+        _filter_genes_impl(adata, max_cells=int(max_cells_ratio*adata.shape[0]))
     else:
         selected_cells = True
         if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
@@ -938,10 +1009,10 @@ def qc_cpu(
     genes_before_final = adata.shape[1]
 
     if not is_rust:
-        sc.pp.filter_cells(adata, min_genes=min_genes)
-        sc.pp.filter_genes(adata, min_cells=min_cells)
-        sc.pp.filter_cells(adata, max_genes=max_genes_ratio*adata.shape[1])
-        sc.pp.filter_genes(adata, max_cells=max_cells_ratio*adata.shape[0])
+        _filter_cells_impl(adata, min_genes=min_genes)
+        _filter_genes_impl(adata, min_cells=min_cells)
+        _filter_cells_impl(adata, max_genes=int(max_genes_ratio*adata.shape[1]))
+        _filter_genes_impl(adata, max_cells=int(max_cells_ratio*adata.shape[0]))
     else:
         selected_cells = True
         if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
@@ -1343,7 +1414,7 @@ def filter_cells(adata: anndata.AnnData,
         print(f"   {Colors.CYAN}Parameters: {', '.join(filter_params)}{Colors.ENDC}")
     
     cells_before = adata.shape[0]
-    sc.pp.filter_cells(adata, min_genes=min_genes,min_counts=min_counts, max_counts=max_counts,
+    _filter_cells_impl(adata, min_genes=min_genes, min_counts=min_counts, max_counts=max_counts,
                        max_genes=max_genes, inplace=inplace)
     cells_filtered = cells_before - adata.shape[0]
     print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{cells_filtered:,}{Colors.ENDC}{Colors.GREEN} cells removed{Colors.ENDC}")
@@ -1409,8 +1480,8 @@ def filter_genes(adata: anndata.AnnData,
         print(f"   {Colors.CYAN}Parameters: {', '.join(filter_params)}{Colors.ENDC}")
     
     genes_before = adata.shape[1]
-    sc.pp.filter_genes(adata, min_counts=min_counts, min_cells=min_cells, max_counts=max_counts,
-                          max_cells=max_cells, inplace=inplace)
+    _filter_genes_impl(adata, min_counts=min_counts, min_cells=min_cells, max_counts=max_counts,
+                       max_cells=max_cells, inplace=inplace)
     genes_filtered = genes_before - adata.shape[1]
     print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{genes_filtered:,}{Colors.ENDC}{Colors.GREEN} genes removed{Colors.ENDC}")
     

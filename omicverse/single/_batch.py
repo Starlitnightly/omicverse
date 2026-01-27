@@ -4,7 +4,9 @@ import numpy as np
 import anndata
 from .._settings import add_reference,settings
 from ..utils.registry import register_function
+from .._monitor import monitor
 
+@monitor
 @register_function(
     aliases=["批次校正", "batch_correction", "batch_correct", "数据整合", "去批次效应"],
     category="single",
