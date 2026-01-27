@@ -21,6 +21,7 @@ from scipy.sparse import issparse
 
 from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Colors
 from ..utils.registry import register_function
+from .._monitor import monitor
 
 
 # Helper function to detect Rust backend
@@ -236,7 +237,7 @@ def _print_final_summary_table(n_start, n_end, genes_start, genes_end):
 
 
 
-
+@monitor
 def mads(meta, cov, nmads=5, lt=None, batch_key=None):
     """
     Calculate Median Absolute Deviation (MAD) thresholds.
@@ -332,6 +333,7 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
             
         return result
 
+@monitor
 @register_function(
     aliases=["质控", "qc", "quality_control", "质量控制"],
     category="preprocessing",
@@ -1280,7 +1282,7 @@ def qc_gpu(adata, mode='seurat',
     
     return adata
 
-
+@monitor
 def filter_cells(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_genes: Optional[int] = None,
@@ -1346,6 +1348,7 @@ def filter_cells(adata: anndata.AnnData,
     cells_filtered = cells_before - adata.shape[0]
     print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{cells_filtered:,}{Colors.ENDC}{Colors.GREEN} cells removed{Colors.ENDC}")
 
+@monitor
 def filter_genes(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_cells: Optional[int] = None,

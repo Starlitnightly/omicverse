@@ -22,6 +22,8 @@ from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_referenc
 from ._normalization import normalize_total,log1p
 from datetime import datetime
 
+from .._monitor import monitor
+
 
 # Helper functions for Rust anndata compatibility
 def _safe_copy(arr):
@@ -49,7 +51,7 @@ def _safe_to_df_copy(arr):
 
 # Emoji map for UMAP status reporting
 
-
+@monitor
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     r"""Identify robust genes as candidates for HVG selection and remove genes that are not expressed in any cells.
 
@@ -418,6 +420,7 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
 
 from sklearn.cluster import KMeans  
 
+@monitor
 @register_function(
     aliases=["数据转GPU", "anndata_to_GPU", "to_gpu", "GPU转换", "move_to_gpu"],
     category="preprocessing",
@@ -461,6 +464,7 @@ def anndata_to_GPU(adata,**kwargs):
     print('Don`t forget to move it back to CPU after analysis is done')
     print('Use `ov.pp.anndata_to_CPU(adata)`')
 
+@monitor
 @register_function(
     aliases=["数据转CPU", "anndata_to_CPU", "to_cpu", "CPU转换", "move_to_cpu"],
     category="preprocessing",
@@ -502,7 +506,7 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     import rapids_singlecell as rsc
     rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
-
+@monitor
 @register_function(
     aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
     category="preprocessing",
@@ -695,6 +699,7 @@ def normalize_pearson_residuals(adata,**kwargs):
 
     sc.experimental.pp.normalize_pearson_residuals(adata,**kwargs)
 
+@monitor
 def highly_variable_genes(adata,**kwargs):
     '''
     highly_variable_genes calculation
@@ -703,6 +708,7 @@ def highly_variable_genes(adata,**kwargs):
         adata, **kwargs,
     )
 
+@monitor
 @register_function(
     aliases=["标准化", "scale", "scaling", "标准化处理"],
     category="preprocessing",
@@ -776,6 +782,7 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
     add_reference(adata,'scanpy','scaling with scanpy')
     adata.uns['status']['scaled'] = True
 
+@monitor
 def regress(adata,**kwargs):
     """
     Regress out covariates from the input AnnData object.
@@ -800,6 +807,7 @@ def regress(adata,**kwargs):
         adata.layers['regressed']=rsc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], inplace=False)
     add_reference(adata,'scanpy','regressing out covariates with scanpy')
 
+@monitor
 def regress_and_scale(adata):
     """
     Regress out covariates from the input AnnData object and scale the resulting expression matrix.
@@ -855,6 +863,7 @@ class my_PCA:
 
         return self
 
+@monitor
 @register_function(
     aliases=["主成分分析", "pca", "PCA", "降维"],
     category="preprocessing",
@@ -949,6 +958,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
     else:
         return adata
 
+@monitor
 def red(adata):
     """
     Reduce the input AnnData object to highly variable features 
@@ -1038,6 +1048,8 @@ _MetricScipySpatial = Literal[
     ]
 _Metric = Union[_MetricSparseCapable, _MetricScipySpatial]
 from types import MappingProxyType
+
+@monitor
 @register_function(
     aliases=["计算邻居", "neighbors", "knn", "邻居图"],
     category="preprocessing",
@@ -1156,7 +1168,7 @@ def neighbors(
                          key_added=key_added,copy=copy,**kwargs)
     add_reference(adata,'scanpy','neighbors with scanpy')
 
-
+@monitor
 @register_function(
     aliases=["umap", "UMAP", "非线性降维"],
     category="preprocessing",
@@ -1214,7 +1226,7 @@ def umap(adata, **kwargs):
         print(f"{EMOJI['error']} UMAP failed: {e}")
         raise
 
-
+@monitor
 def louvain(adata, **kwargs):
     '''
     Louvain clustering
@@ -1230,6 +1242,7 @@ def louvain(adata, **kwargs):
         rsc.tl.louvain(adata, **kwargs)
         add_reference(adata,'louvain','Louvain clustering with RAPIDS')
 
+@monitor
 @register_function(
     aliases=["莱顿聚类", "leiden", "clustering", "聚类"],
     category="preprocessing",
@@ -1289,7 +1302,7 @@ def leiden(
             key_added=key_added,**kwargs)
         add_reference(adata,'leiden','Leiden clustering with RAPIDS')
 
-
+@monitor
 @register_function(
     aliases=["细胞周期评分", "score_genes_cell_cycle", "cell_cycle", "细胞周期", "cc_score"],
     category="preprocessing",
@@ -1380,7 +1393,7 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
         'g2m_genes':g2m_genes
     }
 
-
+@monitor
 def tsne(adata,**kwargs):
     '''
     t-SNE

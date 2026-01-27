@@ -14,7 +14,7 @@ import math
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.tensorboard import SummaryWriter
+
 import time
 import platform
 
@@ -223,6 +223,7 @@ def fit_model(adata, gmt_path, project = None, pre_weights='',
               depth=2,num_heads=4,lr=0.001, epochs= 10, lrf=0.01):
     GLOBAL_SEED = 1
     set_seed(GLOBAL_SEED)
+    from torch.utils.tensorboard import SummaryWriter
     device = 'cuda:0'
     device = torch.device(device if torch.cuda.is_available() else "cpu")
     print(device)
