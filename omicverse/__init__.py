@@ -122,3 +122,44 @@ try:
     from . import agent  # noqa: F401
 except Exception:  # pragma: no cover - optional
     agent = None
+
+
+__all__ = [
+    "alignment",
+    "bulk",
+    "single",
+    "utils",
+    "bulk2single",
+    "pp",
+    "space",
+    "pl",
+    "datasets",
+    "external",
+    "llm",
+    "datacollect",
+
+    "read",
+    "palette",
+    "ov_plot_set",
+    "plot_set",
+    "style",
+    "find_function",
+    "list_functions",
+    "get_function_help",
+    "recommend_function",
+    "export_registry",
+    "import_registry",
+
+    "Agent",
+    "list_supported_models",
+    "setup_kernel_for_env",
+    "settings",
+    "generate_reference_table",
+    "plt",
+    "np",
+    "pd",
+    "AnnData",
+    "agent",
+
+    "__version__",
+]
