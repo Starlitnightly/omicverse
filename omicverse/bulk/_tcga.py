@@ -2,8 +2,8 @@
 import os
 import anndata
 import numpy as np
-from lifelines import KaplanMeierFitter
-from lifelines.statistics import logrank_test
+
+
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional, Union
@@ -260,6 +260,8 @@ class pyTCGA(object):
 
         """
         from scipy.sparse import issparse
+        from lifelines import KaplanMeierFitter
+        from lifelines.statistics import logrank_test
         goal_gene=gene
         
         s_pd=self.s_pd

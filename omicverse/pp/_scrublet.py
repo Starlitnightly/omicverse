@@ -114,11 +114,11 @@ def scrublet(
     Returns:
         adata with doublet predictions added if copy=False, otherwise returns modified copy
     """
-    if threshold is None and not find_spec("skimage"):  # pragma: no cover
+    #if threshold is None and not find_spec("skimage"):  # pragma: no cover
         # Scrublet.call_doublets requires `skimage` with `threshold=None` but PCA
         # is called early, which is wasteful if there is not `skimage`
-        msg = "threshold is None and thus scrublet requires skimage, but skimage is not installed."
-        raise ValueError(msg)
+        #msg = "threshold is None and thus scrublet requires skimage, but skimage is not installed."
+        #raise ValueError(msg)
 
     if copy:
         adata = adata.copy()

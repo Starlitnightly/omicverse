@@ -8,7 +8,7 @@ import numpy as np
 import optuna
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.preprocessing import LabelEncoder
-from torch.utils.tensorboard import SummaryWriter
+
 from transformers import AutoConfig, BertConfig, BertModel, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 from torch.optim import AdamW
 import pandas as pd
@@ -274,6 +274,7 @@ def create_optuna_study(objective, n_trials: int, trials_result_path: str, tenso
 
 @contextmanager
 def setup_logging(config):
+    from torch.utils.tensorboard import SummaryWriter
     run_name = config.get("run_name", "manual_run")
     log_dir = os.path.join(config["tensorboard_log_dir"], run_name)
     writer = SummaryWriter(log_dir=log_dir)

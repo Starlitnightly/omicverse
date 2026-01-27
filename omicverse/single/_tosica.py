@@ -23,7 +23,7 @@ import math
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 import time
 import anndata
 from .._settings import add_reference
@@ -68,6 +68,7 @@ class pyTOSICA(object):
 
         GLOBAL_SEED = 1
         set_seed(GLOBAL_SEED)
+        from torch.utils.tensorboard import SummaryWriter
         #device = 'cuda:0'
         device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.device = device

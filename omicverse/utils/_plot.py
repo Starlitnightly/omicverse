@@ -14,7 +14,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
 import seaborn as sns
 from datetime import datetime,timedelta
-import tomli
+#import tomli
 import os
 from typing import Union
 
@@ -1437,6 +1437,7 @@ def check_dependencies(dependencies=None, check_full=False):
     """
     if dependencies is None:
         try:
+            import tomli
             # Get the directory of the current file
             current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             pyproject_path = os.path.join(current_dir, 'pyproject.toml')
