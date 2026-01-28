@@ -175,21 +175,23 @@ def roe_plot_heatmap(adata: AnnData, display_numbers: bool = False, center_value
 def transform_roe_values(roe):
     # Transform roe DataFrame to string format for annotation
     # Nature paper implementation thresholds: >1 (+++), 0.8<x≤1 (++), 0.2≤x≤0.8 (+), 0<x<0.2 (+/-), =0 (—)
+    def _categorize_value(x):
+        if x == 0:
+            return "—"
+        if 0 < x < 0.2:
+            return "+/-"
+        if 0.2 <= x <= 0.8:
+            return "+"
+        if 0.8 < x <= 1:
+            return "++"
+        return "+++"
+
     transformed_roe = roe.copy()
-    transformed_roe = transformed_roe.applymap(
-        lambda x: '—' if x == 0 else (
-            '+/-' if 0 < x < 0.2 else (
-                '+' if 0.2 <= x <= 0.8 else (
-                    '++' if 0.8 < x <= 1 else '+++'
-                )
-            )
-        )
-    )
-    return transformed_roe
+    # DataFrame.applymap was removed in pandas 3.0; use column-wise map instead.
+    return transformed_roe.apply(lambda col: col.map(_categorize_value))
 
 
 # roe(adata, sample_key='batch', cell_type_key='celltypist_cell_label_coarse')
 # plot_heatmap(adata, display_numbers=True)
 # batch_order = ['sample3', 'sample1', 'sample2']
 # plot_heatmap(adata, batch_order=batch_order)
-
