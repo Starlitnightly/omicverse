@@ -6,19 +6,21 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <meta content="Zehua Zeng" name="author"/>
-<link href="../api/" rel="prev"/>
+<link href="../api/omicverse/utils/" rel="prev"/>
 <link href="../Developer_guild/" rel="next"/>
 <link href="../img/favicon.ico" rel="icon"/>
-<meta content="mkdocs-1.4.2, mkdocs-material-9.1.2" name="generator"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.1.2" name="generator"/>
 <title>Release notes - omicverse Readthedocs</title>
 <link href="../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
 <link href="../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
 <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
-<link href="../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../css/mkapi-common.css" rel="stylesheet"/>
+<link href="../css/mkapi-material.css" rel="stylesheet"/>
 <link href="../css/tags.css" rel="stylesheet"/>
 <link href="../css/custom.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"/>
 <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
 <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
             html.glightbox-open { overflow: initial; height: 100%; }
@@ -317,7 +319,7 @@
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../Tutorials-single/t_cnmf/">
-        Consensus Non-negative Matrix factorization (cNMF)
+        GeneModule Identified
       </a>
 </li>
 <li class="md-nav__item">
@@ -641,7 +643,12 @@
       </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../Tutorials-space/t_starfysh/">
+<a class="md-nav__link" href="../Tutorials-space/t_flashdeconv/">
+        FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Tutorials-space/t_starfysh_new/">
         Spatial deconvolution without reference scRNA-seq
       </a>
 </li>
@@ -779,10 +786,192 @@
         GPU Support
       </a>
 </li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/">API documentation</a>
+<label for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+          API documentation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/agent/">agent</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_2">
+<span class="md-nav__icon md-icon"></span>
+          agent
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/alignment/">alignment</a>
+<label for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+          alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../api/">
-        API documentation
+<a class="md-nav__link" href="../api/omicverse/alignment/kb_api/">
+        kb_api
       </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_4">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/bulk2single/">bulk2single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_5">
+<span class="md-nav__icon md-icon"></span>
+          bulk2single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_6" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/datasets/">datasets</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_6">
+<span class="md-nav__icon md-icon"></span>
+          datasets
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/pl/">pl</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_7_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_7">
+<span class="md-nav__icon md-icon"></span>
+          pl
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/pp/">pp</a>
+<label for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+          pp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/pp/experimental/">experimental</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_8_2">
+<span class="md-nav__icon md-icon"></span>
+          experimental
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../api/omicverse/pp/pyg_knn_implementation/">
+        pyg_knn_implementation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_9" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_9">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_10" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/space/">space</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_10">
+<span class="md-nav__icon md-icon"></span>
+          space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_11" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../api/omicverse/utils/">utils</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_11">
+<span class="md-nav__icon md-icon"></span>
+          utils
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item md-nav__item--active">
 <input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
@@ -1778,6 +1967,55 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="#single-module_34">
     Single Module
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-179">
+    v 1.7.9
+  </a>
+<nav aria-label="v 1.7.9" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_9">
+    PP Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_35">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_13">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#web-module">
+    Web Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#agent-module_1">
+    Agent Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_8">
+    Pl Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#datasets-module_1">
+    Datasets Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#docs">
+    Docs
   </a>
 </li>
 </ul>
@@ -2789,6 +3027,55 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v-179">
+    v 1.7.9
+  </a>
+<nav aria-label="v 1.7.9" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pp-module_9">
+    PP Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#single-module_35">
+    Single Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#space-module_13">
+    Space Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#web-module">
+    Web Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#agent-module_1">
+    Agent Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pl-module_8">
+    Pl Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#datasets-module_1">
+    Datasets Module
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#docs">
+    Docs
+  </a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -3498,6 +3785,42 @@ Added and fixed the <code>anndata-rs</code> to support million size's datasets (
 <li>Added <code>ov.single.Annotation</code> and <code>ov.single.AnnotationRef</code> to annotate the cell type automatically.</li>
 <li>Added <code>ov.alignment.single</code> to alignment the scRNA-seq to counts directly.</li>
 </ul>
+<h2 id="v-179">v 1.7.9<a class="headerlink" href="#v-179" title="Permanent link">¶</a></h2>
+<h3 id="pp-module_9">PP Module<a class="headerlink" href="#pp-module_9" title="Permanent link">¶</a></h3>
+<ul>
+<li>Fixed an HVG issue on <code>ov.pp.preprocess</code>.</li>
+</ul>
+<h3 id="single-module_35">Single Module<a class="headerlink" href="#single-module_35" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>CONCORD</code> to integrate the single-cell data in <code>ov.single.batch_correction</code></li>
+</ul>
+<h3 id="space-module_13">Space Module<a class="headerlink" href="#space-module_13" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>FlashDeconv</code> to perform deconvolution in Visium profile.</li>
+<li>Added <code>Banksy</code> clustering method and update documentation</li>
+</ul>
+<h3 id="web-module">Web Module<a class="headerlink" href="#web-module" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>Omicverse-Notebook</code> and <code>Omicverse-Web</code> to analysis data without code.</li>
+</ul>
+<h3 id="agent-module_1">Agent Module<a class="headerlink" href="#agent-module_1" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added <code>ov.Agent</code> to perform the analysis using LLM.</li>
+</ul>
+<h3 id="pl-module_8">Pl Module<a class="headerlink" href="#pl-module_8" title="Permanent link">¶</a></h3>
+<ul>
+<li>Enhanced categorical legend handling for scatterplot embeddings, including <code>legend_loc='on data'</code>.</li>
+</ul>
+<h3 id="datasets-module_1">Datasets Module<a class="headerlink" href="#datasets-module_1" title="Permanent link">¶</a></h3>
+<ul>
+<li>Added dataset URLs and expanded data downloading utilities.</li>
+<li>Improved dataset utilities and refreshed download behaviors.</li>
+</ul>
+<h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">¶</a></h3>
+<ul>
+<li>Strengthened data handling notes in dotplot and DEG analysis.</li>
+<li>Updated the scTour clustering tutorial and release notes.</li>
+</ul>
 </article>
 </div>
 </div>
@@ -3525,6 +3848,7 @@ Added and fixed the <code>anndata-rs</code> to support million size's datasets (
 </div>
 <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
 <script src="../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../javascript/mkapi.js"></script>
 <script src="../javascripts/config.js"></script>
 <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>

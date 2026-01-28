@@ -1,0 +1,172 @@
+.mkapi-object {
+  margin-block-start: 20px;
+  background-color: var(--mkapi-object-bg-color);
+  padding: 8px 8px 8px 12px;
+}
+
+h1 + .mkapi-object {
+  margin-block-start: 0px;
+}
+
+.mkapi-object-kind {
+  color: var(--mkapi-object-kind-color);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.mkapi-object-parent {
+  display: none;
+}
+
+.mkapi-object-name,
+.mkapi-object-parent {
+  color: var(--mkapi-object-name-color);
+  font-family: var(--mkapi-object-name-font-family);
+  font-weight: bold;
+}
+
+.mkapi-object-name a,
+.mkapi-object-parent a {
+  color: var(--mkapi-object-name-color);
+  text-decoration: none;
+}
+
+.mkapi-dot,
+.mkapi-dash {
+  color: var(--mkapi-punctuation-color);
+}
+
+.mkapi-arg {
+  color: var(--mkapi-arg-color);
+  font-style: italic;
+}
+
+.mkapi-default,
+.mkapi-star {
+  color: var(--mkapi-variable-color);
+}
+
+.mkapi-paren {
+  color: var(--mkapi-punctuation-color);
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+.mkapi-star,
+.mkapi-slash {
+  color: var(--mkapi-punctuation-color);
+  margin-left: 0px;
+  margin-right: 2px;
+}
+
+.mkapi-comma,
+.mkapi-colon {
+  color: var(--mkapi-punctuation-color);
+  margin-left: 2px;
+  margin-right: 0px;
+}
+
+.mkapi-equal,
+.mkapi-arrow {
+  color: var(--mkapi-punctuation-color);
+  margin-left: 0px;
+  margin-right: 0px;
+}
+
+.mkapi-document {
+  margin-left: 12px;
+}
+
+.mkapi-bases {
+  color: var(--mkapi-bases-color);
+  font-size: 0.85em;
+}
+
+.mkapi-section {
+  margin-block-end: 0px;
+  padding-right: 8px;
+}
+
+ul.mkapi-item-list {
+  margin-block-start: 0px;
+}
+
+.mkapi-section-name {
+  color: var(--mkapi-section-name-color);
+  border-bottom: thin solid var(--mkapi-section-border-color);
+}
+
+.mkapi-item-name {
+  color: var(--mkapi-item-name-color);
+  font-weight: bold;
+}
+
+.mkapi-item-type,
+.mkapi-object-type,
+.mkapi-ann,
+.mkapi-return {
+  color: var(--mkapi-type-color);
+}
+
+.mkapi-example-input pre {
+  margin-bottom: 0px;
+}
+
+.mkapi-example-output pre {
+  margin-top: 0px;
+}
+
+.mkapi-example-input code {
+  background-color: var(--mkapi-example-bg-color);
+}
+
+.mkapi-example-output code {
+  border: solid var(--mkapi-example-bg-color);
+  background-color: transparent;
+}
+
+.mkapi-source-link,
+.mkapi-object-link {
+  font-family: var(--mkapi-docs-link-font-family);
+  display: block;
+  float: right;
+  user-select: none;
+}
+
+.mkapi-object-link {
+  font-size: 0.85em;
+  margin-left: 1.2em;
+}
+
+.mkapi-document-toggle,
+.mkapi-parent-toggle,
+.mkapi-section-toggle,
+.mkapi-definition-link {
+  cursor: pointer;
+  color: var(--mkapi-punctuation-color);
+  font-size: 0.85em;
+}
+
+.mkapi-document-toggle:hover,
+.mkapi-parent-toggle:hover,
+.mkapi-section-toggle:hover {
+  color: var(--mkapi-object-name-color);
+}
+
+.mkapi-definition-link a {
+  color: var(--mkapi-punctuation-color);
+  text-decoration: none;
+}
+
+.mkapi-page-object {
+  margin-block-end: 0px;
+  border-bottom: 1px solid var(--mkapi-object-border-color);
+}
+
+.mkapi-source {
+  margin-top: 0px !important;
+}
+
+.mkapi-source > table.highlighttable {
+  margin-top: 0px !important;
+}

@@ -1,0 +1,2185 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href="../bulk2single/" rel="prev"/>
+<link href="../pl/" rel="next"/>
+<link href="../../../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.1.2" name="generator"/>
+<title>datasets - omicverse Readthedocs</title>
+<link href="../../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../css/mkapi-common.css" rel="stylesheet"/>
+<link href="../../../css/mkapi-material.css" rel="stylesheet"/>
+<link href="../../../css/tags.css" rel="stylesheet"/>
+<link href="../../../css/custom.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../../../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#omicverse.datasets">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              datasets
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Installation_guild/">
+        Installation
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_1" id="__nav_3_1_1_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_3" id="__nav_3_1_3_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_3">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_decov_bulk/">
+        Bulk deconvolution with reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_4" id="__nav_3_1_4_label" tabindex="0">
+          Others
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_4">
+<span class="md-nav__icon md-icon"></span>
+          Others
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Alignment
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_alignment_1k/">
+        Alignment and analysis of single-cell RNA-seq data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_alignment_velocity/">
+        Alignment and RNA velocity analysis of single-cell RNA-seq data.
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_preprocess_cpu/">
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_preprocess_gpu/">
+        Preprocessing the data of scRNA-seq with omicverse[GPU]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cluster/">
+        Clustering space
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cnmf/">
+        GeneModule Identified
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_lazy/">
+        Lazy analysis of scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_noref/">
+        Reference-free automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_ref/">
+        Reference automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_gptanno/">
+        Automatic cell type annotation with GPT/Other
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellmatch/">
+        Mapping Cell Names to the Cell Ontology/Taxonomy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scmulan/">
+        Celltype auto annotation with scMulan
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellvote/">
+        Consensus annotation with CellVote
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cytotrace/">
+        Prediction of absolute developmental potential using CytoTrace2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_traj/">
+        Basic Trajectory Inference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_stavia/">
+        Trajectory Inference with StaVIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with TimeFateKernel
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate/">
+        Identify the driver regulators of cell fate decisions
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_metacells/">
+        Inference of MetaCell from Single-Cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_deg_single/">
+        Differential expression and celltype analysis [All Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdeg/">
+        Differential expression analysis [Meta Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scenic/">
+        Gene Regulatory Network Analysis with SCENIC
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellphonedb/">
+        Cell-cell communication using CellPhoneDBViz
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
+          Velocity
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_6">
+<span class="md-nav__icon md-icon"></span>
+          Velocity
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-velo/t_velo/">
+        Velocity Basic Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-velo/t_graphvelo/">
+        Velocity Optimization
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_7" id="__nav_3_2_7_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_7_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_7">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          Space
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
+<span class="md-nav__icon md-icon"></span>
+          Space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_1" id="__nav_3_4_1_label" tabindex="0">
+          Preprocess
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocess
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_crop_rotate/">
+        Crop and Rotation of spatial transcriptomic data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_cellpose/">
+        Cell Segmemtation (10x HD)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_cluster_space/">
+        Spatial clustering and denoising expressions
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_staligner/">
+        Spatial integration and clustering
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_2" id="__nav_3_4_2_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_spaceflow/">
+        Identifying Pseudo-Spatial Map
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_decov/">
+        Spatial deconvolution with reference scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_flashdeconv/">
+        FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_starfysh_new/">
+        Spatial deconvolution without reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_3" id="__nav_3_4_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_stt/">
+        Spatial transition tensor of single cells
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_commot_flowsig/">
+        Spatial Communication
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_slat/">
+        Single cell spatial alignment tools
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+          LLM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_5">
+<span class="md-nav__icon md-icon"></span>
+          LLM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_dr/">
+        Domain Research (dr): Comprehensive Report Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_dr_web/">
+        Domain Research (dr) — Live Web
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_ov_agent_pbmc3k/">
+        ov.Agent with Skills: Natural‑Language Single‑Cell Analysis (PBMC3k)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_uce/">
+        UCE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_scgpt/">
+        scGPT
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_scfoundation/">
+        scFoundation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_geneformer/">
+        GeneFormer
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_cellplm/">
+        CellPLM
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+          Plotting
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_6">
+<span class="md-nav__icon md-icon"></span>
+          Plotting
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_single/">
+        Visualization of single cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_bulk/">
+        Visualization of Bulk RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../GPU_supported_registry_functions/">
+        GPU Support
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../">API documentation</a>
+<label for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+          API documentation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../agent/">agent</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_2">
+<span class="md-nav__icon md-icon"></span>
+          agent
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../alignment/">alignment</a>
+<label for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+          alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../alignment/kb_api/">
+        kb_api
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_4">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../bulk2single/">bulk2single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_5">
+<span class="md-nav__icon md-icon"></span>
+          bulk2single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_5_6" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index md-nav__link--active">
+<a href="./">datasets</a>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_5_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_6">
+<span class="md-nav__icon md-icon"></span>
+          datasets
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pl/">pl</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_7_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_7">
+<span class="md-nav__icon md-icon"></span>
+          pl
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pp/">pp</a>
+<label for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+          pp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pp/experimental/">experimental</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_8_2">
+<span class="md-nav__icon md-icon"></span>
+          experimental
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../pp/pyg_knn_implementation/">
+        pyg_knn_implementation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_9" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_9">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_10" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../space/">space</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_10">
+<span class="md-nav__icon md-icon"></span>
+          space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_11" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../utils/">utils</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_11">
+<span class="md-nav__icon md-icon"></span>
+          utils
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.download_data">
+    download_data
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.download_data_requests">
+    download_data_requests
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.get_adata">
+    get_adata
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.pancreas_cellrank">
+    pancreas_cellrank
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.pbmc3k">
+    pbmc3k
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.create_mock_dataset">
+    create_mock_dataset
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.blobs">
+    blobs
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.burczynski06">
+    burczynski06
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.moignard15">
+    moignard15
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.paul15">
+    paul15
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.pbmc68k_reduced">
+    pbmc68k_reduced
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.toggleswitch">
+    toggleswitch
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.krumsiek11">
+    krumsiek11
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.gillespie">
+    gillespie
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.hl60">
+    hl60
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.nascseq">
+    nascseq
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.scslamseq">
+    scslamseq
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.scifate">
+    scifate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.cite_seq">
+    cite_seq
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.scnt_seq_neuron_splicing">
+    scnt_seq_neuron_splicing
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.scnt_seq_neuron_labeling">
+    scnt_seq_neuron_labeling
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.zebrafish">
+    zebrafish
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.dentate_gyrus">
+    dentate_gyrus
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.bone_marrow">
+    bone_marrow
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.haber">
+    haber
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.hg_forebrain_glutamatergic">
+    hg_forebrain_glutamatergic
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.chromaffin">
+    chromaffin
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.bm">
+    bm
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.pancreatic_endocrinogenesis">
+    pancreatic_endocrinogenesis
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.dentate_gyrus_scvelo">
+    dentate_gyrus_scvelo
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.sceu_seq_rpe1">
+    sceu_seq_rpe1
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.sceu_seq_organoid">
+    sceu_seq_organoid
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.hematopoiesis">
+    hematopoiesis
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.hematopoiesis_raw">
+    hematopoiesis_raw
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.human_tfs">
+    human_tfs
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.multi_brain_5k">
+    multi_brain_5k
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.decov_bulk_covid_bulk">
+    decov_bulk_covid_bulk
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.decov_bulk_covid_single">
+    decov_bulk_covid_single
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.datasets.sc_ref_Lymph_Node">
+    sc_ref_Lymph_Node
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 style="display: none;">omicverse.datasets<a class="headerlink" href="#omicverse.datasets" title="Permanent link">¶</a></h1><p class="mkapi-object mkapi-page-source" id="omicverse.datasets">
+<span class="mkapi-object-link">
+<a href="../../../src/omicverse/datasets/#omicverse.datasets" title="Go to source">source</a>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">package</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets" title="omicverse.datasets">omicverse.datasets</a></span>
+</p>
+<div class="mkapi-document">
+<p>Dataset management utilities for omicverse.</p>
+<p>This module provides functions to load datasets for single-cell analysis,
+following the dynamo-release sample_data.py pattern.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle main functions">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Main functions</span>
+</p>
+<div class="mkapi-section-content">
+<div class="highlight"><pre><span></span><code>get_adata: Download and load AnnData from URLs
+download_data: Download files with progress tracking
+pbmc3k: Load PBMC 3k dataset with fallback to mock data
+create_mock_dataset: Generate synthetic datasets for testing
+</code></pre></div>
+<p>Dataset functions:
+    - Scanpy-inspired: blobs, burczynski06, moignard15, paul15, pbmc68k_reduced
+    - Simulations: toggleswitch, krumsiek11
+    - Dynamo datasets: scnt_seq_neuron_splicing, scnt_seq_neuron_labeling
+    - Real datasets: zebrafish, dentate_gyrus, bone_marrow, hematopoiesis
+    - Special: multi_brain_5k (multiome data)</p>
+<p>Core features:
+    - Robust download with error handling and retry logic
+    - Progress tracking with tqdm
+    - Support for h5ad and loom formats
+    - Mock data generation for testing</p>
+<p>Examples:
+<div class="mkapi-example-input highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+
+<span class="c1"># Load PBMC 3k data (with clustering)</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">pbmc3k</span><span class="p">(</span><span class="n">processed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Loaded: </span><span class="si">{</span><span class="n">adata</span><span class="o">.</span><span class="n">n_obs</span><span class="si">}</span><span class="s2"> cells × </span><span class="si">{</span><span class="n">adata</span><span class="o">.</span><span class="n">n_vars</span><span class="si">}</span><span class="s2"> genes"</span><span class="p">)</span>
+
+<span class="c1"># Load specific datasets</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">hematopoiesis</span><span class="p">()</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">paul15</span><span class="p">()</span>  <span class="c1"># Myeloid development</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">blobs</span><span class="p">()</span>   <span class="c1"># Synthetic clusters</span>
+
+<span class="c1"># Create mock data</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">create_mock_dataset</span><span class="p">(</span>
+    <span class="n">n_cells</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> 
+    <span class="n">n_cell_types</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">with_clustering</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</code></pre></div></p>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle functions">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Functions</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.download_data" title="omicverse.datasets.download_data">download_data</a></span>
+<span class="mkapi-dash">—</span>
+Download example data to local folder.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.download_data_requests" title="omicverse.datasets.download_data_requests">download_data_requests</a></span>
+<span class="mkapi-dash">—</span>
+Download data with headers to bypass 403 errors.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.get_adata" title="omicverse.datasets.get_adata">get_adata</a></span>
+<span class="mkapi-dash">—</span>
+Download example data to local folder.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.pancreas_cellrank" title="omicverse.datasets.pancreas_cellrank">pancreas_cellrank</a></span>
+<span class="mkapi-dash">—</span>
+The pancreas cellrank dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/Pancreas.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.pbmc3k" title="omicverse.datasets.pbmc3k">pbmc3k</a></span>
+<span class="mkapi-dash">—</span>
+Load PBMC 3k dataset from URL.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.create_mock_dataset" title="omicverse.datasets.create_mock_dataset">create_mock_dataset</a></span>
+<span class="mkapi-dash">—</span>
+Create a mock single-cell dataset for testing statistical functions.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.blobs" title="omicverse.datasets.blobs">blobs</a></span>
+<span class="mkapi-dash">—</span>
+Gaussian Blobs dataset.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.burczynski06" title="omicverse.datasets.burczynski06">burczynski06</a></span>
+<span class="mkapi-dash">—</span>
+Bulk data with conditions ulcerative colitis (UC) and Crohn's disease (CD).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.moignard15" title="omicverse.datasets.moignard15">moignard15</a></span>
+<span class="mkapi-dash">—</span>
+Hematopoiesis in early mouse embryos (Moignard et al. 2015).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.paul15" title="omicverse.datasets.paul15">paul15</a></span>
+<span class="mkapi-dash">—</span>
+Development of Myeloid Progenitors (Paul et al. 2015).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.pbmc68k_reduced" title="omicverse.datasets.pbmc68k_reduced">pbmc68k_reduced</a></span>
+<span class="mkapi-dash">—</span>
+Subsampled and processed 68k PBMCs.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.toggleswitch" title="omicverse.datasets.toggleswitch">toggleswitch</a></span>
+<span class="mkapi-dash">—</span>
+Simulated toggleswitch data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.krumsiek11" title="omicverse.datasets.krumsiek11">krumsiek11</a></span>
+<span class="mkapi-dash">—</span>
+Simulated myeloid progenitors (Krumsiek et al. 2011).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.gillespie" title="omicverse.datasets.gillespie">gillespie</a></span>
+<span class="mkapi-dash">—</span>
+TODO: add data here</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.hl60" title="omicverse.datasets.hl60">hl60</a></span>
+<span class="mkapi-dash">—</span>
+TODO: add data here</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.nascseq" title="omicverse.datasets.nascseq">nascseq</a></span>
+<span class="mkapi-dash">—</span>
+TODO: add data here</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.scslamseq" title="omicverse.datasets.scslamseq">scslamseq</a></span>
+<span class="mkapi-dash">—</span>
+TODO: add data here</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.scifate" title="omicverse.datasets.scifate">scifate</a></span>
+<span class="mkapi-dash">—</span>
+TODO: add data here</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.cite_seq" title="omicverse.datasets.cite_seq">cite_seq</a></span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.scnt_seq_neuron_splicing" title="omicverse.datasets.scnt_seq_neuron_splicing">scnt_seq_neuron_splicing</a></span>
+<span class="mkapi-dash">—</span>
+The neuron splicing data is from Qiu, et al (2020).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.scnt_seq_neuron_labeling" title="omicverse.datasets.scnt_seq_neuron_labeling">scnt_seq_neuron_labeling</a></span>
+<span class="mkapi-dash">—</span>
+The neuron splicing data is from Qiu, et al (2020).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.zebrafish" title="omicverse.datasets.zebrafish">zebrafish</a></span>
+<span class="mkapi-dash">—</span>
+The zebrafish is from Saunders, et al (2019).</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.dentate_gyrus" title="omicverse.datasets.dentate_gyrus">dentate_gyrus</a></span>
+<span class="mkapi-dash">—</span>
+The Dentate Gyrus dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/DentateGyrus.ipynb.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.bone_marrow" title="omicverse.datasets.bone_marrow">bone_marrow</a></span>
+<span class="mkapi-dash">—</span>
+The bone marrow dataset used in</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.haber" title="omicverse.datasets.haber">haber</a></span>
+<span class="mkapi-dash">—</span>
+The Haber dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/Haber_et_al.ipynb</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.hg_forebrain_glutamatergic" title="omicverse.datasets.hg_forebrain_glutamatergic">hg_forebrain_glutamatergic</a></span>
+<span class="mkapi-dash">—</span>
+The hgForebrainGlutamatergic dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/hgForebrainGlutamatergic.ipynb</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.chromaffin" title="omicverse.datasets.chromaffin">chromaffin</a></span>
+<span class="mkapi-dash">—</span>
+The chromaffin dataset used in http://pklab.med.harvard.edu/velocyto/notebooks/R/chromaffin2.nb.html</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.bm" title="omicverse.datasets.bm">bm</a></span>
+<span class="mkapi-dash">—</span>
+The BM dataset used in http://pklab.med.harvard.edu/velocyto/notebooks/R/SCG71.nb.html</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.pancreatic_endocrinogenesis" title="omicverse.datasets.pancreatic_endocrinogenesis">pancreatic_endocrinogenesis</a></span>
+<span class="mkapi-dash">—</span>
+Pancreatic endocrinogenesis. Data from scvelo.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.dentate_gyrus_scvelo" title="omicverse.datasets.dentate_gyrus_scvelo">dentate_gyrus_scvelo</a></span>
+<span class="mkapi-dash">—</span>
+The Dentate Gyrus dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/DentateGyrus.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.sceu_seq_rpe1" title="omicverse.datasets.sceu_seq_rpe1">sceu_seq_rpe1</a></span>
+<span class="mkapi-dash">—</span>
+Download rpe1 dataset from Battich, et al (2020) via a figshare link.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.sceu_seq_organoid" title="omicverse.datasets.sceu_seq_organoid">sceu_seq_organoid</a></span>
+<span class="mkapi-dash">—</span>
+Download organoid dataset from Battich, et al (2020) via a figshare link.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.hematopoiesis" title="omicverse.datasets.hematopoiesis">hematopoiesis</a></span>
+<span class="mkapi-dash">—</span>
+Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.hematopoiesis_raw" title="omicverse.datasets.hematopoiesis_raw">hematopoiesis_raw</a></span>
+<span class="mkapi-dash">—</span>
+Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.human_tfs" title="omicverse.datasets.human_tfs">human_tfs</a></span>
+<span class="mkapi-dash">—</span>
+Download human transcription factors.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.multi_brain_5k" title="omicverse.datasets.multi_brain_5k">multi_brain_5k</a></span>
+<span class="mkapi-dash">—</span>
+Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.decov_bulk_covid_bulk" title="omicverse.datasets.decov_bulk_covid_bulk">decov_bulk_covid_bulk</a></span>
+<span class="mkapi-dash">—</span>
+COVID-19 PBMC bulk data from Decov et al. 2020.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.decov_bulk_covid_single" title="omicverse.datasets.decov_bulk_covid_single">decov_bulk_covid_single</a></span>
+<span class="mkapi-dash">—</span>
+COVID-19 PBMC single-cell data from Decov et al. 2020.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.datasets.sc_ref_Lymph_Node" title="omicverse.datasets.sc_ref_Lymph_Node">sc_ref_Lymph_Node</a></span>
+<span class="mkapi-dash">—</span>
+SC reference data for Lymph Node.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.download_data">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.download_data" title="omicverse.datasets.download_data">download_data</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">file_path</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'./data'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">str</span></span>
+</p>
+<div class="mkapi-document">
+<p>Download example data to local folder.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.download_data_requests">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.download_data_requests" title="omicverse.datasets.download_data_requests">download_data_requests</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">file_path</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'./data'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">str</span></span>
+</p>
+<div class="mkapi-document">
+<p>Download data with headers to bypass 403 errors.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.get_adata">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.get_adata" title="omicverse.datasets.get_adata">get_adata</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span>]</span></span>
+</p>
+<div class="mkapi-document">
+<p>Download example data to local folder.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">url</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+the url of the data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">filename</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span> <span class="mkapi-dash">—</span>
+the name of the file to be saved.</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span>]</span> <span class="mkapi-dash">—</span>
+An Annodata object.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.pancreas_cellrank">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.pancreas_cellrank" title="omicverse.datasets.pancreas_cellrank">pancreas_cellrank</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://figshare.com/ndownloader/files/25060877'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'pancreas_cellrank.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The pancreas cellrank dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/Pancreas.</p>
+<p>This data consists of 13,913 genes across 2,930 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.pbmc3k">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.pbmc3k" title="omicverse.datasets.pbmc3k">pbmc3k</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">processed</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Load PBMC 3k dataset from URL.</p>
+<p>3k PBMCs from 10x Genomics. Downloads directly from public URLs,
+falls back to mock data generation if URLs are unavailable.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">processed</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to load processed version with clustering (default: True)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+AnnData object with PBMC 3k data</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.create_mock_dataset">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.create_mock_dataset" title="omicverse.datasets.create_mock_dataset">create_mock_dataset</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">n_cells</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">2000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_genes</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1500</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_cell_types</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">6</span><span class="mkapi-comma">, </span><span class="mkapi-arg">with_clustering</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-comma">, </span><span class="mkapi-arg">random_state</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">42</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Create a mock single-cell dataset for testing statistical functions.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">n_cells</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of cells to simulate.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_genes</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of genes to simulate.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_cell_types</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of cell types to simulate.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">with_clustering</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to include clustering preprocessing.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">random_state</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Random seed for reproducibility.</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+AnnData object with mock single-cell data.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.blobs">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.blobs" title="omicverse.datasets.blobs">blobs</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">n_variables</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">11</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_centers</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5</span><span class="mkapi-comma">, </span><span class="mkapi-arg">cluster_std</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1.0</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_observations</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">640</span><span class="mkapi-comma">, </span><span class="mkapi-arg">random_state</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Gaussian Blobs dataset.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">n_variables</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Dimension of feature space.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_centers</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of cluster centers.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">cluster_std</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Standard deviation of clusters.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_observations</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of observations.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">random_state</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Determines random number generation for dataset creation.</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">Annotated data matrix containing a observation annotation 'blobs' that</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">indicates cluster identity.</span></p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.burczynski06">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.burczynski06" title="omicverse.datasets.burczynski06">burczynski06</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS1nnn/GDS1615/soft/GDS1615_full.soft.gz'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'GDS1615_full.soft.gz'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Bulk data with conditions ulcerative colitis (UC) and Crohn's disease (CD).</p>
+<p>The study assesses transcriptional profiles in peripheral blood mononuclear
+cells from 42 healthy individuals, 59 CD patients, and 26 UC patients.</p>
+<p>This data consists of 127 samples × 22283 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.moignard15">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.moignard15" title="omicverse.datasets.moignard15">moignard15</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://static-content.springer.com/esm/art%3A10.1038%2Fnbt.3154/MediaObjects/41587_2015_BFnbt3154_MOESM4_ESM.xlsx'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'nbt.3154-S3.xlsx'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Hematopoiesis in early mouse embryos (Moignard et al. 2015).</p>
+<p>The data was obtained using qRT–PCR.
+Contains normalized dCt values with experimental groups:
+"primitive streak" (PS), "neural plate" (NP), "head fold (HF),
+"four somite" blood/GFP⁺ (4SG), and "four somite" endothelial/GFP¯ (4SFG).</p>
+<p>This data consists of 3934 cells × 42 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.paul15">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.paul15" title="omicverse.datasets.paul15">paul15</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://falexwolf.de/data/paul15.h5'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'paul15.h5'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Development of Myeloid Progenitors (Paul et al. 2015).</p>
+<p>Non-logarithmized raw data of myeloid progenitor development.
+This data consists of 2730 cells × 3451 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.pbmc68k_reduced">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.pbmc68k_reduced" title="omicverse.datasets.pbmc68k_reduced">pbmc68k_reduced</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://falexwolf.de/data/pbmc68k_reduced.h5ad'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'pbmc68k_reduced.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Subsampled and processed 68k PBMCs.</p>
+<p>PBMC 68k dataset from 10x Genomics, preprocessed and subsampled.
+The original PBMC 68k dataset was preprocessed and saved keeping 
+only 724 cells and 221 highly variable genes.</p>
+<p>Contains cell type annotations, UMAP coordinates, and clustering results.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.toggleswitch">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.toggleswitch" title="omicverse.datasets.toggleswitch">toggleswitch</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'toggleswitch.txt'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Simulated toggleswitch data.</p>
+<p>Data obtained simulating a simple toggleswitch system.
+This data consists of 200 cells × 2 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.krumsiek11">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.krumsiek11" title="omicverse.datasets.krumsiek11">krumsiek11</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Simulated myeloid progenitors (Krumsiek et al. 2011).</p>
+<p>The literature-curated boolean network was used to simulate the data. 
+It describes development to four cell fates:
+"monocyte" (Mo), "erythrocyte" (Ery), "megakaryocyte" (Mk) and "neutrophil" (Neu).</p>
+<p>This data consists of 640 cells × 11 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.gillespie">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.gillespie" title="omicverse.datasets.gillespie">gillespie</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>TODO: add data here</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.hl60">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.hl60" title="omicverse.datasets.hl60">hl60</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>TODO: add data here</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.nascseq">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.nascseq" title="omicverse.datasets.nascseq">nascseq</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>TODO: add data here</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.scslamseq">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.scslamseq" title="omicverse.datasets.scslamseq">scslamseq</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>TODO: add data here</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.scifate">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.scifate" title="omicverse.datasets.scifate">scifate</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>TODO: add data here</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.cite_seq">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.cite_seq" title="omicverse.datasets.cite_seq">cite_seq</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document"></div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.scnt_seq_neuron_splicing">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.scnt_seq_neuron_splicing" title="omicverse.datasets.scnt_seq_neuron_splicing">scnt_seq_neuron_splicing</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'neuron_splicing.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The neuron splicing data is from Qiu, et al (2020).</p>
+<p>This data consists of 44,021 genes across 13,476 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.scnt_seq_neuron_labeling">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.scnt_seq_neuron_labeling" title="omicverse.datasets.scnt_seq_neuron_labeling">scnt_seq_neuron_labeling</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'neuron_labeling.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The neuron splicing data is from Qiu, et al (2020).</p>
+<p>This data consists of 24, 078 genes across 3,060 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.zebrafish">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.zebrafish" title="omicverse.datasets.zebrafish">zebrafish</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'zebrafish.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The zebrafish is from Saunders, et al (2019).</p>
+<p>This data consists of 16,940 genes across 4,181 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.dentate_gyrus">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.dentate_gyrus" title="omicverse.datasets.dentate_gyrus">dentate_gyrus</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'http://pklab.med.harvard.edu/velocyto/DentateGyrus/DentateGyrus.loom'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The Dentate Gyrus dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/DentateGyrus.ipynb.</p>
+<p>This data consists of 27,998 genes across 18,213 cells.
+Note this one http://pklab.med.harvard.edu/velocyto/DG1/10X43_1.loom: a subset of the above data.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.bone_marrow">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.bone_marrow" title="omicverse.datasets.bone_marrow">bone_marrow</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'bone_marrow.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The bone marrow dataset used in</p>
+<p>This data consists of 27,876 genes across 5,780 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.haber">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.haber" title="omicverse.datasets.haber">haber</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'http://pklab.med.harvard.edu/velocyto/Haber_et_al/Haber_et_al.loom'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The Haber dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/Haber_et_al.ipynb</p>
+<p>This data consists of 27,998 genes across 7,216 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.hg_forebrain_glutamatergic">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.hg_forebrain_glutamatergic" title="omicverse.datasets.hg_forebrain_glutamatergic">hg_forebrain_glutamatergic</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'http://pklab.med.harvard.edu/velocyto/hgForebrainGlut/hgForebrainGlut.loom'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The hgForebrainGlutamatergic dataset used in https://github.com/velocyto-team/velocyto-notebooks/blob/master/python/hgForebrainGlutamatergic.ipynb</p>
+<p>This data consists of 32,738 genes across 1,720 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.chromaffin">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.chromaffin" title="omicverse.datasets.chromaffin">chromaffin</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'onefilepercell_A1_unique_and_others_J2CH1.loom'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The chromaffin dataset used in http://pklab.med.harvard.edu/velocyto/notebooks/R/chromaffin2.nb.html</p>
+<p>This data consists of 32,738 genes across 1,720 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.bm">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.bm" title="omicverse.datasets.bm">bm</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'http://pklab.med.harvard.edu/velocyto/mouseBM/SCG71.loom'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The BM dataset used in http://pklab.med.harvard.edu/velocyto/notebooks/R/SCG71.nb.html</p>
+<p>This data consists of 24,421genes across 6,667 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.pancreatic_endocrinogenesis">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.pancreatic_endocrinogenesis" title="omicverse.datasets.pancreatic_endocrinogenesis">pancreatic_endocrinogenesis</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Pancreatic endocrinogenesis. Data from scvelo.</p>
+<p>Pancreatic epithelial and Ngn3-Venus fusion (NVF) cells during secondary transition / embryonic day 15.5.
+https://dev.biologists.org/content/146/12/dev173849</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.dentate_gyrus_scvelo">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.dentate_gyrus_scvelo" title="omicverse.datasets.dentate_gyrus_scvelo">dentate_gyrus_scvelo</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'dentategyrus_scv.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>The Dentate Gyrus dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/DentateGyrus.</p>
+<p>This data consists of 13,913 genes across 2,930 cells. Note this dataset is the same processed dataset from the
+excellent scVelo package, which is a subset of the DentateGyrus dataset.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.sceu_seq_rpe1">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.sceu_seq_rpe1" title="omicverse.datasets.sceu_seq_rpe1">sceu_seq_rpe1</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'rpe1.h5ad'</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Download rpe1 dataset from Battich, et al (2020) via a figshare link.</p>
+<p>This data consists of 13,913 genes across 2,930 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.sceu_seq_organoid">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.sceu_seq_organoid" title="omicverse.datasets.sceu_seq_organoid">sceu_seq_organoid</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'organoid.h5ad'</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Download organoid dataset from Battich, et al (2020) via a figshare link.</p>
+<p>This data consists of 9,157 genes across 3,831 cells.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.hematopoiesis">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.hematopoiesis" title="omicverse.datasets.hematopoiesis">hematopoiesis</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'hematopoiesis.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.hematopoiesis_raw">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.hematopoiesis_raw" title="omicverse.datasets.hematopoiesis_raw">hematopoiesis_raw</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'hematopoiesis_raw.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.human_tfs">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.human_tfs" title="omicverse.datasets.human_tfs">human_tfs</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'human_tfs.txt'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Download human transcription factors.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.multi_brain_5k">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.multi_brain_5k" title="omicverse.datasets.multi_brain_5k">multi_brain_5k</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.decov_bulk_covid_bulk">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.decov_bulk_covid_bulk" title="omicverse.datasets.decov_bulk_covid_bulk">decov_bulk_covid_bulk</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'COVID_PBMC_bulk.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>COVID-19 PBMC bulk data from Decov et al. 2020.</p>
+<p>This data consists of 10,000 cells × 15,000 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.decov_bulk_covid_single">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.decov_bulk_covid_single" title="omicverse.datasets.decov_bulk_covid_single">decov_bulk_covid_single</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'COVID_PBMC_single.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>COVID-19 PBMC single-cell data from Decov et al. 2020.</p>
+<p>This data consists of 10,000 cells × 15,000 genes.</p>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.datasets.sc_ref_Lymph_Node">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.datasets.sc_ref_Lymph_Node" title="omicverse.datasets.sc_ref_Lymph_Node">sc_ref_Lymph_Node</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">url</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">filename</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'sc_ref_Lymph_Node.h5ad'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>SC reference data for Lymph Node.</p>
+<p>This data consists of 10,000 cells × 15,000 genes.</p>
+</div>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2025, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../../../javascript/mkapi.js"></script>
+<script src="../../../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>

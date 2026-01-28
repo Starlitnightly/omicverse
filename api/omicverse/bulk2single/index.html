@@ -1,0 +1,3708 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href="../bulk/" rel="prev"/>
+<link href="../datasets/" rel="next"/>
+<link href="../../../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.1.2" name="generator"/>
+<title>bulk2single - omicverse Readthedocs</title>
+<link href="../../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../css/mkapi-common.css" rel="stylesheet"/>
+<link href="../../../css/mkapi-material.css" rel="stylesheet"/>
+<link href="../../../css/tags.css" rel="stylesheet"/>
+<link href="../../../css/custom.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../../../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#omicverse.bulk2single">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              bulk2single
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Installation_guild/">
+        Installation
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_1" id="__nav_3_1_1_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_3" id="__nav_3_1_3_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_3">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_decov_bulk/">
+        Bulk deconvolution with reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_4" id="__nav_3_1_4_label" tabindex="0">
+          Others
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_4">
+<span class="md-nav__icon md-icon"></span>
+          Others
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Alignment
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_alignment_1k/">
+        Alignment and analysis of single-cell RNA-seq data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_alignment_velocity/">
+        Alignment and RNA velocity analysis of single-cell RNA-seq data.
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_preprocess_cpu/">
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_preprocess_gpu/">
+        Preprocessing the data of scRNA-seq with omicverse[GPU]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cluster/">
+        Clustering space
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cnmf/">
+        GeneModule Identified
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_lazy/">
+        Lazy analysis of scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_noref/">
+        Reference-free automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_ref/">
+        Reference automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_gptanno/">
+        Automatic cell type annotation with GPT/Other
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellmatch/">
+        Mapping Cell Names to the Cell Ontology/Taxonomy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scmulan/">
+        Celltype auto annotation with scMulan
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellvote/">
+        Consensus annotation with CellVote
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cytotrace/">
+        Prediction of absolute developmental potential using CytoTrace2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_traj/">
+        Basic Trajectory Inference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_stavia/">
+        Trajectory Inference with StaVIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with TimeFateKernel
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellfate/">
+        Identify the driver regulators of cell fate decisions
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_metacells/">
+        Inference of MetaCell from Single-Cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_deg_single/">
+        Differential expression and celltype analysis [All Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdeg/">
+        Differential expression analysis [Meta Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scenic/">
+        Gene Regulatory Network Analysis with SCENIC
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_cellphonedb/">
+        Cell-cell communication using CellPhoneDBViz
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
+          Velocity
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_6">
+<span class="md-nav__icon md-icon"></span>
+          Velocity
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-velo/t_velo/">
+        Velocity Basic Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-velo/t_graphvelo/">
+        Velocity Optimization
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_7" id="__nav_3_2_7_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_7_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_7">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          Space
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
+<span class="md-nav__icon md-icon"></span>
+          Space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_1" id="__nav_3_4_1_label" tabindex="0">
+          Preprocess
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocess
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_crop_rotate/">
+        Crop and Rotation of spatial transcriptomic data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_cellpose/">
+        Cell Segmemtation (10x HD)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_cluster_space/">
+        Spatial clustering and denoising expressions
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_staligner/">
+        Spatial integration and clustering
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_2" id="__nav_3_4_2_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_spaceflow/">
+        Identifying Pseudo-Spatial Map
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_decov/">
+        Spatial deconvolution with reference scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_flashdeconv/">
+        FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_starfysh_new/">
+        Spatial deconvolution without reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_3" id="__nav_3_4_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_stt/">
+        Spatial transition tensor of single cells
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_commot_flowsig/">
+        Spatial Communication
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-space/t_slat/">
+        Single cell spatial alignment tools
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+          LLM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_5">
+<span class="md-nav__icon md-icon"></span>
+          LLM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_dr/">
+        Domain Research (dr): Comprehensive Report Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_dr_web/">
+        Domain Research (dr) — Live Web
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_ov_agent_pbmc3k/">
+        ov.Agent with Skills: Natural‑Language Single‑Cell Analysis (PBMC3k)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_uce/">
+        UCE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_scgpt/">
+        scGPT
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_scfoundation/">
+        scFoundation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_geneformer/">
+        GeneFormer
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-llm/t_cellplm/">
+        CellPLM
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+          Plotting
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_6">
+<span class="md-nav__icon md-icon"></span>
+          Plotting
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_single/">
+        Visualization of single cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_bulk/">
+        Visualization of Bulk RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../GPU_supported_registry_functions/">
+        GPU Support
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../">API documentation</a>
+<label for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+          API documentation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../agent/">agent</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_2">
+<span class="md-nav__icon md-icon"></span>
+          agent
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../alignment/">alignment</a>
+<label for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_3">
+<span class="md-nav__icon md-icon"></span>
+          alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../alignment/kb_api/">
+        kb_api
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_4">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_5_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index md-nav__link--active">
+<a href="./">bulk2single</a>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_5_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_5">
+<span class="md-nav__icon md-icon"></span>
+          bulk2single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_6" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../datasets/">datasets</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_6">
+<span class="md-nav__icon md-icon"></span>
+          datasets
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pl/">pl</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_7_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_7">
+<span class="md-nav__icon md-icon"></span>
+          pl
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pp/">pp</a>
+<label for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_8">
+<span class="md-nav__icon md-icon"></span>
+          pp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_8_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../pp/experimental/">experimental</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_8_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_8_2">
+<span class="md-nav__icon md-icon"></span>
+          experimental
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../pp/pyg_knn_implementation/">
+        pyg_knn_implementation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_9" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_9">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_10" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../space/">space</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_10">
+<span class="md-nav__icon md-icon"></span>
+          space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_11" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../utils/">utils</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_5_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_11">
+<span class="md-nav__icon md-icon"></span>
+          utils
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single">
+    Bulk2Single
+  </a>
+<nav aria-label="Bulk2Single" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.predicted_fraction">
+    predicted_fraction
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy">
+    bulk_preprocess_lazy
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.single_preprocess_lazy">
+    single_preprocess_lazy
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.prepare_input">
+    prepare_input
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.train">
+    train
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.save">
+    save
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.generate">
+    generate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.load_fraction">
+    load_fraction
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.load">
+    load
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.load_and_generate">
+    load_and_generate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.filtered">
+    filtered
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Bulk2Single.plot_loss">
+    plot_loss
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Single2Spatial">
+    Single2Spatial
+  </a>
+<nav aria-label="Single2Spatial" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Single2Spatial.train">
+    train
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Single2Spatial.save">
+    save
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Single2Spatial.load">
+    load
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.Single2Spatial.spot_assess">
+    spot_assess
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend">
+    BulkTrajBlend
+  </a>
+<nav aria-label="BulkTrajBlend" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy">
+    bulk_preprocess_lazy
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy">
+    single_preprocess_lazy
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.vae_configure">
+    vae_configure
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.vae_train">
+    vae_train
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.vae_load">
+    vae_load
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.vae_generate">
+    vae_generate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.gnn_configure">
+    gnn_configure
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.gnn_train">
+    gnn_train
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.gnn_load">
+    gnn_load
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.gnn_generate">
+    gnn_generate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.BulkTrajBlend.interpolation">
+    interpolation
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.bulk2single_plot_cellprop">
+    bulk2single_plot_cellprop
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.bulk2single_plot_correlation">
+    bulk2single_plot_correlation
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.scSemiProfiler">
+    scSemiProfiler
+  </a>
+<nav aria-label="scSemiProfiler" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.scSemiProfiler.init_bulk">
+    init_bulk
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.scSemiProfiler.init_single">
+    init_single
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#omicverse.bulk2single.scSemiProfiler.infer">
+    infer
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 style="display: none;">omicverse.bulk2single<a class="headerlink" href="#omicverse.bulk2single" title="Permanent link">¶</a></h1><p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single">
+<span class="mkapi-object-link">
+<a href="../../../src/omicverse/bulk2single/#omicverse.bulk2single" title="Go to source">source</a>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">package</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single" title="omicverse.bulk2single">omicverse.bulk2single</a></span>
+</p>
+<div class="mkapi-document">
+<p>Bulk-to-single-cell deconvolution and mapping utilities.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle this module provides comprehensive tools for bridging bulk and single-cell omics data">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">This module provides comprehensive tools for bridging bulk and single-cell omics data</span>
+</p>
+<div class="mkapi-section-content">
+<ul>
+<li>Converting bulk RNA-seq data to single-cell resolution using deep learning</li>
+<li>Deconvolving cell-type proportions from bulk samples</li>
+<li>Mapping single-cell data to spatial coordinates</li>
+<li>Trajectory blending and temporal analysis</li>
+<li>Variational autoencoder methods for multi-modal data integration</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle key capabilities">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Key capabilities</span>
+</p>
+<div class="mkapi-section-content">
+<ul>
+<li>Cross-platform compatibility (bulk RNA-seq, single-cell RNA-seq, spatial)</li>
+<li>Deep learning-based deconvolution algorithms</li>
+<li>Cell type proportion estimation with uncertainty quantification</li>
+<li>Temporal trajectory inference from bulk time-course data</li>
+<li>Integration with popular single-cell analysis workflows</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle classes">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Classes</span>
+</p>
+<div class="mkapi-section-content">
+<p>Bulk2Single: Main class for bulk-to-single-cell deconvolution
+    - Supports multiple deconvolution algorithms
+    - Handles batch effects and technical variations
+    - Provides confidence estimates for predictions</p>
+<p>Single2Spatial: Single-cell to spatial coordinate mapping
+    - Maps single-cell data onto spatial transcriptomics coordinates
+    - Preserves spatial relationships and tissue architecture
+    - Enables spatially-resolved analysis of single-cell data</p>
+<p>BulkTrajBlend: Trajectory blending for temporal analysis
+    - Infers developmental trajectories from bulk time-course data
+    - Combines bulk and single-cell trajectory information
+    - Models continuous developmental processes</p>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle visualization functions">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Visualization functions</span>
+</p>
+<div class="mkapi-section-content">
+<p>bulk2single_plot_cellprop: Plot cell proportion results
+bulk2single_plot_correlation: Plot correlation analysis</p>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle examples">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Examples</span>
+</p>
+<div class="mkapi-section-content">
+<div class="mkapi-example-input highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+<span class="c1"># Bulk to single-cell deconvolution</span>
+<span class="n">bulk2single</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">bulk2single</span><span class="o">.</span><span class="n">Bulk2Single</span><span class="p">(</span>
+    <span class="n">bulk_data</span><span class="o">=</span><span class="n">bulk_adata</span><span class="p">,</span>
+    <span class="n">ref_data</span><span class="o">=</span><span class="n">sc_adata</span>
+<span class="p">)</span>
+<span class="n">bulk2single</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">cell_props</span> <span class="o">=</span> <span class="n">bulk2single</span><span class="o">.</span><span class="n">predict</span><span class="p">()</span>
+
+<span class="c1"># Single-cell to spatial mapping</span>
+<span class="n">single2spatial</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">bulk2single</span><span class="o">.</span><span class="n">Single2Spatial</span><span class="p">(</span>
+    <span class="n">sc_data</span><span class="o">=</span><span class="n">sc_adata</span><span class="p">,</span>
+    <span class="n">spatial_data</span><span class="o">=</span><span class="n">spatial_adata</span>
+<span class="p">)</span>
+<span class="n">single2spatial</span><span class="o">.</span><span class="n">map_cells</span><span class="p">()</span>
+
+<span class="c1"># Visualization</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">bulk2single</span><span class="o">.</span><span class="n">bulk2single_plot_cellprop</span><span class="p">(</span><span class="n">cell_props</span><span class="p">)</span>
+</code></pre></div>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle classes">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Classes</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a></span>
+<span class="mkapi-dash">—</span>
+Main class for bulk-to-single-cell deconvolution.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a></span>
+<span class="mkapi-dash">—</span>
+Map single-cell data to spatial coordinates using deep learning.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a></span>
+<span class="mkapi-dash">—</span>
+Bulk-to-single-cell trajectory blending using VAE and GNN integration.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.scSemiProfiler" title="omicverse.bulk2single.scSemiProfiler">scSemiProfiler</a></span></p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle functions">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Functions</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.bulk2single_plot_cellprop" title="omicverse.bulk2single.bulk2single_plot_cellprop">bulk2single_plot_cellprop</a></span>
+<span class="mkapi-dash">—</span>
+Plot cell-type proportions in generated single-cell data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.bulk2single_plot_correlation" title="omicverse.bulk2single.bulk2single_plot_correlation">bulk2single_plot_correlation</a></span>
+<span class="mkapi-dash">—</span>
+Plot correlation matrix between reference and generated single-cell data.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">class</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">bulk_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">celltype_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">bulk_group</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="typing.Any">Any</span>]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_single_cells</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">top_marker_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">500</span><span class="mkapi-comma">, </span><span class="mkapi-arg">ratio_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gpu</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Main class for bulk-to-single-cell deconvolution.</p>
+<p>This class implements a VAE-based approach to generate single-cell data from bulk RNA-seq
+data by leveraging reference single-cell data. The method uses deconvolution to predict
+cell-type proportions and then generates synthetic single-cell data matching the bulk
+expression profile.</p>
+<p>Initialize the Bulk2Single class for bulk-to-single-cell deconvolution.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle the workflow includes">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">The workflow includes</span>
+</p>
+<div class="mkapi-section-content">
+<ul>
+<li>Cell fraction prediction using deconvolution methods (SCADEN, TAPE)</li>
+<li>VAE training for single-cell data generation</li>
+<li>Quality filtering and analysis of generated cells</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">bulk_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span> <span class="mkapi-dash">—</span>
+Bulk RNA-seq expression data as DataFrame with genes as rows and samples as columns</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">single_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Reference single-cell RNA-seq data as AnnData object</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">celltype_key</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Column name in single_data.obs containing cell type annotations</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">bulk_group</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="typing.Any">Any</span>]</span> <span class="mkapi-dash">—</span>
+Column names in bulk_data for grouping samples (None)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_single_cells</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Maximum number of single cells to use from reference (5000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">top_marker_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of top marker genes to select per cell type (500)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">ratio_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Ratio between single cells and target converted cells (1)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">gpu</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span> <span class="mkapi-dash">—</span>
+GPU device ID for computation; -1 for CPU, 'mps' for Apple Silicon (0)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle methods">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Methods</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.predicted_fraction" title="omicverse.bulk2single.Bulk2Single.predicted_fraction">predicted_fraction</a></span>
+<span class="mkapi-dash">—</span>
+Predict cell-type fractions from bulk RNA-seq data using deconvolution.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy" title="omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy">bulk_preprocess_lazy</a></span>
+<span class="mkapi-dash">—</span>
+Preprocess bulk RNA-seq data for deconvolution.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.single_preprocess_lazy" title="omicverse.bulk2single.Bulk2Single.single_preprocess_lazy">single_preprocess_lazy</a></span>
+<span class="mkapi-dash">—</span>
+Preprocess single-cell reference data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.prepare_input" title="omicverse.bulk2single.Bulk2Single.prepare_input">prepare_input</a></span>
+<span class="mkapi-dash">—</span>
+Prepare input data for VAE training.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.train" title="omicverse.bulk2single.Bulk2Single.train">train</a></span>
+<span class="mkapi-dash">—</span>
+Train the VAE model for single-cell data generation.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.save" title="omicverse.bulk2single.Bulk2Single.save">save</a></span>
+<span class="mkapi-dash">—</span>
+Save the trained VAE model and cell target numbers.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.generate" title="omicverse.bulk2single.Bulk2Single.generate">generate</a></span>
+<span class="mkapi-dash">—</span>
+Generate synthetic single-cell data from trained VAE model.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.load_fraction" title="omicverse.bulk2single.Bulk2Single.load_fraction">load_fraction</a></span>
+<span class="mkapi-dash">—</span>
+Load predicted cell-type target numbers from file.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.load" title="omicverse.bulk2single.Bulk2Single.load">load</a></span>
+<span class="mkapi-dash">—</span>
+Load a pre-trained VAE model.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.load_and_generate" title="omicverse.bulk2single.Bulk2Single.load_and_generate">load_and_generate</a></span>
+<span class="mkapi-dash">—</span>
+Load pre-trained VAE model and generate single-cell data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.filtered" title="omicverse.bulk2single.Bulk2Single.filtered">filtered</a></span>
+<span class="mkapi-dash">—</span>
+Filter generated single-cell data by removing low-quality clusters.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Bulk2Single.plot_loss" title="omicverse.bulk2single.Bulk2Single.plot_loss">plot_loss</a></span>
+<span class="mkapi-dash">—</span>
+Plot training loss curve of the VAE model.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.predicted_fraction">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.predicted_fraction" title="omicverse.bulk2single.Bulk2Single.predicted_fraction">predicted_fraction</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">method</span><span class="mkapi-equal">=</span><span class="mkapi-default">'scaden'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">sep</span><span class="mkapi-equal">=</span><span class="mkapi-default">'\t'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">scaler</span><span class="mkapi-equal">=</span><span class="mkapi-default">'mms'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">datatype</span><span class="mkapi-equal">=</span><span class="mkapi-default">'counts'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">genelenfile</span><span class="mkapi-equal">=</span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">mode</span><span class="mkapi-equal">=</span><span class="mkapi-default">'overall'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">adaptive</span><span class="mkapi-equal">=</span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">variance_threshold</span><span class="mkapi-equal">=</span><span class="mkapi-default">0.98</span><span class="mkapi-comma">, </span><span class="mkapi-arg">save_model_name</span><span class="mkapi-equal">=</span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_size</span><span class="mkapi-equal">=</span><span class="mkapi-default">128</span><span class="mkapi-comma">, </span><span class="mkapi-arg">epochs</span><span class="mkapi-equal">=</span><span class="mkapi-default">128</span><span class="mkapi-comma">, </span><span class="mkapi-arg">seed</span><span class="mkapi-equal">=</span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">scale_size</span><span class="mkapi-equal">=</span><span class="mkapi-default">2</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Predict cell-type fractions from bulk RNA-seq data using deconvolution.</p>
+<p>Uses machine learning approaches (SCADEN or TAPE) to estimate cell-type
+proportions in bulk samples based on single-cell reference data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">method</span>
+<span class="mkapi-dash">—</span>
+Deconvolution method to use - 'scaden' or 'tape' ('scaden')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">sep</span>
+<span class="mkapi-dash">—</span>
+Separator for input files ('\t')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">scaler</span>
+<span class="mkapi-dash">—</span>
+Scaling method for normalization ('mms')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">datatype</span>
+<span class="mkapi-dash">—</span>
+Type of input data - 'counts' or 'tpm' ('counts')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">genelenfile</span>
+<span class="mkapi-dash">—</span>
+Gene length file for TPM calculation (None)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">mode</span>
+<span class="mkapi-dash">—</span>
+Analysis mode for TAPE method ('overall')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">adaptive</span>
+<span class="mkapi-dash">—</span>
+Whether to use adaptive variance threshold (True)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">variance_threshold</span>
+<span class="mkapi-dash">—</span>
+Variance threshold for feature selection (0.98)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">save_model_name</span>
+<span class="mkapi-dash">—</span>
+Name for saving trained model (None)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch_size</span>
+<span class="mkapi-dash">—</span>
+Batch size for training (128)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">epochs</span>
+<span class="mkapi-dash">—</span>
+Number of training epochs (128)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">seed</span>
+<span class="mkapi-dash">—</span>
+Random seed for reproducibility (1)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">scale_size</span>
+<span class="mkapi-dash">—</span>
+Scaling factor for cell number prediction (2)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span> <span class="mkapi-dash">—</span>
+Predicted cell-type fractions for each bulk sample</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle raises">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Raises</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">ValueError</span></p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy" title="omicverse.bulk2single.Bulk2Single.bulk_preprocess_lazy">bulk_preprocess_lazy</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Preprocess bulk RNA-seq data for deconvolution.</p>
+<p>Performs normalization, log transformation, and group averaging of bulk data.
+Steps include duplicate removal, DESeq2 normalization, log10 transformation,
+and optional group-wise averaging.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.bulk_seq_group in place</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.single_preprocess_lazy">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.single_preprocess_lazy" title="omicverse.bulk2single.Bulk2Single.single_preprocess_lazy">single_preprocess_lazy</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">target_sum</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10000.0</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Preprocess single-cell reference data.</p>
+<p>Normalizes single-cell data using scanpy's standard preprocessing pipeline
+including total count normalization and log1p transformation.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">target_sum</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Target sum for total count normalization (10000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.single_data in place</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.prepare_input">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.prepare_input" title="omicverse.bulk2single.Bulk2Single.prepare_input">prepare_input</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Prepare input data for VAE training.</p>
+<p>Formats and aligns bulk and single-cell data for training the VAE model.
+This step matches genes between datasets and prepares the data structure
+needed for model training.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.input_data</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.train">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.train" title="omicverse.bulk2single.Bulk2Single.train">train</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">vae_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'vae'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">generate_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'output'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">generate_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'output'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">512</span><span class="mkapi-comma">, </span><span class="mkapi-arg">learning_rate</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.0001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">256</span><span class="mkapi-comma">, </span><span class="mkapi-arg">epoch_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">patience</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-comma">, </span><span class="mkapi-arg">save</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="torch">torch</span>.<span class="mkapi-tooltip" title="torch.nn">nn</span>.<span class="mkapi-tooltip" title="torch.nn.modules.module.Module">Module</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Train the VAE model for single-cell data generation.</p>
+<p>Trains a beta-VAE model to learn the mapping from bulk to single-cell expression
+patterns. The model learns to generate synthetic single cells that match the
+bulk expression profile and predicted cell-type proportions.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory to save trained VAE model ('save_model')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">vae_save_name</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Filename for saved VAE model ('vae')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">generate_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory for generated data output ('output')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">generate_save_name</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Filename for generated data ('output')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Training batch size (512)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">learning_rate</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Optimizer learning rate (1e-4)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">hidden_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Hidden layer dimensions in encoder/decoder (256)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">epoch_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Maximum training epochs (5000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">patience</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Early stopping patience (50)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">save</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to save trained model (True)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="torch">torch</span>.<span class="mkapi-tooltip" title="torch.nn">nn</span>.<span class="mkapi-tooltip" title="torch.nn.modules.module.Module">Module</span></span> <span class="mkapi-dash">—</span>
+Trained VAE model</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.save">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.save" title="omicverse.bulk2single.Bulk2Single.save">save</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">vae_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'vae'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Save the trained VAE model and cell target numbers.</p>
+<p>Saves both the model state dict and the predicted cell-type target numbers
+needed for generation.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory to save the trained VAE model. Default: 'save_model'</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">vae_save_name</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Filename for the saved VAE model. Default: 'vae'</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">None</span> <span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.generate">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.generate" title="omicverse.bulk2single.Bulk2Single.generate">generate</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Generate synthetic single-cell data from trained VAE model.</p>
+<p>Uses the trained VAE to generate single-cell expression profiles that match
+the bulk expression and predicted cell-type proportions.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+anndata.AnnData: Generated single-cell data with cell type annotations</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.load_fraction">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.load_fraction" title="omicverse.bulk2single.Bulk2Single.load_fraction">load_fraction</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">fraction_path</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Load predicted cell-type target numbers from file.</p>
+<p>Loads previously computed cell-type target numbers that specify how many
+cells of each type to generate.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">fraction_path</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Path to pickled file containing cell target numbers</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">None</span> <span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.load">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.load" title="omicverse.bulk2single.Bulk2Single.load">load</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_load_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">256</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Load a pre-trained VAE model.</p>
+<p>Loads a previously trained VAE model from disk for generating single-cell data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_load_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory containing the trained VAE model
+hidden_size: Hidden layer dimensions matching training configuration (256)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.vae_net</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.load_and_generate">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.load_and_generate" title="omicverse.bulk2single.Bulk2Single.load_and_generate">load_and_generate</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_load_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">256</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Load pre-trained VAE model and generate single-cell data.</p>
+<p>Convenience method that loads a trained model and immediately generates
+synthetic single-cell data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_load_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory containing the trained VAE model</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">hidden_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Hidden layer dimensions matching training configuration (256)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Generated single-cell data with cell type annotations</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.filtered">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.filtered" title="omicverse.bulk2single.Bulk2Single.filtered">filtered</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">generate_adata</span><span class="mkapi-comma">, </span><span class="mkapi-arg">highly_variable_genes</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_value</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_comps</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">100</span><span class="mkapi-comma">, </span><span class="mkapi-arg">svd_solver</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'auto'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">leiden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Filter generated single-cell data by removing low-quality clusters.</p>
+<p>Applies quality control filtering to generated single-cell data by identifying
+and removing small clusters that may represent noise or artifacts.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">generate_adata</span>
+<span class="mkapi-dash">—</span>
+Generated single-cell AnnData object to filter
+highly_variable_genes: Whether to select highly variable genes (True)
+max_value: Maximum value for scaling (10)
+n_comps: Number of principal components (100)
+svd_solver: SVD solver for PCA ('auto')
+leiden_size: Minimum cluster size threshold for filtering (50)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+anndata.AnnData: Filtered single-cell data</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Bulk2Single.plot_loss">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Bulk2Single" title="omicverse.bulk2single.Bulk2Single">Bulk2Single</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Bulk2Single.plot_loss" title="omicverse.bulk2single.Bulk2Single.plot_loss">plot_loss</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">figsize</span><span class="mkapi-colon">: </span><span class="mkapi-ann">tuple</span><span class="mkapi-equal"> = </span><span class="mkapi-default">(4, 4)</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="typing.Tuple">Tuple</span>[<span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.figure">figure</span>.<span class="mkapi-tooltip" title="matplotlib.figure.Figure">Figure</span>, <span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.axes">axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes">_axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes.Axes">Axes</span>]</span></span>
+</p>
+<div class="mkapi-document">
+<p>Plot training loss curve of the VAE model.</p>
+<p>Visualizes the training loss progression to assess model convergence.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">figsize</span> : 
+<span class="mkapi-item-type">tuple</span> <span class="mkapi-dash">—</span>
+Figure dimensions as (width, height) (4, 4)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.figure">figure</span>.<span class="mkapi-tooltip" title="matplotlib.figure.Figure">Figure</span></span> <span class="mkapi-dash">—</span>
+Figure object containing the plot
+matplotlib.axes.Axes: Axes object for the plot</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Single2Spatial">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">class</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">spatial_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">celltype_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">spot_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">list</span><span class="mkapi-equal"> = </span><span class="mkapi-default">['xcoord', 'ycoord']</span><span class="mkapi-comma">, </span><span class="mkapi-arg">top_marker_num</span><span class="mkapi-equal">=</span><span class="mkapi-default">500</span><span class="mkapi-comma">, </span><span class="mkapi-arg">marker_used</span><span class="mkapi-equal">=</span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gpu</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p><p class="mkapi-bases" markdown="1">Bases :
+<span class="mkapi-base">object</span></p></p>
+<p>Map single-cell data to spatial coordinates using deep learning.</p>
+<p>This class implements a neural network-based approach to map single-cell RNA-seq
+data onto spatial coordinates by learning the relationship between expression
+patterns and spatial locations. The method uses reference spatial transcriptomics
+data to train a model that can predict spatial coordinates for new single cells.</p>
+<p>Initialize Single2Spatial model for mapping single cells to spatial coordinates.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle the workflow includes">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">The workflow includes</span>
+</p>
+<div class="mkapi-section-content">
+<ul>
+<li>Data preparation and alignment between single-cell and spatial datasets</li>
+<li>Training a deep neural network to learn expression-location relationships</li>
+<li>Predicting spatial coordinates for single cells</li>
+<li>Quality assessment and aggregation of results</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">single_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Single-cell RNA-seq data as AnnData object
+spatial_data: Spatial transcriptomics reference data as AnnData object
+celltype_key: Column name in single_data.obs containing cell type annotations
+spot_key: Column names in spatial_data.obs for spatial coordinates (['xcoord','ycoord'])
+top_marker_num: Number of top marker genes to use in model (500)
+marker_used: Whether to use marker genes for training (True)
+gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon (0)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle methods">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Methods</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Single2Spatial.train" title="omicverse.bulk2single.Single2Spatial.train">train</a></span>
+<span class="mkapi-dash">—</span>
+Train the deep neural network for single-cell to spatial mapping.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Single2Spatial.save" title="omicverse.bulk2single.Single2Spatial.save">save</a></span>
+<span class="mkapi-dash">—</span>
+Save the trained Single2Spatial model.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Single2Spatial.load" title="omicverse.bulk2single.Single2Spatial.load">load</a></span>
+<span class="mkapi-dash">—</span>
+Load a pre-trained Single2Spatial model and perform mapping.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.Single2Spatial.spot_assess" title="omicverse.bulk2single.Single2Spatial.spot_assess">spot_assess</a></span>
+<span class="mkapi-dash">—</span>
+Assess and aggregate predicted spatial data at the spot level.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Single2Spatial.train">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Single2Spatial.train" title="omicverse.bulk2single.Single2Spatial.train">train</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">spot_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-comma">, </span><span class="mkapi-arg">cell_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-comma">, </span><span class="mkapi-arg">df_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">df_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'df'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_cell_in_diff_spot_ratio</span><span class="mkapi-equal">=</span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">k</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10</span><span class="mkapi-comma">, </span><span class="mkapi-arg">random_seed</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">112</span><span class="mkapi-comma">, </span><span class="mkapi-arg">mul_train</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">save</span><span class="mkapi-equal">=</span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_jobs</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">num_epochs</span><span class="mkapi-equal">=</span><span class="mkapi-default">1000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_size</span><span class="mkapi-equal">=</span><span class="mkapi-default">1000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">predicted_size</span><span class="mkapi-equal">=</span><span class="mkapi-default">32</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Train the deep neural network for single-cell to spatial mapping.</p>
+<p>Trains a model to learn the relationship between gene expression patterns
+and spatial coordinates using reference spatial transcriptomics data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">spot_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of spatial spots to predict</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">cell_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of cells per spot to predict</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">df_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory to save trained model ('save_model')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">df_save_name</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Filename for saved model ('df')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_cell_in_diff_spot_ratio</span>
+<span class="mkapi-dash">—</span>
+Maximum cell ratio variation between spots (None)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">k</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of nearest neighbors for mapping (10)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">random_seed</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Random seed for reproducibility (112)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">mul_train</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of training iterations (1)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">save</span>
+<span class="mkapi-dash">—</span>
+Whether to save trained model (True)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_jobs</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of parallel jobs (1)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">num_epochs</span>
+<span class="mkapi-dash">—</span>
+Training epochs (1000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch_size</span>
+<span class="mkapi-dash">—</span>
+Training batch size (1000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">predicted_size</span>
+<span class="mkapi-dash">—</span>
+Size of prediction layer (32)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Spatially mapped single-cell data with coordinates</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Single2Spatial.save">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Single2Spatial.save" title="omicverse.bulk2single.Single2Spatial.save">save</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">df_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">df_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'df'</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Save the trained Single2Spatial model.</p>
+<p>Saves the neural network model state for later use in spatial mapping.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">df_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory to save the model ('save_model')
+df_save_name: Filename for the saved model ('df')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Single2Spatial.load">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Single2Spatial.load" title="omicverse.bulk2single.Single2Spatial.load">load</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">modelsize</span><span class="mkapi-comma">, </span><span class="mkapi-arg">df_load_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model/df'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_cell_in_diff_spot_ratio</span><span class="mkapi-equal">=</span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">k</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10</span><span class="mkapi-comma">, </span><span class="mkapi-arg">random_seed</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">112</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_jobs</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">predicted_size</span><span class="mkapi-equal">=</span><span class="mkapi-default">32</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Load a pre-trained Single2Spatial model and perform mapping.</p>
+<p>Loads a previously trained model and uses it to map single cells to
+spatial coordinates.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">modelsize</span>
+<span class="mkapi-dash">—</span>
+Size/dimensions of the pre-trained model</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">df_load_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory containing the saved model ('save_model/df')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_cell_in_diff_spot_ratio</span>
+<span class="mkapi-dash">—</span>
+Maximum cell ratio variation between spots (None)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">k</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of nearest neighbors for mapping (10)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">random_seed</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Random seed for reproducibility (112)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_jobs</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of parallel jobs (1)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">predicted_size</span>
+<span class="mkapi-dash">—</span>
+Size of prediction layer (32)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Spatially mapped single-cell data with coordinates</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.Single2Spatial.spot_assess">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.Single2Spatial" title="omicverse.bulk2single.Single2Spatial">Single2Spatial</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.Single2Spatial.spot_assess" title="omicverse.bulk2single.Single2Spatial.spot_assess">spot_assess</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Assess and aggregate predicted spatial data at the spot level.</p>
+<p>Aggregates single-cell predictions to spot-level data including cell-type
+proportions and mean gene expression per spatial location.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+anndata.AnnData: Spot-level aggregated data with proportions and coordinates</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">class</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">bulk_seq</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">single_seq</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">celltype_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">bulk_group</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="typing.Any">Any</span>]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_single_cells</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">top_marker_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">500</span><span class="mkapi-comma">, </span><span class="mkapi-arg">ratio_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gpu</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p><p class="mkapi-bases" markdown="1">Bases :
+<span class="mkapi-base">object</span></p></p>
+<p>Bulk-to-single-cell trajectory blending using VAE and GNN integration.</p>
+<p>This class implements a comprehensive workflow for integrating bulk RNA-seq data
+with single-cell data to infer cellular trajectories and transition states.
+The method combines:
+- VAE-based bulk-to-single-cell deconvolution
+- Graph Neural Network (GNN) analysis for trajectory inference
+- Non-overlapping cell-type decomposition (NOCD) for transition states</p>
+<p>The workflow enables identification of intermediate cell states and trajectory
+dynamics that bridge bulk expression profiles with single-cell resolution.</p>
+<p>Initialize BulkTrajBlend for trajectory inference and cell blending.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">bulk_seq</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span> <span class="mkapi-dash">—</span>
+Bulk RNA-seq data with genes as rows and samples as columns</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">single_seq</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Single-cell RNA-seq reference data as AnnData object</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">celltype_key</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Column name in single_seq.obs containing cell type annotations</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">bulk_group</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[<span class="mkapi-tooltip" title="typing.Any">Any</span>]</span> <span class="mkapi-dash">—</span>
+Column names in bulk_seq for sample grouping. Default: None</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_single_cells</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Maximum number of single cells to use. Default: 5000</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">top_marker_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of top marker genes per cell type. Default: 500</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">ratio_num</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Cell selection ratio for each cell type. Default: 1</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">gpu</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span> <span class="mkapi-dash">—</span>
+GPU device ID; -1 for CPU, 'mps' for Apple Silicon. Default: 0</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p>None</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle methods">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Methods</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy" title="omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy">bulk_preprocess_lazy</a></span>
+<span class="mkapi-dash">—</span>
+Preprocess bulk RNA-seq data for trajectory analysis.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy" title="omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy">single_preprocess_lazy</a></span>
+<span class="mkapi-dash">—</span>
+Preprocess single-cell reference data for trajectory analysis.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_configure" title="omicverse.bulk2single.BulkTrajBlend.vae_configure">vae_configure</a></span>
+<span class="mkapi-dash">—</span>
+Configure the VAE model for bulk-to-single-cell generation.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_train" title="omicverse.bulk2single.BulkTrajBlend.vae_train">vae_train</a></span>
+<span class="mkapi-dash">—</span>
+Train the VAE model for trajectory-aware single-cell generation.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_load" title="omicverse.bulk2single.BulkTrajBlend.vae_load">vae_load</a></span>
+<span class="mkapi-dash">—</span>
+Load a pre-trained VAE model for trajectory analysis.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_generate" title="omicverse.bulk2single.BulkTrajBlend.vae_generate">vae_generate</a></span>
+<span class="mkapi-dash">—</span>
+Generate trajectory-aware single-cell data with quality filtering.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_configure" title="omicverse.bulk2single.BulkTrajBlend.gnn_configure">gnn_configure</a></span>
+<span class="mkapi-dash">—</span>
+Configure Graph Neural Network for trajectory and transition state analysis.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_train" title="omicverse.bulk2single.BulkTrajBlend.gnn_train">gnn_train</a></span>
+<span class="mkapi-dash">—</span>
+Train the GNN model for trajectory and transition state inference.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_load" title="omicverse.bulk2single.BulkTrajBlend.gnn_load">gnn_load</a></span>
+<span class="mkapi-dash">—</span>
+Load a pre-trained GNN model for trajectory analysis.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_generate" title="omicverse.bulk2single.BulkTrajBlend.gnn_generate">gnn_generate</a></span>
+<span class="mkapi-dash">—</span>
+Generate overlapping cell communities representing transition states.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.interpolation" title="omicverse.bulk2single.BulkTrajBlend.interpolation">interpolation</a></span>
+<span class="mkapi-dash">—</span>
+Interpolate trajectory communities back to original data space.</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy" title="omicverse.bulk2single.BulkTrajBlend.bulk_preprocess_lazy">bulk_preprocess_lazy</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Preprocess bulk RNA-seq data for trajectory analysis.</p>
+<p>Performs normalization, log transformation, and optional group averaging
+of bulk data for downstream trajectory inference.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.bulk_seq and self.bulk_seq_group in place</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy" title="omicverse.bulk2single.BulkTrajBlend.single_preprocess_lazy">single_preprocess_lazy</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">target_sum</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10000.0</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Preprocess single-cell reference data for trajectory analysis.</p>
+<p>Normalizes single-cell data and makes cell/gene names unique for
+consistent integration with bulk data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">target_sum</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Target sum for total count normalization (10000)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.single_seq in place</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.vae_configure">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_configure" title="omicverse.bulk2single.BulkTrajBlend.vae_configure">vae_configure</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">cell_target_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[int]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-comma">, </span><span class="mkapi-star">**</span><span class="mkapi-arg">kwargs</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Any">Any</span></span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Configure the VAE model for bulk-to-single-cell generation.</p>
+<p>Sets up the Bulk2Single model with cell-type target numbers either from
+deconvolution prediction or manual specification.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">cell_target_num</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Optional">Optional</span>[int]</span> <span class="mkapi-dash">—</span>
+Number of cells per type to generate. Default: None for auto-prediction</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">**kwargs</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Any">Any</span></span> <span class="mkapi-dash">—</span>
+Additional arguments passed to predicted_fraction method</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">None</span> <span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.vae_train">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_train" title="omicverse.bulk2single.BulkTrajBlend.vae_train">vae_train</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">vae_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'vae'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">generate_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'output'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">generate_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'output'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">512</span><span class="mkapi-comma">, </span><span class="mkapi-arg">learning_rate</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.0001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">256</span><span class="mkapi-comma">, </span><span class="mkapi-arg">epoch_num</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">patience</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-comma">, </span><span class="mkapi-arg">save</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Train the VAE model for trajectory-aware single-cell generation.</p>
+<p>Trains the underlying Bulk2Single VAE model to generate synthetic single
+cells that preserve trajectory information from bulk data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_save_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory to save trained VAE model ('save_model')
+vae_save_name: Filename for saved VAE model ('vae')
+generate_save_dir: Directory for generated data output ('output')
+generate_save_name: Filename for generated data ('output')
+batch_size: Training batch size (512)
+learning_rate: Optimizer learning rate (1e-4)
+hidden_size: Hidden layer dimensions (256)
+epoch_num: Maximum training epochs (5000)
+patience: Early stopping patience (50)
+save: Whether to save trained model (True)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.vae_net with trained model</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.vae_load">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_load" title="omicverse.bulk2single.BulkTrajBlend.vae_load">vae_load</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">vae_load_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">256</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Load a pre-trained VAE model for trajectory analysis.</p>
+<p>Loads a previously trained VAE model for generating trajectory-aware
+single-cell data.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">vae_load_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory containing the trained VAE model
+hidden_size: Hidden layer dimensions matching training (256)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Updates self.vae_net with loaded model</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.vae_generate">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.vae_generate" title="omicverse.bulk2single.BulkTrajBlend.vae_generate">vae_generate</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">highly_variable_genes</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_value</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">10</span><span class="mkapi-comma">, </span><span class="mkapi-arg">n_comps</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">100</span><span class="mkapi-comma">, </span><span class="mkapi-arg">svd_solver</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'auto'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">leiden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Generate trajectory-aware single-cell data with quality filtering.</p>
+<p>Uses the trained VAE to generate synthetic single cells and applies
+quality control filtering to remove noisy clusters.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">highly_variable_genes</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to select highly variable genes (True)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_value</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Maximum value for data scaling (10)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">n_comps</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of principal components for PCA (100)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">svd_solver</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+SVD solver for PCA ('auto')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">leiden_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Minimum cluster size threshold for filtering (50)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Generated and filtered single-cell data</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.gnn_configure">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_configure" title="omicverse.bulk2single.BulkTrajBlend.gnn_configure">gnn_configure</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">use_rep</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'X'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">neighbor_rep</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'X_pca'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gpu</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0</span><span class="mkapi-comma">, </span><span class="mkapi-arg">hidden_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">128</span><span class="mkapi-comma">, </span><span class="mkapi-arg">weight_decay</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.01</span><span class="mkapi-comma">, </span><span class="mkapi-arg">dropout</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.5</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_norm</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">lr</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">max_epochs</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">500</span><span class="mkapi-comma">, </span><span class="mkapi-arg">display_step</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">25</span><span class="mkapi-comma">, </span><span class="mkapi-arg">balance_loss</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">stochastic_loss</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch_size</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">2000</span><span class="mkapi-comma">, </span><span class="mkapi-arg">num_workers</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Configure Graph Neural Network for trajectory and transition state analysis.</p>
+<p>Sets up the NOCD (Non-Overlapping Cell-type Decomposition) GNN model
+for identifying cellular trajectories and intermediate states.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">use_rep</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Representation to use for GNN input. Default: 'X'</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">neighbor_rep</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Representation for neighbor graph construction. Default: 'X_pca'</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">gpu</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Union">Union</span>[int, str]</span> <span class="mkapi-dash">—</span>
+GPU device ID for training. Default: 0</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">hidden_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Hidden layer dimensions in GNN. Default: 128</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">weight_decay</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+L2 regularization strength. Default: 1e-2</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">dropout</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Dropout probability. Default: 0.5</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch_norm</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to use batch normalization. Default: True</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">lr</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Learning rate for GNN training. Default: 1e-3</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">max_epochs</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Maximum training epochs. Default: 500</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">display_step</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Frequency of progress updates. Default: 25</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">balance_loss</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to use balanced loss function. Default: True</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">stochastic_loss</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to use stochastic loss. Default: True</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch_size</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Training batch size. Default: 2000</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">num_workers</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+Number of data loading workers. Default: 5</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">None</span> <span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.gnn_train">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_train" title="omicverse.bulk2single.BulkTrajBlend.gnn_train">gnn_train</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">thresh</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.5</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gnn_save_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'save_model'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">gnn_save_name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'gnn'</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Train the GNN model for trajectory and transition state inference.</p>
+<p>Trains the NOCD model to identify cellular trajectories and overlapping
+cell communities representing transition states.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">thresh</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Threshold for community assignment (0.5)
+gnn_save_dir: Directory to save trained GNN model ('save_model')
+gnn_save_name: Filename for saved GNN model ('gnn')</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Trains model and computes trajectory results</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.gnn_load">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_load" title="omicverse.bulk2single.BulkTrajBlend.gnn_load">gnn_load</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">gnn_load_dir</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">thresh</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.5</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p>Load a pre-trained GNN model for trajectory analysis.</p>
+<p>Loads a previously trained NOCD model and computes trajectory results.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">gnn_load_dir</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Directory containing the trained GNN model
+thresh: Threshold for community assignment (0.5)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+None: Loads model and computes trajectory results</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.gnn_generate">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.gnn_generate" title="omicverse.bulk2single.BulkTrajBlend.gnn_generate">gnn_generate</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="pandas">pd</span>.<span class="mkapi-tooltip" title="pandas.core.frame.DataFrame">DataFrame</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Generate overlapping cell communities representing transition states.</p>
+<p>Identifies and names cell communities based on trajectory analysis,
+creating binary matrix indicating community membership for each cell.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">None</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span>
+<span class="mkapi-dash">—</span>
+pd.DataFrame: Binary matrix of cell community assignments with community names</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.BulkTrajBlend.interpolation">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.BulkTrajBlend" title="omicverse.bulk2single.BulkTrajBlend">BulkTrajBlend</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.BulkTrajBlend.interpolation" title="omicverse.bulk2single.BulkTrajBlend.interpolation">interpolation</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">celltype</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">adata</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span></span>
+</p>
+<div class="mkapi-document">
+<p>Interpolate trajectory communities back to original data space.</p>
+<p>Integrates identified cell communities from generated data back with
+original single-cell reference data for downstream analysis.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">celltype</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Cell type or community name to interpolate</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">adata</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Original data for interpolation; uses self.single_seq if None (None)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Combined data with interpolated community information</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.bulk2single_plot_cellprop">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.bulk2single_plot_cellprop" title="omicverse.bulk2single.bulk2single_plot_cellprop">bulk2single_plot_cellprop</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">generate_single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">celltype_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">figsize</span><span class="mkapi-colon">: </span><span class="mkapi-ann">tuple</span><span class="mkapi-equal"> = </span><span class="mkapi-default">(4, 4)</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="typing.Tuple">Tuple</span>[<span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.figure">figure</span>.<span class="mkapi-tooltip" title="matplotlib.figure.Figure">Figure</span>, <span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.axes">axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes">_axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes.Axes">Axes</span>]</span></span>
+</p>
+<div class="mkapi-document">
+<p>Plot cell-type proportions in generated single-cell data.</p>
+<p>Visualizes the distribution of cell types in data generated by bulk2single
+analysis as a bar plot with cell counts per type.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">generate_single_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Generated single-cell data from bulk2single analysis</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">celltype_key</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Column name in obs containing cell type annotations</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">figsize</span> : 
+<span class="mkapi-item-type">tuple</span> <span class="mkapi-dash">—</span>
+Figure dimensions as (width, height) (4, 4)</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.axes">axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes.Axes">Axes</span></span> <span class="mkapi-dash">—</span>
+Axes object containing the cell proportion bar plot</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.bulk2single_plot_correlation">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.bulk2single_plot_correlation" title="omicverse.bulk2single.bulk2single_plot_correlation">bulk2single_plot_correlation</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">generate_single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">celltype_key</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">return_table</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-comma">, </span><span class="mkapi-arg">figsize</span><span class="mkapi-colon">: </span><span class="mkapi-ann">tuple</span><span class="mkapi-equal"> = </span><span class="mkapi-default">(6, 6)</span><span class="mkapi-comma">, </span><span class="mkapi-arg">cmap</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'RdBu_r'</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return"><span class="mkapi-tooltip" title="typing.Tuple">Tuple</span>[<span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.figure">figure</span>.<span class="mkapi-tooltip" title="matplotlib.figure.Figure">Figure</span>, <span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.axes">axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes">_axes</span>.<span class="mkapi-tooltip" title="matplotlib.axes._axes.Axes">Axes</span>]</span></span>
+</p>
+<div class="mkapi-document">
+<p>Plot correlation matrix between reference and generated single-cell data.</p>
+<p>Compares expression patterns of cell types between original single-cell reference
+and bulk2single generated data using marker gene correlations.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">single_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Original single-cell reference data</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">generate_single_data</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span> <span class="mkapi-dash">—</span>
+Generated single-cell data from bulk2single analysis</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">celltype_key</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Column name in obs containing cell type annotations</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">return_table</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to return correlation matrix instead of plot (False)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">figsize</span> : 
+<span class="mkapi-item-type">tuple</span> <span class="mkapi-dash">—</span>
+Figure dimensions as (width, height) (6, 6)</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">cmap</span> : 
+<span class="mkapi-item-type">str</span> <span class="mkapi-dash">—</span>
+Colormap for correlation heatmap ('RdBu_r')</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type"><span class="mkapi-tooltip" title="matplotlib">matplotlib</span>.<span class="mkapi-tooltip" title="matplotlib.figure">figure</span>.<span class="mkapi-tooltip" title="matplotlib.figure.Figure">Figure</span></span> <span class="mkapi-dash">—</span>
+Figure object containing correlation heatmap
+matplotlib.axes.Axes: Axes object for the heatmap</p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.scSemiProfiler">
+<span class="mkapi-object-link">
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">class</span>
+<span class="mkapi-object-name"><a href="./#omicverse.bulk2single.scSemiProfiler" title="omicverse.bulk2single.scSemiProfiler">scSemiProfiler</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">name</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">single_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">bulk_data</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="anndata">anndata</span>.<span class="mkapi-tooltip" title="anndata._core.anndata.AnnData">AnnData</span></span><span class="mkapi-comma">, </span><span class="mkapi-arg">bulk_group</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">None</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document">
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle methods">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Methods</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.scSemiProfiler.init_bulk" title="omicverse.bulk2single.scSemiProfiler.init_bulk">init_bulk</a></span>
+<span class="mkapi-dash">—</span>
+Initial setup of the semi-profiling pipeline, including processing the bulk data, clustering for finding the initial representatives. Bulk data should be provided as an 'h5ad' file. Sample IDs should be stored in adata.obs['sample_ids'] and gene names should be stored in adata.var.index. If not using active learning for iterative representative selection, directly set the batch size to be the total number of representatives desired.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.scSemiProfiler.init_single" title="omicverse.bulk2single.scSemiProfiler.init_single">init_single</a></span>
+<span class="mkapi-dash">—</span>
+Process the reprsentatives' single-cell data, including preprocessing and feature augmentations. </p>
+</li>
+<li>
+<p><span class="mkapi-item-name"><a href="./#omicverse.bulk2single.scSemiProfiler.infer" title="omicverse.bulk2single.scSemiProfiler.infer">infer</a></span></p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.scSemiProfiler.init_bulk">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.scSemiProfiler" title="omicverse.bulk2single.scSemiProfiler">scSemiProfiler</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.scSemiProfiler.init_bulk" title="omicverse.bulk2single.scSemiProfiler.init_bulk">init_bulk</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">logged</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-comma">, </span><span class="mkapi-arg">normed</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">geneselection</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[bool, int]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">sample_id</span><span class="mkapi-equal">=</span><span class="mkapi-default">'sample_ids'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">batch</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">4</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Initial setup of the semi-profiling pipeline, including processing the bulk data, clustering for finding the initial representatives. Bulk data should be provided as an 'h5ad' file. Sample IDs should be stored in adata.obs['sample_ids'] and gene names should be stored in adata.var.index. If not using active learning for iterative representative selection, directly set the batch size to be the total number of representatives desired.</p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">name</span>
+<span class="mkapi-dash">—</span>
+Project name.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">bulk</span>
+<span class="mkapi-dash">—</span>
+Path to bulk data as an h5ad file. Sample IDs should be stored in adata.obs['sample_ids'] and gene names should be stored in adata.var.index.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">logged</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether the data has been logged or not</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">normed</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether the library size has been normalized or not</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">geneselection</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Union">Union</span>[bool, int]</span> <span class="mkapi-dash">—</span>
+Either a boolean value indicating whether to perform gene selection using the bulk data or not, or a integer specifying the number of highly variable genes should be selected.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">batch </span>
+<span class="mkapi-dash">—</span>
+Representative selection batch size.</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle returns">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Returns</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-type">None</span> <span class="mkapi-dash">—</span>
+None</p>
+</li>
+</ul>
+</div>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle example">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Example</span>
+</p>
+<div class="mkapi-section-content">
+<div class="mkapi-example-input highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">scSemiProfiler</span>
+<span class="n">name</span> <span class="o">=</span> <span class="s1">'runexample'</span>
+<span class="n">bulk</span> <span class="o">=</span> <span class="s1">'example_data/bulkdata.h5ad'</span>
+<span class="n">logged</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">normed</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">geneselection</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">scSemiProfiler</span><span class="o">.</span><span class="n">initsetup</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">bulk</span><span class="p">,</span><span class="n">logged</span><span class="p">,</span><span class="n">normed</span><span class="p">,</span><span class="n">geneselection</span><span class="p">,</span><span class="n">batch</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.scSemiProfiler.init_single">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.scSemiProfiler" title="omicverse.bulk2single.scSemiProfiler">scSemiProfiler</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.scSemiProfiler.init_single" title="omicverse.bulk2single.scSemiProfiler.init_single">init_single</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">logged</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-comma">, </span><span class="mkapi-arg">normed</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">cellfilter</span><span class="mkapi-colon">: </span><span class="mkapi-ann">bool</span><span class="mkapi-equal"> = </span><span class="mkapi-default">False</span><span class="mkapi-comma">, </span><span class="mkapi-arg">threshold</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">geneset</span><span class="mkapi-colon">: </span><span class="mkapi-ann"><span class="mkapi-tooltip" title="typing.Union">Union</span>[bool, str]</span><span class="mkapi-equal"> = </span><span class="mkapi-default">True</span><span class="mkapi-comma">, </span><span class="mkapi-arg">sample_id</span><span class="mkapi-equal">=</span><span class="mkapi-default">'sample_ids'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">weight</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.5</span><span class="mkapi-comma">, </span><span class="mkapi-arg">k</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">15</span><span class="mkapi-paren">)</span><span class="mkapi-arrow"> → </span><span class="mkapi-return">None</span></span>
+</p>
+<div class="mkapi-document">
+<p>Process the reprsentatives' single-cell data, including preprocessing and feature augmentations. </p>
+<p class="mkapi-section">
+<span class="mkapi-object-link">
+<span class="mkapi-section-toggle" title="Toggle parameters">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span>
+<span class="mkapi-section-name">Parameters</span>
+</p>
+<div class="mkapi-section-content">
+<ul class="mkapi-item-list">
+<li>
+<p><span class="mkapi-item-name">name</span>
+<span class="mkapi-dash">—</span>
+Project name.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">singlecell</span>
+<span class="mkapi-dash">—</span>
+Path to representatives' single-cell data.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">logged</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether the data has been logged or not</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">normed</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether the library size has been normalized or not</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">cellfilter</span> : 
+<span class="mkapi-item-type">bool</span> <span class="mkapi-dash">—</span>
+Whether to perform standard cell filtering.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">threshold</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+Threshold for background noise removal.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">geneset</span> : 
+<span class="mkapi-item-type"><span class="mkapi-tooltip" title="typing.Union">Union</span>[bool, str]</span> <span class="mkapi-dash">—</span>
+Whether to use gene set to augment gene expression features or no.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">weight</span> : 
+<span class="mkapi-item-type">float</span> <span class="mkapi-dash">—</span>
+The proportion of top features to increase importance weight.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">k</span> : 
+<span class="mkapi-item-type">int</span> <span class="mkapi-dash">—</span>
+K for the K-NN graph built for cells.</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Returns</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">-------</span>
+<span class="mkapi-dash">—</span>
+None</p>
+</li>
+<li>
+<p><span class="mkapi-item-name">Example</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">-------</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">```{.python .mkapi-example-input}</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">scSemiProfiler.scprocess(name = 'project_name', singlecell = name+'/representative_sc.h5ad', logged = False, normed = True, cellfilter = False, threshold=1e-3, geneset=True, weight = 0.5, k = 15)</span></p>
+</li>
+<li>
+<p><span class="mkapi-item-name">```</span></p>
+</li>
+</ul>
+</div>
+</div>
+<p class="mkapi-object mkapi-page-source" id="omicverse.bulk2single.scSemiProfiler.infer">
+<span class="mkapi-object-link">
+<span class="mkapi-parent-toggle" title="Toggle class names">
+<i class="fa-solid fa-square-plus"></i>
+</span>
+<span class="mkapi-definition-link"></span>
+<span class="mkapi-document-toggle" title="Toggle all docs">
+<i class="fa-regular fa-square-minus"></i>
+</span>
+</span><span class="mkapi-object-kind">method</span>
+<span class="mkapi-object-parent">
+<a href="./#omicverse.bulk2single.scSemiProfiler" title="omicverse.bulk2single.scSemiProfiler">scSemiProfiler</a><span class="mkapi-dot">.</span></span><span class="mkapi-object-name"><a href="./#omicverse.bulk2single.scSemiProfiler.infer" title="omicverse.bulk2single.scSemiProfiler.infer">infer</a></span><span class="mkapi-signature"><span class="mkapi-paren">(</span><span class="mkapi-arg">representatives</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">cluster</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-comma">, </span><span class="mkapi-arg">bulktype</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'pseudobulk'</span><span class="mkapi-comma">, </span><span class="mkapi-arg">lambdad</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">4.0</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain1batch</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">128</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain1lr</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain1vae</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">100</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain1gan</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">100</span><span class="mkapi-comma">, </span><span class="mkapi-arg">lambdabulkr</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain2lr</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.0001</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain2vae</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pretrain2gan</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">50</span><span class="mkapi-comma">, </span><span class="mkapi-arg">inferepochs</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">150</span><span class="mkapi-comma">, </span><span class="mkapi-arg">lambdabulkt</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">8.0</span><span class="mkapi-comma">, </span><span class="mkapi-arg">inferlr</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.0002</span><span class="mkapi-comma">, </span><span class="mkapi-arg">pseudocount</span><span class="mkapi-colon">: </span><span class="mkapi-ann">float</span><span class="mkapi-equal"> = </span><span class="mkapi-default">0.1</span><span class="mkapi-comma">, </span><span class="mkapi-arg">ministages</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">5</span><span class="mkapi-comma">, </span><span class="mkapi-arg">k</span><span class="mkapi-colon">: </span><span class="mkapi-ann">int</span><span class="mkapi-equal"> = </span><span class="mkapi-default">15</span><span class="mkapi-comma">, </span><span class="mkapi-arg">device</span><span class="mkapi-colon">: </span><span class="mkapi-ann">str</span><span class="mkapi-equal"> = </span><span class="mkapi-default">'cuda:0'</span><span class="mkapi-paren">)</span></span>
+</p>
+<div class="mkapi-document"></div>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2025, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../../../javascript/mkapi.js"></script>
+<script src="../../../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>
