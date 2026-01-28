@@ -62,24 +62,56 @@ Examples:
 """
 
 # All functions imported via wildcard imports from submodules
-from ._data import *
-from ._anndata_rust_patch import *
-from ._plot import *
+from ._data import (
+    read,read_csv,read_10x_mtx,read_h5ad,read_10x_h5,convert_to_pandas,
+    download_CaDRReS_model,download_GDSC_data,
+    download_pathway_database,download_geneid_annotation_pair,
+    gtf_to_pair_tsv,download_tosica_gmt,geneset_prepare,get_gene_annotation,
+    correlation_pseudotime,store_layers,retrieve_layers,easter_egg,
+    save,load,convert_adata_for_rust,
+    anndata_sparse,np_mean,np_std,
+    load_signatures_from_file,predefined_signatures
+    )
+from ._anndata_rust_patch import patch_rust_adata
+from ._plot import (
+    plot_set,plotset,ov_plot_set,pyomic_palette,palette,blue_palette,orange_palette,
+    red_palette,green_palette,plot_text_set,ticks_range,plot_boxplot,plot_network,
+    plot_cellproportion,plot_embedding_celltype,geneset_wordcloud,
+    plot_pca_variance_ratio,gen_mpl_labels
+)
 #from ._genomics import *
-from ._mde import *
-from ._syn import *
-from ._scatterplot import *
-from ._knn import *
-from ._heatmap import *
-from ._roe import roe, roe_plot_heatmap
+from ._mde import mde
+from ._syn import logger, pancreas, synthetic_iid, url_datadir
+from ._scatterplot import diffmap, draw_graph, embedding, pca, spatial, tsne, umap
+from ._knn import weighted_knn_trainer, weighted_knn_transfer
+from ._heatmap import (
+    additional_colors,
+    adjust_palette,
+    clip,
+    default_color,
+    default_palette,
+    get_colors,
+    interpret_colorkey,
+    is_categorical,
+    is_list,
+    is_list_of_str,
+    is_list_or_array,
+    is_view,
+    make_dense,
+    plot_heatmap,
+    set_colors_for_categorical_obs,
+    strings_to_categoricals,
+    to_list,
+)
+from ._roe import roe, roe_plot_heatmap, transform_roe_values
 from ._odds_ratio import odds_ratio, plot_odds_ratio_heatmap
 from ._shannon_diversity import shannon_diversity, compare_shannon_diversity, plot_shannon_diversity
 from ._resolution import optimal_resolution, plot_resolution_optimization, resolution_stability_analysis
-from ._paga import cal_paga,plot_paga
+from ._paga import cal_paga,plot_paga,PAGA_tree
 from ._cluster import cluster,LDA_topic,filtered,refine_label
 from ._venn import venny4py
-from ._lsi import *
-from ._neighboors import neighbors
+from ._lsi import Array, lsi, tfidf
+from ._neighboors import neighbors,calc_kBET,calc_kSIM
 
 # Import smart_agent module to make it accessible and expose key entrypoints
 # Store verifier with a private name first to ensure reference is preserved
@@ -104,7 +136,136 @@ def __getattr__(name):
 # Also make verifier accessible via normal attribute access
 verifier = _verifier_module
 
-# Build __all__ dynamically and ensure verifier is included
-__all__ = [name for name in globals() if not name.startswith("_")]
-if 'verifier' not in __all__:
-    __all__.append('verifier')
+# Explicit public exports for stable, non-wildcard imports
+__all__ = [
+    # @ _data
+    "read",
+    "read_csv",
+    "read_10x_mtx",
+    "read_h5ad",
+    "read_10x_h5",
+    "convert_to_pandas",
+    "download_CaDRReS_model",
+    "download_GDSC_data",
+    "download_pathway_database",
+    "download_geneid_annotation_pair",
+    "gtf_to_pair_tsv",
+    "download_tosica_gmt",
+    "geneset_prepare",
+    "get_gene_annotation",
+    "correlation_pseudotime",
+    "store_layers",
+    "retrieve_layers",
+    "easter_egg",
+    "save",
+    "load",
+    "convert_adata_for_rust",
+    "anndata_sparse",
+    "np_mean",
+    "np_std",
+    "load_signatures_from_file",
+    "predefined_signatures",
+    # @ _anndata_rust_patch
+    "patch_rust_adata",
+    # @ _plot
+    "plot_set",
+    "plotset",
+    "ov_plot_set",
+    "pyomic_palette",
+    "palette",
+    "blue_palette",
+    "orange_palette",
+    "red_palette",
+    "green_palette",
+    "plot_text_set",
+    "ticks_range",
+    "plot_boxplot",
+    "plot_network",
+    "plot_cellproportion",
+    "plot_embedding_celltype",
+    "geneset_wordcloud",
+    "plot_pca_variance_ratio",
+    "gen_mpl_labels",
+    # @ _mde
+    "mde",
+    # @ _syn
+    "logger",
+    "pancreas",
+    "synthetic_iid",
+    "url_datadir",
+    # @ _scatterplot
+    "diffmap",
+    "draw_graph",
+    "embedding",
+    "pca",
+    "spatial",
+    "tsne",
+    "umap",
+    # @ _knn
+    "weighted_knn_trainer",
+    "weighted_knn_transfer",
+    # @ _heatmap
+    "additional_colors",
+    "adjust_palette",
+    "clip",
+    "default_color",
+    "default_palette",
+    "get_colors",
+    "interpret_colorkey",
+    "is_categorical",
+    "is_list",
+    "is_list_of_str",
+    "is_list_or_array",
+    "is_view",
+    "make_dense",
+    "plot_heatmap",
+    "set_colors_for_categorical_obs",
+    "strings_to_categoricals",
+    "to_list",
+    # @ _roe
+    "roe",
+    "roe_plot_heatmap",
+    "transform_roe_values",
+    # @ _odds_ratio
+    "odds_ratio",
+    "plot_odds_ratio_heatmap",
+    # @ _shannon_diversity
+    "shannon_diversity",
+    "compare_shannon_diversity",
+    "plot_shannon_diversity",
+    # @ _resolution
+    "optimal_resolution",
+    "plot_resolution_optimization",
+    "resolution_stability_analysis",
+    # @ _paga
+    "cal_paga",
+    "plot_paga",
+    "PAGA_tree",
+    # @ _cluster
+    "cluster",
+    "LDA_topic",
+    "filtered",
+    "refine_label",
+    # @ _venn
+    "venny4py",
+    # @ _lsi
+    "Array",
+    "lsi",
+    "tfidf",
+    # @ _neighboors
+    "neighbors",
+    "calc_kBET",
+    "calc_kSIM",
+    # @ agent_backend
+    "agent_backend",
+    "BackendConfig",
+    "OmicVerseLLMBackend",
+    "Usage",
+    # @ smart_agent
+    "smart_agent",
+    "Agent",
+    "OmicVerseAgent",
+    "list_supported_models",
+    # @ verifier
+    "verifier",
+]
