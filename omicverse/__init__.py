@@ -65,6 +65,7 @@ from . import pp
 from . import space
 from . import pl
 from . import datasets
+from . import utils
 
 # External modules
 from . import external
