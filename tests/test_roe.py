@@ -150,17 +150,19 @@ class TestROE:
         # —: Ro/e = 0
         def correct_transform_roe_values(roe):
             """Correct implementation according to Nature paper"""
+            def _categorize_value(x):
+                if x == 0:
+                    return "—"
+                if 0 < x < 0.2:
+                    return "+/-"
+                if 0.2 <= x <= 0.8:
+                    return "+"
+                if 0.8 < x <= 1:
+                    return "++"
+                return "+++"
+
             transformed_roe = roe.copy()
-            transformed_roe = transformed_roe.applymap(
-                lambda x: '—' if x == 0 else (
-                    '+/-' if 0 < x < 0.2 else (
-                        '+' if 0.2 <= x <= 0.8 else (
-                            '++' if 0.8 < x <= 1 else '+++'
-                        )
-                    )
-                )
-            )
-            return transformed_roe
+            return transformed_roe.apply(lambda col: col.map(_categorize_value))
         
         result = correct_transform_roe_values(test_roe)
         
