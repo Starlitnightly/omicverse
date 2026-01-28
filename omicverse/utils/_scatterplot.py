@@ -136,7 +136,7 @@ def embedding(
     ax: Optional[Axes] = None,
     return_fig: Optional[bool] = None,
     marker: Union[str, Sequence[str]] = '.',
-    arrow_scale: float = 6, 
+    arrow_scale: float = 10, 
     arrow_width: float = 0.005,
     **kwargs,
 ) -> Union[Figure, Axes, None]:
