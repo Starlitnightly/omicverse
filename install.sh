@@ -219,7 +219,8 @@ pip_install_pkg \
 #------------------------
 # 8. Version‐locked packages 🔒
 #------------------------
-
+echo "🛠️ Ensuring pandas < 3.0.0 for stability..."
+uv pip install "pandas<3.0.0" --force-reinstall $PIP_INDEX
 
 #------------------------
 # 9. Miscellaneous tools 🛠️
