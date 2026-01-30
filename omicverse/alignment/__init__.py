@@ -6,4 +6,11 @@ This module provides comprehensive tools for fastq data processing and alignment
 - RNA velocity analysis with kb-python
 """
 
-from .kb_api import single
+from .kb_api import single,ref,count,parallel_fastq_dump
+
+__all__ = [
+    "single",
+    "ref",
+    "count",
+    "parallel_fastq_dump",
+]
