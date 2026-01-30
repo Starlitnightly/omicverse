@@ -157,6 +157,20 @@ pip_install_pkg omicverse
 #------------------------
 # 6. Other deep‐bio packages 🌱
 #------------------------
+
+pip_install_pkg \
+  pydeseq2 \
+  mofax \
+  tomli \
+  lifelines \
+  ktplotspy \
+  pillow \
+  einops \
+  tensorboard \
+  metatime \
+  graphtools \
+
+
 pip_install_pkg \
   tangram-sc \
   fa2-modified \
