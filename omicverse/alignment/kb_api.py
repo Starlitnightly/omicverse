@@ -446,10 +446,19 @@ def count(
     _append_flag(cmd, '-m', memory)
     _append_flag(cmd, '--overwrite', overwrite, as_bool=True)
 
-    # Filtering
-    if filter_barcodes:
-        cmd.extend(['--filter', 'bustools'])
-    _append_flag(cmd, '--filter-threshold', filter_threshold)
+    # Filtering (ONLY for barcode-based single-cell tech)
+    is_bulk = str(technology).upper() == "BULK"
+    if is_bulk:
+        # BULK has no barcodes/UMIs; kb CLI rejects --filter/--filter-threshold
+        if filter_barcodes:
+            raise ValueError("filter_barcodes/--filter is not supported for technology='BULK'")
+        if filter_threshold is not None:
+            raise ValueError("filter_threshold/--filter-threshold is not supported for technology='BULK'")
+    else:
+        if filter_barcodes:
+            cmd.extend(['--filter', 'bustools'])
+        if filter_threshold is not None:
+            _append_flag(cmd, '--filter-threshold', filter_threshold)
 
     # Matrix mode
     _append_flag(cmd, '--tcc', tcc, as_bool=True)
