@@ -38,7 +38,7 @@ from typing import Any, Callable, Dict, Optional, TypeVar
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 
-from .model_config import ModelConfig
+from .model_config import ModelConfig, WireAPI, get_provider
 
 # Type variable for retry decorator
 T = TypeVar('T')
@@ -47,15 +47,43 @@ T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-OPENAI_COMPAT_BASE_URLS = {
-    "openai": "https://api.openai.com/v1",
-    "xai": "https://api.x.ai/v1",
-    "deepseek": "https://api.deepseek.com/v1",
-    "moonshot": "https://api.moonshot.cn/v1",
-    # Some Zhipu deployments expose OpenAI-compatible APIs; default to official
-    # endpoint when not explicitly overridden by the caller.
-    "zhipu": "https://open.bigmodel.cn/api/paas/v4",  # may not be fully compatible
+# ---------------------------------------------------------------------------
+# Wire-API → method dispatch tables  (P0-1: replaces if/elif chains)
+# ---------------------------------------------------------------------------
+
+_SYNC_DISPATCH = {
+    WireAPI.CHAT_COMPLETIONS:   "_chat_via_openai_compatible",
+    WireAPI.ANTHROPIC_MESSAGES: "_chat_via_anthropic",
+    WireAPI.GEMINI_GENERATE:    "_chat_via_gemini",
+    WireAPI.DASHSCOPE:          "_chat_via_dashscope",
+    WireAPI.LOCAL:              "_run_python_local",
 }
+
+_STREAM_DISPATCH = {
+    WireAPI.CHAT_COMPLETIONS:   "_stream_openai_compatible",
+    WireAPI.ANTHROPIC_MESSAGES: "_stream_anthropic",
+    WireAPI.GEMINI_GENERATE:    "_stream_gemini",
+    WireAPI.DASHSCOPE:          "_stream_dashscope",
+    # LOCAL handled specially (non-streaming fallback)
+}
+
+# ---------------------------------------------------------------------------
+# Shared ThreadPoolExecutor  (P3-1: replaces per-call creation)
+# ---------------------------------------------------------------------------
+
+import atexit as _atexit
+import concurrent.futures as _cf
+
+_SHARED_EXECUTOR: Optional[_cf.ThreadPoolExecutor] = None
+
+def _get_shared_executor() -> _cf.ThreadPoolExecutor:
+    global _SHARED_EXECUTOR
+    if _SHARED_EXECUTOR is None or _SHARED_EXECUTOR._shutdown:
+        _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="ovagent-stream",
+        )
+        _atexit.register(_SHARED_EXECUTOR.shutdown, wait=False)
+    return _SHARED_EXECUTOR
 
 
 @dataclass
@@ -396,84 +424,131 @@ class OmicVerseLLMBackend:
 
     async def _stream_async(self, user_prompt: str):
         """Internal async generator that dispatches to provider-specific streaming."""
-
-        # Use asyncio.to_thread for synchronous streaming generators
-        provider = self.config.provider
-
-        # Check if provider supports streaming
-        if provider in OPENAI_COMPAT_BASE_URLS:
-            async for chunk in self._stream_openai_compatible(user_prompt):
-                yield chunk
-        elif provider == "python":
-            yield await asyncio.to_thread(self._run_python_local, user_prompt)
-        elif provider == "anthropic":
-            async for chunk in self._stream_anthropic(user_prompt):
-                yield chunk
-        elif provider == "google":
-            async for chunk in self._stream_gemini(user_prompt):
-                yield chunk
-        elif provider == "dashscope":
-            async for chunk in self._stream_dashscope(user_prompt):
-                yield chunk
-        else:
+        provider_info = get_provider(self.config.provider)
+        if provider_info is None:
             raise RuntimeError(
-                f"Provider '{provider}' is not supported for streaming yet. "
-                "Use the non-streaming run() method instead."
+                f"Provider '{self.config.provider}' is not registered. "
+                "Use the non-streaming run() method or register the provider first."
             )
+
+        wire = provider_info.wire_api
+
+        # LOCAL has no streaming — fall back to sync
+        if wire == WireAPI.LOCAL:
+            yield await asyncio.to_thread(self._run_python_local, user_prompt)
+            return
+
+        method_name = _STREAM_DISPATCH.get(wire)
+        if method_name is None:
+            raise RuntimeError(
+                f"Provider '{self.config.provider}' (wire={wire.value}) "
+                "is not supported for streaming yet."
+            )
+
+        method = getattr(self, method_name)
+        async for chunk in method(user_prompt):
+            yield chunk
 
     # ---------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------
     def _run_sync(self, user_prompt: str) -> str:
-        provider = self.config.provider
-        # Prefer OpenAI-compatible path when possible (simplest integration)
-        if provider in OPENAI_COMPAT_BASE_URLS:
-            return self._chat_via_openai_compatible(user_prompt)
-        if provider == "python":
-            return self._run_python_local(user_prompt)
+        """Dispatch to the correct sync provider method via the registry."""
+        provider_info = get_provider(self.config.provider)
+        if provider_info is None:
+            raise RuntimeError(
+                f"Provider '{self.config.provider}' is not registered. "
+                "Please choose a supported model or register the provider first."
+            )
 
-        # Provider-specific fallbacks (SDKs) with clear guidance if missing
-        if provider == "anthropic":
-            return self._chat_via_anthropic(user_prompt)
-        if provider == "google":
-            return self._chat_via_gemini(user_prompt)
-        if provider == "dashscope":
-            return self._chat_via_dashscope(user_prompt)
+        method_name = _SYNC_DISPATCH.get(provider_info.wire_api)
+        if method_name is None:
+            raise RuntimeError(
+                f"Provider '{self.config.provider}' (wire={provider_info.wire_api.value}) "
+                "is not supported by the internal backend yet."
+            )
 
-        raise RuntimeError(
-            f"Provider '{provider}' is not supported by the internal backend yet. "
-            "Please choose an OpenAI-compatible model or install/use a supported provider."
-        )
+        method = getattr(self, method_name)
+        return method(user_prompt)
 
     def _resolve_api_key(self) -> Optional[str]:
-        # Defer to ModelConfig key resolution logic used higher up; here we only
-        # need the effective key value for HTTP or SDK clients.
+        """Resolve API key from explicit config, registry env_key, or alt_env_keys."""
         if self.config.api_key:
             return self.config.api_key
 
-        # Try common environment variable names based on provider
-        provider = self.config.provider
-        if provider == "openai":
-            return os.getenv("OPENAI_API_KEY")
-        if provider == "xai":
-            return os.getenv("XAI_API_KEY")
-        if provider == "deepseek":
-            return os.getenv("DEEPSEEK_API_KEY")
-        if provider == "moonshot":
-            return os.getenv("MOONSHOT_API_KEY")
-        if provider == "zhipu":
-            return os.getenv("ZAI_API_KEY") or os.getenv("ZHIPUAI_API_KEY")
-        if provider == "anthropic":
-            return os.getenv("ANTHROPIC_API_KEY")
-        if provider == "google":
-            return os.getenv("GOOGLE_API_KEY")
-        if provider == "dashscope":
-            return os.getenv("DASHSCOPE_API_KEY")
+        info = get_provider(self.config.provider)
+        if info is None:
+            return None
+
+        # Primary env key
+        if info.env_key:
+            val = os.getenv(info.env_key)
+            if val:
+                return val
+
+        # Alternative env keys (e.g. ZHIPUAI_API_KEY)
+        for alt in info.alt_env_keys:
+            val = os.getenv(alt)
+            if val:
+                return val
+
         return None
+
+    # ----------------------------- retry helper (P1-3) ----------------------------
+    def _retry(self, func: Callable[..., T], *args, **kwargs) -> T:
+        """Retry *func* using the retry settings from self.config."""
+        return _retry_with_backoff(
+            func,
+            max_attempts=self.config.max_retry_attempts,
+            base_delay=self.config.retry_base_delay,
+            factor=self.config.retry_backoff_factor,
+            jitter=self.config.retry_jitter,
+            *args,
+            **kwargs,
+        )
+
+    # ---- GPT-5 Responses-API text extraction (P1-3: shared helper) -----------
+    @staticmethod
+    def _extract_responses_text_from_dict(payload: Dict[str, Any]) -> str:
+        """Extract the assistant text from a Responses API JSON dict.
+
+        Consolidates the duplicated extraction logic used in both SDK and
+        HTTP paths for the OpenAI Responses API.
+        """
+        if payload.get("output_text"):
+            return payload["output_text"]
+
+        output = payload.get("output")
+        if output is not None:
+            if isinstance(output, str):
+                return output
+            if isinstance(output, dict):
+                if output.get("text"):
+                    return output["text"]
+                content = output.get("content")
+                if isinstance(content, list):
+                    for p in content:
+                        if isinstance(p, dict) and p.get("text"):
+                            return p["text"]
+            if isinstance(output, list) and len(output) > 0:
+                first = output[0]
+                if isinstance(first, str):
+                    return first
+                if isinstance(first, dict) and first.get("text"):
+                    return first["text"]
+
+        if payload.get("text"):
+            return payload["text"]
+
+        raise RuntimeError(
+            f"Unexpected Responses API response format. "
+            f"Payload keys: {list(payload.keys())}"
+        )
 
     # ----------------------------- OpenAI compatible -----------------------------
     def _chat_via_openai_compatible(self, user_prompt: str) -> str:
-        base_url = self.config.endpoint or OPENAI_COMPAT_BASE_URLS[self.config.provider]
+        info = get_provider(self.config.provider)
+        base_url = self.config.endpoint or (info.base_url if info else "https://api.openai.com/v1")
         api_key = self._resolve_api_key()
         if not api_key:
             raise RuntimeError(
@@ -524,13 +599,7 @@ class OmicVerseLLMBackend:
 
                 return choice.message.content or ""
 
-            return _retry_with_backoff(
-                _make_sdk_call,
-                max_attempts=self.config.max_retry_attempts,
-                base_delay=self.config.retry_base_delay,
-                factor=self.config.retry_backoff_factor,
-                jitter=self.config.retry_jitter
-            )
+            return self._retry(_make_sdk_call)
 
         except ImportError:
             # OpenAI SDK not installed, fallback to HTTP
@@ -599,13 +668,7 @@ class OmicVerseLLMBackend:
                     f"OpenAI-compatible HTTP call failed: {type(exc).__name__}: {exc}"
                 ) from exc
 
-        return _retry_with_backoff(
-            _make_http_call,
-            max_attempts=self.config.max_retry_attempts,
-            base_delay=self.config.retry_base_delay,
-            factor=self.config.retry_backoff_factor,
-            jitter=self.config.retry_jitter
-        )
+        return self._retry(_make_http_call)
 
     # ----------------------------- OpenAI Responses API (gpt-5 series) -----------------------------
     def _chat_via_openai_responses(self, base_url: str, api_key: str, user_prompt: str) -> str:
@@ -755,13 +818,7 @@ class OmicVerseLLMBackend:
                     f"Available attributes: {dir(resp)}"
                 )
 
-            return _retry_with_backoff(
-                _make_responses_sdk_call,
-                max_attempts=self.config.max_retry_attempts,
-                base_delay=self.config.retry_base_delay,
-                factor=self.config.retry_backoff_factor,
-                jitter=self.config.retry_jitter
-            )
+            return self._retry(_make_responses_sdk_call)
 
         except ImportError:
             # OpenAI SDK not installed, fallback to HTTP
@@ -969,13 +1026,7 @@ class OmicVerseLLMBackend:
                     f"OpenAI Responses API HTTP call failed: {type(exc).__name__}: {exc}"
                 ) from exc
 
-        return _retry_with_backoff(
-            _make_responses_http_call,
-            max_attempts=self.config.max_retry_attempts,
-            base_delay=self.config.retry_base_delay,
-            factor=self.config.retry_backoff_factor,
-            jitter=self.config.retry_jitter
-        )
+        return self._retry(_make_responses_http_call)
 
     # ------------------------------- Local Python executor -------------------------------
     def _run_python_local(self, user_prompt: str) -> str:
@@ -1079,13 +1130,7 @@ class OmicVerseLLMBackend:
                         parts.append(getattr(block, "text", ""))
                 return "\n".join([p for p in parts if p])
 
-            return _retry_with_backoff(
-                _make_anthropic_call,
-                max_attempts=self.config.max_retry_attempts,
-                base_delay=self.config.retry_base_delay,
-                factor=self.config.retry_backoff_factor,
-                jitter=self.config.retry_jitter
-            )
+            return self._retry(_make_anthropic_call)
 
         except ImportError:
             raise RuntimeError(
@@ -1149,13 +1194,7 @@ class OmicVerseLLMBackend:
                     text = text.strip()
                 return text
 
-            return _retry_with_backoff(
-                _make_gemini_call,
-                max_attempts=self.config.max_retry_attempts,
-                base_delay=self.config.retry_base_delay,
-                factor=self.config.retry_backoff_factor,
-                jitter=self.config.retry_jitter
-            )
+            return self._retry(_make_gemini_call)
 
         except ImportError:
             raise RuntimeError(
@@ -1210,13 +1249,7 @@ class OmicVerseLLMBackend:
                     return choices[0].get("message", {}).get("content", "")
                 return ""
 
-            return _retry_with_backoff(
-                _make_dashscope_call,
-                max_attempts=self.config.max_retry_attempts,
-                base_delay=self.config.retry_base_delay,
-                factor=self.config.retry_backoff_factor,
-                jitter=self.config.retry_jitter
-            )
+            return self._retry(_make_dashscope_call)
 
         except ImportError:
             raise RuntimeError(
@@ -1261,21 +1294,20 @@ class OmicVerseLLMBackend:
             finally:
                 asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
-        # Start streaming in background thread
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_stream)
+        # Start streaming in background thread (shared executor — P3-1)
+        executor = _get_shared_executor()
+        future = executor.submit(_run_stream)
 
-            # Yield chunks as they arrive
-            while True:
-                chunk = await queue.get()
-                if chunk is None:
-                    break
-                yield chunk
+        # Yield chunks as they arrive
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            yield chunk
 
-            # Check for exceptions
-            if exception_holder:
-                raise exception_holder[0]
+        # Check for exceptions
+        if exception_holder:
+            raise exception_holder[0]
 
     async def _stream_openai_compatible(self, user_prompt: str):
         """Stream responses from OpenAI-compatible providers.
@@ -1283,7 +1315,8 @@ class OmicVerseLLMBackend:
         Uses SDK streaming if available, falls back to non-streaming HTTP response.
         Includes retry logic for transient stream session creation failures.
         """
-        base_url = self.config.endpoint or OPENAI_COMPAT_BASE_URLS[self.config.provider]
+        info = get_provider(self.config.provider)
+        base_url = self.config.endpoint or (info.base_url if info else "https://api.openai.com/v1")
         api_key = self._resolve_api_key()
         if not api_key:
             raise RuntimeError(
@@ -1318,13 +1351,7 @@ class OmicVerseLLMBackend:
                     )
 
                 # Retry stream creation on transient failures
-                stream = _retry_with_backoff(
-                    _create_stream,
-                    max_attempts=self.config.max_retry_attempts,
-                    base_delay=self.config.retry_base_delay,
-                    factor=self.config.retry_backoff_factor,
-                    jitter=self.config.retry_jitter
-                )
+                stream = self._retry(_create_stream)
 
                 for chunk in stream:
                     # Capture usage from streaming chunks (typically in final chunk)
@@ -1410,13 +1437,7 @@ class OmicVerseLLMBackend:
                     )
 
                 # Retry stream creation on transient failures
-                stream = _retry_with_backoff(
-                    _create_stream,
-                    max_attempts=self.config.max_retry_attempts,
-                    base_delay=self.config.retry_base_delay,
-                    factor=self.config.retry_backoff_factor,
-                    jitter=self.config.retry_jitter
-                )
+                stream = self._retry(_create_stream)
 
                 # Process streaming chunks
                 for chunk in stream:
@@ -1534,13 +1555,7 @@ class OmicVerseLLMBackend:
                     )
 
                 # Retry stream creation on transient failures
-                stream_context = _retry_with_backoff(
-                    _create_stream,
-                    max_attempts=self.config.max_retry_attempts,
-                    base_delay=self.config.retry_base_delay,
-                    factor=self.config.retry_backoff_factor,
-                    jitter=self.config.retry_jitter
-                )
+                stream_context = self._retry(_create_stream)
 
                 with stream_context as stream:
                     for text in stream.text_stream:
@@ -1601,37 +1616,30 @@ class OmicVerseLLMBackend:
                     )
 
                 # Retry stream creation on transient failures
-                response = _retry_with_backoff(
-                    _create_stream,
-                    max_attempts=self.config.max_retry_attempts,
-                    base_delay=self.config.retry_base_delay,
-                    factor=self.config.retry_backoff_factor,
-                    jitter=self.config.retry_jitter
-                )
+                response = self._retry(_create_stream)
 
-                # Store response for usage metadata extraction
-                response_list = list(response)
-
-                for chunk in response_list:
+                # Yield chunks as they arrive (true streaming) and track
+                # the last chunk for usage metadata.
+                last_chunk = None
+                for chunk in response:
+                    last_chunk = chunk
                     if hasattr(chunk, 'text') and chunk.text:
                         yield chunk.text
 
-                # Capture usage from the last chunk or accumulated metadata
-                if response_list:
-                    last_chunk = response_list[-1]
-                    if hasattr(last_chunk, 'usage_metadata') and last_chunk.usage_metadata is not None:
-                        usage = last_chunk.usage_metadata
-                        input_tokens = _coerce_int(getattr(usage, 'prompt_token_count', None))
-                        output_tokens = _coerce_int(getattr(usage, 'candidates_token_count', None))
-                        total_tokens = _compute_total(input_tokens, output_tokens, _coerce_int(getattr(usage, 'total_token_count', None)))
-                        if total_tokens is not None:
-                            self.last_usage = Usage(
-                                input_tokens=input_tokens or 0,
-                                output_tokens=output_tokens or 0,
-                                total_tokens=total_tokens,
-                                model=self.config.model,
-                                provider=self.config.provider
-                            )
+                # Capture usage from the last chunk
+                if last_chunk is not None and hasattr(last_chunk, 'usage_metadata') and last_chunk.usage_metadata is not None:
+                    usage = last_chunk.usage_metadata
+                    input_tokens = _coerce_int(getattr(usage, 'prompt_token_count', None))
+                    output_tokens = _coerce_int(getattr(usage, 'candidates_token_count', None))
+                    total_tokens = _compute_total(input_tokens, output_tokens, _coerce_int(getattr(usage, 'total_token_count', None)))
+                    if total_tokens is not None:
+                        self.last_usage = Usage(
+                            input_tokens=input_tokens or 0,
+                            output_tokens=output_tokens or 0,
+                            total_tokens=total_tokens,
+                            model=self.config.model,
+                            provider=self.config.provider
+                        )
 
             # Use helper to run generator in thread
             async for chunk in self._run_generator_in_thread(_stream_sdk):
@@ -1675,13 +1683,7 @@ class OmicVerseLLMBackend:
                     )
 
                 # Retry stream creation on transient failures
-                responses = _retry_with_backoff(
-                    _create_stream,
-                    max_attempts=self.config.max_retry_attempts,
-                    base_delay=self.config.retry_base_delay,
-                    factor=self.config.retry_backoff_factor,
-                    jitter=self.config.retry_jitter
-                )
+                responses = self._retry(_create_stream)
 
                 for response in responses:
                     if response.status_code == HTTPStatus.OK:

@@ -52,6 +52,27 @@ from .agent_backend import OmicVerseLLMBackend
 # Import registry system and model configuration
 from .registry import _global_registry
 from .model_config import ModelConfig, PROVIDER_API_KEYS
+
+# P0-2: Grouped configuration dataclasses
+from .agent_config import AgentConfig, SandboxFallbackPolicy
+
+# P0-3: Structured error hierarchy
+from .agent_errors import (
+    OVAgentError,
+    WorkflowNeedsFallback,
+    ProviderError,
+    ConfigError,
+    ExecutionError,
+    SandboxDeniedError,
+)
+
+# P1-1: Structured event reporting
+from .agent_reporter import (
+    AgentEvent,
+    EventLevel,
+    Reporter,
+    make_reporter,
+)
 from .skill_registry import (
     SkillMatch,
     SkillMetadata,
@@ -235,7 +256,7 @@ class OmicVerseAgent:
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None):
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
@@ -273,8 +294,50 @@ class OmicVerseAgent:
             selective context retrieval. Default: True.
         context_storage_dir : str, optional
             Directory for storing context files. Defaults to ~/.ovagent/context/
+        config : AgentConfig, optional
+            Grouped configuration object.  When provided, its values take priority
+            over the flat keyword arguments above.
+        reporter : Reporter, optional
+            Structured event reporter.  When omitted a default reporter is
+            created based on the *verbose* flag.
+        verbose : bool, optional
+            Whether to emit events to stdout (default: True).
         """
-        print(f" Initializing OmicVerse Smart Agent (internal backend)...")
+
+        # --- Build AgentConfig (P0-2) ------------------------------------------
+        if config is not None:
+            self._config = config
+        else:
+            self._config = AgentConfig.from_flat_kwargs(
+                model=model,
+                api_key=api_key,
+                endpoint=endpoint,
+                enable_reflection=enable_reflection,
+                reflection_iterations=reflection_iterations,
+                enable_result_review=enable_result_review,
+                use_notebook_execution=use_notebook_execution,
+                max_prompts_per_session=max_prompts_per_session,
+                notebook_storage_dir=notebook_storage_dir,
+                keep_execution_notebooks=keep_execution_notebooks,
+                notebook_timeout=notebook_timeout,
+                strict_kernel_validation=strict_kernel_validation,
+                enable_filesystem_context=enable_filesystem_context,
+                context_storage_dir=context_storage_dir,
+            )
+            self._config.verbose = verbose
+
+        # --- Build Reporter (P1-1) ---------------------------------------------
+        self._reporter: Reporter = make_reporter(
+            verbose=self._config.verbose,
+            reporter=reporter,
+        )
+
+        def _emit(level: EventLevel, message: str, category: str = "") -> None:
+            self._reporter.emit(AgentEvent(level=level, message=message, category=category))
+
+        self._emit = _emit
+
+        _emit(EventLevel.INFO, "Initializing OmicVerse Smart Agent (internal backend)...", "init")
         
         # Normalize model ID for aliases and variations, then validate
         original_model = model
@@ -1155,9 +1218,9 @@ Now generate code for: "{request}"
             response_text = await self._llm.run(priority1_prompt)
             self.last_usage = self._llm.last_usage
 
-        # Check if LLM indicates this needs a workflow
+        # Check if LLM indicates this needs a workflow (P0-3 signal)
         if "NEEDS_WORKFLOW" in response_text:
-            raise ValueError("Task requires workflow (Priority 1 insufficient)")
+            raise WorkflowNeedsFallback("Task requires workflow (Priority 1 insufficient)")
 
         # Extract code
         try:
@@ -2349,9 +2412,25 @@ if 'batch' in adata.obs.columns:
                 return result_adata
 
             except Exception as e:
-                print(f"⚠️  Session execution failed: {e}")
-                print(f"   Falling back to in-process execution...")
-                # Fall through to legacy execution
+                # P2-3: Notebook fallback policy
+                policy = getattr(
+                    getattr(self, '_config', None),
+                    'execution', None,
+                )
+                fb = getattr(policy, 'sandbox_fallback_policy', SandboxFallbackPolicy.WARN_AND_FALLBACK)
+
+                if fb == SandboxFallbackPolicy.RAISE:
+                    raise SandboxDeniedError(
+                        f"Notebook execution failed and fallback is disabled: {e}"
+                    ) from e
+                elif fb == SandboxFallbackPolicy.WARN_AND_FALLBACK:
+                    if hasattr(self, '_emit'):
+                        self._emit(EventLevel.WARNING, f"Session execution failed: {e}", "execution")
+                        self._emit(EventLevel.INFO, "Falling back to in-process execution...", "execution")
+                    else:
+                        print(f"\u26a0\ufe0f  Session execution failed: {e}")
+                        print(f"   Falling back to in-process execution...")
+                # SandboxFallbackPolicy.SILENT: fall through silently
 
         # Legacy in-process execution
         compiled = compile(code, "<omicverse-agent>", "exec")
@@ -2952,13 +3031,13 @@ if 'batch' in adata.obs.columns:
 
                 return result
 
-            except ValueError as e:
-                # Priority 1 failed, fall back to Priority 2
+            except (ValueError, WorkflowNeedsFallback) as e:
+                # Priority 1 determined task needs full workflow (P0-3 signal)
                 error_msg = str(e)
                 print()
                 print(f"{'─' * 70}")
-                print(f"⚠️  Priority 1 insufficient: {error_msg}")
-                print(f"🔄 Falling back to Priority 2 (skills-guided workflow)...")
+                print(f"\u26a0\ufe0f  Priority 1 insufficient: {error_msg}")
+                print(f"\U0001f504 Falling back to Priority 2 (skills-guided workflow)...")
                 print(f"{'─' * 70}\n")
 
                 fallback_occurred = True
@@ -2968,8 +3047,8 @@ if 'batch' in adata.obs.columns:
                 # Unexpected error in Priority 1
                 print()
                 print(f"{'─' * 70}")
-                print(f"⚠️  Priority 1 encountered error: {e}")
-                print(f"🔄 Falling back to Priority 2...")
+                print(f"\u26a0\ufe0f  Priority 1 encountered error: {e}")
+                print(f"\U0001f504 Falling back to Priority 2...")
                 print(f"{'─' * 70}\n")
 
                 fallback_occurred = True
@@ -3894,7 +3973,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -3998,6 +4077,9 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         strict_kernel_validation=strict_kernel_validation,
         enable_filesystem_context=enable_filesystem_context,
         context_storage_dir=context_storage_dir,
+        config=config,
+        reporter=reporter,
+        verbose=verbose,
     )
 
 
