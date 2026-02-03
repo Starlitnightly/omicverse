@@ -7,7 +7,7 @@ This module provides comprehensive tools for fastq data processing and alignment
 - SRA download / conversion / QC / alignment / counting wrappers
 """
 
-from .kb_api import single
+from .kb_api import single, ref, count, parallel_fastq_dump
 from .prefetch import prefetch
 from .fq_dump import fqdump
 from .fastp import fastp
@@ -16,6 +16,9 @@ from .featureCount import featureCount
 
 __all__ = [
     "single",
+    "ref",
+    "count",
+    "parallel_fastq_dump",
     "prefetch",
     "fqdump",
     "fastp",
