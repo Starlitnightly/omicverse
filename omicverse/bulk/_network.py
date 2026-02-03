@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd 
+import pandas as pd
 import networkx as nx
 import itertools
 from ..utils import plot_network
 from ..utils.registry import register_function
-from typing import Union,Tuple
+from typing import Union, Tuple, Any
 import matplotlib
 
 @register_function(
@@ -207,7 +207,7 @@ class pyPPI(object):
         self.G=G 
         return G
     
-    def plot_network(self,**kwargs) -> Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
+    def plot_network(self, **kwargs: Any) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
         r"""Plot protein-protein interaction network.
 
         Arguments:
@@ -217,7 +217,7 @@ class pyPPI(object):
             fig: Figure object containing PPI network plot
             ax: Axes object containing PPI network plot
         """
-        return plot_network(self.G,self.gene_type_dict,self.gene_color_dict,**kwargs)
+        return plot_network(self.G, self.gene_type_dict, self.gene_color_dict, **kwargs)
     
     
         

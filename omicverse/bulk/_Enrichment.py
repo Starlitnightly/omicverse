@@ -5,12 +5,40 @@ from sklearn import linear_model
 import networkx as nx
 import seaborn as sns
 import pandas as pd
-from sklearn import decomposition as skldec 
+from sklearn import decomposition as skldec
+from typing import Optional, Any, Dict, List, Tuple
 
 from ..utils import plot_text_set
 from ..utils.registry import register_function
 import matplotlib
 
+@register_function(
+    aliases=["基因集富集", "geneset_enrichment", "enrichr_analysis", "pathway_enrichment", "富集分析"],
+    category="bulk",
+    description="Perform gene set enrichment analysis. IMPORTANT: pathways_dict must be a dictionary loaded via ov.utils.geneset_prepare(), NOT a file path string!",
+    prerequisites={
+        'optional_functions': ['download_pathway_database', 'geneset_prepare']
+    },
+    examples=[
+        "# STEP 1: Download pathway database (run once)",
+        "ov.utils.download_pathway_database()",
+        "",
+        "# STEP 2: Load geneset into dictionary - REQUIRED!",
+        "pathways_dict = ov.utils.geneset_prepare('genesets/GO_Biological_Process_2021.txt', organism='Human')",
+        "",
+        "# STEP 3: Run enrichment with the DICTIONARY (NOT file path!)",
+        "enr = ov.bulk.geneset_enrichment(",
+        "    gene_list=deg_genes,",
+        "    pathways_dict=pathways_dict,  # Must be dict, NOT string path!",
+        "    pvalue_type='auto',",
+        "    organism='Human'",
+        ")",
+        "",
+        "# WRONG - DO NOT DO THIS:",
+        "# enr = ov.bulk.geneset_enrichment(gene_list=genes, pathways_dict='file.gmt')  # ERROR!"
+    ],
+    related=["utils.geneset_prepare", "utils.download_pathway_database", "bulk.geneset_plot", "bulk.pyGSEA"]
+)
 def geneset_enrichment(gene_list:list,pathways_dict:dict,
                        pvalue_threshold:float=0.05,pvalue_type:str='auto',
                        organism:str='Human',description:str='None',
@@ -67,8 +95,8 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
     enrich_res['fraction']=[int(i.split('/')[0])/int(i.split('/')[1]) for i in enrich_res['Overlap']]
     return enrich_res
 
-def enrichment_multi_concat(enr_dict):
-    def process_df(df, term_col_name):
+def enrichment_multi_concat(enr_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    def process_df(df: pd.DataFrame, term_col_name: str) -> pd.DataFrame:
         new_data = []
         for _, row in df.iterrows():
             genes = row['Genes'].split(';')
@@ -76,7 +104,7 @@ def enrichment_multi_concat(enr_dict):
                 new_data.append({
                     'Gene': gene,
                     term_col_name: row['Term'],
-                    
+
                 })
         return pd.DataFrame(new_data)
     new_dict={}
@@ -133,11 +161,11 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
     enrich_res['P-value']=enrich_res['fdr']
     return enrich_res
 
-def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
-                        fig_title:str='',fig_xlabel:str='Fractions of genes',
-                        figsize:tuple=(2,4),cmap:str='YlGnBu',
-                        text_knock:int=5,text_maxsize:int=20,ax=None,
-                        ):
+def geneset_plot_multi(enr_dict: Dict[str, pd.DataFrame], colors_dict: Dict[str, str], num: int = 5, fontsize: int = 10,
+                        fig_title: str = '', fig_xlabel: str = 'Fractions of genes',
+                        figsize: tuple = (2, 4), cmap: str = 'YlGnBu',
+                        text_knock: int = 5, text_maxsize: int = 20, ax: Optional[matplotlib.axes._axes.Axes] = None
+                        ) -> matplotlib.axes._axes.Axes:
     r"""Enrichment multi genesets analysis using GSEA.
 
     Arguments:
@@ -234,13 +262,13 @@ def geneset_plot_multi(enr_dict,colors_dict,num:int=5,fontsize=10,
     ],
     related=["bulk.geneset_enrichment", "bulk.geneset_plot_multi", "pl.volcano", "pl.dotplot"]
 )
-def geneset_plot(enrich_res,num:int=10,node_size:list=[5,10,15],
-                        cax_loc:list=[2, 0.55, 0.5, 0.02],cax_fontsize:int=12,
-                        fig_title:str='',fig_xlabel:str='Fractions of genes',
-                        figsize:tuple=(2,4),cmap:str='YlGnBu',
-                        text_knock:int=5,text_maxsize:int=20,
-                        bbox_to_anchor_used:tuple=(-0.45, -13),node_diameter:int=10,
-                        custom_ticks:list=[5,10],ax=None)->matplotlib.axes._axes.Axes:
+def geneset_plot(enrich_res: pd.DataFrame, num: int = 10, node_size: list = [5, 10, 15],
+                        cax_loc: list = [2, 0.55, 0.5, 0.02], cax_fontsize: int = 12,
+                        fig_title: str = '', fig_xlabel: str = 'Fractions of genes',
+                        figsize: tuple = (2, 4), cmap: str = 'YlGnBu',
+                        text_knock: int = 5, text_maxsize: int = 20,
+                        bbox_to_anchor_used: tuple = (-0.45, -13), node_diameter: int = 10,
+                        custom_ticks: list = [5, 10], ax: Optional[matplotlib.axes._axes.Axes] = None) -> matplotlib.axes._axes.Axes:
     r"""Plot the gene set enrichment result.
 
     Arguments:

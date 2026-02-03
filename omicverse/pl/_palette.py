@@ -93,7 +93,7 @@ def colormaps_palette(map_name:str)->list:
 
     colormap's name could be found in `https://pratiman-91.github.io/colormaps/`
     
-    Arguments:
+    Args:
         map_name: Name of the colormap
         
     Returns:
@@ -108,7 +108,7 @@ def optim_palette(adata,basis,colors,palette=None,**kwargs):
     """
     Optimized palette for plotting
 
-    Arguments:
+    Args:
         adata: AnnData object
         basis: basis for plotting, which is the key of adata.obsm
         colors: key of adata.obs for color
@@ -158,7 +158,7 @@ def Forbidden_Cmap(color_range,return_cmap=False):
     r"""
     Create a colormap or color list from the Forbidden City color palette.
     
-    Arguments:
+    Args:
         color_range: list or sequence
             Range of color indices to select from the Forbidden City palette
         return_cmap: bool, optional (default=False)
@@ -185,7 +185,7 @@ def get_forbidden():
     
     Returns:
         dict: Dictionary containing traditional Chinese color names and their RGB/HTML values
-        Each color entry contains: num, name, name_en, color_rgb, color_html
+            Each color entry contains: num, name, name_en, color_rgb, color_html
     """
     Forbiddencity={'1': {'num': '1',
     'name': '人籁',

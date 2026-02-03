@@ -24,6 +24,20 @@ from ..external.palantir.presults import select_branch_cells,compute_gene_trends
     aliases=["轨迹推断", "TrajInfer", "trajectory_inference", "轨迹分析", "发育轨迹"],
     category="single",
     description="Comprehensive trajectory inference for single-cell data using multiple algorithms including Palantir, diffusion maps, and Slingshot",
+    prerequisites={
+        'functions': ['pca', 'neighbors'],
+        'optional_functions': ['leiden', 'umap']
+    },
+    requires={
+        'obsm': ['X_pca'],
+        'uns': ['neighbors']
+    },
+    produces={
+        'obs': ['palantir_pseudotime'],
+        'obsm': ['X_palantir', 'branch_probs'],
+        'uns': ['palantir_imp', 'gene_trends']
+    },
+    auto_fix='auto',
     examples=[
         "# Initialize TrajInfer",
         "traj = ov.single.TrajInfer(adata, basis='X_umap', groupby='clusters',",
@@ -33,7 +47,7 @@ from ..external.palantir.presults import select_branch_cells,compute_gene_trends
         "traj.set_terminal_cells(['differentiated_A', 'differentiated_B'])",
         "# Diffusion map trajectory inference",
         "traj.inference(method='diffusion_map')",
-        "# Slingshot trajectory inference", 
+        "# Slingshot trajectory inference",
         "traj.inference(method='slingshot', num_epochs=1)",
         "# Palantir trajectory inference",
         "traj.inference(method='palantir', num_waypoints=500)",
@@ -173,6 +187,22 @@ class TrajInfer(object):
             self.adata.obs['slingshot_pseudotime']=pseudotime
             self.slingshot=slingshot
             add_reference(self.adata,'slingshot','trajectory inference with slingshot')
+        elif method=='sctour':
+            import sctour as sct
+            tnode = sct.train.Trainer(
+                self.adata, loss_mode='nb', 
+                **kwargs
+            )
+            tnode.train()
+            self.adata.obs['sctour_pseudotime'] = tnode.get_time()
+            mix_zs, zs, pred_zs = tnode.get_latentsp(alpha_z=0.5, alpha_predz=0.5)
+            self.adata.obsm['X_TNODE'] = mix_zs
+            self.adata.obsm['X_VF'] = tnode.get_vector_field(
+                self.adata.obs['sctour_pseudotime'].values, 
+                self.adata.obsm['X_TNODE']
+            )
+            add_reference(self.adata,'sctour','trajectory inference with sctour')
+            self.tnode=tnode
         else:
             print('Please input the correct method name, such as `palantir` or `diffusion_map`')
             return

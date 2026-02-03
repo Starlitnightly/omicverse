@@ -4,11 +4,24 @@ import numpy as np
 import anndata
 from .._settings import add_reference,settings
 from ..utils.registry import register_function
+from .._monitor import monitor
 
+@monitor
 @register_function(
     aliases=["批次校正", "batch_correction", "batch_correct", "数据整合", "去批次效应"],
     category="single",
     description="Comprehensive batch effect correction using multiple methods including Harmony, Combat, Scanorama, scVI, and CellANOVA",
+    prerequisites={
+        'optional_functions': ['preprocess', 'scale', 'pca']
+    },
+    requires={
+        'obsm': [],  # Flexible - some methods use X_pca, others raw data
+        'obs': []    # Requires batch_key column (user-specified)
+    },
+    produces={
+        'obsm': []  # Dynamic: X_pca_harmony, X_combat, X_scanorama, X_scVI, or X_cellanova
+    },
+    auto_fix='none',
     examples=[
         "# Harmony batch correction (recommended for most cases)",
         "ov.single.batch_correction(adata, batch_key='batch', methods='harmony')",
@@ -133,6 +146,35 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         pca(adata,layer='denoised',n_pcs=n_pcs)
         adata.obsm['X_cellanova']=adata.obsm['denoised|original|X_pca'].copy()
         add_reference(adata,'CellANOVA','batch correction with CellANOVA')
+    elif methods=='Concord' or methods=='concord':
+        try:
+            import concord as ccd
+        except ImportError:
+            raise ImportError(
+                'Please install the concord: `pip install concord-sc`.'
+            )
+        import torch
+        # Set device to cpu or to gpu (if your torch has been set up correctly to use GPU), for mac you can use either torch.device('mps') or torch.device('cpu')
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        if 'highly_variable' in adata.var.columns:
+            feature_list = adata.var.loc[adata.var['highly_variable']==True].index.tolist()
+        elif 'highly_variable_features' in adata.var.columns:
+            feature_list = adata.var.loc[adata.var['highly_variable_features']==True].index.tolist()
+        else:
+            print('No highly variable features found, using all features')
+            feature_list = adata.var_names.tolist()
+
+        # Initialize Concord with an AnnData object, skip input_feature to use all features, set preload_dense=False if your data is very large
+        # Provide 'domain_key' if integrating across batches, see below
+        cur_ccd = ccd.Concord(
+            adata=adata, input_feature=feature_list, 
+            preload_dense=True,domain_key=batch_key, **kwargs
+        ) 
+
+        # Encode data, saving the latent embedding in adata.obsm['Concord']
+        cur_ccd.fit_transform(output_key='X_concord')
+        add_reference(adata,'Concord','batch correction with Concord')
+        return cur_ccd
     else:
         print('Not supported')
 

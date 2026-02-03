@@ -473,6 +473,9 @@ reference_dict = {
     'umap':'McInnes, L., Healy, J., & Melville, J. (2018). Umap: Uniform manifold approximation and projection for dimension reduction. arXiv preprint arXiv:1802.03426.',
     'pymde':'Agrawal, A., Ali, A., & Boyd, S. (2021). Minimum-distortion embedding. Foundations and Trends® in Machine Learning, 14(3), 211-378.',
     'tsne':'Van der Maaten, L., & Hinton, G. (2008). Visualizing data using t-SNE. Journal of machine learning research, 9(11).',
+    'sctour':'Qian Li, scTour: a deep learning architecture for robust inference and accurate prediction of cellular dynamics, 2023, Genome Biology',
+    'Concord':'Zhu, Q., Jiang, Z., Zuckerman, B. et al. Revealing a coherent cell-state landscape across single-cell datasets with CONCORD. Nat Biotechnol (2026).',
+    'Banksy':'Singhal, V., Chou, N., Lee, J. et al. BANKSY unifies cell typing and tissue domain segmentation for scalable spatial omics data analysis. Nat Genet 56, 431–441 (2024). https://doi.org/10.1038/s41588-024-01664-3'
 }
 
 def generate_reference_table(adata):

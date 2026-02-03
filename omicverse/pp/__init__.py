@@ -72,6 +72,7 @@ from ._sude import sude
 from ._qc import qc,filter_cells,filter_genes
 from ._recover import recover_counts,binary_search
 from ._normalization import log1p
+from ._scrublet import scrublet, scrublet_simulate_doublets
 
 __all__ = [
     # Core preprocessing
@@ -104,7 +105,11 @@ __all__ = [
     'qc',
     'filter_cells',
     'filter_genes',
-    
+
+    # Doublet detection
+    'scrublet',
+    'scrublet_simulate_doublets',
+
     # Utility functions
     'score_genes_cell_cycle',
     'anndata_to_GPU',

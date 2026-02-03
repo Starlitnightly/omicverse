@@ -128,10 +128,19 @@ def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_pa
     aliases=["细胞潜能预测", "cytotrace2", "cell_potency", "发育潜能", "CytoTRACE2"],
     category="single",
     description="CytoTRACE 2: Deep learning-based cell potency prediction from single-cell RNA-seq data",
+    prerequisites={
+        'optional_functions': ['preprocess']
+    },
+    requires={},
+    produces={
+        'obs': ['CytoTRACE2_Score', 'CytoTRACE2_Potency', 'CytoTRACE2_Relative',
+                'preKNN_CytoTRACE2_Score', 'preKNN_CytoTRACE2_Potency']
+    },
+    auto_fix='none',
     examples=[
         "# Basic CytoTRACE2 analysis",
         "results = ov.single.cytotrace2(adata, use_model_dir='models/5_models_weights')",
-        "# Mouse data with custom parameters", 
+        "# Mouse data with custom parameters",
         "results = ov.single.cytotrace2(adata, use_model_dir='models/',",
         "                               species='mouse', batch_size=5000)",
         "# Human data analysis",

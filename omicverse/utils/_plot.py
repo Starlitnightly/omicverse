@@ -14,7 +14,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial import ConvexHull
 import seaborn as sns
 from datetime import datetime,timedelta
-import tomli
+#import tomli
 import os
 from typing import Union
 
@@ -187,6 +187,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              color_map: Union[str, None] = None,
              figsize: Union[int, None] = None,
              vector_friendly: bool = True,
+             show_monitor=True,
              ):
     r"""Configure plotting settings for OmicVerse.
     
@@ -208,6 +209,9 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         None: The function configures global plotting settings and displays initialization information.
     """
     global _has_printed_logo
+
+    from .._monitor import set_monitor_display
+    set_monitor_display(show_monitor)
 
     print(f"{EMOJI['start']} Starting plot initialization...")
 
@@ -238,6 +242,8 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
         rcParams["axes.facecolor"] = facecolor
     if scanpy:
         set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
+    if isinstance(figsize, (int, float)):
+        figsize = (figsize, figsize)
     if figsize is not None:
         rcParams["figure.figsize"] = figsize
     
@@ -385,7 +391,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
 # Create aliases for backward compatibility
 plotset = plot_set
 ov_plot_set = plot_set
-
+style=plot_set
 
 
 
@@ -1431,6 +1437,7 @@ def check_dependencies(dependencies=None, check_full=False):
     """
     if dependencies is None:
         try:
+            import tomli
             # Get the directory of the current file
             current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             pyproject_path = os.path.join(current_dir, 'pyproject.toml')

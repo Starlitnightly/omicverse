@@ -14,12 +14,103 @@ from anndata import AnnData
 
 from .._settings import EMOJI, Colors, settings as ov_settings
 from ._compat import CSBase, DaskArray, old_positionals
-from scanpy._settings import Verbosity, settings
-from scanpy._utils import check_nonnegative_integers, sanitize_anndata
-from scanpy.get import _get_obs_rep
 from ._distributed import materialize_as_ndarray
-from scanpy.preprocessing._simple import filter_genes
 from ._utils import axis_mean, sparse_mean_variance_axis,_get_mean_var
+from ._scale import _get_obs_rep
+from scipy import sparse
+
+
+# Local implementations to replace scanpy utilities
+def check_nonnegative_integers(X) -> bool:
+    """Check if X contains only non-negative integers."""
+    if sparse.issparse(X):
+        return (
+            np.all(X.data >= 0)
+            and np.all(X.data == np.floor(X.data))
+        )
+    else:
+        return np.all(X >= 0) and np.all(X == np.floor(X))
+
+
+def sanitize_anndata(adata) -> None:
+    """Sanitize anndata object by ensuring proper categorical types."""
+    # Ensure categorical columns are proper categories
+    for key in adata.obs.columns:
+        if hasattr(adata.obs[key], 'cat'):
+            # Already categorical, ensure categories are valid
+            if not isinstance(adata.obs[key].cat.categories, pd.Index):
+                adata.obs[key] = adata.obs[key].astype('category')
+
+    for key in adata.var.columns:
+        if hasattr(adata.var[key], 'cat'):
+            if not isinstance(adata.var[key].cat.categories, pd.Index):
+                adata.var[key] = adata.var[key].astype('category')
+
+
+def filter_genes(X, *, min_counts=None, min_cells=None, max_counts=None, max_cells=None, inplace=True):
+    """Filter genes based on counts and cells expressing them.
+
+    This is a simplified version for HVG computation.
+    For the full version, use ov.pp.filter_genes from _qc.py
+    """
+    from scipy.sparse import issparse
+
+    n_genes = X.shape[1]
+    gene_subset = np.ones(n_genes, dtype=bool)
+
+    if min_cells is not None:
+        if issparse(X):
+            gene_subset &= (X > 0).sum(axis=0).A1 >= min_cells
+        else:
+            gene_subset &= (X > 0).sum(axis=0) >= min_cells
+
+    if max_cells is not None:
+        if issparse(X):
+            gene_subset &= (X > 0).sum(axis=0).A1 <= max_cells
+        else:
+            gene_subset &= (X > 0).sum(axis=0) <= max_cells
+
+    if min_counts is not None:
+        if issparse(X):
+            gene_subset &= X.sum(axis=0).A1 >= min_counts
+        else:
+            gene_subset &= X.sum(axis=0) >= min_counts
+
+    if max_counts is not None:
+        if issparse(X):
+            gene_subset &= X.sum(axis=0).A1 <= max_counts
+        else:
+            gene_subset &= X.sum(axis=0) <= max_counts
+
+    if inplace:
+        return gene_subset, None
+    else:
+        return gene_subset, X[:, gene_subset]
+
+
+# Simple verbosity context manager replacement
+class _VerbosityManager:
+    """Simple replacement for scanpy's Verbosity manager."""
+    def __init__(self, level):
+        self.level = level
+
+    def override(self, level):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+class _Settings:
+    """Simple replacement for scanpy settings."""
+    def __init__(self):
+        self.verbosity = _VerbosityManager(3)
+
+
+settings = _Settings()
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,7 +118,8 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from scanpy._types import HVGFlavor
+    # Define HVGFlavor type locally
+    HVGFlavor = Literal["seurat", "cell_ranger", "seurat_v3", "seurat_v3_paper"]
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -296,11 +388,10 @@ def _highly_variable_genes_single_batch(
 
     # Filter to genes that are expressed
     if filter_unexpressed_genes:
-        with settings.verbosity.override(Verbosity.error):
-            # TODO use groupby or so instead of materialize_as_ndarray
-            filt, _ = materialize_as_ndarray(
-                filter_genes(x, min_cells=1, inplace=False)
-            )
+        # Filter genes expressed in at least 1 cell (silent mode)
+        filt, _ = materialize_as_ndarray(
+            filter_genes(x, min_cells=1, inplace=False)
+        )
     else:
         filt = np.ones(x.shape[1], dtype=bool)
 

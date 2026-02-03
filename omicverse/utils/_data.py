@@ -17,8 +17,143 @@ from ._enum import ModeEnum
 from scipy.sparse import diags, issparse, spmatrix, csr_matrix, isspmatrix_csr
 import warnings
 from scipy.stats import norm
-from .._settings import Colors  # Import Colors from settings
+from .._settings import Colors, EMOJI  # Import Colors and EMOJI from settings
 from .registry import register_function
+from ..datasets import download_data_requests
+
+
+DATA_DOWNLOAD_LINK_DICT = {
+    'cadrres-wo-sample-bias_output_dict_all_genes':{
+        'figshare':'https://figshare.com/ndownloader/files/39753568',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_output_dict_all_genes.pickle',
+    },
+    'cadrres-wo-sample-bias_output_dict_prism':{
+        'figshare':'https://figshare.com/ndownloader/files/39753571',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_output_dict_prism.pickle',
+    },
+    'cadrres-wo-sample-bias_param_dict_all_genes':{
+        'figshare':'https://figshare.com/ndownloader/files/39753574',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_param_dict_all_genes.pickle',
+    },
+    'cadrres-wo-sample-bias_param_dict_prism':{
+        'figshare':'https://figshare.com/ndownloader/files/39753577',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/cadrres-wo-sample-bias_param_dict_prism.pickle',
+    },
+    'GDSC_exp':{
+        'figshare':'https://figshare.com/ndownloader/files/39753580',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GDSC_exp.tsv.gz',
+    },
+    'masked_drugs':{
+        'figshare':'https://figshare.com/ndownloader/files/39753583',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/masked_drugs.csv',
+    },
+    'GO_Biological_Process_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820720',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Biological_Process_2021.txt',
+    },
+    'GO_Cellular_Component_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820714',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Cellular_Component_2021.txt',
+    },
+    'GO_Molecular_Function_2021':{
+        'figshare':'https://figshare.com/ndownloader/files/39820711',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_Molecular_Function_2021.txt',
+    },
+    'WikiPathway_2021_Human':{
+        'figshare':'https://figshare.com/ndownloader/files/39820705',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/WikiPathway_2021_Human.txt',
+    },
+    'WikiPathways_2019_Mouse':{
+        'figshare':'https://figshare.com/ndownloader/files/39820717',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/WikiPathways_2019_Mouse.txt',
+    },
+    'Reactome_2022':{
+        'figshare':'https://figshare.com/ndownloader/files/39820702',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/Reactome_2022.txt',
+    },
+    'pair_GRCm39':{
+        'figshare':'https://figshare.com/ndownloader/files/39820684',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCm39.tsv',
+    },
+    'pair_T2TCHM13':{
+        'figshare':'https://figshare.com/ndownloader/files/39820687',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_T2TCHM13.tsv',
+    },
+    'pair_GRCh38':{
+        'figshare':'https://figshare.com/ndownloader/files/39820690',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCh38.tsv',
+    },
+    'pair_GRCh37':{
+        'figshare':'https://figshare.com/ndownloader/files/39820693',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_GRCh37.tsv',
+    },
+    'pair_danRer11':{
+        'figshare':'https://figshare.com/ndownloader/files/39820696',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_danRer11.tsv',
+    },
+    'pair_danRer7':{
+        'figshare':'https://figshare.com/ndownloader/files/39820699',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pair_danRer7.tsv',
+    },
+    'GO_bp':{
+        'figshare':'https://figshare.com/ndownloader/files/41460072',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/GO_bp.gmt',
+    },
+    'TF':{
+        'figshare':'https://figshare.com/ndownloader/files/41460066',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/TF.gmt',
+    },
+    'reactome':{
+        'figshare':'https://figshare.com/ndownloader/files/41460051',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/reactome.gmt',
+    },
+    'm_GO_bp':{
+        'figshare':'https://figshare.com/ndownloader/files/41460060',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_GO_bp.gmt',
+    },
+    'm_TF':{
+        'figshare':'https://figshare.com/ndownloader/files/41460057',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_TF.gmt',
+    },
+    'm_reactome':{
+        'figshare':'https://figshare.com/ndownloader/files/41460054',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/m_reactome.gmt',
+    },
+    'immune':{
+        'figshare':'https://figshare.com/ndownloader/files/41460049',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/immune.gmt',
+    },
+
+}
+
+
+def get_utils_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
+    """Get URL for a dataset by name, preferring Stanford over Figshare.
+
+    Args:
+        dataset_name: Name of the dataset (e.g., 'GO_bp', 'GDSC_exp').
+        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+
+    Returns:
+        URL string for the dataset.
+
+    Raises:
+        ValueError: If dataset name is not found.
+    """
+    if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
+        raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
+
+    dataset_urls = DATA_DOWNLOAD_LINK_DICT[dataset_name]
+
+    if prefer_stanford and 'stanford' in dataset_urls:
+        print(f"{Colors.CYAN}Using Stanford mirror for {dataset_name}{Colors.ENDC}")
+        return dataset_urls['stanford']
+    elif 'figshare' in dataset_urls:
+        if prefer_stanford:
+            print(f"{Colors.WARNING}{EMOJI['warning']} Stanford link not available for {dataset_name}, using Figshare{Colors.ENDC}")
+        return dataset_urls['figshare']
+    else:
+        raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
 
 
 # Internal debug logger (opt-in via env OV_DEBUG/OMICVERSE_DEBUG)
@@ -71,328 +206,6 @@ def read(path, backend='python', **kwargs):
     ext = Path(path).suffix.lower()
 
     if ext == '.h5ad':
-        def _sync_obs_index_to_names(adata_obj):
-            """Best‑effort: make obs index show obs_names for display.
-
-            - For pandas obs: set `obs.index = obs_names` directly.
-            - For Rust/Polars obs: override display helpers so head(), to_pandas(),
-              and .index reflect `obs_names`. Only affects display, not storage.
-            """
-            try:
-                names = getattr(adata_obj, 'obs_names', None)
-                if names is None:
-                    return adata_obj
-                try:
-                    # Normalize to list
-                    try:
-                        names_list = list(names) if not hasattr(names, 'to_list') else names.to_list()
-                    except Exception:
-                        names_list = list(names)
-
-                    # Case 1: pandas DataFrame
-                    import pandas as pd  # noqa: F401
-                    if hasattr(adata_obj, 'obs') and hasattr(adata_obj.obs, 'index') and adata_obj.obs.__class__.__module__.startswith('pandas'):
-                        try:
-                            adata_obj.obs.index = pd.Index(names_list, name='obs_names')
-                            return adata_obj
-                        except Exception:
-                            pass
-
-                    # Case 2: Non-pandas (e.g., anndata-rs PyDataFrameElem)
-                    obs_obj = getattr(adata_obj, 'obs', None)
-                    if obs_obj is None:
-                        return adata_obj
-
-                    # 创建通用的智能显示方法，能自动识别 obs 还是 var
-                    def _smart_to_pandas(self):
-                        import pandas as pd
-                        try:
-                            # 获取基础 DataFrame
-                            import polars as pl
-                            try:
-                                df_slice = self[:]
-                                if hasattr(df_slice, 'to_pandas'):
-                                    pdf = df_slice.to_pandas()
-                                elif isinstance(df_slice, pl.DataFrame):
-                                    pdf = df_slice.to_pandas()
-                                else:
-                                    pdf = df_slice
-                            except Exception:
-                                # 备用方法：从列构建
-                                data = {}
-                                if hasattr(self, 'columns'):
-                                    for col in self.columns:
-                                        try:
-                                            series = self[col]
-                                            if hasattr(series, 'to_pandas'):
-                                                data[col] = series.to_pandas()
-                                            elif isinstance(series, pl.Series):
-                                                data[col] = series.to_pandas()
-                                            else:
-                                                data[col] = series
-                                        except Exception:
-                                            pass
-                                pdf = pd.DataFrame(data)
-                            
-                            # 智能识别：通过形状判断是 obs 还是 var
-                            try:
-                                adata_shape = getattr(adata_obj, 'shape', (0, 0))
-                                df_rows = len(pdf)
-                                
-                                if df_rows == adata_shape[0]:  # 行数匹配 n_obs，是 obs
-                                    current_names = getattr(adata_obj, 'obs_names', None)
-                                    name_type = 'obs_names'
-                                elif df_rows == adata_shape[1]:  # 行数匹配 n_vars，是 var
-                                    current_names = getattr(adata_obj, 'var_names', None)
-                                    name_type = 'var_names'
-                                else:
-                                    current_names = None
-                                    name_type = 'unknown'
-                                
-                                if current_names is not None:
-                                    if hasattr(current_names, 'to_list'):
-                                        names_list = current_names.to_list()
-                                    else:
-                                        names_list = list(current_names)
-                                    
-                                    # 设置正确的索引
-                                    if len(names_list) == len(pdf):
-                                        pdf.index = pd.Index(names_list, name=name_type)
-                            except Exception:
-                                pass
-                            
-                            return pdf
-                            
-                        except Exception:
-                            return pd.DataFrame()
-
-                    def _smart_head(self, n=5):
-                        return _smart_to_pandas(self).head(n)
-
-                    # Try to set methods on instance level, with fallback to class level
-                    try:
-                        from types import MethodType
-                        # Use smart methods for both obs and var (same methods work for both)
-                        try:
-                            setattr(obs_obj, 'to_pandas', MethodType(_smart_to_pandas, obs_obj))
-                            setattr(obs_obj, 'head', MethodType(_smart_head, obs_obj))
-                            _dbg(f"   {Colors.GREEN}✅ Set smart obs methods on instance{Colors.ENDC}")
-                        except Exception as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Instance-level setting failed: {e}{Colors.ENDC}")
-                            # Fallback to class-level but with smart methods
-                            obs_cls = obs_obj.__class__
-                            setattr(obs_cls, 'to_pandas', _smart_to_pandas)
-                            setattr(obs_cls, 'head', _smart_head)
-                            _dbg(f"   {Colors.GREEN}✅ Set smart obs methods on class{Colors.ENDC}")
-
-                        # Add pandas-like properties specifically for obs
-                        try:
-                            import pandas as pd
-                            
-                            # Index property for obs - always return obs_names
-                            def _obs_index_property(self):
-                                current_obs_names = getattr(adata_obj, 'obs_names', None)
-                                if current_obs_names is not None:
-                                    if hasattr(current_obs_names, 'to_list'):
-                                        obs_names_list = current_obs_names.to_list()
-                                    else:
-                                        obs_names_list = list(current_obs_names)
-                                    return pd.Index(obs_names_list, name='obs_names')
-                                return pd.Index([], name='obs_names')
-                            
-                            # Columns property for obs
-                            def _obs_columns_property(self):
-                                try:
-                                    df_slice = self[:]
-                                    if hasattr(df_slice, 'columns'):
-                                        return df_slice.columns
-                                    elif hasattr(df_slice, 'to_pandas'):
-                                        return df_slice.to_pandas().columns
-                                except Exception:
-                                    pass
-                                return pd.Index([], name='columns')
-                            
-                            # Shape property for obs
-                            def _obs_shape_property(self):
-                                try:
-                                    obs_len = len(getattr(adata_obj, 'obs_names', []))
-                                    df_slice = self[:]
-                                    if hasattr(df_slice, 'shape'):
-                                        return (obs_len, df_slice.shape[1])
-                                    elif hasattr(df_slice, 'to_pandas'):
-                                        pdf = df_slice.to_pandas()
-                                        return (obs_len, len(pdf.columns))
-                                except Exception:
-                                    pass
-                                return (0, 0)
-                            
-                            # Info method for obs
-                            def _obs_info(self, verbose=None, buf=None, max_cols=None, memory_usage=None, show_counts=None):
-                                try:
-                                    pdf = _smart_to_pandas(self)
-                                    return pdf.info(verbose=verbose, buf=buf, max_cols=max_cols, 
-                                                  memory_usage=memory_usage, show_counts=show_counts)
-                                except Exception:
-                                    print(f"<class 'PyDataFrameElem'>\nShape: {_obs_shape_property(self)}")
-                            
-                            # Use class-level properties (since instance-level setting fails)
-                            try:
-                                obs_cls = obs_obj.__class__
-                                if not hasattr(obs_cls, '_ov_obs_enhanced'):
-                                    # Set all properties on the class level
-                                    obs_cls.index = property(_obs_index_property)
-                                    obs_cls.columns = property(_obs_columns_property)
-                                    obs_cls.shape = property(_obs_shape_property)
-                                    obs_cls.info = _obs_info
-                                    obs_cls._ov_obs_enhanced = True
-                                    _dbg(f"   {Colors.GREEN}✅ Set obs properties on class level{Colors.ENDC}")
-                            except Exception as e:
-                                _dbg(f"   {Colors.WARNING}⚠️  Class-level setting failed: {e}{Colors.ENDC}")
-                                # Final fallback: set as instance attributes
-                                try:
-                                    setattr(obs_obj, 'index', _obs_index_property(obs_obj))
-                                    setattr(obs_obj, 'columns', _obs_columns_property(obs_obj))
-                                    setattr(obs_obj, 'shape', _obs_shape_property(obs_obj))
-                                    setattr(obs_obj, 'info', MethodType(_obs_info, obs_obj))
-                                except Exception:
-                                    pass
-                                
-                        except Exception as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Failed to set obs properties: {e}{Colors.ENDC}")
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            
-            # Also sync var.index with var_names for display
-            try:
-                vnames = getattr(adata_obj, 'var_names', None)
-                if vnames is None:
-                    return adata_obj
-                try:
-                    try:
-                        vnames_list = list(vnames) if not hasattr(vnames, 'to_list') else vnames.to_list()
-                    except Exception:
-                        vnames_list = list(vnames)
-
-                    import pandas as pd  # noqa: F401
-                    if hasattr(adata_obj, 'var') and hasattr(adata_obj.var, 'index') and adata_obj.var.__class__.__module__.startswith('pandas'):
-                        try:
-                            adata_obj.var.index = pd.Index(vnames_list, name='var_names')
-                            return adata_obj
-                        except Exception:
-                            pass
-
-                    var_obj = getattr(adata_obj, 'var', None)
-                    if var_obj is None:
-                        return adata_obj
-
-                    # Use the same smart methods for var as well
-                    try:
-                        from types import MethodType
-                        # Use smart methods that auto-detect obs vs var
-                        try:
-                            setattr(var_obj, 'to_pandas', MethodType(_smart_to_pandas, var_obj))
-                            setattr(var_obj, 'head', MethodType(_smart_head, var_obj))
-                            _dbg(f"   {Colors.GREEN}✅ Set smart var methods on instance{Colors.ENDC}")
-                        except Exception as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Var instance-level setting failed: {e}{Colors.ENDC}")
-                            # Fallback to class-level (should already be set from obs processing)
-                            _dbg(f"   {Colors.BLUE}ℹ️  Using class-level smart methods for var{Colors.ENDC}")
-
-                        # Add pandas-like properties specifically for var
-                        try:
-                            import pandas as pd
-                            
-                            # Index property for var - always return var_names
-                            def _var_index_property(self):
-                                current_var_names = getattr(adata_obj, 'var_names', None)
-                                if current_var_names is not None:
-                                    if hasattr(current_var_names, 'to_list'):
-                                        var_names_list = current_var_names.to_list()
-                                    else:
-                                        var_names_list = list(current_var_names)
-                                    return pd.Index(var_names_list, name='var_names')
-                                return pd.Index([], name='var_names')
-                            
-                            # Columns property for var
-                            def _var_columns_property(self):
-                                try:
-                                    df_slice = self[:]
-                                    if hasattr(df_slice, 'columns'):
-                                        return df_slice.columns
-                                    elif hasattr(df_slice, 'to_pandas'):
-                                        return df_slice.to_pandas().columns
-                                except Exception:
-                                    pass
-                                return pd.Index([], name='columns')
-                            
-                            # Shape property for var
-                            def _var_shape_property(self):
-                                try:
-                                    var_len = len(getattr(adata_obj, 'var_names', []))
-                                    df_slice = self[:]
-                                    if hasattr(df_slice, 'shape'):
-                                        return (var_len, df_slice.shape[1])
-                                    elif hasattr(df_slice, 'to_pandas'):
-                                        pdf = df_slice.to_pandas()
-                                        return (var_len, len(pdf.columns))
-                                except Exception:
-                                    pass
-                                return (0, 0)
-                            
-                            # Info method for var
-                            def _var_info(self, verbose=None, buf=None, max_cols=None, memory_usage=None, show_counts=None):
-                                try:
-                                    pdf = _smart_to_pandas(self)
-                                    return pdf.info(verbose=verbose, buf=buf, max_cols=max_cols, 
-                                                  memory_usage=memory_usage, show_counts=show_counts)
-                                except Exception:
-                                    print(f"<class 'PyDataFrameElem'>\nShape: {_var_shape_property(self)}")
-                            
-                            # Use class-level properties (since instance-level setting fails)
-                            # But we need to be careful since obs and var share the same class
-                            try:
-                                var_cls = var_obj.__class__
-                                # Only set var-specific properties if obs hasn't already set them
-                                if not hasattr(var_cls, '_ov_var_enhanced'):
-                                    # Check if obs properties are already there
-                                    if hasattr(var_cls, '_ov_obs_enhanced'):
-                                        # obs already set class properties, but they're obs-specific
-                                        # We need var-specific versions. Use a different approach.
-                                        # Let's override with var-specific methods only if needed
-                                        pass
-                                    else:
-                                        # Set var properties on class level
-                                        var_cls.index = property(_var_index_property)
-                                        var_cls.columns = property(_var_columns_property)
-                                        var_cls.shape = property(_var_shape_property)
-                                        var_cls.info = _var_info
-                                    var_cls._ov_var_enhanced = True
-                                    _dbg(f"   {Colors.GREEN}✅ Set var properties on class level{Colors.ENDC}")
-                            except Exception as e:
-                                _dbg(f"   {Colors.WARNING}⚠️  Var class-level setting failed: {e}{Colors.ENDC}")
-                                # Final fallback: set as instance attributes
-                                try:
-                                    setattr(var_obj, 'index', _var_index_property(var_obj))
-                                    setattr(var_obj, 'columns', _var_columns_property(var_obj))
-                                    setattr(var_obj, 'shape', _var_shape_property(var_obj))
-                                    setattr(var_obj, 'info', MethodType(_var_info, var_obj))
-                                except Exception:
-                                    pass
-                                
-                        except Exception as e:
-                            _dbg(f"   {Colors.WARNING}⚠️  Failed to set var properties: {e}{Colors.ENDC}")
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            return adata_obj
-
         if backend == 'python':
             adata = sc.read_h5ad(path, **kwargs)
             # Ensure pandas obs index matches obs_names
@@ -409,13 +222,6 @@ def read(path, backend='python', **kwargs):
             print(f'{Colors.WARNING}You should run adata.close() after analysis{Colors.ENDC}')
             print(f'{Colors.WARNING}Not all function support Rust backend{Colors.ENDC}')
             adata = snap.read(path, **kwargs)
-            _patch_ann_compat(adata)  # 兼容补丁
-            _patch_vector_api(adata)
-            # Force display alignment: obs.index mirrors obs_names
-            try:
-                _sync_obs_index_to_names(adata)
-            except Exception:
-                pass
             return adata
 
         else:
@@ -427,469 +233,6 @@ def read(path, backend='python', **kwargs):
         return pd.read_csv(path, sep=sep, **kwargs)
 
     raise ValueError('The type is not supported.')
-
-
-# ------------------ 兼容补丁 ------------------
-
-# 简化的 DataFrame 显示补丁，不再需要全局映射
-
-def _patch_ann_compat(adata):
-    """
-    给 anndata-rs(Rust) AnnData 类/实例补齐：
-    - is_view (property, False)
-    - obsm_keys()/varm_keys()（返回键列表）
-    - raw (property, None)  —— 只在确实缺失时补
-    - strings_to_categoricals(df=None) / _sanitize() —— 兼容 pandas/Polars
-    - obs/var 的表格显示补丁
-    """
-    import numpy as np
-    from types import MethodType
-    try:
-        import pandas as pd
-        from pandas.api.types import infer_dtype
-    except Exception:
-        pd, infer_dtype = None, None
-    try:
-        import polars as pl
-    except Exception:
-        pl = None
-    try:
-        from natsort import natsorted
-    except Exception:
-        natsorted = sorted
-
-    cls = type(adata)
-
-    def _try_set_class_attr(name, value):
-        try:
-            if not hasattr(cls, name):
-                setattr(cls, name, value)
-            return True
-        except Exception:
-            return False
-
-    # 1) is_view → property(False)
-    _try_set_class_attr("is_view", property(lambda self: False))
-
-    # 2) obsm_keys / varm_keys
-    def _obsm_keys(self):
-        o = getattr(self, "obsm", None)
-        if o is None:
-            return []
-        return list(o.keys()) if hasattr(o, "keys") else list(o)
-
-    def _varm_keys(self):
-        o = getattr(self, "varm", None)
-        if o is None:
-            return []
-        return list(o.keys()) if hasattr(o, "keys") else list(o)
-
-    if not _try_set_class_attr("obsm_keys", _obsm_keys):
-        if not hasattr(adata, "obsm_keys"):
-            adata.obsm_keys = MethodType(_obsm_keys, adata)
-
-    if not _try_set_class_attr("varm_keys", _varm_keys):
-        if not hasattr(adata, "varm_keys"):
-            adata.varm_keys = MethodType(_varm_keys, adata)
-
-    # 3) raw → property(None)（只有缺失时才补；避免覆盖已有实现）
-    if not hasattr(adata, "raw"):
-        _try_set_class_attr("raw", property(lambda self: None))
-        # 类不可写就算了，访问 getattr(adata,"raw",None) 做兜底
-
-    # 4) strings_to_categoricals / _sanitize（pandas/Polars 兼容）
-    def _strings_to_categoricals(self, df=None):
-        dont_modify = False
-        if df is None:
-            dfs = [self.obs, self.var]
-            if getattr(self, "is_view", False) and getattr(self, "isbacked", False):
-                dont_modify = True
-        else:
-            dfs = [df]
-
-        for _df in dfs:
-            mod = type(_df).__module__
-            # pandas DataFrame
-            if pd is not None and mod.startswith("pandas"):
-                string_cols = [
-                    k for k in _df.columns
-                    if (infer_dtype(_df[k]) in ("string", "unicode")) or (_df[k].dtype == "object")
-                ]
-                for key in string_cols:
-                    c = pd.Categorical(_df[key])
-                    # 仅当类别数 < 行数时才转分类（与 anndata 行为一致）
-                    if len(c.categories) >= len(c):
-                        continue
-                    cats_sorted = list(natsorted(list(c.categories)))
-                    if dont_modify:
-                        raise RuntimeError(
-                            "Please call `.strings_to_categoricals()` on full AnnData, not on a backed view."
-                        )
-                    if list(c.categories) != cats_sorted:
-                        c = c.reorder_categories(cats_sorted)
-                    _df[key] = c
-
-            # polars DataFrame
-            elif pl is not None and mod.startswith("polars"):
-                string_cols = [k for k, dt in _df.schema.items() if dt == pl.Utf8]
-                for key in string_cols:
-                    s = _df[key]
-                    # 与 pandas 近似：当存在重复（n_unique < n_rows）才转分类
-                    try:
-                        n_null = s.is_null().sum()
-                    except Exception:
-                        n_null = s.null_count()
-                    if dont_modify:
-                        raise RuntimeError(
-                            "Call `.strings_to_categoricals()` on full AnnData, not on a backed view."
-                        )
-                    if s.n_unique(approx=False) < s.len():
-                        _df[key] = s.cast(pl.Categorical)
-
-            # 其它 DataFrame 实现：跳过
-        return None
-
-    # 尝试挂到类
-    ok1 = _try_set_class_attr("strings_to_categoricals", _strings_to_categoricals)
-    ok2 = _try_set_class_attr("_sanitize", _strings_to_categoricals)
-
-    # 类不可写则绑定到实例
-    if not ok1 and not hasattr(adata, "strings_to_categoricals"):
-        adata.strings_to_categoricals = MethodType(_strings_to_categoricals, adata)
-    if not ok2 and not hasattr(adata, "_sanitize"):
-        # 与 anndata 旧 API 对齐
-        adata._sanitize = adata.strings_to_categoricals
-
-    # 5) var_names_make_unique / obs_names_make_unique 方法补丁
-    def _safe_get_index(df):
-        """Safely get index from both pandas DataFrame and Rust PyDataFrameElem."""
-        if hasattr(df, 'index'):
-            # pandas DataFrame
-            return df.index
-        else:
-            # Rust PyDataFrameElem - try different methods to get the index
-            try:
-                # Method 1: Try to get index names directly
-                if hasattr(df, 'index_names') and df.index_names:
-                    return pd.Index(df.index_names)
-                # Method 2: Try to get the first column if it's the index
-                if hasattr(df, 'columns') and hasattr(df, '__getitem__'):
-                    # This is a fallback - we'll use var_names/obs_names from the parent object
-                    return None
-                # Method 3: Convert to pandas and get index
-                if hasattr(df, 'to_pandas'):
-                    return df.to_pandas().index
-            except Exception:
-                pass
-            return None
-
-    def _safe_set_names(adata, attr_name, new_names):
-        """Safely set var_names or obs_names for both pandas and Rust backends."""
-        if hasattr(adata, attr_name):
-            setattr(adata, attr_name, new_names)
-        else:
-            # Fallback for Rust backends
-            if attr_name == 'var_names' and hasattr(adata, 'var'):
-                # Try to set the index of the var dataframe
-                try:
-                    if hasattr(adata.var, 'index'):
-                        adata.var.index = new_names
-                except Exception:
-                    pass
-            elif attr_name == 'obs_names' and hasattr(adata, 'obs'):
-                # Try to set the index of the obs dataframe
-                try:
-                    if hasattr(adata.obs, 'index'):
-                        adata.obs.index = new_names
-                except Exception:
-                    pass
-
-    def make_index_unique(index_or_names, join: str = "-"):
-        """
-        Makes the index unique by appending a number string to each duplicate index element:
-        '1', '2', etc.
-
-        If a tentative name created by the algorithm already exists in the index, it tries
-        the next integer in the sequence.
-
-        The first occurrence of a non-unique value is ignored.
-
-        Parameters
-        ----------
-        index_or_names
-             A pandas Index object or array-like of names
-        join
-             The connecting string between name and integer.
-        """
-        # Convert to pandas Index if needed
-        if not hasattr(index_or_names, 'is_unique'):
-            index_or_names = pd.Index(index_or_names)
-            
-        if index_or_names.is_unique:
-            return index_or_names
-            
-        from collections import Counter
-        import warnings
-
-        values = index_or_names.values.copy()
-        indices_dup = index_or_names.duplicated(keep="first")
-        values_dup = values[indices_dup]
-        values_set = set(values)
-        counter = Counter()
-        issue_interpretation_warning = False
-        example_colliding_values = []
-        for i, v in enumerate(values_dup):
-            while True:
-                counter[v] += 1
-                tentative_new_name = v + join + str(counter[v])
-                if tentative_new_name not in values_set:
-                    values_set.add(tentative_new_name)
-                    values_dup[i] = tentative_new_name
-                    break
-                issue_interpretation_warning = True
-                if len(example_colliding_values) < 5:
-                    example_colliding_values.append(tentative_new_name)
-
-        if issue_interpretation_warning:
-            msg = (
-                f"Suffix used ({join}[0-9]+) to deduplicate index values may make index values difficult to interpret. "
-                "There values with a similar suffixes in the index. "
-                "Consider using a different delimiter by passing `join={delimiter}`. "
-                "Example key collisions generated by the make_index_unique algorithm: "
-                f"{example_colliding_values}"
-            )
-            warnings.warn(msg, UserWarning, stacklevel=3)
-        values[indices_dup] = values_dup
-        index = pd.Index(values, name=getattr(index_or_names, 'name', None))
-        return index
-
-    def var_names_make_unique(self, join: str = "-"):
-        """Make variable names unique by appending numbers to duplicates."""
-        # Get current var_names safely
-        current_names = getattr(self, 'var_names', None)
-        if current_names is None:
-            # Try to get from var.index
-            var_index = _safe_get_index(self.var)
-            if var_index is not None:
-                current_names = var_index
-            else:
-                # Last resort - get from var_names attribute or create default
-                try:
-                    current_names = list(range(self.n_vars))
-                except:
-                    return  # Can't proceed without names
-        
-        # Make unique
-        new_names = make_index_unique(current_names, join)
-        
-        # Set the new names safely
-        _safe_set_names(self, 'var_names', new_names)
-
-    def obs_names_make_unique(self, join: str = "-"):
-        """Make observation names unique by appending numbers to duplicates."""
-        # Get current obs_names safely
-        current_names = getattr(self, 'obs_names', None)
-        if current_names is None:
-            # Try to get from obs.index
-            obs_index = _safe_get_index(self.obs)
-            if obs_index is not None:
-                current_names = obs_index
-            else:
-                # Last resort - get from obs_names attribute or create default
-                try:
-                    current_names = list(range(self.n_obs))
-                except:
-                    return  # Can't proceed without names
-        
-        # Make unique
-        new_names = make_index_unique(current_names, join)
-        
-        # Set the new names safely
-        _safe_set_names(self, 'obs_names', new_names)
-
-    # 尝试挂到类
-    ok3 = _try_set_class_attr("var_names_make_unique", var_names_make_unique)
-    ok4 = _try_set_class_attr("obs_names_make_unique", obs_names_make_unique)
-
-    # 类不可写则绑定到实例
-    if not ok3 and not hasattr(adata, "var_names_make_unique"):
-        adata.var_names_make_unique = MethodType(var_names_make_unique, adata)
-    if not ok4 and not hasattr(adata, "obs_names_make_unique"):
-        adata.obs_names_make_unique = MethodType(obs_names_make_unique, adata)
-
-    # 简化的显示补丁 - 不再需要复杂的全局映射
-    _dbg(f"   {Colors.CYAN}💡 Simplified display patching without global mapping{Colors.ENDC}")
-
-
-def _patch_vector_api(adata):
-    import numpy as np, warnings
-    from types import MethodType
-    try:
-        import scipy.sparse as sp
-        _issparse = sp.issparse
-    except Exception:
-        _issparse = lambda x: False
-
-    cls = type(adata)
-
-    # ---------- helpers ----------
-    def _ensure_list_names(names):
-        try:
-            return names.tolist()
-        except Exception:
-            return list(names)
-
-    def _find_pos(names, key):
-        try:
-            return int(names.get_loc(key))
-        except Exception:
-            seq = _ensure_list_names(names)
-            try:
-                return seq.index(key)
-            except ValueError:
-                for i, v in enumerate(seq):
-                    if str(v) == str(key):
-                        return i
-                raise
-
-    def _try_get_column(df, key):
-        """同时兼容 pandas/Polars/代理对象；返回 (found, series/array-like)。"""
-        # 1) 最常见：支持 df[key]
-        try:
-            s = df[key]
-            return True, s
-        except Exception:
-            pass
-        # 2) Polars: get_column
-        if hasattr(df, "get_column"):
-            try:
-                return True, df.get_column(key)
-            except Exception:
-                pass
-        # 3) Polars: select 返回 DataFrame，再取第一列
-        if hasattr(df, "select"):
-            try:
-                tmp = df.select(key)
-                # polars 0.20+: tmp is DataFrame
-                if hasattr(tmp, "to_series"):
-                    return True, tmp.to_series()  # type: ignore[attr-defined]
-                # 兜底：取第一列
-                if hasattr(tmp, "columns") and tmp.columns:
-                    return True, tmp[tmp.columns[0]]
-            except Exception:
-                pass
-        return False, None
-
-    def _series_to_np(s):
-        for attr in ("to_numpy", "to_ndarray", "to_list"):
-            if hasattr(s, attr):
-                arr = getattr(s, attr)()
-                return np.asarray(arr)
-        return np.asarray(s)
-
-    # ---------- _get_X ----------
-    def _get_X(self, layer=None):
-        if layer is None:
-            return self.X
-        if layer == "X":
-            try:
-                if "X" in self.layers:
-                    return self.layers["X"]
-            except Exception:
-                pass
-            warnings.warn(
-                "In a future AnnData, `layer='X'` will be removed; use layer=None.",
-                FutureWarning, stacklevel=2,
-            )
-            return self.X
-        return self.layers[layer]
-
-    # ---------- _make_slice / _normalize_indices ----------
-    def _make_slice(self, key, selected_dim):
-        if selected_dim == 1:  # along var
-            j = _find_pos(self.var_names, key)
-            return (slice(None), [j])
-        else:                  # along obs
-            i = _find_pos(self.obs_names, key)
-            return ([i], slice(None))
-
-    def _normalize_indices(self, idx):
-        return idx  # 我们生成的已可直接用于 numpy/scipy
-
-    # ---------- get_vector：不再依赖 .columns ----------
-    def _get_vector(self, k, coldim, idxdim, layer=None):
-        dims = ("obs", "var")
-        obj = getattr(self, coldim)
-        idx_names = getattr(self, f"{idxdim}_names")
-
-        in_col, col_series = _try_get_column(obj, k)
-        in_idx = (k in idx_names)
-
-        if (in_col + in_idx) == 2:
-            raise ValueError(f"Key {k} could be found in both .{idxdim}_names and .{coldim}.columns")
-        elif (in_col + in_idx) == 0:
-            raise KeyError(f"Could not find key {k} in .{idxdim}_names or .{coldim}.columns.")
-        elif in_col:
-            return _series_to_arraylike(col_series)
-        else:
-            selected_dim = dims.index(idxdim)
-            idx = self._normalize_indices(_make_slice(self, k, selected_dim))
-            a = self._get_X(layer=layer)[idx]
-            if _issparse(a):
-                a = a.toarray()
-            return np.ravel(a)
-
-    def _obs_vector(self, k, *, layer=None):
-        return _get_vector(self, k, "obs", "var", layer=layer)
-
-    def _var_vector(self, k, *, layer=None):
-        return _get_vector(self, k, "var", "obs", layer=layer)
-
-    # ---------- bind ----------
-    def _set_cls(name, obj):
-        try:
-            if not hasattr(cls, name):
-                setattr(cls, name, obj)
-            return True
-        except Exception:
-            return False
-
-    if not _set_cls("_get_X", _get_X):
-        if not hasattr(adata, "_get_X"):
-            adata._get_X = MethodType(_get_X, adata)
-    if not _set_cls("_normalize_indices", _normalize_indices):
-        if not hasattr(adata, "_normalize_indices"):
-            adata._normalize_indices = MethodType(_normalize_indices, adata)
-    if not _set_cls("get_vector", _get_vector):
-        if not hasattr(adata, "get_vector"):
-            adata.get_vector = MethodType(_get_vector, adata)
-    if not _set_cls("obs_vector", _obs_vector):
-        if not hasattr(adata, "obs_vector"):
-            adata.obs_vector = MethodType(_obs_vector, adata)
-    if not _set_cls("var_vector", _var_vector):
-        if not hasattr(adata, "var_vector"):
-            adata.var_vector = MethodType(_var_vector, adata)
-
-def _series_to_arraylike(s):
-    import numpy as np
-    try:
-        import pandas as pd
-        if s.__class__.__module__.startswith("pandas"):
-            return s.values   # 分类列会得到 pandas.Categorical
-    except Exception:
-        pass
-    try:
-        import polars as pl, pandas as pd
-        if isinstance(s, pl.Series):
-            if s.dtype == pl.Categorical:
-                return pd.Categorical(s.to_list())
-            return np.asarray(s.to_list())
-    except Exception:
-        pass
-    for attr in ("to_numpy", "to_ndarray", "to_list"):
-        if hasattr(s, attr):
-            return np.asarray(getattr(s, attr)())
-    return np.asarray(s)
 
 
 @register_function(
@@ -1211,52 +554,12 @@ def read_10x_h5(**kwargs):
     return sc.read_10x_h5(**kwargs)
 
 
-def data_downloader(url,path,title):
-    r"""Download datasets from URL.
-    
-    Arguments:
-        url: The download url of datasets
-        path: The save path of datasets
-        title: The name of datasets
-    
-    Returns:
-        path: The save path of datasets
-    """
-    if os.path.isfile(path):
-        print("......Loading dataset from {}".format(path))
-        return path
-    else:
-        print("......Downloading dataset save to {}".format(path))
-        
-    dirname, _ = os.path.split(path)
-    try:
-        if not os.path.isdir(dirname):
-            print("......Creating directory {}".format(dirname))
-            os.makedirs(dirname, exist_ok=True)
-    except OSError as e:
-        print("......Unable to create directory {}. Reason {}".format(dirname,e))
-    
-    start = time.time()
-    size = 0
-    res = requests.get(url, stream=True)
-
-    chunk_size = 1024000
-    content_size = int(res.headers["content-length"]) 
-    if res.status_code == 200:
-        print('......[%s Size of file]: %0.2f MB' % (title, content_size/chunk_size/10.24))
-        with open(path, 'wb') as f:
-            for data in res.iter_content(chunk_size=chunk_size):
-                f.write(data)
-                size += len(data) 
-                print('\r'+ '......[Downloader]: %s%.2f%%' % ('>'*int(size*50/content_size), float(size/content_size*100)), end='')
-        end = time.time()
-        print('\n' + ".......Finish！%s.2f s" % (end - start))
-    
-    return path
+# Deprecated: data_downloader has been replaced by download_data_requests from omicverse.datasets
+# All download functions now use download_data_requests for better error handling and progress display
 
 def download_CaDRReS_model():
     r"""load CaDRReS_model
-    
+
     Parameters
     ---------
 
@@ -1264,20 +567,21 @@ def download_CaDRReS_model():
     -------
 
     """
-    _datasets = {
-        'cadrres-wo-sample-bias_output_dict_all_genes':'https://figshare.com/ndownloader/files/39753568',
-        'cadrres-wo-sample-bias_output_dict_prism':'https://figshare.com/ndownloader/files/39753571',
-        'cadrres-wo-sample-bias_param_dict_all_genes':'https://figshare.com/ndownloader/files/39753574',
-        'cadrres-wo-sample-bias_param_dict_prism':'https://figshare.com/ndownloader/files/39753577',
-    }
-    for datasets_name in _datasets.keys():
-        print('......CaDRReS model download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='models/{}.pickle'.format(datasets_name),title=datasets_name)
-    print('......CaDRReS model download finished!')
+    _datasets = [
+        'cadrres-wo-sample-bias_output_dict_all_genes',
+        'cadrres-wo-sample-bias_output_dict_prism',
+        'cadrres-wo-sample-bias_param_dict_all_genes',
+        'cadrres-wo-sample-bias_param_dict_prism',
+    ]
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......CaDRReS model download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        model_path = download_data_requests(url=url, file_path=f'{datasets_name}.pickle', dir='./models')
+    print(f'{Colors.GREEN}{EMOJI["done"]} CaDRReS model download finished!{Colors.ENDC}')
 
 def download_GDSC_data():
     r"""load GDSC_data
-    
+
     Parameters
     ---------
 
@@ -1286,16 +590,14 @@ def download_GDSC_data():
 
     """
     _datasets = {
-        'masked_drugs':'https://figshare.com/ndownloader/files/39753580',
-        'GDSC_exp':'https://figshare.com/ndownloader/files/39744025',
+        'masked_drugs': '.csv',
+        'GDSC_exp': '.tsv.gz',
     }
-    for datasets_name in _datasets.keys():
-        print('......GDSC data download start:',datasets_name)
-        if datasets_name == 'masked_drugs':
-            data_downloader(url=_datasets[datasets_name],path='models/{}.csv'.format(datasets_name),title=datasets_name)
-        elif datasets_name == 'GDSC_exp':
-            data_downloader(url=_datasets[datasets_name],path='models/{}.tsv.gz'.format(datasets_name),title=datasets_name)
-    print('......GDSC data download finished!')
+    for datasets_name, ext in _datasets.items():
+        print(f'{Colors.CYAN}......GDSC data download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}{ext}', dir='./models')
+    print(f'{Colors.GREEN}{EMOJI["done"]} GDSC data download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["下载通路数据库", "download_pathway_database", "download_genesets", "通路数据下载"],
@@ -1322,20 +624,21 @@ def download_pathway_database():
     Returns:
         None: The function downloads pathway databases to the genesets/ directory including GO_Biological_Process_2021, GO_Cellular_Component_2021, GO_Molecular_Function_2021, WikiPathway_2021_Human, WikiPathways_2019_Mouse, and Reactome_2022.
     """
-    _datasets = {
-        'GO_Biological_Process_2021':'https://figshare.com/ndownloader/files/39820720',
-        'GO_Cellular_Component_2021':'https://figshare.com/ndownloader/files/39820714',
-        'GO_Molecular_Function_2021':'https://figshare.com/ndownloader/files/39820711',
-        'WikiPathway_2021_Human':'https://figshare.com/ndownloader/files/39820705',
-        'WikiPathways_2019_Mouse':'https://figshare.com/ndownloader/files/39820717',
-        'Reactome_2022':'https://figshare.com/ndownloader/files/39820702',
-    }
-     
-    for datasets_name in _datasets.keys():
-        print('......Pathway Geneset download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.txt'.format(datasets_name),title=datasets_name)
-    print('......Pathway Geneset download finished!')
-    print('......Other Genesets can be dowload in `https://maayanlab.cloud/Enrichr/#libraries`')
+    _datasets = [
+        'GO_Biological_Process_2021',
+        'GO_Cellular_Component_2021',
+        'GO_Molecular_Function_2021',
+        'WikiPathway_2021_Human',
+        'WikiPathways_2019_Mouse',
+        'Reactome_2022',
+    ]
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......Pathway Geneset download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.txt', dir='./genesets')
+    print(f'{Colors.GREEN}{EMOJI["done"]} Pathway Geneset download finished!{Colors.ENDC}')
+    print(f'{Colors.CYAN}......Other Genesets can be downloaded from https://maayanlab.cloud/Enrichr/#libraries{Colors.ENDC}')
 
 @register_function(
     aliases=["下载基因ID注释", "download_geneid_annotation_pair", "download_gene_mapping", "基因ID映射下载"],
@@ -1360,29 +663,36 @@ def download_geneid_annotation_pair():
     Returns:
         None: The function downloads mapping files to the genesets/ directory including pair_GRCm39.tsv (Mouse), pair_GRCh38.tsv (Human), pair_GRCh37.tsv (Human legacy), and pair_danRer11.tsv (Zebrafish).
     """
-    _datasets = {
-        'pair_GRCm39':'https://figshare.com/ndownloader/files/39820684',
-        'pair_T2TCHM13':'https://figshare.com/ndownloader/files/39820687',
-        'pair_GRCh38':'https://figshare.com/ndownloader/files/39820690',
-        'pair_GRCh37':'https://figshare.com/ndownloader/files/39820693',
-        'pair_danRer11':'https://figshare.com/ndownloader/files/39820696',
-        'pair_danRer7':'https://figshare.com/ndownloader/files/39820699',
-        'pair_hgnc_all':'https://github.com/Starlitnightly/omicverse/files/14664966/pair_hgnc_all.tsv.tar.gz',
+    _datasets = [
+        'pair_GRCm39',
+        'pair_T2TCHM13',
+        'pair_GRCh38',
+        'pair_GRCh37',
+        'pair_danRer11',
+        'pair_danRer7',
+    ]
+
+    # Add special handling for pair_hgnc_all
+    _special_datasets = {
+        'pair_hgnc_all': 'https://github.com/Starlitnightly/omicverse/files/14664966/pair_hgnc_all.tsv.tar.gz'
     }
-     
-    for datasets_name in _datasets.keys():
-        print('......Geneid Annotation Pair download start:',datasets_name)
-        if datasets_name == 'pair_hgnc_all':
-            # Handle the tar.gz file for HGNC mapping
-            import tarfile
-            tar_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tar.gz'.format(datasets_name),title=datasets_name)
-            # Extract the TSV file from tar.gz
-            with tarfile.open(tar_path, 'r:gz') as tar:
-                tar.extractall(path='genesets/')
-            print('......Extracted pair_hgnc_all.tsv from tar.gz')
-        else:
-            model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.tsv'.format(datasets_name),title=datasets_name)
-    print('......Geneid Annotation Pair download finished!')
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......Geneid Annotation Pair download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.tsv', dir='./genesets')
+
+    # Handle special datasets not in DATA_DOWNLOAD_LINK_DICT
+    for datasets_name, url in _special_datasets.items():
+        print(f'{Colors.CYAN}......Geneid Annotation Pair download start: {datasets_name}{Colors.ENDC}')
+        import tarfile
+        tar_path = download_data_requests(url=url, file_path=f'{datasets_name}.tar.gz', dir='./genesets')
+        # Extract the TSV file from tar.gz
+        with tarfile.open(tar_path, 'r:gz') as tar:
+            tar.extractall(path='genesets/')
+        print(f'{Colors.GREEN}......Extracted {datasets_name}.tsv from tar.gz{Colors.ENDC}')
+
+    print(f'{Colors.GREEN}{EMOJI["done"]} Geneid Annotation Pair download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["GTF转换", "gtf_to_pair_tsv", "gtf_to_mapping", "GTF基因映射", "convert_gtf"],
@@ -1473,20 +783,21 @@ def download_tosica_gmt():
     r"""load TOSICA gmt dataset
 
     """
-    _datasets = {
-        'GO_bp':'https://figshare.com/ndownloader/files/41460072',
-        'TF':'https://figshare.com/ndownloader/files/41460066',
-        'reactome':'https://figshare.com/ndownloader/files/41460051',
-        'm_GO_bp':'https://figshare.com/ndownloader/files/41460060',
-        'm_TF':'https://figshare.com/ndownloader/files/41460057',
-        'm_reactome':'https://figshare.com/ndownloader/files/41460054',
-        'immune':'https://figshare.com/ndownloader/files/41460063',
-    }
-     
-    for datasets_name in _datasets.keys():
-        print('......TOSICA gmt dataset download start:',datasets_name)
-        model_path = data_downloader(url=_datasets[datasets_name],path='genesets/{}.gmt'.format(datasets_name),title=datasets_name)
-    print('......TOSICA gmt dataset download finished!')
+    _datasets = [
+        'GO_bp',
+        'TF',
+        'reactome',
+        'm_GO_bp',
+        'm_TF',
+        'm_reactome',
+        'immune',
+    ]
+
+    for datasets_name in _datasets:
+        print(f'{Colors.CYAN}......TOSICA gmt dataset download start: {datasets_name}{Colors.ENDC}')
+        url = get_utils_dataset_url(datasets_name)
+        download_data_requests(url=url, file_path=f'{datasets_name}.gmt', dir='./genesets')
+    print(f'{Colors.GREEN}{EMOJI["done"]} TOSICA gmt dataset download finished!{Colors.ENDC}')
 
 @register_function(
     aliases=["基因集准备", "geneset_prepare", "pathway_prepare", "基因集加载", "load_geneset"],
@@ -2083,48 +1394,8 @@ def load(path,backend=None):
             raise ValueError(f"Invalid backend: {backend}")
 
 
-import os
-import requests
-from tqdm import tqdm
-from typing import Optional
-
-def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download data with headers and progress bar."""
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-
-    file_name = os.path.basename(url) if file_path is None else file_path
-    file_path = os.path.join(dir, file_name)
-
-    if os.path.exists(file_path):
-        print(f"File {file_path} already exists.")
-        return file_path
-
-    print(f"Downloading data to {file_path}...")
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://cf.10xgenomics.com/",
-    }
-
-    try:
-        with requests.get(url, headers=headers, stream=True) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get('Content-Length', 0))
-            chunk_size = 8192
-            with open(file_path, 'wb') as f, tqdm(
-                total=total_size, unit='B', unit_scale=True, desc=file_name, ncols=80
-            ) as pbar:
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    if chunk:
-                        f.write(chunk)
-                        pbar.update(len(chunk))
-    except Exception as e:
-        print(f"Download failed: {e}")
-        raise
-
-    return file_path
+# Note: download_data function has been removed.
+# Please use download_data_requests from omicverse.datasets instead.
 
 
 @register_function(

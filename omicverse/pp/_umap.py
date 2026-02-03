@@ -54,7 +54,7 @@ def umap(  # noqa: PLR0913, PLR0915
     random_state: _LegacyRandom = 0,
     a: float | None = None,
     b: float | None = None,
-    method: Literal["umap", "rapids","torchdr","mde"] = "umap",
+    method: Literal["umap", "rapids","torchdr","mde","pumap"] = "umap",
     key_added: str | None = None,
     neighbors_key: str = "neighbors",
     copy: bool = False,
@@ -78,7 +78,7 @@ def umap(  # noqa: PLR0913, PLR0915
         random_state (int): Random seed for reproducible results (default: 0)
         a (float): UMAP curve parameter (default: None)
         b (float): UMAP curve parameter (default: None)
-        method (str): Implementation method: 'umap', 'torchdr', 'mde', 'rapids' (default: 'umap')
+        method (str): Implementation method: 'umap', 'torchdr', 'mde', 'rapids', 'pumap' (default: 'umap')
         key_added (str): Key for storing results in AnnData (default: None)
         neighbors_key (str): Key for accessing neighbor information (default: 'neighbors')
         copy (bool): Return copy instead of modifying in place (default: False)
@@ -149,7 +149,7 @@ def umap(  # noqa: PLR0913, PLR0915
         print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (classic method)...{Colors.ENDC}")
         # the data matrix X is really only used for determining the number of connected components
         # for the init condition in the UMAP embedding
-        default_epochs = 500 if neighbors["connectivities"].shape[0] <= 10000 else 200
+        default_epochs = 10 if neighbors["connectivities"].shape[0] <= 10000 else 20
         n_epochs = default_epochs if maxiter is None else maxiter
         X_umap, _ = simplicial_set_embedding(
             data=X,
@@ -323,7 +323,75 @@ def umap(  # noqa: PLR0913, PLR0915
         torch.cuda.empty_cache()
         import gc
         gc.collect()
-        
+
+    elif method == "pumap":
+        print(f"   {Colors.GREEN}{EMOJI['start']} Computing UMAP embedding (Parametric PyTorch method)...{Colors.ENDC}")
+        try:
+            from ..external.umap_pytorch.main import PUMAP
+            import torch
+        except ImportError as err:
+            raise ImportError("PUMAP module not found in omicverse.external.umap_pytorch") from err
+
+        # Determine device based on availability
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        num_gpus = 1 if torch.cuda.is_available() else 0
+        print(f"   {Colors.CYAN}Using device: {Colors.BOLD}{device}{Colors.ENDC}")
+
+        # Get neighbor parameters
+        n_neighbors = neighbors["params"]["n_neighbors"]
+        n_epochs = 20 if maxiter is None else maxiter
+
+        # Convert data to torch tensor
+        X_contiguous = np.ascontiguousarray(X, dtype=np.float32)
+        X_tensor = torch.from_numpy(X_contiguous)
+
+        # Determine appropriate batch size based on dataset size
+        n_samples = X.shape[0]
+        batch_size = min(512, max(32, n_samples // 10))
+
+        # Use a reasonable learning rate (not the UMAP alpha parameter)
+        # alpha is for UMAP curve, not good as learning rate
+        learning_rate = 1e-3
+
+        print(f"   {Colors.CYAN}Dataset: {Colors.BOLD}{n_samples} samples × {X.shape[1]} features{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Batch size: {Colors.BOLD}{batch_size}{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Learning rate: {Colors.BOLD}{learning_rate}{Colors.ENDC}")
+
+        # Initialize PUMAP with early stopping
+        pumap = PUMAP(
+            encoder=None,  # Use default encoder
+            decoder=None,  # No decoder needed for embedding only
+            n_neighbors=n_neighbors,
+            min_dist=min_dist,
+            metric=neigh_params.get("metric", "euclidean"),
+            n_components=n_components,
+            beta=1.0,
+            random_state=random_state,
+            lr=learning_rate,  # Use proper learning rate for neural network
+            epochs=n_epochs,
+            batch_size=batch_size,
+            num_workers=0,  # Avoid multiprocessing issues
+            num_gpus=num_gpus,
+            match_nonparametric_umap=False,
+            early_stopping=True,  # Enable early stopping
+            patience=20,  # Stop if no improvement for 20 epochs (more patient)
+            min_delta=1e-5,  # Smaller threshold for improvement
+        )
+
+        # Fit and transform
+        print(f"   {Colors.CYAN}Training parametric UMAP model...{Colors.ENDC}")
+        pumap.fit(X_tensor)
+        X_umap = pumap.transform(X_tensor)
+
+        print(f"   {Colors.CYAN}💡 Using Parametric UMAP (PyTorch) on {device}{Colors.ENDC}")
+
+        # Clean up
+        del pumap, X_tensor
+        import gc
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
     elif method == "rapids":
         msg = (
             "`method='rapids'` is deprecated. "
@@ -341,7 +409,7 @@ def umap(  # noqa: PLR0913, PLR0915
 
         n_neighbors = neighbors["params"]["n_neighbors"]
         n_epochs = (
-            500 if maxiter is None else maxiter
+            100 if maxiter is None else maxiter
         )  # 0 is not a valid value for rapids, unlike original umap
         X_contiguous = np.ascontiguousarray(X, dtype=np.float32)
         umap = UMAP(

@@ -29,19 +29,17 @@ class CellChatVizPlus:
         """
         Get a list of all significant ligand-receptor pairs
         
-        Parameters:
-        -----------
-        min_interactions : int
-            Minimum interaction count threshold
-        pvalue_threshold : float
-            P-value threshold for significance
+        Args:
+            min_interactions: int
+                Minimum interaction count threshold
+            pvalue_threshold: float
+                P-value threshold for significance
         
         Returns:
-        --------
-        lr_pairs : list
-            List of significant ligand-receptor pairs
-        lr_stats : dict
-            Statistics for each ligand-receptor pair
+            lr_pairs: list
+                List of significant ligand-receptor pairs
+            lr_stats: dict
+                Statistics for each ligand-receptor pair
         """
         # Determine the column name for ligand-receptor pairs
         if 'gene_name' in self.adata.var.columns:
@@ -103,76 +101,74 @@ class CellChatVizPlus:
         Draw a chord diagram of all ligand-receptor pairs for specific cell types as senders (gene-level)
         Each sector represents a ligand or receptor, ligands use sender color, receptors use receiver color
         
-        Parameters:
-        -----------
-        sources_use : str, int, list or None
-            Sender cell types. Can be:
-            - String: cell type name
-            - Integer: cell type index (starting from 0)
-            - List: multiple cell types
-            - None: all cell types as senders
-        targets_use : str, int, list or None
-            Receiver cell types. Can be:
-            - String: cell type name
-            - Integer: cell type index (starting from 0)
-            - List: multiple cell types
-            - None: all cell types as receivers
-        signaling : str, list or None
-            Specific signaling pathway name. Can be:
-            - String: single pathway name
-            - List: multiple pathway names
-            - None: all pathways
-        pvalue_threshold : float
-            P-value threshold for significant interactions
-        mean_threshold : float
-            Mean expression intensity threshold
-        gap : float
-            Gap between segments in the chord diagram
-        use_gradient : bool
-            Whether to use gradient effect
-        sort : str or None
-            Sorting method: "size", "distance", None
-        directed : bool
-            Whether to show directionality
-        chord_colors : str or None
-            Chord color
-        rotate_names : bool
-            Whether to rotate names
-        fontcolor : str
-            Font color
-        fontsize : int
-            Font size
-        start_at : int
-            Starting angle
-        extent : int
-            Angle range covered by the chord diagram
-        min_chord_width : int
-            Minimum chord width
-        ax : matplotlib.axes.Axes or None
-            Matplotlib axis object
-        figsize : tuple
-            Figure size
-        title_name : str or None
-            Figure title
-        save : str or None
-            Save file path
-        legend_pos_x : float or None
-            Legend X position (not implemented)
-        show_celltype_in_name : bool
-            Whether to show cell type info in node names (default: True)
-            If True, display as "Gene(CellType)"
-            If False, only show gene name, but the same gene will still appear multiple times in different cell types
-        show_legend : bool
-            Whether to show cell type color legend (default: True)
-        legend_bbox : tuple
-            Legend position, format (x, y) (default: (1.05, 1))
-        legend_ncol : int
-            Number of legend columns (default: 1)
+        Args:
+            sources_use: str, int, list or None
+                Sender cell types. Can be:
+                - String: cell type name
+                - Integer: cell type index (starting from 0)
+                - List: multiple cell types
+                - None: all cell types as senders
+            targets_use: str, int, list or None
+                Receiver cell types. Can be:
+                - String: cell type name
+                - Integer: cell type index (starting from 0)
+                - List: multiple cell types
+                - None: all cell types as receivers
+            signaling: str, list or None
+                Specific signaling pathway name. Can be:
+                - String: single pathway name
+                - List: multiple pathway names
+                - None: all pathways
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            mean_threshold: float
+                Mean expression intensity threshold
+            gap: float
+                Gap between segments in the chord diagram
+            use_gradient: bool
+                Whether to use gradient effect
+            sort: str or None
+                Sorting method: "size", "distance", None
+            directed: bool
+                Whether to show directionality
+            chord_colors: str or None
+                Chord color
+            rotate_names: bool
+                Whether to rotate names
+            fontcolor: str
+                Font color
+            fontsize: int
+                Font size
+            start_at: int
+                Starting angle
+            extent: int
+                Angle range covered by the chord diagram
+            min_chord_width: int
+                Minimum chord width
+            ax: matplotlib.axes.Axes or None
+                Matplotlib axis object
+            figsize: tuple
+                Figure size
+            title_name: str or None
+                Figure title
+            save: str or None
+                Save file path
+            legend_pos_x: float or None
+                Legend X position (not implemented)
+            show_celltype_in_name: bool
+                Whether to show cell type info in node names (default: True)
+                If True, display as "Gene(CellType)"
+                If False, only show gene name, but the same gene will still appear multiple times in different cell types
+            show_legend: bool
+                Whether to show cell type color legend (default: True)
+            legend_bbox: tuple
+                Legend position, format (x, y) (default: (1.05, 1))
+            legend_ncol: int
+                Number of legend columns (default: 1)
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         try:
             from ..external.mpl_chord.chord_diagram import chord_diagram
@@ -547,72 +543,70 @@ class CellChatVizPlus:
         - Supports data scaling: 'row', 'column', or None
         - Supports sender and receiver color bars
         
-        Parameters:
-        -----------
-        sources_use : str, int, list or None
-            Sender cell types. Can be:
-            - String: cell type name
-            - Integer: cell type index (starting from 0)
-            - List: multiple cell types
-            - None: all cell types as senders
-        targets_use : str, int, list or None
-            Receiver cell types. Same format as sources_use
-        signaling : str, list or None
-            Specific signaling pathway name. Can be:
-            - String: single pathway name
-            - List: multiple pathway names
-            - None: all pathways
-        pvalue_threshold : float
-            P-value threshold for significant interactions
-        mean_threshold : float
-            Mean expression intensity threshold
-        top_interactions : int
-            Display the top N strongest interactions
-        show_pvalue : bool
-            Whether to show P-value information
-        show_mean : bool
-            Whether to show mean expression intensity
-        show_count : bool
-            Whether to show interaction count
-        add_violin : bool
-            Whether to add violin plot to show expression distribution
-        add_dendrogram : bool
-            Whether to add clustering tree
-        group_pathways : bool
-            Whether to group by signaling pathways
-        figsize : tuple
-            Figure size
-        title : str
-            Figure title
-        remove_isolate : bool
-            Whether to remove isolated interactions
-        font_size : int
-            Font size (default: 12)
-        cmap : str
-            Color map (default: "RdBu_r")
+        Args:
+            sources_use: str, int, list or None
+                Sender cell types. Can be:
+                - String: cell type name
+                - Integer: cell type index (starting from 0)
+                - List: multiple cell types
+                - None: all cell types as senders
+            targets_use: str, int, list or None
+                Receiver cell types. Same format as sources_use
+            signaling: str, list or None
+                Specific signaling pathway name. Can be:
+                - String: single pathway name
+                - List: multiple pathway names
+                - None: all pathways
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            mean_threshold: float
+                Mean expression intensity threshold
+            top_interactions: int
+                Display the top N strongest interactions
+            show_pvalue: bool
+                Whether to show P-value information
+            show_mean: bool
+                Whether to show mean expression intensity
+            show_count: bool
+                Whether to show interaction count
+            add_violin: bool
+                Whether to add violin plot to show expression distribution
+            add_dendrogram: bool
+                Whether to add clustering tree
+            group_pathways: bool
+                Whether to group by signaling pathways
+            figsize: tuple
+                Figure size
+            title: str
+                Figure title
+            remove_isolate: bool
+                Whether to remove isolated interactions
+            font_size: int
+                Font size (default: 12)
+            cmap: str
+                Color map (default: "RdBu_r")
             Options: "Blues", "Greens", "Oranges", "Purples", "viridis", "plasma", etc.
-        transpose : bool
-            Whether to transpose the heatmap (default: False)
-            If True, swap rows and columns: rows=L-R pairs, columns=cell type pairs
-        scale : str or None
-            Scaling method for the expression data (default: None)
-            - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
-            - 'column': Scale each column (pathway/LR pair) to have mean=0, std=1 (Z-score)
-            - 'row_minmax': Min-max scaling for each row (cell type pair) to [0,1] range
-            - 'column_minmax': Min-max scaling for each column (pathway/LR pair) to [0,1] range
-            - None: No scaling (use raw expression values)
-        vmin : float or None
-            Minimum value for color scaling (default: None)
-        vmax : float or None
-            Maximum value for color scaling (default: None)
-        show_sender_colors : bool
-            Whether to show sender cell type color bar (default: True)
-        show_receiver_colors : bool
-            Whether to show receiver cell type color bar (default: False)
+            transpose: bool
+                Whether to transpose the heatmap (default: False)
+                If True, swap rows and columns: rows=L-R pairs, columns=cell type pairs
+            scale: str or None
+                Scaling method for the expression data (default: None)
+                - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
+                - 'column': Scale each column (pathway/LR pair) to have mean=0, std=1 (Z-score)
+                - 'row_minmax': Min-max scaling for each row (cell type pair) to [0,1] range
+                - 'column_minmax': Min-max scaling for each column (pathway/LR pair) to [0,1] range
+                - None: No scaling (use raw expression values)
+            vmin: float or None
+                Minimum value for color scaling (default: None)
+            vmax: float or None
+                Maximum value for color scaling (default: None)
+            show_sender_colors: bool
+                Whether to show sender cell type color bar (default: True)
+            show_receiver_colors: bool
+                Whether to show receiver cell type color bar (default: False)
             
         Returns:
-        --------
-        h : marsilea plot object
+            h: marsilea plot object
         """
         try:
             import marsilea as ma
@@ -1219,68 +1213,66 @@ class CellChatVizPlus:
         - Uses more permissive default thresholds (pvalue_threshold=1.0, mean_threshold=0.0)
         - Provides show_all_pairs option to force display of all specified pairs
         
-        Parameters:
-        -----------
-        sources_use : str, int, list or None
-            Sender cell types. Can be:
-            - String: cell type name
-            - Integer: cell type index (starting from 0)
-            - List: multiple cell types
-            - None: all cell types as senders
-        targets_use : str, int, list or None
-            Receiver cell types. Same format as sources_use
-        lr_pairs : str, list or None
-            Specific ligand-receptor pairs to visualize. Can be:
-            - String: single L-R pair name (e.g., "TGFB1_TGFBR1")
-            - List: multiple L-R pair names
-            - None: all L-R pairs (equivalent to original function)
-        pvalue_threshold : float
-            P-value threshold (default: 1.0 to show all pairs)
-        mean_threshold : float
-            Mean expression threshold (default: 0.0 to show all pairs)
-        show_all_pairs : bool
-            If True, force display of all specified L-R pairs even if they have zero expression
-        show_pvalue : bool
-            Whether to show P-value information
-        show_mean : bool
-            Whether to show mean expression intensity
-        show_count : bool
-            Whether to show interaction count
-        add_violin : bool
-            Whether to add violin plot to show expression distribution
-        add_dendrogram : bool
-            Whether to add clustering tree
-        figsize : tuple
-            Figure size
-        title : str
-            Figure title
-        remove_isolate : bool
-            Whether to remove isolated interactions
-        font_size : int
-            Font size (default: 12)
-        cmap : str
-            Color map (default: "RdBu_r")
-        transpose : bool
-            Whether to transpose the heatmap (default: False)
-        scale : str or None
-            Scaling method for the expression data (default: None)
-            - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
-            - 'column': Scale each column (L-R pair) to have mean=0, std=1 (Z-score)
-            - 'row_minmax': Min-max scaling for each row to [0,1] range
-            - 'column_minmax': Min-max scaling for each column to [0,1] range
-            - None: No scaling (use raw expression values)
-        vmin : float or None
-            Minimum value for color scaling (default: None)
-        vmax : float or None
-            Maximum value for color scaling (default: None)
-        show_sender_colors : bool
-            Whether to show sender cell type color bar (default: True)
-        show_receiver_colors : bool
-            Whether to show receiver cell type color bar (default: False)
+        Args:
+            sources_use: str, int, list or None
+                Sender cell types. Can be:
+                - String: cell type name
+                - Integer: cell type index (starting from 0)
+                - List: multiple cell types
+                - None: all cell types as senders
+            targets_use: str, int, list or None
+                Receiver cell types. Same format as sources_use
+            lr_pairs: str, list or None
+                Specific ligand-receptor pairs to visualize. Can be:
+                - String: single L-R pair name (e.g., "TGFB1_TGFBR1")
+                - List: multiple L-R pair names
+                - None: all L-R pairs (equivalent to original function)
+            pvalue_threshold: float
+                P-value threshold (default: 1.0 to show all pairs)
+            mean_threshold: float
+                Mean expression threshold (default: 0.0 to show all pairs)
+            show_all_pairs: bool
+                If True, force display of all specified L-R pairs even if they have zero expression
+            show_pvalue: bool
+                Whether to show P-value information
+            show_mean: bool
+                Whether to show mean expression intensity
+            show_count: bool
+                Whether to show interaction count
+            add_violin: bool
+                Whether to add violin plot to show expression distribution
+            add_dendrogram: bool
+                Whether to add clustering tree
+            figsize: tuple
+                Figure size
+            title: str
+                Figure title
+            remove_isolate: bool
+                Whether to remove isolated interactions
+            font_size: int
+                Font size (default: 12)
+            cmap: str
+                Color map (default: "RdBu_r")
+            transpose: bool
+                Whether to transpose the heatmap (default: False)
+            scale: str or None
+                Scaling method for the expression data (default: None)
+                - 'row': Scale each row (cell type pair) to have mean=0, std=1 (Z-score)
+                - 'column': Scale each column (L-R pair) to have mean=0, std=1 (Z-score)
+                - 'row_minmax': Min-max scaling for each row to [0,1] range
+                - 'column_minmax': Min-max scaling for each column to [0,1] range
+                - None: No scaling (use raw expression values)
+            vmin: float or None
+                Minimum value for color scaling (default: None)
+            vmax: float or None
+                Maximum value for color scaling (default: None)
+            show_sender_colors: bool
+                Whether to show sender cell type color bar (default: True)
+            show_receiver_colors: bool
+                Whether to show receiver cell type color bar (default: False)
             
         Returns:
-        --------
-        h : marsilea plot object
+            h: marsilea plot object
         """
         try:
             import marsilea as ma
@@ -1815,21 +1807,19 @@ class CellChatVizPlus:
         - flow_betweenness: flow betweenness (mediator role)
         - information_centrality: information centrality (influencer role)
         
-        Parameters:
-        -----------
-        signaling : str, list or None
-            Specific signaling pathway name. If None, use aggregated network of all pathways
-        slot_name : str
-            Data slot name (compatible with CellChat, used here to identify calculation type)
-        pvalue_threshold : float
-            P-value threshold for significant interactions
-        use_weight : bool
-            Whether to use weights (interaction strength) for calculation
+        Args:
+            signaling: str, list or None
+                Specific signaling pathway name. If None, use aggregated network of all pathways
+            slot_name: str
+                Data slot name (compatible with CellChat, used here to identify calculation type)
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            use_weight: bool
+                Whether to use weights (interaction strength) for calculation
             
         Returns:
-        --------
-        centrality_scores : dict
-            Dictionary containing various centrality metrics, all values are Importance values in 0-1 range
+            centrality_scores: dict
+                Dictionary containing various centrality metrics, all values are Importance values in 0-1 range
         """
         try:
             import networkx as nx
@@ -1983,34 +1973,32 @@ class CellChatVizPlus:
         """
         Visualize signaling roles of cell populations (imitating CellChat's netAnalysis_signalingRole_network function)
         
-        Parameters:
-        -----------
-        signaling : str, list or None
-            Specific signaling pathway name. If None, use stored centrality results or calculate aggregated network
-        measures : list or None
-            Centrality metrics to display. Default shows all metrics
-        color_heatmap : str
-            Heatmap color mapping
-        width : float
-            Figure width
-        height : float
-            Figure height
-        font_size : int
-            Font size
-        title : str
-            Figure title
-        cluster_rows : bool
-            Whether to cluster rows
-        cluster_cols : bool
-            Whether to cluster columns
-        save : str or None
-            Save path
-        show_values : bool
-            Whether to show values in the heatmap
+        Args:
+            signaling: str, list or None
+                Specific signaling pathway name. If None, use stored centrality results or calculate aggregated network
+            measures: list or None
+                Centrality metrics to display. Default shows all metrics
+            color_heatmap: str
+                Heatmap color mapping
+            width: float
+                Figure width
+            height: float
+                Figure height
+            font_size: int
+                Font size
+            title: str
+                Figure title
+            cluster_rows: bool
+                Whether to cluster rows
+            cluster_cols: bool
+                Whether to cluster columns
+            save: str or None
+                Save path
+            show_values: bool
+                Whether to show values in the heatmap
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
+            fig: matplotlib.figure.Figure
         """
         # If no pre-computed centrality scores, calculate first
         if not hasattr(self, 'centrality_scores') or signaling is not None:
@@ -2112,29 +2100,27 @@ class CellChatVizPlus:
         """
         Create 2D scatter plot to visualize cell signaling roles
         
-        Parameters:
-        -----------
-        signaling : str, list or None
-            Specific signaling pathway name
-        x_measure : str
-            Centrality metric used for X-axis
-        y_measure : str  
-            Centrality metric used for Y-axis
-        figsize : tuple
-            Figure size
-        point_size : int
-            Scatter point size
-        alpha : float
-            Transparency
-        title : str
-            Figure title
-        save : str or None
-            Save path
+        Args:
+            signaling: str, list or None
+                Specific signaling pathway name
+            x_measure: str
+                Centrality metric used for X-axis
+            y_measure: str  
+                Centrality metric used for Y-axis
+            figsize: tuple
+                Figure size
+            point_size: int
+                Scatter point size
+            alpha: float
+                Transparency
+            title: str
+                Figure title
+            save: str or None
+                Save path
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         # If no pre-computed centrality scores, calculate first
         if not hasattr(self, 'centrality_scores') or signaling is not None:
@@ -2226,31 +2212,29 @@ class CellChatVizPlus:
         Create a heatmap to analyze the signaling roles of cell populations (outgoing or incoming contribution)
         Use Marsilea for modern heatmap visualization
         
-        Parameters:
-        -----------
-        pattern : str
-            'outgoing' for outgoing signaling or 'incoming' for incoming signaling
-        signaling : str, list or None
-            Specific signaling pathway name. If None, analyze all pathways
-        row_scale : bool
-            Whether to standardize rows (show relative signaling strength)
-        figsize : tuple
-            Figure size
-        cmap : str
-            Heatmap color mapping
-        show_totals : bool
-            Whether to show total signaling strength bar plots
-        title : str or None
-            Figure title
-        save : str or None
-            Save path
+        Args:
+            pattern: str
+                'outgoing' for outgoing signaling or 'incoming' for incoming signaling
+            signaling: str, list or None
+                Specific signaling pathway name. If None, analyze all pathways
+            row_scale: bool
+                Whether to standardize rows (show relative signaling strength)
+            figsize: tuple
+                Figure size
+            cmap: str
+                Heatmap color mapping
+            show_totals: bool
+                Whether to show total signaling strength bar plots
+            title: str or None
+                Figure title
+            save: str or None
+                Save path
             
         Returns:
-        --------
-        h : marsilea plot object
-        axes : list containing marsilea object (for compatibility)
-        signaling_matrix : pandas.DataFrame
-            Signaling strength matrix
+            h: marsilea plot object
+            axes: list containing marsilea object (for compatibility)
+            signaling_matrix: pandas.DataFrame
+                Signaling strength matrix
         """
         # Use new Marsilea implementation to replace old matplotlib implementation
         h, df = self.netVisual_signaling_heatmap(
@@ -2320,23 +2304,21 @@ class CellChatVizPlus:
         """
         Get signaling strength matrix
         
-        Parameters:
-        -----------
-        pattern : str
-            'outgoing', 'incoming', or 'overall'
-        signaling : str, list or None
-            Specific signaling pathway name. If None, analyze all pathways
-        aggregation : str
-            Aggregation method: 'mean', 'sum', 'max'
-        normalize : bool
-            Whether to normalize each row
-        level : str
-            'cell_type' for cell type level or 'cell' for individual cell level
+        Args:
+            pattern: str
+                'outgoing', 'incoming', or 'overall'
+            signaling: str, list or None
+                Specific signaling pathway name. If None, analyze all pathways
+            aggregation: str
+                Aggregation method: 'mean', 'sum', 'max'
+            normalize: bool
+                Whether to normalize each row
+            level: str
+                'cell_type' for cell type level or 'cell' for individual cell level
             
         Returns:
-        --------
-        matrix_df : pandas.DataFrame
-            Signaling strength matrix (cell_type/cell x pathway)
+            matrix_df: pandas.DataFrame
+                Signaling strength matrix (cell_type/cell x pathway)
         """
         import pandas as pd
         
@@ -2509,34 +2491,32 @@ class CellChatVizPlus:
         """
         Use Marsilea to create a signaling pathway heatmap, showing signaling strength of cell types
         
-        Parameters:
-        -----------
-        pattern : str
-            'outgoing', 'incoming', or 'overall'
-        signaling : str, list or None
-            Specific signaling pathway name. If None, analyze all pathways
-        min_threshold : float
-            Minimum signaling strength threshold, pathways below this value will be filtered
-        cmap : str
-            Heatmap color mapping
-        figsize : tuple
-            Figure size (width, height)
-        show_bars : bool
-            Whether to show marginal bar plots
-        show_colors : bool
-            Whether to show cell type color bar
-        fontsize : int
-            Font size
-        title : str or None
-            Figure title
-        save : str or None
-            Save path
+        Args:
+            pattern: str
+                'outgoing', 'incoming', or 'overall'
+            signaling: str, list or None
+                Specific signaling pathway name. If None, analyze all pathways
+            min_threshold: float
+                Minimum signaling strength threshold, pathways below this value will be filtered
+            cmap: str
+                Heatmap color mapping
+            figsize: tuple
+                Figure size (width, height)
+            show_bars: bool
+                Whether to show marginal bar plots
+            show_colors: bool
+                Whether to show cell type color bar
+            fontsize: int
+                Font size
+            title: str or None
+                Figure title
+            save: str or None
+                Save path
             
         Returns:
-        --------
-        h : marsilea plot object
-        df : pandas.DataFrame
-            Filtered signaling strength matrix
+            h: marsilea plot object
+            df: pandas.DataFrame
+                Filtered signaling strength matrix
         """
         try:
             import marsilea as ma
@@ -2640,34 +2620,32 @@ class CellChatVizPlus:
         分析特定信号通路中配体-受体对的贡献
         回答：哪些信号对特定细胞群的传出或传入信号贡献最大
         
-        Parameters:
-        -----------
-        signaling : str or list
-            要分析的信号通路
-        group_celltype : str or None
-            要分析的特定细胞类型。如果为None，分析所有细胞类型
-        sources : list or None
-            关注的发送者细胞类型
-        targets : list or None
-            关注的接收者细胞类型
-        pvalue_threshold : float
-            P-value threshold
-        top_pairs : int
-            显示前N个贡献最大的配体-受体对
-        figsize : tuple
-            图形大小
-        font_size : int
-            字体大小
-        title : str or None
-            图形标题
-        save : str or None
-            保存路径
+        Args:
+            signaling: str or list
+                要分析的信号通路
+            group_celltype: str or None
+                要分析的特定细胞类型。如果为None，分析所有细胞类型
+            sources: list or None
+                关注的发送者细胞类型
+            targets: list or None
+                关注的接收者细胞类型
+            pvalue_threshold: float
+                P-value threshold
+            top_pairs: int
+                显示前N个贡献最大的配体-受体对
+            figsize: tuple
+                图形大小
+            font_size: int
+                字体大小
+            title: str or None
+                图形标题
+            save: str or None
+                保存路径
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        contribution_df : pandas.DataFrame
-            贡献分析结果
+            fig: matplotlib.figure.Figure
+            contribution_df: pandas.DataFrame
+                贡献分析结果
         """
         if isinstance(signaling, str):
             signaling = [signaling]
@@ -2809,36 +2787,34 @@ class CellChatVizPlus:
         """
         使用Marsilea创建高级信号角色热图（CellChat风格的netAnalysis_signalingRole_network）
         
-        Parameters:
-        -----------
-        signaling : str, list or None
-            特定信号通路名称。如果为None，使用存储的中心性结果或计算聚合网络
-        measures : list or None
-            要显示的中心性指标。默认显示所有指标
-        color_heatmap : str
-            热图颜色映射
-        width : float
-            图形宽度
-        height : float
-            图形高度
-        font_size : int
-            字体大小
-        title : str
-            图形标题
-        add_dendrogram : bool
-            是否添加聚类树
-        add_cell_colors : bool
-            是否添加细胞类型颜色条
-        add_importance_bars : bool
-            是否添加Importance值的柱状图
-        show_values : bool
-            是否在热图中显示数值
-        save : str or None
-            保存路径
+        Args:
+            signaling: str, list or None
+                特定信号通路名称。如果为None，使用存储的中心性结果或计算聚合网络
+            measures: list or None
+                要显示的中心性指标。默认显示所有指标
+            color_heatmap: str
+                热图颜色映射
+            width: float
+                图形宽度
+            height: float
+                图形高度
+            font_size: int
+                字体大小
+            title: str
+                图形标题
+            add_dendrogram: bool
+                是否添加聚类树
+            add_cell_colors: bool
+                是否添加细胞类型颜色条
+            add_importance_bars: bool
+                是否添加Importance值的柱状图
+            show_values: bool
+                是否在热图中显示数值
+            save: str or None
+                保存路径
             
         Returns:
-        --------
-        h : marsilea plot object
+            h: marsilea plot object
         """
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
@@ -3053,19 +3029,17 @@ class CellChatVizPlus:
         """
         演示弯曲箭头效果的示例函数
         
-        Parameters:
-        -----------
-        signaling_pathway : str or None
-            要可视化的信号通路，如果为None则使用聚合网络
-        curve_strength : float
-            箭头弯曲强度 (0-1), 0为直线，越大越弯曲
-        figsize : tuple
-            图片大小
+        Args:
+            signaling_pathway: str or None
+                要可视化的信号通路，如果为None则使用聚合网络
+            curve_strength: float
+                箭头弯曲强度 (0-1), 0为直线，越大越弯曲
+            figsize: tuple
+                图片大小
         
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         print("🌸 演示CellChat风格的弯曲箭头效果...")
         print(f"📏 弯曲强度: {curve_strength} (推荐范围: 0.2-0.6)")
@@ -3107,15 +3081,13 @@ class CellChatVizPlus:
         """
         Compute mean expression matrix for cell-cell interactions (like CellChat)
         
-        Parameters:
-        -----------
-        count_min : int
-            Minimum count threshold to filter interactions (default: 1)
+        Args:
+            count_min: int
+                Minimum count threshold to filter interactions (default: 1)
             
         Returns:
-        --------
-        mean_matrix : pd.DataFrame
-            Mean expression matrix with senders as index and receivers as columns
+            mean_matrix: pd.DataFrame
+                Mean expression matrix with senders as index and receivers as columns
         """
         # Initialize matrix
         mean_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
@@ -3144,15 +3116,13 @@ class CellChatVizPlus:
         """
         Compute p-value matrix for cell-cell interactions (like CellChat)
         
-        Parameters:
-        -----------
-        count_min : int
-            Minimum count threshold to filter interactions (default: 1)
+        Args:
+            count_min: int
+                Minimum count threshold to filter interactions (default: 1)
             
         Returns:
-        --------
-        pvalue_matrix : pd.DataFrame
-            Average p-value matrix with senders as index and receivers as columns
+            pvalue_matrix: pd.DataFrame
+                Average p-value matrix with senders as index and receivers as columns
         """
         # Initialize matrix
         pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))  # Default p=1
@@ -3190,17 +3160,15 @@ class CellChatVizPlus:
         """
         Analyze and display detailed pathway statistics
         
-        Parameters:
-        -----------
-        pathway_stats : dict
-            Dictionary returned from get_signaling_pathways
-        show_details : bool
-            Whether to show detailed statistics for each pathway
+        Args:
+            pathway_stats: dict
+                Dictionary returned from get_signaling_pathways
+            show_details: bool
+                Whether to show detailed statistics for each pathway
         
         Returns:
-        --------
-        summary_df : pd.DataFrame
-            Summary statistics for all pathways
+            summary_df: pd.DataFrame
+                Summary statistics for all pathways
         """
         if not pathway_stats:
             print("No pathway statistics available. Run get_signaling_pathways() first.")
@@ -3254,19 +3222,17 @@ class CellChatVizPlus:
         """
         计算通路级别的细胞通讯强度（类似CellChat的方法）
         
-        Parameters:
-        -----------
-        method : str
-            聚合方法: 'mean', 'sum', 'max', 'median' (default: 'mean')
-        min_lr_pairs : int
-            通路中最少L-R对数量 (default: 1)  
-        min_expression : float
-            最小表达阈值 (default: 0.1)
+        Args:
+            method: str
+                聚合方法: 'mean', 'sum', 'max', 'median' (default: 'mean')
+            min_lr_pairs: int
+                通路中最少L-R对数量 (default: 1)  
+            min_expression: float
+                最小表达阈值 (default: 0.1)
             
         Returns:
-        --------
-        pathway_communication : dict
-            包含每个通路的通讯矩阵和统计信息
+            pathway_communication: dict
+                包含每个通路的通讯矩阵和统计信息
         """
         pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
         pathway_communication = {}
@@ -3355,23 +3321,21 @@ class CellChatVizPlus:
         """
         基于通路级别通讯强度判断显著通路（更符合CellChat逻辑）
         
-        Parameters:
-        -----------
-        pathway_communication : dict or None
-            通路通讯结果，如果为None则重新计算
-        strength_threshold : float
-            通路强度阈值 (default: 0.1)
-        pvalue_threshold : float  
-            p-value阈值 (default: 0.05)
-        min_significant_pairs : int
-            最少显著细胞对数量 (default: 1)
+        Args:
+            pathway_communication: dict or None
+                通路通讯结果，如果为None则重新计算
+            strength_threshold: float
+                通路强度阈值 (default: 0.1)
+            pvalue_threshold: float  
+                p-value阈值 (default: 0.05)
+            min_significant_pairs: int
+                最少显著细胞对数量 (default: 1)
             
         Returns:
-        --------
-        significant_pathways : list
-            显著通路列表
-        pathway_summary : pd.DataFrame
-            通路统计摘要
+            significant_pathways: list
+                显著通路列表
+            pathway_summary: pd.DataFrame
+                通路统计摘要
         """
         if pathway_communication is None:
             pathway_communication = self.compute_pathway_communication()
@@ -3445,27 +3409,25 @@ class CellChatVizPlus:
         Calculate the contribution of each ligand-receptor pair to the overall signaling pathway and visualize
         (Similar to CellChat's netAnalysis_contribution function)
         
-        Parameters:
-        -----------
-        signaling : str or list
-            Signaling pathway name
-        pvalue_threshold : float
-            P-value threshold (default: 0.05)
-        mean_threshold : float  
-            Mean expression threshold (default: 0.1)
-        top_pairs : int
-            Number of top L-R pairs to display (default: 10)
-        figsize : tuple
-            Figure size (default: (10, 6))
-        save : str or None
-            Save path (default: None)
+        Args:
+            signaling: str or list
+                Signaling pathway name
+            pvalue_threshold: float
+                P-value threshold (default: 0.05)
+            mean_threshold: float  
+                Mean expression threshold (default: 0.1)
+            top_pairs: int
+                Number of top L-R pairs to display (default: 10)
+            figsize: tuple
+                Figure size (default: (10, 6))
+            save: str or None
+                Save path (default: None)
             
         Returns:
-        --------
-        contribution_df : pd.DataFrame
-            L-R pair contribution statistics
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            contribution_df: pd.DataFrame
+                L-R pair contribution statistics
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         if isinstance(signaling, str):
             signaling = [signaling]
@@ -3583,23 +3545,21 @@ class CellChatVizPlus:
         Extract all significant L-R pairs in the specified signaling pathway
         (Similar to CellChat's extractEnrichedLR function)
         
-        Parameters:
-        -----------
-        signaling : str or list
-            Signaling pathway name
-        pvalue_threshold : float
-            P-value threshold (default: 0.05)
-        mean_threshold : float
-            Mean expression threshold (default: 0.1)  
-        min_cell_pairs : int
-            Minimum number of significant cell pairs (default: 1)
-        geneLR_return : bool
-            Whether to return gene-level information (default: False)
+        Args:
+            signaling: str or list
+                Signaling pathway name
+            pvalue_threshold: float
+                P-value threshold (default: 0.05)
+            mean_threshold: float
+                Mean expression threshold (default: 0.1)  
+            min_cell_pairs: int
+                Minimum number of significant cell pairs (default: 1)
+            geneLR_return: bool
+                Whether to return gene-level information (default: False)
             
         Returns:
-        --------
-        enriched_lr : pd.DataFrame
-            Significant L-R pair information
+            enriched_lr: pd.DataFrame
+                Significant L-R pair information
         """
         if isinstance(signaling, str):
             signaling = [signaling]
@@ -3675,40 +3635,38 @@ class CellChatVizPlus:
         Visualize cell-cell communication mediated by individual ligand-receptor pairs
         (Similar to CellChat's netVisual_individual function)
         
-        Parameters:
-        -----------
-        signaling : str or list
-            Signaling pathway name
-        pairLR_use : str, dict, or pd.Series
-            L-R pair to display. Can be:
-            - String: L-R pair name (e.g., "TGFB1_TGFBR1")
-            - Dictionary: dictionary containing ligand and receptor
-            - pandas Series: row returned by extractEnrichedLR
-        sources_use : list or None
-            Specified sender cell types
-        targets_use : list or None  
-            Specified receiver cell types
-        layout : str
-            Layout type: 'hierarchy', 'circle' (default: 'hierarchy')
-        vertex_receiver : list or None
-            Numeric vector specifying receiver positions (hierarchy layout only)
-        pvalue_threshold : float
-            Significance threshold (default: 0.05)
-        edge_width_max : float
-            Maximum edge width (default: 8)
-        vertex_size_max : float
-            Maximum node size (default: 50)
-        figsize : tuple
-            Figure size (default: (10, 8))
-        title : str or None
-            Figure title
-        save : str or None
-            Save path
+        Args:
+            signaling: str or list
+                Signaling pathway name
+            pairLR_use: str, dict, or pd.Series
+                L-R pair to display. Can be:
+                - String: L-R pair name (e.g., "TGFB1_TGFBR1")
+                - Dictionary: dictionary containing ligand and receptor
+                - pandas Series: row returned by extractEnrichedLR
+            sources_use: list or None
+                Specified sender cell types
+            targets_use: list or None  
+                Specified receiver cell types
+            layout: str
+                Layout type: 'hierarchy', 'circle' (default: 'hierarchy')
+            vertex_receiver: list or None
+                Numeric vector specifying receiver positions (hierarchy layout only)
+            pvalue_threshold: float
+                Significance threshold (default: 0.05)
+            edge_width_max: float
+                Maximum edge width (default: 8)
+            vertex_size_max: float
+                Maximum node size (default: 50)
+            figsize: tuple
+                Figure size (default: (10, 8))
+            title: str or None
+                Figure title
+            save: str or None
+                Save path
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         if isinstance(signaling, str):
             signaling = [signaling]
@@ -3939,19 +3897,17 @@ class CellChatVizPlus:
         """
         Calculate cell-cell communication probability matrix (similar to CellChat's prob matrix)
         
-        Parameters:
-        -----------
-        pvalue_threshold : float
-            P-value threshold for significant interactions
-        normalize : bool
-            Whether to normalize probabilities
+        Args:
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            normalize: bool
+                Whether to normalize probabilities
             
         Returns:
-        --------
-        prob_tensor : np.ndarray
-            Probability tensor, shape (n_cell_types, n_cell_types, n_pathways)
-        pathway_names : list
-            List of signaling pathway names
+            prob_tensor: np.ndarray
+                Probability tensor, shape (n_cell_types, n_cell_types, n_pathways)
+            pathway_names: list
+                List of signaling pathway names
         """
         if 'classification' not in self.adata.var.columns:
             raise ValueError("'classification' column not found in adata.var")
@@ -4010,25 +3966,23 @@ class CellChatVizPlus:
         """
         选择NMF分解的最优K值（类似CellChat的selectK功能）
         
-        Parameters:
-        -----------
-        pattern : str
-            'outgoing' or 'incoming'
-        k_range : range or list
-            要测试的K值范围
-        nrun : int
-            每个K值运行的次数
-        plot_results : bool
-            是否绘制评估结果
-        figsize : tuple
-            图形大小
+        Args:
+            pattern: str
+                'outgoing' or 'incoming'
+            k_range: range or list
+                要测试的K值范围
+            nrun: int
+                每个K值运行的次数
+            plot_results: bool
+                是否绘制评估结果
+            figsize: tuple
+                图形大小
             
         Returns:
-        --------
-        results : dict
-            包含不同K值的评估指标
-        optimal_k : int
-            推荐的最优K值
+            results: dict
+                包含不同K值的评估指标
+            optimal_k: int
+                推荐的最优K值
         """
         try:
             from sklearn.decomposition import NMF
@@ -4185,31 +4139,29 @@ class CellChatVizPlus:
         """
         识别细胞通信模式使用NMF分解（类似CellChat的identifyCommunicationPatterns功能）
         
-        Parameters:
-        -----------
-        pattern : str
-            'outgoing' or 'incoming'
-        k : int or None
-            NMF分解的模式数量，如果为None则需要先运行selectK
-        heatmap_show : bool
-            是否显示热图
-        figsize : tuple
-            图形大小
-        font_size : int
-            字体大小
-        save : str or None
-            保存路径
-        color_heatmap : str
-            热图颜色方案
-        title : str or None
-            图形标题
+        Args:
+            pattern: str
+                'outgoing' or 'incoming'
+            k: int or None
+                NMF分解的模式数量，如果为None则需要先运行selectK
+            heatmap_show: bool
+                是否显示热图
+            figsize: tuple
+                图形大小
+            font_size: int
+                字体大小
+            save: str or None
+                保存路径
+            color_heatmap: str
+                热图颜色方案
+            title: str or None
+                图形标题
             
         Returns:
-        --------
-        patterns : dict
-            包含细胞模式和信号模式的结果
-        fig : matplotlib.figure.Figure or None
-            可视化图形
+            patterns: dict
+                包含细胞模式和信号模式的结果
+            fig: matplotlib.figure.Figure or None
+                可视化图形
         """
         try:
             from sklearn.decomposition import NMF
@@ -4446,19 +4398,17 @@ class CellChatVizPlus:
         """
         计算信号网络之间的相似性（类似CellChat的computeNetSimilarity功能）
         
-        Parameters:
-        -----------
-        similarity_type : str
-            相似性类型: "functional" or "structural"
-        k : int or None
-            SNN平滑的邻居数量，如果为None则自动计算
-        thresh : float or None
-            过滤阈值，去除低于该分位数的交互
+        Args:
+            similarity_type: str
+                相似性类型: "functional" or "structural"
+            k: int or None
+                SNN平滑的邻居数量，如果为None则自动计算
+            thresh: float or None
+                过滤阈值，去除低于该分位数的交互
             
         Returns:
-        --------
-        similarity_matrix : pd.DataFrame
-            信号网络相似性矩阵
+            similarity_matrix: pd.DataFrame
+                信号网络相似性矩阵
         """
         # 获取概率矩阵
         if not hasattr(self, 'prob_tensor'):
@@ -4560,17 +4510,15 @@ class CellChatVizPlus:
         """
         应用共享最近邻（SNN）平滑
         
-        Parameters:
-        -----------
-        similarity_matrix : np.ndarray
-            原始相似性矩阵
-        k : int
-            邻居数量
+        Args:
+            similarity_matrix: np.ndarray
+                原始相似性矩阵
+            k: int
+                邻居数量
             
         Returns:
-        --------
-        smoothed_matrix : np.ndarray
-            平滑后的相似性矩阵
+            smoothed_matrix: np.ndarray
+                平滑后的相似性矩阵
         """
         n = similarity_matrix.shape[0]
         snn_matrix = np.zeros_like(similarity_matrix)
@@ -4607,31 +4555,29 @@ class CellChatVizPlus:
         """
         可视化信号网络相似性和扩散模式
         
-        Parameters:
-        -----------
-        similarity_type : str
-            使用的相似性类型
-        layout : str
-            网络布局: 'spring', 'circular', 'kamada_kawai'
-        node_size_factor : float
-            节点大小因子
-        edge_width_factor : float
-            边宽度因子
-        figsize : tuple
-            图形大小
-        title : str or None
-            图标题
-        save : str or None
-            保存路径
-        show_labels : bool
-            是否显示标签
-        font_size : int
-            字体大小
+        Args:
+            similarity_type: str
+                使用的相似性类型
+            layout: str
+                网络布局: 'spring', 'circular', 'kamada_kawai'
+            node_size_factor: float
+                节点大小因子
+            edge_width_factor: float
+                边宽度因子
+            figsize: tuple
+                图形大小
+            title: str or None
+                图标题
+            save: str or None
+                保存路径
+            show_labels: bool
+                是否显示标签
+            font_size: int
+                字体大小
             
         Returns:
-        --------
-        fig : matplotlib.figure.Figure
-        ax : matplotlib.axes.Axes
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         try:
             import networkx as nx
@@ -4724,21 +4670,19 @@ class CellChatVizPlus:
         """
         识别在特定模式中过表达的基因
         
-        Parameters:
-        -----------
-        signaling : str or list
-            信号通路名称
-        patterns : list or None
-            要分析的模式编号，如果为None则分析所有模式
-        min_expression : float
-            最小表达阈值
-        pvalue_threshold : float
-            显著性阈值
+        Args:
+            signaling: str or list
+                信号通路名称
+            patterns: list or None
+                要分析的模式编号，如果为None则分析所有模式
+            min_expression: float
+                最小表达阈值
+            pvalue_threshold: float
+                显著性阈值
             
         Returns:
-        --------
-        overexpressed_genes : dict
-            每个模式中过表达的基因
+            overexpressed_genes: dict
+                每个模式中过表达的基因
         """
         if not hasattr(self, 'communication_patterns'):
             raise ValueError("Please run identifyCommunicationPatterns() first")

@@ -41,6 +41,7 @@ Examples:
 
 # Fix PyArrow compatibility issue
 # PyExtensionType was renamed to ExtensionType in newer versions
+import os
 try:
     import pyarrow
     if hasattr(pyarrow, 'ExtensionType') and not hasattr(pyarrow, 'PyExtensionType'):
@@ -64,15 +65,20 @@ from . import pp
 from . import space
 from . import pl
 from . import datasets
+from . import utils
 
 # External modules
 from . import external
 
 # Optional modules
-try:
-    from . import llm
-except ImportError:
+if os.environ.get("OMICVERSE_DISABLE_LLM") == "1":
     llm = None
+else:
+    try:
+        from . import llm
+    except Exception:
+        llm = None
+
 
 # Optional datacollect module
 try:
@@ -82,7 +88,7 @@ except ImportError:
 
 # Essential utilities - keep these as direct imports for compatibility
 from .utils._data import read
-from .utils._plot import palette, ov_plot_set, plot_set
+from .utils._plot import palette, ov_plot_set, plot_set, style
 
 # Function registry system for discovery and search
 from .utils.registry import (
@@ -94,8 +100,9 @@ from .utils.registry import (
     import_registry
 )
 
-# Smart Agent system using Pantheon
+# Smart Agent system (internal backend)
 from .utils.smart_agent import Agent, list_supported_models
+from .utils.session_notebook_executor import setup_kernel_for_env
 
 name = "omicverse"
 try:
@@ -109,10 +116,52 @@ from ._settings import settings, generate_reference_table
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from anndata import AnnData
+from anndata import AnnData,concat
 
 # Expose agent helpers (e.g., ov.agent.seeker)
 try:
     from . import agent  # noqa: F401
 except Exception:  # pragma: no cover - optional
     agent = None
+
+
+__all__ = [
+    "alignment",
+    "bulk",
+    "single",
+    "utils",
+    "bulk2single",
+    "pp",
+    "space",
+    "pl",
+    "datasets",
+    "external",
+    "llm",
+    "datacollect",
+
+    "read",
+    "palette",
+    "ov_plot_set",
+    "plot_set",
+    "style",
+    "find_function",
+    "list_functions",
+    "get_function_help",
+    "recommend_function",
+    "export_registry",
+    "import_registry",
+
+    "Agent",
+    "list_supported_models",
+    "setup_kernel_for_env",
+    "settings",
+    "generate_reference_table",
+    "plt",
+    "np",
+    "pd",
+    "AnnData",
+    "concat",
+    "agent",
+
+    "__version__",
+]

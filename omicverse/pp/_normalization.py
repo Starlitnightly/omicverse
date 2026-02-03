@@ -11,8 +11,66 @@ import numpy as np
 
 from .._settings import settings, EMOJI, Colors
 from ._compat import CSBase, CSCBase, CSRBase, DaskArray, old_positionals
-from scanpy._utils import axis_mul_or_truediv, dematrix, view_to_actual, axis_sum,is_backed_type,_check_array_function_arguments
-from scanpy.get import _get_obs_rep, _set_obs_rep
+
+# Import local implementations from _scale.py
+from ._scale import (
+    axis_mul_or_truediv,
+    view_to_actual,
+    axis_sum,
+    is_backed_type,
+    _check_array_function_arguments,
+    _get_obs_rep,
+    _set_obs_rep,
+    dematrix
+)
+
+# Local implementation of check_array from sklearn
+def check_array(
+    array,
+    accept_sparse=False,
+    dtype=None,
+    copy=False,
+    **kwargs
+):
+    """
+    Simple check_array implementation for sparse matrices.
+
+    This is a simplified version that handles the specific use cases in this file.
+    For full functionality, use sklearn.utils.validation.check_array.
+    """
+    from scipy import sparse
+
+    if accept_sparse:
+        # Check if it's a sparse matrix
+        if not sparse.issparse(array):
+            msg = f"Expected sparse matrix, got {type(array)}"
+            raise ValueError(msg)
+
+        # Check sparse format
+        if isinstance(accept_sparse, (tuple, list)):
+            allowed_formats = accept_sparse
+            if not any(isinstance(array, getattr(sparse, f"{fmt}_matrix")) or
+                      isinstance(array, getattr(sparse, f"{fmt}_array", type(None)))
+                      for fmt in allowed_formats):
+                msg = f"Sparse matrix format {array.format} not in allowed formats {allowed_formats}"
+                raise ValueError(msg)
+
+    # Handle dtype
+    if dtype is not None:
+        if not isinstance(dtype, (tuple, list)):
+            dtype = (dtype,)
+        if array.dtype not in dtype:
+            if copy:
+                array = array.astype(dtype[0])
+            else:
+                msg = f"Array dtype {array.dtype} not in allowed dtypes {dtype}"
+                raise ValueError(msg)
+
+    # Handle copy
+    if copy and not sparse.issparse(array):
+        array = array.copy()
+
+    return array
 
 try:
     import dask
@@ -448,7 +506,8 @@ def log1p(
             raise NotImplementedError(msg)
         x = _log1p(x, copy=False, base=base)
         _set_obs_rep(adata, x, layer=layer, obsm=obsm)
-    if base == None:
+    # Set base to np.e if None (natural logarithm)
+    if base is None:
         base = np.e
     adata.uns["log1p"] = {"base": base}
     if copy:
@@ -457,18 +516,8 @@ def log1p(
 
 
 
-from operator import truediv
-from typing import TYPE_CHECKING
-from warnings import warn
-from datetime import datetime
-
-import numpy as np
+# Removed duplicate imports - already imported at the top of the file
 from scipy.sparse import issparse
-
-from scanpy import logging as logg
-from scanpy._compat import DaskArray, old_positionals
-from scanpy._utils import axis_mul_or_truediv, axis_sum, view_to_actual
-from scanpy.get import _get_obs_rep, _set_obs_rep
 
 try:
     import dask
@@ -691,8 +740,18 @@ def normalize_total(
         n_excluded = (~gene_subset).sum()
         print(f"   {EMOJI['warning']} {Colors.WARNING}Excluding {Colors.BOLD}{n_excluded:,}{Colors.ENDC}{Colors.WARNING} highly-expressed genes from normalization computation{Colors.ENDC}")
         if n_excluded <= 10:  # Only show gene names if not too many
-            print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
-        counts_per_cell = axis_sum(x[:, gene_subset], axis=1)
+            if is_rust:
+                # Convert to numpy array for compatibility with Rust backend
+                excluded_genes = np.array(adata.var_names)[~gene_subset].tolist()
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{excluded_genes}{Colors.ENDC}")
+            else:
+                print(f"   {Colors.WARNING}Excluded genes: {Colors.BOLD}{adata.var_names[~gene_subset].tolist()}{Colors.ENDC}")
+        if is_rust:
+            # Use integer indexing for Rust backend
+            gene_indices = np.where(gene_subset)[0]
+            counts_per_cell = axis_sum(x[:, gene_indices], axis=1)
+        else:
+            counts_per_cell = axis_sum(x[:, gene_subset], axis=1)
     counts_per_cell = np.ravel(counts_per_cell)
 
     cell_subset = counts_per_cell > 0
@@ -701,9 +760,29 @@ def normalize_total(
         print(f"   {EMOJI['warning']} {Colors.WARNING}Warning: {Colors.BOLD}{n_zero:,}{Colors.ENDC}{Colors.WARNING} cells have zero counts{Colors.ENDC}")
         warn(UserWarning("Some cells have zero counts"))
 
+    # Compute target_sum if not provided (for norm_factor calculation)
+    if target_sum is None:
+        if isinstance(counts_per_cell, DaskArray):
+            def nonzero_median(x):
+                return np.ma.median(np.ma.masked_array(x, x == 0)).item()
+            import dask
+            import dask.array as da
+            target_sum = da.from_delayed(
+                dask.delayed(nonzero_median)(counts_per_cell),
+                shape=(),
+                meta=counts_per_cell._meta,
+                dtype=counts_per_cell.dtype,
+            )
+            if isinstance(target_sum, DaskArray):
+                target_sum = target_sum.compute()
+        else:
+            counts_greater_than_zero = counts_per_cell[counts_per_cell > 0]
+            target_sum = np.median(counts_greater_than_zero, axis=0)
+
     if inplace:
         if key_added is not None:
-            adata.obs[key_added] = counts_per_cell
+            # Save normalization factor (counts / target_sum), consistent with scanpy
+            adata.obs[key_added] = counts_per_cell / target_sum
         _set_obs_rep(
             adata, _normalize_data(x, counts_per_cell, target_sum), layer=layer
         )
@@ -711,14 +790,19 @@ def normalize_total(
         # not recarray because need to support sparse
         dat = dict(
             X=_normalize_data(x, counts_per_cell, target_sum, copy=True),
-            norm_factor=counts_per_cell,
+            norm_factor=counts_per_cell / target_sum,  # Save normalization factor, consistent with scanpy
         )
 
     # Deprecated features
     if layer_norm == "after":
         after = target_sum
     elif layer_norm == "X":
-        after = np.median(counts_per_cell[cell_subset])
+        if is_rust:
+            # Use integer indexing for Rust backend
+            cell_indices = np.where(cell_subset)[0]
+            after = np.median(counts_per_cell[cell_indices])
+        else:
+            after = np.median(counts_per_cell[cell_subset])
     elif layer_norm is None:
         after = None
     else:

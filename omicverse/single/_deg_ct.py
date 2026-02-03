@@ -12,6 +12,17 @@ from ..utils.registry import register_function
     aliases=["差异组成分析", "DCT", "differential_abundance", "差异丰度分析", "细胞组成分析"],
     category="single",
     description="Differential cell type composition analysis using scCODA or Milo methods for abundance testing",
+    prerequisites={
+        'functions': ['leiden'],
+        'optional_functions': ['pca', 'neighbors']
+    },
+    requires={
+        'obs': []
+    },
+    produces={
+        'uns': ['DCT_results']
+    },
+    auto_fix='escalate',
     examples=[
         "# Initialize DCT with scCODA",
         "dct_obj = ov.single.DCT(adata, condition='treatment', ctrl_group='Control',",
@@ -23,7 +34,7 @@ from ..utils.registry import register_function
         "# Set FDR threshold",
         "dct_obj.model.set_fdr(dct_obj.sccoda_data, modality_key='coda', est_fdr=0.4)",
         "# Initialize DCT with Milo",
-        "dct_obj = ov.single.DCT(adata, condition='condition', ctrl_group='Control',", 
+        "dct_obj = ov.single.DCT(adata, condition='condition', ctrl_group='Control',",
         "                        test_group='Disease', cell_type_key='celltype',",
         "                        method='milo', use_rep='X_pca')",
         "# Run Milo analysis",
@@ -160,6 +171,16 @@ class DCT:
     aliases=["差异表达分析", "DEG", "differential_expression", "差异基因分析", "单细胞差异表达"],
     category="single",
     description="Differential gene expression analysis for single-cell data using Wilcoxon, t-test, or memento methods",
+    prerequisites={
+        'optional_functions': ['preprocess', 'leiden']
+    },
+    requires={
+        'obs': []  # Dynamic: requires condition and celltype_key columns (user-specified)
+    },
+    produces={
+        'uns': ['rank_genes_groups']  # For wilcoxon/t-test methods
+    },
+    auto_fix='none',
     examples=[
         "# Initialize DEG with Wilcoxon test",
         "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',",
@@ -169,7 +190,7 @@ class DCT:
         "# Get results",
         "results = deg_obj.get_results()",
         "# Initialize with t-test method",
-        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',", 
+        "deg_obj = ov.single.DEG(adata, condition='condition', ctrl_group='Control',",
         "                        test_group='Disease', method='t-test')",
         "# Run for all cell types",
         "deg_obj.run(celltype_key='celltype', celltype_group=None)",
@@ -189,6 +210,7 @@ class DEG:
                  ctrl_group: str,
                  test_group: str,
                  method: str='wilcoxon',
+                 use_raw: bool=None,
                  ):
         """
         Init the differential expression gene analysis
@@ -199,16 +221,38 @@ class DEG:
             ctrl_group: The control group name in the condition column
             test_group: The test group name in the condition column
             method: Method for differential expression analysis, either 'wilcoxon', 't-test', or 'memento-de'
+            use_raw: Whether to use adata.raw for DEG analysis. If None, will auto-detect (use raw if it exists)
 
         Returns:
             None
         """
-        self.adata=adata
+        # Auto-detect use_raw
+        if use_raw is None:
+            if adata.raw is not None:
+                use_raw = True
+                print(f"{EMOJI['bar']} Auto-detected adata.raw, will use raw data for DEG analysis")
+            else:
+                use_raw = False
+
+        self.use_raw = use_raw
+
+        # If using raw, create a copy with raw data as X
+        if self.use_raw and adata.raw is not None:
+            # Create a new AnnData with raw data
+            self.adata = AnnData(
+                X=adata.raw.X,
+                obs=adata.obs.copy(),
+                var=adata.raw.var.copy(),
+            )
+            print(f"{EMOJI['bar']} Using raw data with {self.adata.shape[1]} genes")
+        else:
+            self.adata = adata
+
         self.condition=condition
         self.ctrl_group=ctrl_group
         self.test_group=test_group
         self.method=method
-        
+
         from scipy.sparse import csr_matrix
         try:
             assert type(self.adata.X) == csr_matrix

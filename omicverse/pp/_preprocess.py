@@ -22,6 +22,8 @@ from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_referenc
 from ._normalization import normalize_total,log1p
 from datetime import datetime
 
+from .._monitor import monitor
+
 
 # Helper functions for Rust anndata compatibility
 def _safe_copy(arr):
@@ -49,7 +51,7 @@ def _safe_to_df_copy(arr):
 
 # Emoji map for UMAP status reporting
 
-
+@monitor
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
     r"""Identify robust genes as candidates for HVG selection and remove genes that are not expressed in any cells.
 
@@ -418,6 +420,7 @@ def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:
 
 from sklearn.cluster import KMeans  
 
+@monitor
 @register_function(
     aliases=["数据转GPU", "anndata_to_GPU", "to_gpu", "GPU转换", "move_to_gpu"],
     category="preprocessing",
@@ -461,6 +464,7 @@ def anndata_to_GPU(adata,**kwargs):
     print('Don`t forget to move it back to CPU after analysis is done')
     print('Use `ov.pp.anndata_to_CPU(adata)`')
 
+@monitor
 @register_function(
     aliases=["数据转CPU", "anndata_to_CPU", "to_cpu", "CPU转换", "move_to_cpu"],
     category="preprocessing",
@@ -502,11 +506,20 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     import rapids_singlecell as rsc
     rsc.get.anndata_to_CPU(adata,layer=layer, convert_all=convert_all, copy=copy)
 
-
+@monitor
 @register_function(
     aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
     category="preprocessing",
     description="Complete preprocessing pipeline including normalization, HVG selection, scaling, and PCA",
+    prerequisites={
+        'optional_functions': ['qc']
+    },
+    requires={},
+    produces={
+        'layers': ['counts'],
+        'var': ['highly_variable_features', 'means', 'variances', 'residual_variances']
+    },
+    auto_fix='none',
     examples=[
         "ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=2000)",
         "ov.pp.preprocess(adata, mode='pearson|pearson', target_sum=50e4)"
@@ -537,6 +550,10 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     Returns:
         adata: The preprocessed data matrix. 
     """
+
+    # Track the original object so we can propagate changes even if callers
+    # forget to use the returned value.
+    original_adata = adata
 
     # Log-normalization, HVGs identification
     from ._qc import _is_rust_backend
@@ -624,15 +641,28 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data in gpu: {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
 
-    if not is_rust:
-        adata.var = adata.var.drop(columns=['highly_variable_features'])
+    # Normalize HVG column naming across backends and keep both aliases available
+    hv = adata.var['highly_variable'] if 'highly_variable' in adata.var.columns else None
+    hv_features = adata.var['highly_variable_features'] if 'highly_variable_features' in adata.var.columns else None
+    if hv is not None and hv_features is None:
+        adata.var['highly_variable_features'] = hv
+    elif hv_features is not None and hv is None:
+        adata.var['highly_variable'] = hv_features
+    elif hv is None and hv_features is None:
+        # Fallback: create a False vector if nothing is present
+        adata.var['highly_variable'] = False
         adata.var['highly_variable_features'] = adata.var['highly_variable']
-        adata.var = adata.var.drop(columns=['highly_variable'])
     else:
-        #adata.var = adata.var.drop(columns=['highly_variable_features'])
         adata.var['highly_variable_features'] = adata.var['highly_variable']
-        #adata.var = adata.var.drop(columns=['highly_variable'])
-    #adata.var = adata.var.rename(columns={'means':'mean', 'variances':'var'})
+
+    # Ensure PCA is available for downstream steps that expect it
+    try:
+        if 'X_pca' not in adata.obsm:
+            from ._pca import pca as _pca
+            _pca(adata, n_comps=min(50, adata.n_vars - 1), layer=None)
+    except Exception as exc:  # pragma: no cover - runtime safeguard
+        print(f"{Colors.WARNING}⚠️  PCA computation skipped: {exc}{Colors.ENDC}")
+
     print(f"{EMOJI['done']} Preprocessing completed successfully.")
     print(f"{Colors.GREEN}    Added:{Colors.ENDC}")
     print(f"{Colors.CYAN}        'highly_variable_features', boolean vector (adata.var){Colors.ENDC}")
@@ -653,6 +683,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         'organism':organism,
     }
     add_reference(adata,'scanpy','size normalization with scanpy')
+
+    # If we created a sliced copy above, mirror the updated state back onto
+    # the original object so callers get the processed data even when they
+    # forget to assign the returned adata.
+    if adata is not original_adata:
+        original_adata.__dict__.update(adata.__dict__)
+        adata = original_adata
+
     return adata
 def normalize_pearson_residuals(adata,**kwargs):
     '''
@@ -661,45 +699,80 @@ def normalize_pearson_residuals(adata,**kwargs):
 
     sc.experimental.pp.normalize_pearson_residuals(adata,**kwargs)
 
-def highly_variable_genes(adata,**kwargs):
+@monitor
+def highly_variable_genes(adata, **kwargs):
     '''
     highly_variable_genes calculation
     '''
-    sc.experimental.pp.highly_variable_genes(
-        adata, **kwargs,
-    )
+    from ._highly_variable_genes import highly_variable_genes as _hvg
+    return _hvg(adata, **kwargs)
 
+@monitor
 @register_function(
     aliases=["标准化", "scale", "scaling", "标准化处理"],
     category="preprocessing",
     description="Scale data to unit variance and zero mean",
-    examples=["ov.pp.scale(adata, max_value=10)"],
+    prerequisites={
+        'optional_functions': ['normalize', 'qc']
+    },
+    requires={},
+    produces={
+        'layers': ['scaled']
+    },
+    auto_fix='none',
+    examples=["ov.pp.scale(adata, max_value=10)", "ov.pp.scale(adata, max_value=10, to_sparse=True)"],
     related=["normalize", "regress"]
 )
-def scale(adata,max_value=10,layers_add='scaled',**kwargs):
+def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
     """
     Scale the input AnnData object.
 
     Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape.
+        adata: Annotated data matrix with n_obs x n_vars shape.
+        max_value: Maximum value after scaling. Default: 10.
+        layers_add: Name of the layer to store the scaled data. Default: 'scaled'.
+        to_sparse: If True, convert the result to csr_matrix format. Default: True.
+        **kwargs: Additional arguments passed to scaling functions.
 
     Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Adds a new layer called 'scaled' that stores
-            the expression matrix that has been scaled to unit variance and zero mean.
+        adata: Annotated data matrix with n_obs x n_vars shape.
+        Adds a new layer called 'scaled' that stores the expression matrix
+        that has been scaled to unit variance and zero mean.
 
+    Examples:
+        >>> import omicverse as ov
+        >>> # Scale data with default sparse output
+        >>> ov.pp.scale(adata, max_value=10)
+        >>> # Scale data keeping dense format
+        >>> ov.pp.scale(adata, max_value=10, to_sparse=False)
     """
-    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    is_rust = _is_rust_backend(adata)
+    if is_rust:
+        from ._scale import scale_array
+        x = adata.X[:]
+        scaled_data = scale_array(
+            x, zero_center=True, max_value=max_value, copy=True, mask_obs=None
+        )
+    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         from ._scale import scale_anndata as scale
-        adata_mock = scale(adata, copy=True,max_value=max_value,**kwargs)
-        if _is_rust_backend(adata_mock):
-            adata.layers[layers_add] = adata_mock.X[:]
-        else:
-            adata.layers[layers_add] = adata_mock.X.copy()
+        adata_mock = scale(adata, copy=True, max_value=max_value, **kwargs)
+        scaled_data = adata_mock.X.copy()
         del adata_mock
     else:
         import rapids_singlecell as rsc
-        adata.layers['scaled']=rsc.pp.scale(adata, max_value=max_value,inplace=False)
+        scaled_data = rsc.pp.scale(adata, max_value=max_value, inplace=False)
+
+    # Convert to sparse format if requested
+    if to_sparse and not issparse(scaled_data):
+        print(f"{Colors.BLUE}    Converting scaled data to csr_matrix format...{Colors.ENDC}")
+        scaled_data = csr_matrix(scaled_data)
+    elif to_sparse and issparse(scaled_data):
+        # Ensure it's csr_matrix format
+        if not isinstance(scaled_data, csr_matrix):
+            print(f"{Colors.BLUE}    Converting scaled data to csr_matrix format...{Colors.ENDC}")
+            scaled_data = csr_matrix(scaled_data)
+
+    adata.layers[layers_add] = scaled_data
 
     if 'status' not in adata.uns.keys():
         adata.uns['status'] = {}
@@ -708,6 +781,7 @@ def scale(adata,max_value=10,layers_add='scaled',**kwargs):
     add_reference(adata,'scanpy','scaling with scanpy')
     adata.uns['status']['scaled'] = True
 
+@monitor
 def regress(adata,**kwargs):
     """
     Regress out covariates from the input AnnData object.
@@ -732,6 +806,7 @@ def regress(adata,**kwargs):
         adata.layers['regressed']=rsc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], inplace=False)
     add_reference(adata,'scanpy','regressing out covariates with scanpy')
 
+@monitor
 def regress_and_scale(adata):
     """
     Regress out covariates from the input AnnData object and scale the resulting expression matrix.
@@ -787,10 +862,24 @@ class my_PCA:
 
         return self
 
+@monitor
 @register_function(
     aliases=["主成分分析", "pca", "PCA", "降维"],
     category="preprocessing",
     description="Perform Principal Component Analysis for dimensionality reduction",
+    prerequisites={
+        'functions': ['scale'],
+        'optional_functions': ['qc', 'preprocess']
+    },
+    requires={
+        'layers': ['scaled']
+    },
+    produces={
+        'obsm': ['X_pca'],
+        'varm': ['PCs'],
+        'uns': ['pca']
+    },
+    auto_fix='escalate',
     examples=["ov.pp.pca(adata, n_pcs=50)"],
     related=["umap", "tsne", "mde"]
 )
@@ -868,6 +957,7 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
     else:
         return adata
 
+@monitor
 def red(adata):
     """
     Reduce the input AnnData object to highly variable features 
@@ -957,10 +1047,23 @@ _MetricScipySpatial = Literal[
     ]
 _Metric = Union[_MetricSparseCapable, _MetricScipySpatial]
 from types import MappingProxyType
+
+@monitor
 @register_function(
     aliases=["计算邻居", "neighbors", "knn", "邻居图"],
     category="preprocessing",
     description="Compute neighborhood graph of cells",
+    prerequisites={
+        'optional_functions': ['pca']
+    },
+    requires={
+        'obsm': ['X_pca']
+    },
+    produces={
+        'obsp': ['distances', 'connectivities'],
+        'uns': ['neighbors']
+    },
+    auto_fix='auto',
     examples=["ov.pp.neighbors(adata, n_neighbors=15)"],
     related=["umap", "leiden", "louvain"]
 )
@@ -972,10 +1075,12 @@ def neighbors(
     knn: bool = True,
     random_state: int= 0,
     method: Optional[_Method] = 'umap',
+    transformer: Optional[str] = None,
     metric: Union[_Metric, _MetricFn] = 'euclidean',
     metric_kwds: Mapping[str, Any] = MappingProxyType({}),
     key_added: Optional[str] = None,
     copy: bool = False,
+    **kwargs,
 ) -> Optional[anndata.AnnData]:
     """
     Compute a neighborhood graph of observations [McInnes18]_.
@@ -1003,8 +1108,11 @@ def neighbors(
         method: Use 'umap' [McInnes18]_ or 'gauss' (Gauss kernel following [Coifman05]_
             with adaptive width [Haghverdi16]_) for computing connectivities.
             Use 'rapids' for the RAPIDS implementation of UMAP (experimental, GPU
-            only).
-        metric: A known metric’s name or a callable that returns a distance.
+            only). Use 'torch' for GPU-accelerated connectivity computation.
+        transformer: KNN search implementation. Options: None (auto), 'pyg' (PyTorch Geometric,
+            recommended for GPU), 'pynndescent', 'sklearn', or 'rapids'.
+            'pyg' provides 20-100× speedup over other methods.
+        metric: A known metric's name or a callable that returns a distance.
         metric_kwds: Options for the metric.
         key_added: If not specified, the neighbors data is stored in .uns['neighbors'],
             distances and connectivities are stored in .obsp['distances'] and
@@ -1033,27 +1141,49 @@ def neighbors(
     and in later versions it will become a hard dependency.
     
     """
-    if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
+    # Ensure PCA exists; compute a default if missing so downstream code can proceed
+    
+    if settings.mode =='cpu':
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         from ._neighbors import neighbors as _neighbors
         _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method=method,metric=metric,
-                         metric_kwds=metric_kwds,
-                         key_added=key_added,copy=copy)
+                         random_state=random_state,method=method,transformer=transformer,
+                         metric=metric,metric_kwds=metric_kwds,
+                         key_added=key_added,copy=copy,**kwargs)
+    elif settings.mode == 'cpu-gpu-mixed':
+        print(f"{EMOJI['gpu']} Using torch CPU/GPU mixed mode to calculate neighbors...")
+        print_gpu_usage_color()
+        from ._neighbors import neighbors as _neighbors
+        _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
+                         random_state=random_state,method='torch',transformer=transformer,
+                         metric=metric,metric_kwds=metric_kwds,
+                         key_added=key_added,copy=copy,**kwargs)
     else:
         print(f"{EMOJI['gpu']} Using RAPIDS GPU to calculate neighbors...")
         import rapids_singlecell as rsc
         rsc.pp.neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
                          random_state=random_state,algorithm=method,metric=metric,
                          metric_kwds=metric_kwds,
-                         key_added=key_added,copy=copy)
+                         key_added=key_added,copy=copy,**kwargs)
     add_reference(adata,'scanpy','neighbors with scanpy')
 
-
+@monitor
 @register_function(
     aliases=["umap", "UMAP", "非线性降维"],
     category="preprocessing",
     description="Compute UMAP embedding for visualization",
+    prerequisites={
+        'functions': ['neighbors'],
+        'optional_functions': ['pca']
+    },
+    requires={
+        'uns': ['neighbors'],
+        'obsp': ['connectivities', 'distances']
+    },
+    produces={
+        'obsm': ['X_umap']
+    },
+    auto_fix='auto',
     examples=["ov.pp.umap(adata)"],
     related=["tsne", "pca", "mde", "neighbors"]
 )
@@ -1074,23 +1204,28 @@ def umap(adata, **kwargs):
             print(f"{EMOJI['gpu']} Using torch GPU to calculate UMAP...")
             print_gpu_usage_color()
             from ._umap import umap as _umap
-            _umap(adata,method='mde', **kwargs)
+            _umap(adata,method='pumap', **kwargs)
             add_reference(adata,'pymde','UMAP with pymde')
             add_reference(adata,'umap','UMAP with pymde')
-            
-
         else:
-            print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
-            import rapids_singlecell as rsc
-            rsc.tl.umap(adata, **kwargs)
-            add_reference(adata,'umap','UMAP with RAPIDS')
+            try:
+                print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")
+                import rapids_singlecell as rsc
+                rsc.tl.umap(adata, **kwargs)
+                add_reference(adata,'umap','UMAP with RAPIDS')
+            except Exception as e:
+                print(f"{EMOJI['error']} RAPIDS GPU UMAP failed: {e}")
+                print(f"{EMOJI['error']} Using pumap instead...")
+                from ._umap import umap as _umap
+                _umap(adata,method='pumap', **kwargs)
+                #add_reference(adata,'pumap','UMAP with pumap')
 
         print(f"{EMOJI['done']} UMAP completed successfully.")
     except Exception as e:
         print(f"{EMOJI['error']} UMAP failed: {e}")
         raise
 
-
+@monitor
 def louvain(adata, **kwargs):
     '''
     Louvain clustering
@@ -1106,16 +1241,29 @@ def louvain(adata, **kwargs):
         rsc.tl.louvain(adata, **kwargs)
         add_reference(adata,'louvain','Louvain clustering with RAPIDS')
 
+@monitor
 @register_function(
     aliases=["莱顿聚类", "leiden", "clustering", "聚类"],
     category="preprocessing",
     description="Perform Leiden community detection clustering",
+    prerequisites={
+        'functions': ['neighbors'],
+        'optional_functions': ['pca', 'umap']
+    },
+    requires={
+        'uns': ['neighbors'],
+        'obsp': ['connectivities']
+    },
+    produces={
+        'obs': ['leiden']
+    },
+    auto_fix='auto',
     examples=["ov.pp.leiden(adata, resolution=1.0)"],
     related=["louvain", "neighbors"]
 )
 def leiden(
     adata, resolution=1.0, random_state=0, 
-    key_added='leiden', local_iterations=100, max_levels=10, device='cpu',**kwargs):
+    key_added='leiden', local_iterations=100, max_levels=10, device='cpu', symmetrize=None, **kwargs):
     '''
     leiden clustering
     '''
@@ -1130,7 +1278,9 @@ def leiden(
     elif settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['mixed']} Using torch CPU/GPU mixed mode to calculate Leiden...")
         print_gpu_usage_color()
-        from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
+        #from ._leiden_pyg import leiden_gpu_sparse_multilevel as _leiden
+        from ._leiden_test import leiden_gpu_sparse_multilevel as _leiden
+
         _leiden(
             adata,
             resolution=resolution,
@@ -1140,6 +1290,8 @@ def leiden(
             local_iterations=local_iterations,
             max_levels=max_levels,
             device=device,  # None -> auto-pick
+            symmetrize=symmetrize,
+            **kwargs
         )
         add_reference(adata,'leiden','Leiden clustering with omicverse')
     else:
@@ -1149,11 +1301,18 @@ def leiden(
             key_added=key_added,**kwargs)
         add_reference(adata,'leiden','Leiden clustering with RAPIDS')
 
-
+@monitor
 @register_function(
     aliases=["细胞周期评分", "score_genes_cell_cycle", "cell_cycle", "细胞周期", "cc_score"],
     category="preprocessing",
     description="Score cell cycle phases (S and G2M) using predefined gene sets",
+    prerequisites={
+        'optional_functions': ['qc', 'preprocess']
+    },
+    produces={
+        'obs': ['S_score', 'G2M_score', 'phase']
+    },
+    auto_fix='none',
     examples=[
         "# Basic cell cycle scoring for human data",
         "ov.pp.score_genes_cell_cycle(adata, species='human')",
@@ -1233,7 +1392,7 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
         'g2m_genes':g2m_genes
     }
 
-
+@monitor
 def tsne(adata,**kwargs):
     '''
     t-SNE

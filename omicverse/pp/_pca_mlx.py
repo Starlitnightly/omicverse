@@ -31,13 +31,15 @@ def _detect_device() -> str:
     """Detect the best available device for computation."""
     if not MLX_AVAILABLE:
         return "cpu"
-    
-    # Check if Metal GPU is available (Apple Silicon)
+
+    # MLX automatically uses Metal GPU on Apple Silicon
+    # No need for explicit device specification
     try:
-        # Test if we can create an array on Metal GPU
-        test_array = mx.array([1.0], device=mx.metal)
+        # Test if we can create and use an array
+        test_array = mx.array([1.0])
+        _ = test_array + 1.0
         return "metal"
-    except:
+    except Exception:
         return "cpu"
 
 
@@ -59,11 +61,19 @@ class MLXPCA:
         If 'auto', automatically detects the best device.
     """
     
-    def __init__(self, n_components: Optional[Union[int, float, str]] = None, 
+    def __init__(self, n_components: Optional[Union[int, float, str]] = None,
                  device: str = "auto"):
         self.n_components = n_components
-        self.device = device if device != "auto" else _detect_device()
-        
+
+        # Normalize device parameter
+        if device == "auto":
+            self.device = _detect_device()
+        elif device in ["mps", "metal"]:
+            # Both mps and metal refer to Apple Silicon GPU
+            self.device = "metal" if MLX_AVAILABLE else "cpu"
+        else:
+            self.device = device
+
         # Initialize attributes
         self.components_ = None
         self.explained_variance_ = None
@@ -71,11 +81,12 @@ class MLXPCA:
         self.mean_ = None
         self.n_features_ = None
         self.n_samples_ = None
-        
+
         # Determine computation backend
-        self._use_mlx = MLX_AVAILABLE and self.device in ["mps", "cpu"]
-        self._use_sklearn = not self._use_mlx or not SKLEARN_AVAILABLE
-        
+        # Use MLX if available and device is metal/cpu
+        self._use_mlx = MLX_AVAILABLE and self.device in ["metal", "cpu"]
+        self._use_sklearn = not self._use_mlx
+
         if self._use_sklearn and not SKLEARN_AVAILABLE:
             raise ImportError("Neither MLX nor sklearn is available. Please install at least one.")
     
@@ -93,60 +104,83 @@ class MLXPCA:
         return np.array(X)
     
     def _mlx_svd(self, X: 'mx.array', n_components: int) -> Tuple['mx.array', 'mx.array', 'mx.array']:
-        """Perform SVD using MLX."""
-        # Center the data
+        """Perform SVD using MLX.
+
+        Note: MLX's svd requires CPU stream for now. While basic operations
+        can run on GPU, linalg operations need explicit CPU stream.
+        """
+        # Center the data (can run on GPU)
         self.mean_ = mx.mean(X, axis=0)
         X_centered = X - self.mean_
-        
-        # Use MLX SVD
-        U, S, Vt = mx.linalg.svd(X_centered, full_matrices=False)
-        
+
+        # Use MLX SVD with CPU stream (required for linalg operations)
+        U, S, Vt = mx.linalg.svd(X_centered, stream=mx.cpu)
+        # Ensure computation is complete
+        mx.eval(U, S, Vt)
+
         # Select the first n_components
         U = U[:, :n_components]
         S = S[:n_components]
         Vt = Vt[:n_components, :]
-        
+
         return U, S, Vt
     
     def _mlx_eigh(self, X: 'mx.array', n_components: int) -> Tuple['mx.array', 'mx.array']:
-        """Perform eigenvalue decomposition using MLX."""
-        # Center the data
+        """Perform eigenvalue decomposition using MLX.
+
+        Note: MLX linalg operations require CPU stream. The computation still
+        benefits from MLX's optimized CPU kernels and unified memory architecture.
+        """
+        # Center the data (can run on default stream)
         self.mean_ = mx.mean(X, axis=0)
         X_centered = X - self.mean_
-        
-        # Compute covariance matrix
+
+        # Compute covariance matrix (can run on default stream)
         cov_matrix = mx.matmul(X_centered.T, X_centered) / (X.shape[0] - 1)
-        
-        # Eigenvalue decomposition - use CPU stream for eigh operation
-        with mx.stream(mx.cpu):
-            eigenvalues, eigenvectors = mx.linalg.eigh(cov_matrix)
-        
-        # Sort in descending order
+
+        # Use SVD for symmetric matrix decomposition (requires CPU stream)
+        # For symmetric positive semidefinite matrix: cov = U @ diag(S) @ U^T
+        # So eigenvalues = S, eigenvectors = U
+        U, S, Vt = mx.linalg.svd(cov_matrix, stream=mx.cpu)
+        # Ensure computation is complete
+        mx.eval(U, S, Vt)
+
+        eigenvalues = S
+        eigenvectors = U
+
+        # Sort in descending order (eigenvalues from SVD are already sorted)
+        # But we keep this for consistency
         idx = mx.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
-        
+
         # Select the first n_components
         eigenvalues = eigenvalues[:n_components]
         eigenvectors = eigenvectors[:, :n_components]
-        
+
         return eigenvalues, eigenvectors
     
     def fit(self, X: np.ndarray) -> 'MLXPCA':
         """
         Fit the PCA model.
-        
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data.
-            
+            Training data. Can be dense or sparse array.
+
         Returns
         -------
         self : MLXPCA
             Returns the instance itself.
         """
-        X = np.asarray(X)
+        # Handle sparse matrices
+        from scipy import sparse
+        if sparse.issparse(X):
+            X = X.toarray()
+        else:
+            X = np.asarray(X)
+
         self.n_samples_, self.n_features_ = X.shape
         
         # Determine number of components

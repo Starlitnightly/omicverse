@@ -11,11 +11,24 @@ import os
 from scipy.sparse import csr_matrix
 from .._settings import add_reference
 from ..utils.registry import register_function
+from .._settings import Colors
+
 
 @register_function(
     aliases=["STAGATE空间聚类", "pySTAGATE", "STAGATE", "空间聚类模型", "图注意力自编码器"],
     category="space",
     description="PyTorch implementation of STAGATE for spatial transcriptomics analysis using graph attention autoencoder",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obs': []  # Requires spatial coordinates in obs (user-specified spatial_key)
+    },
+    produces={
+        'obsm': ['STAGATE'],
+        'layers': ['STAGATE_ReX']
+    },
+    auto_fix='none',
     examples=[
         "# Basic STAGATE analysis",
         "stagate = ov.space.pySTAGATE(adata, num_batch_x=3, num_batch_y=2,",
@@ -266,6 +279,17 @@ class pySTAGATE:
     aliases=["空间聚类分析", "clusters", "spatial_clustering", "多方法聚类", "空间域聚类"],
     category="space",
     description="Perform spatial clustering using multiple methods (STAGATE, GraphST, CAST, BINARY)",
+    prerequisites={
+        'optional_functions': []
+    },
+    requires={
+        'obs': []  # Requires spatial coordinates (user-specified)
+    },
+    produces={
+        'obsm': [],  # Dynamic: depends on method (STAGATE, GraphST_embedding, CAST, BINARY)
+        'uns': []    # Dynamic: may produce Spatial_Graph
+    },
+    auto_fix='none',
     examples=[
         "# Multiple clustering methods",
         "methods = ['STAGATE', 'GraphST']",
@@ -289,6 +313,7 @@ def clusters(adata,
              methods,
              methods_kwargs,
              batch_key=None,
+             spatial_key='spatial',
              lognorm=50*1e4,
              ):
     """
@@ -346,10 +371,10 @@ def clusters(adata,
         if method=='STAGATE':
             print('The STAGATE method is used to cluster the spatial data.')
             adata_copy=adata.copy()
-            if issparse(adata_copy.obsm['spatial']):
-                adata_copy.obsm['spatial']=adata_copy.obsm['spatial'].toarray()
-            adata_copy.obs['X']=adata_copy.obsm['spatial'][:,0]
-            adata_copy.obs['Y']=adata_copy.obsm['spatial'][:,1]
+            if issparse(adata_copy.obsm[spatial_key]):
+                adata_copy.obsm[spatial_key]=adata_copy.obsm[spatial_key].toarray()
+            adata_copy.obs['X']=adata_copy.obsm[spatial_key][:,0]
+            adata_copy.obs['Y']=adata_copy.obsm[spatial_key][:,1]
             if 'STAGATE' not in methods_kwargs:
                 methods_kwargs['STAGATE']={'num_batch_x':3,'num_batch_y':2,
                                            'spatial_key':['X','Y'],'rad_cutoff':200,'num_epoch':1000,'lr':0.001,
@@ -398,10 +423,10 @@ def clusters(adata,
 
         elif method=='CAST':
             print('The CAST method is used to embed the spatial data.')
-            if issparse(adata.obsm['spatial']):
-                adata.obsm['spatial']=adata.obsm['spatial'].toarray()
-            adata.obs['X']=adata.obsm['spatial'][:,0]
-            adata.obs['Y']=adata.obsm['spatial'][:,1]
+            if issparse(adata.obsm[spatial_key]):
+                adata.obsm[spatial_key]=adata.obsm[spatial_key].toarray()
+            adata.obs['X']=adata.obsm[spatial_key][:,0]
+            adata.obs['Y']=adata.obsm[spatial_key][:,1]
 
             if batch_key is None:
                 adata.obs['CAST_sample']='sample1'
@@ -503,6 +528,49 @@ def clusters(adata,
             adata.uns['Spatial_Graph']=adata_copy.uns['Spatial_Graph']
             print(f'The binary embedding are stored in adata.obsm["BINARY"]. \nShape: {adata.obsm["BINARY"].shape}')
             add_reference(adata,'BINARY','clustering with BINARY')
+        elif method=='Banksy' or method=='banksy':
+            try: 
+                import banksy
+            except:
+                print(f"{Colors.WARNING}banksy not installed. Install with: pip install pybanksy.{Colors.ENDC}")
+                raise ValueError("banksy not installed.")
+            from banksy.initialize_banksy import initialize_banksy
+            from banksy.run_banksy import run_banksy_multiparam
+            from ..pl import palette_112
+
+            # Initialize BANKSY
+            coord_keys = ('X', 'Y', spatial_key)  # Adjust based on your data
+            adata.obs['X']=adata.obsm[spatial_key][:,0]
+            adata.obs['Y']=adata.obsm[spatial_key][:,1]
+            banksy_dict = initialize_banksy(
+                adata,
+                coord_keys=coord_keys,
+                num_neighbours=methods_kwargs['Banksy']['num_neighbours'],
+                nbr_weight_decay=methods_kwargs['Banksy']['nbr_weight_decay'],
+                max_m=methods_kwargs['Banksy']['max_m'],
+            )
+
+            results_df = run_banksy_multiparam(
+                adata,
+                banksy_dict,
+                lambda_list=methods_kwargs['Banksy']['lambda_list'],
+                resolutions=methods_kwargs['Banksy']['resolutions'],
+                color_list=palette_112,
+                annotation_key=None,
+                max_m=methods_kwargs['Banksy']['max_m'],
+                filepath=methods_kwargs['Banksy']['filepath'],
+                key=coord_keys,
+                #annotation_key='banksy_label',
+                add_nonspatial=methods_kwargs['Banksy']['add_nonspatial'],
+                variance_balance=methods_kwargs['Banksy']['variance_balance'],
+                match_labels=methods_kwargs['Banksy']['match_labels'],
+            )
+            result_keys=[i for i in results_df['adata'].keys()]
+            for key in result_keys:
+                adata.obsm[f'X_banksy_{key}']=results_df['adata'][key].obsm['reduced_pc_20']
+
+            add_reference(adata,'Banksy','clustering with Banksy')
+
         else:
             print(f'The method {method} is not supported.')
     return adata
@@ -511,6 +579,17 @@ def clusters(adata,
     aliases=["合并类群", "merge_cluster", "cluster_merge", "类群合并", "合并空间类群"],
     category="space",
     description="Merge spatial clusters based on hierarchical clustering of their representation",
+    prerequisites={
+        'functions': []  # Requires prior clustering but method is flexible
+    },
+    requires={
+        'obs': [],    # Dynamic: requires groupby column (user-specified)
+        'obsm': []    # Dynamic: requires use_rep (user-specified)
+    },
+    produces={
+        'obs': []  # Dynamic: creates {groupby}_tree column
+    },
+    auto_fix='escalate',
     examples=[
         "# Basic cluster merging",
         "result = ov.space.merge_cluster(adata, groupby='mclust_GraphST',",

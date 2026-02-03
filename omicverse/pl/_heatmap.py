@@ -70,7 +70,7 @@ def complexheatmap(adata,
     r"""
     Generate a complex annotated heatmap from single-cell RNA-seq data using PyComplexHeatmap.
     
-    Arguments:
+    Args:
         adata: Annotated data object containing expression data
         groupby: Grouping variable for cell categorization ('')
         figsize: Figure dimensions as (width, height) ((6,10))
@@ -337,7 +337,7 @@ def marker_heatmap(
     r"""
     Create a dot plot heatmap showing marker gene expression across cell types.
     
-    Arguments:
+    Args:
         adata: Annotated data object with expression data
         marker_genes_dict: Dictionary mapping cell types to marker genes (None)
         groupby: Column name for cell type grouping (None)
@@ -562,7 +562,7 @@ def global_imports(modulename,shortname = None, asfunction = False):
     r"""
     Import a module into the global namespace with optional short name.
     
-    Arguments:
+    Args:
         modulename: Name of the module to import
         shortname: Short name for the module (None, uses modulename)
         asfunction: Whether to import as function (False)

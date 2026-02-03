@@ -48,6 +48,7 @@ from ._datasets import (
     download_data,
     download_data_requests,
     get_adata,
+    pancreas_cellrank,
     
     # Main dataset loaders
     pbmc3k,
@@ -91,4 +92,6 @@ from ._datasets import (
 
     decov_bulk_covid_bulk,
     decov_bulk_covid_single,
+
+    sc_ref_Lymph_Node,
 )

@@ -24,7 +24,9 @@ import matplotlib.pyplot as plt
 
 import scanpy as sc
 
-from multiprocessing import Pool 
+from multiprocessing import Pool
+
+
 
 
 def save_df_to_npz(obj, filename):
@@ -228,11 +230,14 @@ class cNMF():
 
     def __init__(self, adata, components, n_iter = 100, densify=False, tpm_fn=None, seed=None,
                         beta_loss='frobenius',num_highvar_genes=2000, genes_file=None,
-                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir="./tmp", name=None):
+                        alpha_usage=0.0, alpha_spectra=0.0, init='random',output_dir=None, name=None,
+                        use_gpu=True, gpu_id=0):
         """
         Arguments:
-            output_dir: path, optional (default="."). Output directory for analysis files.
+            output_dir: path, optional (default=None). Output directory for analysis files. If None, all analysis is done in memory.
             name: string, optional (default=None). A name for this analysis. Will be prefixed to all output files. If set to None, will be automatically generated from date (and random string).
+            use_gpu: bool, optional (default=True). If True and GPU is available, use GPU acceleration for NMF factorization.
+            gpu_id: int, optional (default=0). GPU device ID to use when multiple GPUs are available.
         """
 
         self.output_dir = output_dir
@@ -243,7 +248,27 @@ class cNMF():
             name = '%s_%s' % (now.strftime("%Y_%m_%d"), rand_hash)
         self.name = name
         self.paths = None
-        self._initialize_dirs()
+
+        # GPU configuration
+        self.use_gpu = use_gpu
+        self.gpu_id = gpu_id
+        if use_gpu:
+            import torch
+            self.device = torch.device(f'cuda:{gpu_id}' if self.use_gpu else 'cpu')
+
+        # In-memory storage
+        self.tpm = None
+        self.tpm_stats = None
+        self.norm_counts = None
+        self.replicate_params = None
+        self.run_params = None
+        self.highvar_genes = None
+        self.iter_spectra = {}  # {(k, iter): spectra_df}
+        self.merged_spectra_dict = {}  # {k: merged_spectra_df}
+        self.consensus_results = {}  # {(k, density_threshold): result_dict}
+
+        if self.output_dir is not None:
+            self._initialize_dirs()
         self.prepare(adata, components, n_iter, densify, tpm_fn, seed,
                         beta_loss, num_highvar_genes, genes_file,
                         alpha_usage, alpha_spectra, init)
@@ -322,25 +347,27 @@ class cNMF():
  
         if tpm_fn is None:
             tpm = compute_tpm(input_counts)
-            sc.write(self.paths['tpm'], tpm)
         elif tpm_fn.endswith('.h5ad'):
-            subprocess.call('cp %s %s' % (tpm_fn, self.paths['tpm']), shell=True)
-            tpm = sc.read(self.paths['tpm'])
+            tpm = sc.read(tpm_fn)
         else:
             if tpm_fn.endswith('.npz'):
                 tpm = load_df_from_npz(tpm_fn)
             else:
                 tpm = pd.read_csv(tpm_fn, sep='\t', index_col=0)
-            
+
             if densify:
                 tpm = sc.AnnData(X=tpm.values,
                             obs=pd.DataFrame(index=tpm.index),
-                            var=pd.DataFrame(index=tpm.columns)) 
+                            var=pd.DataFrame(index=tpm.columns))
             else:
                 tpm = sc.AnnData(X=sp.csr_matrix(tpm.values),
                             obs=pd.DataFrame(index=tpm.index),
-                            var=pd.DataFrame(index=tpm.columns)) 
+                            var=pd.DataFrame(index=tpm.columns))
 
+        # Store in memory
+        self.tpm = tpm
+        # Optionally save to disk
+        if self.output_dir is not None:
             sc.write(self.paths['tpm'], tpm)
         
         if sp.issparse(tpm.X):
@@ -353,8 +380,13 @@ class cNMF():
             
         input_tpm_stats = pd.DataFrame([gene_tpm_mean, gene_tpm_stddev],
              index = ['__mean', '__std'], columns = tpm.var.index).T
-        save_df_to_npz(input_tpm_stats, self.paths['tpm_stats'])
-        
+
+        # Store in memory
+        self.tpm_stats = input_tpm_stats
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(input_tpm_stats, self.paths['tpm_stats'])
+
         if genes_file is not None:
             highvargenes = open(genes_file).read().rstrip().split('\n')
         else:
@@ -363,11 +395,22 @@ class cNMF():
         norm_counts = self.get_norm_counts(input_counts, tpm, num_highvar_genes=num_highvar_genes,
                                                high_variance_genes_filter=highvargenes)
 
-        self.save_norm_counts(norm_counts)
+        # Store in memory
+        self.norm_counts = norm_counts
+        # Optionally save to disk
+        if self.output_dir is not None:
+            self.save_norm_counts(norm_counts)
+
         (replicate_params, run_params) = self.get_nmf_iter_params(ks=components, n_iter=n_iter, random_state_seed=seed,
                                                                   beta_loss=beta_loss, alpha_usage=alpha_usage,
                                                                   alpha_spectra=alpha_spectra, init=init)
-        self.save_nmf_iter_params(replicate_params, run_params)
+
+        # Store in memory
+        self.replicate_params = replicate_params
+        self.run_params = run_params
+        # Optionally save to disk
+        if self.output_dir is not None:
+            self.save_nmf_iter_params(replicate_params, run_params)
         
     
     def combine(self, components=None, skip_missing_files=False):
@@ -385,7 +428,8 @@ class cNMF():
         if type(components) is int:
             ks = [components]
         elif components is None:
-            run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+            # Use in-memory data
+            run_params = self.replicate_params
             ks = sorted(set(run_params.n_components))
         else:
             ks = components
@@ -453,8 +497,11 @@ class cNMF():
             if np.isnan(norm_counts.X).sum().sum() > 0:
                 print('Warning NaNs in normalized counts matrix')                    
         
-        ## Save a \n-delimited list of the high-variance genes used for factorization
-        open(self.paths['nmf_genes_list'], 'w').write('\n'.join(high_variance_genes_filter))
+        ## Save high-variance genes list in memory
+        self.highvar_genes = high_variance_genes_filter
+        ## Optionally save to disk
+        if self.output_dir is not None:
+            open(self.paths['nmf_genes_list'], 'w').write('\n'.join(high_variance_genes_filter))
 
         ## Check for any cells that have 0 counts of the overdispersed genes
         zerocells = np.array(norm_counts.X.sum(axis=1)==0).reshape(-1)
@@ -542,18 +589,123 @@ class cNMF():
 
     def _nmf(self, X, nmf_kwargs):
         """
+        GPU-accelerated NMF with automatic fallback to CPU.
+
         Parameters
         ----------
-        X : pandas.DataFrame,
+        X : pandas.DataFrame or scipy.sparse matrix,
             Normalized counts dataFrame to be factorized.
 
         nmf_kwargs : dict,
-            Arguments to be passed to ``non_negative_factorization``
+            Arguments to be passed to NMF
 
+        Returns
+        -------
+        spectra : numpy.ndarray
+            Gene expression programs (components x genes)
+        usages : numpy.ndarray
+            Usage matrix (cells x components)
         """
-        (usages, spectra, niter) = non_negative_factorization(X, **nmf_kwargs)
+        if self.use_gpu:
+            try:
+                return self._nmf_torch(X, nmf_kwargs)
+            except Exception as e:
+                print(f"⚠️  GPU NMF failed: {e}")
+                print("⚠️  Falling back to CPU mode")
+                # Fall through to CPU mode
 
+        # CPU mode (original sklearn implementation)
+        (usages, spectra, niter) = non_negative_factorization(X, **nmf_kwargs)
         return(spectra, usages)
+
+    def _nmf_torch(self, X, nmf_kwargs):
+        """
+        PyTorch GPU-accelerated NMF implementation.
+
+        Parameters
+        ----------
+        X : scipy.sparse or numpy.ndarray
+            Input matrix to factorize
+        nmf_kwargs : dict
+            NMF parameters from sklearn
+
+        Returns
+        -------
+        spectra : numpy.ndarray
+        usages : numpy.ndarray
+        """
+        # Convert sparse matrix to dense if needed
+        # GPU acceleration support
+        try:
+            import torch
+            from torchnmf.nmf import NMF as TorchNMF
+            TORCH_AVAILABLE = True
+            CUDA_AVAILABLE = torch.cuda.is_available()
+        except ImportError:
+            TORCH_AVAILABLE = False
+            CUDA_AVAILABLE = False
+            print("⚠ torchnmf not available. Install with: pip install torchnmf") 
+        if sp.issparse(X):
+            X_dense = X.toarray()
+        else:
+            X_dense = np.array(X)
+
+        # Convert to PyTorch tensor and move to GPU
+        X_tensor = torch.FloatTensor(X_dense).to(self.device)
+
+        # Extract parameters
+        n_components = nmf_kwargs['n_components']
+        max_iter = nmf_kwargs.get('max_iter', 200)
+        tol = nmf_kwargs.get('tol', 1e-4)
+        beta_loss = nmf_kwargs.get('beta_loss', 'frobenius')
+        random_state = nmf_kwargs.get('random_state', None)
+
+        # Map beta_loss to torchnmf beta parameter
+        # sklearn: 'frobenius' (beta=2), 'kullback-leibler' (beta=1)
+        # torchnmf: beta parameter directly
+        if beta_loss == 'frobenius':
+            beta = 2.0
+        elif beta_loss == 'kullback-leibler':
+            beta = 1.0
+        else:
+            beta = 2.0  # default to Frobenius
+
+        # Set random seed if provided
+        if random_state is not None:
+            torch.manual_seed(random_state)
+            if self.use_gpu:
+                torch.cuda.manual_seed(random_state)
+
+        # Initialize torchnmf model
+        # Note: Only shape and rank are passed to __init__()
+        # Beta, tol, max_iter are passed to fit() method
+        model = TorchNMF(
+            X_tensor.shape,
+            rank=n_components
+        ).to(self.device)
+
+        # Fit the model with all training parameters
+        model.fit(
+            X_tensor,
+            beta=beta,
+            tol=tol,
+            max_iter=max_iter,
+            verbose=False
+        )
+
+        # Extract results and move back to CPU
+        # IMPORTANT: torchnmf uses V ≈ H @ W^T (not W @ H like sklearn)
+        # - H: (cells, components) - this is usages
+        # - W: (genes, components) - need to transpose for spectra
+        usages = model.H.detach().cpu().numpy()  # (cells, components)
+        spectra = model.W.T.detach().cpu().numpy()  # (components, genes) - transposed!
+
+        # Clear GPU memory
+        del X_tensor, model
+        if self.use_gpu:
+            torch.cuda.empty_cache()
+
+        return (spectra, usages)
 
     def factorize_multi_process(self, total_workers):
         """
@@ -577,7 +729,7 @@ class cNMF():
 
         Use the `worker_i` and `total_workers` parameters for parallelization.
 
-        Generic kwargs for NMF are loaded from self.paths['nmf_run_parameters'], defaults below::
+        Generic kwargs for NMF are loaded from self.run_params, defaults below::
 
             ``non_negative_factorization`` default arguments:
                 alpha=0.0
@@ -588,27 +740,55 @@ class cNMF():
                 max_iter=200
                 regularization=None
                 init='random'
-                random_state, n_components are both set by the prespecified self.paths['nmf_replicate_parameters'].
+                random_state, n_components are both set by the prespecified self.replicate_params.
 
 
         Parameters
         ----------
-        norm_counts : pandas.DataFrame,
-            Normalized counts dataFrame to be factorized.
-            (Output of ``normalize_counts``)
+        worker_i : int, optional (default=0)
+            Worker index for parallelization. When using multiple workers, each worker
+            should have a unique index from 0 to total_workers-1.
 
-        run_params : pandas.DataFrame,
-            Parameters for NMF iterations.
-            (Output of ``prepare_nmf_iter_params``)
+        total_workers : int, optional (default=1)
+            Total number of workers for parallelization.
+
+            IMPORTANT: If you set total_workers > 1, you MUST run factorize() for each
+            worker separately:
+                cnmf_obj.factorize(worker_i=0, total_workers=2)
+                cnmf_obj.factorize(worker_i=1, total_workers=2)
+
+            For in-memory mode (output_dir=None), it's recommended to use total_workers=1
+            and run all iterations in a single call.
 
         """
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
-        norm_counts = sc.read(self.paths['normalized_counts'])
-        _nmf_kwargs = yaml.load(open(self.paths['nmf_run_parameters']), Loader=yaml.FullLoader)
+        # Use in-memory data
+        run_params = self.replicate_params
+        norm_counts = self.norm_counts
+        _nmf_kwargs = self.run_params.copy()
+
+        # Display compute mode
+        if self.use_gpu:
+            print(f'🚀 Running NMF on GPU (device {self.gpu_id})')
+        else:
+            print(f'💻 Running NMF on CPU')
+
+        # Warning for multi-worker setup in memory mode
+        if total_workers > 1 and self.output_dir is None:
+            print(f'⚠️  Using total_workers={total_workers} in memory mode.')
+            print(f'⚠️  You MUST run factorize() for ALL workers (0 to {total_workers-1}), otherwise iterations will be missing!')
+            print(f'⚠️  Currently running worker {worker_i}/{total_workers-1}')
 
         jobs_for_this_worker = worker_filter(range(len(run_params)), worker_i, total_workers)
         from tqdm import tqdm
-        for idx in tqdm(jobs_for_this_worker):
+        jobs_list = list(jobs_for_this_worker)
+
+        if len(jobs_list) == 0:
+            print(f'⚠️  No jobs assigned to worker {worker_i}. Check your worker_i and total_workers settings.')
+            return
+
+        print(f'Running {len(jobs_list)} factorization iterations for worker {worker_i}...')
+
+        for idx in tqdm(jobs_list):
 
             p = run_params.iloc[idx, :]
             #print('[Worker %d]. Starting task %d.' % (worker_i, idx))
@@ -619,32 +799,69 @@ class cNMF():
             spectra = pd.DataFrame(spectra,
                                    index=np.arange(1, _nmf_kwargs['n_components']+1),
                                    columns=norm_counts.var.index)
-            save_df_to_npz(spectra, self.paths['iter_spectra'] % (p['n_components'], p['iter']))
+
+            # Store in memory
+            self.iter_spectra[(p['n_components'], p['iter'])] = spectra
+            # Optionally save to disk
+            if self.output_dir is not None:
+                save_df_to_npz(spectra, self.paths['iter_spectra'] % (p['n_components'], p['iter']))
+
+        print(f'✓ Worker {worker_i} completed {len(jobs_list)} iterations. Total in memory: {len(self.iter_spectra)}')
 
 
     def combine_nmf(self, k, skip_missing_files=False, remove_individual_iterations=False):
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+        # Use in-memory data
+        run_params = self.replicate_params
         print('Combining factorizations for k=%d.'%k)
 
         run_params_subset = run_params[run_params.n_components==k].sort_values('iter')
         combined_spectra = []
+        missing_count = 0
+        total_expected = len(run_params_subset)
 
         for i,p in run_params_subset.iterrows():
-            current_file = self.paths['iter_spectra'] % (p['n_components'], p['iter'])
-            if not os.path.exists(current_file):
-                if not skip_missing_files:
-                    print('Missing file: %s, run with skip_missing=True to override' % current_file)
-                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), current_file)
-                else:
-                    print('Missing file: %s. Skipping.' % current_file)
-            else:
-                spectra = load_df_from_npz(current_file)
+            spectra_key = (p['n_components'], p['iter'])
+            # First try to get from memory
+            if spectra_key in self.iter_spectra:
+                spectra = self.iter_spectra[spectra_key]
                 spectra.index = ['iter%d_topic%d' % (p['iter'], t+1) for t in range(k)]
                 combined_spectra.append(spectra)
-                
-        if len(combined_spectra)>0:        
+            # Fall back to disk if output_dir is set and file exists
+            elif self.output_dir is not None:
+                current_file = self.paths['iter_spectra'] % (p['n_components'], p['iter'])
+                if not os.path.exists(current_file):
+                    missing_count += 1
+                    if not skip_missing_files:
+                        print('Missing spectra: %s, run with skip_missing=True to override' % str(spectra_key))
+                        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(spectra_key))
+                else:
+                    spectra = load_df_from_npz(current_file)
+                    spectra.index = ['iter%d_topic%d' % (p['iter'], t+1) for t in range(k)]
+                    combined_spectra.append(spectra)
+            else:
+                missing_count += 1
+                if not skip_missing_files:
+                    print('Missing spectra: %s, run with skip_missing=True to override' % str(spectra_key))
+                    raise KeyError(f"Spectra not found for {spectra_key}")
+
+        # Print summary
+        found_count = len(combined_spectra)
+        if missing_count > 0:
+            print(f'  Found {found_count}/{total_expected} iterations for k={k} ({missing_count} missing)')
+            if missing_count == total_expected // 2:
+                print(f'  ⚠️  WARNING: Exactly half the iterations are missing!')
+                print(f'  ⚠️  This usually means you used total_workers>1 but only ran one worker.')
+                print(f'  ⚠️  Solution: Either run factorize() with total_workers=1, or run all workers.')
+        else:
+            print(f'  Found all {found_count} iterations for k={k}')
+
+        if len(combined_spectra)>0:
             combined_spectra = pd.concat(combined_spectra, axis=0)
-            save_df_to_npz(combined_spectra, self.paths['merged_spectra']%k)
+            # Store in memory
+            self.merged_spectra_dict[k] = combined_spectra
+            # Optionally save to disk
+            if self.output_dir is not None:
+                save_df_to_npz(combined_spectra, self.paths['merged_spectra']%k)
         else:
             print('No spectra found for k=%d' % k)
         return combined_spectra
@@ -653,7 +870,7 @@ class cNMF():
     def refit_usage(self, X, spectra):
         """
         Takes an input data matrix and a fixed spectra and uses NNLS to find the optimal
-        usage matrix. Generic kwargs for NMF are loaded from self.paths['nmf_run_parameters'].
+        usage matrix. Generic kwargs for NMF are loaded from self.run_params.
         If input data are pandas.DataFrame, returns a DataFrame with row index matching X and
         columns index matching index of spectra
 
@@ -666,16 +883,17 @@ class cNMF():
             Non-negative spectra of expression programs
         """
 
-        refit_nmf_kwargs = yaml.load(open(self.paths['nmf_run_parameters']), Loader=yaml.FullLoader)
+        # Use in-memory run_params
+        refit_nmf_kwargs = self.run_params.copy()
         if type(spectra) is pd.DataFrame:
             refit_nmf_kwargs.update(dict(n_components = spectra.shape[0], H = spectra.values, update_H = False))
         else:
             refit_nmf_kwargs.update(dict(n_components = spectra.shape[0], H = spectra, update_H = False))
-            
+
         _, rf_usages = self._nmf(X, nmf_kwargs=refit_nmf_kwargs)
         if (type(X) is pd.DataFrame) and (type(spectra) is pd.DataFrame):
             rf_usages = pd.DataFrame(rf_usages, index=X.index, columns=spectra.index)
-          
+
         return(rf_usages)
     
     
@@ -740,11 +958,21 @@ class cNMF():
             Speed up calculation of k_selection_plot by avoiding reloading norm_counts for each K. Should not be used by
             most users
         """
-        
-        
-        merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+
+
+        # Use in-memory data
+        if k not in self.merged_spectra_dict:
+            # Try loading from disk if output_dir is set
+            if self.output_dir is not None and os.path.exists(self.paths['merged_spectra']%k):
+                merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+                self.merged_spectra_dict[k] = merged_spectra
+            else:
+                raise ValueError(f"Merged spectra for k={k} not found. Run combine() first.")
+        else:
+            merged_spectra = self.merged_spectra_dict[k]
+
         if norm_counts is None:
-            norm_counts = sc.read(self.paths['normalized_counts'])
+            norm_counts = self.norm_counts
 
         density_threshold_str = str(density_threshold)
         if skip_density_and_return_after_stats:
@@ -758,8 +986,17 @@ class cNMF():
         if not skip_density_and_return_after_stats:
             # Compute the local density matrix (if not previously cached)
             topics_dist = None
-            if os.path.isfile(self.paths['local_density_cache'] % k):
+            # Check in-memory cache first
+            cache_key = f'local_density_{k}'
+            if not hasattr(self, '_local_density_cache'):
+                self._local_density_cache = {}
+
+            if cache_key in self._local_density_cache:
+                local_density = self._local_density_cache[cache_key]
+            # Then check disk cache if output_dir is set
+            elif self.output_dir is not None and os.path.isfile(self.paths['local_density_cache'] % k):
                 local_density = load_df_from_npz(self.paths['local_density_cache'] % k)
+                self._local_density_cache[cache_key] = local_density
             else:
                 #   first find the full distance matrix
                 topics_dist = euclidean_distances(l2_spectra.values)
@@ -770,7 +1007,11 @@ class cNMF():
                 local_density = pd.DataFrame(distance_to_nearest_neighbors.sum(1)/(n_neighbors),
                                              columns=['local_density'],
                                              index=l2_spectra.index)
-                save_df_to_npz(local_density, self.paths['local_density_cache'] % k)
+                # Cache in memory
+                self._local_density_cache[cache_key] = local_density
+                # Optionally save to disk
+                if self.output_dir is not None:
+                    save_df_to_npz(local_density, self.paths['local_density_cache'] % k)
                 del(partitioning_order)
                 del(distance_to_nearest_neighbors)
 
@@ -835,8 +1076,8 @@ class cNMF():
         
         # Convert spectra to TPM units, and obtain results for all genes by running last step of NMF
         # with usages fixed and TPM as the input matrix
-        tpm = sc.read(self.paths['tpm'])
-        tpm_stats = load_df_from_npz(self.paths['tpm_stats'])
+        tpm = self.tpm
+        tpm_stats = self.tpm_stats
         spectra_tpm = self.refit_spectra(tpm.X, norm_usages.astype(tpm.X.dtype))
         spectra_tpm = pd.DataFrame(spectra_tpm, index=rf_usages.columns, columns=tpm.var.index)
         if normalize_tpm_spectra:
@@ -855,28 +1096,39 @@ class cNMF():
         if refit_usage:
             ## Re-fitting usage a final time on std-scaled HVG TPM seems to
             ## increase accuracy on simulated data
-            hvgs = open(self.paths['nmf_genes_list']).read().split('\n')
+            hvgs = self.highvar_genes
             norm_tpm = tpm[:, hvgs]
             if sp.issparse(norm_tpm.X):
-                sc.pp.scale(norm_tpm, zero_center=False)                       
+                sc.pp.scale(norm_tpm, zero_center=False)
             else:
                 norm_tpm.X /= norm_tpm.X.std(axis=0, ddof=1)
-                
+
             spectra_tpm_rf = spectra_tpm.loc[:,hvgs]
 
             spectra_tpm_rf = spectra_tpm_rf.div(tpm_stats.loc[hvgs, '__std'], axis=1)
             rf_usages = self.refit_usage(norm_tpm.X, spectra_tpm_rf.astype(norm_tpm.X.dtype))
-            rf_usages = pd.DataFrame(rf_usages, index=norm_counts.obs.index, columns=spectra_tpm_rf.index)                                                                  
-               
-        save_df_to_npz(median_spectra, self.paths['consensus_spectra']%(k, density_threshold_repl))
-        save_df_to_npz(rf_usages, self.paths['consensus_usages']%(k, density_threshold_repl))
-        #save_df_to_npz(consensus_stats, self.paths['consensus_stats']%(k, density_threshold_repl))
-        save_df_to_text(median_spectra, self.paths['consensus_spectra__txt']%(k, density_threshold_repl))
-        save_df_to_text(rf_usages, self.paths['consensus_usages__txt']%(k, density_threshold_repl))
-        save_df_to_npz(spectra_tpm, self.paths['gene_spectra_tpm']%(k, density_threshold_repl))
-        save_df_to_text(spectra_tpm, self.paths['gene_spectra_tpm__txt']%(k, density_threshold_repl))
-        save_df_to_npz(usage_coef, self.paths['gene_spectra_score']%(k, density_threshold_repl))
-        save_df_to_text(usage_coef, self.paths['gene_spectra_score__txt']%(k, density_threshold_repl))
+            rf_usages = pd.DataFrame(rf_usages, index=norm_counts.obs.index, columns=spectra_tpm_rf.index)
+
+        # Store consensus results in memory
+        consensus_key = (k, density_threshold)
+        self.consensus_results[consensus_key] = {
+            'median_spectra': median_spectra,
+            'rf_usages': rf_usages,
+            'spectra_tpm': spectra_tpm,
+            'usage_coef': usage_coef
+        }
+
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(median_spectra, self.paths['consensus_spectra']%(k, density_threshold_repl))
+            save_df_to_npz(rf_usages, self.paths['consensus_usages']%(k, density_threshold_repl))
+            #save_df_to_npz(consensus_stats, self.paths['consensus_stats']%(k, density_threshold_repl))
+            save_df_to_text(median_spectra, self.paths['consensus_spectra__txt']%(k, density_threshold_repl))
+            save_df_to_text(rf_usages, self.paths['consensus_usages__txt']%(k, density_threshold_repl))
+            save_df_to_npz(spectra_tpm, self.paths['gene_spectra_tpm']%(k, density_threshold_repl))
+            save_df_to_text(spectra_tpm, self.paths['gene_spectra_tpm__txt']%(k, density_threshold_repl))
+            save_df_to_npz(usage_coef, self.paths['gene_spectra_score']%(k, density_threshold_repl))
+            save_df_to_text(usage_coef, self.paths['gene_spectra_score__txt']%(k, density_threshold_repl))
         if show_clustering:
             if topics_dist is None:
                 topics_dist = euclidean_distances(l2_spectra.values)
@@ -969,25 +1221,334 @@ class cNMF():
             #hist_ax.hist(local_density.values, bins=np.linspace(0, 1, 50))
             #hist_ax.yaxis.tick_right()            
 
-            fig.savefig(self.paths['clustering_plot']%(k, density_threshold_repl), dpi=250)
+            if self.output_dir is not None:
+                fig.savefig(self.paths['clustering_plot']%(k, density_threshold_repl), dpi=250)
             if close_clustergram_fig:
                 plt.close(fig)
 
-        self.topic_dist = topics_dist
-        self.spectra_order=spectra_order
-        self.local_density = local_density
-        self.kmeans_cluster_labels=kmeans_cluster_labels
+            # Store clustering results
+            self.topic_dist = topics_dist
+            self.spectra_order = spectra_order
+            self.local_density = local_density
+            self.kmeans_cluster_labels = kmeans_cluster_labels
+        else:
+            # When show_clustering=False, still store what we have
+            self.local_density = local_density if not skip_density_and_return_after_stats else None
+            self.kmeans_cluster_labels = kmeans_cluster_labels
 
 
-    def k_selection_plot(self, close_fig=False):
+    def calculate_silhouette_k(self, k, density_threshold=2.0, use_l2_spectra=True):
+        """
+        Calculate silhouette scores for a given k value.
+
+        Parameters
+        ----------
+        k : int
+            Number of programs
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        use_l2_spectra : bool, optional (default=True)
+            If True, use L2-normalized spectra for distance calculation.
+            If False, use consensus usages from cells.
+
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - 'avg_silhouette': Average silhouette score
+            - 'silhouette_values': Per-sample silhouette scores
+            - 'cluster_labels': Cluster labels
+            - 'n_clusters': Number of clusters
+        """
+        from sklearn.metrics import silhouette_score, silhouette_samples
+
+        # Get merged spectra
+        if k not in self.merged_spectra_dict:
+            if self.output_dir is not None and os.path.exists(self.paths['merged_spectra']%k):
+                merged_spectra = load_df_from_npz(self.paths['merged_spectra']%k)
+                self.merged_spectra_dict[k] = merged_spectra
+            else:
+                raise ValueError(f"Merged spectra for k={k} not found. Run combine() first.")
+        else:
+            merged_spectra = self.merged_spectra_dict[k]
+
+        # L2 normalize spectra
+        l2_spectra = (merged_spectra.T/np.sqrt((merged_spectra**2).sum(axis=1))).T
+
+        # Apply density filtering if needed
+        if density_threshold < 2.0:
+            cache_key = f'local_density_{k}'
+            if not hasattr(self, '_local_density_cache'):
+                self._local_density_cache = {}
+
+            if cache_key in self._local_density_cache:
+                local_density = self._local_density_cache[cache_key]
+            elif self.output_dir is not None and os.path.isfile(self.paths['local_density_cache'] % k):
+                local_density = load_df_from_npz(self.paths['local_density_cache'] % k)
+                self._local_density_cache[cache_key] = local_density
+            else:
+                # Calculate local density
+                from sklearn.metrics.pairwise import euclidean_distances
+                local_neighborhood_size = 0.30
+                n_neighbors = int(local_neighborhood_size * merged_spectra.shape[0]/k)
+                topics_dist = euclidean_distances(l2_spectra.values)
+                partitioning_order = np.argpartition(topics_dist, n_neighbors+1)[:, :n_neighbors+1]
+                distance_to_nearest_neighbors = topics_dist[np.arange(topics_dist.shape[0])[:, None], partitioning_order]
+                local_density = pd.DataFrame(distance_to_nearest_neighbors.sum(1)/(n_neighbors),
+                                             columns=['local_density'],
+                                             index=l2_spectra.index)
+                self._local_density_cache[cache_key] = local_density
+
+            density_filter = local_density.iloc[:, 0] < density_threshold
+            l2_spectra = l2_spectra.loc[density_filter, :]
+
+        # Perform K-means clustering
+        from sklearn.cluster import KMeans
+        kmeans_model = KMeans(n_clusters=k, n_init=10, random_state=1)
+        cluster_labels = kmeans_model.fit_predict(l2_spectra.values)
+
+        # Calculate silhouette scores
+        avg_silhouette = silhouette_score(l2_spectra.values, cluster_labels, metric='euclidean')
+        silhouette_values = silhouette_samples(l2_spectra.values, cluster_labels, metric='euclidean')
+
+        return {
+            'avg_silhouette': avg_silhouette,
+            'silhouette_values': silhouette_values,
+            'cluster_labels': cluster_labels,
+            'n_clusters': k,
+            'l2_spectra': l2_spectra
+        }
+
+
+    def plot_silhouette_for_k(self, k, density_threshold=2.0, ax=None, show_avg=True,
+                              cmap='Spectral', figsize=(8, 6)):
+        """
+        Plot detailed silhouette plot for a single k value.
+
+        Parameters
+        ----------
+        k : int
+            Number of programs
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on. If None, creates new figure.
+
+        show_avg : bool, optional (default=True)
+            If True, shows average silhouette score line
+
+        cmap : str, optional (default='Spectral')
+            Colormap for clusters
+
+        figsize : tuple, optional (default=(8, 6))
+            Figure size if creating new figure
+
+        Returns
+        -------
+        fig, ax
+            Figure and axes objects
+        """
+        # Calculate silhouette scores
+        sil_data = self.calculate_silhouette_k(k, density_threshold)
+
+        silhouette_values = sil_data['silhouette_values']
+        cluster_labels = sil_data['cluster_labels']
+        avg_silhouette = sil_data['avg_silhouette']
+
+        # Create figure if needed
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        else:
+            fig = ax.get_figure()
+
+        # Set up y-axis
+        y_lower = 10
+
+        # Get colormap - compatible with different matplotlib versions
+        import matplotlib.pyplot as plt
+        try:
+            # Try matplotlib.pyplot.get_cmap (works in most versions)
+            cmap_obj = plt.get_cmap(cmap)
+        except AttributeError:
+            try:
+                # Try new API (matplotlib >= 3.7)
+                import matplotlib as mpl
+                cmap_obj = mpl.colormaps[cmap]
+            except (AttributeError, KeyError):
+                # Last resort: direct import
+                from matplotlib.colors import get_cmap
+                cmap_obj = get_cmap(cmap)
+
+        colors = cmap_obj(np.linspace(0, 1, k))
+
+        for i in range(k):
+            # Aggregate silhouette scores for samples in cluster i
+            ith_cluster_silhouette_values = silhouette_values[cluster_labels == i]
+            ith_cluster_silhouette_values.sort()
+
+            size_cluster_i = ith_cluster_silhouette_values.shape[0]
+            y_upper = y_lower + size_cluster_i
+
+            ax.fill_betweenx(np.arange(y_lower, y_upper),
+                            0, ith_cluster_silhouette_values,
+                            facecolor=colors[i], edgecolor=colors[i], alpha=0.7)
+
+            # Label the silhouette plots with their cluster numbers at the middle
+            ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i+1))
+
+            # Compute the new y_lower for next plot
+            y_lower = y_upper + 10  # 10 for the 0 samples
+
+        ax.set_title(f'Silhouette Plot for k={k}')
+        ax.set_xlabel('Silhouette Coefficient')
+        ax.set_ylabel('Cluster Label')
+
+        # The vertical line for average silhouette score of all the values
+        if show_avg:
+            ax.axvline(x=avg_silhouette, color="red", linestyle="--", linewidth=2,
+                      label=f'Avg: {avg_silhouette:.3f}')
+            ax.legend(loc='best')
+
+        ax.set_yticks([])  # Clear the yaxis labels / ticks
+        ax.set_xticks(np.arange(-0.2, 1.0, 0.2))
+        ax.set_xlim([-0.2, 1])
+
+        return fig, ax
+
+
+    def plot_silhouette_survey(self, k_range=None, density_threshold=2.0,
+                               ncols=3, figsize=None, cmap='Spectral',
+                               show_avg=True, title=None, save_path=None):
+        """
+        Generate a grid of silhouette plots for multiple k values for easy comparison.
+
+        This automated visualization method generates detailed silhouette plots for each
+        k value in the range and arranges them in a grid layout, allowing easy visual
+        comparison of clustering quality across different factorization ranks.
+
+        Parameters
+        ----------
+        k_range : list or range, optional
+            Range of k values to plot. If None, uses all k values from run_params.
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra
+
+        ncols : int, optional (default=3)
+            Number of columns in the grid
+
+        figsize : tuple, optional
+            Figure size. If None, automatically calculated based on grid size.
+
+        cmap : str, optional (default='Spectral')
+            Colormap for clusters
+
+        show_avg : bool, optional (default=True)
+            If True, shows average silhouette score line on each subplot
+
+        title : str, optional
+            Overall figure title. If None, uses default.
+
+        save_path : str, optional
+            If provided, saves the figure to this path
+
+        Returns
+        -------
+        fig, axes
+            Figure and axes array
+
+        Examples
+        --------
+        >>> # Compare silhouette plots for k=3 to k=10
+        >>> fig, axes = cnmf_obj.plot_silhouette_survey(k_range=range(3, 11))
+        >>>
+        >>> # Custom layout with 2 columns
+        >>> fig, axes = cnmf_obj.plot_silhouette_survey(k_range=[5, 6, 7, 8], ncols=2)
+        """
+        # Determine k values to plot
+        if k_range is None:
+            run_params = self.replicate_params
+            k_range = sorted(set(run_params.n_components))
+        else:
+            k_range = list(k_range)
+
+        n_plots = len(k_range)
+        nrows = int(np.ceil(n_plots / ncols))
+
+        # Auto-calculate figure size if not provided
+        if figsize is None:
+            figsize = (6 * ncols, 5 * nrows)
+
+        # Create figure and axes
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+        if n_plots == 1:
+            axes = np.array([axes])
+        axes = axes.flatten()
+
+        # Plot each k
+        for idx, k in enumerate(k_range):
+            try:
+                self.plot_silhouette_for_k(k, density_threshold=density_threshold,
+                                          ax=axes[idx], show_avg=show_avg, cmap=cmap)
+            except Exception as e:
+                axes[idx].text(0.5, 0.5, f'Error for k={k}:\n{str(e)}',
+                              ha='center', va='center', transform=axes[idx].transAxes)
+                axes[idx].set_title(f'k={k} (Error)')
+
+        # Hide extra subplots
+        for idx in range(n_plots, len(axes)):
+            axes[idx].set_visible(False)
+
+        # Set overall title
+        if title is None:
+            title = f'Silhouette Analysis Survey (density_threshold={density_threshold})'
+        fig.suptitle(title, fontsize=16, y=0.995)
+
+        plt.tight_layout()
+
+        # Save if requested
+        if save_path is not None:
+            fig.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f'Silhouette survey plot saved to: {save_path}')
+
+        return fig, axes
+
+
+    def k_selection_plot(self, close_fig=False, include_silhouette=True,
+                        density_threshold=2.0):
         '''
+        Plot stability, reconstruction error, and optionally silhouette scores for K selection.
+
         Borrowed from Alexandrov Et Al. 2013 Deciphering Mutational Signatures
-        publication in Cell Reports
+        publication in Cell Reports, with additional silhouette analysis option.
+
+        Parameters
+        ----------
+        close_fig : bool, optional (default=False)
+            If True, closes the figure after saving
+
+        include_silhouette : bool, optional (default=True)
+            If True, adds average silhouette score as a third metric on the plot
+
+        density_threshold : float, optional (default=2.0)
+            Density threshold for filtering spectra when calculating silhouette scores
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object
         '''
-        run_params = load_df_from_npz(self.paths['nmf_replicate_parameters'])
+        # Use in-memory data
+        run_params = self.replicate_params
         stats = []
-        norm_counts = sc.read(self.paths['normalized_counts'])
-        for k in sorted(set(run_params.n_components)):
+        norm_counts = self.norm_counts
+        k_values = sorted(set(run_params.n_components))
+
+        for k in k_values:
             stats.append(self.consensus(k, skip_density_and_return_after_stats=True,
                                         show_clustering=False, close_clustergram_fig=True,
                                         norm_counts=norm_counts).stats)
@@ -995,38 +1556,105 @@ class cNMF():
         stats = pd.DataFrame(stats)
         stats.reset_index(drop = True, inplace = True)
 
-        save_df_to_npz(stats, self.paths['k_selection_stats'])
+        # Calculate silhouette scores if requested
+        if include_silhouette:
+            print("Calculating silhouette scores for K selection...")
+            silhouette_scores = []
+            for k in k_values:
+                try:
+                    sil_data = self.calculate_silhouette_k(k, density_threshold=density_threshold)
+                    silhouette_scores.append(sil_data['avg_silhouette'])
+                except Exception as e:
+                    print(f"Warning: Could not calculate silhouette for k={k}: {e}")
+                    silhouette_scores.append(np.nan)
+            stats['avg_silhouette'] = silhouette_scores
 
-        fig = plt.figure(figsize=(6, 4))
-        ax1 = fig.add_subplot(111)
-        ax2 = ax1.twinx()
+        # Optionally save to disk
+        if self.output_dir is not None:
+            save_df_to_npz(stats, self.paths['k_selection_stats'])
 
+        # Create figure with appropriate layout
+        if include_silhouette and not stats['avg_silhouette'].isna().all():
+            # Three metrics: use larger figure with three y-axes
+            fig = plt.figure(figsize=(10, 5))
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twinx()
+            ax3 = ax1.twinx()
 
-        ax1.plot(stats.k, stats.silhouette, 'o-', color='b')
-        ax1.set_ylabel('Stability', color='b', fontsize=15)
-        for tl in ax1.get_yticklabels():
-            tl.set_color('b')
-        #ax1.set_xlabel('K', fontsize=15)
+            # Offset the third axis
+            ax3.spines['right'].set_position(('outward', 60))
 
-        ax2.plot(stats.k, stats.prediction_error, 'o-', color='r')
-        ax2.set_ylabel('Error', color='r', fontsize=15)
-        for tl in ax2.get_yticklabels():
-            tl.set_color('r')
+            # Plot stability (silhouette from consensus - kept as "Stability")
+            p1 = ax1.plot(stats.k, stats.silhouette, 'o-', color='b', linewidth=2,
+                         markersize=8, label='Stability')
+            ax1.set_ylabel('Stability', color='b', fontsize=13)
+            ax1.tick_params(axis='y', labelcolor='b')
+            for tl in ax1.get_yticklabels():
+                tl.set_color('b')
 
-        ax1.set_xlabel('Number of Components', fontsize=15)
-        ax1.grid('on')
+            # Plot reconstruction error
+            p2 = ax2.plot(stats.k, stats.prediction_error, 'o-', color='r', linewidth=2,
+                         markersize=8, label='Reconstruction Error')
+            ax2.set_ylabel('Reconstruction Error', color='r', fontsize=13)
+            ax2.tick_params(axis='y', labelcolor='r')
+            for tl in ax2.get_yticklabels():
+                tl.set_color('r')
+
+            # Plot average silhouette score
+            p3 = ax3.plot(stats.k, stats.avg_silhouette, 's-', color='green', linewidth=2,
+                         markersize=8, label='Avg Silhouette')
+            ax3.set_ylabel('Average Silhouette Score', color='green', fontsize=13)
+            ax3.tick_params(axis='y', labelcolor='green')
+            ax3.set_ylim([max(0, stats.avg_silhouette.min() - 0.1),
+                         min(1, stats.avg_silhouette.max() + 0.1)])
+            for tl in ax3.get_yticklabels():
+                tl.set_color('green')
+
+            ax1.set_xlabel('Number of Components (K)', fontsize=13)
+            ax1.grid(True, alpha=0.3)
+
+            # Add legend
+            lines = p1 + p2 + p3
+            labels = [l.get_label() for l in lines]
+            ax1.legend(lines, labels, loc='best', fontsize=10)
+
+            fig.suptitle('cNMF K Selection Metrics', fontsize=14, fontweight='bold')
+        else:
+            # Two metrics only: original layout
+            fig = plt.figure(figsize=(8, 5))
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twinx()
+
+            ax1.plot(stats.k, stats.silhouette, 'o-', color='b', linewidth=2, markersize=8)
+            ax1.set_ylabel('Stability', color='b', fontsize=13)
+            for tl in ax1.get_yticklabels():
+                tl.set_color('b')
+
+            ax2.plot(stats.k, stats.prediction_error, 'o-', color='r', linewidth=2, markersize=8)
+            ax2.set_ylabel('Reconstruction Error', color='r', fontsize=13)
+            for tl in ax2.get_yticklabels():
+                tl.set_color('r')
+
+            ax1.set_xlabel('Number of Components (K)', fontsize=13)
+            ax1.grid(True, alpha=0.3)
+            fig.suptitle('cNMF K Selection Metrics', fontsize=14, fontweight='bold')
+
         plt.tight_layout()
-        fig.savefig(self.paths['k_selection_plot'], dpi=250)
+
+        if self.output_dir is not None:
+            fig.savefig(self.paths['k_selection_plot'], dpi=250, bbox_inches='tight')
         if close_fig:
             plt.close(fig)
+
+        return fig
             
             
     def load_results(self, K, density_threshold, n_top_genes=100, norm_usage = True):
         """
-        Loads normalized usages and gene_spectra_scores for a given choice of K and 
+        Loads normalized usages and gene_spectra_scores for a given choice of K and
         local_density_threshold for the cNMF run. Additionally returns a DataFrame of
         the top genes linked to each program
-        
+
         Parameters
         ----------
         K : int
@@ -1040,7 +1668,7 @@ class cNMF():
 
         norm_usage : boolean, optional (default=True)
             If True, normalize cNMF usages to sum to 1
-        
+
         Returns
         ----------
         usage - cNMF usages (cells X K)
@@ -1049,13 +1677,23 @@ class cNMF():
         spectra_tpm - Coeffecients for contribution of each gene to each program (K x genes) in TPM units
         top_genes - ranked list of marker genes per GEP (n_top_genes X K)
         """
-        scorefn = self.paths['gene_spectra_score__txt'] % (K, str(density_threshold).replace('.', '_'))
-        tpmfn = self.paths['gene_spectra_tpm__txt'] % (K, str(density_threshold).replace('.', '_'))
-        usagefn = self.paths['consensus_usages__txt'] % (K, str(density_threshold).replace('.', '_'))
-        spectra_scores = pd.read_csv(scorefn, sep='\t', index_col=0).T
-        spectra_tpm = pd.read_csv(tpmfn, sep='\t', index_col=0).T
-
-        usage = pd.read_csv(usagefn, sep='\t', index_col=0)
+        # First try to load from memory
+        consensus_key = (K, density_threshold)
+        if consensus_key in self.consensus_results:
+            consensus_data = self.consensus_results[consensus_key]
+            spectra_scores = consensus_data['usage_coef'].T
+            spectra_tpm = consensus_data['spectra_tpm'].T
+            usage = consensus_data['rf_usages']
+        # Fall back to disk if output_dir is set
+        elif self.output_dir is not None:
+            scorefn = self.paths['gene_spectra_score__txt'] % (K, str(density_threshold).replace('.', '_'))
+            tpmfn = self.paths['gene_spectra_tpm__txt'] % (K, str(density_threshold).replace('.', '_'))
+            usagefn = self.paths['consensus_usages__txt'] % (K, str(density_threshold).replace('.', '_'))
+            spectra_scores = pd.read_csv(scorefn, sep='\t', index_col=0).T
+            spectra_tpm = pd.read_csv(tpmfn, sep='\t', index_col=0).T
+            usage = pd.read_csv(usagefn, sep='\t', index_col=0)
+        else:
+            raise ValueError(f"Results for K={K}, density_threshold={density_threshold} not found. Run consensus() first.")
         
         if norm_usage:
             usage = usage.div(usage.sum(axis=1), axis=0)
@@ -1184,3 +1822,136 @@ class cNMF():
         adata.obs['cNMF_cluster_clf']=[str(i) for i in clf.predict(adata.obsm[use_rep])]
         print('cNMF_cluster_rfc is added to adata.obs')
         print('cNMF_cluster_clf is added to adata.obs')
+
+    def save(self, filename):
+        """
+        Save the cNMF object to a file for later use.
+
+        This saves all in-memory data, parameters, and analysis results,
+        allowing you to resume analysis without re-running factorization.
+
+        Parameters
+        ----------
+        filename : str
+            Path to save the cNMF object. Recommended extension: .cnmf or .pkl
+
+        Examples
+        --------
+        >>> # Save after factorization
+        >>> cnmf_obj.factorize()
+        >>> cnmf_obj.combine()
+        >>> cnmf_obj.save('my_cnmf_analysis.cnmf')
+        >>>
+        >>> # Later, load and continue
+        >>> cnmf_obj = ov.single.cNMF.load('my_cnmf_analysis.cnmf')
+        >>> cnmf_obj.consensus(k=7, density_threshold=2.0)
+        """
+        import pickle
+
+        # Prepare state dictionary
+        state = {
+            # Basic parameters
+            'output_dir': self.output_dir,
+            'name': self.name,
+            'paths': self.paths,
+
+            # In-memory data
+            'tpm': self.tpm,
+            'tpm_stats': self.tpm_stats,
+            'norm_counts': self.norm_counts,
+            'replicate_params': self.replicate_params,
+            'run_params': self.run_params,
+            'highvar_genes': self.highvar_genes,
+
+            # Analysis results
+            'iter_spectra': self.iter_spectra,
+            'merged_spectra_dict': self.merged_spectra_dict,
+            'consensus_results': self.consensus_results,
+
+            # Optional results
+            '_local_density_cache': getattr(self, '_local_density_cache', None),
+            'topic_dist': getattr(self, 'topic_dist', None),
+            'spectra_order': getattr(self, 'spectra_order', None),
+            'local_density': getattr(self, 'local_density', None),
+            'kmeans_cluster_labels': getattr(self, 'kmeans_cluster_labels', None),
+        }
+
+        # Save to file
+        with open(filename, 'wb') as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        print(f"✓ cNMF object saved to: {filename}")
+        print(f"  - {len(self.iter_spectra)} factorization iterations")
+        print(f"  - {len(self.merged_spectra_dict)} merged spectra (K values)")
+        print(f"  - {len(self.consensus_results)} consensus results")
+
+
+    @classmethod
+    def load(cls, filename):
+        """
+        Load a saved cNMF object from file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the saved cNMF object file
+
+        Returns
+        -------
+        cnmf_obj : cNMF
+            Loaded cNMF object with all data and results restored
+
+        Examples
+        --------
+        >>> # Load saved analysis
+        >>> cnmf_obj = ov.single.cNMF.load('my_cnmf_analysis.cnmf')
+        >>>
+        >>> # Continue analysis
+        >>> cnmf_obj.consensus(k=7, density_threshold=2.0)
+        >>> result_dict = cnmf_obj.load_results(K=7, density_threshold=2.0)
+        """
+        import pickle
+
+        # Load state from file
+        with open(filename, 'rb') as f:
+            state = pickle.load(f)
+
+        # Create a minimal cNMF object (skip __init__ to avoid re-initialization)
+        obj = cls.__new__(cls)
+
+        # Restore basic parameters
+        obj.output_dir = state['output_dir']
+        obj.name = state['name']
+        obj.paths = state['paths']
+
+        # Restore in-memory data
+        obj.tpm = state['tpm']
+        obj.tpm_stats = state['tpm_stats']
+        obj.norm_counts = state['norm_counts']
+        obj.replicate_params = state['replicate_params']
+        obj.run_params = state['run_params']
+        obj.highvar_genes = state['highvar_genes']
+
+        # Restore analysis results
+        obj.iter_spectra = state['iter_spectra']
+        obj.merged_spectra_dict = state['merged_spectra_dict']
+        obj.consensus_results = state['consensus_results']
+
+        # Restore optional results
+        if state.get('_local_density_cache'):
+            obj._local_density_cache = state['_local_density_cache']
+        if state.get('topic_dist') is not None:
+            obj.topic_dist = state['topic_dist']
+        if state.get('spectra_order') is not None:
+            obj.spectra_order = state['spectra_order']
+        if state.get('local_density') is not None:
+            obj.local_density = state['local_density']
+        if state.get('kmeans_cluster_labels') is not None:
+            obj.kmeans_cluster_labels = state['kmeans_cluster_labels']
+
+        print(f"✓ cNMF object loaded from: {filename}")
+        print(f"  - {len(obj.iter_spectra)} factorization iterations")
+        print(f"  - {len(obj.merged_spectra_dict)} merged spectra (K values)")
+        print(f"  - {len(obj.consensus_results)} consensus results")
+
+        return obj

@@ -110,6 +110,7 @@ from ._diffusionmap import diffmap
 from ._cellmatch import CellOntologyMapper,download_cl
 from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulation,plot_grn
 from ._annotation import Annotation
+from ._annotation_ref import AnnotationRef
 from ._velo import Velo,velocity_embedding
 
 
@@ -251,6 +252,7 @@ __all__ = [
     'plot_grn',
     'Velo',
     'velocity_embedding',
-    'Annotation',
+    'Annotation',   # cell type annotation
+    'AnnotationRef', # cell type annotation with reference
 ]
 

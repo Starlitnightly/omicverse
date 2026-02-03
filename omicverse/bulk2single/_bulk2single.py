@@ -3,14 +3,14 @@ import torch
 import numpy as np
 import anndata
 import matplotlib.pyplot as plt
-from ._utils import load_data, data_process,bulk2single_data_prepare
+from ._utils import load_data, data_process, bulk2single_data_prepare
 from ._vae import train_vae, generate_vae, load_vae
-from ..bulk import data_drop_duplicates_index,deseq2_normalize
+from ..bulk import data_drop_duplicates_index, deseq2_normalize
 #from .map_utils import create_data, DFRunner, joint_analysis, knn
 import os
 import warnings
 import matplotlib
-from typing import Union,Tuple
+from typing import Union, Tuple, Optional, Any
 
 warnings.filterwarnings("ignore")
 
@@ -29,9 +29,9 @@ class Bulk2Single:
     - VAE training for single-cell data generation
     - Quality filtering and analysis of generated cells
     """
-    def __init__(self,bulk_data:pd.DataFrame,single_data:anndata.AnnData,
-                 celltype_key:str,bulk_group=None,max_single_cells:int=5000,
-                 top_marker_num:int=500,ratio_num:int=1,gpu:Union[int,str]=0):
+    def __init__(self, bulk_data: pd.DataFrame, single_data: anndata.AnnData,
+                 celltype_key: str, bulk_group: Optional[Any] = None, max_single_cells: int = 5000,
+                 top_marker_num: int = 500, ratio_num: int = 1, gpu: Union[int, str] = 0):
         r"""
         Initialize the Bulk2Single class for bulk-to-single-cell deconvolution.
 
@@ -303,18 +303,18 @@ class Bulk2Single:
                                generate_save_dir, generate_save_name)
         return sc_g
     
-    def save(self,vae_save_dir:str='save_model',
-            vae_save_name:str='vae',):
+    def save(self, vae_save_dir: str = 'save_model',
+            vae_save_name: str = 'vae') -> None:
         r"""
         Save the trained VAE model and cell target numbers.
-        
+
         Saves both the model state dict and the predicted cell-type target numbers
         needed for generation.
 
         Arguments:
-            vae_save_dir: Directory to save the trained VAE model ('save_model')
-            vae_save_name: Filename for the saved VAE model ('vae')
-            
+            vae_save_dir: Directory to save the trained VAE model. Default: 'save_model'
+            vae_save_name: Filename for the saved VAE model. Default: 'vae'
+
         Returns:
             None
         """
@@ -352,18 +352,18 @@ class Bulk2Single:
         sc_g.obs[self.celltype_key] = generate_sc_meta.loc[sc_g.obs.index,'Cell_type'].values
         return sc_g
     
-    def load_fraction(self,fraction_path:str):
+    def load_fraction(self, fraction_path: str) -> None:
         r"""
         Load predicted cell-type target numbers from file.
-        
+
         Loads previously computed cell-type target numbers that specify how many
         cells of each type to generate.
 
         Arguments:
             fraction_path: Path to pickled file containing cell target numbers
-            
+
         Returns:
-            None: Updates self.cell_target_num
+            None
         """
         #load cell_target_num
         import pickle

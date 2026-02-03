@@ -34,10 +34,14 @@ class FunctionRegistry:
                  category: str,
                  description: str,
                  examples: Optional[List[str]] = None,
-                 related: Optional[List[str]] = None) -> Callable:
+                 related: Optional[List[str]] = None,
+                 prerequisites: Optional[Dict[str, List[str]]] = None,
+                 requires: Optional[Dict[str, List[str]]] = None,
+                 produces: Optional[Dict[str, List[str]]] = None,
+                 auto_fix: str = 'none') -> Callable:
         """
         Register a function with its metadata.
-        
+
         Parameters
         ----------
         func : Callable
@@ -52,7 +56,19 @@ class FunctionRegistry:
             Usage examples
         related : List[str], optional
             Related function names
-        
+        prerequisites : Dict[str, List[str]], optional
+            Function prerequisites, format:
+            {'functions': ['scale'], 'optional_functions': ['qc', 'preprocess']}
+        requires : Dict[str, List[str]], optional
+            Required data structures, format:
+            {'layers': ['scaled'], 'obsm': ['X_pca'], 'uns': ['neighbors'], ...}
+        produces : Dict[str, List[str]], optional
+            Data structures created by this function, format:
+            {'layers': ['scaled'], 'obsm': ['X_pca'], 'uns': ['pca'], ...}
+        auto_fix : str, optional
+            Auto-fix strategy: 'auto' (can auto-insert prerequisites),
+            'escalate' (suggest workflow), 'none' (just warn). Default: 'none'
+
         Returns
         -------
         Callable
@@ -79,6 +95,40 @@ class FunctionRegistry:
                 related = list(related)
             elif not isinstance(related, list):
                 raise TypeError("Related entries must be provided as a list of strings when specified.")
+
+        # Validate prerequisite metadata
+        if prerequisites is not None:
+            if not isinstance(prerequisites, dict):
+                raise TypeError("Prerequisites must be a dictionary.")
+            valid_keys = {'functions', 'optional_functions'}
+            for key in prerequisites.keys():
+                if key not in valid_keys:
+                    raise ValueError(f"Invalid prerequisites key '{key}'. Valid keys: {valid_keys}")
+                if not isinstance(prerequisites[key], list):
+                    raise TypeError(f"Prerequisites['{key}'] must be a list.")
+
+        if requires is not None:
+            if not isinstance(requires, dict):
+                raise TypeError("Requires must be a dictionary.")
+            valid_keys = {'layers', 'obsm', 'obsp', 'uns', 'var', 'obs', 'varm'}
+            for key in requires.keys():
+                if key not in valid_keys:
+                    raise ValueError(f"Invalid requires key '{key}'. Valid keys: {valid_keys}")
+                if not isinstance(requires[key], list):
+                    raise TypeError(f"Requires['{key}'] must be a list.")
+
+        if produces is not None:
+            if not isinstance(produces, dict):
+                raise TypeError("Produces must be a dictionary.")
+            valid_keys = {'layers', 'obsm', 'obsp', 'uns', 'var', 'obs', 'varm'}
+            for key in produces.keys():
+                if key not in valid_keys:
+                    raise ValueError(f"Invalid produces key '{key}'. Valid keys: {valid_keys}")
+                if not isinstance(produces[key], list):
+                    raise TypeError(f"Produces['{key}'] must be a list.")
+
+        if auto_fix not in ('auto', 'escalate', 'none'):
+            raise ValueError(f"Invalid auto_fix value '{auto_fix}'. Valid values: 'auto', 'escalate', 'none'")
 
         # Generate function key
         module_name = func.__module__
@@ -125,7 +175,12 @@ class FunctionRegistry:
             'related': related or [],
             'signature': signature,
             'parameters': params_info,
-            'docstring': docstring
+            'docstring': docstring,
+            # Prerequisite tracking metadata
+            'prerequisites': prerequisites or {},
+            'requires': requires or {},
+            'produces': produces or {},
+            'auto_fix': auto_fix
         }
         
         # Register under all aliases
@@ -281,7 +336,295 @@ class FunctionRegistry:
                         output.append(f"      {example}")
                 if entry['related']:
                     output.append(f"   🔗 Related: {', '.join(entry['related'])}")
-        
+
+        return "\n".join(output)
+
+    def get_prerequisites(self, func_name: str) -> Dict[str, Any]:
+        """
+        Get full prerequisite information for a function.
+
+        Parameters
+        ----------
+        func_name : str
+            Function name or alias
+
+        Returns
+        -------
+        Dict with keys:
+            - required_functions: List[str] - Must run these first
+            - optional_functions: List[str] - Recommended to run first
+            - requires: Dict - Required data structures
+            - produces: Dict - What the function creates
+            - auto_fix: str - Auto-fix strategy
+
+        Examples
+        --------
+        >>> registry.get_prerequisites('pca')
+        {
+            'required_functions': ['scale'],
+            'optional_functions': ['qc', 'preprocess'],
+            'requires': {'layers': ['scaled']},
+            'produces': {'obsm': ['X_pca'], 'varm': ['PCs'], 'uns': ['pca']},
+            'auto_fix': 'escalate'
+        }
+        """
+        matches = self.find(func_name)
+        if not matches:
+            return {
+                'required_functions': [],
+                'optional_functions': [],
+                'requires': {},
+                'produces': {},
+                'auto_fix': 'none'
+            }
+
+        entry = matches[0]
+        prereqs = entry.get('prerequisites', {})
+
+        return {
+            'required_functions': prereqs.get('functions', []),
+            'optional_functions': prereqs.get('optional_functions', []),
+            'requires': entry.get('requires', {}),
+            'produces': entry.get('produces', {}),
+            'auto_fix': entry.get('auto_fix', 'none')
+        }
+
+    def get_prerequisite_chain(self, func_name: str, include_optional: bool = False) -> List[str]:
+        """
+        Get ordered list of functions to run for prerequisites.
+
+        Parameters
+        ----------
+        func_name : str
+            Target function name
+        include_optional : bool
+            Whether to include optional prerequisites. Default: False
+
+        Returns
+        -------
+        List[str]
+            Ordered prerequisite chain, e.g., ['scale', 'pca']
+
+        Examples
+        --------
+        >>> registry.get_prerequisite_chain('pca')
+        ['scale', 'pca']
+
+        >>> registry.get_prerequisite_chain('leiden')
+        ['neighbors', 'leiden']
+
+        >>> registry.get_prerequisite_chain('pca', include_optional=True)
+        ['qc', 'preprocess', 'scale', 'pca']
+        """
+        prereq_info = self.get_prerequisites(func_name)
+        chain = []
+
+        # Add optional functions if requested
+        if include_optional:
+            chain.extend(prereq_info['optional_functions'])
+
+        # Add required functions
+        chain.extend(prereq_info['required_functions'])
+
+        # Add the target function itself
+        matches = self.find(func_name)
+        if matches:
+            chain.append(matches[0]['short_name'])
+
+        return chain
+
+    def check_prerequisites(self, func_name: str, adata) -> Dict[str, Any]:
+        """
+        Validate if all prerequisites are satisfied for an AnnData object.
+
+        Parameters
+        ----------
+        func_name : str
+            Function to check
+        adata : AnnData
+            Data object to validate
+
+        Returns
+        -------
+        Dict with keys:
+            - satisfied: bool - All requirements met
+            - missing_functions: List[str] - Functions likely not run yet
+            - missing_structures: List[str] - Missing data layers/structures
+            - recommendation: str - What to do next
+            - auto_fixable: bool - Can prerequisites be auto-inserted
+
+        Examples
+        --------
+        >>> result = registry.check_prerequisites('pca', raw_adata)
+        >>> result
+        {
+            'satisfied': False,
+            'missing_functions': ['scale'],
+            'missing_structures': ['adata.layers["scaled"]'],
+            'recommendation': 'Run ov.pp.scale() first or use ov.pp.preprocess()',
+            'auto_fixable': False
+        }
+        """
+        prereq_info = self.get_prerequisites(func_name)
+        requires = prereq_info['requires']
+
+        missing_structures = []
+
+        # Check required layers
+        if 'layers' in requires:
+            for layer in requires['layers']:
+                if not hasattr(adata, 'layers') or layer not in adata.layers:
+                    missing_structures.append(f'adata.layers["{layer}"]')
+
+        # Check required obsm
+        if 'obsm' in requires:
+            for key in requires['obsm']:
+                if not hasattr(adata, 'obsm') or key not in adata.obsm:
+                    missing_structures.append(f'adata.obsm["{key}"]')
+
+        # Check required obsp
+        if 'obsp' in requires:
+            for key in requires['obsp']:
+                if not hasattr(adata, 'obsp') or key not in adata.obsp:
+                    missing_structures.append(f'adata.obsp["{key}"]')
+
+        # Check required uns
+        if 'uns' in requires:
+            for key in requires['uns']:
+                if not hasattr(adata, 'uns') or key not in adata.uns:
+                    missing_structures.append(f'adata.uns["{key}"]')
+
+        # Check required var columns
+        if 'var' in requires:
+            for col in requires['var']:
+                if not hasattr(adata, 'var') or col not in adata.var.columns:
+                    missing_structures.append(f'adata.var["{col}"]')
+
+        # Check required obs columns
+        if 'obs' in requires:
+            for col in requires['obs']:
+                if not hasattr(adata, 'obs') or col not in adata.obs.columns:
+                    missing_structures.append(f'adata.obs["{col}"]')
+
+        # Check required varm
+        if 'varm' in requires:
+            for key in requires['varm']:
+                if not hasattr(adata, 'varm') or key not in adata.varm:
+                    missing_structures.append(f'adata.varm["{key}"]')
+
+        satisfied = len(missing_structures) == 0
+        missing_functions = prereq_info['required_functions'] if not satisfied else []
+
+        # Generate recommendation
+        if satisfied:
+            recommendation = "All prerequisites satisfied"
+        else:
+            auto_fix = prereq_info['auto_fix']
+            if auto_fix == 'auto' and len(missing_functions) <= 2:
+                func_list = ', '.join([f'ov.pp.{f}()' for f in missing_functions])
+                recommendation = f"Auto-fixable: Will insert {func_list}"
+            elif auto_fix == 'escalate' or len(missing_functions) > 2:
+                recommendation = f"Complex prerequisite chain. Consider using a workflow function."
+            else:
+                func_list = ', '.join([f'ov.pp.{f}()' for f in missing_functions])
+                recommendation = f"Run {func_list} first"
+
+        # Auto-fixable if: auto_fix='auto' AND <= 2 missing functions
+        auto_fixable = (prereq_info['auto_fix'] == 'auto' and
+                       len(missing_functions) > 0 and
+                       len(missing_functions) <= 2)
+
+        return {
+            'satisfied': satisfied,
+            'missing_functions': missing_functions,
+            'missing_structures': missing_structures,
+            'recommendation': recommendation,
+            'auto_fixable': auto_fixable
+        }
+
+    def format_prerequisites_for_llm(self, func_name: str) -> str:
+        """
+        Format prerequisite info for LLM consumption in system prompt.
+
+        Parameters
+        ----------
+        func_name : str
+            Function to format prerequisites for
+
+        Returns
+        -------
+        str
+            Formatted text with prerequisite chain, requirements, and guidance
+
+        Examples
+        --------
+        >>> print(registry.format_prerequisites_for_llm('pca'))
+        Function: ov.pp.pca()
+        Prerequisites:
+          - Required functions: scale
+          - Optional functions: qc, preprocess
+          - Requires: adata.layers['scaled']
+          - Produces: adata.obsm['X_pca'], adata.varm['PCs'], adata.uns['pca']
+        Prerequisite Chain: scale → pca
+        Full Chain (with optional): qc → preprocess → scale → pca
+        Auto-fix Strategy: ESCALATE (suggest workflow for complex cases)
+        """
+        matches = self.find(func_name)
+        if not matches:
+            return f"Function '{func_name}' not found in registry."
+
+        entry = matches[0]
+        prereq_info = self.get_prerequisites(func_name)
+        chain = self.get_prerequisite_chain(func_name, include_optional=False)
+        full_chain = self.get_prerequisite_chain(func_name, include_optional=True)
+
+        output = []
+        output.append(f"Function: {entry['full_name']}()")
+        output.append("Prerequisites:")
+
+        # Required functions
+        if prereq_info['required_functions']:
+            output.append(f"  - Required functions: {', '.join(prereq_info['required_functions'])}")
+        else:
+            output.append("  - Required functions: None")
+
+        # Optional functions
+        if prereq_info['optional_functions']:
+            output.append(f"  - Optional functions: {', '.join(prereq_info['optional_functions'])}")
+
+        # Required structures
+        requires = prereq_info['requires']
+        req_list = []
+        for key, values in requires.items():
+            for val in values:
+                req_list.append(f"adata.{key}['{val}']")
+        if req_list:
+            output.append(f"  - Requires: {', '.join(req_list)}")
+
+        # Produced structures
+        produces = prereq_info['produces']
+        prod_list = []
+        for key, values in produces.items():
+            for val in values:
+                prod_list.append(f"adata.{key}['{val}']")
+        if prod_list:
+            output.append(f"  - Produces: {', '.join(prod_list)}")
+
+        # Prerequisite chain
+        if len(chain) > 1:
+            output.append(f"Prerequisite Chain: {' → '.join(chain)}")
+        if len(full_chain) > len(chain):
+            output.append(f"Full Chain (with optional): {' → '.join(full_chain)}")
+
+        # Auto-fix strategy
+        auto_fix = prereq_info['auto_fix']
+        auto_fix_desc = {
+            'auto': 'AUTO (can auto-insert simple prerequisites)',
+            'escalate': 'ESCALATE (suggest workflow for complex cases)',
+            'none': 'NONE (just warn user)'
+        }
+        output.append(f"Auto-fix Strategy: {auto_fix_desc.get(auto_fix, auto_fix)}")
+
         return "\n".join(output)
 
 
@@ -293,10 +636,14 @@ def register_function(aliases: List[str],
                      category: str,
                      description: str,
                      examples: Optional[List[str]] = None,
-                     related: Optional[List[str]] = None):
+                     related: Optional[List[str]] = None,
+                     prerequisites: Optional[Dict[str, List[str]]] = None,
+                     requires: Optional[Dict[str, List[str]]] = None,
+                     produces: Optional[Dict[str, List[str]]] = None,
+                     auto_fix: str = 'none'):
     """
     Decorator to register a function with metadata.
-    
+
     Parameters
     ----------
     aliases : List[str]
@@ -309,7 +656,19 @@ def register_function(aliases: List[str],
         Usage examples
     related : List[str], optional
         Related function names
-    
+    prerequisites : Dict[str, List[str]], optional
+        Function prerequisites, format:
+        {'functions': ['scale'], 'optional_functions': ['qc', 'preprocess']}
+    requires : Dict[str, List[str]], optional
+        Required data structures, format:
+        {'layers': ['scaled'], 'obsm': ['X_pca'], 'uns': ['neighbors'], ...}
+    produces : Dict[str, List[str]], optional
+        Data structures created by this function, format:
+        {'layers': ['scaled'], 'obsm': ['X_pca'], 'uns': ['pca'], ...}
+    auto_fix : str, optional
+        Auto-fix strategy: 'auto' (can auto-insert prerequisites),
+        'escalate' (suggest workflow), 'none' (just warn). Default: 'none'
+
     Examples
     --------
     >>> @register_function(
@@ -319,6 +678,18 @@ def register_function(aliases: List[str],
     ... )
     ... def qc(adata, min_genes=200):
     ...     pass
+
+    >>> @register_function(
+    ...     aliases=["pca", "PCA"],
+    ...     category="preprocessing",
+    ...     description="Perform Principal Component Analysis",
+    ...     prerequisites={'functions': ['scale']},
+    ...     requires={'layers': ['scaled']},
+    ...     produces={'obsm': ['X_pca'], 'varm': ['PCs'], 'uns': ['pca']},
+    ...     auto_fix='escalate'
+    ... )
+    ... def pca(adata, n_pcs=50):
+    ...     pass
     """
     def decorator(func: Callable) -> Callable:
         _global_registry.register(
@@ -327,20 +698,31 @@ def register_function(aliases: List[str],
             category=category,
             description=description,
             examples=examples,
-            related=related
+            related=related,
+            prerequisites=prerequisites,
+            requires=requires,
+            produces=produces,
+            auto_fix=auto_fix
         )
         
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
-        
+
         # Add registry info to function
         wrapper._registry_info = {
             'aliases': aliases,
             'category': category,
             'description': description
         }
-        
+
+        # If func is a class, copy over class methods and static methods
+        import inspect
+        if inspect.isclass(func):
+            for name, value in inspect.getmembers(func):
+                if isinstance(inspect.getattr_static(func, name), (classmethod, staticmethod)):
+                    setattr(wrapper, name, value)
+
         return wrapper
     
     return decorator

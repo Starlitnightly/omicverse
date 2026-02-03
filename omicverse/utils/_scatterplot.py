@@ -136,7 +136,7 @@ def embedding(
     ax: Optional[Axes] = None,
     return_fig: Optional[bool] = None,
     marker: Union[str, Sequence[str]] = '.',
-    arrow_scale: float = 6, 
+    arrow_scale: float = 10, 
     arrow_width: float = 0.005,
     **kwargs,
 ) -> Union[Figure, Axes, None]:
@@ -1175,15 +1175,37 @@ def _add_categorical_legend(
     elif legend_loc == 'on data':
         # identify centroids to put labels
 
+        # Use a category array without index alignment to keep coords and labels in sync.
+        if isinstance(color_source_vector, pd.Categorical):
+            groupby_key = color_source_vector
+        else:
+            groupby_key = pd.Categorical(np.asarray(color_source_vector))
+
         all_pos = (
             pd.DataFrame(scatter_array, columns=["x", "y"])
-            .groupby(color_source_vector, observed=True)
+            .groupby(groupby_key, observed=True)
             .median()
             # Have to sort_index since if observed=True and categorical is unordered
             # the order of values in .index is undefined. Related issue:
             # https://github.com/pandas-dev/pandas/issues/25167
             .sort_index()
         )
+
+        # Convert legend_fontoutline to PathEffect list if needed
+        if legend_fontoutline is not None:
+            if isinstance(legend_fontoutline, (int, float)):
+                # Create white stroke outline with specified width
+                text_path_effects = [
+                    patheffects.withStroke(linewidth=legend_fontoutline, foreground='white')
+                ]
+            elif isinstance(legend_fontoutline, list):
+                # Already a list of PathEffects
+                text_path_effects = legend_fontoutline
+            else:
+                # Single PathEffect object
+                text_path_effects = [legend_fontoutline]
+        else:
+            text_path_effects = None
 
         for label, x_pos, y_pos in all_pos.itertuples():
             ax.text(
@@ -1194,7 +1216,7 @@ def _add_categorical_legend(
                 verticalalignment='center',
                 horizontalalignment='center',
                 fontsize=legend_fontsize,
-                path_effects=legend_fontoutline,
+                path_effects=text_path_effects,
             )
 
 
@@ -1256,8 +1278,12 @@ def _get_color_source_vector(
     
     # Safe checks for obs and var
     in_obs = _safe_check_obs_columns(adata, value_to_plot)
-    in_var = _safe_check_var_names(adata, value_to_plot)
-    
+    # When use_raw is True, check raw.var_names; otherwise check var_names
+    if use_raw and adata.raw is not None:
+        in_var = _safe_check_var_names(adata.raw, value_to_plot)
+    else:
+        in_var = _safe_check_var_names(adata, value_to_plot)
+
     # Handle gene symbols - convert to actual gene names if needed
     if (
         gene_symbols is not None
@@ -1266,11 +1292,15 @@ def _get_color_source_vector(
     ):
         # We should probably just make an index for this, and share it over runs
         try:
-            value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][0]
-            in_var = _safe_check_var_names(adata, value_to_plot)  # Update after conversion
+            if use_raw and adata.raw is not None:
+                value_to_plot = adata.raw.var.index[adata.raw.var[gene_symbols] == value_to_plot][0]
+                in_var = _safe_check_var_names(adata.raw, value_to_plot)  # Update after conversion
+            else:
+                value_to_plot = adata.var.index[adata.var[gene_symbols] == value_to_plot][0]
+                in_var = _safe_check_var_names(adata, value_to_plot)  # Update after conversion
         except (IndexError, KeyError):
             pass  # Will be handled in the error case below
-    
+
     # Determine the source of the data
     if in_obs:
         # Data is in adata.obs (metadata)

@@ -21,3 +21,17 @@ omicverse_guide/site
 *sqlite3
 *log
 *moban*
+# Local, non-repo directories
+Skill_Seekers/
+skill_seekers/
+tmp/
+tmp_omicverse/
+
+# Local progress log
+progress.json
+
+# Coverage reports
+.coverage
+.coverage.*
+coverage.json
+htmlcov/

@@ -37,6 +37,69 @@ except ImportError:
     }
 
 
+DATA_DOWNLOAD_LINK_DICT = {
+    'neuron_splicing':{
+        'figshare':'https://figshare.com/ndownloader/files/47439605',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/neuron_splicing.h5ad',
+    },
+    'neuron_labeling':{
+        'figshare':'https://figshare.com/ndownloader/files/47439629',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/neuron_labeling.h5ad',
+    },
+    'zebrafish':{
+        'figshare':'https://figshare.com/ndownloader/files/47420257',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/zebrafish.h5ad',
+    },
+    'bone_marrow':{
+        'figshare':'https://figshare.com/ndownloader/files/35826944',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/setty_bone_marrow.h5ad',
+    },
+    'human_tfs':{
+        'figshare':'https://figshare.com/ndownloader/files/47439617',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/human_tfs.txt',
+    },
+    'onefilepercell_A1_unique_and_others_J2CH1':{
+        'figshare':'https://figshare.com/ndownloader/files/47439620',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/onefilepercell_A1_unique_and_others_J2CH1.loom',
+    },
+    '10X_multiome_mouse_brain':{
+        'figshare':'https://figshare.com/ndownloader/files/54153947',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/10X_multiome_mouse_brain.loom',
+    },
+    'cell_annotations':{
+        'figshare':'https://figshare.com/ndownloader/files/54154376',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/cell_annotations.tsv',
+    },
+    'dentategyrus_scv':{
+        'figshare':'https://figshare.com/ndownloader/files/47439623',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/dentategyrus_scv.h5ad',
+    },
+    'hematopoiesis_raw':{
+        'figshare':'https://figshare.com/ndownloader/files/47439626',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/hematopoiesis_raw.h5ad',
+    },
+    'rpe1':{
+        'figshare':'https://figshare.com/ndownloader/files/47439641',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/rpe1.h5ad',
+    },
+    'organoid':{
+        'figshare':'https://figshare.com/ndownloader/files/47439632',
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/organoid.h5ad',
+    },
+    'hematopoiesis':{
+        'figshare':'https://figshare.com/ndownloader/files/47439635',  
+        'stanford':'https://stacks.stanford.edu/file/sh696dv4420/hematopoiesis.h5ad',
+    },
+    'COVID_PBMC_bulk':{
+        'figshare':'https://figshare.com/ndownloader/files/59192924',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/COVID_PBMC_bulk_GSE152418.h5ad',
+    },
+    'COVID_PBMC_single':{
+        'figshare':'https://figshare.com/ndownloader/files/59192927',
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/COVID_PBMC_sc_ref.h5ad',
+    },
+}
+
 def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
     """Download example data to local folder."""
     file_path = ntpath.basename(url) if file_path is None else file_path
@@ -73,6 +136,35 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
     return file_path
 
 
+def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
+    """Get URL for a dataset by name, preferring Stanford over Figshare.
+
+    Args:
+        dataset_name: Name of the dataset (e.g., 'neuron_splicing').
+        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+
+    Returns:
+        URL string for the dataset.
+
+    Raises:
+        ValueError: If dataset name is not found.
+    """
+    if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
+        raise ValueError(f"Dataset '{dataset_name}' not found in available datasets")
+
+    dataset_urls = DATA_DOWNLOAD_LINK_DICT[dataset_name]
+
+    if prefer_stanford and 'stanford' in dataset_urls:
+        print(f"{Colors.CYAN}Using Stanford mirror for {dataset_name}{Colors.ENDC}")
+        return dataset_urls['stanford']
+    elif 'figshare' in dataset_urls:
+        if prefer_stanford:
+            print(f"{Colors.WARNING}{EMOJI['warning']} Stanford link not available for {dataset_name}, using Figshare{Colors.ENDC}")
+        return dataset_urls['figshare']
+    else:
+        raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
+
+
 def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     """Download example data to local folder.
 
@@ -85,9 +177,9 @@ def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     """
 
     try:
-        file_path = download_data(url, filename)
+        file_path = download_data_requests(url, filename)
         print(f"{Colors.CYAN} Loading data from {file_path}{Colors.ENDC}")
-        
+
         if Path(file_path).suffixes[-1][1:] == "loom":
             adata = read_loom(filename=file_path)
         elif Path(file_path).suffixes[-1][1:] == "h5ad":
@@ -98,7 +190,7 @@ def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
 
         adata.var_names_make_unique()
         print(f"{Colors.GREEN}{EMOJI['done']} Successfully loaded: {adata.n_obs} cells × {adata.n_vars} genes{Colors.ENDC}")
-        
+
     except OSError:
         # Usually occurs when download is stopped before completion then attempted again.
         file_path = os.path.join('./data', filename)
@@ -192,26 +284,26 @@ def scifate():
 
 
 def scnt_seq_neuron_splicing(
-    url: str = "https://figshare.com/ndownloader/files/47439605",
     filename: str = "neuron_splicing.h5ad",
 ) -> AnnData:
     """The neuron splicing data is from Qiu, et al (2020).
 
     This data consists of 44,021 genes across 13,476 cells.
     """
+    url = get_dataset_url("neuron_splicing")
     adata = get_adata(url, filename)
 
     return adata
 
 
 def scnt_seq_neuron_labeling(
-    url: str = "https://figshare.com/ndownloader/files/47439629",
     filename: str = "neuron_labeling.h5ad",
 ) -> AnnData:
     """The neuron splicing data is from Qiu, et al (2020).
 
     This data consists of 24, 078 genes across 3,060 cells.
     """
+    url = get_dataset_url("neuron_labeling")
     adata = get_adata(url, filename)
 
     return adata
@@ -222,13 +314,13 @@ def cite_seq():
 
 
 def zebrafish(
-    url: str = "https://figshare.com/ndownloader/files/47420257",
     filename: str = "zebrafish.h5ad",
 ) -> AnnData:
     """The zebrafish is from Saunders, et al (2019).
 
     This data consists of 16,940 genes across 4,181 cells.
     """
+    url = get_dataset_url("zebrafish")
     adata = get_adata(url, filename)
 
     return adata
@@ -249,13 +341,13 @@ def dentate_gyrus(
 
 
 def bone_marrow(
-    url: str = "https://figshare.com/ndownloader/files/35826944",
     filename: str = "bone_marrow.h5ad",
 ) -> AnnData:
     """The bone marrow dataset used in
 
     This data consists of 27,876 genes across 5,780 cells.
     """
+    url = get_dataset_url("bone_marrow")
     adata = get_adata(url, filename)
 
     return adata
@@ -300,7 +392,6 @@ def hg_forebrain_glutamatergic(
 
 
 def chromaffin(
-    url: str = "https://figshare.com/ndownloader/files/47439620",
     filename: str = "onefilepercell_A1_unique_and_others_J2CH1.loom",
 ) -> AnnData:  #
     """The chromaffin dataset used in http://pklab.med.harvard.edu/velocyto/notebooks/R/chromaffin2.nb.html
@@ -308,6 +399,7 @@ def chromaffin(
     This data consists of 32,738 genes across 1,720 cells.
     """
 
+    url = get_dataset_url("onefilepercell_A1_unique_and_others_J2CH1")
     adata = get_adata(url, filename)
 
     adata.var_names_make_unique()
@@ -342,9 +434,20 @@ def pancreatic_endocrinogenesis(
 
     return adata
 
+def pancreas_cellrank(
+    url: str = "https://figshare.com/ndownloader/files/25060877",
+    filename: str = "pancreas_cellrank.h5ad",
+) -> AnnData:
+    """The pancreas cellrank dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/Pancreas.
+
+    This data consists of 13,913 genes across 2,930 cells.
+    """
+    adata = get_adata(url, filename)
+    return adata
+
+
 
 def dentate_gyrus_scvelo(
-    url: str = "https://figshare.com/ndownloader/files/47439623",
     filename: str = "dentategyrus_scv.h5ad",
 ) -> AnnData:
     """The Dentate Gyrus dataset used in https://github.com/theislab/scvelo_notebooks/tree/master/data/DentateGyrus.
@@ -352,13 +455,13 @@ def dentate_gyrus_scvelo(
     This data consists of 13,913 genes across 2,930 cells. Note this dataset is the same processed dataset from the
     excellent scVelo package, which is a subset of the DentateGyrus dataset.
     """
+    url = get_dataset_url("dentategyrus_scv")
     adata = get_adata(url, filename)
 
     return adata
 
 
 def sceu_seq_rpe1(
-    url: str = "https://figshare.com/ndownloader/files/47439641",
     filename: str = "rpe1.h5ad",
 ):
     """Download rpe1 dataset from Battich, et al (2020) via a figshare link.
@@ -366,12 +469,12 @@ def sceu_seq_rpe1(
     This data consists of 13,913 genes across 2,930 cells.
     """
     print(f"{Colors.HEADER}{EMOJI['start']} Downloading scEU_seq data{Colors.ENDC}")
+    url = get_dataset_url("rpe1")
     adata = get_adata(url, filename)
     return adata
 
 
 def sceu_seq_organoid(
-    url: str = "https://figshare.com/ndownloader/files/47439632",
     filename: str = "organoid.h5ad",
 ):
     """Download organoid dataset from Battich, et al (2020) via a figshare link.
@@ -379,18 +482,17 @@ def sceu_seq_organoid(
     This data consists of 9,157 genes across 3,831 cells.
     """
     print(f"{Colors.HEADER}{EMOJI['start']} Downloading scEU_seq data{Colors.ENDC}")
+    url = get_dataset_url("organoid")
     adata = get_adata(url, filename)
     return adata
 
 
 def hematopoiesis(
-    url: str = "https://figshare.com/ndownloader/files/47439635",
-    # url: str = "https://pitt.box.com/shared/static/kyh3s4wrxdywupn9wk9r2j27vzlvk8vf.h5ad", # with box
-    # url: str = "https://pitt.box.com/shared/static/efqa8icu1m6d1ghfcc3s9tj0j91pky1h.h5ad", # v0: umap_ori version
     filename: str = "hematopoiesis.h5ad",
 ) -> AnnData:
     """Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed."""
     print(f"{Colors.HEADER}🧬 Downloading processed hematopoiesis adata{Colors.ENDC}")
+    url = get_dataset_url("hematopoiesis")
     adata = get_adata(url, filename)
     return adata
 
@@ -404,8 +506,8 @@ def multi_brain_5k():
     fragment_url='https://cf.10xgenomics.com/samples/cell-arc/1.0.0/e18_mouse_brain_fresh_5k/e18_mouse_brain_fresh_5k_atac_fragments.tsv.gz'
     fragment_tbi_url='https://cf.10xgenomics.com/samples/cell-arc/1.0.0/e18_mouse_brain_fresh_5k/e18_mouse_brain_fresh_5k_atac_fragments.tsv.gz.tbi'
     peak_annotation_url='https://cf.10xgenomics.com/samples/cell-arc/1.0.0/e18_mouse_brain_fresh_5k/e18_mouse_brain_fresh_5k_atac_peak_annotation.tsv'
-    velocyto_url='https://figshare.com/ndownloader/files/54153947'
-    anontation_url='https://figshare.com/ndownloader/files/54154376'
+    velocyto_url=get_dataset_url("10X_multiome_mouse_brain")
+    anontation_url=get_dataset_url("cell_annotations")
 
     h5_path = download_data_requests(h5_url, 'filtered_feature_bc_matrix.h5', dir='./data/multi_brain_5k')
     fragment_path = download_data_requests(fragment_url, 'fragments.tsv.gz', dir='./data/multi_brain_5k')
@@ -442,22 +544,21 @@ def multi_brain_5k():
 
 
 def hematopoiesis_raw(
-    url: str = "https://figshare.com/ndownloader/files/47439626",
-    # url: str = "https://pitt.box.com/shared/static/bv7q0kgxjncc5uoget5wvmi700xwntje.h5ad", # with box
     filename: str = "hematopoiesis_raw.h5ad",
 ) -> AnnData:
     """Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed."""
     print(f"{Colors.HEADER}🧬 Downloading raw hematopoiesis adata{Colors.ENDC}")
+    url = get_dataset_url("hematopoiesis_raw")
     adata = get_adata(url, filename)
     return adata
 
 
 def human_tfs(
-    url: str = "https://figshare.com/ndownloader/files/47439617",
     filename: str = "human_tfs.txt",
 ) -> pd.DataFrame:
     """Download human transcription factors."""
-    file_path = download_data(url, filename)
+    url = get_dataset_url("human_tfs")
+    file_path = download_data_requests(url, filename)
     tfs = pd.read_csv(file_path, sep="\t")
     return tfs
 
@@ -843,26 +944,38 @@ def create_mock_dataset(
 
 
 def decov_bulk_covid_bulk(
-    url: str = "https://figshare.com/ndownloader/files/59192924",
     filename: str = "COVID_PBMC_bulk.h5ad"
 ) -> AnnData:
     """COVID-19 PBMC bulk data from Decov et al. 2020.
-    
+
     This data consists of 10,000 cells × 15,000 genes.
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC bulk data{Colors.ENDC}")
+    url = get_dataset_url("COVID_PBMC_bulk")
     adata = get_adata(url, filename)
     return adata
 
 def decov_bulk_covid_single(
-    url: str = "https://figshare.com/ndownloader/files/59192927",
     filename: str = "COVID_PBMC_single.h5ad"
 ) -> AnnData:
     """COVID-19 PBMC single-cell data from Decov et al. 2020.
-    
+
     This data consists of 10,000 cells × 15,000 genes.
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC single-cell data{Colors.ENDC}")
+    url = get_dataset_url("COVID_PBMC_single")
+    adata = get_adata(url, filename)
+    return adata
+
+def sc_ref_Lymph_Node(
+    url: str = "https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad",
+    filename: str = "sc_ref_Lymph_Node.h5ad"
+) -> AnnData:
+    """SC reference data for Lymph Node.
+    
+    This data consists of 10,000 cells × 15,000 genes.
+    """
+    print(f"{Colors.HEADER}🧬 Loading SC reference data for Lymph Node{Colors.ENDC}")
     adata = get_adata(url, filename)
     return adata
 

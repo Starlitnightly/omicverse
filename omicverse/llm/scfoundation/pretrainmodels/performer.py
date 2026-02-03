@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.cuda.amp import autocast
-from einops import rearrange, repeat
+
 
 from functools import partial
 from contextlib import contextmanager
@@ -71,6 +71,7 @@ class Always(nn.Module):
 # https://github.com/google-research/google-research/blob/master/performer/fast_attention/jax/fast_attention.py
 
 def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device = None):
+    from einops import rearrange, repeat
     b, h, *_ = data.shape
 
     data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.
@@ -98,6 +99,7 @@ def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, ep
     return data_dash.type_as(data)
 
 def generalized_kernel(data, *, projection_matrix, kernel_fn = nn.ReLU(), kernel_epsilon = 0.001, normalize_data = True, device = None):
+    from einops import rearrange, repeat
     b, h, *_ = data.shape
 
     data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.
@@ -363,6 +365,7 @@ class SelfAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, pos_emb = None, context = None, mask = None, context_mask = None, output_attentions = False, **kwargs):
+        from einops import rearrange, repeat
         b, n, _, h, gh = *x.shape, self.heads, self.global_heads
 
         cross_attend = exists(context)
@@ -418,12 +421,14 @@ class AbsolutePositionalEmbedding(nn.Module):
 # rotary positional embedding helpers
 
 def rotate_every_two(x):
+    from einops import rearrange, repeat
     x = rearrange(x, '... (d j) -> ... d j', j = 2)
     x1, x2 = x.unbind(dim = -1)
     x = torch.stack((-x2, x1), dim = -1)
     return rearrange(x, '... d j -> ... (d j)')
 
 def apply_rotary_pos_emb(q, k, sinu_pos):
+    from einops import rearrange, repeat
     sinu_pos = rearrange(sinu_pos, '() n (j d) -> n j d', j = 2)
     sin, cos = sinu_pos.unbind(dim = -2)
     sin, cos = map(lambda t: repeat(t, 'b n -> b (n j)', j = 2), (sin, cos))

@@ -244,7 +244,7 @@ def pruning_clustergraph(adjacency, global_pruning_std=1, max_outgoing=30, prese
     n_comp, comp_labels = connected_components(csgraph=adjacency, directed=False, return_labels=True)
 
     sources, targets = cluster_graph_csr.nonzero()
-    mask = np.zeros(len(sources), dtype=bool)
+    mask = np.zeros(len(cluster_graph_csr.data), dtype=bool)
 
     cluster_graph_csr.data = cluster_graph_csr.data / (np.std(cluster_graph_csr.data))  # normalize
     threshold_global = np.mean(cluster_graph_csr.data) - global_pruning_std * np.std(cluster_graph_csr.data)

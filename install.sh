@@ -157,6 +157,20 @@ pip_install_pkg omicverse
 #------------------------
 # 6. Other deep‐bio packages 🌱
 #------------------------
+
+pip_install_pkg \
+  pydeseq2 \
+  mofax \
+  tomli \
+  lifelines \
+  ktplotspy \
+  pillow \
+  einops \
+  tensorboard \
+  metatime \
+  graphtools \
+
+
 pip_install_pkg \
   tangram-sc \
   fa2-modified \
@@ -205,7 +219,8 @@ pip_install_pkg \
 #------------------------
 # 8. Version‐locked packages 🔒
 #------------------------
-
+echo "🛠️ Ensuring pandas < 3.0.0, numpy < 2.0.0, and zarr < 3.0.0 for stability..."
+uv pip install "pandas<3.0.0" "numpy<2.0.0" "zarr<3.0.0" --force-reinstall $PIP_INDEX
 
 #------------------------
 # 9. Miscellaneous tools 🛠️

@@ -17,6 +17,8 @@ import shutil
 import subprocess
 from uuid import uuid4
 from typing import List, Dict, Optional, Union
+import importlib.util
+from ..utils.registry import register_function
 
 class Colors:
     """ANSI color codes for terminal output styling."""
@@ -39,19 +41,51 @@ def _ensure_dir(path: str):
 
 def _which_kb() -> str:
     """
-    Resolve the kb executable.
-    Returns the absolute path to the 'kb' executable if found in PATH, else
-    returns a 'python -m kb_python' launcher string if Python is available.
+    Resolve the 'kb' executable.
+
+    Priority:
+    1) Return the 'kb' executable found on the PATH.
+    2) If not found, try to find an executable named 'kb' in the same directory
+       as the current Python interpreter (this covers venv/conda installs).
+    3) If still not found, fall back to invoking a module with the current Python:
+       prefer `python -m kb` if the 'kb' module is importable, otherwise try
+       `python -m kb_python` if that module is importable.
+    If none of the above are available, raise FileNotFoundError.
     """
+    # 1) Look for 'kb' on PATH first
     kb = shutil.which('kb')
     if kb:
         return kb
+
+    # 2) Try to find a 'kb' executable next to the current Python executable
+    #    (handles cases where the console script is installed into the env's bin/)
+    if sys.executable:
+        exe_dir = os.path.dirname(sys.executable)
+        for candidate in ('kb', 'kb.exe'):
+            cand_path = os.path.join(exe_dir, candidate)
+            if os.path.isfile(cand_path) and os.access(cand_path, os.X_OK):
+                return cand_path
+
+    # 3) Fall back to using `python -m <module>` but only if the module exists.
     python_exe = sys.executable or shutil.which('python3') or shutil.which('python')
     if python_exe:
-        return f'{python_exe} -m kb_python'
+        try:
+            # Prefer the 'kb' module (if present) so we run `python -m kb`
+            if importlib.util.find_spec('kb') is not None:
+                return f'{python_exe} -m kb'
+            # Otherwise, try the legacy/alternate 'kb_python' package
+            if importlib.util.find_spec('kb_python') is not None:
+                return f'{python_exe} -m kb_python'
+        except Exception:
+            # If importlib checks fail unexpectedly, fall through to the final error.
+            pass
+
+    # Nothing found — raise a helpful error
     raise FileNotFoundError(
-        "Could not find 'kb' executable on PATH and no suitable Python interpreter to "
-        "run 'python -m kb_python'. Please ensure kb-python is installed and available."
+        "Could not find the 'kb' executable on PATH or next to the current Python interpreter, "
+        "and neither 'kb' nor 'kb_python' modules are importable for `python -m` invocation. "
+        "Please ensure kb-python is installed in the active environment (e.g. activate your conda/venv), "
+        "or provide the absolute path to the 'kb' executable."
     )
 
 
@@ -83,6 +117,31 @@ def _run_kb(cmd: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[
     ret = proc.wait()
     if ret != 0:
         raise RuntimeError(f"kb command failed with exit code {ret}")
+
+
+def _run_parallel_fastq_dump(cmd: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None) -> None:
+    """
+    Run a parallel-fastq-dump command, streaming output to the console. Raises on non-zero exit.
+    """
+    print(f"{Colors.CYAN}>> {' '.join(shlex.quote(c) for c in cmd)}{Colors.ENDC}")
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        cwd=cwd,
+        env=env,
+        text=True,
+        bufsize=1
+    )
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            print(line, end='')
+    finally:
+        proc.stdout.close()
+    ret = proc.wait()
+    if ret != 0:
+        raise RuntimeError(f"parallel-fastq-dump command failed with exit code {ret}")
 
 
 def _append_flag(cmd: List[str], flag: str, value: Optional[Union[str, int, float, bool]], as_bool: bool = False):
@@ -413,10 +472,19 @@ def count(
     _append_flag(cmd, '-m', memory)
     _append_flag(cmd, '--overwrite', overwrite, as_bool=True)
 
-    # Filtering
-    if filter_barcodes:
-        cmd.extend(['--filter', 'bustools'])
-    _append_flag(cmd, '--filter-threshold', filter_threshold)
+    # Filtering (ONLY for barcode-based single-cell tech)
+    is_bulk = str(technology).upper() == "BULK"
+    if is_bulk:
+        # BULK has no barcodes/UMIs; kb CLI rejects --filter/--filter-threshold
+        if filter_barcodes:
+            raise ValueError("filter_barcodes/--filter is not supported for technology='BULK'")
+        if filter_threshold is not None:
+            raise ValueError("filter_threshold/--filter-threshold is not supported for technology='BULK'")
+    else:
+        if filter_barcodes:
+            cmd.extend(['--filter', 'bustools'])
+        if filter_threshold is not None:
+            _append_flag(cmd, '--filter-threshold', filter_threshold)
 
     # Matrix mode
     _append_flag(cmd, '--tcc', tcc, as_bool=True)
@@ -614,6 +682,199 @@ def analyze_10x_v3_data(
     return results  # type: ignore[return-value]
 
 
+@register_function(
+    aliases=["parallel_fastq_dump", "并行下载SRA", "pfastq_dump"],
+    category="utils",
+    description="Download SRA data in parallel using parallel-fastq-dump",
+    examples=[
+        "# Download SRA data with 4 threads",
+        "ov.alignment.parallel_fastq_dump(sra_id='SRR2244401', threads=4, outdir='out/', split_files=True, gzip=True)",
+        "# Download with specific spot range",
+        "ov.alignment.parallel_fastq_dump(sra_id='SRR2244401', threads=4, outdir='out/', min_spot_id=1, max_spot_id=10000, split_files=True)"
+    ],
+    related=["alignment.ref", "alignment.count"]
+)
+def parallel_fastq_dump(
+    sra_id: str,
+    threads: int = 1,
+    outdir: str = '.',
+    tmpdir: Optional[str] = None,
+    min_spot_id: int = 1,
+    max_spot_id: Optional[int] = None,
+    split_files: bool = False,
+    gzip: bool = False,
+    **kwargs
+) -> Dict[str, Union[str, int]]:
+    r"""Download SRA data in parallel using parallel-fastq-dump.
+
+    This function wraps the parallel-fastq-dump tool to download sequencing data
+    from NCBI SRA (Sequence Read Archive) in parallel for faster downloads.
+
+    Arguments:
+        sra_id: SRA accession ID (e.g., 'SRR2244401').
+        threads: Number of threads to use for parallel download. Default: 1.
+        outdir: Output directory for downloaded FASTQ files. Default: '.'.
+        tmpdir: Temporary directory for intermediate files. Default: None.
+        min_spot_id: Minimum spot ID to download. Default: 1.
+        max_spot_id: Maximum spot ID to download. Default: None (all spots).
+        split_files: Split paired-end reads into separate files. Default: False.
+        gzip: Compress output files with gzip. Default: False.
+        **kwargs: Additional arguments to pass to parallel-fastq-dump.
+
+    Returns:
+        result: Dictionary containing download metadata including sra_id, threads,
+                outdir, and output file paths.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> # Download SRA data with 4 threads and split files
+        >>> result = ov.alignment.parallel_fastq_dump(
+        ...     sra_id='SRR2244401',
+        ...     threads=4,
+        ...     outdir='fastq_output/',
+        ...     split_files=True,
+        ...     gzip=True
+        ... )
+        >>> # Download with spot range limit
+        >>> result = ov.alignment.parallel_fastq_dump(
+        ...     sra_id='SRR2244401',
+        ...     threads=8,
+        ...     outdir='fastq_output/',
+        ...     min_spot_id=1,
+        ...     max_spot_id=100000,
+        ...     split_files=True,
+        ...     gzip=True
+        ... )
+    """
+    print(f"{Colors.BOLD}{Colors.HEADER}🚀 Starting parallel-fastq-dump for {sra_id}{Colors.ENDC}")
+    print(f"{Colors.CYAN}    Threads: {threads}{Colors.ENDC}")
+    print(f"{Colors.CYAN}    Output directory: {outdir}{Colors.ENDC}")
+
+    # Ensure output directory exists
+    _ensure_dir(outdir)
+
+    # Check if parallel-fastq-dump is available
+    try:
+        pfastq_dump = _which_parallel_fastq_dump()
+    except Exception as e:
+        print(f"{Colors.FAIL}✗ parallel-fastq-dump not found: {e}{Colors.ENDC}", file=sys.stderr)
+        raise FileNotFoundError(
+            "Could not find 'parallel-fastq-dump' executable on PATH. "
+            "Please install it using: conda install -c bioconda parallel-fastq-dump"
+        )
+
+    # Build command
+    cmd: List[str] = [pfastq_dump]
+
+    # Required arguments
+    _append_flag(cmd, '--sra-id', sra_id)
+    _append_flag(cmd, '--threads', threads)
+    _append_flag(cmd, '--outdir', outdir)
+
+    # Optional arguments
+    if tmpdir:
+        _append_flag(cmd, '--tmpdir', tmpdir)
+    _append_flag(cmd, '--minSpotId', min_spot_id)
+    if max_spot_id:
+        _append_flag(cmd, '--maxSpotId', max_spot_id)
+
+    # Boolean flags
+    if split_files:
+        cmd.append('--split-files')
+    if gzip:
+        cmd.append('--gzip')
+
+    # Pass-through additional arguments
+    for key, value in kwargs.items():
+        flag = f"--{key.replace('_', '-')}"
+        if isinstance(value, bool):
+            if value:
+                cmd.append(flag)
+        else:
+            _append_flag(cmd, flag, value)
+
+    # Ensure the directory containing parallel-fastq-dump is in PATH
+    # so that sra-stat and other SRA tools can be found
+    env = os.environ.copy()
+    pfastq_dump_dir = os.path.dirname(pfastq_dump) if not ' ' in pfastq_dump else os.path.dirname(shlex.split(pfastq_dump)[-1])
+    if pfastq_dump_dir and os.path.isdir(pfastq_dump_dir):
+        # Prepend the directory to PATH
+        env['PATH'] = pfastq_dump_dir + os.pathsep + env.get('PATH', '')
+        print(f"{Colors.BLUE}    Added to PATH: {pfastq_dump_dir}{Colors.ENDC}")
+
+    try:
+        _run_parallel_fastq_dump(cmd, env=env)
+        print(f"{Colors.GREEN}✓ parallel-fastq-dump completed successfully!{Colors.ENDC}")
+    except Exception as e:
+        print(f"{Colors.FAIL}✗ parallel-fastq-dump failed: {e}{Colors.ENDC}", file=sys.stderr)
+        raise
+
+    # Build result dictionary
+    result: Dict[str, Union[str, int, List[str]]] = {
+        'sra_id': sra_id,
+        'threads': threads,
+        'outdir': outdir,
+        'split_files': split_files,
+        'gzip': gzip
+    }
+
+    # Detect output files
+    extension = '.fastq.gz' if gzip else '.fastq'
+    if split_files:
+        # For paired-end data with split files
+        file1 = os.path.join(outdir, f"{sra_id}_1{extension}")
+        file2 = os.path.join(outdir, f"{sra_id}_2{extension}")
+        if os.path.exists(file1):
+            result['output_files'] = [file1]
+            if os.path.exists(file2):
+                result['output_files'].append(file2)  # type: ignore[union-attr]
+    else:
+        # Single file output
+        output_file = os.path.join(outdir, f"{sra_id}{extension}")
+        if os.path.exists(output_file):
+            result['output_file'] = output_file
+
+    return result  # type: ignore[return-value]
+
+
+def _which_parallel_fastq_dump() -> str:
+    """
+    Resolve the 'parallel-fastq-dump' executable.
+    """
+
+    # 1) Look for 'parallel-fastq-dump' on PATH first
+    parallel_fastq_dump = shutil.which('parallel-fastq-dump')
+    if parallel_fastq_dump:
+        return parallel_fastq_dump
+
+    # 2) Try to find a 'parallel-fastq-dump' executable next to the current Python executable
+    #    (handles cases where the console script is installed into the env's bin/)
+    if sys.executable:
+        exe_dir = os.path.dirname(sys.executable)
+        for candidate in ('parallel-fastq-dump', 'parallel-fastq-dump.exe'):
+            cand_path = os.path.join(exe_dir, candidate)
+            if os.path.isfile(cand_path) and os.access(cand_path, os.X_OK):
+                return cand_path
+
+    # 3) Fall back to using `python -m <module>` but only if the module exists.
+    python_exe = sys.executable or shutil.which('python3') or shutil.which('python')
+    if python_exe:
+        try:
+            # Prefer the 'parallel-fastq-dump' module (if present) so we run `python -m parallel-fastq-dump`
+            if importlib.util.find_spec('parallel-fastq-dump') is not None:
+                return f'{python_exe} -m parallel-fastq-dump'
+        except Exception:
+            # If importlib checks fail unexpectedly, fall through to the final error.
+            pass
+
+    # Nothing found — raise a helpful error
+    raise FileNotFoundError(
+        "Could not find the 'parallel-fastq-dump' executable on PATH or next to the current Python interpreter, "
+        "and neither 'parallel-fastq-dump' modules are importable for `python -m` invocation. "
+        "Please ensure parallel-fastq-dump is installed in the active environment (e.g. activate your conda/venv), "
+        "or provide the absolute path to the 'parallel-fastq-dump' executable."
+    )
+
 # Optional namespace similar to your previous code
 import types
 single = types.SimpleNamespace()
@@ -621,3 +882,4 @@ single.Colors = Colors
 single.ref = ref
 single.count = count
 single.analyze_10x_v3_data = analyze_10x_v3_data
+single.parallel_fastq_dump = parallel_fastq_dump

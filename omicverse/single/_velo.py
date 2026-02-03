@@ -1,4 +1,5 @@
 from .._settings import Colors, EMOJI
+from .._monitor import monitor
 
 
 class Velo:

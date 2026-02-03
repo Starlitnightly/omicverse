@@ -4,9 +4,40 @@
 
 <div align="center">
   <a href="READMEM/README_CN.md">中文</a> | <a href="READMEM/README_ES.md">Español</a> | <a href="READMEM/README_JP.md">日本語</a> | <a href="READMEM/README_DE.md">Deutsch</a> | <a href="READMEM/README_FR.md">Français</a> | <a href="READMEM/README_KR.md">한국어</a>
-</div>
 
-[![pypi-badge](https://img.shields.io/pypi/v/omicverse)](https://pypi.org/project/omicverse) [![Documentation Status](https://readthedocs.org/projects/omicverse/badge/?version=latest)](https://omicverse.readthedocs.io/en/latest/?badge=latest) [![pypiDownloads](https://static.pepy.tech/badge/omicverse)](https://pepy.tech/project/omicverse) [![condaDownloads](https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda)](https://anaconda.org/conda-forge/omicverse) [![License:GPL](https://img.shields.io/badge/license-GNU-blue)](https://img.shields.io/apm/l/vim-mode) [![scverse](https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow)](https://scverse.org/) [![Pytest](https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg)](https://github.com/Starlitnightly/omicverse/) ![Docker Pulls](https://img.shields.io/docker/pulls/starlitnightly/omicverse)
+
+|         |                                                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CI/CD   |  [![pre-commit.ci status][precommit-badge]][precommit-link]               |
+| Docs    | [![Documentation Status][readthedocs-badge]][readthedocs-link] [![Preprint][preprint-badge]][preprint-link]                                            |
+| Package | [![PyPI - Version][pypi-badge]][pypi-link] [![pypi download][pypi-download-badge]][pypi-download-link] [![Conda-forge badge][conda-forge-badge]][anaconda-link] [![Docker image][docker-badge]][docker-link] |
+| Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link] [![Star][star-badge]][star-link] [![Citations][citation-badge]][citation-link]           |
+
+
+[precommit-badge]: https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg
+[precommit-link]:https://github.com/Starlitnightly/omicverse/
+[readthedocs-badge]:https://readthedocs.org/projects/omicverse/badge/?version=latest
+[readthedocs-link]:https://omicverse.readthedocs.io/en/latest/?badge=latest
+[preprint-badge]: https://img.shields.io/badge/DOI-10.1038/s41467.024.50194.3-368650.svg
+[preprint-link]: https://doi.org/10.1038/s41467-024-50194-3
+[pypi-badge]: https://img.shields.io/pypi/v/omicverse
+[pypi-link]: https://pypi.org/project/omicverse
+[pypi-download-badge]:https://static.pepy.tech/badge/omicverse
+[pypi-download-link]:https://pepy.tech/project/omicverse
+[conda-forge-badge]: https://img.shields.io/conda/dn/conda-forge/omicverse?logo=Anaconda
+[anaconda-link]: https://anaconda.org/conda-forge/omicverse
+[docker-badge]: https://img.shields.io/badge/docker-image-blue?logo=docker
+[docker-link]: https://img.shields.io/docker/pulls/starlitnightly/omicverse
+[license-badge]: https://img.shields.io/badge/license-GNU-blue
+[license-link]: https://img.shields.io/apm/l/vim-mode
+[scverse-badge]: https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow
+[scverse-link]: https://scverse.org/
+[star-badge]:https://img.shields.io/github/stars/Starlitnightly/omicverse
+[star-link]:https://github.com/Starlitnightly/omicverse
+[citation-badge]:https://citations.njzjz.win/10.1038/s41467-024-50194-3
+[citation-link]:https://doi.org/10.1038/s41467-024-50194-3
+
+</div>
 
 
 **`OmicVerse`** is the fundamental package for multi omics included **bulk ,single cell and spatial RNA-seq** analysis with Python. For more information, please read our paper: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
@@ -178,7 +209,19 @@ The table contains the tools have been published
     <td align="center">Scaden<br><a href="https://github.com/KevinMenden/scaden">📦</a> <a href="https://www.science.org/doi/10.1126/sciadv.aba2619">📖</a></td>
     <td align="center">BayesPrime<br><a href="https://github.com/Danko-Lab/BayesPrism">📦</a> <a href="https://github.com/ziluwang829/pyBayesPrism">📦</a> <a href="https://www.nature.com/articles/s43018-022-00356-3">📖</a></td>
     <td align="center">InstaPrime<br><a href="https://github.com/humengying0907/InstaPrism">📦</a> <a href="https://academic.oup.com/bioinformatics/article/40/7/btae440/7708397">📖</a></td>
+    <td align="center">Cellpytist<br><a href="https://github.com/Teichlab/celltypist">📦</a> <a href="https://www.science.org/doi/10.1126/science.abl5197">📖</a></td>
+    <td align="center">latentvelo<br><a href="https://github.com/Spencerfar/LatentVelo">📦</a> <a href="https://www.cell.com/cell-reports-methods/fulltext/S2667-2375(23)00225-4">📖</a></td>
+    <td align="center">graphvelo<br><a href="https://github.com/xing-lab-pitt/GraphVelo">📦</a> <a href="https://www.nature.com/articles/s41467-025-62784-w">📖</a></td>
 
+  </tr>
+
+  <tr>
+    <td align="center">scvelo<br><a href="https://github.com/theislab/scvelo">📦</a> <a href="http://dx.doi.org/10.1038/s41587-020-0591-3">📖</a></td>
+    <td align="center">Dynamo<br><a href="https://github.com/aristoteleo/dynamo-release">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S0092867421015774">📖</a></td>
+    <td align="center">CONCORD<br><a href="https://github.com/Gartner-Lab/Concord/">📦</a> <a href="https://www.nature.com/articles/s41587-025-02950-z">📖</a></td>
+    <td align="center">FlashDeconv<br><a href="https://github.com/cafferychen777/FlashDeconv">📦</a> <a href="https://doi.org/10.64898/2025.12.22.696108">📖</a></td>
+    <td align="center">Hospot<br><a href="https://github.com/yoseflab/hotspot">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S2405471221001149?via%3Dihub">📖</a></td>
+    <td align="center">Banksy<br><a href="https://github.com/prabhakarlab/Banksy_py">📦</a> <a href="https://www.nature.com/articles/s41588-024-01664-3#citeas">📖</a></td>
 
   </tr>
 </table>
@@ -200,6 +243,20 @@ The table contains the tools have been published
 ## `6` [Developer Guild and Contributing](#)
 
 If you would like to contribute to omicverse, please refer to our [developer documentation](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
+
+### Running tests locally
+
+Install the test dependencies and execute the suite with `pytest`:
+
+```bash
+pip install -e .[tests]
+# or install the pinned latest requirements
+pip install -r requirements-latest.txt
+
+pytest
+```
+
+The optional `tests` extra and the `requirements-latest.txt` file now include `pytest-asyncio>=0.23`, which is required for the asynchronous streaming tests under `tests/utils/`.
 
 <table align="center">
     <tr>
@@ -229,9 +286,9 @@ Here are some other related packages, feel free to reference them if you use the
 
 > **CellOntologyMapper: Consensus mapping of cell type annotation**
 >
-> Zeng, Z., Wang, X., Du, H.
+> Zeng, Z., Wang, X., Du, H. et al.
 >
-> _bioRxiv_ 2025 Jun 20. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
+> _imetaomics_ 2025 Nov 06. doi: [10.1002/imo2.70064](https://doi.org/10.1002/imo2.70064).
 
 
 ## `8` [Other](#)

@@ -1,45 +1,41 @@
 # This file is a modified version of the scrublet.py file from scanpy.
-# The only difference is that it allows for the use of GPU.
+# The only difference is that it allows for the use of GPU and removes scanpy dependency.
 # The original file can be found at:
 # https://github.com/scverse/scanpy/blob/main/scanpy/preprocessing/_scrublet/core.py
 from __future__ import annotations
 
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
+from functools import wraps
 
 import numpy as np
 import pandas as pd
 from anndata import AnnData
 from scipy import sparse
 
-from scanpy import logging as logg
-from scanpy import preprocessing as pp
-from ._compat import old_positionals
-from scanpy.get import _get_obs_rep
-from scanpy.preprocessing._scrublet import pipeline
-from scanpy.preprocessing._scrublet.core import Scrublet
+from ..external.scrublet import Scrublet
+from ..external.scrublet.helper_functions import (
+    pipeline_mean_center,
+    pipeline_normalize_variance,
+    pipeline_zscore,
+    pipeline_truncated_svd,
+)
 from .._settings import EMOJI, Colors, settings
 from datetime import datetime
 
-
-from importlib.util import find_spec
-from typing import TYPE_CHECKING
-
-import numpy as np
-import pandas as pd
-from anndata import AnnData
-from scipy import sparse
-
-
-
+# Import utility functions from pp module
+from ._compat import old_positionals
+from ._scale import _get_obs_rep
+from ._qc import filter_cells, filter_genes
+from ._normalization import normalize_total, log1p
+from ._highly_variable_genes import highly_variable_genes
 
 if TYPE_CHECKING:
     from typing import Literal
-    from ._compat import _LegacyRandom
-    from scanpy.neighbors import _Metric, _MetricFn
-
-from ._normalization import normalize_total
-from ._highly_variable_genes import highly_variable_genes
+    from numpy.random import RandomState
+    _LegacyRandom = int | RandomState | None
+    _Metric = str
+    _MetricFn = callable
 
 @old_positionals(
     "batch_key",
@@ -114,11 +110,11 @@ def scrublet(
     Returns:
         adata with doublet predictions added if copy=False, otherwise returns modified copy
     """
-    if threshold is None and not find_spec("skimage"):  # pragma: no cover
+    #if threshold is None and not find_spec("skimage"):  # pragma: no cover
         # Scrublet.call_doublets requires `skimage` with `threshold=None` but PCA
         # is called early, which is wasteful if there is not `skimage`
-        msg = "threshold is None and thus scrublet requires skimage, but skimage is not installed."
-        raise ValueError(msg)
+        #msg = "threshold is None and thus scrublet requires skimage, but skimage is not installed."
+        #raise ValueError(msg)
 
     if copy:
         adata = adata.copy()
@@ -140,8 +136,8 @@ def scrublet(
 
         if ad_sim is None:
             print(f"   {Colors.GREEN}{EMOJI['start']} Filtering genes and cells...{Colors.ENDC}")
-            pp.filter_genes(ad_obs, min_cells=3)
-            pp.filter_cells(ad_obs, min_genes=3)
+            filter_genes(ad_obs, min_cells=3)
+            filter_cells(ad_obs, min_genes=3)
 
             # Doublet simulation will be based on the un-normalised counts, but on the
             # selection of genes following normalisation and variability filtering. So
@@ -153,7 +149,7 @@ def scrublet(
 
             # HVG process needs log'd data.
             ad_obs.layers["log1p"] = ad_obs.X.copy()
-            pp.log1p(ad_obs, layer="log1p")
+            log1p(ad_obs, layer="log1p")
             highly_variable_genes(ad_obs, layer="log1p")
             del ad_obs.layers["log1p"]
             ad_obs = ad_obs[:, ad_obs.var["highly_variable"]].copy()
@@ -171,8 +167,8 @@ def scrublet(
             )
             del ad_obs.layers["raw"]
             if log_transform:
-                pp.log1p(ad_obs)
-                pp.log1p(ad_sim)
+                log1p(ad_obs)
+                log1p(ad_sim)
 
             # Now normalise simulated and observed in the same way
 
@@ -373,19 +369,19 @@ def _scrublet_call_doublets(
     # Ensure normalised matrix sparseness as Scrublet does
     # https://github.com/swolock/scrublet/blob/67f8ecbad14e8e1aa9c89b43dac6638cebe38640/src/scrublet/scrublet.py#L100
 
-    scrub._counts_obs_norm = sparse.csc_matrix(adata_obs.X)
-    scrub._counts_sim_norm = sparse.csc_matrix(adata_sim.X)
+    scrub._E_obs_norm = sparse.csc_matrix(adata_obs.X)
+    scrub._E_sim_norm = sparse.csc_matrix(adata_sim.X)
 
     scrub.doublet_parents_ = adata_sim.obsm["doublet_parents"]
 
     # Call scrublet-specific preprocessing where specified
 
     if mean_center and normalize_variance:
-        pipeline.zscore(scrub)
+        pipeline_zscore(scrub)
     elif mean_center:
-        pipeline.mean_center(scrub)
+        pipeline_mean_center(scrub)
     elif normalize_variance:
-        pipeline.normalize_variance(scrub)
+        pipeline_normalize_variance(scrub)
 
     # Do PCA. Scrublet fits to the observed matrix and decomposes both observed
     # and simulated based on that fit, so we'll just let it do its thing rather
@@ -393,12 +389,12 @@ def _scrublet_call_doublets(
 
     if mean_center:
         print(f"   {Colors.GREEN}{EMOJI['start']} Embedding transcriptomes using PCA...{Colors.ENDC}")
-        pca_torch(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state,use_gpu=use_gpu)
-        #pipeline.pca(scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state)
+        pca_torch(scrub, n_prin_comps=n_prin_comps, random_state=scrub.random_state,use_gpu=use_gpu)
+        #pipeline.pca(scrub, n_prin_comps=n_prin_comps, random_state=scrub.random_state)
     else:
         print(f"   {Colors.GREEN}{EMOJI['start']} Embedding transcriptomes using Truncated SVD...{Colors.ENDC}")
-        pipeline.truncated_svd(
-            scrub, n_prin_comps=n_prin_comps, random_state=scrub._random_state
+        pipeline_truncated_svd(
+            scrub, n_prin_comps=n_prin_comps, random_state=scrub.random_state
         )
 
     # Score the doublets
@@ -514,7 +510,7 @@ def scrublet_simulate_doublets(
         synthetic_doublet_umi_subsampling=synthetic_doublet_umi_subsampling,
     )
 
-    adata_sim = AnnData(scrub._counts_sim)
+    adata_sim = AnnData(scrub._E_sim)
     adata_sim.obs["n_counts"] = scrub._total_counts_sim
     adata_sim.obsm["doublet_parents"] = scrub.doublet_parents_
     adata_sim.uns["scrublet"] = {"parameters": {"sim_doublet_ratio": sim_doublet_ratio}}
@@ -528,13 +524,20 @@ def pca_torch(
     svd_solver: Literal["auto", "full", "arpack", "randomized","gesvd", "gesvdj", "gesvda"] = "auto",
     use_gpu: bool = False,
 ) -> None:
-    if self._counts_sim_norm is None:
-        msg = "_counts_sim_norm is not set"
+    if self._E_sim_norm is None:
+        msg = "_E_sim_norm is not set"
         raise RuntimeError(msg)
-    
 
-    X_obs = self._counts_obs_norm.toarray()
-    X_sim = self._counts_sim_norm.toarray()
+    # Convert to array if sparse, otherwise use as is
+    if sparse.issparse(self._E_obs_norm):
+        X_obs = self._E_obs_norm.toarray()
+    else:
+        X_obs = np.asarray(self._E_obs_norm)
+
+    if sparse.issparse(self._E_sim_norm):
+        X_sim = self._E_sim_norm.toarray()
+    else:
+        X_sim = np.asarray(self._E_sim_norm)
 
     if use_gpu:
         if svd_solver == "auto":
