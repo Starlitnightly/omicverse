@@ -214,15 +214,15 @@ def _normalize_items(
 
 
 @register_function(
-    aliases=["count", "featureCounts", "gene_count"],
+    aliases=["featureCount", "featureCounts", "gene_count"],
     category="alignment",
     description="Quantify aligned reads using featureCounts.",
     examples=[
-        "ov.alignment.count([('S1','S1.bam')], gtf='genes.gtf', output_dir='counts')",
+        "ov.alignment.featureCount([('S1','S1.bam')], gtf='genes.gtf', output_dir='counts')",
     ],
     related=["alignment.STAR"],
 )
-def count(
+def featureCount(
     bam_items: Union[Tuple[str, str], Tuple[str, str, bool], Sequence[Tuple[str, str]], Sequence[Tuple[str, str, bool]]],
     gtf: str,
     output_dir: str = "counts",

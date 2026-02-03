@@ -12,7 +12,7 @@ from .prefetch import prefetch
 from .fq_dump import fqdump
 from .fastp import fastp
 from .STAR import STAR
-from .count import count
+from .featureCount import featureCount
 
 __all__ = [
     "single",
@@ -20,5 +20,5 @@ __all__ = [
     "fqdump",
     "fastp",
     "STAR",
-    "count",
+    "featureCount",
 ]

@@ -227,7 +227,7 @@ def _run_star_one(
     examples=[
         "ov.alignment.STAR([('S1','S1_1.fq.gz','S1_2.fq.gz')], genome_dir='index', output_dir='star')",
     ],
-    related=["alignment.fastp", "alignment.count"],
+    related=["alignment.fastp", "alignment.featureCount"],
 )
 def STAR(
     samples: Union[
