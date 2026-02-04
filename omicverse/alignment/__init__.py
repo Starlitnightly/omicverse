@@ -4,13 +4,24 @@ Alignment analysis utilities.
 This module provides comprehensive tools for fastq data processing and alignment including:
 - Alignment with kb-python
 - RNA velocity analysis with kb-python
+- SRA download / conversion / QC / alignment / counting wrappers
 """
 
-from .kb_api import single,ref,count,parallel_fastq_dump
+from .kb_api import single, ref, count, parallel_fastq_dump
+from .prefetch import prefetch
+from .fq_dump import fqdump
+from .fastp import fastp
+from .STAR import STAR
+from .featureCount import featureCount
 
 __all__ = [
     "single",
     "ref",
     "count",
     "parallel_fastq_dump",
+    "prefetch",
+    "fqdump",
+    "fastp",
+    "STAR",
+    "featureCount",
 ]
