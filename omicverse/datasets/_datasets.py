@@ -107,8 +107,9 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
     print(f"{Colors.BLUE}{EMOJI['start']} Downloading data to {file_path}{Colors.ENDC}")
 
     if not os.path.exists(file_path):
-        if not os.path.exists("./data/"):
-            os.mkdir("data")
+        parent_dir = os.path.dirname(file_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
 
         # download the data with colored progress bar
         class ColoredTqdm(tqdm):
@@ -1020,4 +1021,3 @@ def pbmc3k(processed: bool = False) -> AnnData:
 
 if __name__ == "__main__":
     pass
-
