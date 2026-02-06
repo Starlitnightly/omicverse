@@ -45,7 +45,7 @@ from scanpy.plotting._utils import (
     VBound,
 )
 
-def mde(adata: AnnData, **kwargs):
+def mde(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot MDE embedding.
 
@@ -59,9 +59,15 @@ def mde(adata: AnnData, **kwargs):
     """
     if 'X_mde' not in adata.obsm.keys():
         raise ValueError('X_mde not found in adata.obsm. Please run ov.pp.mde first.')
-    return embedding(adata, basis='X_mde', **kwargs)
+    if convert:
+        adata.obsm['MDE'] = adata.obsm['X_mde']
+        print(f"X_mde converted to MDE to visualize and saved to adata.obsm['MDE']")
+        print(f"if you want to use X_mde, please set convert=False")
+    else:
+        print(f"if you want to use MDE to visualize, please set convert=True")
+    return embedding(adata, basis='MDE', **kwargs)
 
-def tsne(adata: AnnData, **kwargs):
+def tsne(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot t-SNE embedding.
 
@@ -75,9 +81,15 @@ def tsne(adata: AnnData, **kwargs):
     """
     if 'X_tsne' not in adata.obsm.keys():
         raise ValueError('X_tsne not found in adata.obsm. Please run ov.pp.tsne first.')
-    return embedding(adata, basis='X_tsne', **kwargs)
+    if convert:
+        adata.obsm['TSNE'] = adata.obsm['X_tsne']
+        print(f"X_tsne converted to TSNE to visualize and saved to adata.obsm['TSNE']")
+        print(f"if you want to use X_tsne, please set convert=False")
+    else:
+        print(f"if you want to use TSNE to visualize, please set convert=True")
+    return embedding(adata, basis='TSNE', **kwargs)
 
-def pca(adata: AnnData, **kwargs):
+def pca(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot PCA embedding.
 
@@ -89,10 +101,15 @@ def pca(adata: AnnData, **kwargs):
         raise ValueError('X_pca not found in adata.obsm. Please run ov.pp.pca first.')
     if 'scaled|original|X_pca' in adata.obsm.keys():
         adata.obsm['X_pca'] = adata.obsm['scaled|original|X_pca']
-
+    if convert:
+        adata.obsm['PCA'] = adata.obsm['X_pca']
+        print(f"X_pca converted to PCA to visualize and saved to adata.obsm['PCA']")
+        print(f"if you want to use X_pca, please set convert=False")
+    else:
+        print(f"if you want to use PCA to visualize, please set convert=True")
     return embedding(adata, basis='X_pca', **kwargs)
 
-def umap(adata: AnnData, **kwargs):
+def umap(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot UMAP embedding.
 
@@ -150,7 +167,13 @@ def umap(adata: AnnData, **kwargs):
     """
     if 'X_umap' not in adata.obsm.keys():
         raise ValueError('X_umap not found in adata.obsm. Please run ov.pp.umap first.')
-    return embedding(adata, basis='X_umap', **kwargs)
+    if convert:
+        adata.obsm['UMAP'] = adata.obsm['X_umap']
+        print(f"X_umap converted to UMAP to visualize and saved to adata.obsm['UMAP']")
+        print(f"if you want to use X_umap, please set convert=False")
+    else:
+        print(f"if you want to use UMAP to visualize, please set convert=True")
+    return embedding(adata, basis='UMAP', **kwargs)
 
 @register_function(
     aliases=["细胞嵌入图", "embedding", "scatter_plot", "降维可视化", "嵌入图"],
