@@ -342,14 +342,60 @@ class Annotation(object):
         self.scsa_db_path = reference
 
 
-    def download_scsa_db(self, save_path: str = 'temp/pySCSA_2024_v1_plus.db'):
+    def download_scsa_db(self, save_path: str = 'temp/pySCSA_2023_v2_plus.db'):
+        """Download SCSA database with fallback mirrors.
+
+        Tries Stanford repository first, falls back to Figshare if download fails.
+
+        Args:
+            save_path: Path to save the database file. Default: 'temp/pySCSA_2023_v2_plus.db'
+
+        Returns:
+            Path to the downloaded database file.
+
+        Raises:
+            Exception: If download fails from all mirrors.
+        """
+        # Define download mirrors (Stanford preferred, Figshare as fallback)
+        mirrors = [
+            {
+                'name': 'Stanford',
+                'url': 'https://stacks.stanford.edu/file/cv694yk7414/pySCSA_2023_v2_plus.db'
+            },
+            {
+                'name': 'Figshare',
+                'url': 'https://figshare.com/ndownloader/files/41369037'
+            }
+        ]
+
         parent_dir = os.path.dirname(save_path)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
-        download_data(url='https://figshare.com/ndownloader/files/41369037',
-                        file_path=os.path.basename(save_path), dir=parent_dir)
-        print(f"SCSA database saved to {save_path}")
-        return save_path
+        file_name = os.path.basename(save_path)
+        target_dir = parent_dir if parent_dir else '.'
+
+        # Try each mirror in order
+        last_error = None
+        for mirror in mirrors:
+            try:
+                print(f"Trying to download from {mirror['name']}...")
+                # download_data will handle directory creation automatically
+                download_data(
+                    url=mirror['url'],
+                    file_path=file_name,
+                    dir=target_dir
+                )
+                print(f"SCSA database saved to {save_path}")
+                return save_path
+            except Exception as e:
+                last_error = e
+                print(f"Failed to download from {mirror['name']}: {str(e)}")
+                # Try next mirror
+                continue
+
+        # If all mirrors failed, raise the last error
+        raise Exception(
+            f"Failed to download SCSA database from all mirrors. "
+            f"Last error: {str(last_error)}"
+        )
 
     def download_reference_pkl(
         self, 
