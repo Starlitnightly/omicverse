@@ -656,12 +656,14 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
         adata.var['highly_variable_features'] = adata.var['highly_variable']
 
     # Ensure PCA is available for downstream steps that expect it
+    '''
     try:
         if 'X_pca' not in adata.obsm:
             from ._pca import pca as _pca
             _pca(adata, n_comps=min(50, adata.n_vars - 1), layer=None)
     except Exception as exc:  # pragma: no cover - runtime safeguard
         print(f"{Colors.WARNING}⚠️  PCA computation skipped: {exc}{Colors.ENDC}")
+    '''
 
     print(f"{EMOJI['done']} Preprocessing completed successfully.")
     print(f"{Colors.GREEN}    Added:{Colors.ENDC}")

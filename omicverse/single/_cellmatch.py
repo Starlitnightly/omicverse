@@ -1263,7 +1263,7 @@ Cell type abbreviation: {cell_name}"""
         self.output_path = Path(cl_obo_file).parent
         
         print("📖 Parsing ontology file...")
-        with open(cl_obo_file) as f:
+        with open(cl_obo_file, encoding='utf-8') as f:
             graph = json.load(f)["graphs"][0]
         
         # Build ontology dictionary
@@ -1438,8 +1438,8 @@ Cell type abbreviation: {cell_name}"""
             return
         
         # Save JSON file
-        with open(f"{self.output_path}/cl_popv.json", "w") as f:
-            json.dump(self.popv_dict, f, indent=4)
+        with open(f"{self.output_path}/cl_popv.json", "w", encoding='utf-8') as f:
+            json.dump(self.popv_dict, f, indent=4, ensure_ascii=False)
         
         # Save edge information
         children_edge_celltype_df = pd.DataFrame(self.popv_dict["ct_edges"])
@@ -1450,7 +1450,7 @@ Cell type abbreviation: {cell_name}"""
         
         # Save text format embeddings
         output_file = os.path.join(self.output_path, "cl.ontology.nlp.emb")
-        with open(output_file, "w") as fout:
+        with open(output_file, "w", encoding='utf-8') as fout:
             for label, vec in self.ontology_embeddings.items():
                 fout.write(label + "\t" + "\t".join(map(str, vec)) + "\n")
     
