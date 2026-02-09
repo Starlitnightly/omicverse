@@ -71,6 +71,7 @@ def _run_fastp_one(
     extra_args: Optional[Sequence[str]],
     fastp_bin: str,
     env: dict,
+    overwrite: bool,
 ) -> Dict[str, str]:
     sample_dir = ensure_dir(out_root / sample)
     ext = _out_ext(fq1, force_gzip)
@@ -80,15 +81,20 @@ def _run_fastp_one(
     json = sample_dir / f"{sample}.fastp.json"
     html = sample_dir / f"{sample}.fastp.html"
 
-    if clean1.exists() and clean1.stat().st_size > 0 and json.exists() and html.exists():
-        if not fq2 or (clean2 and clean2.exists() and clean2.stat().st_size > 0):
-            return {
-                "sample": sample,
-                "clean1": str(clean1),
-                "clean2": str(clean2) if clean2 else "",
-                "json": str(json),
-                "html": str(html),
-            }
+    if not overwrite:
+        if clean1.exists() and clean1.stat().st_size > 0 and json.exists() and html.exists():
+            if not fq2 or (clean2 and clean2.exists() and clean2.stat().st_size > 0):
+                return {
+                    "sample": sample,
+                    "clean1": str(clean1),
+                    "clean2": str(clean2) if clean2 else "",
+                    "json": str(json),
+                    "html": str(html),
+                }
+    else:
+        for path in (clean1, clean2, json, html):
+            if path and path.exists():
+                path.unlink()
 
     cmd = [
         fastp_bin,
@@ -139,6 +145,7 @@ def fastp(
     extra_args: Optional[Sequence[str]] = None,
     fastp_path: Optional[str] = None,
     auto_install: bool = True,
+    overwrite: bool = False,
 ) -> Union[Dict[str, str], List[Dict[str, str]]]:
     """
     Run fastp QC.
@@ -163,6 +170,8 @@ def fastp(
         Explicit path to fastp executable.
     auto_install
         Install missing tools automatically when possible.
+    overwrite
+        If True, rerun fastp and overwrite existing outputs.
     """
     sample_list, single_input = _normalize_samples(samples)
 
@@ -184,6 +193,7 @@ def fastp(
             extra_args=extra_args,
             fastp_bin=fastp_bin,
             env=env,
+            overwrite=overwrite,
         )
 
     results = run_in_threads(sample_list, _worker, worker_count)
