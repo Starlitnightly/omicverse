@@ -107,7 +107,7 @@ def pca(adata: AnnData,convert=True, **kwargs):
         print(f"if you want to use X_pca, please set convert=False")
     else:
         print(f"if you want to use PCA to visualize, please set convert=True")
-    return embedding(adata, basis='X_pca', **kwargs)
+    return embedding(adata, basis='PCA', **kwargs)
 
 def umap(adata: AnnData,convert=True, **kwargs):
     r"""

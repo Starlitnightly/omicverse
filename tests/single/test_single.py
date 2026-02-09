@@ -27,3 +27,7 @@ def test_pca_umap(processed_adata):
     assert processed_adata.obsm["X_umap"] is not None
     #assert processed_adata.obsm["scaled|original|X_pca"] is not None
 
+def test_cpu_gpu_mixed_init():
+    ov.settings.cpu_gpu_mixed_init()
+    assert ov.settings.mode == "cpu_gpu_mixed"
+
