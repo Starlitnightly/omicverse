@@ -16,7 +16,7 @@ from typing import Union,Tuple
 from ..external.VIA.utils_via import *
 from ..external.VIA.plotting_via import *
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 #from ..via.utils_via import sc_loc_ofsuperCluster_PCAspace,compute_velocity_on_grid
 
 @register_function(

@@ -20,7 +20,7 @@ import seaborn as sns
 from scipy.sparse import issparse
 
 from .._settings import settings,print_gpu_usage_color,EMOJI,add_reference,Colors
-from ..utils.registry import register_function
+from .._registry import register_function
 from .._monitor import monitor
 
 

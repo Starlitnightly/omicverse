@@ -50,7 +50,7 @@ if _parent_pkg is not None and _utils_pkg is not None:
 from .agent_backend import OmicVerseLLMBackend
 
 # Import registry system and model configuration
-from .registry import _global_registry
+from .._registry import _global_registry
 from .model_config import ModelConfig, PROVIDER_API_KEYS
 
 # P0-2: Grouped configuration dataclasses

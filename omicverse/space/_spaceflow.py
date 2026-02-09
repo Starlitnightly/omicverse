@@ -12,7 +12,7 @@ from scipy.spatial import distance_matrix
 from torch_geometric.nn import GCNConv, DeepGraphInfomax
 from sklearn.neighbors import kneighbors_graph
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 sf_install = False
 

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 from .comparison import *
-from ...utils.registry import register_function
+from ..._registry import register_function
 
 # bcolors
 HEADER = '\033[95m'

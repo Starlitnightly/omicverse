@@ -3,7 +3,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["空间解卷积", "deconvolution", "spatial_deconvolution", "空间解卷积分析", "空间映射"],

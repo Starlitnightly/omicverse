@@ -10,7 +10,7 @@ import numpy as np
 import os
 from scipy.sparse import csr_matrix
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 from .._settings import Colors
 
 

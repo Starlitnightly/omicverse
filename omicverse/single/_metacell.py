@@ -1,7 +1,7 @@
 from ..external.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
 from ..external.SEACells import compute_celltype_purity,separation,compactness
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 import pandas as pd
 
 

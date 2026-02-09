@@ -5,7 +5,7 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["STT空间转换张量", "STT", "spatial_transition_tensor", "空间转换分析", "空间动力学"],

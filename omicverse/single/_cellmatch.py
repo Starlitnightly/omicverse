@@ -13,7 +13,7 @@ from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tqdm import tqdm
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["细胞本体映射", "CellOntologyMapper", "cellontology_mapper", "细胞本体注释", "本体映射器"],

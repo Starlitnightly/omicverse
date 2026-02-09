@@ -30,7 +30,7 @@ from ..gseapy.plot import dotplot
 from pandas.api.types import is_numeric_dtype
 
 from .geneExp import *
-from ...utils.registry import register_function
+from ..._registry import register_function
 
 
 

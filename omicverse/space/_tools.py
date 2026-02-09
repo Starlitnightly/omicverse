@@ -8,7 +8,7 @@ from matplotlib.cm import ScalarMappable
 import scanpy as sc
 import torch
 import torch.nn.functional as F
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["裁剪空间数据", "crop_space_visium", "crop_visium", "空间数据裁剪", "Visium裁剪"],

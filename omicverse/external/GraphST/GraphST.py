@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from scipy.sparse.csc import csc_matrix
 from scipy.sparse.csr import csr_matrix
 import pandas as pd
-from ...utils.registry import register_function
+from ..._registry import register_function
     
 @register_function(
     aliases=["GraphST空间模型", "GraphST", "graph_spatial_transcriptomics", "图空间转录组", "GraphST聚类"],

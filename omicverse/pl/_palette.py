@@ -1,7 +1,7 @@
 import scanpy as sc
 import numpy as np
 import pandas as pd
-from ..utils.registry import register_function
+from .._registry import register_function
 
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', 

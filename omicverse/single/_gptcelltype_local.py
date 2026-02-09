@@ -1,5 +1,4 @@
-
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["本地GPT注释", "gptcelltype_local", "local_ai_celltype", "本地AI注释", "离线细胞注释"],

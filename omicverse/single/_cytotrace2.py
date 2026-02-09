@@ -12,7 +12,7 @@ import scanpy as sc
 
 
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 from ..external.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *

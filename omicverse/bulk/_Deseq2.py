@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from typing import Union, Tuple, Optional, Any
 from ..utils import plot_boxplot
-from ..utils.registry import register_function
+from .._registry import register_function
 from ..pl import volcano
 
 @register_function(

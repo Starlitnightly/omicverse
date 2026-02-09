@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional, Union
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["TCGA分析", "pyTCGA", "tcga_analysis", "癌症基因组分析"],

@@ -19,7 +19,7 @@ import scanpy as sc
 import zipfile
 from ..external.CEFCON.cell_lineage_GRN import NetModel
 from ..external.CEFCON.utils import data_preparation
-from ..utils.registry import register_function
+from .._registry import register_function
 
 biomart_install = False
 ctxcore_install = False

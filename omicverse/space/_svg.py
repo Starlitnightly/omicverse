@@ -2,7 +2,7 @@ import scanpy as sc
 from ..external.PROST import prepare_for_PI,cal_PI,spatial_autocorrelation,feature_selection
 from ..pp import preprocess
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["空间变异基因", "svg", "spatially_variable_genes", "空间变异基因检测", "SVG检测"],

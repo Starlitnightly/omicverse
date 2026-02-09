@@ -40,7 +40,7 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 
 @register_function(

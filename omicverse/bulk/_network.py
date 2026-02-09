@@ -4,7 +4,7 @@ import pandas as pd
 import networkx as nx
 import itertools
 from ..utils import plot_network
-from ..utils.registry import register_function
+from .._registry import register_function
 from typing import Union, Tuple, Any
 import matplotlib
 

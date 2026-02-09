@@ -200,7 +200,7 @@ def factorize_mp_signature(args):
     args[2].factorize(worker_i=args[0],  total_workers=args[1])
 
 
-from ...utils.registry import register_function
+from ..._registry import register_function
 
 @register_function(
     aliases=["共识非负矩阵分解", "cNMF", "consensus_nmf", "cNMF聚类", "共识NMF"],

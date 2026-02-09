@@ -6,7 +6,7 @@ from scipy.sparse import issparse
 import pandas as pd
 
 from .._settings import EMOJI,add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["差异组成分析", "DCT", "differential_abundance", "差异丰度分析", "细胞组成分析"],

@@ -8,7 +8,7 @@ import json
 from scipy.sparse import csr_matrix, isspmatrix_csr, issparse
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from ..utils.registry import register_function
+from .._registry import register_function
 
 # Small number for checking integer values in presence of floating point error
 EPSILON = 1e-10

@@ -7,7 +7,7 @@ from scipy.sparse import issparse, csr_matrix
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["GASTON空间深度分析", "GASTON", "spatial_depth_analysis", "空间深度建模", "组织空间组织"],

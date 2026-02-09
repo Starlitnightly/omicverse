@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from anndata import AnnData
 import numpy as np
-from .registry import register_function
+from .._registry import register_function
 
 
 

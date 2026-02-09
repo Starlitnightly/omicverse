@@ -15,7 +15,7 @@ from typing import (
     Literal,
 )
 from warnings import warn
-from .registry import register_function
+from .._registry import register_function
 
 import numpy as np
 import pandas as pd

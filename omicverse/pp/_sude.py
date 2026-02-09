@@ -8,7 +8,7 @@ import numpy as np
 from anndata import AnnData
 
 from .._settings import settings, EMOJI, Colors
-from ..utils.registry import register_function
+from .._registry import register_function
 
 from ..external.sude_py import sude as sude_py
 

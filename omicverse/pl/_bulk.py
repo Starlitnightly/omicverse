@@ -5,7 +5,7 @@ import statsmodels.api as sm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["火山图", "volcano", "volcano_plot", "差异基因可视化", "火山图绘制"],

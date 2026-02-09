@@ -9,7 +9,7 @@ from sklearn import decomposition as skldec
 from typing import Optional, Any, Dict, List, Tuple
 
 from ..utils import plot_text_set
-from ..utils.registry import register_function
+from .._registry import register_function
 import matplotlib
 
 @register_function(

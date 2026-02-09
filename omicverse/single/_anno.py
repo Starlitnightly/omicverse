@@ -14,7 +14,7 @@ from ..pp._preprocess import scale
 from ..utils import gen_mpl_labels
 
 from .._settings import add_reference, Colors, EMOJI
-from ..utils.registry import register_function
+from .._registry import register_function
 from ..datasets import download_data_requests
 
 DATA_DOWNLOAD_LINK_DICT = {

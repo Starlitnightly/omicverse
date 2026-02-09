@@ -1,5 +1,5 @@
 from ..utils._scatterplot import _embedding
-from ..utils.registry import register_function
+from .._registry import register_function
 import collections.abc as cabc
 from copy import copy
 from numbers import Integral

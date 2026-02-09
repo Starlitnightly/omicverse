@@ -11,7 +11,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     torch = None
 from scipy.sparse import spmatrix
-from .registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["MDE降维", "mde", "minimum_distortion_embedding", "MDE嵌入", "最小失真嵌入"],

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from ..utils.registry import register_function
+from .._registry import register_function
 from ._cli_utils import (
     build_env,
     ensure_dir,

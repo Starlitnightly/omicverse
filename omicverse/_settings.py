@@ -1,5 +1,4 @@
-
-from .utils.registry import register_function
+from ._registry import register_function
 
 class omicverseConfig:
 

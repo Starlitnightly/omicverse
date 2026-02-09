@@ -4,7 +4,7 @@ import os
 import numpy as np
 import anndata
 from sklearn.neighbors import KNeighborsTransformer
-from .registry import register_function
+from .._registry import register_function
 
 #These function were created by Lisa Sikemma in scArches
 

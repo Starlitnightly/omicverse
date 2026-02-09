@@ -11,7 +11,7 @@ import numpy as np
 import scanpy as sc
 from anndata import AnnData
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 tg_install=False
 

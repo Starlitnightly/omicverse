@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 import warnings
 import platform
 import os
-from .registry import register_function
+from .._registry import register_function
 try:
     import torch  # Optional, used for GPU information
 except ImportError:  # pragma: no cover - optional dependency

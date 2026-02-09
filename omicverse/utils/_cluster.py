@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import anndata
 from .._settings import add_reference
-from .registry import register_function
+from .._registry import register_function
 
 mira_install=False
 def global_imports(modulename,shortname = None, asfunction = False):

@@ -5,7 +5,7 @@ import scipy.stats as st
 from typing import Sequence, Union, Optional, Literal, List
 from matplotlib.axes import Axes
 from collections import OrderedDict
-from ..utils.registry import register_function
+from .._registry import register_function
 
 try:
     from anndata import AnnData

@@ -10,7 +10,7 @@ import functools
 import operator
 from typing import Any
 from ._palette import palette_28, palette_56
-from ..utils.registry import register_function
+from .._registry import register_function
 
 _VarNames = Union[str, Sequence[str]]
 

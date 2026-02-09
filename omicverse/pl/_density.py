@@ -2,7 +2,7 @@ import numpy as np
 import scanpy as sc
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
-from ..utils.registry import register_function
+from .._registry import register_function
 
 
 

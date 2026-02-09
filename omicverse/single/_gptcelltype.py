@@ -2,7 +2,7 @@ import requests
 import os
 import numpy as np
 import pandas as pd
-from ..utils.registry import register_function
+from .._registry import register_function
 
 @register_function(
     aliases=["GPT细胞类型注释", "gptcelltype", "ai_celltype", "GPT注释", "AI细胞注释"],

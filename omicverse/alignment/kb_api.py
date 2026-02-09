@@ -18,7 +18,7 @@ import subprocess
 from uuid import uuid4
 from typing import List, Dict, Optional, Union
 import importlib.util
-from ..utils.registry import register_function
+from .._registry import register_function
 
 class Colors:
     """ANSI color codes for terminal output styling."""

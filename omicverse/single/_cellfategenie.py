@@ -8,7 +8,7 @@ import anndata
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import torch
-from ..utils.registry import register_function
+from .._registry import register_function
 
 class PyTorchRidge: # 保持不变， 不需要修改
     def __init__(self, alpha=1.0, device='cpu'):

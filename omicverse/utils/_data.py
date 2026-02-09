@@ -18,7 +18,7 @@ from scipy.sparse import diags, issparse, spmatrix, csr_matrix, isspmatrix_csr
 import warnings
 from scipy.stats import norm
 from .._settings import Colors, EMOJI  # Import Colors and EMOJI from settings
-from .registry import register_function
+from .._registry import register_function
 from ..datasets import download_data_requests
 
 

@@ -11,7 +11,7 @@ from tqdm import tqdm
 import sys
 from ..utils._neighboors import update_rep, eff_n_jobs,neighbors,W_from_rep
 from .._settings import add_reference
-from ..utils.registry import register_function
+from .._registry import register_function
 
 from ._cosg import cosg
 from ..external.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
