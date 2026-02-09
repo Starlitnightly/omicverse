@@ -8,9 +8,11 @@ from warnings import simplefilter
 import numpy as np
 import numpy.typing as npt
 from scipy import sparse
+from tqdm import tqdm
 from .countdata import CountTable
 from .classifier import Classifier
 from .densetools import first_nonzero_1d, density_hull
+from . import Colors, EMOJI
 
 
 def combine_coords(coords: Iterable[int]) -> str:
@@ -217,20 +219,23 @@ class ExpressionGrid:
             count_col:
                 A string labelling the column containing transcript counts.
         """
+        print(f"{Colors.CYAN}{EMOJI['grid']} Initializing expression grid...{Colors.ENDC}")
         self.x_min, self.x_max = table.x.min(), table.x.max()
         self.y_min, self.y_max = table.y.min(), table.y.max()
         self.height: int = self.x_max - self.x_min + 1
         self.width: int = self.y_max - self.y_min + 1
         num_genes = len(genes)
+        print(f"{Colors.BLUE}  → Grid size: {self.height}x{self.width}, Genes: {num_genes}{Colors.ENDC}")
         matrix = sparse.lil_matrix(((self.height) * (self.width),
                                    num_genes)
                                    )
-        for row in table.itertuples():
+        for row in tqdm(table.itertuples(), total=len(table), desc=f"{Colors.BLUE}Building matrix{Colors.ENDC}"):
             matrix[self._flatten_coords(row.x, row.y),
                    genes.index(getattr(row, gene_col))
                    ] = getattr(row, count_col)
         self.matrix = matrix.tocsc()
         self.num_genes = cast(int, num_genes)
+        print(f"{Colors.GREEN}{EMOJI['done']} Expression grid initialized!{Colors.ENDC}")
 
     def rows(self) -> range:
         """Returns a range of all row indices in the grid."""
@@ -295,7 +300,7 @@ class Worker(Process):
     def run(self):
         simplefilter(action='ignore', category=FutureWarning)
         if self.verbose:
-            print(f'Worker {self.procid} started')
+            print(f'{Colors.CYAN}{EMOJI["process"]} Worker {self.procid} started{Colors.ENDC}')
 
         num_classes = len(self.classifier.classes)
 
@@ -304,7 +309,7 @@ class Worker(Process):
         exprs = np.zeros((num_scales, self.grid.num_genes))
         for i, col_values in iter(self.job_queue.get, None):
             if self.verbose:
-                print(f"Worker {self.procid} got job {i}")
+                print(f"{Colors.BLUE}  → Worker {self.procid} processing row {i}{Colors.ENDC}")
             for col_index in col_values:
                 j = cols[col_index]
                 for scale in range(self.min_scale, self.max_scale + 1):
@@ -341,7 +346,7 @@ class Worker(Process):
                 self.res_queue.put((i, j, probs.tolist()))
         self.res_queue.put(None)
         if self.verbose:
-            print(f'Worker {self.procid} finished')
+            print(f'{Colors.GREEN}{EMOJI["done"]} Worker {self.procid} finished{Colors.ENDC}')
 
 
 class CountGrid(CountTable):
@@ -353,9 +358,11 @@ class CountGrid(CountTable):
 
     def __init__(self, *args, **kwargs):
         """Inits spatial data with values from a dataframe."""
+        print(f"{Colors.HEADER}{EMOJI['spatial']} Initializing spatial CountGrid...{Colors.ENDC}")
         super().__init__(*args, **kwargs)
         self.generate_expression_grid()
         self.height, self.width = self.grid.height, self.grid.width
+        print(f"{Colors.GREEN}{EMOJI['done']} CountGrid initialized! Grid dimensions: {self.height}×{self.width}{Colors.ENDC}")
 
     @classmethod
     def from_coord_table(cls, table, **kwargs):
@@ -412,12 +419,16 @@ class CountGrid(CountTable):
                           verbose: bool = False
                           ):
 
+        print(f"{Colors.HEADER}{EMOJI['spatial']} Starting parallel spatial classification...{Colors.ENDC}")
+        print(f"{Colors.CYAN}  → Scales: {min_scale}-{max_scale}, Processes: {num_proc}{Colors.ENDC}")
+
         outfile += '' if outfile[-4:] == '.npy' else '.npy'
         shape = (self.grid.height,
                  self.grid.width,
                  max_scale - min_scale + 1,
                  len(classifier.classes)
                  )
+        print(f"{Colors.BLUE}  → Output shape: {shape}, File: {outfile}{Colors.ENDC}")
         result = np.lib.format.open_memmap(outfile, dtype=np.float32,
                                            mode='w+', shape=shape)
         result[:] = np.nan
@@ -431,10 +442,11 @@ class CountGrid(CountTable):
             if mask.shape != (self.height, self.width):
                 raise ValueError(f'Mask has shape {mask.shape} but expected {(self.height, self.width)}')
             col_values = [[j for j in range(self.width) if mask[i, j] == 1] for i in range(self.height)]
-
+            print(f"{Colors.WARNING}  → Using mask for spot selection{Colors.ENDC}")
         else:
             col_values = [list(range(self.width)) for _ in range(self.height)]
 
+        print(f"{Colors.CYAN}{EMOJI['process']} Launching {num_proc} worker processes...{Colors.ENDC}")
         for i in range(num_proc):
             Worker(self.grid,
                    min_scale,
@@ -457,19 +469,25 @@ class CountGrid(CountTable):
         for _ in range(num_proc):
             job_queue.put(None)
 
+        print(f"{Colors.CYAN}{EMOJI['classify']} Classifying {num_spots} spots...{Colors.ENDC}")
+        pbar = tqdm(total=num_spots, desc=f"{Colors.BLUE}Processing spots{Colors.ENDC}")
+
+        processed_spots = 0
         for msg_index in range(num_spots + num_proc):
             res = res_queue.get()
             if res:
                 i, j, probs = res
                 result[i-self.grid.x_min, j-self.grid.y_min] = probs
+                processed_spots += 1
+                pbar.update(1)
                 if msg_index % 5000 == 0:
                     result.flush()
                     if verbose:
-                        print("Flushed!")
+                        print(f"{Colors.BLUE}  → Flushed to disk ({processed_spots}/{num_spots} spots){Colors.ENDC}")
 
+        pbar.close()
         result.flush()
-        if verbose:
-            print("Done!")
+        print(f"{Colors.GREEN}{EMOJI['done']} Classification completed! Results saved to {outfile}{Colors.ENDC}")
 
     def annotate(self,
                  confidence_matrix: npt.NDArray,
@@ -477,10 +495,13 @@ class CountGrid(CountTable):
                  labels: tuple[str, ...],
                  column_label: str = "cell type"):
 
+        print(f"{Colors.CYAN}{EMOJI['cell']} Annotating spots with threshold={threshold}...{Colors.ENDC}")
         classifications = extract_classifications(confidence_matrix, threshold)
+        print(f"{Colors.BLUE}  → Found {len(classifications)} confident classifications{Colors.ENDC}")
         x_min, y_min = self.grid.x_min, self.grid.y_min
         to_add = {combine_coords((x+x_min, y+y_min)): labels[c]
                   for (x, y), c in classifications.items()
                   }
 
         self.add_metadata(column_label, to_add)
+        print(f"{Colors.GREEN}{EMOJI['done']} Annotation completed! Column '{column_label}' added to metadata{Colors.ENDC}")

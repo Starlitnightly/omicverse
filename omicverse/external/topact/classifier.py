@@ -10,9 +10,11 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
+from tqdm import tqdm
 
 from .countdata import CountData
 from .sparsetools import rescale_rows
+from . import Colors, EMOJI
 
 
 def normalize_rows(matrix: scipy.sparse.spmatrix | np.matrix,
@@ -78,16 +80,21 @@ class SVCClassifier(Classifier):
         self.r_value = r_value
 
     def train(self, X_train: scipy.sparse.spmatrix, y_train: Sequence[str]):
+        print(f"{Colors.CYAN}{EMOJI['train']} Training SVC classifier...{Colors.ENDC}")
+        print(f"{Colors.BLUE}  → Normalizing {X_train.shape[0]} samples with r_value={self.r_value}{Colors.ENDC}")
         X_train = normalize_rows(X_train, self.r_value)
         X_train = X_train.log1p()
+        print(f"{Colors.BLUE}  → Fitting classifier on {len(set(y_train))} cell types{Colors.ENDC}")
         self.clf.fit(X_train, y_train)
         self.classes = self.clf.classes_
         super().train(X_train, y_train)
+        print(f"{Colors.GREEN}{EMOJI['done']} Training completed! Classes: {list(self.classes)}{Colors.ENDC}")
 
     def classify(self,
                  samples: scipy.sparse.spmatrix | np.matrix
                  ):  # -> npt.NDArray:
         super().classify(samples)
+        print(f"{Colors.CYAN}{EMOJI['classify']} Classifying {samples.shape[0]} samples...{Colors.ENDC}")
         test = normalize_rows(samples, self.r_value)
         if scipy.sparse.isspmatrix(test):
             test = test.log1p()
@@ -97,6 +104,7 @@ class SVCClassifier(Classifier):
             raise ValueError(f"{samples} is not a matrix")
 
         probs = self.clf.predict_proba(test)
+        print(f"{Colors.GREEN}{EMOJI['done']} Classification completed!{Colors.ENDC}")
         # predicted = np.array([self.clf.classes_[i] for i in np.argmax(probs, axis=1)])
         # predicted_prob = np.max(probs, axis=1)
         return probs
@@ -107,4 +115,6 @@ def train_from_countmatrix(classifier: Classifier,
                            countmatrix: CountData,
                            label: str
                            ):
+    print(f"{Colors.HEADER}{EMOJI['start']} Training classifier from count matrix...{Colors.ENDC}")
+    print(f"{Colors.BLUE}  → Using label: {label}{Colors.ENDC}")
     classifier.train(countmatrix.matrix, list(countmatrix.metadata[label]))

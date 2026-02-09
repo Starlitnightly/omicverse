@@ -5,8 +5,10 @@ from typing import (Any, Callable, Collection, Dict, Iterable, Iterator, Mapping
                     MutableSequence, Pattern, Sequence, cast)
 
 import pandas as pd
+from tqdm import tqdm
 from .sparsetools import rescale_rows, filter_cols, iterate_sparse
 from .constantlookuplist import ConstantLookupList
+from . import Colors, EMOJI
 
 
 def matching(values: Sequence[str],
@@ -172,11 +174,13 @@ class CountMatrix(CountData):
 
     def __init__(self, matrix, **kwargs):
         num_samples, num_genes = matrix.shape
+        print(f"{Colors.CYAN}{EMOJI['gene']} Initializing CountMatrix: {num_samples} samples × {num_genes} genes{Colors.ENDC}")
         self.matrix = matrix
         super().__init__(num_genes=num_genes,
                          num_samples=num_samples,
                          **kwargs
                          )
+        print(f"{Colors.GREEN}{EMOJI['done']} CountMatrix initialized!{Colors.ENDC}")
 
     def expression(self,
                    samples: Sequence[str] | Sequence[int] | None = None,
@@ -242,12 +246,15 @@ class CountMatrix(CountData):
         self.matrix = rescale_columns(self.matrix, factors)
 
     def filter_genes(self, pattern: Pattern | Collection[str]):
+        print(f"{Colors.CYAN}{EMOJI['filter']} Filtering genes...{Colors.ENDC}")
         new_genes = ConstantLookupList(matching(self.genes, pattern))
+        print(f"{Colors.BLUE}  → Keeping {len(new_genes)}/{self.num_genes} genes{Colors.ENDC}")
         keep_indices = list(map(self.genes.index, new_genes))
         new_matrix = filter_cols(self.matrix, keep_indices)
         self.matrix = new_matrix
         self.genes = new_genes
         self.num_genes = len(new_genes)
+        print(f"{Colors.GREEN}{EMOJI['done']} Gene filtering completed!{Colors.ENDC}")
 
     def to_count_table(self, **kwargs):
         """Converts the CountMatrix into a CountTable.
@@ -260,12 +267,14 @@ class CountMatrix(CountData):
         Returns:
             A CountTable holding the same expression data.
         """
+        print(f"{Colors.CYAN}{EMOJI['process']} Converting CountMatrix to CountTable...{Colors.ENDC}")
         entries = []
-        for i, j, count in iterate_sparse(self.matrix):
+        for i, j, count in tqdm(iterate_sparse(self.matrix), desc=f"{Colors.BLUE}Processing entries{Colors.ENDC}"):
             sample = self.samples[i]
             gene = self.genes[j]
             entries.append([gene, sample, count])
         table = pd.DataFrame(entries, columns=["gene", "sample", "count"])
+        print(f"{Colors.GREEN}{EMOJI['done']} Conversion completed!{Colors.ENDC}")
         return CountTable(table,
                           genes=self.genes,
                           samples=self.samples,
