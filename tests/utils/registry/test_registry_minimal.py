@@ -14,7 +14,7 @@ def main():
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
         # Import only what we need
-        from omicverse.utils.registry import FunctionRegistry
+        from omicverse._registry import FunctionRegistry
 
         print("=" * 80)
         print("LAYER 1 PREREQUISITE TRACKING - MINIMAL VALIDATION")
