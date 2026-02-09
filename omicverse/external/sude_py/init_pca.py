@@ -5,7 +5,7 @@ import warnings
 def init_pca(X, no_dims, contri, use_gpu=True, verbose=False):
     """
     This function preprocesses data with excessive size and dimensions.
-    Now supports GPU acceleration via MLX (Apple Silicon) or TorchDR (CUDA).
+    Now supports GPU acceleration via MLX (Apple Silicon) or torch_pca (CUDA).
 
     Parameters
     ----------
@@ -33,8 +33,8 @@ def init_pca(X, no_dims, contri, use_gpu=True, verbose=False):
 
     if device_info['backend'] == 'mlx' and device_info['device'] == 'mps' and omicverse_mode != 'cpu':
         return _init_pca_mlx(X, no_dims, contri, verbose)
-    elif device_info['backend'] == 'torchdr' and device_info['device'] == 'cuda' and omicverse_mode != 'cpu':
-        return _init_pca_torchdr(X, no_dims, contri, verbose)
+    elif device_info['backend'] == 'torch_pca' and device_info['device'] == 'cuda' and omicverse_mode != 'cpu':
+        return _init_pca_torch_pca(X, no_dims, contri, verbose)
     else:
         # Fallback to CPU implementation
         return _init_pca_cpu(X, no_dims, contri, verbose)
@@ -84,12 +84,11 @@ def _detect_optimal_pca_backend(use_gpu=True, verbose=False):
                 pass
                 
         elif device_type == 'cuda' and use_gpu:
-            # Try TorchDR for CUDA
+            # Use torch_pca for CUDA
             try:
-                import torchdr
                 import torch
                 if torch.cuda.is_available():
-                    return {'backend': 'torchdr', 'device': 'cuda', 'available': True}
+                    return {'backend': 'torch_pca', 'device': 'cuda', 'available': True}
             except ImportError:
                 pass
         
@@ -148,10 +147,10 @@ def _init_pca_mlx(X, no_dims, contri, verbose=False):
         
     
 
-def _init_pca_torchdr(X, no_dims, contri, verbose=False):
+def _init_pca_torch_pca(X, no_dims, contri, verbose=False):
     """
-    TorchDR-based PCA implementation for CUDA devices.
-    
+    torch_pca-based PCA implementation for CUDA devices.
+
     Parameters
     ----------
     X : array-like
@@ -162,38 +161,51 @@ def _init_pca_torchdr(X, no_dims, contri, verbose=False):
         Variance contribution threshold
     verbose : bool
         Whether to print information
-        
+
     Returns
     -------
     mappedX : array-like
         PCA-transformed data
     """
     if verbose:
-        print(f"   🚀 Using TorchDR PCA for CUDA acceleration")
-    
+        print(f"   🚀 Using torch_pca PCA for CUDA acceleration")
+
     import torch
-    import torchdr
-    
-    # Convert to torch tensor
-    if hasattr(X, 'toarray'):
-        X = X.toarray()
-    X_tensor = torch.tensor(X, dtype=torch.float32, device='cuda')
-    
+    from ...external.torch_pca import PCA
+
     # Determine optimal number of components
     optimal_comps = _determine_optimal_components(X, contri, no_dims, verbose)
-    
-    # Create TorchDR PCA
-    pca = torchdr.MLXPCA(n_components=optimal_comps)
-    
-    # Fit and transform
-    mappedX_tensor = pca.fit_transform(X_tensor)
-    
-    # Convert back to numpy
-    mappedX = mappedX_tensor.cpu().numpy()
-    
+
+    # torch_pca supports sparse matrices natively
+    from scipy import sparse
+    if sparse.issparse(X):
+        # For sparse matrices, use ARPACK solver
+        pca = PCA(n_components=optimal_comps, svd_solver='arpack')
+        mappedX = pca.fit_transform(X)
+        # Convert to numpy if tensor
+        if hasattr(mappedX, 'cpu'):
+            mappedX = mappedX.cpu().numpy()
+    else:
+        # For dense arrays, convert to torch tensor on GPU
+        if hasattr(X, 'toarray'):
+            X = X.toarray()
+        X_tensor = torch.tensor(X, dtype=torch.float32, device='cuda')
+
+        # Create torch_pca PCA
+        pca = PCA(n_components=optimal_comps, svd_solver='randomized')
+
+        # Fit and transform
+        mappedX_tensor = pca.fit_transform(X_tensor)
+
+        # Move PCA model to GPU
+        pca.to('cuda')
+
+        # Convert back to numpy
+        mappedX = mappedX_tensor.cpu().numpy()
+
     if verbose:
-        print(f"   ✅ TorchDR PCA completed: {X.shape} -> {mappedX.shape}")
-        
+        print(f"   ✅ torch_pca PCA completed: {X.shape} -> {mappedX.shape}")
+
     return mappedX
         
     

@@ -133,18 +133,17 @@ except ImportError:  # pragma: no cover - optional dependency
 def check_acceleration_packages():
     """
     Check which acceleration packages are installed and provide installation guidance.
-    
+
     Returns
     -------
     dict
         Dictionary containing installation status and recommendations
     """
     status = {
-        'torchdr': {'installed': False, 'recommended': False, 'device': 'cuda'},
         'mlx': {'installed': False, 'recommended': False, 'device': 'mps'},
         'torch': {'installed': False, 'recommended': False, 'device': 'any'}
     }
-    
+
     # Check PyTorch
     try:
         import torch
@@ -152,16 +151,7 @@ def check_acceleration_packages():
         status['torch']['recommended'] = True
     except ImportError:
         pass
-    
-    # Check TorchDR
-    try:
-        import torchdr
-        status['torchdr']['installed'] = True
-        status['torchdr']['recommended'] = True
-    except ImportError:
-        if torch is not None and torch.cuda.is_available():
-            status['torchdr']['recommended'] = True
-    
+
     # Check MLX
     try:
         import mlx.core as mx
@@ -171,7 +161,7 @@ def check_acceleration_packages():
     except ImportError:
         if torch is not None and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             status['mlx']['recommended'] = True
-    
+
     return status
 
 
@@ -200,28 +190,13 @@ def print_acceleration_status(verbose=True):
                     print(f"   CUDA: Available ({torch.cuda.device_count()} device(s))")
                 if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                     print(f"   MPS: Available (Apple Silicon)")
+                print(f"   {Colors.CYAN}Note: Using built-in torch_pca for GPU-accelerated PCA{Colors.ENDC}")
             except:
                 pass
     else:
         print(f"{Colors.WARNING}⚠️ PyTorch: Not installed{Colors.ENDC}")
         print(f"   {Colors.CYAN}Install with: pip install torch{Colors.ENDC}")
-    
-    # TorchDR status
-    if status['torchdr']['installed']:
-        print(f"{Colors.GREEN}✅ TorchDR: Installed{Colors.ENDC}")
-        if verbose:
-            try:
-                import torchdr
-                print(f"   Version: {torchdr.__version__}")
-            except:
-                pass
-    elif status['torchdr']['recommended']:
-        print(f"{Colors.WARNING}⚠️ TorchDR: Not installed (Recommended for CUDA){Colors.ENDC}")
-        print(f"   {Colors.CYAN}Install with: pip install torchdr{Colors.ENDC}")
-        print(f"   {Colors.CYAN}For GPU-accelerated dimensionality reduction{Colors.ENDC}")
-    else:
-        print(f"{Colors.FAIL}❌ TorchDR: Not installed{Colors.ENDC}")
-    
+
     # MLX status
     if status['mlx']['installed']:
         print(f"{Colors.GREEN}✅ MLX: Installed{Colors.ENDC}")
@@ -246,12 +221,10 @@ def print_acceleration_status(verbose=True):
     # Recommendations
     recommendations = []
     if not status['torch']['installed']:
-        recommendations.append("Install PyTorch for basic GPU support")
-    if status['torchdr']['recommended'] and not status['torchdr']['installed']:
-        recommendations.append("Install TorchDR for CUDA-accelerated PCA")
+        recommendations.append("Install PyTorch for GPU support (includes built-in torch_pca)")
     if status['mlx']['recommended'] and not status['mlx']['installed']:
         recommendations.append("Install MLX for Apple Silicon GPU acceleration")
-    
+
     if recommendations:
         print(f"{Colors.CYAN}💡 Recommendations:{Colors.ENDC}")
         for i, rec in enumerate(recommendations, 1):
@@ -264,21 +237,21 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
     """
     Get the optimal PyTorch device based on available hardware.
     Now includes acceleration package status checking.
-    
+
     Priority order:
-    1. CUDA (NVIDIA GPUs) - requires TorchDR for optimal performance
-    2. MPS (Apple Silicon) - requires MLX for optimal performance
-    3. ROCm (AMD GPUs) 
+    1. CUDA (NVIDIA GPUs) - uses built-in torch_pca for GPU acceleration
+    2. MPS (Apple Silicon) - MLX recommended for optimal performance
+    3. ROCm (AMD GPUs)
     4. XPU (Intel GPUs)
     5. CPU (fallback)
-    
+
     Parameters
     ----------
     prefer_gpu : bool
         Whether to prefer GPU over CPU when available
     verbose : bool
         Whether to print device selection information and acceleration status
-        
+
     Returns
     -------
     torch.device
@@ -305,12 +278,7 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
         device = torch.device("cuda")
         if verbose:
             print(f"Using CUDA device: {torch.cuda.get_device_name()}")
-            # Check if TorchDR is available for optimal performance
-            try:
-                import torchdr
-                print(f"{Colors.GREEN}✅ TorchDR available for GPU-accelerated PCA{Colors.ENDC}")
-            except ImportError:
-                print(f"{Colors.WARNING}⚠️ TorchDR not installed - install with: pip install torchdr{Colors.ENDC}")
+            print(f"{Colors.GREEN}✅ Using built-in torch_pca for GPU-accelerated PCA{Colors.ENDC}")
         return device
     
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():

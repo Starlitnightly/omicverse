@@ -5,15 +5,41 @@
 # Copyright (c) Scikit-learn developers. All Rights Reserved.
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import torch
 from torch import Tensor
+from scipy import sparse as sp
 
 from .ncompo import NComponentsType
 from .random_svd import randomized_range_finder
 
 
-def choose_svd_solver(inputs: Tensor, n_components: NComponentsType) -> str:
-    """Choose the SVD solver based on the input shape."""
+def choose_svd_solver(
+    inputs: Union[Tensor, sp.spmatrix],
+    n_components: NComponentsType,
+    is_sparse: bool = False
+) -> str:
+    """Choose the SVD solver based on the input shape and type.
+
+    Parameters
+    ----------
+    inputs : Tensor or scipy.sparse matrix
+        Input data
+    n_components : NComponentsType
+        Number of components
+    is_sparse : bool
+        Whether input is a scipy sparse matrix
+
+    Returns
+    -------
+    str
+        Selected solver name ('full', 'covariance_eigh', 'randomized', or 'arpack')
+    """
+    # For sparse matrices, prefer ARPACK
+    if is_sparse:
+        return "arpack"
+
+    # Original logic for dense tensors
     if inputs.shape[-1] <= 1_000 and inputs.shape[-2] >= 10 * inputs.shape[-1]:
         return "covariance_eigh"
     if max(inputs.shape[-2:]) <= 500 or n_components == "mle":
@@ -83,6 +109,124 @@ def randomized_svd(
             u_mat[:, :n_components].T,
         )
     return u_mat[:, :n_components], coefs[:n_components], vh_mat[:n_components, :]
+
+
+def arpack_svd(
+    inputs: Union[sp.csr_matrix, sp.csc_matrix],
+    n_components: int,
+    mean_vector: Optional[np.ndarray] = None,
+    random_state: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """ARPACK-based SVD for sparse matrices using scipy.sparse.linalg.svds.
+
+    Parameters
+    ----------
+    inputs : scipy.sparse.csr_matrix or csc_matrix
+        Sparse input matrix (n_samples, n_features)
+    n_components : int
+        Number of components to compute
+    mean_vector : np.ndarray, optional
+        Mean vector for centering. If None, data is not centered.
+        Note: Centering sparse matrices destroys sparsity, so we use
+        a LinearOperator to apply centering implicitly.
+    random_state : int, optional
+        Random seed for reproducibility
+
+    Returns
+    -------
+    u_mat : np.ndarray
+        Left singular vectors (n_samples, n_components)
+    coefs : np.ndarray
+        Singular values (n_components,)
+    vh_mat : np.ndarray
+        Right singular vectors (n_components, n_features)
+
+    Notes
+    -----
+    ARPACK computes SVD using Implicitly Restarted Lanczos Method.
+    If mean_vector is provided, the matrix is centered implicitly
+    without densifying (using LinearOperator).
+
+    References
+    ----------
+    .. [1] scipy.sparse.linalg.svds documentation
+    .. [2] Lehoucq, R. B., Sorensen, D. C., & Yang, C. (1998).
+           ARPACK users' guide: solution of large-scale eigenvalue problems
+           with implicitly restarted Arnoldi methods.
+    """
+    from scipy.sparse.linalg import svds, LinearOperator
+
+    n_samples, n_features = inputs.shape
+
+    # Validate n_components
+    max_components = min(n_samples, n_features) - 1
+    if n_components >= max_components:
+        raise ValueError(
+            f"n_components must be < min(n_samples, n_features) for ARPACK. "
+            f"Got n_components={n_components}, but max is {max_components}"
+        )
+
+    # Set random state if provided
+    if random_state is not None:
+        np.random.seed(random_state)
+        v0 = np.random.uniform(-1.0, 1.0, min(n_samples, n_features))
+    else:
+        v0 = None
+
+    # If centering is needed, use LinearOperator to avoid densification
+    if mean_vector is not None:
+        # Create implicit centered matrix using LinearOperator
+        mean_vector = mean_vector.ravel()
+
+        def matvec(x):
+            # Compute (A - mean_row) @ x where each row of A is centered by mean
+            # (A - ones @ mean.T) @ x = A @ x - ones * (mean @ x)
+            # Result shape: (n_samples,)
+            # Force x to 1D to avoid broadcasting issues
+            x = np.asarray(x).ravel()
+            result = inputs @ x - np.dot(mean_vector, x)
+            return result
+
+        def rmatvec(x):
+            # Compute (A - mean_row).T @ x
+            # = A.T @ x - mean @ (ones.T @ x) = A.T @ x - mean * sum(x)
+            # Result shape: (n_features,)
+            # Force x to 1D to avoid broadcasting issues
+            x = np.asarray(x).ravel()
+            result = inputs.T @ x - mean_vector * np.sum(x)
+            return result
+
+        centered_op = LinearOperator(
+            shape=(n_samples, n_features),
+            matvec=matvec,
+            rmatvec=rmatvec,
+            dtype=inputs.dtype
+        )
+
+        # Compute SVD on centered operator
+        u_mat, coefs, vh_mat = svds(
+            centered_op,
+            k=n_components,
+            v0=v0,
+            return_singular_vectors=True
+        )
+    else:
+        # Compute SVD directly on sparse matrix
+        u_mat, coefs, vh_mat = svds(
+            inputs,
+            k=n_components,
+            v0=v0,
+            return_singular_vectors=True
+        )
+
+    # svds returns singular values in ascending order, need to reverse
+    # to match torch.linalg.svd convention (descending order)
+    # Use .copy() to avoid negative strides (ascontiguousarray doesn't always work with PyTorch)
+    u_mat = u_mat[:, ::-1].copy()
+    coefs = coefs[::-1].copy()
+    vh_mat = vh_mat[::-1, :].copy()
+
+    return u_mat, coefs, vh_mat
 
 
 def svd_flip(u_mat: Optional[Tensor], vh_mat: Tensor) -> Tuple[Tensor, Tensor]:

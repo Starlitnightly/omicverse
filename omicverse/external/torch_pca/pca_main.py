@@ -9,9 +9,10 @@ from typing import Any, Optional, Tuple, Union
 import torch
 from torch import Tensor
 from torch._prims_common import DeviceLikeType
+from scipy import sparse as sp
 
 from .ncompo import NComponentsType, find_ncomponents
-from .svd import choose_svd_solver, randomized_svd, svd_flip
+from .svd import choose_svd_solver, randomized_svd, svd_flip, arpack_svd
 
 
 class PCA:
@@ -35,14 +36,19 @@ class PCA:
         By default, n_components=None.
 
     svd_solver: str, optional
-        One of {'auto', 'full', 'covariance_eigh'}
+        One of {'auto', 'full', 'covariance_eigh', 'randomized', 'arpack'}
 
-        * 'auto': the solver is selected automatically based on the shape of the input.
-        * 'full': Run exact full SVD with torch.linalg.svd
+        * 'auto': the solver is selected automatically based on the shape and type of input.
+          For sparse matrices, 'arpack' is selected. For dense tensors, selection follows
+          the original heuristics.
+        * 'full': Run exact full SVD with torch.linalg.svd (dense tensors only)
         * 'covariance_eigh': Compute the covariance matrix and take
-          the eigenvalues decomposition with torch.linalg.eigh.
+          the eigenvalues decomposition with torch.linalg.eigh (dense tensors only).
           Most efficient for small n_features and large n_samples.
-        * 'randomized': Compute the randomized SVD by the method of Halko et al.
+        * 'randomized': Compute the randomized SVD by the method of Halko et al (dense tensors only).
+        * 'arpack': Use ARPACK iterative solver from scipy.sparse.linalg.svds.
+          Only works with scipy sparse matrices (csr_matrix, csc_matrix).
+          Efficient for sparse matrices when computing a small number of components.
 
         By default, svd_solver='auto'.
 
@@ -108,20 +114,25 @@ class PCA:
         self.iterated_power = iterated_power
         self.power_iteration_normalizer = power_iteration_normalizer
         self.random_state = random_state
+        # Internal tracking for sparse matrix support
+        self._input_is_sparse: bool = False
+        self._original_device: Optional[torch.device] = None
+        self._original_dtype: Optional[torch.dtype] = None
 
-        if self.svd_solver_ not in ["auto", "full", "covariance_eigh", "randomized"]:
+        if self.svd_solver_ not in ["auto", "full", "covariance_eigh", "randomized", "arpack"]:
             raise ValueError(
                 "Unknown SVD solver. `svd_solver` should be one of "
-                "'auto', 'full', 'covariance_eigh', 'randomized'."
+                "'auto', 'full', 'covariance_eigh', 'randomized', 'arpack'."
             )
 
-    def fit_transform(self, inputs: Tensor, *, determinist: bool = True) -> Tensor:
+    def fit_transform(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> Tensor:
         """Fit the PCA model and apply the dimensionality reduction.
 
         Parameters
         ----------
-        inputs : Tensor
+        inputs : Tensor or scipy.sparse matrix
             Input data of shape (n_samples, n_features).
+            Can be a PyTorch tensor (dense) or scipy sparse matrix (csr_matrix, csc_matrix).
         determinist : bool, optional
             If True, the SVD solver is deterministic but the gradient
             cannot be computed through the PCA fit (the PCA transform is
@@ -140,13 +151,14 @@ class PCA:
         transformed = self.transform(inputs)
         return transformed
 
-    def fit(self, inputs: Tensor, *, determinist: bool = True) -> "PCA":
+    def fit(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> "PCA":
         """Fit the PCA model and return it.
 
         Parameters
         ----------
-        inputs : Tensor
+        inputs : Tensor or scipy.sparse matrix
             Input data of shape (n_samples, n_features).
+            Can be a PyTorch tensor (dense) or scipy sparse matrix (csr_matrix, csc_matrix).
         determinist : bool, optional
             If True, the SVD solver is deterministic but the gradient
             cannot be computed through the PCA fit (the PCA transform is
@@ -160,18 +172,125 @@ class PCA:
         PCA
             The PCA model fitted on the input data.
         """
-        # Auto-cast to float32 because float16 is not supported
-        if inputs.dtype == torch.float16:
-            inputs = inputs.to(torch.float32)
+        # Detect and validate input type, convert to torch tensor
+        if sp.issparse(inputs):
+            self._input_is_sparse = True
+            if not isinstance(inputs, (sp.csr_matrix, sp.csc_matrix)):
+                raise ValueError(
+                    f"Sparse input must be csr_matrix or csc_matrix, got {type(inputs)}"
+                )
+            # Validate solver compatibility
+            if self.svd_solver_ == 'arpack':
+                # ARPACK can work with sparse inputs
+                pass
+            elif self.svd_solver_ != 'auto':
+                raise ValueError(
+                    f"Only 'arpack' and 'auto' solvers support sparse inputs, got '{self.svd_solver_}'"
+                )
+            # Convert scipy sparse to torch sparse tensor
+            # This allows GPU acceleration for matrix operations
+            from .sparse_utils import scipy_sparse_to_torch_sparse
+            # Use CPU for now, will move to GPU if needed
+            inputs_torch_sparse = scipy_sparse_to_torch_sparse(
+                inputs, device=torch.device('cpu'), dtype=torch.float32
+            )
+            # Keep original scipy sparse for ARPACK SVD (CPU-only operation)
+            inputs_scipy = inputs
+            inputs = inputs_torch_sparse
+        else:
+            self._input_is_sparse = False
+            inputs_scipy = None
+            if self.svd_solver_ == 'arpack':
+                raise ValueError(
+                    "ARPACK solver only works with sparse matrices (scipy.sparse.csr_matrix or csc_matrix)"
+                )
+            # Convert to tensor if needed
+            if not isinstance(inputs, Tensor):
+                inputs = torch.as_tensor(inputs)
+            # Auto-cast to float32 because float16 is not supported
+            if inputs.dtype == torch.float16:
+                inputs = inputs.to(torch.float32)
 
         if self.svd_solver_ == "auto":
             self.svd_solver_ = choose_svd_solver(
                 inputs=inputs,
                 n_components=self.n_components_,
+                is_sparse=self._input_is_sparse,
             )
-        self.mean_ = inputs.mean(dim=-2, keepdim=True)
-        self.n_samples_, self.n_features_in_ = inputs.shape[-2:]
-        if self.svd_solver_ == "full":
+
+        # Compute mean and shape based on input type
+        if self._input_is_sparse:
+            # For sparse tensor, convert to dense for mean calculation
+            # (mean operation requires densification anyway)
+            if inputs.is_sparse:
+                self.mean_ = inputs.to_dense().mean(dim=0, keepdim=True)
+            else:
+                self.mean_ = inputs.mean(dim=0, keepdim=True)
+            self.n_samples_, self.n_features_in_ = inputs.shape
+        else:
+            self.mean_ = inputs.mean(dim=-2, keepdim=True)
+            self.n_samples_, self.n_features_in_ = inputs.shape[-2:]
+
+        # Handle ARPACK solver for sparse matrices
+        if self.svd_solver_ == "arpack":
+            from .sparse_utils import numpy_to_torch
+            import numpy as np
+
+            # Validate n_components
+            max_arpack_components = min(self.n_samples_, self.n_features_in_) - 1
+
+            if self.n_components_ is None:
+                self.n_components_ = max_arpack_components
+            elif isinstance(self.n_components_, str):
+                raise ValueError(
+                    f"ARPACK solver does not support n_components='{self.n_components_}'. "
+                    "Please specify an integer value."
+                )
+            elif isinstance(self.n_components_, float):
+                raise ValueError(
+                    "ARPACK solver does not support float n_components (variance threshold). "
+                    "Please specify an integer value."
+                )
+            elif self.n_components_ >= max_arpack_components:
+                raise ValueError(
+                    f"ARPACK requires n_components < min(n_samples, n_features) - 1. "
+                    f"Got n_components={self.n_components_}, max allowed is {max_arpack_components}"
+                )
+
+            # Compute ARPACK SVD with mean centering
+            # ARPACK svds is CPU-only, so use the original scipy sparse matrix
+            mean_np = self.mean_.cpu().numpy().ravel()
+            u_mat, coefs, vh_mat = arpack_svd(
+                inputs=inputs_scipy,  # Use scipy sparse matrix for ARPACK
+                n_components=self.n_components_,
+                mean_vector=mean_np,
+                random_state=self.random_state if isinstance(self.random_state, int) else None
+            )
+
+            # Convert results to PyTorch tensors (can be on GPU)
+            device = inputs.device if hasattr(inputs, 'device') else torch.device('cpu')
+            vh_mat = numpy_to_torch(vh_mat, device=device, dtype=torch.float32)
+            coefs = numpy_to_torch(coefs, device=device, dtype=torch.float32)
+            u_mat = numpy_to_torch(u_mat, device=device, dtype=torch.float32) if u_mat is not None else None
+
+            # Apply deterministic sign flip if requested
+            if determinist:
+                u_mat, vh_mat = svd_flip(u_mat, vh_mat)
+
+            # Compute explained variance
+            explained_variance = coefs**2 / (self.n_samples_ - 1)
+
+            # Compute total variance
+            # For ARPACK with fewer components, total variance is approximate
+            total_var = torch.sum(explained_variance)
+            if self.n_components_ < max_arpack_components:
+                import warnings
+                warnings.warn(
+                    f"ARPACK with n_components={self.n_components_} < {max_arpack_components}: "
+                    "Total variance is approximate. explained_variance_ratio_ may be underestimated.",
+                    UserWarning
+                )
+        elif self.svd_solver_ == "full":
             inputs_centered = inputs - self.mean_
             u_mat, coefs, vh_mat = torch.linalg.svd(  # pylint: disable=E1102
                 inputs_centered,
@@ -250,12 +369,12 @@ class PCA:
                 "Please call `fit` or `fit_transform` first."
             )
 
-    def transform(self, inputs: Tensor, center: str = "fit") -> Tensor:
+    def transform(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], center: str = "fit") -> Tensor:
         """Apply dimensionality reduction to X.
 
         Parameters
         ----------
-        inputs : Tensor
+        inputs : Tensor or scipy.sparse matrix
             Input data of shape (n_samples, n_features).
         center : str
             One of 'fit', 'input' or 'none'.
@@ -275,26 +394,83 @@ class PCA:
         self._check_fitted("transform")
         assert self.components_ is not None  # for mypy
         assert self.mean_ is not None  # for mypy
-        components = (
-            self.components_.to(torch.float16)
-            if inputs.dtype == torch.float16
-            else self.components_
-        )
-        mean = (
-            self.mean_.to(torch.float16)
-            if inputs.dtype == torch.float16
-            else self.mean_
-        )
-        transformed = inputs @ components.T
-        if center == "fit":
-            transformed -= mean @ components.T
-        elif center == "input":
-            transformed -= inputs.mean(dim=-2, keepdim=True) @ components.T
-        elif center != "none":
-            raise ValueError(
-                "Unknown centering, `center` argument should be "
-                "one of 'fit', 'input' or 'none'."
+
+        # Handle sparse input (scipy sparse or torch sparse)
+        if sp.issparse(inputs):
+            # Convert scipy sparse to torch sparse for GPU acceleration
+            from .sparse_utils import scipy_sparse_to_torch_sparse
+
+            # Convert to torch sparse on same device as components
+            inputs_sparse = scipy_sparse_to_torch_sparse(
+                inputs,
+                device=self.components_.device,
+                dtype=self.components_.dtype
             )
+
+            # Use torch sparse matrix multiplication (GPU accelerated)
+            # X @ components.T where X is sparse and components.T is dense
+            transformed = torch.sparse.mm(inputs_sparse, self.components_.T)
+
+            # Handle centering
+            if center == "fit":
+                # Subtract mean projection: mean @ components.T
+                mean_projection = self.mean_ @ self.components_.T
+                transformed = transformed - mean_projection
+            elif center == "input":
+                # Compute input mean and subtract its projection
+                input_mean = inputs_sparse.to_dense().mean(dim=0, keepdim=True)
+                mean_projection = input_mean @ self.components_.T
+                transformed = transformed - mean_projection
+            elif center != "none":
+                raise ValueError(
+                    "Unknown centering, `center` argument should be "
+                    "one of 'fit', 'input' or 'none'."
+                )
+
+        elif isinstance(inputs, Tensor) and inputs.is_sparse:
+            # Already a torch sparse tensor
+            # Use torch sparse matrix multiplication (GPU accelerated)
+            transformed = torch.sparse.mm(inputs, self.components_.T)
+
+            # Handle centering
+            if center == "fit":
+                mean_projection = self.mean_ @ self.components_.T
+                transformed = transformed - mean_projection
+            elif center == "input":
+                input_mean = inputs.to_dense().mean(dim=0, keepdim=True)
+                mean_projection = input_mean @ self.components_.T
+                transformed = transformed - mean_projection
+            elif center != "none":
+                raise ValueError(
+                    "Unknown centering, `center` argument should be "
+                    "one of 'fit', 'input' or 'none'."
+                )
+
+        else:
+            # Original tensor path
+            if not isinstance(inputs, Tensor):
+                inputs = torch.as_tensor(inputs)
+
+            components = (
+                self.components_.to(torch.float16)
+                if inputs.dtype == torch.float16
+                else self.components_
+            )
+            mean = (
+                self.mean_.to(torch.float16)
+                if inputs.dtype == torch.float16
+                else self.mean_
+            )
+            transformed = inputs @ components.T
+            if center == "fit":
+                transformed -= mean @ components.T
+            elif center == "input":
+                transformed -= inputs.mean(dim=-2, keepdim=True) @ components.T
+            elif center != "none":
+                raise ValueError(
+                    "Unknown centering, `center` argument should be "
+                    "one of 'fit', 'input' or 'none'."
+                )
 
         if self.whiten:
             scale = torch.sqrt(self.explained_variance_)

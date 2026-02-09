@@ -495,29 +495,52 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         chunk_dense = chunk.toarray() if isinstance(chunk, CSBase) else chunk
                         X_pca[start:end] = pca_.transform(chunk_dense)
             else:
-                # Use TorchDR for non-MPS GPU devices (CUDA, etc.)
-                logg.info(f"   {EMOJI['gpu']} Using TorchDR IncrementalPCA for {device.type.upper()} GPU (chunked)")
-                print(f"   {EMOJI['gpu']} TorchDR IncrementalPCA backend: {device.type.upper()} GPU chunked computation")
-                
-                from torchdr import IncrementalPCA
-                
+                # Use torch_pca for non-MPS GPU devices (CUDA, etc.)
+                logg.info(f"   {EMOJI['gpu']} Using torch_pca PCA for {device.type.upper()} GPU (chunked mode)")
+                print(f"   {EMOJI['gpu']} torch_pca PCA backend: {device.type.upper()} GPU computation (supports sparse matrices)")
+
+                from ..external.torch_pca import PCA
+
                 # Prepare data for GPU compatibility (float32 requirement)
                 X = prepare_data_for_device(X, device, verbose=True)
-                X_pca = zeros((X.shape[0], n_comps), X.dtype)
-                
+
+                # Print input data type information
+                import scipy.sparse
+                print(f"   {Colors.CYAN}📊 PCA input data type (chunked): {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
+                if scipy.sparse.issparse(X):
+                    print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+
                 # Reset memory stats only for CUDA devices
                 if device.type == 'cuda':
                     torch.cuda.reset_peak_memory_stats(device)
-                
-                pca_ = IncrementalPCA(n_components=n_comps, device=device, 
-                                      batch_size=chunk_size,
-                                      **incremental_pca_kwargs)
-                pca_.fit(X, check_input=True)
-                X_pca = pca_.transform(X)
-                
-                del pca_
+
+                # torch_pca supports sparse matrices natively, no need to convert to dense
+                if isinstance(X, CSBase):
+                    # For sparse matrices, use ARPACK solver which is more memory efficient
+                    pca_ = PCA(n_components=n_comps, svd_solver='arpack',
+                              **incremental_pca_kwargs)
+                    X_pca = pca_.fit_transform(X)
+
+                    # Convert to numpy if tensor
+                    if hasattr(X_pca, 'cpu'):
+                        X_pca = X_pca.cpu().numpy()
+                else:
+                    # For dense arrays, convert to torch tensor and move to GPU
+                    X_torch = torch.from_numpy(np.asarray(X)).to(device)
+                    pca_ = PCA(n_components=n_comps, svd_solver='randomized',
+                              **incremental_pca_kwargs)
+                    X_pca = pca_.fit_transform(X_torch)
+                    # Move PCA model to GPU
+                    pca_.to(device)
+
+                    # Convert torch tensor back to numpy array
+                    if hasattr(X_pca, 'cpu'):
+                        X_pca = X_pca.cpu().numpy()
+
+                    del X_torch
+
                 gc.collect()
-                
+
                 # Clear cache based on device type
                 if device.type == 'cuda':
                     torch.cuda.empty_cache()
@@ -613,35 +636,62 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             )
                             X_pca = pca_.fit_transform(X)
                     else:
-                        # Use TorchDR for non-MPS GPU devices (CUDA, etc.)
-                        logg.info(f"   {EMOJI['gpu']} Using TorchDR PCA for {device.type.upper()} GPU acceleration")
-                        print(f"   {Colors.GREEN}{EMOJI['gpu']} TorchDR PCA backend: {device.type.upper()} GPU acceleration{Colors.ENDC}")
-                        
-                        if svd_solver == "auto":
-                            svd_solver = "gesvd"
-                        if svd_solver not in ["gesvd", "gesvdj", "gesvda"]:
-                            svd_solver = "gesvd"
-                        from torchdr import  PCA
+                        # Use torch_pca for non-MPS GPU devices (CUDA, etc.)
+                        logg.info(f"   {EMOJI['gpu']} Using torch_pca PCA for {device.type.upper()} GPU acceleration")
+                        print(f"   {Colors.GREEN}{EMOJI['gpu']} torch_pca PCA backend: {device.type.upper()} GPU acceleration (supports sparse matrices){Colors.ENDC}")
+
+                        from ..external.torch_pca import PCA
                         import torch
-                        
+
+                        # Map svd_solver to torch_pca compatible values
+                        if svd_solver == "auto":
+                            svd_solver_mapped = "auto"
+                        elif svd_solver in ["gesvd", "gesvdj", "gesvda"]:
+                            svd_solver_mapped = "full"
+                        else:
+                            svd_solver_mapped = "auto"
+
                         # Prepare data for GPU compatibility (float32 requirement)
                         X = prepare_data_for_device(X, device, verbose=True)
 
-                        # TorchDR PCA requires dense arrays, convert sparse to dense
+                        # Print input data type information
+                        import scipy.sparse
+                        print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
+                        if scipy.sparse.issparse(X):
+                            print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+
+                        # torch_pca natively supports sparse matrices - no need to convert to dense!
+                        # Move tensor to GPU if not sparse
                         if isinstance(X, CSBase):
-                            X = X.toarray()
+                            # torch_pca handles scipy sparse matrices directly
+                            pass
+                        else:
+                            # Convert dense numpy array to torch tensor on GPU
+                            X = torch.from_numpy(np.asarray(X)).to(device)
 
                         pca_ = PCA(
                             n_components=n_comps,
-                            device=device,
-                            svd_driver=svd_solver,
+                            svd_solver=svd_solver_mapped,
                             random_state=random_state,
                         )
                         X_pca = pca_.fit_transform(X)
+
+                        # Move PCA model to GPU
+                        pca_.to(device)
+
+                        # Convert torch tensor back to numpy array
+                        if hasattr(X_pca, 'cpu'):
+                            X_pca = X_pca.cpu().numpy()
                 else:
                     logg.info(f"   {EMOJI['cpu']} Using sklearn PCA for CPU computation")
                     print(f"   {Colors.CYAN}{EMOJI['cpu']} sklearn PCA backend: CPU computation{Colors.ENDC}")
-                    
+
+                    # Print input data type information
+                    import scipy.sparse
+                    print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
+                    if scipy.sparse.issparse(X):
+                        print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+
                     from sklearn.decomposition import PCA
 
                     svd_solver = _handle_sklearn_args(
