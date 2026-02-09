@@ -117,7 +117,7 @@ class omicverseConfig:
             else:
                 print('No GPU accelerators detected - fallback to CPU')
         
-        self.mode = 'cpu-gpu-mixed'
+        self.mode = 'cpu_gpu_mixed'
     
 
 

@@ -325,7 +325,8 @@ class Worker(Process):
                 if 0 <= first_nonzero < num_scales:
                     to_classify = np.vstack(exprs[first_nonzero:])  # pyright: ignore # noqa: E501
 
-                    all_confidences = self.classifier.classify(to_classify)
+                    # Use silent=True to avoid excessive output in multiprocessing
+                    all_confidences = self.classifier.classify(to_classify, silent=True)
 
                     probs[first_nonzero:] = all_confidences
 

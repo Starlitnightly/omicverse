@@ -16,7 +16,7 @@ def test_registry_basic():
     print("TEST 1: Checking if Function Registry is populated")
     print("=" * 70)
 
-    from omicverse.utils.registry import _global_registry
+    from omicverse.registry import _global_registry
 
     # Count unique functions
     unique_functions = set()
@@ -38,7 +38,7 @@ def test_registry_search():
     print("TEST 2: Testing Registry Search Functionality")
     print("=" * 70)
 
-    from omicverse.utils.registry import _global_registry
+    from omicverse.registry import _global_registry
 
     # Test Chinese search
     results = _global_registry.find("质控")
@@ -72,7 +72,7 @@ def test_agent_integration():
 
     try:
         from omicverse.utils.smart_agent import OmicVerseAgent
-        from omicverse.utils.registry import _global_registry
+        from omicverse.registry import _global_registry
 
         # Check if agent imports registry
         print("\n✅ Agent successfully imports registry module")
