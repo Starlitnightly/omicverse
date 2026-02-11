@@ -197,14 +197,32 @@ class pyPPI(object):
 
     def interaction_analysis(self) -> nx.Graph:
         r"""Perform protein-protein interaction analysis.
-        
+
         Returns:
             G: NetworkX Graph object containing PPI network for query genes
         """
+        # Map original gene names to STRING preferred names
+        gene_mapping = string_map(self.gene, self.species)
+        name_map = dict(zip(gene_mapping['queryItem'], gene_mapping['preferredName']))
+
+        # Update gene_type_dict and gene_color_dict to use STRING preferred names
+        updated_type_dict = {}
+        updated_color_dict = {}
+        for orig_gene in self.gene:
+            if orig_gene in name_map:
+                string_name = name_map[orig_gene]
+                if orig_gene in self.gene_type_dict:
+                    updated_type_dict[string_name] = self.gene_type_dict[orig_gene]
+                if orig_gene in self.gene_color_dict:
+                    updated_color_dict[string_name] = self.gene_color_dict[orig_gene]
+
+        self.gene_type_dict = updated_type_dict
+        self.gene_color_dict = updated_color_dict
+
         G=generate_G(self.gene,
                           self.species,
                           self.score)
-        self.G=G 
+        self.G=G
         return G
     
     def plot_network(self, **kwargs: Any) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:

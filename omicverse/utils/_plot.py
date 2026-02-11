@@ -641,9 +641,11 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     elif pos_type=='kamada_kawai':
         pos=nx.kamada_kawai_layout(G,dim=pos_dim,scale=pos_scale)
     degree_dict = dict(G.degree(G.nodes()))
-    
-    G_color_dict=dict(zip(G.nodes,[G_color_dict[i] for i in G.nodes]))
-    G_type_dict=dict(zip(G.nodes,[G_type_dict[i] for i in G.nodes]))
+
+    # Handle nodes that might not be in the input dictionaries (e.g., STRING-added interacting partners)
+    # Use .get() with defaults to avoid KeyError
+    G_color_dict=dict(zip(G.nodes,[G_color_dict.get(i, '#808080') for i in G.nodes]))
+    G_type_dict=dict(zip(G.nodes,[G_type_dict.get(i, 'unknown') for i in G.nodes]))
 
     nx.draw_networkx_edges(G, pos,nodelist=list(G_color_dict.keys()), alpha=pos_alpha)
     nx.draw_networkx_nodes(
