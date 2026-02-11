@@ -138,6 +138,30 @@ def _build_star_index(
     run_cmd(cmd, env=env)
 
 
+def _clean_star_outputs(sample_dir: Path) -> None:
+    patterns = [
+        "Aligned.*",
+        "Log.*",
+        "SJ.out.tab",
+        "ReadsPerGene.out.tab",
+        "Gene.out.tab",
+        "Signal.*",
+        "Unmapped.*",
+        "Chimeric.*",
+        "Solo.out*",
+        "*STARtmp*",
+    ]
+    for pattern in patterns:
+        for path in sample_dir.glob(pattern):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+
+
 def _run_star_one(
     sample: str,
     fq1: Path,
@@ -154,8 +178,11 @@ def _run_star_one(
     auto_install: bool,
     index_ok: bool,
     strict: bool,
+    overwrite: bool,
 ) -> Dict[str, str]:
     sample_dir = ensure_dir(out_root / sample)
+    if overwrite:
+        _clean_star_outputs(sample_dir)
     prefix = str(sample_dir) + os.sep
     bam_path = sample_dir / "Aligned.sortedByCoord.out.bam"
 
@@ -165,7 +192,7 @@ def _run_star_one(
             raise FileNotFoundError(msg)
         return {"sample": sample, "error": msg}
 
-    if bam_path.exists() and bam_path.stat().st_size > 1_000_000:
+    if not overwrite and bam_path.exists() and bam_path.stat().st_size > 1_000_000:
         return {"sample": sample, "bam": str(bam_path)}
 
     cmd = [
@@ -255,6 +282,7 @@ def STAR(
     extra_args: Optional[Sequence[str]] = None,
     star_path: Optional[str] = None,
     auto_install: bool = True,
+    overwrite: bool = False,
 ) -> Union[Dict[str, str], List[Dict[str, str]]]:
     """
     Run STAR alignment.
@@ -301,6 +329,8 @@ def STAR(
         Explicit path to STAR executable.
     auto_install
         Install missing tools automatically when possible.
+    overwrite
+        If True, rerun STAR and overwrite existing outputs.
     """
     if isinstance(samples, tuple):
         if len(samples) == 2:
@@ -415,6 +445,7 @@ def STAR(
             auto_install=auto_install,
             index_ok=index_ok,
             strict=strict,
+            overwrite=overwrite,
         )
 
     results = run_in_threads(sample_list, _worker, worker_count)
