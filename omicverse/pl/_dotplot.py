@@ -395,7 +395,21 @@ def dotplot(
         else:
             # Use the order as they appear in gene_groups
             used_groups = list(dict.fromkeys(gene_groups))
-        
+
+        # Ensure all used_groups have colors in color_dict
+        missing_in_used = [g for g in used_groups if g not in color_dict]
+        if missing_in_used:
+            # Determine which palette to use based on total unique groups
+            all_unique_groups = list(dict.fromkeys(gene_groups))
+            if len(all_unique_groups) <= 28:
+                palette = palette_28
+            else:
+                palette = palette_56
+            # Add missing colors
+            start_idx = len(color_dict)
+            for i, group in enumerate(missing_in_used):
+                color_dict[group] = palette[(start_idx + i) % len(palette)]
+
         used_color_dict = {k: color_dict[k] for k in used_groups}
         m.add_top(
             mp.Colors(gene_groups, palette=used_color_dict),
