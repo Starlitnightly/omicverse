@@ -173,6 +173,38 @@ class CountMatrix(CountData):
     """
 
     def __init__(self, matrix, **kwargs):
+        # Check if input is AnnData object
+        adata_obj = None
+        try:
+            from anndata import AnnData
+            is_anndata = isinstance(matrix, AnnData)
+            if is_anndata:
+                adata_obj = matrix
+        except ImportError:
+            is_anndata = False
+
+        if is_anndata and adata_obj is not None:
+            # Extract data from AnnData
+            print(f"{Colors.HEADER}{EMOJI['start']} Creating CountMatrix from AnnData...{Colors.ENDC}")
+
+            # Get expression matrix (convert to sparse CSC if needed)
+            import scipy.sparse as sp
+            matrix = adata_obj.X
+            if not sp.isspmatrix(matrix):
+                print(f"{Colors.CYAN}  → Converting dense matrix to sparse format...{Colors.ENDC}")
+                matrix = sp.csc_matrix(matrix)
+            elif not sp.isspmatrix_csc(matrix):
+                print(f"{Colors.CYAN}  → Converting to CSC format...{Colors.ENDC}")
+                matrix = matrix.tocsc()
+
+            # Get genes and samples from AnnData if not provided in kwargs
+            if 'genes' not in kwargs:
+                kwargs['genes'] = list(adata_obj.var_names)
+            if 'samples' not in kwargs:
+                kwargs['samples'] = list(adata_obj.obs_names)
+
+            print(f"{Colors.BLUE}  → Extracted {len(kwargs['samples'])} cells and {len(kwargs['genes'])} genes{Colors.ENDC}")
+
         num_samples, num_genes = matrix.shape
         print(f"{Colors.CYAN}{EMOJI['gene']} Initializing CountMatrix: {num_samples} samples × {num_genes} genes{Colors.ENDC}")
         self.matrix = matrix
@@ -180,6 +212,15 @@ class CountMatrix(CountData):
                          num_samples=num_samples,
                          **kwargs
                          )
+
+        # If AnnData, import all metadata from obs
+        if is_anndata and adata_obj is not None:
+            obs_columns = adata_obj.obs.columns.tolist()
+            print(f"{Colors.CYAN}  → Importing {len(obs_columns)} metadata columns{Colors.ENDC}")
+            for col in obs_columns:
+                self.add_metadata(col, list(adata_obj.obs[col]))
+                print(f"{Colors.BLUE}    • Added metadata: {col}{Colors.ENDC}")
+
         print(f"{Colors.GREEN}{EMOJI['done']} CountMatrix initialized!{Colors.ENDC}")
 
     def expression(self,
