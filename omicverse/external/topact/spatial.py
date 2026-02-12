@@ -3,6 +3,7 @@
 import itertools
 from typing import Iterable, Iterator, Sequence, cast
 from multiprocessing import Process, Queue
+from multiprocessing.shared_memory import SharedMemory
 from warnings import simplefilter
 
 import numpy as np
@@ -177,6 +178,132 @@ def extract_image(confidence_matrix: npt.NDArray,
         image[i, j] = c
 
     return image
+
+
+def extract_classifications_from_dict(result_dict: dict[tuple[int, int], npt.NDArray],
+                                      threshold: float,
+                                      x_min: int = 0,
+                                      y_min: int = 0
+                                      ) -> dict[tuple[int, int], int]:
+    """Extract cell type classifications from result dictionary.
+
+    Args:
+        result_dict:
+            Dictionary {(i, j): probs} where probs is array of shape (n_scales, n_classes)
+        threshold:
+            Confidence threshold for classification
+        x_min, y_min:
+            Grid offsets (if coordinates are not 0-indexed)
+
+    Returns:
+        Dictionary {(i, j): cell_type} for spots passing threshold
+    """
+    classifications: dict[tuple[int, int], int] = {}
+
+    for (i, j), probs in result_dict.items():
+        # probs shape: (n_scales, n_classes)
+        # For each scale, find best class
+        max_per_scale = probs.max(axis=1)  # Max confidence per scale
+
+        # Find first scale meeting threshold (lowest scale)
+        for scale_idx, scale_confidences in enumerate(probs):
+            best_class = scale_confidences.argmax()
+            confidence = scale_confidences[best_class]
+
+            if confidence >= threshold:
+                # Adjust coordinates if needed
+                classifications[(i - x_min, j - y_min)] = best_class
+                break  # Use lowest scale
+
+    return classifications
+
+
+def extract_image_from_dict(result_dict: dict[tuple[int, int], npt.NDArray],
+                            grid_shape: tuple[int, int],
+                            threshold: float,
+                            x_min: int = 0,
+                            y_min: int = 0,
+                            return_confidence: bool = False
+                            ) -> npt.NDArray | tuple[npt.NDArray, npt.NDArray]:
+    """Extract classification image from result dictionary.
+
+    Args:
+        result_dict:
+            Dictionary {(i, j): probs} from classify_parallel with return_dict=True
+        grid_shape:
+            (height, width) of output image
+        threshold:
+            Confidence threshold
+        x_min, y_min:
+            Grid offsets
+        return_confidence:
+            If True, also return confidence values
+
+    Returns:
+        classification_image: (height, width) array of cell types (NaN for unclassified)
+        [confidence_image]: (height, width) array of confidence values (if requested)
+    """
+    height, width = grid_shape
+    classification = np.full((height, width), np.nan)
+    confidences = np.full((height, width), np.nan) if return_confidence else None
+
+    for (i, j), probs in result_dict.items():
+        # Adjust coordinates
+        adj_i = i - x_min
+        adj_j = j - y_min
+
+        # Check bounds
+        if not (0 <= adj_i < height and 0 <= adj_j < width):
+            continue
+
+        # Find best classification across scales
+        for scale_idx, scale_confidences in enumerate(probs):
+            best_class = scale_confidences.argmax()
+            confidence = scale_confidences[best_class]
+
+            if confidence >= threshold:
+                classification[adj_i, adj_j] = best_class
+                if return_confidence:
+                    confidences[adj_i, adj_j] = confidence
+                break  # Use lowest scale
+
+    if return_confidence:
+        return classification, confidences
+    return classification
+
+
+def dict_to_full_matrix(result_dict: dict[tuple[int, int], npt.NDArray],
+                       grid_shape: tuple[int, int],
+                       num_scales: int,
+                       num_classes: int,
+                       x_min: int = 0,
+                       y_min: int = 0
+                       ) -> npt.NDArray:
+    """Convert result dictionary to full 4D confidence matrix.
+
+    Useful if you need the full matrix format for compatibility with existing code.
+
+    Args:
+        result_dict: Dictionary {(i, j): probs} from classify_parallel
+        grid_shape: (height, width) of grid
+        num_scales: Number of scales
+        num_classes: Number of cell types
+        x_min, y_min: Grid offsets
+
+    Returns:
+        4D array of shape (height, width, num_scales, num_classes)
+    """
+    height, width = grid_shape
+    matrix = np.full((height, width, num_scales, num_classes), np.nan, dtype=np.float32)
+
+    for (i, j), probs in result_dict.items():
+        adj_i = i - x_min
+        adj_j = j - y_min
+
+        if 0 <= adj_i < height and 0 <= adj_j < width:
+            matrix[adj_i, adj_j] = probs
+
+    return matrix
 
 
 class ExpressionGrid:
@@ -431,20 +558,81 @@ class ExpressionGrid:
                                (self.y_min, self.y_max))
 
 
+class SharedSparseMatrix:
+    """Wrapper for sharing scipy sparse CSC matrices via shared memory."""
+
+    def __init__(self, matrix: sparse.csc_matrix):
+        """Create shared memory from CSC matrix."""
+        if not sparse.isspmatrix_csc(matrix):
+            matrix = matrix.tocsc()
+
+        # Store metadata
+        self.shape = matrix.shape
+        self.dtype = matrix.dtype
+
+        # Create shared memory for each CSC array
+        self.data_shm = SharedMemory(create=True, size=matrix.data.nbytes)
+        self.indices_shm = SharedMemory(create=True, size=matrix.indices.nbytes)
+        self.indptr_shm = SharedMemory(create=True, size=matrix.indptr.nbytes)
+
+        # Copy data to shared memory
+        shm_data = np.ndarray(matrix.data.shape, dtype=matrix.data.dtype, buffer=self.data_shm.buf)
+        shm_indices = np.ndarray(matrix.indices.shape, dtype=matrix.indices.dtype, buffer=self.indices_shm.buf)
+        shm_indptr = np.ndarray(matrix.indptr.shape, dtype=matrix.indptr.dtype, buffer=self.indptr_shm.buf)
+
+        np.copyto(shm_data, matrix.data)
+        np.copyto(shm_indices, matrix.indices)
+        np.copyto(shm_indptr, matrix.indptr)
+
+        # Store array metadata
+        self.data_shape = matrix.data.shape
+        self.indices_shape = matrix.indices.shape
+        self.indptr_shape = matrix.indptr.shape
+        self.data_dtype = matrix.data.dtype
+        self.indices_dtype = matrix.indices.dtype
+        self.indptr_dtype = matrix.indptr.dtype
+
+    def get_names(self):
+        """Get shared memory names for child processes."""
+        return {
+            'data_name': self.data_shm.name,
+            'indices_name': self.indices_shm.name,
+            'indptr_name': self.indptr_shm.name,
+            'shape': self.shape,
+            'dtype': self.dtype,
+            'data_shape': self.data_shape,
+            'indices_shape': self.indices_shape,
+            'indptr_shape': self.indptr_shape,
+            'data_dtype': self.data_dtype,
+            'indices_dtype': self.indices_dtype,
+            'indptr_dtype': self.indptr_dtype,
+        }
+
+    def cleanup(self):
+        """Release shared memory."""
+        self.data_shm.close()
+        self.indices_shm.close()
+        self.indptr_shm.close()
+        self.data_shm.unlink()
+        self.indices_shm.unlink()
+        self.indptr_shm.unlink()
+
+
 class Worker(Process):
 
     def __init__(self,
-                 grid: ExpressionGrid,
+                 grid_or_shm_names,  # Can be ExpressionGrid or shared memory names dict
                  min_scale: int,
                  max_scale: int,
                  classifier: Classifier,
                  job_queue: Queue,
                  res_queue: Queue,
                  procid: int,
-                 verbose: bool
+                 verbose: bool,
+                 use_shared_memory: bool = False
                  ):
         super().__init__()
-        self.grid = grid
+        self.grid_or_shm_names = grid_or_shm_names
         self.min_scale = min_scale
         self.max_scale = max_scale
         self.classifier = classifier
@@ -452,25 +640,69 @@ class Worker(Process):
         self.res_queue = res_queue
         self.procid = procid
         self.verbose = verbose
+        self.use_shared_memory = use_shared_memory
 
     def run(self):
         simplefilter(action='ignore', category=FutureWarning)
         if self.verbose:
             print(f'{Colors.CYAN}{EMOJI["process"]} Worker {self.procid} started{Colors.ENDC}')
 
-        num_classes = len(self.classifier.classes)
+        # Reconstruct grid from shared memory or use directly
+        if self.use_shared_memory:
+            names = self.grid_or_shm_names
+            # Attach to shared memory
+            data_shm = SharedMemory(name=names['data_name'])
+            indices_shm = SharedMemory(name=names['indices_name'])
+            indptr_shm = SharedMemory(name=names['indptr_name'])
 
-        cols = list(self.grid.cols())
+            # Reconstruct arrays
+            data = np.ndarray(names['data_shape'], dtype=names['data_dtype'], buffer=data_shm.buf)
+            indices = np.ndarray(names['indices_shape'], dtype=names['indices_dtype'], buffer=indices_shm.buf)
+            indptr = np.ndarray(names['indptr_shape'], dtype=names['indptr_dtype'], buffer=indptr_shm.buf)
+
+            # Reconstruct sparse matrix
+            matrix = sparse.csc_matrix((data, indices, indptr), shape=names['shape'])
+
+            # Create a minimal grid-like object
+            class GridLike:
+                def __init__(self, matrix, names):
+                    self.matrix = matrix
+                    self.x_min = names['x_min']
+                    self.y_min = names['y_min']
+                    self.x_max = names['x_max']
+                    self.y_max = names['y_max']
+                    self.width = names['width']
+                    self.num_genes = names['num_genes']
+
+                def cols(self):
+                    return range(self.y_min, self.y_max + 1)
+
+                def expression_vec(self, coords):
+                    flattened = ((self.width, 1) * (coords - (self.x_min, self.y_min))).sum(axis=1)
+                    return self.matrix[flattened].sum(axis=0)
+
+                def square_nbhd_vec(self, i, j, scale):
+                    return square_nbhd_vec((i, j), scale, (self.x_min, self.x_max), (self.y_min, self.y_max))
+
+            grid = GridLike(matrix, names)
+            shm_refs = (data_shm, indices_shm, indptr_shm)
+        else:
+            grid = self.grid_or_shm_names
+            shm_refs = None
+
+        num_classes = len(self.classifier.classes)
+        cols = list(grid.cols())
         num_scales = self.max_scale - self.min_scale + 1
-        exprs = np.zeros((num_scales, self.grid.num_genes))
+        exprs = np.zeros((num_scales, grid.num_genes))
+
         for i, col_values in iter(self.job_queue.get, None):
             if self.verbose:
                 print(f"{Colors.BLUE}  → Worker {self.procid} processing row {i}{Colors.ENDC}")
             for col_index in col_values:
                 j = cols[col_index]
                 for scale in range(self.min_scale, self.max_scale + 1):
-                    nbhd = self.grid.square_nbhd_vec(i, j, scale)
-                    expr = self.grid.expression_vec(nbhd)
+                    nbhd = grid.square_nbhd_vec(i, j, scale)
+                    expr = grid.expression_vec(nbhd)
                     exprs[scale - self.min_scale] = expr
 
                 first_nonzero = first_nonzero_1d(exprs.sum(axis=1))
@@ -480,27 +712,16 @@ class Worker(Process):
 
                 if 0 <= first_nonzero < num_scales:
                     to_classify = np.vstack(exprs[first_nonzero:])  # pyright: ignore # noqa: E501
-
-                    # Use silent=True to avoid excessive output in multiprocessing
                     all_confidences = self.classifier.classify(to_classify, silent=True)
-
                     probs[first_nonzero:] = all_confidences
 
-                    # sample_confidences = np.max(all_confidences, axis=1)
-
-                    # first_confident = utf1st.find_1st(sample_confidences,
-                    #                                   self.threshold,
-                    #                                   utf1st.cmp_larger_eq)
-
-                    # if 0 <= first_confident < num_scales - first_nonzero:
-                    #     sample_probs = all_confidences[first_confident]
-                    #     index = np.argmax(sample_probs)
-                    #     result = classifier.classes[index]
-                    #     scale = first_confident + first_nonzero + self.min_scale
-                    # else:
-                    #     result = scale = None
-                    # self.res_queue.put((i, j, result, scale))
                 self.res_queue.put((i, j, probs.tolist()))
+
+        # Clean up shared memory references
+        if shm_refs:
+            for shm in shm_refs:
+                shm.close()
+
         self.res_queue.put(None)
         if self.verbose:
             print(f'{Colors.GREEN}{EMOJI["done"]} Worker {self.procid} finished{Colors.ENDC}')
@@ -659,6 +880,54 @@ class CountGrid(CountTable):
         count_grid.add_metadata('y', y_coords)
         return count_grid
 
+    def get_nonzero_spots(self) -> set[tuple[int, int]]:
+        """Get all (i, j) coordinates with non-zero expression.
+
+        Returns:
+            Set of (i, j) tuples representing spots with expression data.
+        """
+        matrix_coo = self.grid.matrix.tocoo()
+        nonzero_spots = set()
+
+        for row_idx in set(matrix_coo.row):
+            i = row_idx // self.grid.width + self.grid.x_min
+            j = row_idx % self.grid.width + self.grid.y_min
+            nonzero_spots.add((i, j))
+
+        return nonzero_spots
+
+    def get_spots_with_nearby_data(self, max_radius: int) -> set[tuple[int, int]]:
+        """Get all (i, j) coordinates that have data within max_radius distance.
+
+        This includes:
+        1. Spots with their own expression data
+        2. Spots whose neighborhood (within max_radius) contains other spots with data
+
+        Args:
+            max_radius: Maximum neighborhood radius (typically max_scale)
+
+        Returns:
+            Set of (i, j) tuples that should be classified
+        """
+        # First, get all spots with data
+        nonzero_spots = self.get_nonzero_spots()
+
+        # Expand to include all positions within max_radius of any data spot
+        spots_to_classify = set()
+
+        for i, j in nonzero_spots:
+            # Add the spot itself and all positions within max_radius
+            for di in range(-max_radius, max_radius + 1):
+                for dj in range(-max_radius, max_radius + 1):
+                    ni = i + di
+                    nj = j + dj
+                    # Check if within grid bounds
+                    if (self.grid.x_min <= ni <= self.grid.x_max and
+                        self.grid.y_min <= nj <= self.grid.y_max):
+                        spots_to_classify.add((ni, nj))
+
+        return spots_to_classify
+
     def pseudobulk(self) -> npt.NDArray:
         return np.array(self.grid.matrix.sum(axis=0))[0]
 
@@ -693,26 +962,69 @@ class CountGrid(CountTable):
                           classifier: Classifier,
                           min_scale: int,
                           max_scale: int,
-                          outfile: str,
+                          outfile: str | None = None,
                           mask: npt.NDArray | None = None,
                           num_proc: int = 1,
-                          verbose: bool = False
+                          verbose: bool = False,
+                          only_nonzero: bool = True,
+                          use_shared_memory: bool = True,
+                          return_dict: bool = False
                           ):
 
         print(f"{Colors.HEADER}{EMOJI['spatial']} Starting parallel spatial classification...{Colors.ENDC}")
         print(f"{Colors.CYAN}  → Scales: {min_scale}-{max_scale}, Processes: {num_proc}{Colors.ENDC}")
 
-        outfile += '' if outfile[-4:] == '.npy' else '.npy'
+        # Setup shared memory if requested
+        shared_matrix = None
+        shm_names = None
+        if use_shared_memory:
+            print(f"{Colors.CYAN}  → Creating shared memory for matrix (avoiding serialization)...{Colors.ENDC}")
+            matrix_size_mb = (self.grid.matrix.data.nbytes +
+                            self.grid.matrix.indices.nbytes +
+                            self.grid.matrix.indptr.nbytes) / (1024**2)
+            print(f"{Colors.BLUE}    • Matrix size: {matrix_size_mb:.1f} MB{Colors.ENDC}")
+
+            try:
+                shared_matrix = SharedSparseMatrix(self.grid.matrix)
+                shm_names = shared_matrix.get_names()
+                # Add grid metadata
+                shm_names.update({
+                    'x_min': self.grid.x_min,
+                    'y_min': self.grid.y_min,
+                    'x_max': self.grid.x_max,
+                    'y_max': self.grid.y_max,
+                    'width': self.grid.width,
+                    'num_genes': self.grid.num_genes,
+                })
+                print(f"{Colors.GREEN}    ✓ Shared memory created (workers access directly){Colors.ENDC}")
+            except Exception as e:
+                print(f"{Colors.WARNING}    ⚠ Shared memory creation failed: {e}{Colors.ENDC}")
+                print(f"{Colors.WARNING}    → Falling back to traditional serialization{Colors.ENDC}")
+                use_shared_memory = False
+
+        # Setup output storage
         shape = (self.grid.height,
                  self.grid.width,
                  max_scale - min_scale + 1,
                  len(classifier.classes)
                  )
-        print(f"{Colors.BLUE}  → Output shape: {shape}, File: {outfile}{Colors.ENDC}")
-        result = np.lib.format.open_memmap(outfile, dtype=np.float32,
-                                           mode='w+', shape=shape)
-        result[:] = np.nan
-        result.flush()
+
+        if return_dict:
+            # Memory-efficient mode: store only non-empty results
+            print(f"{Colors.GREEN}  → Using memory-efficient dict mode (no file I/O){Colors.ENDC}")
+            result_dict = {}
+            result = None
+        else:
+            # Traditional mode: use memory-mapped file
+            if outfile is None:
+                raise ValueError("outfile is required when return_dict=False")
+            outfile += '' if outfile[-4:] == '.npy' else '.npy'
+            print(f"{Colors.BLUE}  → Output shape: {shape}, File: {outfile}{Colors.ENDC}")
+            result = np.lib.format.open_memmap(outfile, dtype=np.float32,
+                                               mode='w+', shape=shape)
+            result[:] = np.nan
+            result.flush()
+            result_dict = None
 
         job_queue: Queue[tuple[int, list[int]] | None] = Queue()
         res_queue: Queue[tuple[int, int, list[list[int]]] | None] = Queue()
@@ -723,20 +1035,62 @@ class CountGrid(CountTable):
                 raise ValueError(f'Mask has shape {mask.shape} but expected {(self.height, self.width)}')
             col_values = [[j for j in range(self.width) if mask[i, j] == 1] for i in range(self.height)]
             print(f"{Colors.WARNING}  → Using mask for spot selection{Colors.ENDC}")
+        elif only_nonzero:
+            # CRITICAL OPTIMIZATION: Only classify spots with data in their neighborhood
+            print(f"{Colors.CYAN}  → Identifying spots to classify (including neighborhoods)...{Colors.ENDC}")
+
+            # Get spots with data
+            nonzero_spots = self.get_nonzero_spots()
+            print(f"{Colors.BLUE}    • Found {len(nonzero_spots):,} spots with expression data{Colors.ENDC}")
+
+            # Expand to include neighborhoods (within max_scale radius)
+            print(f"{Colors.BLUE}    • Expanding to include neighborhoods (max_scale={max_scale})...{Colors.ENDC}")
+            spots_to_classify = self.get_spots_with_nearby_data(max_scale)
+            print(f"{Colors.GREEN}    • Total spots to classify: {len(spots_to_classify):,}{Colors.ENDC}")
+
+            # Group by row (i coordinate)
+            from collections import defaultdict
+            row_to_cols = defaultdict(list)
+            for i, j in spots_to_classify:
+                row_to_cols[i].append(j - self.grid.y_min)  # Store as index relative to y_min
+
+            # Create col_values array
+            col_values = []
+            for i in range(self.grid.height):
+                actual_i = i + self.grid.x_min
+                if actual_i in row_to_cols:
+                    col_values.append(sorted(row_to_cols[actual_i]))
+                else:
+                    col_values.append([])
+
+            total_grid_positions = self.grid.height * self.grid.width
+            reduction_pct = (1 - len(spots_to_classify) / total_grid_positions) * 100
+            speedup = total_grid_positions / max(len(spots_to_classify), 1)
+            print(f"{Colors.GREEN}  ✓ Optimization enabled: Classifying {len(spots_to_classify):,} spots (not {total_grid_positions:,}){Colors.ENDC}")
+            print(f"{Colors.GREEN}    → Includes {len(nonzero_spots):,} data spots + {len(spots_to_classify) - len(nonzero_spots):,} neighborhood spots{Colors.ENDC}")
+            print(f"{Colors.GREEN}    → Reduction: {reduction_pct:.1f}% fewer spots{Colors.ENDC}")
+            print(f"{Colors.GREEN}    → Speedup estimate: {speedup:.0f}x faster{Colors.ENDC}")
         else:
             col_values = [list(range(self.width)) for _ in range(self.height)]
+            total_grid_positions = self.grid.height * self.grid.width
+            print(f"{Colors.WARNING}  ⚠ Optimization disabled: Classifying ALL grid positions ({total_grid_positions:,} spots){Colors.ENDC}")
+            print(f"{Colors.WARNING}    → Set only_nonzero=True to classify only spots with data{Colors.ENDC}")
 
         print(f"{Colors.CYAN}{EMOJI['process']} Launching {num_proc} worker processes...{Colors.ENDC}")
         workers = []
         for i in range(num_proc):
-            worker = Worker(self.grid,
+            # Use shared memory names or grid object
+            grid_or_names = shm_names if use_shared_memory else self.grid
+
+            worker = Worker(grid_or_names,
                            min_scale,
                            max_scale,
                            classifier,
                            job_queue,
                            res_queue,
                            i,
-                           verbose
+                           verbose,
+                           use_shared_memory
                            )
             worker.start()
             workers.append(worker)
@@ -789,7 +1143,14 @@ class CountGrid(CountTable):
 
             if res:
                 i, j, probs = res
-                result[i-self.grid.x_min, j-self.grid.y_min] = probs
+
+                if return_dict:
+                    # Store in dictionary (memory-efficient)
+                    result_dict[(i, j)] = np.array(probs, dtype=np.float32)
+                else:
+                    # Write to memmap file
+                    result[i-self.grid.x_min, j-self.grid.y_min] = probs
+
                 processed_spots += 1
                 pbar.update(1)
 
@@ -797,20 +1158,46 @@ class CountGrid(CountTable):
                 if processed_spots % 1000 == 0:
                     pbar.set_postfix_str(f"Flushed: {flush_counter}x", refresh=True)
 
-                # Flush to disk periodically
-                if msg_index % 5000 == 0:
+                # Flush to disk periodically (only for file mode)
+                if not return_dict and msg_index % 5000 == 0:
                     result.flush()
                     flush_counter += 1
                     if verbose:
                         print(f"{Colors.BLUE}  → Flushed to disk ({processed_spots:,}/{num_spots:,} spots completed){Colors.ENDC}")
 
         pbar.close()
-        result.flush()
+
+        # Finalize results
+        if return_dict:
+            # Calculate memory usage
+            mem_mb = sum(arr.nbytes for arr in result_dict.values()) / (1024**2)
+        else:
+            result.flush()
+            mem_mb = result.nbytes / (1024**2)
+
+        # Clean up shared memory
+        if shared_matrix is not None:
+            print(f"\n{Colors.CYAN}  → Cleaning up shared memory...{Colors.ENDC}")
+            try:
+                shared_matrix.cleanup()
+                print(f"{Colors.GREEN}    ✓ Shared memory released{Colors.ENDC}")
+            except Exception as e:
+                print(f"{Colors.WARNING}    ⚠ Warning: Shared memory cleanup issue: {e}{Colors.ENDC}")
 
         print(f"\n{Colors.GREEN}{EMOJI['done']} Classification completed!{Colors.ENDC}")
         print(f"{Colors.BLUE}  → Processed: {processed_spots:,} spots{Colors.ENDC}")
-        print(f"{Colors.BLUE}  → Results saved to: {outfile}{Colors.ENDC}")
-        print(f"{Colors.BLUE}  → File size: ~{result.nbytes / (1024**2):.1f} MB{Colors.ENDC}")
+
+        if return_dict:
+            print(f"{Colors.BLUE}  → Results stored in dict: {len(result_dict):,} spots{Colors.ENDC}")
+            print(f"{Colors.BLUE}  → Memory usage: ~{mem_mb:.1f} MB{Colors.ENDC}")
+            # Calculate potential savings
+            full_grid_mb = (shape[0] * shape[1] * shape[2] * shape[3] * 4) / (1024**2)
+            print(f"{Colors.GREEN}  → Saved ~{full_grid_mb - mem_mb:.1f} MB vs full grid ({(1 - mem_mb/full_grid_mb)*100:.1f}%){Colors.ENDC}")
+            return result_dict
+        else:
+            print(f"{Colors.BLUE}  → Results saved to: {outfile}{Colors.ENDC}")
+            print(f"{Colors.BLUE}  → File size: ~{mem_mb:.1f} MB{Colors.ENDC}")
+            return result
 
     def annotate(self,
                  confidence_matrix: npt.NDArray,

@@ -1839,7 +1839,7 @@ def _obs_categories_ordered(adata, key) -> list[str]:
     return [str(x) for x in natsorted(np.unique(arr))]
 
 def _set_colors_for_categorical_obs(
-    adata, value_to_plot: str, palette: str | Sequence[str] | Cycler | Mapping[str, str]
+    adata, value_to_plot: str, palette: Union[str, Sequence[str], Cycler, Mapping[str, str]]
 ):
     """Set `adata.uns[f'{value_to_plot}_colors']` according to the given palette.
     兼容 pandas/Polars；若 palette 是 dict，会按类别键匹配。
