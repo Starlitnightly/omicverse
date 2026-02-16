@@ -342,6 +342,8 @@ def _normalize_items(
         "ov.alignment.featureCount([('S1','S1.bam')], gtf='genes.gtf', output_dir='counts')",
     ],
     related=["alignment.STAR"],
+    prerequisites={"optional_functions": ["STAR"]},
+    produces={"uns": ["count_matrix"]},
 )
 def featureCount(
     bam_items: Union[Tuple[str, str], Tuple[str, str, bool], Sequence[Tuple[str, str]], Sequence[Tuple[str, str, bool]]],

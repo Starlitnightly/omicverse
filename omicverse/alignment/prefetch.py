@@ -28,6 +28,7 @@ from ._cli_utils import (
         "ov.alignment.prefetch(['SRR1', 'SRR2'], output_dir='prefetch', jobs=4)",
     ],
     related=["alignment.fqdump", "alignment.fastp", "alignment.STAR", "alignment.featureCount"],
+    produces={"uns": ["sra_files"]},
 )
 def prefetch(
     sra_ids: Union[str, Sequence[str]],

@@ -63,6 +63,8 @@ def _normalize_layout(layout: str) -> str:
         "ov.alignment.fqdump(['SRR1','SRR2'], output_dir='fastq', gzip=True)",
     ],
     related=["alignment.prefetch", "alignment.fastp", "alignment.STAR", "alignment.featureCount"],
+    prerequisites={"optional_functions": ["prefetch"]},
+    produces={"uns": ["fastq_files"]},
 )
 def fqdump(
     sra_ids: Union[str, Sequence[str]],

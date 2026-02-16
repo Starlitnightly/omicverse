@@ -86,12 +86,28 @@ class WorkflowEscalator:
             'estimated_time': '30-60 seconds',
             'estimated_time_seconds': 45,
         },
+        'bulk_rnaseq_pipeline': {
+            'replaces': ['prefetch', 'fqdump', 'fastp', 'STAR', 'featureCount'],
+            'code_template': (
+                "# Bulk RNA-seq pipeline: download -> QC -> align -> quantify\n"
+                "fq = ov.alignment.fqdump(sra_ids, output_dir='fastq')\n"
+                "clean = ov.alignment.fastp(samples, output_dir='fastp')\n"
+                "bams = ov.alignment.STAR(samples, genome_dir=genome_dir, output_dir='star')\n"
+                "counts = ov.alignment.featureCount(bam_items, gtf=gtf, output_dir='counts')"
+            ),
+            'description': 'Complete bulk RNA-seq alignment pipeline',
+            'estimated_time': '10-30 minutes',
+            'estimated_time_seconds': 1200,
+        },
     }
 
     # Complex prerequisites that trigger escalation
     COMPLEX_TRIGGERS = {
         'qc', 'preprocess', 'batch_correct', 'highly_variable_genes',
-        'normalize', 'combat', 'harmony', 'scanorama'
+        'normalize', 'combat', 'harmony', 'scanorama',
+        # alignment / FASTQ analysis triggers
+        'prefetch', 'fqdump', 'fastp', 'STAR', 'featureCount',
+        'align', 'alignment', 'fastq', 'mapping',
     }
 
     def __init__(self, registry: Any):
@@ -367,6 +383,37 @@ class WorkflowEscalator:
                 auto_executable=True
             )
 
+        # Check if bulk RNA-seq pipeline can be used
+        elif self._can_use_bulk_rnaseq_pipeline(missing_prerequisites):
+            pipeline_meta = self.HIGH_LEVEL_FUNCTIONS['bulk_rnaseq_pipeline']
+
+            code_lines = [pipeline_meta['code_template']]
+
+            # Add any remaining prerequisites not covered by the pipeline
+            pipeline_replaces = set(pipeline_meta['replaces'])
+            remaining = [p for p in missing_prerequisites if p not in pipeline_replaces]
+            for prereq in remaining:
+                code_lines.append(self._get_default_code(prereq))
+
+            code_lines.append(self._get_default_code(target_function))
+            code = '\n'.join(code_lines)
+
+            return Suggestion(
+                priority='HIGH',
+                suggestion_type='workflow_escalation',
+                description=f'Bulk RNA-seq alignment pipeline for {target_function}',
+                code=code,
+                explanation=(
+                    f'{target_function} requires a multi-step alignment workflow. '
+                    f'Use the ov.alignment pipeline (fqdump -> fastp -> STAR -> featureCount) '
+                    f'to process raw sequencing data end-to-end.'
+                ),
+                estimated_time=pipeline_meta['estimated_time'],
+                estimated_time_seconds=pipeline_meta['estimated_time_seconds'],
+                prerequisites=[],
+                auto_executable=True
+            )
+
         # Fallback: generate workflow chain
         else:
             return self._generate_workflow_chain(
@@ -448,6 +495,15 @@ class WorkflowEscalator:
         # Check if any batch correction method is missing
         overlap = missing_set & batch_replaces
         return len(overlap) >= 1
+
+    def _can_use_bulk_rnaseq_pipeline(self, missing_prerequisites: List[str]) -> bool:
+        """Check if the bulk RNA-seq pipeline can replace missing prerequisites."""
+        pipeline_replaces = set(self.HIGH_LEVEL_FUNCTIONS['bulk_rnaseq_pipeline']['replaces'])
+        missing_set = set(missing_prerequisites)
+
+        # Trigger when at least 2 alignment steps are missing
+        overlap = missing_set & pipeline_replaces
+        return len(overlap) >= 2
 
     def _get_remaining_after_preprocess(self, missing_prerequisites: List[str]) -> List[str]:
         """Get prerequisites not covered by preprocess()."""
@@ -534,6 +590,12 @@ class WorkflowEscalator:
             'leiden': 'ov.pp.leiden(adata, resolution=1.0)',
             'louvain': 'ov.pp.louvain(adata, resolution=1.0)',
             'tsne': 'ov.pp.tsne(adata)',
+            # alignment / FASTQ analysis defaults
+            'prefetch': "ov.alignment.prefetch(sra_ids, output_dir='prefetch')",
+            'fqdump': "ov.alignment.fqdump(sra_ids, output_dir='fastq')",
+            'fastp': "ov.alignment.fastp(samples, output_dir='fastp')",
+            'STAR': "ov.alignment.STAR(samples, genome_dir='index', output_dir='star')",
+            'featureCount': "ov.alignment.featureCount(bam_items, gtf='genes.gtf', output_dir='counts')",
         }
 
         return defaults.get(function_name, f'ov.pp.{function_name}(adata)')
