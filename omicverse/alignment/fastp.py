@@ -134,6 +134,8 @@ def _run_fastp_one(
         "ov.alignment.fastp(('S1','S1.fq.gz', None), output_dir='fastp')",
     ],
     related=["alignment.fqdump", "alignment.STAR"],
+    prerequisites={"optional_functions": ["fqdump"]},
+    produces={"uns": ["cleaned_fastq"]},
 )
 def fastp(
     samples: Union[Tuple[str, str, Optional[str]], Sequence[Tuple[str, str, Optional[str]]]],

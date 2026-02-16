@@ -13,6 +13,7 @@ from .fq_dump import fqdump
 from .fastp import fastp
 from .STAR import STAR
 from .featureCount import featureCount
+from .pipeline import bulk_rnaseq_pipeline
 
 __all__ = [
     "single",
@@ -24,4 +25,5 @@ __all__ = [
     "fastp",
     "STAR",
     "featureCount",
+    "bulk_rnaseq_pipeline",
 ]
