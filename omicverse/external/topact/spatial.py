@@ -629,7 +629,8 @@ class Worker(Process):
                  res_queue: Queue,
                  procid: int,
                  verbose: bool,
-                 use_shared_memory: bool = False
+                 use_shared_memory: bool = False,
+                 batch_size: int = 1000
                  ):
         super().__init__()
         self.grid_or_shm_names = grid_or_shm_names
@@ -641,11 +642,12 @@ class Worker(Process):
         self.procid = procid
         self.verbose = verbose
         self.use_shared_memory = use_shared_memory
+        self.batch_size = batch_size
 
     def run(self):
         simplefilter(action='ignore', category=FutureWarning)
         if self.verbose:
-            print(f'{Colors.CYAN}{EMOJI["process"]} Worker {self.procid} started{Colors.ENDC}')
+            print(f'{Colors.CYAN}{EMOJI["process"]} Worker {self.procid} started (batch_size={self.batch_size}){Colors.ENDC}')
 
         # Reconstruct grid from shared memory or use directly
         if self.use_shared_memory:
@@ -693,13 +695,19 @@ class Worker(Process):
         num_classes = len(self.classifier.classes)
         cols = list(grid.cols())
         num_scales = self.max_scale - self.min_scale + 1
-        exprs = np.zeros((num_scales, grid.num_genes))
+
+        # Batch processing: accumulate spots before classification
+        batch_spots = []  # List of (i, j, exprs, first_nonzero) tuples
 
         for i, col_values in iter(self.job_queue.get, None):
             if self.verbose:
-                print(f"{Colors.BLUE}  → Worker {self.procid} processing row {i}{Colors.ENDC}")
+                print(f"{Colors.BLUE}  → Worker {self.procid} processing row {i} ({len(col_values)} spots){Colors.ENDC}")
+
             for col_index in col_values:
                 j = cols[col_index]
+
+                # Compute expressions for all scales
+                exprs = np.zeros((num_scales, grid.num_genes))
                 for scale in range(self.min_scale, self.max_scale + 1):
                     nbhd = grid.square_nbhd_vec(i, j, scale)
                     expr = grid.expression_vec(nbhd)
@@ -707,15 +715,17 @@ class Worker(Process):
 
                 first_nonzero = first_nonzero_1d(exprs.sum(axis=1))
 
-                probs = np.empty((num_scales, num_classes))
-                probs[:] = -1
+                # Add to batch
+                batch_spots.append((i, j, exprs, first_nonzero))
 
-                if 0 <= first_nonzero < num_scales:
-                    to_classify = np.vstack(exprs[first_nonzero:])  # pyright: ignore # noqa: E501
-                    all_confidences = self.classifier.classify(to_classify, silent=True)
-                    probs[first_nonzero:] = all_confidences
+                # Process batch when it reaches batch_size
+                if len(batch_spots) >= self.batch_size:
+                    self._process_batch(batch_spots, num_scales, num_classes)
+                    batch_spots = []
 
-                self.res_queue.put((i, j, probs.tolist()))
+        # Process remaining spots in batch
+        if len(batch_spots) > 0:
+            self._process_batch(batch_spots, num_scales, num_classes)
 
         # Clean up shared memory references
         if shm_refs:
@@ -725,6 +735,55 @@ class Worker(Process):
         self.res_queue.put(None)
         if self.verbose:
             print(f'{Colors.GREEN}{EMOJI["done"]} Worker {self.procid} finished{Colors.ENDC}')
+
+    def _process_batch(self, batch_spots, num_scales, num_classes):
+        """Process a batch of spots together for efficiency.
+
+        Args:
+            batch_spots: List of (i, j, exprs, first_nonzero) tuples
+            num_scales: Number of scales
+            num_classes: Number of cell type classes
+        """
+        if len(batch_spots) == 0:
+            return
+
+        # Collect all samples to classify across all spots in batch
+        samples_to_classify = []
+        sample_metadata = []  # (spot_idx, scale_idx) for each sample
+
+        for spot_idx, (i, j, exprs, first_nonzero) in enumerate(batch_spots):
+            if 0 <= first_nonzero < num_scales:
+                # Add all scales from first_nonzero onwards
+                for scale_idx in range(first_nonzero, num_scales):
+                    samples_to_classify.append(exprs[scale_idx])
+                    sample_metadata.append((spot_idx, scale_idx))
+
+        # Batch classify all samples at once (CRITICAL OPTIMIZATION)
+        if len(samples_to_classify) > 0:
+            to_classify = np.vstack(samples_to_classify)
+            all_confidences = self.classifier.classify(to_classify, silent=True)
+
+            # Distribute results back to spots
+            result_idx = 0
+            for spot_idx, (i, j, exprs, first_nonzero) in enumerate(batch_spots):
+                probs = np.empty((num_scales, num_classes))
+                probs[:] = -1
+
+                if 0 <= first_nonzero < num_scales:
+                    # Count how many samples belong to this spot
+                    num_samples_for_spot = num_scales - first_nonzero
+                    # Extract this spot's results
+                    spot_confidences = all_confidences[result_idx:result_idx + num_samples_for_spot]
+                    probs[first_nonzero:] = spot_confidences
+                    result_idx += num_samples_for_spot
+
+                self.res_queue.put((i, j, probs.tolist()))
+        else:
+            # No samples to classify, send empty results
+            for i, j, exprs, first_nonzero in batch_spots:
+                probs = np.empty((num_scales, num_classes))
+                probs[:] = -1
+                self.res_queue.put((i, j, probs.tolist()))
 
 
 class CountGrid(CountTable):
@@ -968,11 +1027,13 @@ class CountGrid(CountTable):
                           verbose: bool = False,
                           only_nonzero: bool = True,
                           use_shared_memory: bool = True,
-                          return_dict: bool = False
+                          return_dict: bool = False,
+                          batch_size: int = 1000
                           ):
 
         print(f"{Colors.HEADER}{EMOJI['spatial']} Starting parallel spatial classification...{Colors.ENDC}")
-        print(f"{Colors.CYAN}  → Scales: {min_scale}-{max_scale}, Processes: {num_proc}{Colors.ENDC}")
+        print(f"{Colors.CYAN}  → Scales: {min_scale}-{max_scale}, Processes: {num_proc}, Batch size: {batch_size}{Colors.ENDC}")
+        print(f"{Colors.GREEN}  → Batch processing enabled: {batch_size} spots per batch for GPU acceleration{Colors.ENDC}")
 
         # Setup shared memory if requested
         shared_matrix = None
@@ -1090,11 +1151,12 @@ class CountGrid(CountTable):
                            res_queue,
                            i,
                            verbose,
-                           use_shared_memory
+                           use_shared_memory,
+                           batch_size
                            )
             worker.start()
             workers.append(worker)
-            print(f"{Colors.BLUE}  → Worker {i+1}/{num_proc} started{Colors.ENDC}")
+            print(f"{Colors.BLUE}  → Worker {i+1}/{num_proc} started (batch_size={batch_size}){Colors.ENDC}")
 
         print(f"\n{Colors.CYAN}{EMOJI['grid']} Preparing classification jobs...{Colors.ENDC}")
         num_spots = 0
