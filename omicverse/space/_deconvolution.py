@@ -160,6 +160,7 @@ class Deconvolution(object):
         starfysh_kwargs=None,
         spatial_type='visium',
         gene_sig=None,
+        categorical_covariate_keys_sc=None,
     ):
         r"""Deconvolution the spatial transcriptomics data.
         Parameters
@@ -192,6 +193,11 @@ class Deconvolution(object):
             Spatial type, by default 'visium'.
         gene_sig : dict, optional
             Gene signature, by default None.
+        categorical_covariate_keys_sc : list, optional
+            List of obs column names to use as categorical covariates in the
+            cell2location regression model (e.g. ``["Method", "Platform"]``).
+            Only used when ``method='cell2location'``. Set to ``None`` to
+            omit categorical covariates. Default: None.
         """
         if method=='Tangram':
             self.method='Tangram'
@@ -230,7 +236,7 @@ class Deconvolution(object):
                 # cell type, covariate used for constructing signatures
                 labels_key=celltype_key_sc,
                 # multiplicative technical effects (platform, 3' vs 5', donor effect)
-                categorical_covariate_keys=["Method"],
+                categorical_covariate_keys=categorical_covariate_keys_sc,
             )
             self.mod_sc = RegressionModel(self.adata_sc)
 
@@ -377,7 +383,6 @@ class Deconvolution(object):
             self.method='starfysh'
 
             import torch
-            import scanpy as sc
             sc.settings.verbosity = 0
                 
             starfysh_default_kwargs={

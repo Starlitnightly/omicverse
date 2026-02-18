@@ -4,6 +4,7 @@ import itertools
 from typing import Iterable, Iterator, Sequence, cast
 from multiprocessing import Process, Queue
 from multiprocessing.shared_memory import SharedMemory
+import threading
 from warnings import simplefilter
 
 import numpy as np
@@ -544,6 +545,11 @@ class ExpressionGrid:
         flattened = self._flatten_coords_vec(coords)
         return self.matrix[flattened].sum(axis=0)
 
+    def expression_flat(self, flattened: npt.ArrayLike) -> npt.NDArray:
+        """Total expression for pre-flattened grid indices."""
+        expr = self.matrix[np.asarray(flattened, dtype=np.int64)].sum(axis=0)
+        return np.asarray(expr).ravel()
+
     def square_nbhd(self,
                     i: int,
                     j: int,
@@ -556,6 +562,18 @@ class ExpressionGrid:
     def square_nbhd_vec(self, i: int, j: int, scale: int) -> npt.NDArray:
         return square_nbhd_vec((i, j), scale, (self.x_min, self.x_max),
                                (self.y_min, self.y_max))
+
+    def square_nbhd_flat(self, i: int, j: int, scale: int) -> npt.NDArray:
+        """Flattened indices for square neighborhood around (i, j)."""
+        x0 = max(self.x_min, i - scale)
+        x1 = min(self.x_max, i + scale)
+        y0 = max(self.y_min, j - scale)
+        y1 = min(self.y_max, j + scale)
+        if x1 < x0 or y1 < y0:
+            return np.empty((0,), dtype=np.int64)
+        x = np.arange(x0, x1 + 1, dtype=np.int64) - self.x_min
+        y = np.arange(y0, y1 + 1, dtype=np.int64) - self.y_min
+        return (x[:, None] * self.width + y[None, :]).ravel()
 
 
 class SharedSparseMatrix:
@@ -686,6 +704,21 @@ class Worker(Process):
                 def square_nbhd_vec(self, i, j, scale):
                     return square_nbhd_vec((i, j), scale, (self.x_min, self.x_max), (self.y_min, self.y_max))
 
+                def expression_flat(self, flattened):
+                    expr = self.matrix[np.asarray(flattened, dtype=np.int64)].sum(axis=0)
+                    return np.asarray(expr).ravel()
+
+                def square_nbhd_flat(self, i, j, scale):
+                    x0 = max(self.x_min, i - scale)
+                    x1 = min(self.x_max, i + scale)
+                    y0 = max(self.y_min, j - scale)
+                    y1 = min(self.y_max, j + scale)
+                    if x1 < x0 or y1 < y0:
+                        return np.empty((0,), dtype=np.int64)
+                    x = np.arange(x0, x1 + 1, dtype=np.int64) - self.x_min
+                    y = np.arange(y0, y1 + 1, dtype=np.int64) - self.y_min
+                    return (x[:, None] * self.width + y[None, :]).ravel()
+
             grid = GridLike(matrix, names)
             shm_refs = (data_shm, indices_shm, indptr_shm)
         else:
@@ -698,6 +731,7 @@ class Worker(Process):
 
         # Batch processing: accumulate spots before classification
         batch_spots = []  # List of (i, j, exprs, first_nonzero) tuples
+        scales = list(range(self.min_scale, self.max_scale + 1))
 
         for i, col_values in iter(self.job_queue.get, None):
             if self.verbose:
@@ -707,11 +741,10 @@ class Worker(Process):
                 j = cols[col_index]
 
                 # Compute expressions for all scales
-                exprs = np.zeros((num_scales, grid.num_genes))
-                for scale in range(self.min_scale, self.max_scale + 1):
-                    nbhd = grid.square_nbhd_vec(i, j, scale)
-                    expr = grid.expression_vec(nbhd)
-                    exprs[scale - self.min_scale] = expr
+                exprs = np.zeros((num_scales, grid.num_genes), dtype=np.float32)
+                for scale_idx, scale in enumerate(scales):
+                    flat_idx = grid.square_nbhd_flat(i, j, scale)
+                    exprs[scale_idx] = grid.expression_flat(flat_idx).astype(np.float32, copy=False)
 
                 first_nonzero = first_nonzero_1d(exprs.sum(axis=1))
 
@@ -1017,6 +1050,36 @@ class CountGrid(CountTable):
                                    count_col=self.count_col
                                    )
 
+    def _build_neighborhood_operator(self,
+                                     spots: list[tuple[int, int]],
+                                     scale: int
+                                     ) -> sparse.csr_matrix:
+        """Build sparse operator A mapping grid -> neighborhood sums for one scale."""
+        n_rows = len(spots)
+        n_cols = self.grid.height * self.grid.width
+        if n_rows == 0:
+            return sparse.csr_matrix((0, n_cols), dtype=np.float32)
+
+        row_idx: list[int] = []
+        col_idx: list[int] = []
+
+        for r, (i, j) in enumerate(spots):
+            flat = self.grid.square_nbhd_flat(i, j, scale)
+            if flat.size == 0:
+                continue
+            row_idx.extend([r] * int(flat.size))
+            col_idx.extend(flat.tolist())
+
+        if len(col_idx) == 0:
+            return sparse.csr_matrix((n_rows, n_cols), dtype=np.float32)
+
+        data = np.ones(len(col_idx), dtype=np.float32)
+        return sparse.csr_matrix(
+            (data, (np.asarray(row_idx, dtype=np.int32), np.asarray(col_idx, dtype=np.int64))),
+            shape=(n_rows, n_cols),
+            dtype=np.float32
+        )
+
     def classify_parallel(self,
                           classifier: Classifier,
                           min_scale: int,
@@ -1026,6 +1089,9 @@ class CountGrid(CountTable):
                           num_proc: int = 1,
                           verbose: bool = False,
                           only_nonzero: bool = True,
+                          include_neighborhood: bool = True,
+                          use_sparse_operator: bool = False,
+                          operator_chunk_size: int = 2000,
                           use_shared_memory: bool = True,
                           return_dict: bool = False,
                           batch_size: int = 1000
@@ -1034,6 +1100,11 @@ class CountGrid(CountTable):
         print(f"{Colors.HEADER}{EMOJI['spatial']} Starting parallel spatial classification...{Colors.ENDC}")
         print(f"{Colors.CYAN}  → Scales: {min_scale}-{max_scale}, Processes: {num_proc}, Batch size: {batch_size}{Colors.ENDC}")
         print(f"{Colors.GREEN}  → Batch processing enabled: {batch_size} spots per batch for GPU acceleration{Colors.ENDC}")
+        if use_sparse_operator:
+            print(f"{Colors.GREEN}  → Sparse operator mode enabled (A_s @ grid.matrix){Colors.ENDC}")
+        if num_proc == 1 and use_shared_memory:
+            print(f"{Colors.BLUE}  → Single-process mode detected: disabling shared memory{Colors.ENDC}")
+            use_shared_memory = False
 
         # Setup shared memory if requested
         shared_matrix = None
@@ -1104,9 +1175,13 @@ class CountGrid(CountTable):
             nonzero_spots = self.get_nonzero_spots()
             print(f"{Colors.BLUE}    • Found {len(nonzero_spots):,} spots with expression data{Colors.ENDC}")
 
-            # Expand to include neighborhoods (within max_scale radius)
-            print(f"{Colors.BLUE}    • Expanding to include neighborhoods (max_scale={max_scale})...{Colors.ENDC}")
-            spots_to_classify = self.get_spots_with_nearby_data(max_scale)
+            if include_neighborhood:
+                # Expand to include neighborhoods (within max_scale radius)
+                print(f"{Colors.BLUE}    • Expanding to include neighborhoods (max_scale={max_scale})...{Colors.ENDC}")
+                spots_to_classify = self.get_spots_with_nearby_data(max_scale)
+            else:
+                print(f"{Colors.BLUE}    • Using only observed spots (no neighborhood expansion){Colors.ENDC}")
+                spots_to_classify = nonzero_spots
             print(f"{Colors.GREEN}    • Total spots to classify: {len(spots_to_classify):,}{Colors.ENDC}")
 
             # Group by row (i coordinate)
@@ -1128,7 +1203,7 @@ class CountGrid(CountTable):
             reduction_pct = (1 - len(spots_to_classify) / total_grid_positions) * 100
             speedup = total_grid_positions / max(len(spots_to_classify), 1)
             print(f"{Colors.GREEN}  ✓ Optimization enabled: Classifying {len(spots_to_classify):,} spots (not {total_grid_positions:,}){Colors.ENDC}")
-            print(f"{Colors.GREEN}    → Includes {len(nonzero_spots):,} data spots + {len(spots_to_classify) - len(nonzero_spots):,} neighborhood spots{Colors.ENDC}")
+            print(f"{Colors.GREEN}    → Includes {len(nonzero_spots):,} data spots + {max(0, len(spots_to_classify) - len(nonzero_spots)):,} neighborhood spots{Colors.ENDC}")
             print(f"{Colors.GREEN}    → Reduction: {reduction_pct:.1f}% fewer spots{Colors.ENDC}")
             print(f"{Colors.GREEN}    → Speedup estimate: {speedup:.0f}x faster{Colors.ENDC}")
         else:
@@ -1139,24 +1214,28 @@ class CountGrid(CountTable):
 
         print(f"{Colors.CYAN}{EMOJI['process']} Launching {num_proc} worker processes...{Colors.ENDC}")
         workers = []
-        for i in range(num_proc):
-            # Use shared memory names or grid object
-            grid_or_names = shm_names if use_shared_memory else self.grid
+        run_inline_worker = (num_proc == 1)
+        if run_inline_worker:
+            print(f"{Colors.BLUE}  → Using inline single-process worker (no multiprocessing overhead){Colors.ENDC}")
+        else:
+            for i in range(num_proc):
+                # Use shared memory names or grid object
+                grid_or_names = shm_names if use_shared_memory else self.grid
 
-            worker = Worker(grid_or_names,
-                           min_scale,
-                           max_scale,
-                           classifier,
-                           job_queue,
-                           res_queue,
-                           i,
-                           verbose,
-                           use_shared_memory,
-                           batch_size
-                           )
-            worker.start()
-            workers.append(worker)
-            print(f"{Colors.BLUE}  → Worker {i+1}/{num_proc} started (batch_size={batch_size}){Colors.ENDC}")
+                worker = Worker(grid_or_names,
+                               min_scale,
+                               max_scale,
+                               classifier,
+                               job_queue,
+                               res_queue,
+                               i,
+                               verbose,
+                               use_shared_memory,
+                               batch_size
+                               )
+                worker.start()
+                workers.append(worker)
+                print(f"{Colors.BLUE}  → Worker {i+1}/{num_proc} started (batch_size={batch_size}){Colors.ENDC}")
 
         print(f"\n{Colors.CYAN}{EMOJI['grid']} Preparing classification jobs...{Colors.ENDC}")
         num_spots = 0
@@ -1177,8 +1256,117 @@ class CountGrid(CountTable):
         print(f"{Colors.BLUE}  → Classes: {len(classifier.classes)}{Colors.ENDC}")
         print(f"{Colors.BLUE}  → Total classifications: {num_spots:,} × {max_scale - min_scale + 1} × {len(classifier.classes)} = {num_spots * (max_scale - min_scale + 1) * len(classifier.classes):,}{Colors.ENDC}")
 
+        if use_sparse_operator and num_proc == 1:
+            print(f"\n{Colors.CYAN}{EMOJI['classify']} Running sparse-operator single-process classification...{Colors.ENDC}")
+            query_spots: list[tuple[int, int]] = []
+            for i in self.grid.rows():
+                index = i - self.grid.x_min
+                if len(col_values[index]) > 0:
+                    for col_index in col_values[index]:
+                        query_spots.append((i, col_index + self.grid.y_min))
+
+            scales = list(range(min_scale, max_scale + 1))
+            num_scales = len(scales)
+            num_classes = len(classifier.classes)
+            n_grid = self.grid.height * self.grid.width
+            gsum = np.asarray(self.grid.matrix.sum(axis=1)).ravel().astype(np.float32)
+
+            pbar = tqdm(total=len(query_spots),
+                        desc=f"{Colors.CYAN}Classifying spots{Colors.ENDC}",
+                        ncols=120,
+                        unit='spot')
+
+            flush_counter = 0
+            for start in range(0, len(query_spots), operator_chunk_size):
+                end = min(start + operator_chunk_size, len(query_spots))
+                chunk = query_spots[start:end]
+                n_chunk = len(chunk)
+
+                # Pass 1: determine first nonzero scale using A_s @ total_counts.
+                row_sums = np.zeros((n_chunk, num_scales), dtype=np.float32)
+                for scale_idx, scale in enumerate(scales):
+                    A = self._build_neighborhood_operator(chunk, scale)
+                    if A.nnz == 0:
+                        continue
+                    row_sums[:, scale_idx] = np.asarray(A.dot(gsum)).ravel()
+
+                nonzero_mask = row_sums > 0
+                first_nonzero = np.full(n_chunk, -1, dtype=np.int32)
+                any_nonzero = nonzero_mask.any(axis=1)
+                first_nonzero[any_nonzero] = np.argmax(nonzero_mask[any_nonzero], axis=1)
+
+                chunk_probs = np.full((n_chunk, num_scales, num_classes), -1, dtype=np.float32)
+
+                # Pass 2: classify only required scales/spots via A_s @ grid.matrix
+                for scale_idx, scale in enumerate(scales):
+                    eligible = np.where((first_nonzero >= 0) & (first_nonzero <= scale_idx))[0]
+                    if eligible.size == 0:
+                        continue
+
+                    subset = [chunk[idx] for idx in eligible.tolist()]
+                    A = self._build_neighborhood_operator(subset, scale)
+                    if A.nnz == 0:
+                        continue
+
+                    X_scale = A.dot(self.grid.matrix)  # sparse matrix (eligible, genes)
+
+                    for b_start in range(0, eligible.size, batch_size):
+                        b_end = min(b_start + batch_size, eligible.size)
+                        idx_slice = eligible[b_start:b_end]
+                        probs = classifier.classify(X_scale[b_start:b_end], silent=True)
+                        chunk_probs[idx_slice, scale_idx, :] = probs
+
+                # Write outputs
+                for local_idx, (i, j) in enumerate(chunk):
+                    probs = chunk_probs[local_idx]
+                    if return_dict:
+                        result_dict[(i, j)] = probs
+                    else:
+                        result[i-self.grid.x_min, j-self.grid.y_min] = probs
+                    pbar.update(1)
+
+                if not return_dict:
+                    result.flush()
+                    flush_counter += 1
+
+            pbar.close()
+
+            if return_dict:
+                mem_mb = sum(arr.nbytes for arr in result_dict.values()) / (1024**2)
+            else:
+                result.flush()
+                mem_mb = result.nbytes / (1024**2)
+
+            print(f"\n{Colors.GREEN}{EMOJI['done']} Classification completed (sparse operator mode)!{Colors.ENDC}")
+            print(f"{Colors.BLUE}  → Processed: {len(query_spots):,} spots{Colors.ENDC}")
+            if return_dict:
+                print(f"{Colors.BLUE}  → Results stored in dict: {len(result_dict):,} spots{Colors.ENDC}")
+                print(f"{Colors.BLUE}  → Memory usage: ~{mem_mb:.1f} MB{Colors.ENDC}")
+                return result_dict
+            print(f"{Colors.BLUE}  → Results saved to: {outfile}{Colors.ENDC}")
+            print(f"{Colors.BLUE}  → File size: ~{mem_mb:.1f} MB{Colors.ENDC}")
+            return result
+
         print(f"\n{Colors.CYAN}{EMOJI['classify']} Waiting for workers to process jobs...{Colors.ENDC}")
         print(f"{Colors.WARNING}  ⏳ This may take a few seconds to start (workers are initializing)...{Colors.ENDC}")
+
+        inline_thread = None
+        if run_inline_worker:
+            # Run inline worker in a background thread so the main thread can
+            # update tqdm in real time while consuming results.
+            inline_worker = Worker(self.grid,
+                                  min_scale,
+                                  max_scale,
+                                  classifier,
+                                  job_queue,
+                                  res_queue,
+                                  0,
+                                  verbose,
+                                  False,
+                                  batch_size
+                                  )
+            inline_thread = threading.Thread(target=inline_worker.run, daemon=True)
+            inline_thread.start()
 
         # Wait for first result to confirm workers are running
         import time
@@ -1228,6 +1416,9 @@ class CountGrid(CountTable):
                         print(f"{Colors.BLUE}  → Flushed to disk ({processed_spots:,}/{num_spots:,} spots completed){Colors.ENDC}")
 
         pbar.close()
+
+        if inline_thread is not None:
+            inline_thread.join()
 
         # Finalize results
         if return_dict:

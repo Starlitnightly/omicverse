@@ -769,9 +769,10 @@ def add_pie2spatial(
         spatial_coords = np.asarray(adata.obsm['spatial'])
         if spatial_coords.shape[0] != adata.n_obs:
             raise ValueError("spatial 坐标与 obs 数量不一致")
-        
-        spatial_key=list(adata.uns['spatial'].keys())[0]
-        spatial_coords=spatial_coords*adata.uns['spatial'][spatial_key]['scalefactors'][f'tissue_{img_key}_scalef']
+
+        if img_key is not None and 'spatial' in adata.uns:
+            spatial_key=list(adata.uns['spatial'].keys())[0]
+            spatial_coords=spatial_coords*adata.uns['spatial'][spatial_key]['scalefactors'][f'tissue_{img_key}_scalef']
 
 
     plot_data=pd.DataFrame()

@@ -29,8 +29,12 @@ def first_nonzero_1d(vector: npt.NDArray) -> int:
         The smallest i >= 0 such that vector[i] != 0. If no such i exists,
         then -1.
     """
-    import utils_find_1st as utf1st
-    return utf1st.find_1st(vector, 0, utf1st.cmp_not_equal)
+    try:
+        import utils_find_1st as utf1st
+        return utf1st.find_1st(vector, 0, utf1st.cmp_not_equal)
+    except Exception:
+        nz = np.flatnonzero(vector)
+        return int(nz[0]) if nz.size > 0 else -1
 
 
 def first_nonzero_2d(array: npt.NDArray, axis: int) -> npt.NDArray:
