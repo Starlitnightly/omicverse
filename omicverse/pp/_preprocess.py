@@ -530,7 +530,7 @@ def preprocess(
     adata, mode='shiftlog|pearson', 
     target_sum=50*1e4, n_HVGs=2000,
     organism='human', no_cc=False,batch_key=None,
-    identify_robust_genes=True):
+    identify_robust=True):
     """
     Preprocesses the AnnData object adata using either a scanpy or 
     a pearson residuals workflow for size normalization
@@ -569,7 +569,7 @@ def preprocess(
     
     print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
     print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
-    if identify_robust_genes:
+    if identify_robust:
         identify_robust_genes(adata, percent_cells=0.05)
         if not is_rust:
             adata = adata[:, adata.var['robust']]
