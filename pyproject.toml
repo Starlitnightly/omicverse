@@ -47,7 +47,7 @@ dependencies = [
     #'ktplotspy>=0.1',
     'python-dotplot>=0.0.1',
     #'pybedtools>=0.8.1',
-    'boltons>=23.0',
+    #'boltons>=23.0',
     'ctxcore>=0.2',
     #'termcolor>=2.1',
     'pygam>=0.8.0',
@@ -108,6 +108,7 @@ full = [
   'tensorboard>=2.6',
   'metatime>=1.3.0',
   'graphtools>=1.5',
+  'boltons>=23.0',
 ]
 
 easy=[

@@ -10,7 +10,7 @@ from typing import Sequence, Type
 
 import numpy as np
 import pandas as pd
-from boltons.iterutils import chunked
+
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
 
@@ -188,6 +188,7 @@ def aucell4r(
         A dataframe with the AUCs (n_cells x n_modules).
 
     """
+    from boltons.iterutils import chunked
     check_ctxcore()
     global ctxcore_install
     if ctxcore_install==True:
