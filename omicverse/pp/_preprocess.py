@@ -526,8 +526,11 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
     ],
     related=["qc", "normalize", "scale", "pca", "highly_variable_genes"]
 )
-def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
-    organism='human', no_cc=False,batch_key=None,):
+def preprocess(
+    adata, mode='shiftlog|pearson', 
+    target_sum=50*1e4, n_HVGs=2000,
+    organism='human', no_cc=False,batch_key=None,
+    identify_robust_genes=True):
     """
     Preprocesses the AnnData object adata using either a scanpy or 
     a pearson residuals workflow for size normalization
@@ -566,12 +569,13 @@ def preprocess(adata, mode='shiftlog|pearson', target_sum=50*1e4, n_HVGs=2000,
     
     print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
     print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
-    identify_robust_genes(adata, percent_cells=0.05)
-    if not is_rust:
-        adata = adata[:, adata.var['robust']]
-    else:
-        adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
-    print(f"{EMOJI['done']} Robust gene identification completed successfully.")
+    if identify_robust_genes:
+        identify_robust_genes(adata, percent_cells=0.05)
+        if not is_rust:
+            adata = adata[:, adata.var['robust']]
+        else:
+            adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
+        print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
     print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
     if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':

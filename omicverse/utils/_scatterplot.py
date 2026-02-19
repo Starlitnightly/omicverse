@@ -578,22 +578,30 @@ def embedding(
         elif colorbar_loc is not None:
 
             if frameon=='small' or frameon==False:
-                
+
                 from matplotlib.ticker import MaxNLocator
 
                 # 获取主轴的位置
                 pos = ax.get_position()
-                
+
                 # 计算colorbar的高度（主轴高度的30%）
                 cb_height = pos.height * 0.3
                 # colorbar垂直居中
-                cb_bottom = pos.y0 
-                
+                cb_bottom = pos.y0
+
+                # 计算colorbar的宽度（相对于subplot宽度，而不是figure宽度）
+                # 使用subplot宽度的5%作为colorbar宽度，这样在多子图时也能保持合适的宽度
+                cb_width = pos.width * 0.05
+                # colorbar与subplot的间距也相对于subplot宽度
+                cb_pad = pos.width * 0.05
+
                 # 手动创建colorbar轴：[left, bottom, width, height]
-                cax1 = pl.gcf().add_axes([pos.x1 + 0.02, cb_bottom, 0.02, cb_height])
-                
+                # Use ax.figure instead of pl.gcf() to ensure correct figure in multi-panel plots
+                cax1 = ax.figure.add_axes([pos.x1 + cb_pad, cb_bottom, cb_width, cb_height])
+
                 cb = pl.colorbar(cax, cax=cax1, orientation="vertical")
-                cb.locator = MaxNLocator(nbins=3, integer=True)
+                # Remove integer=True to allow float values in colorbar ticks
+                cb.locator = MaxNLocator(nbins=3, integer=False)
                 cb.update_ticks()
 
             else:

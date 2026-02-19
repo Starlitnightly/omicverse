@@ -29,5 +29,5 @@ def test_pca_umap(processed_adata):
 
 def test_cpu_gpu_mixed_init():
     ov.settings.cpu_gpu_mixed_init()
-    assert ov.settings.mode == "cpu_gpu_mixed"
+    assert ov.settings.mode == "cpu-gpu-mixed"
 

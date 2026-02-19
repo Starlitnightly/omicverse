@@ -3,8 +3,8 @@
 import logging
 from ctypes import c_uint32
 from math import ceil
-from multiprocessing import Array, Process, cpu_count
-from multiprocessing.sharedctypes import RawArray
+import os
+from multiprocessing import cpu_count
 from operator import attrgetter, mul
 from typing import Sequence, Type
 
@@ -77,12 +77,16 @@ def fast_rank(X_sparse, seed=42):
     shuffle_order = rng.permutation(n_cols)
     X_shuffled = X_sparse[:, shuffle_order]
 
-    # results = Parallel(n_jobs=n_jobs, backend=backend)(
-    #     delayed(_rank_sparse_row)(X_shuffled.getrow(i), n_cols) for i in range(n_rows)
-    # )
+    # Handle both sparse matrix and dense array
     results = []
     for i in tqdm(range(n_rows)):
-        row_result = _rank_sparse_row(X_shuffled.getrow(i), n_cols)
+        if hasattr(X_shuffled, 'getrow'):
+            # Sparse matrix
+            row_result = _rank_sparse_row(X_shuffled.getrow(i), n_cols)
+        else:
+            # Dense array - create a sparse-like object
+            from scipy.sparse import csr_matrix
+            row_result = _rank_sparse_row(csr_matrix(X_shuffled[i:i+1]), n_cols)
         results.append(row_result)
     ranks = np.stack(results)
 
@@ -113,34 +117,49 @@ def derive_auc_threshold(ex_mtx: csr_matrix, AUC_threshold: float = None) -> pd.
     if AUC_threshold is not None and AUC_threshold not in quantiles:
         quantiles.append(AUC_threshold)
         quantiles.sort()
-    
+
+    # Handle both sparse matrix and dense array
+    if hasattr(ex_mtx, 'toarray'):
+        # Sparse matrix
+        counts = np.count_nonzero(ex_mtx.toarray(), axis=1)
+    else:
+        # Dense array
+        counts = np.count_nonzero(ex_mtx, axis=1)
+
     return (
-        pd.Series(np.count_nonzero(ex_mtx.toarray(), axis=1)).quantile(quantiles)
+        pd.Series(counts).quantile(quantiles)
         / ex_mtx.shape[1]
     )
 
 
 
 def _enrichment(
-    shared_ro_memory_array, modules, genes, cells, auc_threshold, auc_mtx, offset
+    shared_ro_memory_array, modules, genes, cells, auc_threshold, auc_mtx, offset, gene_overlap_threshold
 ):
     from ..external.ctxcore.recovery import enrichment4cells
 
     # The rankings dataframe is properly reconstructed (checked this).
+    # Ensure genes are Python native strings for proper type matching with GeneSignature
     df_rnk = pd.DataFrame(
         data=np.frombuffer(shared_ro_memory_array, dtype=DTYPE).reshape(
             len(cells), len(genes)
         ),
-        columns=genes,
+        columns=pd.Index([str(g) for g in genes]),
         index=cells,
     )
     # To avoid additional memory burden de resulting AUCs are immediately stored in the output sync. array.
     result_mtx = np.frombuffer(auc_mtx.get_obj(), dtype="d")
     inc = len(cells)
     for idx, module in enumerate(modules):
+        # Get enrichment results and reindex to match df_rnk cell order
+        enrichment_result = enrichment4cells(df_rnk, module, auc_threshold, gene_overlap_threshold)
+        # Reindex to ensure correct cell order
+        enrichment_result = enrichment_result.reindex(
+            [(cell, module.name) for cell in df_rnk.index]
+        )
         result_mtx[
             offset + (idx * inc) : offset + ((idx + 1) * inc)
-        ] = enrichment4cells(df_rnk, module, auc_threshold).values.ravel(order="C")
+        ] = enrichment_result.values.ravel(order="C")
 
 
 def aucell4r(
@@ -150,6 +169,7 @@ def aucell4r(
     noweights: bool = False,
     normalize: bool = False,
     num_workers: int = cpu_count(),
+    gene_overlap_threshold: float = 0.80,
 ) -> pd.DataFrame:
     """
     Calculate enrichment of gene signatures for single cells.
@@ -161,7 +181,8 @@ def aucell4r(
         noweights: Should the weights of the genes part of a signature be used in calculation of enrichment?
         normalize: Normalize the AUC values to a maximum of 1.0 per regulon.
         num_workers: The number of cores to use.
-    
+        gene_overlap_threshold: Minimum fraction of genes that must be present (default: 0.80 = 80%).
+
     Returns:
         A dataframe with the AUCs (n_cells x n_modules).
 
@@ -178,6 +199,7 @@ def aucell4r(
                     df_rnk,
                     module.noweights() if noweights else module,
                     auc_threshold=auc_threshold,
+                    gene_overlap_threshold=gene_overlap_threshold,
                 )
                 for module in tqdm(signatures, desc="Processing pathways")
             ]
@@ -186,19 +208,28 @@ def aucell4r(
     else:
         # Multi-worker processing with progress info
         print(f"Computing AUC scores for {len(signatures)} pathways using {num_workers} workers...")
+        # Prefer fork on POSIX to avoid spawn bootstrap issues in interactive environments.
+        if os.name == "posix":
+            from multiprocessing import get_context
+            ctx = get_context("fork")
+        else:
+            from multiprocessing import get_context
+            ctx = get_context("spawn")
+
         # Decompose the rankings dataframe: the index and columns are shared with the child processes via pickling.
-        genes = df_rnk.columns.values
-        cells = df_rnk.index.values
+        # Use tolist() to ensure proper type matching in child processes
+        genes = df_rnk.columns.tolist()
+        cells = df_rnk.index.tolist()
         # The actual rankings are shared directly. This is possible because during a fork from a parent process the child
         # process inherits the memory of the parent process. A RawArray is used instead of a synchronize Array because
         # these rankings are read-only.
-        shared_ro_memory_array = RawArray(DTYPE_C, mul(*df_rnk.shape))
+        shared_ro_memory_array = ctx.RawArray(DTYPE_C, mul(*df_rnk.shape))
         array = np.frombuffer(shared_ro_memory_array, dtype=DTYPE)
         # Copy the contents of df_rank into this shared memory block using row-major ordering.
         array[:] = df_rnk.values.ravel(order="C")
 
         # The resulting AUCs are returned via a synchronize array.
-        auc_mtx = Array("d", len(cells) * len(signatures))  # Double precision floats.
+        auc_mtx = ctx.Array("d", len(cells) * len(signatures))  # Double precision floats.
 
         # Convert the modules to modules with uniform weights if necessary.
         if noweights:
@@ -209,7 +240,7 @@ def aucell4r(
         print(f"Splitting {len(signatures)} pathways into {num_workers} chunks of ~{chunk_size} pathways each...")
         
         processes = [
-            Process(
+            ctx.Process(
                 target=_enrichment,
                 args=(
                     shared_ro_memory_array,
@@ -219,6 +250,7 @@ def aucell4r(
                     auc_threshold,
                     auc_mtx,
                     (chunk_size * len(cells)) * idx,
+                    gene_overlap_threshold,
                 ),
             )
             for idx, chunk in enumerate(chunked(signatures, chunk_size))
@@ -229,6 +261,14 @@ def aucell4r(
             p.start()
         for p in processes:
             p.join()
+
+        failed = [p for p in processes if p.exitcode != 0]
+        if failed:
+            raise RuntimeError(
+                "AUCell parallel processing failed in worker process(es). "
+                "Please try num_workers=1, or run from a script guarded by "
+                "if __name__ == '__main__'."
+            )
         print("Parallel processing completed!")
 
         # Reconstitute the results array. Using C or row-major ordering.
@@ -243,6 +283,8 @@ def aucell4r(
         ).T
     
     result = aucs / aucs.max(axis=0) if normalize else aucs
+    # Keep a stable output layout regardless of processing mode.
+    result = result.reindex(index=df_rnk.index, columns=[module.name for module in signatures])
     print(f"AUC calculation completed! Generated scores for {result.shape[1]} pathways across {result.shape[0]} cells.")
     return result
 
@@ -257,6 +299,7 @@ def aucell(
     num_workers: int = cpu_count(),
     index=None,
     columns=None,
+    gene_overlap_threshold: float = 0.80,
 ) -> pd.DataFrame:
     r"""Calculate gene signature enrichment scores using AUCell algorithm.
 
@@ -273,7 +316,8 @@ def aucell(
         num_workers (int): Number of CPU cores for parallel processing (default: all cores)
         index: Custom row index for output DataFrame (default: None)
         columns: Custom column names for output DataFrame (default: None)
-    
+        gene_overlap_threshold (float): Minimum fraction of genes that must be present (default: 0.80 = 80%)
+
     Returns:
         pd.DataFrame: AUC enrichment scores with cells as rows and signatures as columns
 
@@ -314,4 +358,5 @@ def aucell(
         noweights,
         normalize,
         num_workers,
+        gene_overlap_threshold,
     )

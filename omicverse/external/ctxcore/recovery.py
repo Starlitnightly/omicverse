@@ -131,7 +131,10 @@ def recovery(
 
 
 def enrichment4cells(
-    rnk_mtx: pd.DataFrame, regulon: GeneSignature, auc_threshold: float = 0.05
+    rnk_mtx: pd.DataFrame,
+    regulon: GeneSignature,
+    auc_threshold: float = 0.05,
+    gene_overlap_threshold: float = 0.80
 ) -> pd.DataFrame:
     """
     Calculate the enrichment of the regulon for the cells in the ranking dataframe.
@@ -140,6 +143,8 @@ def enrichment4cells(
     :param regulon: The regulon the assess for enrichment
     :param auc_threshold: The fraction of the ranked genome to take into account for the
         calculation of the Area Under the recovery Curve.
+    :param gene_overlap_threshold: Minimum fraction of genes from the regulon that must be
+        present in the expression matrix (default: 0.80 = 80%).
     :return:
     """
     total_genes = len(rnk_mtx.columns)
@@ -147,10 +152,11 @@ def enrichment4cells(
         list(zip(rnk_mtx.index.values, repeat(regulon.name))), names=["Cell", "Regulon"]
     )
     rnk = rnk_mtx.iloc[:, rnk_mtx.columns.isin(regulon.genes)]
-    if rnk.empty or (float(len(rnk.columns)) / float(len(regulon))) < 0.80:
+    overlap_ratio = float(len(rnk.columns)) / float(len(regulon))
+    if rnk.empty or overlap_ratio < gene_overlap_threshold:
         LOGGER.warning(
-            f"Less than 80% of the genes in {regulon.name} are present in the "
-            "expression matrix."
+            f"Only {overlap_ratio*100:.1f}% of the genes in {regulon.name} are present in the "
+            f"expression matrix (threshold: {gene_overlap_threshold*100:.1f}%)."
         )
         return pd.DataFrame(
             index=index,

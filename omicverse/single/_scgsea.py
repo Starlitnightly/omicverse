@@ -172,7 +172,7 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
 
         adata.obs[f'{pathway_name}_aucell'] = auc_results
             
-def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1):
+def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1,gene_overlap_threshold=0.80):
     r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
     Arguments:
@@ -181,6 +181,7 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
         AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
         seed: The seed to use for the random number generator. (42)
         num_workers: The number of workers to use for parallel processing. (1)
+        gene_overlap_threshold: Minimum fraction of pathway genes that must be present in expression matrix (0.80 = 80%).
 
     Returns:
         adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
@@ -197,9 +198,10 @@ def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num
     auc_threshold = percentiles[AUC_threshold]
 
     # Pass sparse matrix directly to aucell with index and columns
-    aucs_mtx = aucell(matrix_sparse, signatures=test_gmt, auc_threshold=auc_threshold, 
-                     num_workers=num_workers, seed=seed, 
-                     index=adata.obs_names, columns=adata.var_names)
+    aucs_mtx = aucell(matrix_sparse, signatures=test_gmt, auc_threshold=auc_threshold,
+                     num_workers=num_workers, seed=seed,
+                     index=adata.obs_names, columns=adata.var_names,
+                     gene_overlap_threshold=gene_overlap_threshold)
     
     adata_aucs=anndata.AnnData(aucs_mtx)
     add_reference(adata,'AUCell','pathway activity score with AUCell')
