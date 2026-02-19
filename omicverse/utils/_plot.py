@@ -240,19 +240,12 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
     if facecolor is not None:
         rcParams["figure.facecolor"] = facecolor
         rcParams["axes.facecolor"] = facecolor
-    if scanpy:
-        set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
-    if isinstance(figsize, (int, float)):
-        figsize = (figsize, figsize)
-    if figsize is not None:
-        rcParams["figure.figsize"] = figsize
-    
+
     # Set global vector_friendly setting
     global _vector_friendly
     _vector_friendly = vector_friendly
-    #print(f"{EMOJI['done']} Settings applied")
 
-    # 3) Custom font setup
+    # 3) Custom font setup (BEFORE scanpy to avoid FontManager reset issues)
     if font_path is not None:
         # Check if user wants Arial font (auto-download)
         if font_path.lower() in ['arial', 'arial.ttf'] and not font_path.endswith('.ttf'):
@@ -308,6 +301,16 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
             except Exception as e:
                 print(f"Failed to set custom font: {e}")
                 print("Continuing with default font settings...")
+
+    # Apply scanpy rcParams AFTER font setup to preserve font-related settings
+    if scanpy:
+        set_rcParams_scanpy(fontsize=fontsize, color_map=color_map)
+
+    # Apply figsize AFTER scanpy to ensure it's not overridden
+    if isinstance(figsize, (int, float)):
+        figsize = (figsize, figsize)
+    if figsize is not None:
+        rcParams["figure.figsize"] = figsize
 
     # 4) suppress user/future/deprecation warnings
     #print(f"{EMOJI['warnings']} Suppressing common warnings")

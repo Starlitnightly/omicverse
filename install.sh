@@ -169,7 +169,10 @@ pip_install_pkg \
   tensorboard \
   metatime \
   graphtools \
-
+  boltons \
+  leidenalg \
+  gdown \
+  wandb \
 
 pip_install_pkg \
   tangram-sc \
@@ -196,7 +199,7 @@ pip_install_pkg \
   scvi-tools \
   mofax \
   metatime \
-  s-gd2
+  s-gd2 
 
 pip_install_pkg \
   mellon \

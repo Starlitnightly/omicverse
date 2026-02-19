@@ -20,24 +20,6 @@ LOGGER = logging.getLogger(__name__)
 DTYPE = "uint32"
 DTYPE_C = c_uint32
 
-ctxcore_install=False
-
-def check_ctxcore():
-    r"""Check if ctxcore package is installed for AUCell analysis.
-    
-    Raises:
-        ImportError: If ctxcore is not installed
-    """
-    global ctxcore_install
-    try:
-        import ctxcore
-        ctxcore_install=True
-        #print('ctxcore have been install version:',ctxcore.__version__)
-    except ImportError:
-        raise ImportError(
-            'Please install the ctxcore: `pip install ctxcore`.'
-        )
-
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
         shortname = modulename
@@ -142,11 +124,7 @@ def derive_auc_threshold(ex_mtx: csr_matrix, AUC_threshold: float = None) -> pd.
 def _enrichment(
     shared_ro_memory_array, modules, genes, cells, auc_threshold, auc_mtx, offset
 ):
-    check_ctxcore()
-    global ctxcore_install
-    if ctxcore_install==True:
-        global enrichment4cells
-        from ctxcore.recovery import enrichment4cells
+    from ..external.ctxcore.recovery import enrichment4cells
 
     # The rankings dataframe is properly reconstructed (checked this).
     df_rnk = pd.DataFrame(
@@ -189,12 +167,7 @@ def aucell4r(
 
     """
     from boltons.iterutils import chunked
-    check_ctxcore()
-    global ctxcore_install
-    if ctxcore_install==True:
-        global enrichment4cells
-        from ctxcore.recovery import enrichment4cells
-
+    from ..external.ctxcore.recovery import enrichment4cells
 
     if num_workers == 1:
         # Show progress bar for pathway processing

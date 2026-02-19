@@ -120,7 +120,7 @@ class Worker(Process):
 
     def run(self):
         # Load ranking database in memory.
-        from ctxcore.rnkdb import MemoryDecorator, RankingDatabase
+        from ..ctxcore.rnkdb import MemoryDecorator, RankingDatabase
         rnkdb = MemoryDecorator(self.database)
         #LOGGER.info("Worker {}: database loaded in memory.".format(self.name))
 

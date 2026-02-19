@@ -17,14 +17,190 @@ from .._settings import EMOJI, Colors
 
 
 
-from scanpy import logging as logg
-from ._compat import DaskArray, pkg_version
-from scanpy._settings import settings
-from scanpy._utils import _doc_params, _empty, is_backed_type
-from scanpy.get import  _get_obs_rep
-from scanpy.preprocessing._docs import doc_mask_var_hvg
-from scanpy.preprocessing._pca._compat import _pca_compat_sparse
+from ._compat import DaskArray, pkg_version, CSBase
 from scipy import sparse
+from scipy.sparse.linalg import LinearOperator, svds
+from sklearn.utils.extmath import svd_flip
+from sklearn.utils import check_array
+from ._scale import _get_obs_rep
+from datetime import datetime
+
+
+# ============================================================================
+# Utility Functions (ported from scanpy to remove dependency)
+# ============================================================================
+
+# Default number of PCs
+N_PCS = 50
+
+
+def mean_var(X, axis=0, correction=0):
+    """Calculate mean and variance along specified axis."""
+    if sparse.issparse(X):
+        # For sparse matrices
+        mean = np.asarray(X.mean(axis=axis)).flatten()
+        if correction == 0:
+            var = np.asarray(X.power(2).mean(axis=axis)).flatten() - mean**2
+        else:
+            # Compute variance with Bessel's correction
+            n = X.shape[axis]
+            var = np.asarray(X.power(2).mean(axis=axis)).flatten() - mean**2
+            var = var * n / (n - correction)
+        return mean, var
+    else:
+        # For dense arrays
+        mean = X.mean(axis=axis)
+        if correction == 0:
+            var = X.var(axis=axis)
+        else:
+            var = X.var(axis=axis, ddof=correction)
+        return mean, var
+
+# Empty marker class
+class _Empty:
+    pass
+
+_empty = _Empty()
+
+
+def is_backed_type(X):
+    """Check if X is a backed array type (e.g., zarr, h5py)."""
+    # Check for zarr arrays
+    try:
+        import zarr
+        if isinstance(X, zarr.Array):
+            return True
+    except ImportError:
+        pass
+
+    # Check for h5py datasets
+    try:
+        import h5py
+        if isinstance(X, h5py.Dataset):
+            return True
+    except ImportError:
+        pass
+
+    return False
+
+
+# Simple logging functions
+def info(msg: str, *, time: datetime | None = None) -> datetime:
+    """Log info message."""
+    now = datetime.now()
+    if time is not None:
+        time_passed = now - time
+        print(f"{msg} ({time_passed.total_seconds():.2f}s)")
+    else:
+        print(msg)
+    return now
+
+
+def debug(msg: str):
+    """Log debug message (currently just prints)."""
+    # Could add verbosity level check here
+    pass  # Don't print debug messages by default
+
+
+def warning(msg: str):
+    """Log warning message."""
+    import warnings
+    warnings.warn(msg, UserWarning, stacklevel=2)
+
+
+class _Logger:
+    """Simple logger to replace scanpy.logging."""
+    def info(self, msg: str, *, time: datetime | None = None, deep: str | None = None) -> datetime:
+        now = datetime.now()
+        if time is not None:
+            time_passed = now - time
+            print(f"{msg} ({time_passed.total_seconds():.2f}s)")
+        else:
+            print(msg)
+        if deep:
+            print(f"    {deep}")
+        return now
+
+    def debug(self, msg: str):
+        pass  # Don't print debug by default
+
+    def warning(self, msg: str):
+        import warnings
+        warnings.warn(msg, UserWarning, stacklevel=2)
+
+
+logg = _Logger()
+
+
+def _pca_compat_sparse(
+    x: CSBase,
+    n_pcs: int,
+    *,
+    solver: Literal["arpack", "lobpcg"],
+    mu: np.ndarray | None = None,
+    random_state=None,
+):
+    """Sparse PCA for scikit-learn <1.4 compatibility."""
+    random_state = check_random_state(random_state)
+    np.random.set_state(random_state.get_state())
+    random_init = np.random.rand(np.min(x.shape))
+    x = check_array(x, accept_sparse=["csr", "csc"])
+
+    if mu is None:
+        mu = np.asarray(x.mean(0)).flatten()[None, :]
+    ones = np.ones(x.shape[0])[None, :].dot
+
+    def mat_op(v):
+        return (x @ v) - (mu @ v)
+
+    def rmat_op(v):
+        return (x.T.conj() @ v) - (mu.T @ ones(v))
+
+    linop = LinearOperator(
+        dtype=x.dtype,
+        shape=x.shape,
+        matvec=mat_op,
+        matmat=mat_op,
+        rmatvec=rmat_op,
+        rmatmat=rmat_op,
+    )
+
+    u, s, v = svds(linop, solver=solver, k=n_pcs, v0=random_init)
+    u, v = svd_flip(
+        u, v, u_based_decision=pkg_version("scikit-learn") < Version("1.5.0rc1")
+    )
+    idx = np.argsort(-s)
+    v = v[idx, :]
+
+    x_pca = (u * s)[:, idx]
+    ev = s[idx] ** 2 / (x.shape[0] - 1)
+
+    total_var = mean_var(x, correction=1, axis=0)[1].sum()
+    ev_ratio = ev / total_var
+
+    from sklearn.decomposition import PCA
+
+    pca = PCA(n_components=n_pcs, svd_solver=solver, random_state=random_state)
+    pca.explained_variance_ = ev
+    pca.explained_variance_ratio_ = ev_ratio
+    pca.components_ = v
+    return x_pca, pca
+
+
+# Dummy decorator to replace _doc_params
+def _doc_params(**kwargs):
+    """Dummy decorator that does nothing (replaces scanpy's _doc_params)."""
+    def decorator(func):
+        return func
+    return decorator
+
+
+# Dummy doc string for mask_var_hvg
+doc_mask_var_hvg = """
+    mask_var
+        Restrict PCA computation to a subset of variables (genes).
+"""
+
 
 # Handle Union types for different Python versions
 try:
@@ -102,14 +278,17 @@ if TYPE_CHECKING:
     import sklearn.decomposition as skld
     from numpy.typing import DTypeLike, NDArray
 
-    from scanpy._utils import Empty
-    from scanpy._utils.random import _LegacyRandom
+    Empty = type[_Empty]
+    _LegacyRandom = int | np.random.RandomState
 
     MethodDaskML = type[dmld.PCA | dmld.IncrementalPCA | dmld.TruncatedSVD]
     MethodSklearn = type[skld.PCA | skld.TruncatedSVD]
 
     T = TypeVar("T", bound=LiteralString)
     M = TypeVar("M", bound=LiteralString)
+else:
+    Empty = type[_Empty]
+    _LegacyRandom = int | np.random.RandomState
 
 
 SvdSolvPCADaskML = Literal["auto", "full", "tsqr", "randomized"]
@@ -130,19 +309,7 @@ SvdSolvPCACustom = Literal["covariance_eigh"]
 
 SvdSolver = SvdSolvDaskML | SvdSolvSkearn | SvdSolvPCACustom
 
-SpBase = sparse.spmatrix | sparse.sparray  # noqa: TID251
-"""Only use when you directly convert it to a known subclass."""
-
-_CSArray = sparse.csr_array | sparse.csc_array  # noqa: TID251
-"""Only use if you want to specially handle arrays as opposed to matrices."""
-
-_CSMatrix = sparse.csr_matrix | sparse.csc_matrix  # noqa: TID251
-"""Only use if you want to specially handle matrices as opposed to arrays."""
-
-CSRBase = sparse.csr_matrix | sparse.csr_array  # noqa: TID251
-CSCBase = sparse.csc_matrix | sparse.csc_array  # noqa: TID251
-CSBase = _CSArray | _CSMatrix
-
+# CSBase and related types are imported from _compat
 
 # Helper utilities for cross-backend dtype and array handling
 def _normalize_to_numpy_dtype(dt):
@@ -387,7 +554,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
     if n_comps is None:
         min_dim = min(adata_comp.n_vars, adata_comp.n_obs)
-        n_comps = min_dim - 1 if min_dim <= settings.N_PCS else settings.N_PCS
+        n_comps = min_dim - 1 if min_dim <= N_PCS else N_PCS
 
     logg.info(f"    with {n_comps=}")
 

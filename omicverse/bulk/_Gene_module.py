@@ -491,7 +491,11 @@ class pyWGCNA_old(object):
 
         #new_keys = {'item_key': 'module','group_key': 'meta','sizes_key': 'logp','color_key': 'correlation'}
         
-        import dotplot
+        try:
+            import dotplot
+        except ImportError:
+            print("dotplot is not installed, please install it using `pip install python-dotplot`")
+            return None
         new_keys = {'item_key': 'meta','group_key': 'module','sizes_key': 'logp','color_key': 'correlation'}
         dp = dotplot.DotPlot.parse_from_tidy_data(df_melt, **new_keys)
         #fig, ax = plt.subplots(figsize=(10,2))

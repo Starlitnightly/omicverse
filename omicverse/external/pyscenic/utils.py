@@ -213,7 +213,7 @@ def modules4thr(adjacencies, threshold, context=frozenset(), pattern="weight>{:.
     :param threshold:
     :return:
     """
-    from ctxcore.genesig import Regulon
+    from ..ctxcore.genesig import Regulon
     for tf_name, df_grp in adjacencies[
         adjacencies[COLUMN_NAME_WEIGHT] > threshold
     ].groupby(by=COLUMN_NAME_TF):
@@ -239,7 +239,7 @@ def modules4top_targets(adjacencies, n, context=frozenset()):
     :param n:
     :return:
     """
-    from ctxcore.genesig import Regulon
+    from ..ctxcore.genesig import Regulon
     for tf_name, df_grp in adjacencies.groupby(by=COLUMN_NAME_TF):
         module = df_grp.nlargest(n, COLUMN_NAME_WEIGHT)
         if len(module) > 0:
@@ -264,7 +264,7 @@ def modules4top_factors(adjacencies, n, context=frozenset()):
     :param n:
     :return:
     """
-    from ctxcore.genesig import Regulon
+    from ..ctxcore.genesig import Regulon
     df = adjacencies.groupby(by=COLUMN_NAME_TARGET).apply(
         lambda grp: grp.nlargest(n, COLUMN_NAME_WEIGHT)
     )
@@ -429,7 +429,7 @@ def save_to_yaml(signatures, fname: str):
     :param signatures:
     :return:
     """
-    from ctxcore.genesig import openfile
+    from ..ctxcore.genesig import openfile
     with openfile(fname, "w") as f:
         f.write(dump(signatures, default_flow_style=False, Dumper=Dumper))
 
@@ -440,7 +440,7 @@ def load_from_yaml(fname: str):
     :param fname:
     :return:
     """
-    from ctxcore.genesig import openfile
+    from ..ctxcore.genesig import openfile
     with openfile(fname, "r") as f:
         return load(f.read(), Loader=Loader)
 

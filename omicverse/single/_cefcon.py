@@ -22,18 +22,7 @@ from ..external.CEFCON.utils import data_preparation
 from .._registry import register_function
 
 biomart_install = False
-ctxcore_install = False
 
-def check_ctxcore():
-    global ctxcore_install
-    try:
-        from ctxcore.genesig import GeneSignature
-        ctxcore_install = True
-    except ImportError:
-        raise ImportError(
-            'Please install the ctxcore: `pip install ctxcore`.'
-        )
-    
 @register_function(
     aliases=["小鼠造血干细胞数据集", "mouse_hsc", "nestorowa16", "造血数据", "HSC数据集"],
     category="single",

@@ -9,8 +9,8 @@ import pandas as pd
 from numba import jit
 
 if TYPE_CHECKING:
-    from ctxcore.genesig import GeneSignature
-    from ctxcore.rnkdb import RankingDatabase
+    from .genesig import GeneSignature
+    from .rnkdb import RankingDatabase
 
 __all__ = [
     "recovery",

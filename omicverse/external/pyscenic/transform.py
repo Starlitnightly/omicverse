@@ -120,7 +120,7 @@ def module2features_rcc4all_impl(
     )
 
     # Calculate recovery curves, AUC and NES values.
-    from ctxcore.recovery import recovery
+    from ..ctxcore.recovery import recovery
     rccs, aucs = recovery(df, db.total_genes, weights, rank_threshold, auc_threshold)
     ness = (aucs - aucs.mean()) / aucs.std()
 
@@ -217,7 +217,7 @@ def module2features_auc1st_impl(
 
     # Calculate recovery curves, AUC and NES values.
     # For fast unweighted implementation so weights to None.
-    from ctxcore.recovery import aucs as calc_aucs
+    from ..ctxcore.recovery import aucs as calc_aucs
     aucs = calc_aucs(df, db.total_genes, weights, auc_threshold)
     ness = (aucs - aucs.mean()) / aucs.std()
 
@@ -273,7 +273,7 @@ def module2features_auc1st_impl(
     # TODO: Solution could be to go for an iterative approach boosted by numba. But before doing so investigate the
     # broader issue with creep in memory usage when using the dask framework: use a memory profile tool
     # (https://pythonhosted.org/Pympler/muppy.html) to check what is kept in memory in all subprocesses/workers.
-    from ctxcore.recovery import recovery
+    from ..ctxcore.recovery import recovery
     rccs, _ = recovery(
         df, db.total_genes, weights, rank_threshold, auc_threshold, no_auc=True
     )
@@ -358,7 +358,7 @@ def module2df(
 
     # Calculate the leading edges for each row. Always return importance from gene inference phase.
     weights = np.array([module[gene] for gene in genes])
-    from ctxcore.recovery import leading_edge4row, recovery
+    from ..ctxcore.recovery import leading_edge4row, recovery
     df[
         [
             ("Enrichment", COLUMN_NAME_TARGET_GENES),
@@ -439,7 +439,7 @@ def _regulon4group(tf_name, context, df_group, save_columns=[]):
         return "(-)" if REPRESSING_MODULE in ctx else "(+)"
 
     def row2regulon(row):
-        from ctxcore.genesig import Regulon
+        from ..ctxcore.genesig import Regulon
         # The target genes as well as their weights/importances are directly taken from the dataframe.
         return Regulon(
             name="{}{}".format(tf_name, derive_interaction_type(context)),
@@ -484,7 +484,7 @@ def _regulon4group(tf_name, context, df_group, save_columns=[]):
         if COLUMN_NAME_ANNOTATION in save_columns
         else ""
     )
-    from ctxcore.genesig import Regulon
+    from ..ctxcore.genesig import Regulon
 
     # First we create a regulon for each enriched and annotated feature and then we aggregate these regulons into a
     # single one using the union operator. This operator combined all target genes into a single set of genes keeping

@@ -1,26 +1,155 @@
 from __future__ import annotations
 
+import warnings
+from contextlib import contextmanager, suppress
+from datetime import datetime
 from typing import TYPE_CHECKING
+import importlib.util
 
 import numpy as np
 import pandas as pd
 from natsort import natsorted
 
-from scanpy import _utils
-from scanpy import logging as logg
-from scanpy._utils.random import set_igraph_random_state
-
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Generator, Iterable, Sequence
+    from typing import Literal
 
-    import numpy as np
-    import pandas as pd
     from anndata import AnnData
     from numpy.typing import NDArray
 
     from ._compat import CSBase
 
+    try:  # sphinx-autodoc-typehints + optional dependency
+        from leidenalg.VertexPartition import MutableVertexPartition
+    except ImportError:
+        if not TYPE_CHECKING:
+            MutableVertexPartition = type("MutableVertexPartition", (), {})
+            MutableVertexPartition.__module__ = "leidenalg.VertexPartition"
+
+
+# ============================================================================
+# Utility Functions (ported from scanpy to remove dependency)
+# ============================================================================
+
+def ensure_igraph() -> None:
+    """Check if igraph is installed."""
+    if importlib.util.find_spec("igraph"):
+        return
+    msg = (
+        "Please install the igraph package: "
+        "`conda install -c conda-forge python-igraph` or "
+        "`pip install igraph`."
+    )
+    raise ImportError(msg)
+
+
+def dematrix(x):
+    """Convert numpy matrix to array."""
+    if isinstance(x, np.matrix):
+        return x.A
+    return x
+
+
+def _choose_graph(
+    adata: AnnData, obsp: str | None, neighbors_key: str | None
+) -> "CSBase":
+    """Choose connectivities from neighbors or another obsp entry."""
+    if obsp is not None and neighbors_key is not None:
+        msg = "You can't specify both obsp, neighbors_key. Please select only one."
+        raise ValueError(msg)
+
+    if obsp is not None:
+        return adata.obsp[obsp]
+    else:
+        # Simple implementation without NeighborsView
+        if neighbors_key is None:
+            connectivities_key = "connectivities"
+        else:
+            if neighbors_key not in adata.uns:
+                msg = f"neighbors_key {neighbors_key!r} not found in adata.uns"
+                raise ValueError(msg)
+            neighbors_dict = adata.uns[neighbors_key]
+            if "connectivities_key" in neighbors_dict:
+                connectivities_key = neighbors_dict["connectivities_key"]
+            else:
+                connectivities_key = "connectivities"
+
+        if connectivities_key not in adata.obsp:
+            msg = (
+                "You need to run `pp.neighbors` first to compute a neighborhood graph."
+            )
+            raise ValueError(msg)
+        return adata.obsp[connectivities_key]
+
+
+class _RNGIgraph:
+    """Random number generator for igraph avoiding global seed modification."""
+
+    def __init__(self, random_state: int | np.random.RandomState = 0) -> None:
+        if isinstance(random_state, np.random.RandomState):
+            self._rng = random_state
+        else:
+            self._rng = np.random.RandomState(random_state)
+
+    def getrandbits(self, k: int) -> int:
+        # Generate a random integer using the RandomState
+        max_val = (1 << k)
+        return self._rng.randint(0, max_val)
+
+    def randint(self, a: int, b: int) -> int:
+        return self._rng.randint(a, b + 1)
+
+    def __getattr__(self, attr: str):
+        # For igraph compatibility, map 'gauss' to 'normal'
+        if attr == "gauss":
+            return self._rng.normal
+        return getattr(self._rng, attr)
+
+
+@contextmanager
+def set_igraph_random_state(
+    random_state: int | np.random.RandomState,
+) -> Generator[None, None, None]:
+    """Context manager for igraph random number generator."""
+    ensure_igraph()
+    import igraph
+    import random as stdlib_random
+
+    rng = _RNGIgraph(random_state)
+    try:
+        igraph.set_random_number_generator(rng)
+        yield None
+    finally:
+        igraph.set_random_number_generator(stdlib_random)
+
+
+def warn_once(msg: str, category: type[Warning] = UserWarning, stacklevel: int = 2):
+    """Warn only once for a given message."""
+    # Simple implementation: just issue warning every time
+    # To truly warn once, you'd need to track warnings issued
+    warnings.warn(msg, category=category, stacklevel=stacklevel)
+
+
+# Simple logging functions to replace scanpy.logging
+_log_start_time = None
+
+def info(msg: str, *, time: datetime | None = None, deep: str | None = None) -> datetime:
+    """Log info message."""
+    now = datetime.now()
+    if time is not None:
+        time_passed = now - time
+        print(f"{msg} ({time_passed.total_seconds():.2f}s)")
+    else:
+        print(msg)
+    if deep:
+        print(f"    {deep}")
+    return now
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
 
 def rename_groups(
     adata: AnnData,
@@ -44,8 +173,8 @@ def restrict_adjacency(
     restrict_key: str,
     *,
     restrict_categories: Sequence[str],
-    adjacency: CSBase,
-) -> tuple[CSBase, NDArray[np.bool_]]:
+    adjacency: "CSBase",
+) -> tuple["CSBase", NDArray[np.bool_]]:
     if not isinstance(restrict_categories[0], str):
         msg = "You need to use strings to label categories, e.g. '1' instead of 1."
         raise ValueError(msg)
@@ -58,31 +187,40 @@ def restrict_adjacency(
     adjacency = adjacency[:, restrict_indices]
     return adjacency, restrict_indices
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from typing import Literal
 
-    from anndata import AnnData
+def get_igraph_from_adjacency(adjacency: "CSBase", *, directed: bool = False):
+    """Get igraph graph from adjacency matrix."""
+    import igraph as ig
 
-    from .._compat import CSBase
-    from .._utils.random import _LegacyRandom
+    sources, targets = adjacency.nonzero()
+    weights = dematrix(adjacency[sources, targets]).ravel() if len(sources) else []
+    g = ig.Graph(directed=directed)
+    g.add_vertices(adjacency.shape[0])
+    g.add_edges(list(zip(sources, targets, strict=True)))
+    with suppress(KeyError):
+        g.es["weight"] = weights
+    if g.vcount() != adjacency.shape[0]:
+        warnings.warn(
+            f"The constructed graph has only {g.vcount()} nodes. "
+            "Your adjacency matrix contained redundant nodes.",
+            UserWarning,
+            stacklevel=2
+        )
+    return g
 
-    try:  # sphinx-autodoc-typehints + optional dependency
-        from leidenalg.VertexPartition import MutableVertexPartition
-    except ImportError:
-        if not TYPE_CHECKING:
-            MutableVertexPartition = type("MutableVertexPartition", (), {})
-            MutableVertexPartition.__module__ = "leidenalg.VertexPartition"
 
+# ============================================================================
+# Main Leiden Function
+# ============================================================================
 
 def leiden(  # noqa: PLR0912, PLR0913, PLR0915
     adata: AnnData,
     resolution: float = 1,
     *,
     restrict_to: tuple[str, Sequence[str]] | None = None,
-    random_state: _LegacyRandom = 0,
+    random_state: int | np.random.RandomState = 0,
     key_added: str = "leiden",
-    adjacency: CSBase | None = None,
+    adjacency: "CSBase" | None = None,
     directed: bool | None = None,
     use_weights: bool = True,
     n_iterations: int = -1,
@@ -110,7 +248,7 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         A parameter value controlling the coarseness of the clustering.
         Higher values lead to more clusters.
         Set to `None` if overriding `partition_type`
-        to one that doesn’t accept a `resolution_parameter`.
+        to one that doesn't accept a `resolution_parameter`.
     random_state
         Change the initialization of the optimization.
     restrict_to
@@ -170,18 +308,18 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         msg = (
             "In the future, the default backend for leiden will be igraph instead of leidenalg. "
             "To achieve the future defaults please pass: `flavor='igraph'` and `n_iterations=2`. "
-            "`directed` must also be `False` to work with igraph’s implementation."
+            "`directed` must also be `False` to work with igraph's implementation."
         )
-        _utils.warn_once(msg, FutureWarning, stacklevel=2)
+        warn_once(msg, FutureWarning, stacklevel=2)
     if flavor not in {"igraph", "leidenalg"}:
         msg = (
             f"flavor must be either 'igraph' or 'leidenalg', but {flavor!r} was passed"
         )
         raise ValueError(msg)
-    _utils.ensure_igraph()
+    ensure_igraph()
     if flavor == "igraph":
         if directed:
-            msg = "Cannot use igraph’s leiden implementation with a directed graph."
+            msg = "Cannot use igraph's leiden implementation with a directed graph."
             raise ValueError(msg)
         if partition_type is not None:
             msg = "Do not pass in partition_type argument when using igraph."
@@ -194,11 +332,11 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
             raise ImportError(msg) from e
     clustering_args = dict(clustering_args)
 
-    start = logg.info("running Leiden clustering")
+    start = info("running Leiden clustering")
     adata = adata.copy() if copy else adata
     # are we clustering a user-provided graph or the default AnnData one?
     if adjacency is None:
-        adjacency = _utils._choose_graph(adata, obsp, neighbors_key)
+        adjacency = _choose_graph(adata, obsp, neighbors_key)
     if restrict_to is not None:
         restrict_key, restrict_categories = restrict_to
         adjacency, restrict_indices = restrict_adjacency(
@@ -216,7 +354,7 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         if resolution is not None:
             clustering_args["resolution_parameter"] = resolution
         directed = True if directed is None else directed
-        g = _utils.get_igraph_from_adjacency(adjacency, directed=directed)
+        g = get_igraph_from_adjacency(adjacency, directed=directed)
         if partition_type is None:
             partition_type = leidenalg.RBConfigurationVertexPartition
         if use_weights:
@@ -224,7 +362,7 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         clustering_args["seed"] = random_state
         part = leidenalg.find_partition(g, partition_type, **clustering_args)
     else:
-        g = _utils.get_igraph_from_adjacency(adjacency, directed=False)
+        g = get_igraph_from_adjacency(adjacency, directed=False)
         if use_weights:
             clustering_args["weights"] = "weight"
         if resolution is not None:
@@ -267,7 +405,7 @@ def leiden(  # noqa: PLR0912, PLR0913, PLR0915
         random_state=random_state,
         n_iterations=n_iterations,
     )
-    logg.info(
+    info(
         "    finished",
         time=start,
         deep=(

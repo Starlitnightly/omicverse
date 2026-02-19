@@ -13,8 +13,7 @@ class SCENIC:
             n_jobs=8):
         
         from .._settings import Colors, EMOJI, print_gpu_usage_color
-        
-        from ctxcore.rnkdb import FeatherRankingDatabase as RankingDatabase
+        from ..external.ctxcore.rnkdb import FeatherRankingDatabase as RankingDatabase
         self.adata = adata
         self.db_glob = db_glob
         self.motif_path = motif_path

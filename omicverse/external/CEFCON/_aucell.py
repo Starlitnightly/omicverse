@@ -12,28 +12,13 @@ import numpy as np
 import pandas as pd
 from boltons.iterutils import chunked
 from tqdm import tqdm
+from ..ctxcore.recovery import enrichment4cells
 
 LOGGER = logging.getLogger(__name__)
 # To reduce the memory footprint of a ranking matrix we use unsigned 32bit integers which provides a range from 0
 # through 4,294,967,295. This should be sufficient even for region-based approaches.
 DTYPE = "uint32"
 DTYPE_C = c_uint32
-
-ctxcore_install=False
-
-def check_ctxcore():
-    """
-    
-    """
-    global ctxcore_install
-    try:
-        import ctxcore
-        ctxcore_install=True
-        #print('ctxcore have been install version:',ctxcore.__version__)
-    except ImportError:
-        raise ImportError(
-            'Please install the ctxcore: `pip install ctxcore`.'
-        )
 
 def global_imports(modulename,shortname = None, asfunction = False):
     if shortname is None: 
@@ -106,12 +91,6 @@ def derive_auc_threshold(ex_mtx: pd.DataFrame, AUC_threshold: float = None) -> p
 def _enrichment(
     shared_ro_memory_array, modules, genes, cells, auc_threshold, auc_mtx, offset
 ):
-    check_ctxcore()
-    global ctxcore_install
-    if ctxcore_install==True:
-        global enrichment4cells
-        from ctxcore.recovery import enrichment4cells
-
     # The rankings dataframe is properly reconstructed (checked this).
     df_rnk = pd.DataFrame(
         data=np.frombuffer(shared_ro_memory_array, dtype=DTYPE).reshape(
@@ -152,12 +131,6 @@ def aucell4r(
         A dataframe with the AUCs (n_cells x n_modules).
 
     """
-    check_ctxcore()
-    global ctxcore_install
-    if ctxcore_install==True:
-        global enrichment4cells
-        from ctxcore.recovery import enrichment4cells
-
 
     if num_workers == 1:
         # Show progress bar ...

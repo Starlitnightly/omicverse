@@ -13,11 +13,11 @@ from matplotlib.pyplot import rc_context
 import seaborn as sns
 # import aucell and ctxcore
 from ._aucell import aucell
+from ..ctxcore.genesig import GeneSignature
 
 from .driver_regulators import driver_regulators
 
 venn_install = False
-ctxcore_install = False
 
 def matplotlib_venn():
     global venn_install
@@ -27,16 +27,6 @@ def matplotlib_venn():
     except ImportError:
         raise ImportError(
             'Please install the matplotlib_venn: `pip install matplotlib_venn`.'
-        )
-    
-def check_ctxcore():
-    global ctxcore_install
-    try:
-        from ctxcore.genesig import GeneSignature
-        ctxcore_install = True
-    except ImportError:
-        raise ImportError(
-            'Please install the ctxcore: `pip install ctxcore`.'
         )
     
 class CefconResults:
@@ -134,13 +124,6 @@ class CefconResults:
             raise ValueError(
                 f'Did not find the result of driver regulators. Run `cefcon.NetModel.driver_regulators` first.'
             )
-
-
-        check_ctxcore()
-        global ctxcore_install
-        if ctxcore_install==True:
-            global GeneSignature
-            from ctxcore.genesig import GeneSignature
 
         network = self.network
         DEgenes = self.DEgenes
