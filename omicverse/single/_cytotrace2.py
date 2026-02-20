@@ -14,7 +14,7 @@ import scanpy as sc
 from .._settings import add_reference
 from .._registry import register_function
 
-from ..external.cytotrace2.gen_utils import *
+#from ..external.cytotrace2.gen_utils import *
 #from cytotrace2_py.common.argument_parser import *
 
 #pylint: disable=too-many-arguments
@@ -37,6 +37,7 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
     Returns:
         pd.DataFrame: Smoothed CytoTRACE2 scores for the data chunk
     """
+    from ..external.cytotrace2.gen_utils import preprocess, top_var_genes, predict, smoothing_by_diffusion, binning
 
     # map and rank
     cell_names, gene_names, ranked_data = preprocess(chunked_expression, species)
@@ -185,6 +186,7 @@ def cytotrace2(
         pd.DataFrame: DataFrame containing CytoTRACE2 scores, potency categories, and relative scores
     
     """
+    from ..external.cytotrace2.gen_utils import preprocess, top_var_genes, predict, smoothing_by_diffusion, binning
 
     # Make output directory 
     out = os.system('mkdir -p '+output_dir)

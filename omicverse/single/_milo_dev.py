@@ -27,6 +27,157 @@ from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import euclidean_distances
 
 
+def _calcFactorTMM(obs, ref, obs_lib_size, ref_lib_size,
+                   logratioTrim=0.3, sumTrim=0.05, doWeighting=True, Acutoff=-1e10):
+    """
+    Calculate TMM factor for one sample against reference.
+
+    This implements the core TMM (Trimmed Mean of M-values) algorithm
+    as used in edgeR's calcNormFactors.
+    """
+    # Remove genes with zero counts in both samples
+    nzobs = obs > 0
+    nzref = ref > 0
+    keep = nzobs & nzref
+
+    if keep.sum() == 0:
+        return 1.0
+
+    obs = obs[keep]
+    ref = ref[keep]
+
+    # Calculate M values (log ratios) and A values (average log expression)
+    obs_prop = obs / obs_lib_size
+    ref_prop = ref / ref_lib_size
+    M = np.log2(obs_prop / ref_prop)
+    A = (np.log2(obs_prop) + np.log2(ref_prop)) / 2
+
+    # Remove infinite values
+    finite = np.isfinite(M) & np.isfinite(A)
+    M = M[finite]
+    A = A[finite]
+    obs = obs[finite]
+    ref = ref[finite]
+
+    if len(M) == 0:
+        return 1.0
+
+    # Remove genes with A values below cutoff
+    if Acutoff > -1e10:
+        keep = A > Acutoff
+        M, A, obs, ref = M[keep], A[keep], obs[keep], ref[keep]
+
+    if len(M) == 0:
+        return 1.0
+
+    # Trim by M and A
+    if logratioTrim > 0:
+        M_cutoff_low = np.percentile(M, logratioTrim * 100)
+        M_cutoff_high = np.percentile(M, (1 - logratioTrim) * 100)
+        keep_M = (M >= M_cutoff_low) & (M <= M_cutoff_high)
+    else:
+        keep_M = np.ones(len(M), dtype=bool)
+
+    if sumTrim > 0:
+        A_cutoff_low = np.percentile(A, sumTrim * 100)
+        A_cutoff_high = np.percentile(A, (1 - sumTrim) * 100)
+        keep_A = (A >= A_cutoff_low) & (A <= A_cutoff_high)
+    else:
+        keep_A = np.ones(len(A), dtype=bool)
+
+    keep = keep_M & keep_A
+    M, A, obs, ref = M[keep], A[keep], obs[keep], ref[keep]
+
+    if len(M) == 0:
+        return 1.0
+
+    # Calculate weights
+    if doWeighting:
+        weights = 1.0 / (1.0/obs + 1.0/ref)
+        weights = weights / weights.sum()
+    else:
+        weights = np.ones(len(M)) / len(M)
+
+    # Weighted mean of M
+    tmm = 2 ** np.sum(weights * M)
+
+    return tmm
+
+
+def calcNormFactors(counts, method="TMM", ref_column=None, logratioTrim=0.3, sumTrim=0.05,
+                    doWeighting=True, Acutoff=-1e10):
+    """
+    Calculate normalization factors using TMM method.
+
+    This is a Python implementation of edgeR's calcNormFactors function.
+
+    Parameters:
+    -----------
+    counts : np.ndarray
+        Count matrix (features x samples)
+    method : str
+        Normalization method ("TMM" or "none")
+    ref_column : int
+        Reference sample column index. If None, use sample closest to mean
+    logratioTrim : float
+        Amount of trim to use on log-ratios (M-values)
+    sumTrim : float
+        Amount of trim to use on combined absolute levels (A-values)
+    doWeighting : bool
+        Whether to compute weights
+    Acutoff : float
+        Cutoff on A-values to use before trimming
+
+    Returns:
+    --------
+    norm_factors : np.ndarray
+        Normalization factors for each sample
+    """
+    counts = np.asarray(counts, dtype=float)
+    n_features, n_samples = counts.shape
+
+    if method == "none":
+        return np.ones(n_samples)
+
+    if method != "TMM":
+        raise ValueError(f"Only TMM method is supported, got: {method}")
+
+    # Calculate library sizes
+    lib_sizes = counts.sum(axis=0)
+
+    # Find reference column (sample closest to mean)
+    if ref_column is None:
+        f = counts / lib_sizes
+        geom_means = np.exp(np.mean(np.log(f + 1e-10), axis=0))
+        ref_column = np.argmin(np.abs(geom_means - np.median(geom_means)))
+
+    # Calculate TMM factors
+    norm_factors = np.ones(n_samples)
+    ref_counts = counts[:, ref_column]
+    ref_lib_size = lib_sizes[ref_column]
+
+    for i in range(n_samples):
+        if i == ref_column:
+            continue
+
+        obs_counts = counts[:, i]
+        obs_lib_size = lib_sizes[i]
+
+        norm_factors[i] = _calcFactorTMM(
+            obs_counts, ref_counts,
+            obs_lib_size, ref_lib_size,
+            logratioTrim=logratioTrim,
+            sumTrim=sumTrim,
+            doWeighting=doWeighting,
+            Acutoff=Acutoff
+        )
+
+    # Normalize factors so their geometric mean is 1
+    norm_factors = norm_factors / np.exp(np.mean(np.log(norm_factors)))
+
+    return norm_factors
+
+
 class Milo:
     """Python implementation of Milo."""
 
@@ -358,65 +509,134 @@ class Milo:
                 design_formula = design + " + 0"
             else:
                 design_formula = design
-            
+
             # Create model matrix
-            model_matrix = patsy.dmatrix(design_formula, design_df, return_type='dataframe')
-            
+            # Keep as patsy DesignMatrix (don't convert to array)
+            model_matrix = patsy.dmatrix(design_formula, design_df)
+
             # Create DGEList object
             dge = edgepy.DGEList(
-                counts=count_mat[keep_nhoods, :][:, keep_smp],
-                lib_size=lib_size[keep_smp]
+                counts=count_mat[keep_nhoods, :][:, keep_smp]
             )
-            
-            # Normalize
-            dge = edgepy.calcNormFactors(dge, method="TMM")
-            
-            # Estimate dispersion
-            dge = edgepy.estimateDisp(dge, design=model_matrix)
-            
+
+            # Apply TMM normalization (critical for accurate DA testing)
+            logger.info("Calculating TMM normalization factors...")
+            tmm_factors = calcNormFactors(
+                count_mat[keep_nhoods, :][:, keep_smp],
+                method="TMM"
+            )
+            logger.info(f"TMM factors: {tmm_factors}")
+
+            # CRITICAL: edgepy may not automatically use norm.factors
+            # In edgeR, effective library size = lib_size * norm_factors
+            # We need to manually set the effective library sizes
+            original_lib_sizes = dge.samples['lib_size'].values
+            effective_lib_sizes = original_lib_sizes * tmm_factors
+            logger.info(f"Original lib_sizes: {original_lib_sizes}")
+            logger.info(f"Effective lib_sizes: {effective_lib_sizes}")
+
+            # Update lib_size to effective library sizes
+            dge.samples['lib_size'] = effective_lib_sizes
+            # Keep norm_factors for reference (but edgepy won't use it)
+            dge.samples['norm_factors'] = tmm_factors
+
+            # Estimate dispersion using edgepy's methods
+            dge = dge.estimateGLMCommonDisp(design=model_matrix)
+            dge = dge.estimateGLMTagwiseDisp(design=model_matrix)
+
             # Fit GLM QLF
-            fit = edgepy.glmQLFit(dge, design=model_matrix, robust=True)
-            
+            # Note: edgepy doesn't support robust=True
+            # See: https://github.com/inmanjm/inmoose/issues/
+            fit = dge.glmQLFit(design=model_matrix, robust=False)
+
             # Test
             if model_contrasts is not None:
-                # Parse contrasts
-                # For edgepy, we need to create the contrast matrix manually
-                contrast_cols = list(model_matrix.columns)
-                
-                # Create contrast vector
-                contrast_vector = np.zeros(len(contrast_cols))
-                
-                # Parse the contrast string (e.g., "conditionDisease - conditionControl")
+                # Parse contrasts and create contrast vector
+                # Get column names from patsy DesignMatrix
+                contrast_cols = list(model_matrix.design_info.column_names)
+                logger.info(f"Design matrix columns: {contrast_cols}")
+                logger.info(f"Model contrasts: {model_contrasts}")
+
+                # Parse the contrast string (e.g., "condition[Salmonella]-condition[Control]")
                 contrast_terms = re.split(r'\s*[+-]\s*', model_contrasts.strip())
                 signs = [1] + [-1 if s == '-' else 1 for s in re.findall(r'[+-]', model_contrasts)]
-                
+
+                # Create contrast vector
+                # CRITICAL: When design has no intercept (+ 0), we MUST use contrast vector
+                # Testing a single coefficient would give the mean in that group, not logFC
+                contrast_vector = np.zeros(len(contrast_cols))
+
                 for term, sign in zip(contrast_terms, signs):
                     term = term.strip()
+                    # Try exact match first
                     if term in contrast_cols:
                         idx = contrast_cols.index(term)
                         contrast_vector[idx] = sign
+                        logger.info(f"  Contrast term '{term}' (index {idx}): {sign:+d}")
                     else:
-                        logger.error(f"Contrast term '{term}' not found in model matrix columns")
-                        raise ValueError(f"Invalid contrast term: {term}")
-                
+                        # Try with T. prefix (patsy treatment coding with intercept)
+                        # condition[Treatment] -> condition[T.Treatment]
+                        if '[' in term and ']' in term:
+                            base, level = term.split('[')
+                            level = level.rstrip(']')
+                            term_with_t = f"{base}[T.{level}]"
+                            if term_with_t in contrast_cols:
+                                idx = contrast_cols.index(term_with_t)
+                                contrast_vector[idx] = sign
+                                logger.info(f"  Contrast term '{term_with_t}' (index {idx}): {sign:+d}")
+                            else:
+                                logger.error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
+                                raise ValueError(f"Invalid contrast term: {term}")
+                        else:
+                            logger.error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
+                            raise ValueError(f"Invalid contrast term: {term}")
+
+                # Verify contrast vector
+                if contrast_vector.sum() == 0 and np.abs(contrast_vector).sum() > 0:
+                    logger.info(f"Contrast vector: {contrast_vector}")
+                    logger.info("✓ Contrast sums to 0 (valid difference contrast)")
+                else:
+                    logger.warning(f"Contrast vector: {contrast_vector}")
+                    logger.warning("⚠ Contrast does not sum to 0")
+
+                # Reshape to column vector for edgepy
+                contrast_matrix = contrast_vector.reshape(-1, 1)
+
                 # Perform test with contrast
-                result = edgepy.glmQLFTest(fit, contrast=contrast_vector)
+                # This correctly tests the difference: test_group - control_group
+                result = edgepy.glmQLFTest(fit, contrast=contrast_matrix)
                 res = edgepy.topTags(result, n=np.inf, sort_by="none")
             else:
                 # Test last coefficient
                 n_coef = model_matrix.shape[1]
                 result = edgepy.glmQLFTest(fit, coef=n_coef-1)  # Python uses 0-based indexing
                 res = edgepy.topTags(result, n=np.inf, sort_by="none")
-            
+
             # Convert to DataFrame if not already
             if not isinstance(res, pd.DataFrame):
                 res = pd.DataFrame(res)
-        
+
+            # edgepy returns different column names than edgeR
+            # Rename columns to match pertpy/Milo expected format
+            column_mapping = {
+                'log2FoldChange': 'logFC',  # edgepy uses this name
+                'pvalue': 'PValue',          # If lowercase exists
+            }
+
+            # Apply column renaming
+            for old_col, new_col in column_mapping.items():
+                if old_col in res.columns:
+                    res.rename(columns={old_col: new_col}, inplace=True)
+
         elif solver == "batchglm":
             raise NotImplementedError("batchglm solver is not yet implemented")
 
         # Save outputs
         res.index = sample_adata.var_names[keep_nhoods]
+
+        # Debug: print column names
+        logger.info(f"edgepy result columns: {list(res.columns)}")
+
         if any(col in sample_adata.var.columns for col in res.columns):
             sample_adata.var = sample_adata.var.drop(res.columns, axis=1)
         sample_adata.var = pd.concat([sample_adata.var, res], axis=1)

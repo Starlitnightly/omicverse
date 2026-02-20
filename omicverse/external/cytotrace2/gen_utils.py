@@ -9,7 +9,7 @@ import scipy
 import random
 import warnings
 from sklearn.preprocessing import MinMaxScaler
-import pkg_resources
+
 from .models import *
 
 # functions for one-to-one best match mapping of orthology
@@ -71,6 +71,7 @@ def top_var_genes(ranked_data):
 
 
 def build_mapping_dict():
+    import pkg_resources
     fn_mart_export = pkg_resources.resource_filename("omicverse", "data_files/mart_export.txt")
     human_mapping = pd.read_csv(fn_mart_export,sep='\t').dropna().reset_index()
     fn_features = pkg_resources.resource_filename("omicverse", "data_files/features_model_training_17.csv")

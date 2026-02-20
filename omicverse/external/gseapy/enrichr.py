@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 from io import StringIO
 from collections import OrderedDict
-from pkg_resources import resource_filename
+
 from time import sleep
 from tempfile import TemporaryDirectory
 from numpy import isscalar

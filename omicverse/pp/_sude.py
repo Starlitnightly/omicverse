@@ -10,7 +10,7 @@ from anndata import AnnData
 from .._settings import settings, EMOJI, Colors
 from .._registry import register_function
 
-from ..external.sude_py import sude as sude_py
+
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -139,6 +139,7 @@ def sude(
     >>> ov.pp.sude(adata)
     >>> ov.pl.sude(adata, color='leiden')
     """
+    from ..external.sude_py import sude as sude_py
     print(f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} SUDE Dimensionality Reduction:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Mode: {Colors.BOLD}{settings.mode}{Colors.ENDC}")
     print(f"   {Colors.CYAN}Components: {Colors.BOLD}{no_dims}{Colors.ENDC}")
