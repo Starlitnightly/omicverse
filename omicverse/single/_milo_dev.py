@@ -12,10 +12,8 @@ import seaborn as sns
 from anndata import AnnData
 from lamin_utils import logger
 from mudata import MuData
-import patsy
-from inmoose import edgepy
-
-from pertpy._doc import _doc_params, doc_common_plot_args
+#import patsy
+#from inmoose import edgepy
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -200,8 +198,8 @@ class Milo:
             :class:`mudata.MuData` object with original AnnData.
 
         Examples:
-            >>> import pertpy as pt
-            >>> adata = pt.dt.bhattacherjee()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
             >>> milo = pt.tl.Milo()
             >>> mdata = milo.load(adata)
 
@@ -251,12 +249,11 @@ class Milo:
             KNN graph key, used for neighbourhood construction
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
 
         """
@@ -358,12 +355,11 @@ class Milo:
             sample in each neighbourhood
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
 
@@ -432,17 +428,18 @@ class Milo:
                 calculated with weighted Benjamini-Hochberg procedure
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.da_nhoods(mdata, design="~label")
 
         """
+        import patsy
+        from inmoose import edgepy
         try:
             sample_adata = mdata["milo"]
         except KeyError:
@@ -665,12 +662,11 @@ class Milo:
             - `milo_mdata['milo'].uns["annotation_labels"]`: stores the column names for `milo_mdata['milo'].varm['frac_annotation']`
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.annotate_nhoods(mdata, anno_col="cell_type")
@@ -717,12 +713,11 @@ class Milo:
             - `milo_mdata['milo'].var["nhood_{anno_col}"]`: assigning a continuous value to each nhood
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.annotate_nhoods_continuous(mdata, anno_col="nUMI")
@@ -757,12 +752,11 @@ class Milo:
             None, adds columns to `milo_mdata['milo']` in place
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.add_covariate_to_nhoods_var(mdata, new_covariates=["label"])
@@ -810,13 +804,13 @@ class Milo:
             - `milo_mdata['milo'].var["Nhood_size"]`: number of cells in neighbourhoods
 
         Examples:
-            >>> import pertpy as pt
+            >>> import omicverse as ov
             >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
+            >>> adata = ov.datasets.bhattacherjee()
             >>> milo = pt.tl.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
-            >>> sc.tl.umap(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
+            >>> ov.pp.umap(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.build_nhood_graph(mdata)
@@ -847,12 +841,11 @@ class Milo:
             Updates adata in place to store the matrix of average expression in each neighbourhood in `milo_mdata['milo'].varm['expr']`
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.add_nhood_expression(mdata)
@@ -915,7 +908,7 @@ class Milo:
     # Removed _setup_rpy2 and _try_import_bioc_library methods as they are no longer needed
 
     # The plotting methods remain unchanged
-    @_doc_params(common_plot_args=doc_common_plot_args)
+    #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood_graph(  # pragma: no cover # noqa: D417
         self,
         mdata: MuData,
@@ -931,7 +924,7 @@ class Milo:
         return_fig: bool = False,
         **kwargs,
     ) -> Figure | None:
-        """Visualize DA results on abstracted graph (wrapper around sc.pl.embedding).
+        """Visualize DA results on abstracted graph (wrapper around ov.pl.embedding).
 
         Args:
             mdata: MuData object
@@ -941,16 +934,15 @@ class Milo:
             plot_edges: If edges for neighbourhood overlaps whould be plotted.
             title: Plot title.
             {common_plot_args}
-            **kwargs: Additional arguments to `scanpy.pl.embedding`.
+            **kwargs: Additional arguments to `ov.pl.embedding`.
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
-            >>> sc.tl.umap(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
+            >>> ov.pp.umap(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.da_nhoods(mdata,
@@ -962,6 +954,7 @@ class Milo:
         Preview:
             .. image:: /_static/docstring_previews/milo_nhood_graph.png
         """
+        from ..pl._single import embedding
         nhood_adata = mdata["milo"].T.copy()
 
         if "Nhood_size" not in nhood_adata.obs.columns:
@@ -983,7 +976,7 @@ class Milo:
         vmax = np.max([nhood_adata.obs["graph_color"].max(), abs(nhood_adata.obs["graph_color"].min())])
         vmin = -vmax
 
-        fig = sc.pl.embedding(
+        fig = embedding(
             nhood_adata,
             "X_milo_graph",
             color="graph_color",
@@ -1008,7 +1001,7 @@ class Milo:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
+    #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood(  # pragma: no cover # noqa: D417
         self,
         mdata: MuData,
@@ -1036,21 +1029,22 @@ class Milo:
             **kwargs: Additional arguments to `scanpy.pl.embedding`.
 
         Examples:
-            >>> import pertpy as pt
+            >>> import omicverse as ov
             >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
-            >>> sc.tl.umap(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
+            >>> ov.pp.umap(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> milo.plot_nhood(mdata, ix=0)
 
         Preview:
             .. image:: /_static/docstring_previews/milo_nhood.png
         """
+        from ..pl._single import embedding
         mdata[feature_key].obs["Nhood"] = mdata[feature_key].obsm["nhoods"][:, ix].toarray().ravel()
-        fig = sc.pl.embedding(
+        fig = embedding(
             mdata[feature_key],
             basis,
             color="Nhood",
@@ -1069,7 +1063,7 @@ class Milo:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
+    #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_da_beeswarm(  # pragma: no cover # noqa: D417
         self,
         mdata: MuData,
@@ -1097,12 +1091,11 @@ class Milo:
             If `return_fig` is `True`, returns the figure, otherwise `None`.
 
         Examples:
-            >>> import pertpy as pt
-            >>> import scanpy as sc
-            >>> adata = pt.dt.bhattacherjee()
-            >>> milo = pt.tl.Milo()
+            >>> import omicverse as ov
+            >>> adata = ov.datasets.bhattacherjee()
+            >>> milo = ov.single.Milo()
             >>> mdata = milo.load(adata)
-            >>> sc.pp.neighbors(mdata["rna"])
+            >>> ov.pp.neighbors(mdata["rna"])
             >>> milo.make_nhoods(mdata["rna"])
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
             >>> milo.da_nhoods(mdata, design="~label")
@@ -1195,7 +1188,7 @@ class Milo:
         plt.show()
         return None
 
-    @_doc_params(common_plot_args=doc_common_plot_args)
+    #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood_counts_by_cond(  # pragma: no cover # noqa: D417
         self,
         mdata: MuData,

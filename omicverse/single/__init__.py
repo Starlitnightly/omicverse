@@ -112,6 +112,7 @@ from ._scenic import SCENIC,build_correlation_network_umap_layout,add_tf_regulat
 from ._annotation import Annotation
 from ._annotation_ref import AnnotationRef
 from ._velo import Velo,velocity_embedding
+from ._milo_dev import Milo
 
 
 __all__ = [
@@ -254,5 +255,6 @@ __all__ = [
     'velocity_embedding',
     'Annotation',   # cell type annotation
     'AnnotationRef', # cell type annotation with reference
+    'Milo',
 ]
 

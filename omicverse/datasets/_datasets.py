@@ -1019,5 +1019,48 @@ def pbmc3k(processed: bool = False) -> AnnData:
         return create_mock_dataset(n_cells=2700, n_genes=32738, n_cell_types=8, with_clustering=processed)
 
 
+def bhattacherjee(processed: bool = True) -> AnnData:
+    """Processed single-cell data PFC adult mice under cocaine self-administration.
+
+    Adult mice were subject to cocaine self-administration, samples were
+    collected at three time points: Maintenance, 48h after cocaine withdrawal and
+    15 days after cocaine withdrawal.
+
+    Args:
+        processed: If True, returns processed data. If False, returns raw data.
+
+    References:
+        Bhattacherjee A, Djekidel MN, Chen R, Chen W, Tuesta LM, Zhang Y. Cell
+        type-specific transcriptional programs in mouse prefrontal cortex during
+        adolescence and addiction. Nat Commun. 2019 Sep 13;10(1):4169.
+        doi: 10.1038/s41467-019-12054-3. PMID: 31519873; PMCID: PMC6744514.
+
+    Returns:
+        :class:`~anndata.AnnData` object of a single-cell RNA seq dataset
+
+    Examples:
+        >>> import omicverse as ov
+        >>> adata = ov.datasets.bhattacherjee()
+        >>> print(adata)
+    """
+    try:
+        url = "https://exampledata.scverse.org/pertpy/bhattacher_rna.h5ad"
+        filename = "bhattacherjee_rna.h5ad"
+
+        print(f"{Colors.HEADER} Loading Bhattacherjee et al. dataset{Colors.ENDC}")
+        adata = get_adata(url, filename)
+
+        if adata is not None:
+            return adata
+        else:
+            print(f"{Colors.WARNING}{EMOJI['warning']} Failed to load from URL, generating mock data...{Colors.ENDC}")
+            return create_mock_dataset(n_cells=5000, n_genes=2000, n_cell_types=10, with_clustering=processed)
+
+    except Exception as e:
+        print(f"{Colors.FAIL}{EMOJI['error']} Error loading Bhattacherjee dataset: {e}{Colors.ENDC}")
+        print(f"{Colors.WARNING}🔄 Generating mock data as fallback...{Colors.ENDC}")
+        return create_mock_dataset(n_cells=5000, n_genes=2000, n_cell_types=10, with_clustering=processed)
+
+
 if __name__ == "__main__":
     pass

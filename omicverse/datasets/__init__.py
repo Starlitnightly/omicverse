@@ -52,6 +52,7 @@ from ._datasets import (
     
     # Main dataset loaders
     pbmc3k,
+    bhattacherjee,
     create_mock_dataset,
     
     # Scanpy-inspired datasets
