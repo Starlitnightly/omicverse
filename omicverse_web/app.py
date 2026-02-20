@@ -343,56 +343,271 @@ def execute_code_stream():
 # Tools Routes
 # ============================================================================
 
+def _capture_tool_output(func):
+    """Run func() while capturing stdout, stderr, and scanpy/root logging into one string."""
+    import contextlib
+
+    output_buf = io.StringIO()
+
+    # Handler that writes into our buffer
+    log_handler = logging.StreamHandler(output_buf)
+    log_handler.setLevel(logging.DEBUG)
+    log_handler.setFormatter(logging.Formatter('%(message)s'))
+
+    sc_logger = logging.getLogger('scanpy')
+    root_logger = logging.getLogger()
+
+    # Temporarily lower scanpy logger level so info/hint messages are emitted
+    prev_sc_level = sc_logger.level
+    prev_root_level = root_logger.level
+    sc_logger.setLevel(logging.DEBUG)
+    # Don't lower root logger – it's too noisy; Flask/werkzeug use it
+    sc_logger.addHandler(log_handler)
+    root_logger.addHandler(log_handler)
+
+    # Also temporarily raise scanpy verbosity so logg.info / logg.hint fire
+    try:
+        import scanpy as _sc
+        prev_verbosity = _sc.settings.verbosity
+        _sc.settings.verbosity = 3  # hint level: info + hints
+    except Exception:
+        prev_verbosity = None
+
+    try:
+        with contextlib.redirect_stdout(output_buf), \
+             contextlib.redirect_stderr(output_buf):
+            func()
+    finally:
+        sc_logger.removeHandler(log_handler)
+        root_logger.removeHandler(log_handler)
+        sc_logger.setLevel(prev_sc_level)
+        root_logger.setLevel(prev_root_level)
+        if prev_verbosity is not None:
+            try:
+                _sc.settings.verbosity = prev_verbosity
+            except Exception:
+                pass
+
+    return output_buf.getvalue().strip()
+
+
 @app.route('/api/tools/<tool>', methods=['POST'])
 def run_tool(tool):
-    """Run single-cell analysis tools."""
+    """Run single-cell analysis tools, capturing all output for the analysis log."""
     if state.current_adata is None:
         return jsonify({'error': 'No data loaded'}), 400
 
     try:
         params = request.json if request.json else {}
+        captured = ''
 
+        # ── Preprocessing ────────────────────────────────────────────────────
         if tool == 'normalize':
             target_sum = params.get('target_sum', 1e4)
-            sc.pp.normalize_total(state.current_adata, target_sum=target_sum)
+            def _run(): sc.pp.normalize_total(state.current_adata, target_sum=target_sum)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'log1p':
-            sc.pp.log1p(state.current_adata)
+            def _run(): sc.pp.log1p(state.current_adata)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'scale':
             max_value = params.get('max_value', 10)
-            sc.pp.scale(state.current_adata, max_value=max_value)
+            def _run(): sc.pp.scale(state.current_adata, max_value=max_value)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'hvg':
+            n_total = state.current_adata.n_vars
             n_genes = params.get('n_genes', 2000)
-            method = params.get('method', 'seurat')
-            sc.pp.highly_variable_genes(state.current_adata, flavor=method, n_top_genes=n_genes)
-            state.current_adata = state.current_adata[:, state.current_adata.var.highly_variable]
+            method  = params.get('method', 'seurat')
+            def _run(): sc.pp.highly_variable_genes(state.current_adata, flavor=method, n_top_genes=n_genes)
+            captured = _capture_tool_output(_run)
+            state.current_adata = state.current_adata[:, state.current_adata.var.highly_variable].copy()
+            n_hvg = state.current_adata.n_vars
+            prefix = (captured + '\n') if captured else ''
+            captured = prefix + f'hvg: selected {n_hvg} highly variable genes (from {n_total})'
 
+
+        # ── QC ───────────────────────────────────────────────────────────────
+        elif tool == 'filter_cells':
+            before = state.current_adata.n_obs
+            for key in ('min_counts', 'min_genes', 'max_counts', 'max_genes'):
+                v = params.get(key, None)
+                if v is None or v == '':
+                    continue
+                try:
+                    v = int(v)
+                except Exception:
+                    continue
+                if key == 'min_counts':
+                    sc.pp.filter_cells(state.current_adata, min_counts=v)
+                elif key == 'min_genes':
+                    sc.pp.filter_cells(state.current_adata, min_genes=v)
+                elif key == 'max_counts':
+                    sc.pp.filter_cells(state.current_adata, max_counts=v)
+                elif key == 'max_genes':
+                    sc.pp.filter_cells(state.current_adata, max_genes=v)
+            after = state.current_adata.n_obs
+            captured = (f'filter_cells: {before} → {after} cells '
+                        f'(removed {before - after})')
+
+        elif tool == 'filter_genes':
+            import numpy as _np
+            before = state.current_adata.n_vars
+            min_cells   = params.get('min_cells', None)
+            g_min_counts = params.get('min_counts', params.get('g_min_counts', None))
+            max_cells   = params.get('max_cells', None)
+            g_max_counts = params.get('max_counts', params.get('g_max_counts', None))
+            if g_min_counts is not None and g_min_counts != '':
+                sc.pp.filter_genes(state.current_adata, min_counts=int(g_min_counts))
+            if min_cells is not None and min_cells != '':
+                sc.pp.filter_genes(state.current_adata, min_cells=int(min_cells))
+            X = (state.current_adata.X.toarray()
+                 if hasattr(state.current_adata.X, 'toarray')
+                 else state.current_adata.X)
+            if max_cells is not None:
+                expr_cells = (X > 0).sum(axis=0)
+                expr_cells = (_np.asarray(expr_cells).A1
+                              if hasattr(expr_cells, 'A1') else _np.asarray(expr_cells))
+                state.current_adata._inplace_subset_var(expr_cells <= int(max_cells))
+                X = (state.current_adata.X.toarray()
+                     if hasattr(state.current_adata.X, 'toarray')
+                     else state.current_adata.X)
+            if g_max_counts is not None:
+                sums = _np.asarray(X).sum(axis=0)
+                sums = sums.A1 if hasattr(sums, 'A1') else sums
+                state.current_adata._inplace_subset_var(sums <= float(g_max_counts))
+            after = state.current_adata.n_vars
+            captured = (f'filter_genes: {before} → {after} genes '
+                        f'(removed {before - after})')
+
+        elif tool == 'filter_outliers':
+            import numpy as _np, re as _re
+            before = state.current_adata.n_obs
+            # Auto-detect mitochondrial gene prefix
+            req_prefixes = params.get('mt_prefixes')
+            if req_prefixes:
+                mt_prefixes = [p.strip() for p in str(req_prefixes).split(',') if p.strip()]
+            else:
+                mt_prefixes = []
+                for name in state.current_adata.var_names.astype(str):
+                    if _re.match(r'^(mt|MT|Mt|mT)[-_].+', name):
+                        mt_prefixes = list({n[:3] for n in state.current_adata.var_names.astype(str) if len(n) >= 3})
+                        break
+                if not mt_prefixes:
+                    mt_prefixes = ['MT-', 'mt-']
+            lname = _np.array([str(x) for x in state.current_adata.var_names])
+            mt_mask = _np.zeros(len(lname), dtype=bool)
+            for pref in mt_prefixes:
+                mt_mask |= _np.char.startswith(lname, pref)
+            state.current_adata.var['mt'] = mt_mask
+            upper = _np.char.upper(lname)
+            state.current_adata.var['ribo'] = (
+                _np.char.startswith(upper, 'RPS') | _np.char.startswith(upper, 'RPL'))
+            state.current_adata.var['hb'] = _np.array(
+                [bool(_re.search(r'^(HB(?!P))', n, _re.I)) for n in lname])
+            sc.pp.calculate_qc_metrics(
+                state.current_adata, qc_vars=['mt', 'ribo', 'hb'],
+                inplace=True, log1p=True)
+            keep = _np.ones(state.current_adata.n_obs, dtype=bool)
+            for pct_param, col_hint in [
+                ('max_mt_percent', 'mt'),
+                ('max_ribo_percent', 'ribo'),
+                ('max_hb_percent', 'hb'),
+            ]:
+                threshold = params.get(pct_param)
+                if threshold is None:
+                    continue
+                pct_col = next(
+                    (c for c in state.current_adata.obs.columns
+                     if 'pct' in c.lower() and col_hint in c.lower()), None)
+                if pct_col:
+                    keep &= (state.current_adata.obs[pct_col].astype(float)
+                             <= float(threshold)).values
+            if keep.sum() != state.current_adata.n_obs:
+                state.current_adata._inplace_subset_obs(keep)
+            after = state.current_adata.n_obs
+            n_mt = int(mt_mask.sum())
+            captured = (f'filter_outliers: {before} → {after} cells '
+                        f'(removed {before - after})\n'
+                        f'  detected {n_mt} mitochondrial genes '
+                        f'(prefixes: {", ".join(mt_prefixes)})')
+
+        elif tool == 'doublets':
+            before = state.current_adata.n_obs
+            batch_key = params.get('batch_key') or None
+            scrublet_kwargs = dict(
+                sim_doublet_ratio=float(params.get('sim_doublet_ratio', 2.0)),
+                expected_doublet_rate=float(params.get('expected_doublet_rate', 0.05)),
+                stdev_doublet_rate=float(params.get('stdev_doublet_rate', 0.02)),
+                synthetic_doublet_umi_subsampling=float(
+                    params.get('synthetic_doublet_umi_subsampling', 1.0)),
+                knn_dist_metric=params.get('knn_dist_metric', 'euclidean'),
+                normalize_variance=bool(params.get('normalize_variance', True)),
+                log_transform=bool(params.get('log_transform', False)),
+                mean_center=bool(params.get('mean_center', True)),
+                n_prin_comps=int(params.get('n_prin_comps', 30))
+            )
+            try:
+                sc.pp.scrublet(state.current_adata, batch_key=batch_key,
+                               **scrublet_kwargs)
+            except Exception as e:
+                return jsonify({'error': f'Scrublet 执行失败: {e}'}), 400
+            pred_col = next((c for c in ('predicted_doublet', 'predicted_doublets')
+                             if c in state.current_adata.obs.columns), None)
+            score_col = next((c for c in ('doublet_score', 'doublet_scores')
+                              if c in state.current_adata.obs.columns), None)
+            n_doublets = 0
+            if pred_col:
+                n_doublets = int(state.current_adata.obs[pred_col].astype(bool).sum())
+                keep = ~state.current_adata.obs[pred_col].astype(bool)
+                state.current_adata._inplace_subset_obs(keep.values)
+            after = state.current_adata.n_obs
+            score_info = (f', median score={state.current_adata.obs[score_col].median():.3f}'
+                          if score_col and after > 0 else '')
+            captured = (f'doublets: {n_doublets} doublets removed, '
+                        f'{before} → {after} cells{score_info}')
+
+        # ── Dimensionality reduction ──────────────────────────────────────────
         elif tool == 'pca':
             n_comps = params.get('n_comps', 50)
-            sc.pp.pca(state.current_adata, n_comps=min(n_comps, min(state.current_adata.shape) - 1))
+            def _run():
+                sc.pp.pca(state.current_adata,
+                          n_comps=min(n_comps, min(state.current_adata.shape) - 1))
+            captured = _capture_tool_output(_run)
 
         elif tool == 'neighbors':
             n_neighbors = params.get('n_neighbors', 15)
-            n_pcs = params.get('n_pcs', 50)
-            sc.pp.neighbors(state.current_adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
+            n_pcs       = params.get('n_pcs', 50)
+            def _run():
+                sc.pp.neighbors(state.current_adata,
+                                n_neighbors=n_neighbors, n_pcs=n_pcs)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'umap':
             min_dist = params.get('min_dist', 0.5)
-            sc.tl.umap(state.current_adata, min_dist=min_dist)
+            def _run():
+                if 'neighbors' not in state.current_adata.uns:
+                    sc.pp.neighbors(state.current_adata, n_neighbors=15,
+                                    n_pcs=30, use_rep='X_pca')
+                sc.tl.umap(state.current_adata, min_dist=min_dist)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'tsne':
             perplexity = params.get('perplexity', 30)
-            sc.tl.tsne(state.current_adata, perplexity=perplexity)
+            def _run(): sc.tl.tsne(state.current_adata, perplexity=perplexity)
+            captured = _capture_tool_output(_run)
 
+        # ── Clustering ───────────────────────────────────────────────────────
         elif tool == 'leiden':
             resolution = params.get('resolution', 1.0)
-            sc.tl.leiden(state.current_adata, resolution=resolution)
+            def _run(): sc.tl.leiden(state.current_adata, resolution=resolution)
+            captured = _capture_tool_output(_run)
 
         elif tool == 'louvain':
             resolution = params.get('resolution', 1.0)
-            sc.tl.louvain(state.current_adata, resolution=resolution)
+            def _run(): sc.tl.louvain(state.current_adata, resolution=resolution)
+            captured = _capture_tool_output(_run)
 
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
@@ -405,7 +620,8 @@ def run_tool(tool):
             'n_cells': state.current_adata.n_obs,
             'n_genes': state.current_adata.n_vars,
             'embeddings': [emb.replace('X_', '') for emb in state.current_adata.obsm.keys()],
-            'obs_columns': list(state.current_adata.obs.columns)
+            'obs_columns': list(state.current_adata.obs.columns),
+            'stdout': captured
         })
 
     except Exception as e:

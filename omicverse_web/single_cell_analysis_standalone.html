@@ -70,46 +70,40 @@
                         </ul>
                     </li>
                     
-                    <!-- Dimensionality Reduction -->
+                    <!-- Visualization (formerly Dimensionality Reduction) -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-layers"></i></span>
-                            <span class="nxl-mtext" data-i18n="nav.dimReduction">Dimensionality Reduction</span>
+                            <span class="nxl-mtext" data-i18n="nav.dimReduction">Visualization</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.linearDR">Linear DR</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.nonlinearDR">Nonlinear DR</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.visualization">Visualization</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dimreduction')" data-i18n="nav.dimReductionSub">Dimensionality Reduction</a></li>
                         </ul>
                     </li>
-                    
-                    <!-- Clustering -->
+
+                    <!-- Basic Analysis (formerly Clustering) -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-grid"></i></span>
-                            <span class="nxl-mtext" data-i18n="nav.clustering">Clustering</span>
+                            <span class="nxl-mtext" data-i18n="nav.clustering">Basic Analysis</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.communityDetection">Community Detection</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.cellTypeId">Cell Type ID</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.clusterValidation">Cluster Validation</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.clusteringSub">Clustering</a></li>
                         </ul>
                     </li>
-                    
-                    <!-- OmicVerse -->
+
+                    <!-- Advanced Analysis (formerly OmicVerse) -->
                     <li class="nxl-item nxl-hasmenu">
                         <a href="javascript:void(0);" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-dna"></i></span>
-                            <span class="nxl-mtext" data-i18n="nav.omicverse">OmicVerse</span>
+                            <span class="nxl-mtext" data-i18n="nav.omicverse">Advanced Analysis</span>
                             <span class="nxl-arrow"><i class="feather-chevron-right"></i></span>
                         </a>
                         <ul class="nxl-submenu">
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.cellAnnotation">Cell Annotation</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.trajectory">Trajectory Analysis</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.diffAnalysis">Differential Analysis</a></li>
-                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('omicverse')" data-i18n="nav.enrichment">Functional Enrichment</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('cell_annotation')" data-i18n="nav.cellAnnotation">Cell Annotation</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('trajectory')" data-i18n="nav.trajectory">Trajectory Analysis</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -476,8 +470,29 @@
                 <!-- Visualization View -->
                 <div id="visualization-view" class="content-view">
                 <div class="row">
-                    <!-- Main Analysis Panel -->
-                    <div class="col-lg-8 col-xl-9">
+                    <!-- Parameter Settings Panel (left of UMAP) -->
+                    <div class="col-lg-3">
+                        <!-- Parameter Settings Section -->
+                        <div class="parameter-section" id="parameter-panel">
+                            <h6>
+                                <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
+                            </h6>
+                            <div id="parameter-content"></div>
+                        </div>
+
+                        <!-- Analysis Status Section -->
+                        <div class="analysis-log-section mt-3">
+                            <h6>
+                                <i class="fas fa-info-circle"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
+                            </h6>
+                            <div id="analysis-log" class="bg-light p-3 rounded analysis-log">
+                                <div class="text-muted" data-i18n="panel.waitingUpload">Waiting for data upload...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Visualization Panel -->
+                    <div class="col-lg-9">
                         <!-- File Upload Area -->
                         <div id="upload-section" class="mb-4">
                             <div class="file-upload-area" id="dropZone" style="cursor: pointer;">
@@ -512,85 +527,6 @@
                             </div>
                         </div>
 
-                        <!-- Visualization Controls -->
-                        <div id="viz-controls" class="control-panel" style="display: none;">
-                            <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label for="embedding-select" class="form-label" data-i18n="controls.embedding">Embedding</label>
-                                    <select class="form-select" id="embedding-select" onchange="updatePlot()">
-                                        <option value="" data-i18n="controls.embeddingPlaceholder">Select embedding</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label for="color-select" class="form-label" data-i18n="controls.colorBy">Color by</label>
-                                    <select class="form-select" id="color-select" onchange="updatePlot()">
-                                        <option value="" data-i18n="controls.colorNone">None</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label for="gene-input" class="form-label" data-i18n="controls.gene">Gene Expression</label>
-                                    <div class="position-relative">
-                                        <input type="text" class="form-control" id="gene-input" placeholder="Enter gene name" data-i18n-placeholder="controls.genePlaceholder" autocomplete="off">
-                                        <div id="gene-autocomplete" class="list-group position-absolute w-100" style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <label for="palette-select" class="form-label">
-                                        <span id="palette-label" data-i18n="controls.paletteContinuous">Palette (continuous)</span>
-                                    </label>
-                                    <select class="form-select" id="palette-select" onchange="updatePlot()">
-                                        <option value="default" data-i18n="controls.paletteDefault">Default</option>
-                                        <option value="Viridis">Viridis</option>
-                                        <option value="Plasma">Plasma</option>
-                                        <option value="Inferno">Inferno</option>
-                                        <option value="Magma">Magma</option>
-                                        <option value="Cividis">Cividis</option>
-                                        <option value="Blues">Blues</option>
-                                        <option value="Reds">Reds</option>
-                                        <option value="YlOrRd">YlOrRd</option>
-                                        <option value="YlGnBu">YlGnBu</option>
-                                        <option value="RdBu" data-i18n="controls.paletteDiverging">RdBu (diverging)</option>
-                                        <option value="Spectral" data-i18n="controls.paletteSpectral">Spectral (diverging)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row g-3 mt-1" id="category-palette-row" style="display: none;">
-                                <div class="col-md-12">
-                                    <label for="category-palette-select" class="form-label" data-i18n="controls.categoryPalette">Categorical palette</label>
-                                    <select class="form-select" id="category-palette-select" onchange="updatePlot()">
-                                        <option value="default" data-i18n="controls.paletteDefaultScanpy">Default (Scanpy)</option>
-                                        <option value="tab10" data-i18n="controls.tab10">Tab10 (10 colors)</option>
-                                        <option value="tab20" data-i18n="controls.tab20">Tab20 (20 colors)</option>
-                                        <option value="tab20b" data-i18n="controls.tab20b">Tab20b (20 colors)</option>
-                                        <option value="tab20c" data-i18n="controls.tab20c">Tab20c (20 colors)</option>
-                                        <option value="set1" data-i18n="controls.set1">Set1 (9, vivid)</option>
-                                        <option value="set2" data-i18n="controls.set2">Set2 (8, soft)</option>
-                                        <option value="set3" data-i18n="controls.set3">Set3 (12, gentle)</option>
-                                        <option value="paired" data-i18n="controls.paired">Paired (12)</option>
-                                        <option value="pastel1" data-i18n="controls.pastel1">Pastel1 (9)</option>
-                                        <option value="pastel2" data-i18n="controls.pastel2">Pastel2 (8)</option>
-                                        <option value="dark2" data-i18n="controls.dark2">Dark2 (8)</option>
-                                        <option value="accent" data-i18n="controls.accent">Accent (8)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row g-3 mt-1" id="vminmax-row" style="display: none;">
-                                <div class="col-md-4">
-                                    <label for="vmin-input" class="form-label" data-i18n="controls.vmin">Min (vmin)</label>
-                                    <input type="number" class="form-control form-control-sm" id="vmin-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="vmax-input" class="form-label" data-i18n="controls.vmax">Max (vmax)</label>
-                                    <input type="number" class="form-control form-control-sm" id="vmax-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
-                                </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="singleCellApp.applyVMinMax()">
-                                        <i class="fas fa-sync-alt me-1"></i><span data-i18n="controls.apply">Apply</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Visualization Panel -->
                         <div id="viz-panel" class="visualization-panel" style="display: none;">
                             <div class="position-relative">
@@ -607,30 +543,111 @@
                                 <div id="plotly-div"></div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Analysis Toolbar -->
-                    <div class="col-lg-4 col-xl-3">
-                        <!-- Parameter Settings Section -->
-                        <div class="parameter-section" id="parameter-panel">
-                            <h6>
-                                <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
-                            </h6>
-                            <div id="parameter-content">
-                                <div class="text-muted text-center py-4">
-                                    <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
-                                    <p data-i18n="panel.selectAnalysis">Select an analysis type from the left menu</p>
+                        <!-- Visualization Controls (below chart) -->
+                        <div id="viz-controls" class="control-panel mt-3" style="display: none;">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label for="embedding-select" class="form-label form-label-sm" data-i18n="controls.embedding">Embedding</label>
+                                    <select class="form-select form-select-sm" id="embedding-select" onchange="updatePlot()">
+                                        <option value="" data-i18n="controls.embeddingPlaceholder">Select embedding</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="color-select" class="form-label form-label-sm" data-i18n="controls.colorBy">Color by</label>
+                                    <select class="form-select form-select-sm" id="color-select" onchange="singleCellApp.onColorSelectChange()">
+                                        <option value="" data-i18n="controls.colorNone">None</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="gene-input" class="form-label form-label-sm" data-i18n="controls.gene">Gene Expression</label>
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control form-control-sm" id="gene-input" placeholder="Enter gene name" data-i18n-placeholder="controls.genePlaceholder" autocomplete="off">
+                                        <div id="gene-autocomplete" class="list-group position-absolute w-100" style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="palette-select" class="form-label form-label-sm">
+                                        <span id="palette-label" data-i18n="controls.paletteContinuous">Palette (continuous)</span>
+                                    </label>
+                                    <select class="form-select form-select-sm" id="palette-select" onchange="updatePlot()">
+                                        <option value="default" data-i18n="controls.paletteDefault">Default</option>
+                                        <option value="Viridis">Viridis</option>
+                                        <option value="Plasma">Plasma</option>
+                                        <option value="Inferno">Inferno</option>
+                                        <option value="Magma">Magma</option>
+                                        <option value="Cividis">Cividis</option>
+                                        <option value="Blues">Blues</option>
+                                        <option value="Reds">Reds</option>
+                                        <option value="YlOrRd">YlOrRd</option>
+                                        <option value="YlGnBu">YlGnBu</option>
+                                        <option value="RdBu" data-i18n="controls.paletteDiverging">RdBu (diverging)</option>
+                                        <option value="Spectral" data-i18n="controls.paletteSpectral">Spectral (diverging)</option>
+                                    </select>
                                 </div>
                             </div>
-                        </div>
+                            <div class="row g-2 mt-1" id="category-palette-row" style="display: none;">
+                                <div class="col-md-12">
+                                    <label for="category-palette-select" class="form-label form-label-sm" data-i18n="controls.categoryPalette">Categorical palette</label>
+                                    <select class="form-select form-select-sm" id="category-palette-select" onchange="updatePlot()">
+                                        <option value="default" data-i18n="controls.paletteDefaultScanpy">Default (Scanpy)</option>
+                                        <option value="tab10" data-i18n="controls.tab10">Tab10 (10 colors)</option>
+                                        <option value="tab20" data-i18n="controls.tab20">Tab20 (20 colors)</option>
+                                        <option value="tab20b" data-i18n="controls.tab20b">Tab20b (20 colors)</option>
+                                        <option value="tab20c" data-i18n="controls.tab20c">Tab20c (20 colors)</option>
+                                        <option value="set1" data-i18n="controls.set1">Set1 (9, vivid)</option>
+                                        <option value="set2" data-i18n="controls.set2">Set2 (8, soft)</option>
+                                        <option value="set3" data-i18n="controls.set3">Set3 (12, gentle)</option>
+                                        <option value="paired" data-i18n="controls.paired">Paired (12)</option>
+                                        <option value="pastel1" data-i18n="controls.pastel1">Pastel1 (9)</option>
+                                        <option value="pastel2" data-i18n="controls.pastel2">Pastel2 (8)</option>
+                                        <option value="dark2" data-i18n="controls.dark2">Dark2 (8)</option>
+                                        <option value="accent" data-i18n="controls.accent">Accent (8)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-1" id="vminmax-row" style="display: none;">
+                                <div class="col-md-4">
+                                    <label for="vmin-input" class="form-label form-label-sm" data-i18n="controls.vmin">Min (vmin)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmin-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="vmax-input" class="form-label form-label-sm" data-i18n="controls.vmax">Max (vmax)</label>
+                                    <input type="number" class="form-control form-control-sm" id="vmax-input" placeholder="Auto" data-i18n-placeholder="controls.auto" step="0.01">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="singleCellApp.applyVMinMax()">
+                                        <i class="fas fa-sync-alt me-1"></i><span data-i18n="controls.apply">Apply</span>
+                                    </button>
+                                </div>
+                            </div>
 
-                        <!-- Analysis Status Section -->
-                        <div class="analysis-log-section">
-                            <h6>
-                                <i class="fas fa-info-circle"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
-                            </h6>
-                            <div id="analysis-log" class="bg-light p-3 rounded analysis-log">
-                                <div class="text-muted" data-i18n="panel.waitingUpload">Waiting for data upload...</div>
+                            <!-- Point style controls -->
+                            <div class="row g-2 mt-1 align-items-center" id="point-style-row">
+                                <div class="col-md-4">
+                                    <label for="point-size-slider" class="form-label form-label-sm d-flex justify-content-between">
+                                        <span data-i18n="controls.pointSize">Point size</span>
+                                        <span id="point-size-value" class="text-muted fw-semibold">Auto</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="point-size-slider"
+                                           min="1" max="20" step="0.5"
+                                           oninput="singleCellApp.onPointSizeChange(this.value)"
+                                           title="Drag to adjust point size">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="opacity-slider" class="form-label form-label-sm d-flex justify-content-between">
+                                        <span data-i18n="controls.opacity">Opacity</span>
+                                        <span id="opacity-value" class="text-muted fw-semibold">0.7</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="opacity-slider"
+                                           min="0.05" max="1" step="0.05" value="0.7"
+                                           oninput="singleCellApp.onOpacityChange(this.value)">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                                            onclick="singleCellApp.resetPointStyle()"
+                                            data-i18n="controls.resetStyle">Reset style</button>
+                                </div>
                             </div>
                         </div>
                     </div>

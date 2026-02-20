@@ -49,7 +49,7 @@ class SingleCellAnalysis {
         this.setupKernelSelector();
         this.setupSidebarResize(); // JupyterLab-like resizable sidebar
         this.checkStatus();
-        this.selectAnalysisCategory('preprocessing');
+        this.showParameterPlaceholder();
         this.applyCodeFontSize();
         this.fetchKernelVars();
     }
@@ -77,15 +77,17 @@ class SingleCellAnalysis {
                 'nav.normalization': 'Normalization',
                 'nav.qc': 'Quality Control',
                 'nav.featureSelection': 'Feature Selection',
-                'nav.dimReduction': 'Dimensionality Reduction',
+                'nav.dimReduction': 'Visualization',
+                'nav.dimReductionSub': 'Dimensionality Reduction',
                 'nav.linearDR': 'Linear DR',
                 'nav.nonlinearDR': 'Nonlinear DR',
                 'nav.visualization': 'Visualization',
-                'nav.clustering': 'Clustering',
+                'nav.clustering': 'Basic Analysis',
+                'nav.clusteringSub': 'Clustering',
                 'nav.communityDetection': 'Community Detection',
                 'nav.cellTypeId': 'Cell Type ID',
                 'nav.clusterValidation': 'Cluster Validation',
-                'nav.omicverse': 'OmicVerse',
+                'nav.omicverse': 'Advanced Analysis',
                 'nav.cellAnnotation': 'Cell Annotation',
                 'nav.trajectory': 'Trajectory Analysis',
                 'nav.diffAnalysis': 'Differential Analysis',
@@ -144,6 +146,9 @@ class SingleCellAnalysis {
                 'controls.vmax': 'Max (vmax)',
                 'controls.auto': 'Auto',
                 'controls.apply': 'Apply',
+                'controls.pointSize': 'Point size',
+                'controls.opacity': 'Opacity',
+                'controls.resetStyle': 'Reset style',
                 'loading.processing': 'Processing data...',
                 'panel.parameters': 'Parameters',
                 'panel.selectAnalysis': 'Select an analysis type from the left menu',
@@ -267,6 +272,22 @@ class SingleCellAnalysis {
                 'tools.diffDesc': 'Differential expression genes',
                 'tools.enrichment': 'Enrichment',
                 'tools.enrichmentDesc': 'GO/KEGG enrichment',
+                'tools.celltypist': 'CellTypist',
+                'tools.celltypistDesc': 'Logistic regression-based cell type annotation',
+                'tools.gpt4celltype': 'GPT4Celltype',
+                'tools.gpt4celltypeDesc': 'LLM-based cell type annotation',
+                'tools.scsa': 'SCSA',
+                'tools.scsaDesc': 'Score-based cell type annotation',
+                'tools.diffusionmap': 'Diffusion Map',
+                'tools.diffusionmapDesc': 'Diffusion map trajectory analysis',
+                'tools.slingshot': 'Slingshot',
+                'tools.slingshotDesc': 'Cell lineage and pseudotime inference',
+                'tools.palantir': 'Palantir',
+                'tools.palantirDesc': 'Cell fate prediction via diffusion',
+                'tools.pyvia': 'pyVIA',
+                'tools.pyviaDesc': 'Graph-based trajectory analysis',
+                'tools.sctour': 'scTour',
+                'tools.sctourDesc': 'Deep learning-based trajectory analysis',
                 'gene.error': 'Gene expression error',
                 'gene.notFound': 'Gene not found',
                 'gene.showing': 'Showing gene expression',
@@ -343,15 +364,17 @@ class SingleCellAnalysis {
                 'nav.normalization': '标准化处理',
                 'nav.qc': '质量控制',
                 'nav.featureSelection': '特征选择',
-                'nav.dimReduction': '降维分析',
+                'nav.dimReduction': '可视化',
+                'nav.dimReductionSub': '降维',
                 'nav.linearDR': '线性降维',
                 'nav.nonlinearDR': '非线性降维',
                 'nav.visualization': '可视化',
-                'nav.clustering': '聚类分析',
+                'nav.clustering': '基础分析',
+                'nav.clusteringSub': '聚类',
                 'nav.communityDetection': '社区检测',
                 'nav.cellTypeId': '细胞类型识别',
                 'nav.clusterValidation': '聚类验证',
-                'nav.omicverse': 'OmicVerse',
+                'nav.omicverse': '进阶分析',
                 'nav.cellAnnotation': '细胞注释',
                 'nav.trajectory': '轨迹分析',
                 'nav.diffAnalysis': '差异分析',
@@ -410,9 +433,12 @@ class SingleCellAnalysis {
                 'controls.vmax': '最大值 (vmax)',
                 'controls.auto': '自动',
                 'controls.apply': '应用',
+                'controls.pointSize': '点大小',
+                'controls.opacity': '透明度',
+                'controls.resetStyle': '重置样式',
                 'loading.processing': '正在处理数据...',
                 'panel.parameters': '参数设置',
-                'panel.selectAnalysis': '请从左侧菜单选择分析类型',
+                'panel.selectAnalysis': '点击左侧菜单栏选取功能',
                 'panel.analysisStatus': '分析状态',
                 'panel.waitingUpload': '等待上传数据...',
                 'toolbar.kernel': '内核',
@@ -533,6 +559,22 @@ class SingleCellAnalysis {
                 'tools.diffDesc': '差异表达基因',
                 'tools.enrichment': '功能富集',
                 'tools.enrichmentDesc': 'GO/KEGG富集分析',
+                'tools.celltypist': 'CellTypist',
+                'tools.celltypistDesc': '基于逻辑回归的细胞类型自动注释',
+                'tools.gpt4celltype': 'GPT4Celltype',
+                'tools.gpt4celltypeDesc': '基于大语言模型的细胞类型注释',
+                'tools.scsa': 'SCSA',
+                'tools.scsaDesc': '基于打分系统的细胞类型注释',
+                'tools.diffusionmap': 'Diffusion Map',
+                'tools.diffusionmapDesc': '扩散映射轨迹分析',
+                'tools.slingshot': 'Slingshot',
+                'tools.slingshotDesc': '细胞谱系与拟时序推断',
+                'tools.palantir': 'Palantir',
+                'tools.palantirDesc': '基于扩散过程的细胞命运预测',
+                'tools.pyvia': 'pyVIA',
+                'tools.pyviaDesc': '基于图的细胞轨迹分析',
+                'tools.sctour': 'scTour',
+                'tools.sctourDesc': '基于深度学习的轨迹分析',
                 'gene.error': '基因表达错误',
                 'gene.notFound': '基因未找到',
                 'gene.showing': '显示基因表达',
@@ -1495,6 +1537,9 @@ class SingleCellAnalysis {
         document.getElementById('viz-controls').style.display = 'block';
         document.getElementById('viz-panel').style.display = 'block';
 
+        // Initialise point-size slider to auto default for this dataset
+        this.initPointSizeSlider();
+
         // Update embedding options
         const embeddingSelect = document.getElementById('embedding-select');
         embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
@@ -1603,11 +1648,26 @@ class SingleCellAnalysis {
         });
     }
 
+    /** Called when the user explicitly picks a new obs column from color-select.
+     *  Clears gene-input so gene mode doesn't interfere. */
+    onColorSelectChange() {
+        const geneInput = document.getElementById('gene-input');
+        if (geneInput) geneInput.value = '';
+        this.updatePlot();
+    }
+
     updatePlot() {
         const embedding = document.getElementById('embedding-select').value;
-        const colorBy = document.getElementById('color-select').value;
-
         if (!embedding) return;
+
+        // Gene expression takes priority: if gene-input has a value use it,
+        // regardless of what color-select says. This ensures palette/style
+        // changes don't accidentally revert to the obs categorical variable.
+        const geneInput = document.getElementById('gene-input');
+        const geneValue = geneInput ? geneInput.value.trim() : '';
+        const colorBy = geneValue
+            ? 'gene:' + geneValue
+            : document.getElementById('color-select').value;
 
         // Update palette visibility based on color type
         this.updatePaletteVisibility(colorBy);
@@ -1869,8 +1929,8 @@ class SingleCellAnalysis {
     updateColorsOnly(data) {
         // 只更新颜色，保持位置不变
         let markerConfig = {
-            size: data.size || 3,
-            opacity: 0.7
+            size: this.getMarkerSize(),
+            opacity: this.getMarkerOpacity()
         };
         
         if (data.colors) {
@@ -1948,8 +2008,8 @@ class SingleCellAnalysis {
             
             // 准备marker配置
             let markerConfig = {
-                size: data.size || 3,
-                opacity: 0.7
+                size: this.getMarkerSize(),
+                opacity: this.getMarkerOpacity()
             };
             
             if (data.colors) {
@@ -2016,8 +2076,8 @@ class SingleCellAnalysis {
                 mode: 'markers',
                 type: 'scattergl',
                 marker: {
-                    size: data.size || 3,
-                    opacity: 0.7
+                    size: this.getMarkerSize(),
+                    opacity: this.getMarkerOpacity()
                 },
                 showlegend: false
             };
@@ -2127,11 +2187,94 @@ class SingleCellAnalysis {
         };
     }
 
+    // ── Point-style helpers ──────────────────────────────────────────────────
+
+    /** Compute default Plotly marker size from cell count (mirrors Python 120000/n). */
+    computeDefaultPointSize() {
+        const nCells = parseInt(document.getElementById('cell-count')?.textContent || '0', 10);
+        if (!nCells || nCells <= 0) return 4;
+        // Python: s = 120000 / n  (matplotlib area units)
+        // Plotly size ≈ diameter in px ≈ sqrt(s)
+        return Math.max(1, Math.round(Math.sqrt(120000 / nCells) * 10) / 10);
+    }
+
+    getMarkerSize() {
+        const slider = document.getElementById('point-size-slider');
+        if (!slider || slider.dataset.auto === 'true') {
+            return this.computeDefaultPointSize();
+        }
+        return parseFloat(slider.value);
+    }
+
+    getMarkerOpacity() {
+        const slider = document.getElementById('opacity-slider');
+        return slider ? parseFloat(slider.value) : 0.7;
+    }
+
+    /** Called when the size slider is moved manually. */
+    onPointSizeChange(value) {
+        const slider = document.getElementById('point-size-slider');
+        const label  = document.getElementById('point-size-value');
+        if (slider) slider.dataset.auto = 'false';
+        if (label)  label.textContent = parseFloat(value).toFixed(1);
+        this.applyPointStyleLive();
+    }
+
+    /** Called when the opacity slider is moved. */
+    onOpacityChange(value) {
+        const label = document.getElementById('opacity-value');
+        if (label) label.textContent = parseFloat(value).toFixed(2);
+        this.applyPointStyleLive();
+    }
+
+    /** Reset sliders back to auto defaults and redraw. */
+    resetPointStyle() {
+        const sizeSlider    = document.getElementById('point-size-slider');
+        const opacitySlider = document.getElementById('opacity-slider');
+        const sizeLabel     = document.getElementById('point-size-value');
+        const opacityLabel  = document.getElementById('opacity-value');
+
+        if (sizeSlider) {
+            sizeSlider.dataset.auto = 'true';
+            const def = this.computeDefaultPointSize();
+            sizeSlider.value = def;
+            if (sizeLabel) sizeLabel.textContent = 'Auto';
+        }
+        if (opacitySlider) {
+            opacitySlider.value = 0.7;
+            if (opacityLabel) opacityLabel.textContent = '0.70';
+        }
+        this.applyPointStyleLive();
+    }
+
+    /** Initialize the size slider to the auto-computed default after data load. */
+    initPointSizeSlider() {
+        const slider = document.getElementById('point-size-slider');
+        const label  = document.getElementById('point-size-value');
+        if (!slider) return;
+        const def = this.computeDefaultPointSize();
+        slider.value = def;
+        slider.dataset.auto = 'true';
+        if (label) label.textContent = 'Auto';
+    }
+
+    /** Restyle the existing Plotly traces in-place (no data re-fetch). */
+    applyPointStyleLive() {
+        const plotDiv = document.getElementById('plotly-div');
+        if (!plotDiv || !plotDiv.data || plotDiv.data.length === 0) return;
+        const size    = this.getMarkerSize();
+        const opacity = this.getMarkerOpacity();
+        const traceIndices = plotDiv.data.map((_, i) => i);
+        Plotly.restyle('plotly-div', { 'marker.size': size, 'marker.opacity': opacity }, traceIndices);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+
     plotData(data) {
         // 处理颜色配置
         let markerConfig = {
-            size: data.size || 3,
-            opacity: 0.7
+            size: this.getMarkerSize(),
+            opacity: this.getMarkerOpacity()
         };
 
         let traces = [];
@@ -2172,8 +2315,8 @@ class SingleCellAnalysis {
                             name: category, // 设置trace名称，这将显示在legend中
                             marker: {
                                 color: color,
-                                size: data.size || 3,
-                                opacity: 0.7
+                                size: this.getMarkerSize(),
+                                opacity: this.getMarkerOpacity()
                             },
                             text: categoryText,
                             hovertemplate: '%{text}<extra></extra>',
@@ -2248,8 +2391,8 @@ class SingleCellAnalysis {
                 type: 'scattergl',
                 marker: {
                     color: 'blue',
-                    size: data.size || 3,
-                    opacity: 0.7
+                    size: this.getMarkerSize(),
+                    opacity: this.getMarkerOpacity()
                 },
                 text: data.hover_text || [],
                 hovertemplate: '%{text}<extra></extra>',
@@ -2394,7 +2537,17 @@ class SingleCellAnalysis {
         });
     }
 
-    selectAnalysisCategory(category) {
+    showParameterPlaceholder() {
+        const parameterContent = document.getElementById('parameter-content');
+        if (!parameterContent) return;
+        parameterContent.innerHTML = `
+            <div class="d-flex flex-column align-items-center justify-content-center text-center text-muted py-5" style="min-height:160px">
+                <i class="fas fa-hand-pointer fa-2x mb-3 opacity-50"></i>
+                <p class="mb-0 small" data-i18n="panel.selectAnalysis">${this.t('panel.selectAnalysis')}</p>
+            </div>`;
+    }
+
+    selectAnalysisCategory(category, { silent = false } = {}) {
         this.currentCategory = category;
         const parameterContent = document.getElementById('parameter-content');
         
@@ -2432,6 +2585,18 @@ class SingleCellAnalysis {
                 { id: 'coming_soon', nameKey: 'tools.trajectory', icon: 'fas fa-route', descKey: 'tools.trajectoryDesc' },
                 { id: 'coming_soon', nameKey: 'tools.diff', icon: 'fas fa-not-equal', descKey: 'tools.diffDesc' },
                 { id: 'coming_soon', nameKey: 'tools.enrichment', icon: 'fas fa-sitemap', descKey: 'tools.enrichmentDesc' }
+            ],
+            'cell_annotation': [
+                { id: 'coming_soon', nameKey: 'tools.celltypist', icon: 'fas fa-tag', descKey: 'tools.celltypistDesc' },
+                { id: 'coming_soon', nameKey: 'tools.gpt4celltype', icon: 'fas fa-robot', descKey: 'tools.gpt4celltypeDesc' },
+                { id: 'coming_soon', nameKey: 'tools.scsa', icon: 'fas fa-star', descKey: 'tools.scsaDesc' }
+            ],
+            'trajectory': [
+                { id: 'coming_soon', nameKey: 'tools.diffusionmap', icon: 'fas fa-project-diagram', descKey: 'tools.diffusionmapDesc' },
+                { id: 'coming_soon', nameKey: 'tools.slingshot', icon: 'fas fa-route', descKey: 'tools.slingshotDesc' },
+                { id: 'coming_soon', nameKey: 'tools.palantir', icon: 'fas fa-compass', descKey: 'tools.palantirDesc' },
+                { id: 'coming_soon', nameKey: 'tools.pyvia', icon: 'fas fa-code-branch', descKey: 'tools.pyviaDesc' },
+                { id: 'coming_soon', nameKey: 'tools.sctour', icon: 'fas fa-brain', descKey: 'tools.sctourDesc' }
             ]
         };
         
@@ -2457,15 +2622,17 @@ class SingleCellAnalysis {
             parameterContent.appendChild(toolDiv);
         });
         
-        this.addToLog(this.t('panel.categorySelected') + ` ${this.getCategoryName(category)}`);
+        if (!silent) this.addToLog(this.t('panel.categorySelected') + ` ${this.getCategoryName(category)}`);
     }
 
     getCategoryName(category) {
         const names = {
             'preprocessing': this.t('nav.preprocessing'),
-            'dimreduction': this.t('nav.dimReduction'),
-            'clustering': this.t('nav.clustering'),
-            'omicverse': this.t('nav.omicverse')
+            'dimreduction': this.t('nav.dimReductionSub'),
+            'clustering': this.t('nav.clusteringSub'),
+            'omicverse': this.t('nav.omicverse'),
+            'cell_annotation': this.t('nav.cellAnnotation'),
+            'trajectory': this.t('nav.trajectory')
         };
         return names[category] || category;
     }
@@ -2828,8 +2995,14 @@ class SingleCellAnalysis {
                 this.currentData = data;
                 this.updateUI(data);
                 this.addToLog(this.formatToolMessage(toolName, this.t('tool.completed')));
+
+                // Print captured stdout lines to the analysis log
+                if (data.stdout && data.stdout.trim()) {
+                    this.addToLog(data.stdout, 'stdout');
+                }
+
                 this.showStatus(this.formatToolMessage(toolName, this.t('tool.completed')), false);
-                
+
                 // Auto-update plot if embedding is available
                 const embeddingSelect = document.getElementById('embedding-select');
                 if (embeddingSelect.value) {
@@ -2953,14 +3126,35 @@ class SingleCellAnalysis {
     addToLog(message, type = 'info') {
         const log = document.getElementById('analysis-log');
         if (!log) return;
-        
+
         const timestamp = new Date().toLocaleTimeString();
-        const className = type === 'error' ? 'text-danger' : 'text-dark';
-        
         const logEntry = document.createElement('div');
-        logEntry.className = `mb-1 ${className}`;
-        logEntry.innerHTML = `<small class="text-muted">[${timestamp}]</small> ${message}`;
-        
+
+        if (type === 'error') {
+            logEntry.className = 'mb-1 text-danger';
+            logEntry.innerHTML = `<small class="text-muted">[${timestamp}]</small> ${message}`;
+        } else if (type === 'stdout') {
+            // Render captured Python print output as monospace terminal block
+            logEntry.className = 'mb-1';
+            const pre = document.createElement('pre');
+            pre.style.cssText = [
+                'font-size:0.75rem',
+                'margin:2px 0 2px 0',
+                'padding:4px 8px',
+                'background:var(--bs-light, #f8f9fa)',
+                'border-left:3px solid #6c757d',
+                'border-radius:0 4px 4px 0',
+                'white-space:pre-wrap',
+                'word-break:break-all',
+                'color:#495057'
+            ].join(';');
+            pre.textContent = message;
+            logEntry.appendChild(pre);
+        } else {
+            logEntry.className = 'mb-1 text-dark';
+            logEntry.innerHTML = `<small class="text-muted">[${timestamp}]</small> ${message}`;
+        }
+
         log.appendChild(logEntry);
         log.scrollTop = log.scrollHeight;
     }
