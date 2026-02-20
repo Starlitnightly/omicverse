@@ -354,7 +354,7 @@ def MDIC3_score(AA, GRN,labelsl, label_index):
         S11 = np.column_stack((S11, b))
     if shapeA[0] > shapeA[1]:
         b = np.zeros((shapeA[0] - shapeA[1], shapeA[1]))
-        S11 = np.row_stack((S11, b))
+        S11 = np.vstack((S11, b))
 
     T = np.dot(GRN, S11)
     Tp = np.linalg.pinv(T)

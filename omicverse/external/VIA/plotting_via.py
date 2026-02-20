@@ -26,6 +26,12 @@ import random
 from scipy.spatial.distance import pdist, squareform
 from sklearn.preprocessing import StandardScaler
 
+# Numpy 2.0 compatibility: trapz renamed to trapezoid
+try:
+    from numpy import trapezoid as np_trapz
+except ImportError:
+    from numpy import trapz as np_trapz
+
 
 def _pl_velocity_embedding(via_object, X_emb, smooth_transition, b, use_sequentially_augmented=False):
     '''
@@ -2936,7 +2942,7 @@ def get_gene_expression(via_object, gene_exp: pd.DataFrame, cmap: str = 'jet', d
                             xval = np.linspace(min(sc_pt), max_val_pt, 100 * 2)
                             yg = geneGAM.predict(X=xval)
                             x_conf_int = geneGAM.confidence_intervals(xval, width=conf_int)
-                            A_under_curve = np.trapz(yg, x=xval)
+                            A_under_curve = np_trapz(yg, x=xval)
                             print(f'Area under curve {gene_i} for branch {majority_true} is {A_under_curve}')
 
                         else:

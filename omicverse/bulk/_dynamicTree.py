@@ -694,7 +694,7 @@ def cutreeHybrid(link, distM,
                             if onBr > 0:
                                 basicOnBranch = branch_basicClusters[onBr[0] - 1]
                                 labelsOnBranch = branchLabels[basicOnBranch - 1]
-                                useObjects = np.in1d(ColorsX, np.unique(labelsOnBranch))
+                                useObjects = np.isin(ColorsX, np.unique(labelsOnBranch))
                                 DistSClustClust = get_rows(InCluster, distM)[:,useObjects]
                                 #DistSClustClust = distM[InCluster, useObjects]
                                 MeanDist = np.mean(DistSClustClust, axis=0)
@@ -738,7 +738,7 @@ def cutreeHybrid(link, distM,
                         onBr = onBranch[obj]
                         basicOnBranch = branch_basicClusters[onBr - 1]
                         labelsOnBranch = branchLabels[basicOnBranch - 1]
-                        useObjects = np.in1d(ColorsX, np.unique(labelsOnBranch))
+                        useObjects = np.isin(ColorsX, np.unique(labelsOnBranch))
                         useColorsFac = factor(ColorsX[useObjects]) ### think about
                         #UnassdToClustDist = tapply(distM[useObjects, obj], useColorsFac, mean) ### think about
                         UnassdToClustDist = tapply(get_rows(useObjects, distM)[:,obj], useColorsFac, np.mean) ### think about

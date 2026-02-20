@@ -9,7 +9,7 @@ def kmeans_plot_multiple(embed_dict_t,graph_list,coords,taskname_t,output_path_t
     plot_row = int(np.floor(num_plot/2) + 1)
     embed_stack = embed_dict_t[graph_list[0]].cpu().detach().numpy()
     for i in range(1,num_plot):
-        embed_stack = np.row_stack((embed_stack,embed_dict_t[graph_list[i]].cpu().detach().numpy()))
+        embed_stack = np.vstack((embed_stack,embed_dict_t[graph_list[i]].cpu().detach().numpy()))
     print(f'Perform KMeans clustering on {embed_stack.shape[0]} cells...')
     kmeans = KMeans(n_clusters=k,random_state=0).fit(embed_stack) if minibatch == False else MiniBatchKMeans(n_clusters=k,random_state=0).fit(embed_stack)
     cell_label = kmeans.labels_
@@ -119,8 +119,8 @@ def link_plot(all_cosine_knn_inds_t,coords_q,coords_r,k,figsize_t = [15,20],scal
     for i_t in range(k):
         idx_transfer_r_link = assign_mat[:,i_t]
         coords_transfer_r_link = coords_r[idx_transfer_r_link,:]
-        t1 = np.row_stack((coords_transfer_r_link[:,0],coords_transfer_r_link[:,1]))
-        t2 = np.row_stack((coords_transfer_q[:,0],coords_transfer_q[:,1]))
+        t1 = np.vstack((coords_transfer_r_link[:,0],coords_transfer_r_link[:,1]))
+        t2 = np.vstack((coords_transfer_q[:,0],coords_transfer_q[:,1]))
         plt.plot([t1[0,i],t2[0,j]],[t1[1,i],t2[1,j]],'g',lw = 0.3,rasterized=True)
     plt.scatter(x = coords_transfer_r[:,0],y = coords_transfer_r[:,1],s = 4,c = 'red',rasterized=True)
 

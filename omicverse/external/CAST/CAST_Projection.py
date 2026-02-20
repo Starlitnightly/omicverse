@@ -388,8 +388,8 @@ def link_plot_3d(assign_mat, coords_target, coords_source, k, figsize_t = [15,20
     coordsidx_transfer_source_link = assign_mat[:, 0]
     
     coords_transfer_source_link = coords_source[coordsidx_transfer_source_link,:]
-    t1 = np.row_stack((coords_transfer_source_link[:,0],coords_transfer_source_link[:,1])) # source
-    t2 = np.row_stack((coords_target[:,0],coords_target[:,1])) # target
+    t1 = np.vstack((coords_transfer_source_link[:,0],coords_transfer_source_link[:,1])) # source
+    t2 = np.vstack((coords_target[:,0],coords_target[:,1])) # target
     
     downsample_indices = np.random.choice(range(coords_target.shape[0]), sample_n)
     

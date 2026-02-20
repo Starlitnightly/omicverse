@@ -5,7 +5,7 @@ import requests
 import pandas as pd
 import xml.etree.ElementTree as ET 
 from io import StringIO
-from numpy import in1d
+from numpy import in1d, isin
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from .biomart import Biomart
@@ -147,7 +147,7 @@ def gsea_gmt_parser(gmt, organism='Human', min_size = 3, max_size = 1000, gene_l
     if gene_list is not None:
         subsets = sorted(genesets_filter.keys())
         for subset in subsets:
-            tag_indicator = in1d(gene_list, genesets_filter.get(subset), assume_unique=True)
+            tag_indicator = isin(gene_list, genesets_filter.get(subset), assume_unique=True)
             tag_len = sum(tag_indicator)
             if tag_len <= min_size or tag_len >= max_size:
                 del genesets_filter[subset]

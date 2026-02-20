@@ -74,7 +74,7 @@ def select_groups(adata, groups_order_subset='all', key='groups'):
         if len(groups_ids) == 0:
             # fallback to index retrieval
             groups_ids = np.where(
-                np.in1d(
+                np.isin(
                     np.arange(len(adata.obs[key].cat.categories)).astype(str),
                     np.array(groups_order_subset),
                 )

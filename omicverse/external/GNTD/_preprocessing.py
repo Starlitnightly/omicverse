@@ -177,7 +177,7 @@ def preprocessing(raw_data_path, PPI_data_path, load_labels=False,
     # Construct PPI graph
     gene_names_A = biogrid_PPI['Official Symbol Interactor A'].str.lower().to_numpy().astype('<U16') 
     gene_names_B = biogrid_PPI['Official Symbol Interactor B'].str.lower().to_numpy().astype('<U16')
-    matched_indices = np.where(np.in1d(gene_names_A, gene_names) & np.in1d(gene_names_B, gene_names))[0]
+    matched_indices = np.where(np.isin(gene_names_A, gene_names) & np.isin(gene_names_B, gene_names))[0]
     gene_names_A = gene_names_A[matched_indices]; gene_names_B = gene_names_B[matched_indices]
     gene_names_PPI = np.unique(np.union1d(gene_names_A, gene_names_B))
     row = np.array([np.where(gene_names_PPI == gene_name)[0][0] for gene_name in gene_names_A])

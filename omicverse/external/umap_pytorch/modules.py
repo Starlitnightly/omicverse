@@ -98,7 +98,7 @@ def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None, use_py
             print(f"   🚀 Using PyTorch Geometric KNN (faster)")
 
             # Flatten input for KNN
-            X_flat = X_np.reshape((len(X_np), np.product(np.shape(X_np)[1:])))
+            X_flat = X_np.reshape((len(X_np), np.prod(np.shape(X_np)[1:])))
             X_torch = torch.from_numpy(X_flat).float()
 
             # Determine device
@@ -136,7 +136,7 @@ def get_umap_graph(X, n_neighbors=10, metric="cosine", random_state=None, use_py
 
     # get nearest neighbors
     nnd = NNDescent(
-        X_np.reshape((len(X_np), np.product(np.shape(X_np)[1:]))),
+        X_np.reshape((len(X_np), np.prod(np.shape(X_np)[1:]))),
         n_neighbors=n_neighbors,
         metric=metric,
         n_trees=n_trees,

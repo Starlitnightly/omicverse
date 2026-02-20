@@ -169,7 +169,7 @@ class build_3D():
                 cell0_index = mapping[:,k][1]  # ref
                 cell0_coord = self.loc_list[j][cell0_index,:]
                 cell1_coord = self.loc_list[j+1][cell1_index,:]
-                coord = np.row_stack((cell0_coord,cell1_coord))
+                coord = np.vstack((cell0_coord,cell1_coord))
                 ax.plot(coord[:,0], coord[:,1], [height*j, height*(j+1)], color=line_color,
                         linestyle="dashed", linewidth=line_width, alpha=line_alpha)
 
@@ -383,7 +383,7 @@ class match_3D_multi():
             point0 = np.append(self.dataset_A[self.dataset_A['index']==pair[1]][['x','y']], 0)
             point1 = np.append(self.dataset_B[self.dataset_B['index']==pair[0]][['x','y']], 1)
 
-            coord = np.row_stack((point0, point1))
+            coord = np.vstack((point0, point1))
             color = color if show_error or show_celltype else default_color
             ax.plot(coord[:,0], coord[:,1], coord[:,2], color=color, linestyle="dashed", linewidth=line_width, alpha=line_alpha)
 
@@ -458,7 +458,7 @@ class match_3D_multi_error(match_3D_multi):
                     continue
             point0 = np.append(self.dataset_A[self.dataset_A['index']==pair[1]][['x','y']], 0)
             point1 = np.append(self.dataset_B[self.dataset_B['index']==pair[0]][['x','y']], 1)
-            coord = np.row_stack((point0,point1))
+            coord = np.vstack((point0,point1))
             ax.scatter(point0[0],point0[1],point0[2],color='red',alpha=1,s=0.3)
             ax.scatter(point1[0],point1[1],point1[2],color='red',alpha=1,s=0.3)
             ax.plot(coord[:,0], coord[:,1], coord[:,2], color=self.highlight_color,
@@ -545,7 +545,7 @@ class match_3D_celltype(match_3D_multi):
                 continue
             point0 = np.append(self.dataset_A[self.dataset_A['index']==pair[1]][['x','y']], 0)
             point1 = np.append(self.dataset_B[self.dataset_B['index']==pair[0]][['x','y']], 1)
-            coord = np.row_stack((point0,point1))
+            coord = np.vstack((point0,point1))
             if self.highlight_cell:
                 ax.scatter(point0[0],point0[1],point0[2],color=self.highlight_cell,alpha=1,s=1)
                 ax.scatter(point1[0],point1[1],point1[2],color=self.highlight_cell,alpha=1,s=1)
