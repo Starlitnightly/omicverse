@@ -613,7 +613,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Wedge
-import scanpy as sc
 
 def _make_color_dict(cell_type_columns, colors):
     """统一生成颜色字典"""

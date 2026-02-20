@@ -7,11 +7,8 @@ from typing import TYPE_CHECKING, Literal
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import seaborn as sns
 from anndata import AnnData
-from lamin_utils import logger
-from mudata import MuData
 #import patsy
 #from inmoose import edgepy
 
@@ -23,6 +20,20 @@ if TYPE_CHECKING:
 
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import euclidean_distances
+
+from .._settings import Colors
+
+
+def _log_info(message: str) -> None:
+    print(f"{Colors.BLUE}{message}{Colors.ENDC}")
+
+
+def _log_warning(message: str) -> None:
+    print(f"{Colors.WARNING}{message}{Colors.ENDC}")
+
+
+def _log_error(message: str) -> None:
+    print(f"{Colors.FAIL}{message}{Colors.ENDC}")
 
 
 def _calcFactorTMM(obs, ref, obs_lib_size, ref_lib_size,
@@ -187,7 +198,7 @@ class Milo:
         self,
         input: AnnData,
         feature_key: str | None = "rna",
-    ) -> MuData:
+    ):
         """Prepare a MuData object for subsequent processing.
 
         Args:
@@ -204,12 +215,13 @@ class Milo:
             >>> mdata = milo.load(adata)
 
         """
+        from mudata import MuData
         mdata = MuData({feature_key: input, "milo": AnnData()})
         return mdata
 
     def make_nhoods(
         self,
-        data: AnnData | MuData,
+        data: AnnData,
         neighbors_key: str | None = None,
         feature_key: str | None = "rna",
         prop: float = 0.1,
@@ -257,6 +269,7 @@ class Milo:
             >>> milo.make_nhoods(mdata["rna"])
 
         """
+        from mudata import MuData
         if isinstance(data, MuData):
             adata = data[feature_key]
         if isinstance(data, AnnData):
@@ -269,18 +282,18 @@ class Milo:
             try:
                 use_rep = adata.uns["neighbors"]["params"]["use_rep"]
             except KeyError:
-                logger.warning("Using X_pca as default embedding")
+                _log_warning("Using X_pca as default embedding")
                 use_rep = "X_pca"
             try:
                 knn_graph = adata.obsp["connectivities"].copy()
             except KeyError:
-                logger.error('No "connectivities" slot in adata.obsp -- please run scanpy.pp.neighbors(adata) first')
+                _log_error('No "connectivities" slot in adata.obsp -- please run scanpy.pp.neighbors(adata) first')
                 raise
         else:
             try:
                 use_rep = adata.uns[neighbors_key]["params"]["use_rep"]
             except KeyError:
-                logger.warning("Using X_pca as default embedding")
+                _log_warning("Using X_pca as default embedding")
                 use_rep = "X_pca"
             knn_graph = adata.obsp[neighbors_key + "_connectivities"].copy()
 
@@ -334,7 +347,7 @@ class Milo:
 
     def count_nhoods(
         self,
-        data: AnnData | MuData,
+        data: AnnData,
         sample_col: str,
         feature_key: str | None = "rna",
     ):
@@ -364,6 +377,7 @@ class Milo:
             >>> mdata = milo.count_nhoods(mdata, sample_col="orig.ident")
 
         """
+        from mudata import MuData
         if isinstance(data, MuData):
             adata = data[feature_key]
             is_MuData = True
@@ -374,7 +388,7 @@ class Milo:
             try:
                 nhoods = adata.obsm["nhoods"]
             except KeyError:
-                logger.error('Cannot find "nhoods" slot in adata.obsm -- please run milopy.make_nhoods(adata)')
+                _log_error('Cannot find "nhoods" slot in adata.obsm -- please run milopy.make_nhoods(adata)')
                 raise
         # Make nhood abundance matrix
         sample_dummies = pd.get_dummies(adata.obs[sample_col])
@@ -399,7 +413,7 @@ class Milo:
 
     def da_nhoods(
         self,
-        mdata: MuData,
+        mdata,
         design: str,
         model_contrasts: str | None = None,
         subset_samples: list[str] | None = None,
@@ -443,7 +457,7 @@ class Milo:
         try:
             sample_adata = mdata["milo"]
         except KeyError:
-            logger.error(
+            _log_error(
                 "milo_mdata should be a MuData object with two slots:"
                 " feature_key and 'milo' - please run milopy.count_nhoods() first"
             )
@@ -458,7 +472,7 @@ class Milo:
             sample_obs = adata.obs[covariates + [sample_col]].drop_duplicates()
         except KeyError:
             missing_cov = [x for x in covariates if x not in sample_adata.obs.columns]
-            logger.warning("Covariates {c} are not columns in adata.obs".format(c=" ".join(missing_cov)))
+            _log_warning("Covariates {c} are not columns in adata.obs".format(c=" ".join(missing_cov)))
             raise
         sample_obs = sample_obs[covariates + [sample_col]]
         sample_obs.index = sample_obs[sample_col].astype("str")
@@ -466,7 +480,7 @@ class Milo:
         try:
             assert sample_obs.loc[sample_adata.obs_names].shape[0] == len(sample_adata.obs_names)
         except AssertionError:
-            logger.warning(
+            _log_warning(
                 f"Values in mdata[{feature_key}].obs[{covariates}] cannot be unambiguously assigned to each sample"
                 f" -- each sample value should match a single covariate value"
             )
@@ -478,7 +492,7 @@ class Milo:
             design_df = sample_adata.obs[covariates]
         except KeyError:
             missing_cov = [x for x in covariates if x not in sample_adata.obs.columns]
-            logger.error(
+            _log_error(
                 'Covariates {c} are not columns in adata.uns["sample_adata"].obs'.format(c=" ".join(missing_cov))
             )
             raise
@@ -517,20 +531,20 @@ class Milo:
             )
 
             # Apply TMM normalization (critical for accurate DA testing)
-            logger.info("Calculating TMM normalization factors...")
+            _log_info("Calculating TMM normalization factors...")
             tmm_factors = calcNormFactors(
                 count_mat[keep_nhoods, :][:, keep_smp],
                 method="TMM"
             )
-            logger.info(f"TMM factors: {tmm_factors}")
+            _log_info(f"TMM factors: {tmm_factors}")
 
             # CRITICAL: edgepy may not automatically use norm.factors
             # In edgeR, effective library size = lib_size * norm_factors
             # We need to manually set the effective library sizes
             original_lib_sizes = dge.samples['lib_size'].values
             effective_lib_sizes = original_lib_sizes * tmm_factors
-            logger.info(f"Original lib_sizes: {original_lib_sizes}")
-            logger.info(f"Effective lib_sizes: {effective_lib_sizes}")
+            _log_info(f"Original lib_sizes: {original_lib_sizes}")
+            _log_info(f"Effective lib_sizes: {effective_lib_sizes}")
 
             # Update lib_size to effective library sizes
             dge.samples['lib_size'] = effective_lib_sizes
@@ -551,8 +565,8 @@ class Milo:
                 # Parse contrasts and create contrast vector
                 # Get column names from patsy DesignMatrix
                 contrast_cols = list(model_matrix.design_info.column_names)
-                logger.info(f"Design matrix columns: {contrast_cols}")
-                logger.info(f"Model contrasts: {model_contrasts}")
+                _log_info(f"Design matrix columns: {contrast_cols}")
+                _log_info(f"Model contrasts: {model_contrasts}")
 
                 # Parse the contrast string (e.g., "condition[Salmonella]-condition[Control]")
                 contrast_terms = re.split(r'\s*[+-]\s*', model_contrasts.strip())
@@ -569,7 +583,7 @@ class Milo:
                     if term in contrast_cols:
                         idx = contrast_cols.index(term)
                         contrast_vector[idx] = sign
-                        logger.info(f"  Contrast term '{term}' (index {idx}): {sign:+d}")
+                        _log_info(f"  Contrast term '{term}' (index {idx}): {sign:+d}")
                     else:
                         # Try with T. prefix (patsy treatment coding with intercept)
                         # condition[Treatment] -> condition[T.Treatment]
@@ -580,21 +594,21 @@ class Milo:
                             if term_with_t in contrast_cols:
                                 idx = contrast_cols.index(term_with_t)
                                 contrast_vector[idx] = sign
-                                logger.info(f"  Contrast term '{term_with_t}' (index {idx}): {sign:+d}")
+                                _log_info(f"  Contrast term '{term_with_t}' (index {idx}): {sign:+d}")
                             else:
-                                logger.error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
+                                _log_error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
                                 raise ValueError(f"Invalid contrast term: {term}")
                         else:
-                            logger.error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
+                            _log_error(f"Could not find contrast term '{term}' in columns: {contrast_cols}")
                             raise ValueError(f"Invalid contrast term: {term}")
 
                 # Verify contrast vector
                 if contrast_vector.sum() == 0 and np.abs(contrast_vector).sum() > 0:
-                    logger.info(f"Contrast vector: {contrast_vector}")
-                    logger.info("✓ Contrast sums to 0 (valid difference contrast)")
+                    _log_info(f"Contrast vector: {contrast_vector}")
+                    _log_info("✓ Contrast sums to 0 (valid difference contrast)")
                 else:
-                    logger.warning(f"Contrast vector: {contrast_vector}")
-                    logger.warning("⚠ Contrast does not sum to 0")
+                    _log_warning(f"Contrast vector: {contrast_vector}")
+                    _log_warning("⚠ Contrast does not sum to 0")
 
                 # Reshape to column vector for edgepy
                 contrast_matrix = contrast_vector.reshape(-1, 1)
@@ -632,7 +646,7 @@ class Milo:
         res.index = sample_adata.var_names[keep_nhoods]
 
         # Debug: print column names
-        logger.info(f"edgepy result columns: {list(res.columns)}")
+        _log_info(f"edgepy result columns: {list(res.columns)}")
 
         if any(col in sample_adata.var.columns for col in res.columns):
             sample_adata.var = sample_adata.var.drop(res.columns, axis=1)
@@ -643,7 +657,7 @@ class Milo:
 
     def annotate_nhoods(
         self,
-        mdata: MuData,
+        mdata,
         anno_col: str,
         feature_key: str | None = "rna",
     ):
@@ -675,7 +689,7 @@ class Milo:
         try:
             sample_adata = mdata["milo"]
         except KeyError:
-            logger.error(
+            _log_error(
                 "milo_mdata should be a MuData object with two slots: feature_key and 'milo' - please run milopy.count_nhoods(adata) first"
             )
             raise
@@ -700,7 +714,7 @@ class Milo:
         sample_adata.var["nhood_annotation"] = anno_frac_dataframe.idxmax(1)
         sample_adata.var["nhood_annotation_frac"] = anno_frac_dataframe.max(1)
 
-    def annotate_nhoods_continuous(self, mdata: MuData, anno_col: str, feature_key: str | None = "rna"):
+    def annotate_nhoods_continuous(self, mdata, anno_col: str, feature_key: str | None = "rna"):
         """Assigns a continuous value to neighbourhoods, based on mean cell level covariate stored in adata.obs. This can be useful to correlate DA log-foldChanges with continuous covariates such as pseudotime, gene expression scores etc...
 
         Args:
@@ -740,7 +754,7 @@ class Milo:
 
         mdata["milo"].var[f"nhood_{anno_col}"] = mean_anno_val
 
-    def add_covariate_to_nhoods_var(self, mdata: MuData, new_covariates: list[str], feature_key: str | None = "rna"):
+    def add_covariate_to_nhoods_var(self, mdata, new_covariates: list[str], feature_key: str | None = "rna"):
         """Add covariate from cell-level obs to sample-level obs. These should be covariates for which a single value can be assigned to each sample.
 
         Args:
@@ -764,7 +778,7 @@ class Milo:
         try:
             sample_adata = mdata["milo"]
         except KeyError:
-            logger.error(
+            _log_error(
                 "milo_mdata should be a MuData object with two slots: feature_key and 'milo' - please run milopy.count_nhoods(adata) first"
             )
             raise
@@ -778,20 +792,20 @@ class Milo:
             sample_obs = adata.obs[covariates + [sample_col]].drop_duplicates()
         except KeyError:
             missing_cov = [covar for covar in covariates if covar not in sample_adata.obs.columns]
-            logger.error("Covariates {c} are not columns in adata.obs".format(c=" ".join(missing_cov)))
+            _log_error("Covariates {c} are not columns in adata.obs".format(c=" ".join(missing_cov)))
             raise
         sample_obs = sample_obs[covariates + [sample_col]].astype("str")
         sample_obs.index = sample_obs[sample_col]
         try:
             assert sample_obs.loc[sample_adata.obs_names].shape[0] == len(sample_adata.obs_names)
         except ValueError:
-            logger.error(
+            _log_error(
                 "Covariates cannot be unambiguously assigned to each sample -- each sample value should match a single covariate value"
             )
             raise
         sample_adata.obs = sample_obs.loc[sample_adata.obs_names]
 
-    def build_nhood_graph(self, mdata: MuData, basis: str = "X_umap", feature_key: str | None = "rna"):
+    def build_nhood_graph(self, mdata, basis: str = "X_umap", feature_key: str | None = "rna"):
         """Build graph of neighbourhoods used for visualization of DA results.
 
         Args:
@@ -829,7 +843,7 @@ class Milo:
             "distances_key": "",
         }
 
-    def add_nhood_expression(self, mdata: MuData, layer: str | None = None, feature_key: str | None = "rna") -> None:
+    def add_nhood_expression(self, mdata, layer: str | None = None, feature_key: str | None = "rna") -> None:
         """Calculates the mean expression in neighbourhoods of each feature.
 
         Args:
@@ -854,7 +868,7 @@ class Milo:
         try:
             sample_adata = mdata["milo"]
         except KeyError:
-            logger.error(
+            _log_error(
                 "milo_mdata should be a MuData object with two slots:"
                 " feature_key and 'milo' - please run milopy.count_nhoods(adata) first"
             )
@@ -911,7 +925,7 @@ class Milo:
     #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood_graph(  # pragma: no cover # noqa: D417
         self,
-        mdata: MuData,
+        mdata,
         *,
         alpha: float = 0.1,
         min_logFC: float = 0,
@@ -1004,7 +1018,7 @@ class Milo:
     #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood(  # pragma: no cover # noqa: D417
         self,
-        mdata: MuData,
+        mdata,
         ix: int,
         *,
         feature_key: str | None = "rna",
@@ -1066,7 +1080,7 @@ class Milo:
     #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_da_beeswarm(  # pragma: no cover # noqa: D417
         self,
-        mdata: MuData,
+        mdata,
         *,
         feature_key: str | None = "rna",
         anno_col: str = "nhood_annotation",
@@ -1191,7 +1205,7 @@ class Milo:
     #@_doc_params(common_plot_args=doc_common_plot_args)
     def plot_nhood_counts_by_cond(  # pragma: no cover # noqa: D417
         self,
-        mdata: MuData,
+        mdata,
         test_var: str,
         *,
         subset_nhoods: list[str] = None,

@@ -31,7 +31,7 @@ except ImportError:
         BOLD = '\033[1m'
         UNDERLINE = '\033[4m'
 
-# Type definitions to match scanpy
+
 DensityNorm = Literal["area", "count", "width"]
 
 @register_function(
@@ -91,9 +91,9 @@ def violin(
     **kwds
 ) -> Union[Axes, None]:
     r"""
-    Enhanced violin plot compatible with scanpy's interface.
+    Enhanced violin plot compatible with omicverse's interface.
     
-    This function provides all the functionality of scanpy's violin plot
+    This function provides all the functionality of omicverse's violin plot
     with additional customization options for enhanced visualization,
     implemented using pure matplotlib.
     
@@ -477,7 +477,6 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
         dict: Dictionary containing extracted data
     """
     # Default behavior: use raw if it exists and use_raw is not explicitly False
-    # This matches scanpy's behavior
     if use_raw is None:
         use_raw = hasattr(adata, 'raw') and adata.raw is not None
 

@@ -1,6 +1,5 @@
 import anndata
 import pandas as pd
-import scanpy as sc
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +10,7 @@ from matplotlib.patches import FancyArrowPatch
 
 from ..single import cpdb_exact_target,cpdb_exact_source
 from ._cpdbviz import CellChatViz
+from ._palette import palette_28,palette_56,palette_112
 
 def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
                       celltype_key:str,nodecolor_dict=None,count_min=50,
@@ -59,9 +59,9 @@ def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
         else:
             if len(adata.obs[celltype_key].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_112))
             else:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_28))
 
     G_nodes_dict={}
     links = []
@@ -185,9 +185,9 @@ def cpdb_chord(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
         else:
             if len(adata.obs[celltype_key].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_112))
             else:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_28))
     
     fig=ocd.Chord(matrix, unique_names,radius=radius)
     fig.colormap=[type_color_all[u] for u in unique_names]
@@ -236,9 +236,9 @@ def cpdb_heatmap(adata:anndata.AnnData,interaction_edges:pd.DataFrame,
             type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
         else:
             if len(adata.obs[celltype_key].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_112))
             else:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_28))
 
     from PyComplexHeatmap import DotClustermapPlotter,HeatmapAnnotation,anno_simple,anno_label,AnnotationBase
     
@@ -502,9 +502,9 @@ def cpdb_interacting_heatmap(adata,
         else:
             categories = adata.obs[celltype_key].cat.categories
             if len(categories) > 28:
-                type_color_all = dict(zip(categories, sc.pl.palettes.default_102))
+                type_color_all = dict(zip(categories, palette_112))
             else:
-                type_color_all = dict(zip(categories, sc.pl.palettes.zeileis_28))
+                type_color_all = dict(zip(categories, palette_28))
                 
     # 筛选 source 与 target 细胞，剔除无效的交互记录
     sub_means = cpdb_exact_target(means, target_cells)
@@ -721,9 +721,9 @@ def cpdb_group_heatmap(adata,
             type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,adata.uns['{}_colors'.format(celltype_key)]))
         else:
             if len(adata.obs[celltype_key].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_112))
             else:
-                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+                type_color_all=dict(zip(adata.obs[celltype_key].cat.categories,palette_28))
     
     sub_means=cpdb_exact_target(means,target_cells)
     sub_means=cpdb_exact_source(sub_means,source_cells)
@@ -883,7 +883,7 @@ def cpdb_interacting_network(adata,
         if color_key in adata.uns:
             type_color_all = dict(zip(categories, adata.uns[color_key]))
         else:
-            palette = sc.pl.palettes.default_102 if len(categories) > 28 else sc.pl.palettes.zeileis_28
+            palette = palette_112 if len(categories) > 28 else palette_28
             type_color_all = dict(zip(categories, palette))
 
     # Create a directed graph

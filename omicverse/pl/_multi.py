@@ -7,12 +7,11 @@ import pandas as pd
 from scipy.sparse import issparse
 import matplotlib.pyplot as plt
 import seaborn as sns
-import scanpy as sc
 from anndata import AnnData
 from ._single import embedding
 
 def embedding_multi(
-    data: AnnData,
+    data,
     basis: str,
     color: Optional[Union[str, Sequence[str]]] = None,
     use_raw: Optional[bool] = None,
@@ -77,7 +76,7 @@ def embedding_multi(
 
     if color is None:
         ad = AnnData(obs=obs, obsm=adata.obsm, obsp=adata.obsp)
-        return sc.pl.embedding(ad, basis=basis_mod, **kwargs)
+        return embedding(ad, basis=basis_mod, **kwargs)
 
     # Some `color` has been provided
     if isinstance(color, str):

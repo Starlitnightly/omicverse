@@ -4,6 +4,9 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
+
+from ._palette import palette_112
+
 def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
     r"""
     Generate points for a curved line between two coordinates using Bezier curves.
@@ -79,7 +82,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import random
-import scanpy as sc
 import networkx as nx
 import pandas as pd
 import anndata
@@ -284,7 +286,7 @@ def plot_flowsig_network(flow_network,
                             ['#c2c2c2'  for i in range(len(receptor_li))]+\
                             ['#a51616' for i in range(len(sender_li))]))
     else:
-        sc_color=sc.pl.palettes.default_102
+        sc_color=palette_112
         G_color_dict=dict(zip(gem_li+receptor_li+sender_li,
                 [sc_color[i] for i in range(len(gem_li))]+\
                             ['#c2c2c2'  for i in range(len(receptor_li))]+\

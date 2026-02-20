@@ -1,4 +1,3 @@
-import scanpy as sc
 import numpy as np
 import pandas as pd
 from .._registry import register_function
@@ -132,9 +131,9 @@ def optim_palette(adata,basis,colors,palette=None,**kwargs):
 
     if (adata.uns[f'{colors}_colors'] is None) and (palette is None):
         if len(adata.obs[colors].cat.categories)>28:
-            palette_t=sc.pl.palettes.default_102[:len(list(set(adata.obs[colors].tolist())))]
+            palette_t=palette_112[:len(list(set(adata.obs[colors].tolist())))]
         else:
-            palette_t=sc.pl.palettes.zeileis_28[:len(list(set(adata.obs[colors].tolist())))]
+            palette_t=palette_28[:len(list(set(adata.obs[colors].tolist())))]
         #palette_t=ditto_color[:len(list(set(adata.obs[colors].tolist())))]
     elif palette!= None:
         palette_t=palette[:len(list(set(adata.obs[colors].tolist())))]

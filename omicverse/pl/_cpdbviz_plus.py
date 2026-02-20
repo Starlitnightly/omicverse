@@ -2521,9 +2521,9 @@ class CellChatVizPlus:
         try:
             import marsilea as ma
             import marsilea.plotter as mp
-            import scanpy as sc
+            import anndata as ad
         except ImportError:
-            raise ImportError("marsilea and scanpy packages are required. Please install them: pip install marsilea scanpy")
+            raise ImportError("marsilea and anndata packages are required. Please install them: pip install marsilea anndata")
         
         # Get signaling matrix (cell type x pathway)
         cell_matrix = self.get_signaling_matrix(
@@ -2533,7 +2533,7 @@ class CellChatVizPlus:
         )
         
         # Create AnnData object for filtering
-        ad_signal = sc.AnnData(cell_matrix)
+        ad_signal = ad.AnnData(cell_matrix)
         ad_signal.var['mean'] = ad_signal.X.mean(axis=0)
         ad_signal.var['min'] = ad_signal.X.min(axis=0)
         
