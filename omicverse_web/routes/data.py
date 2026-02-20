@@ -250,9 +250,9 @@ def get_data_info():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/status', methods=['GET'])
-def get_status():
-    """Get current data status."""
+@bp.route('/data_status', methods=['GET'])
+def get_data_status():
+    """Get current data status (basic). Use /api/status for full UI-compatible response."""
     return jsonify({
         'loaded': bp.state.current_adata is not None,
         'filename': bp.state.current_filename,

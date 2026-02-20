@@ -90,20 +90,36 @@
 }
 
 /* Analysis Log Section Styles */
-.analysis-log-section {
+.analysis-log-section,
+.adata-status-section {
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     padding: 20px;
 }
 
-.analysis-log-section h6 {
+.analysis-log-section h6,
+.adata-status-section h6 {
     color: #283c50;
     font-weight: 600;
     margin-bottom: 15px;
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* Key chips inside adata status */
+.adata-key-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    margin: 1px 2px 1px 0;
+    color: #495057;
+    line-height: 1.5;
 }
 
 .analysis-log {
@@ -205,10 +221,17 @@ html.app-skin-dark .status-info,
 html.app-skin-dark .control-panel,
 html.app-skin-dark .visualization-panel,
 html.app-skin-dark .parameter-section,
-html.app-skin-dark .analysis-log-section {
+html.app-skin-dark .analysis-log-section,
+html.app-skin-dark .adata-status-section {
     background: #1f2937 !important;
     border-color: #374151 !important;
     color: #e5e7eb !important;
+}
+
+html.app-skin-dark .adata-key-chip {
+    background: #374151;
+    border-color: #4b5563;
+    color: #d1d5db;
 }
 
 /* File upload area */
@@ -387,7 +410,8 @@ html.app-skin-dark .logo-circle {
     .control-panel,
     .visualization-panel,
     .parameter-section,
-    .analysis-log-section {
+    .analysis-log-section,
+    .adata-status-section {
         padding: 15px;
     }
     

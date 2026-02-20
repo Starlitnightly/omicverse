@@ -50,8 +50,10 @@ class SingleCellAnalysis {
         this.setupSidebarResize(); // JupyterLab-like resizable sidebar
         this.checkStatus();
         this.showParameterPlaceholder();
+        this.updateAdataStatus(null);
         this.applyCodeFontSize();
         this.fetchKernelVars();
+        window.addEventListener('resize', () => this.syncPanelHeight());
     }
 
     setupLanguageToggle() {
@@ -152,6 +154,7 @@ class SingleCellAnalysis {
                 'loading.processing': 'Processing data...',
                 'panel.parameters': 'Parameters',
                 'panel.selectAnalysis': 'Select an analysis type from the left menu',
+                'panel.adataStatus': 'adata Status',
                 'panel.analysisStatus': 'Analysis Status',
                 'panel.waitingUpload': 'Waiting for data upload...',
                 'toolbar.kernel': 'Kernel',
@@ -439,6 +442,7 @@ class SingleCellAnalysis {
                 'loading.processing': '正在处理数据...',
                 'panel.parameters': '参数设置',
                 'panel.selectAnalysis': '点击左侧菜单栏选取功能',
+                'panel.adataStatus': 'adata 状态',
                 'panel.analysisStatus': '分析状态',
                 'panel.waitingUpload': '等待上传数据...',
                 'toolbar.kernel': '内核',
@@ -1510,6 +1514,7 @@ class SingleCellAnalysis {
             } else {
                 this.currentData = data;
                 this.updateUI(data);
+                this.updateAdataStatus(data);
                 this.addToLog(this.t('upload.successDetail') + ': ' + data.n_cells + ' ' + this.t('status.cells') + ', ' + data.n_genes + ' ' + this.t('status.genes'));
                 this.showStatus(this.t('upload.success'), false);
             }
@@ -1523,7 +1528,28 @@ class SingleCellAnalysis {
     }
 
     updateUI(data) {
-        // Hide upload section
+        // ── Reset all controls when switching datasets ───────────────────────
+        const geneInput = document.getElementById('gene-input');
+        if (geneInput) geneInput.value = '';
+
+        const paletteSelect = document.getElementById('palette-select');
+        if (paletteSelect) paletteSelect.value = 'default';
+
+        const catPaletteSelect = document.getElementById('category-palette-select');
+        if (catPaletteSelect) catPaletteSelect.value = 'default';
+
+        // Clear any stale Plotly chart from the previous dataset
+        const plotDiv = document.getElementById('plotly-div');
+        if (plotDiv && typeof Plotly !== 'undefined') Plotly.purge(plotDiv);
+
+        // Reset point-size slider to auto mode
+        const sizeSlider = document.getElementById('point-size-slider');
+        if (sizeSlider) sizeSlider.dataset.auto = 'true';
+
+        // Hide palette visibility rows (will be re-evaluated after plot)
+        this.updatePaletteVisibility('');
+
+        // ── Hide upload section ──────────────────────────────────────────────
         document.getElementById('upload-section').style.display = 'none';
 
         // Show data status
@@ -1536,6 +1562,9 @@ class SingleCellAnalysis {
         // Show controls and visualization
         document.getElementById('viz-controls').style.display = 'block';
         document.getElementById('viz-panel').style.display = 'block';
+
+        // Sync left-panel height to match data-status + viz-panel
+        requestAnimationFrame(() => this.syncPanelHeight());
 
         // Initialise point-size slider to auto default for this dataset
         this.initPointSizeSlider();
@@ -1569,6 +1598,13 @@ class SingleCellAnalysis {
         // Fetch gene list for autocomplete
         if (this.fetchGeneList) {
             this.fetchGeneList();
+        }
+
+        // Reset parameter panel back to tool-list view (clear any open tool form)
+        if (this.currentCategory) {
+            this.selectAnalysisCategory(this.currentCategory, { silent: true });
+        } else {
+            this.showParameterPlaceholder();
         }
 
         // Auto-select first embedding and update plot
@@ -2537,6 +2573,95 @@ class SingleCellAnalysis {
         });
     }
 
+    syncPanelHeight() {
+        const leftMain  = document.getElementById('left-main-panel');
+        const dataStatus = document.getElementById('data-status');
+        const vizPanel  = document.getElementById('viz-panel');
+        if (!leftMain || !vizPanel) return;
+        const dsH = (dataStatus && !dataStatus.classList.contains('d-none'))
+            ? dataStatus.offsetHeight : 0;
+        const vpH = vizPanel.offsetHeight;
+        if (dsH + vpH > 0) {
+            leftMain.style.minHeight = (dsH + vpH) + 'px';
+        }
+    }
+
+    updateAdataStatus(data, diff = null) {
+        const content = document.getElementById('adata-status-content');
+        if (!content) return;
+
+        // No data loaded yet — show placeholder
+        if (!data) {
+            content.innerHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center text-center text-muted h-100" style="min-height:160px">
+                    <i class="fas fa-database fa-2x mb-3 opacity-25"></i>
+                    <p class="small mb-0">${this.currentLang === 'zh'
+                        ? '请在右方上传 h5ad 文件<br>或从代码编辑器加载 adata'
+                        : 'Upload an h5ad file on the right<br>or load adata from the code editor'}</p>
+                </div>`;
+            return;
+        }
+
+        // Small bordered chip for each key name
+        const chip = k => `<span class="adata-key-chip">${k}</span>`;
+
+        const labelStyle = 'font-size:0.72rem;min-width:40px;flex-shrink:0;color:#6c757d;font-weight:500';
+        const row = (label, valueHtml) =>
+            `<div class="d-flex align-items-start gap-2 mb-2">
+                <span style="${labelStyle}">${label}</span>
+                <span style="line-height:1.8">${valueHtml}</span>
+            </div>`;
+
+        // ── Full current structure ───────────────────────────────────────────
+        const cells = (data.n_cells || 0).toLocaleString();
+        const genes = (data.n_genes || 0).toLocaleString();
+        let html = row('shape', `<span class="adata-key-chip" style="font-weight:600">${cells} × ${genes}</span>`);
+
+        const obs = data.obs_columns || [];
+        if (obs.length) html += row('obs', obs.map(chip).join(''));
+
+        const vr = data.var_columns || [];
+        if (vr.length) html += row('var', vr.map(chip).join(''));
+
+        const uns = data.uns_keys || [];
+        if (uns.length) html += row('uns', uns.map(chip).join(''));
+
+        const obsm = (data.embeddings || []).map(e => `X_${e}`);
+        if (obsm.length) html += row('obsm', obsm.map(chip).join(''));
+
+        // ── Last operation diff (reset each time) ───────────────────────────
+        if (diff) {
+            const [cb, gb] = diff.shape_before;
+            const [ca, ga] = diff.shape_after;
+            const slotColor = { obs:'primary', var:'success', uns:'warning',
+                                obsm:'info', obsp:'secondary', layers:'danger' };
+            const changes = diff.changes || {};
+            let diffHtml = '';
+
+            if (cb !== ca || gb !== ga) {
+                diffHtml += `<span class="adata-key-chip text-muted">${cb.toLocaleString()}×${gb.toLocaleString()}</span>`
+                    + `<i class="fas fa-arrow-right mx-1 text-muted" style="font-size:0.55rem;vertical-align:middle"></i>`
+                    + `<span class="adata-key-chip text-success fw-semibold">${ca.toLocaleString()}×${ga.toLocaleString()}</span> `;
+            }
+            for (const [slot, ch] of Object.entries(changes)) {
+                const col = slotColor[slot] || 'secondary';
+                const badge = `<span class="badge rounded-pill text-bg-${col} me-1" style="font-size:0.6rem;vertical-align:middle">${slot}</span>`;
+                if (ch.added)
+                    diffHtml += badge + `<span class="text-success me-1">+</span>`
+                        + ch.added.map(chip).join('') + ' ';
+                if (ch.removed)
+                    diffHtml += badge + `<span class="text-danger me-1">−</span>`
+                        + ch.removed.map(chip).join('') + ' ';
+            }
+            if (!diffHtml) diffHtml = `<span class="text-muted fst-italic" style="font-size:0.72rem">no changes</span>`;
+            diffHtml += `<span class="text-muted ms-1" style="font-size:0.7rem">${diff.duration}s</span>`;
+
+            html += `<hr class="my-2">` + row('diff', diffHtml);
+        }
+
+        content.innerHTML = html;
+    }
+
     showParameterPlaceholder() {
         const parameterContent = document.getElementById('parameter-content');
         if (!parameterContent) return;
@@ -2995,12 +3120,8 @@ class SingleCellAnalysis {
                 this.currentData = data;
                 this.updateUI(data);
                 this.addToLog(this.formatToolMessage(toolName, this.t('tool.completed')));
-
-                // Print captured stdout lines to the analysis log
-                if (data.stdout && data.stdout.trim()) {
-                    this.addToLog(data.stdout, 'stdout');
-                }
-
+                this.updateAdataStatus(data, data.diff || null);
+                requestAnimationFrame(() => this.syncPanelHeight());
                 this.showStatus(this.formatToolMessage(toolName, this.t('tool.completed')), false);
 
                 // Auto-update plot if embedding is available
@@ -3092,21 +3213,24 @@ class SingleCellAnalysis {
 
     checkStatus() {
         fetch('/api/status')
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
-            if (data.loaded) {
-                // If data is already loaded, update UI accordingly
-                this.currentData = {
-                    filename: data.filename,
-                    n_cells: data.cells,
-                    n_genes: data.genes
-                };
-                // Note: This is a simplified status, you might want to fetch full data
+            if (!data.loaded) return;
+            // Guard: ensure the response has the fields updateUI needs
+            if (!Array.isArray(data.embeddings)) {
+                console.warn('checkStatus: /api/status response missing embeddings field', data);
+                return;
             }
+            // Server has adata in memory — restore full UI without re-uploading
+            this.currentData = data;
+            this.updateUI(data);
+            this.updateAdataStatus(data);
+            requestAnimationFrame(() => this.syncPanelHeight());
+            this.addToLog(
+                `${this.t('upload.successDetail')}: ${data.n_cells} ${this.t('status.cells')}, ${data.n_genes} ${this.t('status.genes')}`
+            );
         })
-        .catch(error => {
-            console.log('Status check failed:', error);
-        });
+        .catch(err => { console.warn('checkStatus error:', err); });
     }
 
     showLoading(text = null) {

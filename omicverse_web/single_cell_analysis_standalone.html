@@ -471,17 +471,26 @@
                 <div id="visualization-view" class="content-view">
                 <div class="row">
                     <!-- Parameter Settings Panel (left of UMAP) -->
-                    <div class="col-lg-3">
-                        <!-- Parameter Settings Section -->
-                        <div class="parameter-section" id="parameter-panel">
-                            <h6>
-                                <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
-                            </h6>
-                            <div id="parameter-content"></div>
+                    <div class="col-lg-3 d-flex flex-column">
+                        <!-- left-main-panel: parameter + adata-status, height-synced to right panel -->
+                        <div id="left-main-panel" class="d-flex flex-column">
+                            <!-- Parameter Settings Section -->
+                            <div class="parameter-section" id="parameter-panel" style="flex:0 0 auto">
+                                <h6>
+                                    <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
+                                </h6>
+                                <div id="parameter-content"></div>
+                            </div>
+
+                            <!-- adata Status Card -->
+                            <div class="adata-status-section mt-3" id="adata-status-section" style="flex:1;min-height:0;overflow-y:auto">
+                                <h6><i class="fas fa-database"></i><span data-i18n="panel.adataStatus">adata 状态</span></h6>
+                                <div id="adata-status-content"></div>
+                            </div>
                         </div>
 
                         <!-- Analysis Status Section -->
-                        <div class="analysis-log-section mt-3">
+                        <div class="analysis-log-section mt-3" style="flex:0 0 auto">
                             <h6>
                                 <i class="fas fa-info-circle"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
                             </h6>
