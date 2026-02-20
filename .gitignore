@@ -33,5 +33,6 @@ progress.json
 # Coverage reports
 .coverage
 .coverage.*
+.ruff*
 coverage.json
 htmlcov/

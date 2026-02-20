@@ -368,12 +368,19 @@ class HighPerformanceAnndataAdaptor:
         logger.info("Data adaptor closed")
 
     def _get_random_embedding(self):
-        """Generate or return cached random 2D embedding for fallback visualization."""
+        """Return random 2D embedding, preferring the persisted adata.obsm['X_random']."""
         if 'X_random' in self._embedding_cache:
             return self._embedding_cache['X_random']
-        # Seed based on dataset path for determinism
+        # Use the version stored in adata.obsm if available (persists across tool runs)
+        if hasattr(self, 'adata') and 'X_random' in self.adata.obsm:
+            coords = np.asarray(self.adata.obsm['X_random'], dtype=np.float64)
+            self._embedding_cache['X_random'] = coords
+            return coords
+        # Fallback: generate deterministic random coords and store in obsm
         seed = abs(hash(self.data_path)) % (2**32 - 1)
         rng = np.random.RandomState(seed)
         coords = rng.rand(self.n_obs, 2)
+        if hasattr(self, 'adata'):
+            self.adata.obsm['X_random'] = coords.astype(np.float32)
         self._embedding_cache['X_random'] = coords
         return coords

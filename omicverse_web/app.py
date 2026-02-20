@@ -82,6 +82,10 @@ def sync_adaptor_with_adata():
         state.current_adaptor.n_obs = state.current_adata.n_obs
         state.current_adaptor.n_vars = state.current_adata.n_vars
         state.current_adaptor._build_indexes()
+        # Clear embedding cache so adaptor re-reads from adata.obsm
+        # (important after cell-count changes where X_random is auto-subset)
+        if hasattr(state.current_adaptor, '_embedding_cache'):
+            state.current_adaptor._embedding_cache.clear()
     except Exception:
         pass
 

@@ -42,6 +42,16 @@ def upload_file():
         bp.state.current_adata = bp.state.current_adaptor.adata
         bp.state.current_filename = filename
 
+        # Always store a deterministic random 2D embedding in obsm so it:
+        #  - persists across tool runs (obsm is auto-subset on cell filtering)
+        #  - survives page refresh (exposed via /api/status embeddings list)
+        #  - is always available as a fallback before PCA/UMAP are computed
+        if 'X_random' not in bp.state.current_adata.obsm:
+            seed = abs(hash(filepath)) % (2**32 - 1)
+            rng = np.random.RandomState(seed)
+            bp.state.current_adata.obsm['X_random'] = rng.rand(
+                bp.state.current_adata.n_obs, 2).astype(np.float32)
+
         try:
             bp.state.kernel_executor.sync_adata(bp.state.current_adata)
         except Exception:
@@ -53,12 +63,13 @@ def upload_file():
         chunk_info = bp.state.current_adaptor.get_chunk_info()
 
         # Build response compatible with legacy UI expectations
+        embeddings = [k.replace('X_', '') for k in bp.state.current_adata.obsm.keys()]
         response_data = {
             'filename': filename,
             # Legacy/UI fields used by single-cell.js
-            'n_cells': summary.get('n_obs', bp.state.current_adaptor.n_obs),
-            'n_genes': summary.get('n_vars', bp.state.current_adaptor.n_vars),
-            'embeddings': summary.get('embeddings', []),
+            'n_cells': bp.state.current_adata.n_obs,
+            'n_genes': bp.state.current_adata.n_vars,
+            'embeddings': embeddings,
             'obs_columns': list(bp.state.current_adaptor.adata.obs.columns),
             'var_columns': list(bp.state.current_adaptor.adata.var.columns),
             # New high-performance metadata
@@ -67,10 +78,6 @@ def upload_file():
             'summary': summary,
             'success': True
         }
-
-        # If no embeddings available, provide a synthetic 'random' embedding to avoid empty canvas
-        if not response_data['embeddings']:
-            response_data['embeddings'] = ['random']
 
         return jsonify(response_data)
 
