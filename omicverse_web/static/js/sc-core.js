@@ -11,6 +11,7 @@ class SingleCellAnalysis {
         this.currentLang = 'en';
         this.isPreviewMode = false;  // true when file is opened in backed='r' mode
         this.paramCache = {};  // persists tool parameter values across re-renders
+        this.degAllResults = [];  // stores all DEG results for client-side filtering
         this.codeCells = [];
         this.cellCounter = 0;
         this.pendingPlotRefresh = false;

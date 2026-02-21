@@ -30,6 +30,7 @@ from utils.notebook_helpers import ensure_default_notebook
 
 # Import blueprints
 from routes import kernel, files, data, notebooks
+from routes.terminal import terminal_bp
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -58,6 +59,20 @@ class AppState:
     def __init__(self):
         self.current_adaptor = None
         self.current_adata = None
+        self.deg_results   = None     # DataFrame from last DEG analysis
+        self.deg_method    = None     # method used for last DEG analysis
+        self.deg_condition = None     # condition column used for last DEG analysis
+        # DCT analysis state
+        self.dct_results        = None   # DataFrame from last DCT analysis
+        self.dct_method         = None   # 'sccoda' or 'milopy'
+        self.dct_model          = None   # model object (Sccoda or Milo)
+        self.dct_data           = None   # sccoda_data (MuData) or mdata (MuData)
+        self.dct_adata          = None   # filtered adata used for plotting
+        self.dct_condition      = None   # condition column
+        self.dct_ctrl_group     = None
+        self.dct_test_group     = None
+        self.dct_cell_type_key  = None
+        self.dct_sample_key     = None
         self.current_filename = None
         self.is_preview_mode = False   # True when opened with backed='r'
         self.thread_pool = ThreadPoolExecutor(max_workers=4)
@@ -248,6 +263,9 @@ data.bp.upload_folder = app.config['UPLOAD_FOLDER']
 # Notebooks blueprint
 app.register_blueprint(notebooks.bp, url_prefix='/api/notebooks')
 notebooks.bp.notebook_root = state.notebook_root
+
+# Terminal blueprint (PTY-based interactive shell)
+app.register_blueprint(terminal_bp)
 
 
 # ============================================================================
@@ -1082,6 +1100,596 @@ def trajectory_plot_heatmap():
 
     except Exception as e:
         logging.error(f"trajectory_plot_heatmap failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# Differential Expression (DEG) Endpoints
+# ============================================================================
+
+@app.route('/api/deg/get_groups', methods=['GET'])
+def deg_get_groups():
+    """Return unique values for a given obs column (for group selectors)."""
+    if state.current_adata is None:
+        return jsonify({'groups': []})
+    col = request.args.get('col', '').strip()
+    if not col or col not in state.current_adata.obs.columns:
+        return jsonify({'groups': []})
+    try:
+        groups = state.current_adata.obs[col].dropna().astype(str).unique().tolist()
+        return jsonify({'groups': sorted(groups)})
+    except Exception as e:
+        return jsonify({'groups': [], 'error': str(e)})
+
+
+@app.route('/api/deg/analyze', methods=['POST'])
+def deg_analyze():
+    """Run DEG analysis and store results; return summary statistics."""
+    if state.current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import omicverse as ov
+        import numpy as _np
+
+        params = request.json or {}
+        condition     = params.get('condition', '').strip()
+        ctrl_group    = params.get('ctrl_group', '').strip()
+        test_group    = params.get('test_group', '').strip()
+        celltype_key  = params.get('celltype_key', '').strip()
+        celltype_group = params.get('celltype_group', [])   # list of strings
+        method        = params.get('method', 'wilcoxon').strip()
+        max_cells     = int(params.get('max_cells', 100000))
+
+        # Validate required fields
+        if not condition or condition not in state.current_adata.obs.columns:
+            return jsonify({'error': f'条件列 "{condition}" 不存在，请检查 obs 列名'}), 400
+        if not ctrl_group:
+            return jsonify({'error': '请选择对照组（ctrl_group）'}), 400
+        if not test_group:
+            return jsonify({'error': '请选择实验组（test_group）'}), 400
+        if ctrl_group == test_group:
+            return jsonify({'error': '对照组与实验组不能相同'}), 400
+        if not celltype_key or celltype_key not in state.current_adata.obs.columns:
+            return jsonify({'error': f'细胞类型列 "{celltype_key}" 不存在，请检查 obs 列名'}), 400
+
+        # Build DEG object
+        deg_obj = ov.single.DEG(
+            state.current_adata,
+            condition=condition,
+            ctrl_group=ctrl_group,
+            test_group=test_group,
+            method=method,
+        )
+
+        # Determine cell type groups
+        if not celltype_group:
+            ct_groups = None  # use all cell types
+        else:
+            ct_groups = celltype_group
+
+        deg_obj.run(
+            celltype_key=celltype_key,
+            celltype_group=ct_groups,
+            max_cells=max_cells,
+        )
+
+        results = deg_obj.get_results()
+
+        # Store results for subsequent volcano/violin requests
+        state.deg_results  = results
+        state.deg_method   = method
+        state.deg_condition = condition  # keep for violin groupby default
+
+        # Build summary stats
+        if method in ('wilcoxon', 't-test'):
+            if 'log2FC' in results.columns and 'sig' in results.columns:
+                n_sig_up   = int(((results['sig'] == 'sig') & (results['log2FC'] > 0)).sum())
+                n_sig_down = int(((results['sig'] == 'sig') & (results['log2FC'] < 0)).sum())
+            else:
+                n_sig_up, n_sig_down = 0, 0
+        else:
+            n_sig_up, n_sig_down = 0, 0
+        n_total = len(results)
+
+        # Serialize ALL results for client-side filtering
+        keep_cols = ['log2FC', 'pvalue', 'padj', 'sig']
+        for col in ('pct_ctrl', 'pct_test'):
+            if col in results.columns:
+                keep_cols.append(col)
+        res_js = results[keep_cols].copy()
+        if 'pct_ctrl' not in res_js.columns:
+            res_js['pct_ctrl'] = 0.0
+        if 'pct_test' not in res_js.columns:
+            res_js['pct_test'] = 0.0
+        # Round floats and sanitize NaN/Inf for JSON
+        res_js['log2FC']   = res_js['log2FC'].round(4)
+        res_js['pct_ctrl'] = res_js['pct_ctrl'].round(2)
+        res_js['pct_test'] = res_js['pct_test'].round(2)
+        res_js = res_js.replace([float('inf'), float('-inf')], [999.0, -999.0])
+        res_js = res_js.fillna(0.0)
+        res_js = res_js.reset_index().rename(columns={'index': 'gene'})
+        all_results = res_js.to_dict(orient='records')
+
+        return jsonify({
+            'n_total':     n_total,
+            'n_sig_up':    n_sig_up,
+            'n_sig_down':  n_sig_down,
+            'method':      method,
+            'condition':   condition,
+            'all_results': all_results,
+        })
+
+    except Exception as e:
+        logging.error(f"deg_analyze failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/deg/plot_volcano', methods=['POST'])
+def deg_plot_volcano():
+    """Generate a volcano plot from the stored DEG results using ov.pl.volcano."""
+    if state.deg_results is None:
+        return jsonify({'error': '请先运行 DEG 分析'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import numpy as _np
+        import base64
+        import omicverse as ov
+
+        params = request.json or {}
+        fc_thresh   = float(params.get('fc_thresh', 1.0))
+        padj_thresh = float(params.get('padj_thresh', 0.05))
+        label_top   = int(params.get('label_top', 10))
+
+        res = state.deg_results
+        method = state.deg_method or 'wilcoxon'
+        condition_label = getattr(state, 'deg_condition', '') or 'Volcano Plot'
+
+        if method in ('wilcoxon', 't-test'):
+            if 'log2FC' not in res.columns or 'padj' not in res.columns:
+                return jsonify({'error': '结果缺少 log2FC 或 padj 列'}), 400
+
+            # ov.pl.volcano expects sig column with 'up'/'down'/'normal'
+            res_v = res.copy()
+            res_v['sig'] = 'normal'
+            res_v.loc[(res_v['log2FC'] >  fc_thresh) & (res_v['padj'] < padj_thresh), 'sig'] = 'up'
+            res_v.loc[(res_v['log2FC'] < -fc_thresh) & (res_v['padj'] < padj_thresh), 'sig'] = 'down'
+
+            ax = ov.pl.volcano(res_v, pval_name='padj', fc_name='log2FC',
+                               pval_threshold=padj_thresh,
+                               fc_max=fc_thresh, fc_min=-fc_thresh,
+                               plot_genes_num=label_top,
+                               figsize=(6, 5), title=condition_label)
+            fig = ax.get_figure()
+
+        else:
+            # memento-de: use de_coef vs -log10(de_pval) — plain scatter fallback
+            if 'de_coef' not in res.columns or 'de_pval' not in res.columns:
+                return jsonify({'error': '结果缺少 de_coef 或 de_pval 列'}), 400
+            coef = _np.array(res['de_coef'].values, dtype=float)
+            neg_logp = -_np.log10(_np.where(res['de_pval'] > 0, res['de_pval'], 1e-300))
+
+            fig, ax = plt.subplots(figsize=(7, 5))
+            ax.scatter(coef, neg_logp, s=15, c='#7aa2f7', alpha=0.7, linewidths=0, rasterized=True)
+            ax.set_xlabel('DE coefficient', fontsize=10)
+            ax.set_ylabel('-log₁₀(p-value)', fontsize=10)
+            ax.set_title('Volcano Plot (memento-de)', fontsize=11)
+            for spine in ('top', 'right'):
+                ax.spines[spine].set_visible(False)
+            plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=130)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"deg_plot_volcano failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/deg/plot_violin', methods=['POST'])
+def deg_plot_violin():
+    """Generate violin plots for specified genes using ov.pl.violin."""
+    if state.current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import omicverse as ov
+        import base64
+
+        params    = request.json or {}
+        genes_raw = params.get('genes', '')
+        groupby   = params.get('groupby', '').strip()
+        layer     = params.get('layer', '').strip() or None
+
+        genes = [g.strip() for g in genes_raw.replace('\n', ',').split(',') if g.strip()]
+        if not genes:
+            return jsonify({'error': '请输入至少一个基因名称'}), 400
+
+        adata = state.current_adata
+        genes = [g for g in genes if g in adata.var_names]
+        if not genes:
+            return jsonify({'error': '所有输入基因均不在数据集中，请检查基因名称'}), 400
+
+        if not groupby or groupby not in adata.obs.columns:
+            groupby = getattr(state, 'deg_condition', None) or ''
+        if not groupby or groupby not in adata.obs.columns:
+            return jsonify({'error': '分组列不存在，请选择有效的 obs 列'}), 400
+
+        n = len(genes)
+        ncols = min(3, n)
+        nrows = (n + ncols - 1) // ncols
+        fig_w = max(5, ncols * 3.5)
+        fig_h = max(4, nrows * 3.2)
+
+        # Use a single gene string when n==1 (ov.pl.violin prefers that)
+        keys = genes[0] if n == 1 else genes
+
+        ov.pl.violin(adata, keys=keys, groupby=groupby,
+                     layer=layer, stripplot=True, jitter=True,
+                     show=False, show_boxplot=False, show_means=True,
+                     rotation=30, figsize=(fig_w, fig_h))
+        fig = plt.gcf()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=130)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"deg_plot_violin failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# DCT (Differential Cell Type) Analysis Endpoints
+# ============================================================================
+
+@app.route('/api/dct/analyze', methods=['POST'])
+def dct_analyze():
+    """Run DCT analysis (scCODA or milopy) and store results."""
+    if state.current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import scanpy as sc
+        import numpy as _np
+        import pandas as pd
+
+        params         = request.json or {}
+        condition      = params.get('condition', '').strip()
+        ctrl_group     = params.get('ctrl_group', '').strip()
+        test_group     = params.get('test_group', '').strip()
+        cell_type_key  = params.get('cell_type_key', '').strip()
+        sample_key     = params.get('sample_key', '').strip() or None
+        method         = params.get('method', 'sccoda').strip()
+        use_rep        = params.get('use_rep', 'X_pca').strip()
+        est_fdr        = float(params.get('est_fdr', 0.2))
+        n_neighbors    = int(params.get('n_neighbors', 150))
+        prop           = float(params.get('prop', 0.1))
+
+        adata = state.current_adata
+
+        # Validate common parameters
+        for col, label in [(condition, '条件列'), (cell_type_key, '细胞类型列')]:
+            if not col or col not in adata.obs.columns:
+                return jsonify({'error': f'{label} "{col}" 不存在，请检查 obs 列名'}), 400
+        if not ctrl_group or not test_group:
+            return jsonify({'error': '请选择对照组和实验组'}), 400
+        if ctrl_group == test_group:
+            return jsonify({'error': '对照组与实验组不能相同'}), 400
+
+        # Filter to relevant conditions
+        adata_sub = adata[adata.obs[condition].astype(str).isin([ctrl_group, test_group])].copy()
+        if len(adata_sub) == 0:
+            return jsonify({'error': f'在条件列 "{condition}" 中未找到指定分组的细胞'}), 400
+
+        # Store context for plotting
+        state.dct_condition     = condition
+        state.dct_ctrl_group    = ctrl_group
+        state.dct_test_group    = test_group
+        state.dct_cell_type_key = cell_type_key
+        state.dct_sample_key    = sample_key
+        state.dct_method        = method
+        state.dct_adata         = adata_sub
+
+        if method == 'sccoda':
+            import pertpy as pt
+            if sample_key and sample_key not in adata_sub.obs.columns:
+                return jsonify({'error': f'样本列 "{sample_key}" 不存在于 obs，请检查列名是否正确'}), 400
+
+            model = pt.tl.Sccoda()
+            sccoda_data = model.load(
+                adata_sub,
+                type='cell_level',
+                cell_type_identifier=cell_type_key,
+                sample_identifier=sample_key,
+                covariate_obs=[condition],
+            )
+            sccoda_data = model.prepare(
+                sccoda_data,
+                modality_key='coda',
+                formula=condition,          # use actual column name
+            )
+            model.run_nuts(sccoda_data, modality_key='coda',
+                           num_samples=5000, num_warmup=500)
+            model.credible_effects(sccoda_data, modality_key='coda')
+            model.set_fdr(sccoda_data, modality_key='coda', est_fdr=est_fdr)
+
+            results = model.get_effect_df(sccoda_data, modality_key='coda')
+
+            state.dct_model   = model
+            state.dct_data    = sccoda_data
+            state.dct_results = results
+
+            # Build results for client
+            results_reset = results.reset_index()
+            # Rename columns for display
+            col_map = {
+                'Cell Type':        'cell_type',
+                'Effect':           'effect',
+                'Final Parameter':  'final_parameter',
+                'Inclusion probability': 'inclusion_prob',
+                'Is credible':      'is_credible',
+                'Expected sample':  'expected_sample',
+                'log2-fold change': 'log2fc',
+            }
+            results_reset = results_reset.rename(columns={k: v for k, v in col_map.items() if k in results_reset.columns})
+            # Sanitize for JSON
+            results_reset = results_reset.replace([float('inf'), float('-inf')], [999.0, -999.0])
+            results_reset = results_reset.fillna(0)
+            # Round numerics
+            for c in results_reset.select_dtypes(include=_np.number).columns:
+                results_reset[c] = results_reset[c].round(4)
+
+            n_credible = int(results.get('Is credible', pd.Series(dtype=bool)).astype(bool).sum()) if 'Is credible' in results.columns else 0
+
+            return jsonify({
+                'method':     method,
+                'n_total':    len(results),
+                'n_credible': n_credible,
+                'all_results': results_reset.to_dict(orient='records'),
+            })
+
+        elif method == 'milopy':
+            # Validate milopy-specific params
+            if not sample_key:
+                return jsonify({'error': 'milopy 方法需要提供样本列 (sample_key)，请在参数面板中选择一个 obs 列'}), 400
+            if sample_key not in adata_sub.obs.columns:
+                return jsonify({'error': f'样本列 "{sample_key}" 不存在于 obs，请检查列名是否正确'}), 400
+            if not use_rep or use_rep not in adata_sub.obsm:
+                # fallback
+                if 'X_pca' in adata_sub.obsm:
+                    use_rep = 'X_pca'
+                else:
+                    return jsonify({'error': f'嵌入空间 "{use_rep}" 不存在于 obsm，请先运行 PCA'}), 400
+
+            from omicverse.single._milo_dev import Milo
+            milo = Milo()
+            mdata = milo.load(adata_sub)
+            sc.pp.neighbors(mdata['rna'], use_rep=use_rep, n_neighbors=n_neighbors)
+            milo.make_nhoods(mdata['rna'], prop=prop)
+            mdata = milo.count_nhoods(mdata, sample_col=sample_key)
+            milo.da_nhoods(
+                mdata,
+                design=f'~{condition}',
+                model_contrasts=f'{condition}[{test_group}]-{condition}[{ctrl_group}]',
+                solver='edger',
+            )
+            # Build nhood graph (for visualization) - use use_rep as basis
+            milo.build_nhood_graph(mdata, basis=use_rep)
+            milo.annotate_nhoods(mdata, anno_col=cell_type_key)
+
+            state.dct_model   = milo
+            state.dct_data    = mdata
+            state.dct_results = mdata['milo'].var.copy()
+
+            results = mdata['milo'].var.copy()
+
+            # Annotate with mix_threshold
+            results['nhood_annotation'] = results['nhood_annotation'].astype(str)
+            results.loc[results['nhood_annotation_frac'] < 0.6, 'nhood_annotation'] = 'Mixed'
+
+            # Build results for client
+            keep = ['nhood_annotation', 'nhood_annotation_frac', 'logFC', 'PValue', 'SpatialFDR', 'Nhood_size']
+            keep = [c for c in keep if c in results.columns]
+            res_sub = results[keep].copy()
+            res_sub = res_sub.replace([float('inf'), float('-inf')], [999.0, -999.0]).fillna(0)
+            for c in res_sub.select_dtypes(include=_np.number).columns:
+                res_sub[c] = res_sub[c].round(4)
+            res_sub = res_sub.reset_index().rename(columns={'index': 'nhood_id'})
+
+            # Aggregate by cell type
+            sig_mask = results['SpatialFDR'] < 0.1 if 'SpatialFDR' in results.columns else pd.Series(False, index=results.index)
+            n_sig = int(sig_mask.sum())
+            n_up  = int((sig_mask & (results.get('logFC', pd.Series(0, index=results.index)) > 0)).sum())
+            n_down= int((sig_mask & (results.get('logFC', pd.Series(0, index=results.index)) < 0)).sum())
+
+            return jsonify({
+                'method':      method,
+                'n_total':     len(results),
+                'n_sig':       n_sig,
+                'n_sig_up':    n_up,
+                'n_sig_down':  n_down,
+                'all_results': res_sub.to_dict(orient='records'),
+            })
+        else:
+            return jsonify({'error': f'不支持的方法: {method}'}), 400
+
+    except Exception as e:
+        logging.error(f"dct_analyze failed: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dct/plot_composition', methods=['POST'])
+def dct_plot_composition():
+    """Generate a stacked bar chart of cell type proportions per sample/condition."""
+    if state.dct_adata is None:
+        return jsonify({'error': '请先运行 DCT 分析'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import numpy as _np
+        import base64
+
+        adata      = state.dct_adata
+        condition  = state.dct_condition
+        ct_key     = state.dct_cell_type_key
+        sample_key = state.dct_sample_key
+        method     = state.dct_method
+
+        import pandas as pd
+
+        # Compute proportions per sample (or per condition if no sample_key)
+        group_by = sample_key if sample_key and sample_key in adata.obs.columns else condition
+
+        ct_counts = pd.crosstab(adata.obs[group_by], adata.obs[ct_key])
+        ct_prop   = ct_counts.div(ct_counts.sum(axis=1), axis=0)
+
+        # Order by condition label
+        if sample_key and sample_key in adata.obs.columns and condition in adata.obs.columns:
+            sample_cond = adata.obs[[sample_key, condition]].drop_duplicates().set_index(sample_key)
+            ct_prop['__cond'] = [sample_cond.loc[s, condition] if s in sample_cond.index else '' for s in ct_prop.index]
+            ct_prop = ct_prop.sort_values('__cond').drop(columns='__cond')
+
+        n_ct = ct_prop.shape[1]
+        colors = plt.cm.tab20(_np.linspace(0, 1, n_ct)) if n_ct <= 20 else plt.cm.hsv(_np.linspace(0, 1, n_ct))
+
+        fig, ax = plt.subplots(figsize=(max(6, len(ct_prop) * 0.7), 4.5))
+        bottom = _np.zeros(len(ct_prop))
+        for i, ct in enumerate(ct_prop.columns):
+            vals = ct_prop[ct].values
+            ax.bar(range(len(ct_prop)), vals, bottom=bottom,
+                   label=ct, color=colors[i], width=0.8, linewidth=0)
+            bottom += vals
+
+        ax.set_xticks(range(len(ct_prop)))
+        ax.set_xticklabels(ct_prop.index, rotation=45, ha='right', fontsize=8)
+        ax.set_ylabel('Proportion', fontsize=10)
+        ax.set_title(f'Cell Type Composition by {group_by}', fontsize=11)
+        ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left', fontsize=7,
+                  framealpha=0.5, ncol=max(1, n_ct // 20))
+        ax.set_ylim(0, 1)
+        for spine in ('top', 'right'):
+            ax.spines[spine].set_visible(False)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=130)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"dct_plot_composition failed: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dct/plot_effects', methods=['POST'])
+def dct_plot_effects():
+    """Generate effects / beeswarm plot for DCT results."""
+    if state.dct_results is None:
+        return jsonify({'error': '请先运行 DCT 分析'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import numpy as _np
+        import base64
+
+        method = state.dct_method
+
+        if method == 'sccoda':
+            results = state.dct_results
+            if results is None or len(results) == 0:
+                return jsonify({'error': 'scCODA 分析结果为空'}), 400
+
+            # Bar plot of effect sizes (log2-fold change or Final Parameter)
+            fc_col = 'log2-fold change' if 'log2-fold change' in results.columns else \
+                     'Final Parameter' if 'Final Parameter' in results.columns else None
+            if fc_col is None:
+                return jsonify({'error': '结果中无法找到效应量列'}), 400
+
+            credible_col = 'Is credible' if 'Is credible' in results.columns else None
+            results = results.copy().dropna(subset=[fc_col])
+            results = results.sort_values(fc_col)
+
+            is_credible = results[credible_col].astype(bool) if credible_col else \
+                          _np.zeros(len(results), dtype=bool)
+
+            colors = ['#e06c75' if c and v > 0 else '#5ba4cf' if c and v < 0 else '#aaaaaa'
+                      for c, v in zip(is_credible, results[fc_col])]
+
+            fig, ax = plt.subplots(figsize=(6, max(3, len(results) * 0.35 + 1)))
+            y_pos = range(len(results))
+            # Get cell type names
+            ct_names = results.index.tolist() if results.index.name == 'Cell Type' else \
+                       results['Cell Type'].tolist() if 'Cell Type' in results.columns else \
+                       results.index.tolist()
+
+            ax.barh(y_pos, results[fc_col].values, color=colors, height=0.6, linewidth=0)
+            ax.axvline(0, color='#555', lw=1, ls='--')
+            ax.set_yticks(list(y_pos))
+            ax.set_yticklabels(ct_names, fontsize=9)
+            ax.set_xlabel('log₂-fold change' if fc_col == 'log2-fold change' else 'Effect', fontsize=10)
+            ax.set_title('scCODA Effects (credible cell types highlighted)', fontsize=10)
+            for spine in ('top', 'right'):
+                ax.spines[spine].set_visible(False)
+            plt.tight_layout()
+
+        elif method == 'milopy':
+            mdata  = state.dct_data
+            milo   = state.dct_model
+            ct_key = state.dct_cell_type_key
+
+            # Use built-in beeswarm plot
+            try:
+                fig = milo.plot_da_beeswarm(mdata, return_fig=True)
+                if fig is None:
+                    raise RuntimeError('plot_da_beeswarm returned None')
+            except Exception:
+                # Fallback: manual beeswarm from stored results
+                results = state.dct_results
+                if 'nhood_annotation' not in results.columns or 'logFC' not in results.columns:
+                    return jsonify({'error': '结果缺少必要的列，请检查分析是否成功'}), 400
+
+                import seaborn as sns
+                fig, ax = plt.subplots(figsize=(6, max(3.5, len(results['nhood_annotation'].unique()) * 0.4 + 1)))
+                results_plot = results.copy()
+                results_plot['nhood_annotation'] = results_plot['nhood_annotation'].astype(str)
+                alpha_col = 'SpatialFDR' if 'SpatialFDR' in results_plot.columns else None
+                results_plot['_sig'] = (results_plot[alpha_col] < 0.1) if alpha_col else False
+
+                sorted_annos = (results_plot[['nhood_annotation', 'logFC']]
+                                .groupby('nhood_annotation').median()
+                                .sort_values('logFC', ascending=True).index.tolist())
+
+                sns.violinplot(data=results_plot, y='nhood_annotation', x='logFC',
+                               order=sorted_annos, inner=None, orient='h',
+                               linewidth=0, scale='width', ax=ax)
+                sns.stripplot(data=results_plot, y='nhood_annotation', x='logFC',
+                              order=sorted_annos, size=2,
+                              hue='_sig', palette=['grey', 'black'],
+                              orient='h', alpha=0.5, ax=ax)
+                ax.axvline(0, color='black', ls='--', lw=1)
+                ax.set_xlabel('log Fold Change', fontsize=10)
+                ax.set_title('Milopy DA Beeswarm', fontsize=11)
+                for spine in ('top', 'right'):
+                    ax.spines[spine].set_visible(False)
+                plt.tight_layout()
+        else:
+            return jsonify({'error': f'不支持的方法: {method}'}), 400
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=130)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"dct_plot_effects failed: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

@@ -307,9 +307,16 @@ Object.assign(SingleCellAnalysis.prototype, {
             }
         }
         
-        // Update Plotly theme and status bar theme
+        // Update Plotly theme, status bar theme, and terminal theme
         this.updatePlotlyTheme();
         this.updateStatusBarTheme();
+        if (this._termMgr) this._termMgr.updateTheme();
+        // Update CodeMirror theme for .py editor
+        if (this._cmEditor) {
+            const dark = document.documentElement.classList.contains('app-skin-dark') ||
+                         document.body.classList.contains('app-skin-dark');
+            this._cmEditor.setOption('theme', dark ? 'dracula' : 'default');
+        }
     },
 
     updateUI(data) {
@@ -670,117 +677,99 @@ Object.assign(SingleCellAnalysis.prototype, {
     switchView(view) {
         this.currentView = view;
 
-        const vizView = document.getElementById('visualization-view');
-        const codeView = document.getElementById('code-editor-view');
-        const agentView = document.getElementById('agent-view');
-        const vizBtn = document.getElementById('view-viz-btn');
-        const codeBtn = document.getElementById('view-code-btn');
-        const agentBtn = document.getElementById('view-agent-btn');
-        const vizToolbar = document.getElementById('viz-toolbar');
+        const vizView      = document.getElementById('visualization-view');
+        const codeView     = document.getElementById('code-editor-view');
+        const agentView    = document.getElementById('agent-view');
+        const termView     = document.getElementById('terminal-view');
+        const vizBtn       = document.getElementById('view-viz-btn');
+        const codeBtn      = document.getElementById('view-code-btn');
+        const agentBtn     = document.getElementById('view-agent-btn');
+        const termBtn      = document.getElementById('view-terminal-btn');
+        const vizToolbar   = document.getElementById('viz-toolbar');
         const codeToolbarRow = document.getElementById('code-editor-toolbar-row');
-        const pageTitle = document.getElementById('page-title');
+        const pageTitle    = document.getElementById('page-title');
         const breadcrumbTitle = document.getElementById('breadcrumb-title');
-        const analysisNav = document.getElementById('analysis-nav');
+        const analysisNav  = document.getElementById('analysis-nav');
         const agentConfigNav = document.getElementById('agent-config-nav');
-        const fileManager = document.getElementById('file-manager');
+        const fileManager  = document.getElementById('file-manager');
+        const termNavPanel = document.getElementById('term-nav-panel');
+        const navbarContent = document.querySelector('.navbar-content');
+
+        // ── helper: reset all tab buttons to outline ──────────────────────
+        const _deactivateAll = () => {
+            [vizBtn, codeBtn, agentBtn, termBtn].forEach(b => {
+                if (!b) return;
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline-primary');
+            });
+        };
+
+        // Hide all views first
+        [vizView, codeView, agentView, termView].forEach(v => { if (v) v.style.display = 'none'; });
+        _deactivateAll();
+        if (vizToolbar)    vizToolbar.style.display    = 'none';
+        if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+        if (analysisNav)   analysisNav.style.display   = 'none';
+        if (agentConfigNav) agentConfigNav.style.display = 'none';
+        if (fileManager)   fileManager.style.display   = 'none';
+        // Hide terminal nav panel and restore navbar-content for non-terminal views
+        if (termNavPanel)  termNavPanel.style.display  = 'none';
+        if (navbarContent) navbarContent.style.display = '';
 
         if (view === 'visualization') {
-            vizView.style.display = 'block';
-            codeView.style.display = 'none';
-            if (agentView) agentView.style.display = 'none';
-            vizBtn.classList.remove('btn-outline-primary');
-            vizBtn.classList.add('btn-primary');
-            codeBtn.classList.remove('btn-primary');
-            codeBtn.classList.add('btn-outline-primary');
-            if (agentBtn) {
-                agentBtn.classList.remove('btn-primary');
-                agentBtn.classList.add('btn-outline-primary');
-            }
-
-            // Toggle toolbars
+            if (vizView) vizView.style.display = 'block';
+            if (vizBtn)  { vizBtn.classList.remove('btn-outline-primary'); vizBtn.classList.add('btn-primary'); }
             if (vizToolbar) vizToolbar.style.display = 'flex';
-            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+            if (analysisNav) analysisNav.style.display = 'block';
 
-            // Scroll to top when switching to visualization view (JupyterLab-like behavior)
             window.scrollTo({ top: 0, behavior: 'smooth' });
-
-            // Update page title
             if (pageTitle) pageTitle.textContent = this.t('breadcrumb.title');
             if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.title');
-            if (analysisNav) analysisNav.style.display = 'block';
-            if (agentConfigNav) agentConfigNav.style.display = 'none';
-            if (fileManager) fileManager.style.display = 'none';
+
             if (this.pendingPlotRefresh) {
                 const embeddingSelect = document.getElementById('embedding-select');
-                if (embeddingSelect && embeddingSelect.value) {
-                    this.updatePlot();
-                }
+                if (embeddingSelect && embeddingSelect.value) this.updatePlot();
                 this.pendingPlotRefresh = false;
             }
+
         } else if (view === 'code') {
-            vizView.style.display = 'none';
-            codeView.style.display = 'block';
-            if (agentView) agentView.style.display = 'none';
-            vizBtn.classList.remove('btn-primary');
-            vizBtn.classList.add('btn-outline-primary');
-            codeBtn.classList.remove('btn-outline-primary');
-            codeBtn.classList.add('btn-primary');
-            if (agentBtn) {
-                agentBtn.classList.remove('btn-outline-primary');
-                agentBtn.classList.add('btn-primary');
-            }
-
-            // Toggle toolbars
-            if (vizToolbar) vizToolbar.style.display = 'none';
+            if (codeView) codeView.style.display = 'block';
+            if (codeBtn)  { codeBtn.classList.remove('btn-outline-primary'); codeBtn.classList.add('btn-primary'); }
             if (codeToolbarRow) codeToolbarRow.style.display = 'flex';
+            if (fileManager) fileManager.style.display = 'block';
 
-            // Update page title
             if (pageTitle) pageTitle.innerHTML = `<i class="feather-code me-2"></i>${this.t('view.codeTitle')}`;
             if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.code');
-            if (analysisNav) analysisNav.style.display = 'none';
-            if (agentConfigNav) agentConfigNav.style.display = 'none';
-            if (fileManager) fileManager.style.display = 'block';
-            if (!this.fileTreeLoaded) {
-                this.fetchFileTree();
-                this.fileTreeLoaded = true;
-            }
+
+            if (!this.fileTreeLoaded) { this.fetchFileTree(); this.fileTreeLoaded = true; }
             this.fetchKernelStats();
             this.fetchKernelVars();
-            // Ensure visualization adata is synced to kernel as odata when entering code view
-            if (this.currentData) {
-                fetch('/api/kernel/sync_odata', { method: 'POST' }).catch(() => {});
-            }
-            if (this.openTabs.length === 0) {
-                this.openFileFromServer('default.ipynb');
-            }
+            if (this.currentData) fetch('/api/kernel/sync_odata', { method: 'POST' }).catch(() => {});
+            if (this.openTabs.length === 0) this.openFileFromServer('default.ipynb');
+            if (this.codeCells.length === 0) this.addCodeCell();
 
-            // Add a default cell if none exists
-            if (this.codeCells.length === 0) {
-                this.addCodeCell();
-            }
+        } else if (view === 'terminal') {
+            if (termView) termView.style.display = 'block';
+            if (termBtn)  { termBtn.classList.remove('btn-outline-primary'); termBtn.classList.add('btn-primary'); }
+
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-terminal me-2"></i>${this.t('terminal.label')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('terminal.label');
+
+            // Swap left sidebar: hide normal nav, show terminal session list
+            if (navbarContent) navbarContent.style.display = 'none';
+            if (termNavPanel)  termNavPanel.style.display  = 'flex';
+            if (window.feather) feather.replace({ 'stroke-width': 2 });
+
+            // Lazily create and open the terminal on first visit
+            this.openTerminalView();
+
         } else if (view === 'agent') {
-            vizView.style.display = 'none';
-            codeView.style.display = 'none';
             if (agentView) agentView.style.display = 'block';
-            vizBtn.classList.remove('btn-primary');
-            vizBtn.classList.add('btn-outline-primary');
-            codeBtn.classList.remove('btn-primary');
-            codeBtn.classList.add('btn-outline-primary');
-            if (agentBtn) {
-                agentBtn.classList.remove('btn-outline-primary');
-                agentBtn.classList.add('btn-primary');
-            }
+            if (agentBtn)  { agentBtn.classList.remove('btn-outline-primary'); agentBtn.classList.add('btn-primary'); }
+            if (agentConfigNav) agentConfigNav.style.display = 'block';
 
-            // Toggle toolbars
-            if (vizToolbar) vizToolbar.style.display = 'none';
-            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
-
-            // Update page title
             if (pageTitle) pageTitle.innerHTML = `<i class="feather-message-circle me-2"></i>${this.t('view.agentTitle')}`;
             if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.agent');
-            if (analysisNav) analysisNav.style.display = 'none';
-            if (agentConfigNav) agentConfigNav.style.display = 'block';
-            if (fileManager) fileManager.style.display = 'none';
         }
     },
 

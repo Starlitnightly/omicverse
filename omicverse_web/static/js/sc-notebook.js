@@ -707,6 +707,10 @@ Object.assign(SingleCellAnalysis.prototype, {
             const mdEditor = document.getElementById('md-file-editor');
             return mdEditor ? mdEditor.value : '';
         }
+        // If CodeMirror is active (used for .py and other code files) read from it
+        if (this._cmEditor) {
+            return this._cmEditor.getValue();
+        }
         const textEditor = document.getElementById('text-file-editor');
         return textEditor ? textEditor.value : '';
     },

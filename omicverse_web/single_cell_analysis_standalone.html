@@ -38,6 +38,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <!-- CodeMirror 5 — editable Python syntax highlighting in file editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/python/python.min.js"></script>
+    <!-- xterm.js — embedded terminal emulator -->
+    <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css">
+    <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <!-- Code Editor Styles (extracted from inline) -->
     <link rel="stylesheet" href="static/css/code-editor-layout.css">
     <link rel="stylesheet" href="static/css/code-editor-dark.css">
@@ -94,6 +103,8 @@
                         </a>
                         <ul class="nxl-submenu">
                             <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('clustering')" data-i18n="nav.clusteringSub">Clustering</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('deg_expression')" data-i18n="nav.deg">Differential Expression</a></li>
+                            <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('dct')" data-i18n="nav.dct">Differential Cell Type</a></li>
                         </ul>
                     </li>
 
@@ -247,6 +258,24 @@
                 </div>
             </div>
         </div>
+        <!-- Terminal session sidebar — shown only when terminal view is active -->
+        <div id="term-nav-panel" style="display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0;">
+            <div class="term-nav-header">
+                <i class="feather-terminal" style="width:13px;height:13px;flex-shrink:0;"></i>
+                <span data-i18n="terminal.panelTitle">Terminals</span>
+            </div>
+            <div id="term-session-list" class="term-session-list">
+                <!-- populated by TerminalManager._renderSidebar() -->
+            </div>
+            <div class="term-nav-footer">
+                <button id="term-new-btn"
+                        onclick="singleCellApp._termMgr && singleCellApp._termMgr.newSession()">
+                    <i class="feather-plus" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    <span data-i18n="terminal.newSession">New Terminal</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Memory Usage Bar — pinned at bottom of sidebar -->
         <div id="memory-bar-container" style="padding: 8px 12px 10px; border-top: 1px solid; flex-shrink: 0;">
             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -358,6 +387,9 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-code-btn" onclick="singleCellApp.switchView('code')">
                                 <i class="feather-code me-1"></i><span data-i18n="view.codeEditor">Code Editor</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-terminal-btn" onclick="singleCellApp.switchView('terminal')">
+                                <i class="feather-terminal me-1"></i><span data-i18n="view.terminal">Terminal</span>
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')" style="display: none;">
                                 <i class="feather-message-circle me-1"></i>Agent
@@ -961,6 +993,315 @@
                             </div><!-- /#traj-viz-body -->
                         </div><!-- /#traj-viz-panel -->
 
+                        <!-- ── Differential Expression Analysis Panel ── -->
+                        <div id="deg-viz-panel" class="control-panel mt-3" style="display:none;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="mb-0" style="color:var(--accent-primary,#7aa2f7);">
+                                    <i class="fas fa-dna me-2"></i>
+                                    <span data-i18n="deg.title">Differential Expression Analysis</span>
+                                </h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleDegViz()" title="Collapse">
+                                    <i class="fas fa-chevron-up" id="deg-viz-toggle-icon"></i>
+                                </button>
+                            </div>
+
+                            <div id="deg-viz-body">
+
+                                <!-- ── Row 1: Volcano + Violin ── -->
+                                <div class="row g-3">
+
+                                    <!-- Volcano card -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-chart-bar me-1 text-danger"></i>
+                                                    <span data-i18n="deg.volcanoTitle">Volcano Plot</span>
+                                                </span>
+                                                <button class="btn btn-sm btn-danger py-0 px-2"
+                                                        onclick="singleCellApp.generateDegVolcano()">
+                                                    <i class="fas fa-play me-1"></i>
+                                                    <span data-i18n="deg.generate">Generate</span>
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <div id="deg-volcano-img"
+                                                     class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                     style="min-height:220px;">
+                                                    <span class="text-muted small" data-i18n="deg.volcanoHint">Run DEG analysis first, then click Generate</span>
+                                                </div>
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.fcThresh">FC threshold</label>
+                                                        <input type="number" class="form-control form-control-sm"
+                                                               id="deg-fc-thresh" value="1" min="0" max="10" step="0.5">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.padjThresh">padj threshold</label>
+                                                        <input type="number" class="form-control form-control-sm"
+                                                               id="deg-padj-thresh" value="0.05" min="0" max="1" step="0.01">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.pointSize">Point size</label>
+                                                        <input type="number" class="form-control form-control-sm"
+                                                               id="deg-point-size" value="15" min="1" max="100" step="1">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.labelTop">Label top N</label>
+                                                        <input type="number" class="form-control form-control-sm"
+                                                               id="deg-label-top" value="10" min="0" max="50" step="1">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Violin card -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-music me-1 text-purple" style="color:#a57ded;"></i>
+                                                    <span data-i18n="deg.violinTitle">Violin Plot</span>
+                                                </span>
+                                                <button class="btn btn-sm py-0 px-2" style="background:#a57ded;color:#fff;"
+                                                        onclick="singleCellApp.generateDegViolin()">
+                                                    <i class="fas fa-play me-1"></i>
+                                                    <span data-i18n="deg.generate">Generate</span>
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <div id="deg-violin-img"
+                                                     class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                     style="min-height:220px;">
+                                                    <span class="text-muted small" data-i18n="deg.violinHint">Click a gene in the results table or type below</span>
+                                                </div>
+                                                <div class="row g-2">
+                                                    <div class="col-12">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.violinGenes">Genes (comma separated)</label>
+                                                        <input type="text" class="form-control form-control-sm"
+                                                               id="deg-violin-genes"
+                                                               placeholder="Gene1, Gene2, Gene3">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.violinGroupby">Group by</label>
+                                                        <select class="form-select form-select-sm" id="deg-violin-groupby">
+                                                            <option value="" data-i18n="deg.selectCol">-- Select --</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label form-label-sm" data-i18n="deg.violinLayer">Data layer</label>
+                                                        <select class="form-select form-select-sm" id="deg-violin-layer">
+                                                            <option value="">X (default)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div><!-- /Row 1 -->
+
+                                <!-- ── Row 2: Full Results Table ── -->
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-table me-1 text-info"></i>
+                                                    <span data-i18n="deg.resultsTitle">DEG Results</span>
+                                                </span>
+                                                <span id="deg-filter-count" class="badge bg-secondary small">0 / 0</span>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <!-- Filter bar -->
+                                                <div class="d-flex flex-wrap align-items-end gap-3 mb-2 pb-2" style="border-bottom:1px solid var(--bs-border-color,#dee2e6);">
+                                                    <!-- |log2FC| slider -->
+                                                    <div style="min-width:160px;">
+                                                        <label class="form-label form-label-sm mb-0">
+                                                            <span data-i18n="deg.filterFC">|log₂FC| ≥</span>
+                                                            <strong id="deg-filter-fc-val" class="ms-1">0</strong>
+                                                        </label>
+                                                        <input type="range" class="form-range form-range-sm"
+                                                               id="deg-filter-fc"
+                                                               min="0" max="5" step="0.1" value="0"
+                                                               oninput="document.getElementById('deg-filter-fc-val').textContent=parseFloat(this.value).toFixed(1);singleCellApp.filterDegResults()">
+                                                    </div>
+                                                    <!-- padj slider -->
+                                                    <div style="min-width:160px;">
+                                                        <label class="form-label form-label-sm mb-0">
+                                                            <span data-i18n="deg.filterPadj">padj ≤</span>
+                                                            <strong id="deg-filter-padj-val" class="ms-1">1.00</strong>
+                                                        </label>
+                                                        <input type="range" class="form-range form-range-sm"
+                                                               id="deg-filter-padj"
+                                                               min="0" max="1" step="0.01" value="1"
+                                                               oninput="document.getElementById('deg-filter-padj-val').textContent=parseFloat(this.value).toFixed(2);singleCellApp.filterDegResults()">
+                                                    </div>
+                                                    <!-- Expression % slider -->
+                                                    <div style="min-width:160px;">
+                                                        <label class="form-label form-label-sm mb-0">
+                                                            <span data-i18n="deg.filterPct">Expr% ≥</span>
+                                                            <strong id="deg-filter-pct-val" class="ms-1">0</strong>%
+                                                        </label>
+                                                        <input type="range" class="form-range form-range-sm"
+                                                               id="deg-filter-pct"
+                                                               min="0" max="100" step="1" value="0"
+                                                               oninput="document.getElementById('deg-filter-pct-val').textContent=this.value;singleCellApp.filterDegResults()">
+                                                    </div>
+                                                    <!-- Direction toggle -->
+                                                    <div>
+                                                        <label class="form-label form-label-sm mb-1 d-block" data-i18n="deg.filterDir">Direction</label>
+                                                        <div id="deg-dir-group" class="btn-group btn-group-sm" role="group">
+                                                            <button type="button" class="btn btn-outline-secondary active"
+                                                                    data-dir="all" onclick="singleCellApp.setDegDir('all')"
+                                                                    data-i18n="deg.dirAll">All</button>
+                                                            <button type="button" class="btn btn-outline-danger"
+                                                                    data-dir="up" onclick="singleCellApp.setDegDir('up')"
+                                                                    data-i18n="deg.dirUp">Up</button>
+                                                            <button type="button" class="btn btn-outline-primary"
+                                                                    data-dir="down" onclick="singleCellApp.setDegDir('down')"
+                                                                    data-i18n="deg.dirDown">Down</button>
+                                                        </div>
+                                                    </div>
+                                                    <!-- Gene search -->
+                                                    <div style="min-width:130px;">
+                                                        <label class="form-label form-label-sm mb-1 d-block" data-i18n="deg.filterSearch">Search gene</label>
+                                                        <input type="text" class="form-control form-control-sm"
+                                                               id="deg-filter-gene"
+                                                               placeholder="Gene name..."
+                                                               oninput="singleCellApp.filterDegResults()">
+                                                    </div>
+                                                </div>
+                                                <!-- Results table -->
+                                                <div style="max-height:320px;overflow-y:auto;font-size:0.75rem;">
+                                                    <table class="table table-sm table-hover mb-0">
+                                                        <thead class="sticky-top" style="background:var(--bs-body-bg,#fff);">
+                                                            <tr>
+                                                                <th data-i18n="deg.geneCol">Gene</th>
+                                                                <th data-i18n="deg.log2fcCol">log₂FC</th>
+                                                                <th>padj</th>
+                                                                <th data-i18n="deg.pctCtrlCol">Expr%(ctrl)</th>
+                                                                <th data-i18n="deg.pctTestCol">Expr%(test)</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="deg-results-tbody">
+                                                            <tr><td colspan="5" class="text-center text-muted py-3" data-i18n="deg.tableEmpty">Run DEG analysis to see results</td></tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <small class="text-muted mt-1 d-block" data-i18n="deg.tableClickHint">Click a gene row to add it to the Violin Plot</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div><!-- /Row 2 -->
+
+                            </div><!-- /#deg-viz-body -->
+                        </div><!-- /#deg-viz-panel -->
+
+                        <!-- ── Differential Cell Type (DCT) Analysis Panel ── -->
+                        <div id="dct-viz-panel" class="control-panel mt-3" style="display:none;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="mb-0" style="color:var(--accent-primary,#7aa2f7);">
+                                    <i class="fas fa-chart-pie me-2"></i>
+                                    <span data-i18n="dct.title">Differential Cell Type Composition</span>
+                                </h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleDctViz()" title="Collapse">
+                                    <i class="fas fa-chevron-up" id="dct-viz-toggle-icon"></i>
+                                </button>
+                            </div>
+
+                            <div id="dct-viz-body">
+
+                                <!-- ── Row 1: Composition + Effects/Beeswarm ── -->
+                                <div class="row g-3">
+
+                                    <!-- Composition barplot card -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between" data-no-collapse="true">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-chart-bar me-1 text-success"></i>
+                                                    <span data-i18n="dct.compositionTitle">Cell Type Composition</span>
+                                                </span>
+                                                <button class="btn btn-sm btn-success py-0 px-2"
+                                                        onclick="singleCellApp.generateDctComposition()">
+                                                    <i class="fas fa-play me-1"></i>
+                                                    <span data-i18n="dct.generate">Generate</span>
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <div id="dct-composition-img"
+                                                     class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                     style="min-height:220px;">
+                                                    <span class="text-muted small" data-i18n="dct.compositionHint">Run DCT analysis first, then click Generate</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Effects / Beeswarm card -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between" data-no-collapse="true">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-wave-square me-1 text-primary" id="dct-effects-icon"></i>
+                                                    <span data-i18n="dct.effectsTitle" id="dct-effects-title">Effects / Beeswarm</span>
+                                                </span>
+                                                <button class="btn btn-sm btn-primary py-0 px-2"
+                                                        onclick="singleCellApp.generateDctEffects()">
+                                                    <i class="fas fa-play me-1"></i>
+                                                    <span data-i18n="dct.generate">Generate</span>
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <div id="dct-effects-img"
+                                                     class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                     style="min-height:220px;">
+                                                    <span class="text-muted small" data-i18n="dct.effectsHint">Run DCT analysis first, then click Generate</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div><!-- /Row 1 -->
+
+                                <!-- ── Row 2: Full Results Table ── -->
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header py-2 d-flex align-items-center justify-content-between" data-no-collapse="true">
+                                                <span class="small fw-semibold">
+                                                    <i class="fas fa-table me-1 text-info"></i>
+                                                    <span data-i18n="dct.resultsTitle">DCT Results</span>
+                                                </span>
+                                                <span id="dct-results-count" class="badge bg-secondary small">0</span>
+                                            </div>
+                                            <div class="card-body p-2">
+                                                <div style="max-height:320px;overflow-y:auto;font-size:0.75rem;">
+                                                    <table class="table table-sm table-hover mb-0">
+                                                        <thead class="sticky-top" style="background:var(--bs-body-bg,#fff);">
+                                                            <tr id="dct-results-thead">
+                                                                <th data-i18n="dct.col.celltype">Cell Type</th>
+                                                                <th data-i18n="dct.col.logfc">logFC / Effect</th>
+                                                                <th>p-value</th>
+                                                                <th>FDR</th>
+                                                                <th data-i18n="dct.col.sig">Significant</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="dct-results-tbody">
+                                                            <tr><td colspan="5" class="text-center text-muted py-3" data-i18n="dct.tableEmpty">Run DCT analysis to see results</td></tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div><!-- /Row 2 -->
+
+                            </div><!-- /#dct-viz-body -->
+                        </div><!-- /#dct-viz-panel -->
+
                     </div>
                 </div>
                 </div>
@@ -977,6 +1318,8 @@
                             </div>
                             <div id="text-file-view" class="text-file-view">
                                 <textarea id="text-file-editor" spellcheck="false"></textarea>
+                                <!-- CodeMirror replaces textarea for .py/.js/.json etc. files -->
+                                <div id="cm-editor-wrap" style="display:none; height:100%;"></div>
                             </div>
                             <div id="md-file-view" class="md-file-view">
                                 <div class="md-editor">
@@ -1012,6 +1355,12 @@
                     </div>
                 </div>
                 <!-- End Agent View -->
+
+                <!-- Terminal View — fills nxl-container; session list is in nxl-navigation -->
+                <div id="terminal-view" class="content-view term-full-view" style="display:none;">
+                    <div id="term-panels"></div>
+                </div>
+                <!-- End Terminal View -->
             </div>
         </div>
     </main>
@@ -1192,6 +1541,7 @@
     <script src="static/js/sc-tools.js"></script>
     <script src="static/js/sc-notebook.js"></script>
     <script src="static/js/sc-environment.js"></script>
+    <script src="static/js/sc-terminal.js"></script>
 
     <!-- ── Python Environment Manager Modal ────────────────────────────── -->
     <div id="env-manager-modal" style="

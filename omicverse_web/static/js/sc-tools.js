@@ -53,7 +53,9 @@ Object.assign(SingleCellAnalysis.prototype, {
                 { id: 'slingshot',     nameKey: 'tools.slingshot',    icon: 'fas fa-route',           descKey: 'tools.slingshotDesc' },
                 { id: 'palantir',      nameKey: 'tools.palantir',     icon: 'fas fa-compass',         descKey: 'tools.palantirDesc' },
                 { id: 'sctour',        nameKey: 'tools.sctour',       icon: 'fas fa-brain',           descKey: 'tools.sctourDesc' }
-            ]
+            ],
+            'deg_expression': [],
+            'dct': []
         };
         
         const tools = categoryTools[category] || [];
@@ -105,6 +107,31 @@ Object.assign(SingleCellAnalysis.prototype, {
             }
         }
 
+        // Show deg-viz-panel only for deg_expression category
+        const degPanel = document.getElementById('deg-viz-panel');
+        if (degPanel) {
+            if (category === 'deg_expression') {
+                degPanel.style.display = '';
+                this.updateDegVizSelects();
+                // Render parameter form in the left settings panel
+                this.renderDegParamForm(parameterContent);
+            } else {
+                degPanel.style.display = 'none';
+            }
+        }
+
+        // Show dct-viz-panel only for dct category
+        const dctPanel = document.getElementById('dct-viz-panel');
+        if (dctPanel) {
+            if (category === 'dct') {
+                dctPanel.style.display = '';
+                // Render parameter form in the left settings panel
+                this.renderDctParamForm(parameterContent);
+            } else {
+                dctPanel.style.display = 'none';
+            }
+        }
+
         if (!silent) this.addToLog(this.t('panel.categorySelected') + ` ${this.getCategoryName(category)}`);
     },
 
@@ -115,7 +142,9 @@ Object.assign(SingleCellAnalysis.prototype, {
             'clustering': this.t('nav.clusteringSub'),
             'omicverse': this.t('nav.omicverse'),
             'cell_annotation': this.t('nav.cellAnnotation'),
-            'trajectory': this.t('nav.trajectory')
+            'trajectory': this.t('nav.trajectory'),
+            'deg_expression': this.t('nav.deg'),
+            'dct': this.t('nav.dct'),
         };
         return names[category] || category;
     },
@@ -1083,6 +1112,692 @@ Object.assign(SingleCellAnalysis.prototype, {
         .catch(e => {
             imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`;
         });
+    },
+
+    // -----------------------------------------------------------------------
+    // DEG Analysis helpers
+    // -----------------------------------------------------------------------
+
+    /** Render DEG parameter form into the parameter-content panel. */
+    renderDegParamForm(container) {
+        const obs    = this.currentData ? (this.currentData.obs_columns || []) : [];
+        const layers = this.currentData ? (this.currentData.layers      || []) : [];
+        const colOpts = `<option value="">${this.t('deg.selectCol')}</option>` +
+            obs.map(c => `<option value="${c}">${c}</option>`).join('');
+        container.innerHTML = `
+        <div class="row g-2">
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('deg.conditionCol')}</label>
+                <select class="form-select form-select-sm" id="deg-condition-col"
+                        onchange="singleCellApp.onDegConditionChange(this.value)">
+                    ${colOpts}
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('deg.ctrlGroup')}</label>
+                <select class="form-select form-select-sm" id="deg-ctrl-group">
+                    <option value="">${this.t('deg.selectCol')}</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('deg.testGroup')}</label>
+                <select class="form-select form-select-sm" id="deg-test-group">
+                    <option value="">${this.t('deg.selectCol')}</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('deg.celltypeKey')}</label>
+                <select class="form-select form-select-sm" id="deg-celltype-key"
+                        onchange="singleCellApp.onDegCelltypeChange(this.value)">
+                    ${colOpts}
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('deg.celltypeGroup')}</label>
+                <select class="form-select form-select-sm" id="deg-celltype-group"
+                        multiple size="3" style="height:auto;">
+                    <option value="" selected>${this.t('deg.allTypes')}</option>
+                </select>
+                <small class="text-muted d-block mt-1">${this.t('deg.celltypeHint')}</small>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('deg.method')}</label>
+                <select class="form-select form-select-sm" id="deg-method">
+                    <option value="wilcoxon">Wilcoxon</option>
+                    <option value="t-test">T-test</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('deg.maxCells')}</label>
+                <input type="number" class="form-control form-control-sm"
+                       id="deg-max-cells" value="100000" min="100" max="1000000" step="1000">
+            </div>
+            <div class="col-12 mt-1">
+                <button class="btn btn-success btn-sm w-100" id="deg-run-btn"
+                        onclick="singleCellApp.runDegAnalysis()">
+                    <i class="fas fa-play me-1"></i>${this.t('deg.run')}
+                </button>
+            </div>
+            <div id="deg-summary" class="col-12" style="display:none;">
+                <div class="alert alert-success py-1 px-2 mb-0 small mt-1">
+                    ${this.t('deg.total')} <strong id="deg-n-total">-</strong>
+                    &nbsp;|&nbsp; <span class="text-danger">${this.t('deg.sigUp')}</span>
+                    <strong id="deg-n-up">-</strong>
+                    &nbsp;|&nbsp; <span class="text-primary">${this.t('deg.sigDown')}</span>
+                    <strong id="deg-n-down">-</strong>
+                </div>
+            </div>
+        </div>`;
+        this._restoreAndTrackParams('deg_expression', container);
+    },
+
+    showDegViz() {
+        const panel = document.getElementById('deg-viz-panel');
+        if (panel) {
+            panel.style.display = '';
+            this.updateDegVizSelects();
+        }
+    },
+
+    toggleDegViz() {
+        const body = document.getElementById('deg-viz-body');
+        const icon = document.getElementById('deg-viz-toggle-icon');
+        if (!body) return;
+        const collapsed = body.style.display === 'none';
+        body.style.display = collapsed ? '' : 'none';
+        if (icon) {
+            icon.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+        }
+    },
+
+    updateDegVizSelects() {
+        if (!this.currentData) return;
+        const obs    = this.currentData.obs_columns || [];
+        const layers = this.currentData.layers      || [];
+        const colOpts = `<option value="">${this.t('deg.selectCol')}</option>` +
+            obs.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        // Violin groupby selector
+        const groupbySel = document.getElementById('deg-violin-groupby');
+        if (groupbySel) groupbySel.innerHTML = colOpts;
+
+        // Violin layer selector
+        const layerSel = document.getElementById('deg-violin-layer');
+        if (layerSel) {
+            layerSel.innerHTML = '<option value="">X (default)</option>' +
+                layers.map(l => `<option value="${l}">${l}</option>`).join('');
+        }
+    },
+
+    onDegConditionChange(col) {
+        if (!col) return;
+        fetch(`/api/deg/get_groups?col=${encodeURIComponent(col)}`)
+        .then(r => r.json())
+        .then(data => {
+            const groups = data.groups || [];
+            const opts = `<option value="">${this.t('deg.selectCol')}</option>` +
+                groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            const ctrl = document.getElementById('deg-ctrl-group');
+            const test = document.getElementById('deg-test-group');
+            if (ctrl) ctrl.innerHTML = opts;
+            if (test) test.innerHTML = opts;
+            if (ctrl && groups.length >= 1) ctrl.value = groups[0];
+            if (test && groups.length >= 2) test.value = groups[1];
+            // Pre-fill violin groupby with condition column
+            const groupbySel = document.getElementById('deg-violin-groupby');
+            if (groupbySel) groupbySel.value = col;
+        })
+        .catch(() => {});
+    },
+
+    onDegCelltypeChange(col) {
+        const selEl = document.getElementById('deg-celltype-group');
+        if (!selEl) return;
+        if (!col) {
+            selEl.innerHTML = `<option value="" selected>${this.t('deg.allTypes')}</option>`;
+            return;
+        }
+        fetch(`/api/deg/get_groups?col=${encodeURIComponent(col)}`)
+        .then(r => r.json())
+        .then(data => {
+            const groups = data.groups || [];
+            selEl.innerHTML =
+                `<option value="" selected>${this.t('deg.allTypes')}</option>` +
+                groups.map(g => `<option value="${g}">${g}</option>`).join('');
+        })
+        .catch(() => {});
+    },
+
+    runDegAnalysis() {
+        const btn = document.getElementById('deg-run-btn');
+        if (btn) btn.disabled = true;
+
+        const ctSel = document.getElementById('deg-celltype-group');
+        const celltypeGroup = ctSel
+            ? Array.from(ctSel.selectedOptions).map(o => o.value).filter(v => v !== '')
+            : [];
+
+        const params = {
+            condition:      (document.getElementById('deg-condition-col') || {}).value || '',
+            ctrl_group:     (document.getElementById('deg-ctrl-group')    || {}).value || '',
+            test_group:     (document.getElementById('deg-test-group')    || {}).value || '',
+            celltype_key:   (document.getElementById('deg-celltype-key')  || {}).value || '',
+            celltype_group: celltypeGroup,
+            method:         (document.getElementById('deg-method')        || {}).value || 'wilcoxon',
+            max_cells:      parseInt((document.getElementById('deg-max-cells') || {}).value || '100000'),
+        };
+
+        this.showStatus(this.t('deg.running'), true);
+        this.addToLog(this.t('deg.running'));
+
+        fetch('/api/deg/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (btn) btn.disabled = false;
+            this.hideStatus();
+            if (data.error) {
+                this.addToLog(data.error, 'error');
+                alert(data.error);
+                return;
+            }
+            this.addToLog(this.t('deg.done'));
+            this.showStatus(this.t('deg.done'), false);
+
+            // Update summary in parameter panel
+            const summaryDiv = document.getElementById('deg-summary');
+            if (summaryDiv) {
+                summaryDiv.style.display = '';
+                const nTotal = document.getElementById('deg-n-total');
+                const nUp    = document.getElementById('deg-n-up');
+                const nDown  = document.getElementById('deg-n-down');
+                if (nTotal) nTotal.textContent = data.n_total    || 0;
+                if (nUp)    nUp.textContent    = data.n_sig_up   || 0;
+                if (nDown)  nDown.textContent  = data.n_sig_down || 0;
+            }
+
+            // Pre-fill violin groupby with returned condition column
+            if (data.condition) {
+                const groupbySel = document.getElementById('deg-violin-groupby');
+                if (groupbySel) groupbySel.value = data.condition;
+            }
+
+            // Store all results for client-side filtering
+            this.degAllResults = data.all_results || [];
+
+            // Reset filter sliders and render table
+            this._resetDegFilters();
+            this.filterDegResults();
+
+            // Auto-generate volcano
+            this.generateDegVolcano();
+        })
+        .catch(error => {
+            if (btn) btn.disabled = false;
+            this.hideStatus();
+            this.addToLog(error.message, 'error');
+            alert(error.message);
+        });
+    },
+
+    _resetDegFilters() {
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
+        const setTxt = (id, txt) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = txt;
+        };
+        setVal('deg-filter-fc',   0);   setTxt('deg-filter-fc-val',   '0.0');
+        setVal('deg-filter-padj', 1);   setTxt('deg-filter-padj-val', '1.00');
+        setVal('deg-filter-pct',  0);   setTxt('deg-filter-pct-val',  '0');
+        const geneInput = document.getElementById('deg-filter-gene');
+        if (geneInput) geneInput.value = '';
+        this.setDegDir('all');
+    },
+
+    filterDegResults() {
+        if (!this.degAllResults || !this.degAllResults.length) return;
+
+        const fcMin   = parseFloat((document.getElementById('deg-filter-fc')   || {}).value || 0);
+        const padjMax = parseFloat((document.getElementById('deg-filter-padj') || {}).value || 1);
+        const pctMin  = parseFloat((document.getElementById('deg-filter-pct')  || {}).value || 0);
+        const search  = ((document.getElementById('deg-filter-gene') || {}).value || '').toLowerCase();
+        const activeBtn = document.querySelector('#deg-dir-group .active');
+        const dir = activeBtn ? (activeBtn.dataset.dir || 'all') : 'all';
+
+        const filtered = this.degAllResults.filter(row => {
+            const fc      = parseFloat(row.log2FC   || 0);
+            const padj    = parseFloat(row.padj     || 1);
+            const pctCtrl = parseFloat(row.pct_ctrl || 0);
+            const pctTest = parseFloat(row.pct_test || 0);
+            const gene    = (row.gene || '').toLowerCase();
+
+            if (Math.abs(fc) < fcMin) return false;
+            if (padj > padjMax)       return false;
+            if (Math.max(pctCtrl, pctTest) < pctMin) return false;
+            if (dir === 'up'   && fc <= 0)  return false;
+            if (dir === 'down' && fc >= 0)  return false;
+            if (search && !gene.includes(search)) return false;
+            return true;
+        });
+
+        const counter = document.getElementById('deg-filter-count');
+        if (counter) counter.textContent = `${filtered.length} / ${this.degAllResults.length}`;
+
+        this.renderDegTable(filtered.slice(0, 300));
+    },
+
+    renderDegTable(rows) {
+        const tbody = document.getElementById('deg-results-tbody');
+        if (!tbody) return;
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-2">${this.t('deg.noResults')}</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map(row => {
+            const fc    = parseFloat(row.log2FC   || 0);
+            const padj  = parseFloat(row.padj     || 1);
+            const pctC  = parseFloat(row.pct_ctrl || 0).toFixed(1);
+            const pctT  = parseFloat(row.pct_test || 0).toFixed(1);
+            const gene  = row.gene || '';
+            const color = fc > 0 ? '#e06c75' : '#5ba4cf';
+            const padjStr = padj < 0.001 ? padj.toExponential(2) : padj.toFixed(4);
+            return `<tr style="cursor:pointer;" title="Click to add to violin plot"
+                        onclick="singleCellApp.addGeneToViolin('${gene.replace(/'/g,"\\'")}')">
+                <td style="color:${color};font-weight:600;">${gene}</td>
+                <td style="color:${color};">${fc.toFixed(3)}</td>
+                <td>${padjStr}</td>
+                <td>${pctC}%</td>
+                <td>${pctT}%</td>
+            </tr>`;
+        }).join('');
+    },
+
+    setDegDir(dir) {
+        document.querySelectorAll('#deg-dir-group .btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.dir === dir);
+        });
+        this.filterDegResults();
+    },
+
+    addGeneToViolin(gene) {
+        const el = document.getElementById('deg-violin-genes');
+        if (!el) return;
+        const existing = el.value.split(',').map(g => g.trim()).filter(Boolean);
+        if (!existing.includes(gene)) {
+            existing.push(gene);
+            el.value = existing.join(', ');
+        }
+    },
+
+    generateDegVolcano() {
+        const imgDiv = document.getElementById('deg-volcano-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-danger"></div>';
+
+        const params = {
+            fc_thresh:   parseFloat((document.getElementById('deg-fc-thresh')   || {}).value || '1'),
+            padj_thresh: parseFloat((document.getElementById('deg-padj-thresh') || {}).value || '0.05'),
+            point_size:  parseFloat((document.getElementById('deg-point-size')  || {}).value || '15'),
+            label_top:   parseInt(  (document.getElementById('deg-label-top')   || {}).value || '10'),
+        };
+
+        fetch('/api/deg/plot_volcano', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML =
+                    `<img src="data:image/png;base64,${data.figure}"
+                          style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                          onclick="singleCellApp.showToolFigures(['${data.figure}'], 'Volcano Plot')">`;
+            }
+        })
+        .catch(e => {
+            imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`;
+        });
+    },
+
+    generateDegViolin() {
+        const imgDiv = document.getElementById('deg-violin-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm" style="color:#a57ded;"></div>';
+
+        const params = {
+            genes:   (document.getElementById('deg-violin-genes')   || {}).value || '',
+            groupby: (document.getElementById('deg-violin-groupby') || {}).value || '',
+            layer:   (document.getElementById('deg-violin-layer')   || {}).value || '',
+        };
+
+        fetch('/api/deg/plot_violin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML =
+                    `<img src="data:image/png;base64,${data.figure}"
+                          style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                          onclick="singleCellApp.showToolFigures(['${data.figure}'], 'Violin Plot')">`;
+            }
+        })
+        .catch(e => {
+            imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`;
+        });
+    },
+
+    // -----------------------------------------------------------------------
+    // DCT (Differential Cell Type) Analysis helpers
+    // -----------------------------------------------------------------------
+
+    /** Render DCT parameter form into the parameter-content panel. */
+    renderDctParamForm(container) {
+        const obs      = this.currentData ? (this.currentData.obs_columns || []) : [];
+        const embeddings = this.currentData ? (this.currentData.embeddings || []) : [];
+        const colOpts  = `<option value="">${this.t('dct.selectCol')}</option>` +
+            obs.map(c => `<option value="${c}">${c}</option>`).join('');
+        const repOpts  = embeddings.map(e => `<option value="${e}">${e.replace(/^X_/, '')}</option>`).join('') ||
+                         `<option value="X_pca">PCA</option>`;
+
+        container.innerHTML = `
+        <div class="row g-2">
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('dct.method')}</label>
+                <select class="form-select form-select-sm" id="dct-method"
+                        onchange="singleCellApp.onDctMethodChange(this.value)">
+                    <option value="sccoda">scCODA</option>
+                    <option value="milopy">milopy</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('dct.conditionCol')}</label>
+                <select class="form-select form-select-sm" id="dct-condition-col"
+                        onchange="singleCellApp.onDctConditionChange(this.value)">
+                    ${colOpts}
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('dct.ctrlGroup')}</label>
+                <select class="form-select form-select-sm" id="dct-ctrl-group">
+                    <option value="">${this.t('dct.selectCol')}</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label form-label-sm">${this.t('dct.testGroup')}</label>
+                <select class="form-select form-select-sm" id="dct-test-group">
+                    <option value="">${this.t('dct.selectCol')}</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label form-label-sm">${this.t('dct.celltypeKey')}</label>
+                <select class="form-select form-select-sm" id="dct-celltype-key">
+                    ${colOpts}
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label form-label-sm" id="dct-sample-label">
+                    ${this.t('dct.sampleKey')}
+                    <span id="dct-sample-required" class="text-danger ms-1" style="display:none;" title="required">*</span>
+                </label>
+                <select class="form-select form-select-sm" id="dct-sample-key">
+                    <option value="">${this.t('dct.sampleKeyOptional')}</option>
+                    ${obs.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </select>
+                <small class="text-muted d-block mt-1" id="dct-sample-hint">${this.t('dct.sampleKeyHintSccoda')}</small>
+            </div>
+            <div class="col-12" id="dct-use-rep-row" style="display:none;">
+                <label class="form-label form-label-sm">${this.t('dct.useRep')}</label>
+                <select class="form-select form-select-sm" id="dct-use-rep">
+                    ${repOpts}
+                </select>
+            </div>
+            <div class="col-12" id="dct-est-fdr-row">
+                <label class="form-label form-label-sm">${this.t('dct.estFdr')} <strong id="dct-est-fdr-val">0.20</strong></label>
+                <input type="range" class="form-range" id="dct-est-fdr"
+                       min="0.05" max="0.5" step="0.05" value="0.2"
+                       oninput="document.getElementById('dct-est-fdr-val').textContent=parseFloat(this.value).toFixed(2)">
+            </div>
+            <div class="col-12 mt-1">
+                <button class="btn btn-success btn-sm w-100" id="dct-run-btn"
+                        onclick="singleCellApp.runDctAnalysis()">
+                    <i class="fas fa-play me-1"></i>${this.t('dct.run')}
+                </button>
+            </div>
+            <div id="dct-summary" class="col-12" style="display:none;">
+                <div class="alert alert-success py-1 px-2 mb-0 small mt-1" id="dct-summary-text"></div>
+            </div>
+        </div>`;
+        this._restoreAndTrackParams('dct', container);
+    },
+
+    onDctMethodChange(method) {
+        const useRepRow      = document.getElementById('dct-use-rep-row');
+        const estFdrRow      = document.getElementById('dct-est-fdr-row');
+        const sampleHint     = document.getElementById('dct-sample-hint');
+        const sampleRequired = document.getElementById('dct-sample-required');
+        const sampleSel      = document.getElementById('dct-sample-key');
+        const effectTitle    = document.getElementById('dct-effects-title');
+        const effectIcon     = document.getElementById('dct-effects-icon');
+        if (method === 'milopy') {
+            if (useRepRow)      useRepRow.style.display         = '';
+            if (estFdrRow)      estFdrRow.style.display         = 'none';
+            if (sampleHint)     sampleHint.textContent          = this.t('dct.sampleKeyHintMilopy');
+            if (sampleRequired) sampleRequired.style.display    = '';   // show * required
+            if (sampleSel)      sampleSel.querySelector('option[value=""]').textContent = this.t('dct.sampleKeySelect');
+            if (effectTitle)    effectTitle.textContent         = this.t('dct.beeswarmTitle');
+            if (effectIcon)     effectIcon.className            = 'fas fa-broom me-1 text-warning';
+        } else {
+            if (useRepRow)      useRepRow.style.display         = 'none';
+            if (estFdrRow)      estFdrRow.style.display         = '';
+            if (sampleHint)     sampleHint.textContent          = this.t('dct.sampleKeyHintSccoda');
+            if (sampleRequired) sampleRequired.style.display    = 'none';  // optional for scCODA
+            if (sampleSel)      sampleSel.querySelector('option[value=""]').textContent = this.t('dct.sampleKeyOptional');
+            if (effectTitle)    effectTitle.textContent         = this.t('dct.effectsTitle');
+            if (effectIcon)     effectIcon.className            = 'fas fa-wave-square me-1 text-primary';
+        }
+    },
+
+    onDctConditionChange(col) {
+        if (!col) return;
+        fetch(`/api/deg/get_groups?col=${encodeURIComponent(col)}`)   // reuse same endpoint
+        .then(r => r.json())
+        .then(data => {
+            const groups = data.groups || [];
+            const opts   = `<option value="">${this.t('dct.selectCol')}</option>` +
+                groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            const ctrl = document.getElementById('dct-ctrl-group');
+            const test = document.getElementById('dct-test-group');
+            if (ctrl) ctrl.innerHTML = opts;
+            if (test) test.innerHTML = opts;
+            if (ctrl && groups.length >= 1) ctrl.value = groups[0];
+            if (test && groups.length >= 2) test.value = groups[1];
+        })
+        .catch(() => {});
+    },
+
+    toggleDctViz() {
+        const body = document.getElementById('dct-viz-body');
+        const icon = document.getElementById('dct-viz-toggle-icon');
+        if (!body) return;
+        const collapsed = body.style.display === 'none';
+        body.style.display = collapsed ? '' : 'none';
+        if (icon) icon.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    },
+
+    runDctAnalysis() {
+        const btn = document.getElementById('dct-run-btn');
+
+        const params = {
+            method:        (document.getElementById('dct-method')        || {}).value || 'sccoda',
+            condition:     (document.getElementById('dct-condition-col') || {}).value || '',
+            ctrl_group:    (document.getElementById('dct-ctrl-group')    || {}).value || '',
+            test_group:    (document.getElementById('dct-test-group')    || {}).value || '',
+            cell_type_key: (document.getElementById('dct-celltype-key')  || {}).value || '',
+            sample_key:    (document.getElementById('dct-sample-key')    || {}).value || '',
+            use_rep:       (document.getElementById('dct-use-rep')       || {}).value || 'X_pca',
+            est_fdr:       parseFloat((document.getElementById('dct-est-fdr') || {}).value || '0.2'),
+        };
+
+        // Frontend guard: milopy requires sample_key
+        if (params.method === 'milopy' && !params.sample_key) {
+            const msg = this.t('dct.sampleKeyHintMilopy') || 'milopy 方法需要提供样本列 (sample_key)，请选择一个 obs 列';
+            alert(msg);
+            return;
+        }
+
+        if (btn) btn.disabled = true;
+        this.showStatus(this.t('dct.running'), true);
+        this.addToLog(this.t('dct.running'));
+
+        fetch('/api/dct/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (btn) btn.disabled = false;
+            this.hideStatus();
+            if (data.error) { this.addToLog(data.error, 'error'); alert(data.error); return; }
+            this.addToLog(this.t('dct.done'));
+            this.showStatus(this.t('dct.done'), false);
+
+            // Summary
+            const summaryDiv  = document.getElementById('dct-summary');
+            const summaryText = document.getElementById('dct-summary-text');
+            if (summaryDiv && summaryText) {
+                summaryDiv.style.display = '';
+                const method = data.method || 'sccoda';
+                if (method === 'sccoda') {
+                    summaryText.innerHTML = `${this.t('dct.totalCellTypes')} <strong>${data.n_total || 0}</strong>
+                        &nbsp;|&nbsp; ${this.t('dct.credible')} <strong class="text-danger">${data.n_credible || 0}</strong>`;
+                } else {
+                    summaryText.innerHTML = `${this.t('dct.totalNhoods')} <strong>${data.n_total || 0}</strong>
+                        &nbsp;|&nbsp; ${this.t('dct.sigUp')} <strong class="text-danger">${data.n_sig_up || 0}</strong>
+                        &nbsp;|&nbsp; ${this.t('dct.sigDown')} <strong class="text-primary">${data.n_sig_down || 0}</strong>`;
+                }
+            }
+
+            // Update count badge
+            const countBadge = document.getElementById('dct-results-count');
+            if (countBadge) countBadge.textContent = data.n_total || 0;
+
+            // Render table
+            this.dctAllResults = data.all_results || [];
+            this._renderDctTable(data.method || 'sccoda', this.dctAllResults);
+
+            // Auto-generate composition plot
+            this.generateDctComposition();
+        })
+        .catch(error => {
+            if (btn) btn.disabled = false;
+            this.hideStatus();
+            this.addToLog(error.message, 'error');
+            alert(error.message);
+        });
+    },
+
+    _renderDctTable(method, rows) {
+        const tbody  = document.getElementById('dct-results-tbody');
+        const thead  = document.getElementById('dct-results-thead');
+        if (!tbody) return;
+        if (!rows || !rows.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">${this.t('dct.tableEmpty')}</td></tr>`;
+            return;
+        }
+        if (method === 'sccoda') {
+            if (thead) thead.innerHTML = `
+                <tr>
+                    <th>${this.t('dct.col.celltype')}</th>
+                    <th>${this.t('dct.col.effect')}</th>
+                    <th>${this.t('dct.col.log2fc')}</th>
+                    <th>${this.t('dct.col.inclProb')}</th>
+                    <th>${this.t('dct.col.sig')}</th>
+                </tr>`;
+            tbody.innerHTML = rows.map(row => {
+                const credible = row.is_credible;
+                const color    = credible ? (parseFloat(row.log2fc || 0) > 0 ? '#e06c75' : '#5ba4cf') : '#aaaaaa';
+                return `<tr>
+                    <td style="font-weight:600;color:${color};">${row.cell_type || row['Cell Type'] || '-'}</td>
+                    <td>${parseFloat(row.effect || row['Effect'] || 0).toFixed(3)}</td>
+                    <td>${parseFloat(row.log2fc || row['log2-fold change'] || 0).toFixed(3)}</td>
+                    <td>${parseFloat(row.inclusion_prob || row['Inclusion probability'] || 0).toFixed(3)}</td>
+                    <td>${credible ? '<span class="badge bg-danger">✓</span>' : '<span class="badge bg-secondary">-</span>'}</td>
+                </tr>`;
+            }).join('');
+        } else {
+            // milopy
+            if (thead) thead.innerHTML = `
+                <tr>
+                    <th>${this.t('dct.col.celltype')}</th>
+                    <th>${this.t('dct.col.logfc')}</th>
+                    <th>PValue</th>
+                    <th>SpatialFDR</th>
+                    <th>${this.t('dct.col.nhoodSize')}</th>
+                </tr>`;
+            tbody.innerHTML = rows.slice(0, 300).map(row => {
+                const fdr   = parseFloat(row.SpatialFDR || 1);
+                const lfc   = parseFloat(row.logFC || 0);
+                const color = fdr < 0.1 ? (lfc > 0 ? '#e06c75' : '#5ba4cf') : '#aaaaaa';
+                return `<tr>
+                    <td style="font-weight:600;color:${color};">${row.nhood_annotation || '-'}</td>
+                    <td style="color:${color};">${lfc.toFixed(3)}</td>
+                    <td>${parseFloat(row.PValue || 1).toExponential(2)}</td>
+                    <td>${fdr < 0.001 ? fdr.toExponential(2) : fdr.toFixed(4)}</td>
+                    <td>${row.Nhood_size || '-'}</td>
+                </tr>`;
+            }).join('');
+        }
+    },
+
+    generateDctComposition() {
+        const imgDiv = document.getElementById('dct-composition-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-success"></div>';
+        fetch('/api/dct/plot_composition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML = `<img src="data:image/png;base64,${data.figure}"
+                    style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                    onclick="singleCellApp.showToolFigures(['${data.figure}'], 'Cell Type Composition')">`;
+            }
+        })
+        .catch(e => { imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`; });
+    },
+
+    generateDctEffects() {
+        const imgDiv = document.getElementById('dct-effects-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+        fetch('/api/dct/plot_effects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML = `<img src="data:image/png;base64,${data.figure}"
+                    style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                    onclick="singleCellApp.showToolFigures(['${data.figure}'], '${data.method === 'milopy' ? 'DA Beeswarm' : 'scCODA Effects'}')">`;
+            }
+        })
+        .catch(e => { imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`; });
     },
 
     saveData() {

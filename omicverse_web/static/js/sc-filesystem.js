@@ -473,7 +473,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             this.fetchKernelStats(tab.kernelId);
             this.fetchKernelVars(tab.kernelId);
         } else if (tab.type === 'text') {
-            this.showTextFile(tab.content || '');
+            this.showTextFile(tab.content || '', tab.name || '');
             this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'markdown') {
             this.showMarkdownFile(tab.content || '');
@@ -556,25 +556,75 @@ Object.assign(SingleCellAnalysis.prototype, {
         }
     },
 
-    showTextFile(content) {
-        const container = document.getElementById('code-cells-container');
-        const textView = document.getElementById('text-file-view');
+    showTextFile(content, filename) {
+        const container  = document.getElementById('code-cells-container');
+        const textView   = document.getElementById('text-file-view');
         const textEditor = document.getElementById('text-file-editor');
-        const varView = document.getElementById('var-detail-view');
-        const mdView = document.getElementById('md-file-view');
-        const imageView = document.getElementById('image-file-view');
-        if (container) container.style.display = 'none';
-        if (textView) {
-            textView.style.display = 'block';
+        const cmWrap     = document.getElementById('cm-editor-wrap');
+        const varView    = document.getElementById('var-detail-view');
+        const mdView     = document.getElementById('md-file-view');
+        const imageView  = document.getElementById('image-file-view');
+
+        if (container)  container.style.display  = 'none';
+        if (varView)    varView.style.display     = 'none';
+        if (mdView)     mdView.style.display      = 'none';
+        if (imageView)  imageView.style.display   = 'none';
+        if (textView)   textView.style.display    = 'block';
+
+        // Destroy any previous CodeMirror instance
+        if (this._cmEditor) {
+            this._cmEditor.toTextArea();
+            this._cmEditor = null;
         }
-        if (textEditor) {
-            textEditor.value = content;
+
+        // Determine CodeMirror mode from file extension
+        const ext = (filename || '').split('.').pop().toLowerCase();
+        const CM_MODE_MAP = {
+            py:   'python',
+            js:   'javascript',
+            ts:   'javascript',
+            json: 'application/json',
+            sh:   'shell',
+            r:    'r',
+        };
+        const cmMode = CM_MODE_MAP[ext];
+
+        if (cmMode && window.CodeMirror) {
+            // ── CodeMirror highlighted editor ────────────────────────────
+            if (textEditor) textEditor.style.display = 'none';
+            if (cmWrap)     cmWrap.style.display     = 'block';
+
+            // Move textarea value first so CM can seed from it
+            if (textEditor) textEditor.value = content;
+
+            const isDark = document.documentElement.classList.contains('app-skin-dark') ||
+                           document.body.classList.contains('app-skin-dark');
+
+            this._cmEditor = window.CodeMirror.fromTextArea(textEditor, {
+                mode:          cmMode,
+                theme:         isDark ? 'dracula' : 'default',
+                lineNumbers:   true,
+                lineWrapping:  false,
+                indentUnit:    4,
+                tabSize:       4,
+                indentWithTabs: false,
+                autofocus:     true,
+                extraKeys:     { 'Tab': cm => cm.replaceSelection('    ') },
+            });
+
+            // Fill the cmWrap container (not the original textarea location)
+            if (cmWrap) cmWrap.appendChild(this._cmEditor.getWrapperElement());
+            this._cmEditor.getWrapperElement().style.cssText =
+                'height:100%; font-size:13px; font-family:"JetBrains Mono","Fira Code",Menlo,monospace;';
+            this._cmEditor.setValue(content);
+            // Let CM measure itself after the container becomes visible
+            setTimeout(() => { if (this._cmEditor) this._cmEditor.refresh(); }, 50);
+
+        } else {
+            // ── plain textarea (non-code or CM not loaded) ───────────────
+            if (cmWrap)     cmWrap.style.display     = 'none';
+            if (textEditor) { textEditor.style.display = ''; textEditor.value = content; }
         }
-        if (varView) {
-            varView.style.display = 'none';
-        }
-        if (mdView) mdView.style.display = 'none';
-        if (imageView) imageView.style.display = 'none';
     },
 
     showMarkdownFile(content) {
