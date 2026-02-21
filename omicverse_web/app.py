@@ -283,7 +283,7 @@ def execute_code():
                 'filename': state.current_filename,
                 'n_cells': state.current_adata.n_obs,
                 'n_genes': state.current_adata.n_vars,
-                'embeddings': [emb.replace('X_', '') for emb in state.current_adata.obsm.keys()],
+                'embeddings': _canonical_embedding_keys(state.current_adata),
                 'obs_columns': list(state.current_adata.obs.columns),
                 'var_columns': list(state.current_adata.var.columns)
             }
@@ -371,7 +371,7 @@ def execute_code_stream():
                             'filename': state.current_filename,
                             'n_cells': state.current_adata.n_obs,
                             'n_genes': state.current_adata.n_vars,
-                            'embeddings': [emb.replace('X_', '') for emb in state.current_adata.obsm.keys()],
+                            'embeddings': _canonical_embedding_keys(state.current_adata),
                             'obs_columns': list(state.current_adata.obs.columns),
                             'var_columns': list(state.current_adata.var.columns)
                         }
@@ -433,7 +433,10 @@ def execute_code_stream():
 # Tools Routes
 # ============================================================================
 
-from utils.adata_helpers import analyze_data_state as _analyze_data_state
+from utils.adata_helpers import (
+    analyze_data_state as _analyze_data_state,
+    canonical_embedding_keys as _canonical_embedding_keys,
+)
 
 
 def _snapshot_adata(adata):
@@ -840,7 +843,7 @@ def get_status():
         'filename':      state.current_filename or 'data.h5ad',
         'n_cells':       state.current_adata.n_obs,
         'n_genes':       state.current_adata.n_vars,
-        'embeddings':    [k.replace('X_', '') for k in state.current_adata.obsm.keys()],
+        'embeddings':    _canonical_embedding_keys(state.current_adata),
         'obs_columns':   list(state.current_adata.obs.columns),
         'var_columns':   list(state.current_adata.var.columns),
         'uns_keys':      list(state.current_adata.uns.keys()),

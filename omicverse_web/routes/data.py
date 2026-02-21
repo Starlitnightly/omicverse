@@ -11,6 +11,10 @@ from flask import Blueprint, request, jsonify, send_file, make_response
 from werkzeug.utils import secure_filename
 
 from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
+from utils.adata_helpers import (
+    canonical_embedding_keys as _canonical_embedding_keys,
+    resolve_embedding_key as _resolve_embedding_key,
+)
 
 
 # Create blueprint
@@ -97,7 +101,7 @@ def upload_file():
         # Build response compatible with legacy UI expectations
         from utils.adata_helpers import analyze_data_state as _analyze_data_state
         adata = bp.state.current_adata
-        embeddings = [k.replace('X_', '') for k in adata.obsm.keys()]
+        embeddings = _canonical_embedding_keys(adata)
         response_data = {
             'filename': filename,
             # Legacy/UI fields used by single-cell.js
@@ -154,7 +158,7 @@ def upload_file_preview():
         # Pass the already-opened backed adata to the adaptor (avoids re-loading fully)
         bp.state.current_adaptor = HighPerformanceAnndataAdaptor(adata_backed)
 
-        embeddings = [k.replace('X_', '') for k in adata_backed.obsm.keys()]
+        embeddings = _canonical_embedding_keys(adata_backed)
 
         response_data = {
             'filename': filename,
@@ -232,7 +236,7 @@ def get_embedding_data(embedding_name):
                 if embedding_name == 'random' or embedding_name == 'X_random':
                     coords = bp.state.current_adaptor._get_random_embedding()
                 else:
-                    embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+                    embedding_key = _resolve_embedding_key(bp.state.current_adaptor.adata, embedding_name)
                     coords = bp.state.current_adaptor.adata.obsm[embedding_key]
                 start = chunk_index * bp.state.current_adaptor.chunk_size
                 end = min(start + bp.state.current_adaptor.chunk_size, bp.state.current_adaptor.n_obs)
@@ -249,7 +253,7 @@ def get_embedding_data(embedding_name):
                 if embedding_name == 'random' or embedding_name == 'X_random':
                     coords = bp.state.current_adaptor._get_random_embedding()
                 else:
-                    embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
+                    embedding_key = _resolve_embedding_key(bp.state.current_adaptor.adata, embedding_name)
                     coords = bp.state.current_adaptor.adata.obsm[embedding_key]
                 return jsonify({'x': coords[:, 0].tolist(), 'y': coords[:, 1].tolist()})
             else:

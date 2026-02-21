@@ -4,6 +4,68 @@ AnnData Helpers - Fast preprocessing state analysis
 import logging
 
 
+def canonical_embedding_keys(adata):
+    """Return the actual obsm keys to expose as embeddings, deduplicating by
+    display name and preferring the ``X_``-prefixed variant when both exist.
+
+    Examples
+    --------
+    obsm = {'X_umap', 'UMAP', 'X_pca'}  →  ['X_pca', 'X_umap']
+      (UMAP is dropped because X_umap already covers that display name)
+
+    obsm = {'umap', 'UMAP', 'X_pca'}  →  ['X_pca', 'umap', 'UMAP']
+      (no X_ version exists for either, so both are kept as-is)
+
+    Returns
+    -------
+    list[str]
+        Actual obsm key strings in the order they were first encountered.
+    """
+    # First pass: collect keys, building display_name → [keys] mapping
+    display_to_keys: dict = {}
+    for key in adata.obsm.keys():
+        display = key[2:].lower() if key.startswith('X_') else key.lower()
+        display_to_keys.setdefault(display, []).append(key)
+
+    result = []
+    for keys in display_to_keys.values():
+        if len(keys) == 1:
+            result.append(keys[0])
+        else:
+            # Multiple keys share the same display name.
+            # Prefer the X_-prefixed one; if none, keep the first.
+            preferred = next((k for k in keys if k.startswith('X_')), keys[0])
+            result.append(preferred)
+    return result
+
+
+def resolve_embedding_key(adata, name: str) -> str:
+    """Resolve *name* to the actual key present in ``adata.obsm``.
+
+    Lookup order:
+    1. Exact match  (name  is in obsm)
+    2. Prefixed     (X_{name} is in obsm)
+    3. Stripped     (name without leading X_ is in obsm)
+    4. Case-insensitive exact match
+
+    Raises ``KeyError`` if no match found.
+    """
+    if name in adata.obsm:
+        return name
+    prefixed = f'X_{name}'
+    if prefixed in adata.obsm:
+        return prefixed
+    stripped = name[2:] if name.startswith('X_') else name
+    if stripped in adata.obsm:
+        return stripped
+    # Case-insensitive fallback
+    name_lower = name.lower()
+    for k in adata.obsm.keys():
+        if k.lower() == name_lower or k.lower() == f'x_{name_lower}' or k[2:].lower() == name_lower:
+            return k
+    raise KeyError(f"Embedding '{name}' not found in obsm")
+
+
 def analyze_data_state(adata):
     """Fast heuristic analysis of adata preprocessing state.
 

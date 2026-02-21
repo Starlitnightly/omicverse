@@ -106,3 +106,12 @@ body.resizing-sidebar * {
     z-index: 10 !important;
     width: 100% !important;
 }
+
+/* ========================================
+   Status Bar — offset by sidebar so it never
+   overlaps the memory bar
+   ======================================== */
+#status-bar {
+    left: var(--sidebar-width) !important;
+    transition: left 0.05s ease !important;
+}

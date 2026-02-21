@@ -22,6 +22,7 @@ from services.kernel_service import (
 )
 from utils.variable_helpers import summarize_var, resolve_var_path
 from utils.memory_helpers import estimate_var_size, get_process_memory_mb
+from utils.adata_helpers import canonical_embedding_keys as _canonical_embedding_keys
 
 
 # Create blueprint
@@ -336,7 +337,7 @@ def kernel_load_adata():
             'filename': bp.state.current_filename,
             'n_cells': adata.n_obs,
             'n_genes': adata.n_vars,
-            'embeddings': [emb.replace('X_', '') for emb in adata.obsm.keys()],
+            'embeddings': _canonical_embedding_keys(adata),
             'obs_columns': list(adata.obs.columns),
             'var_columns': list(adata.var.columns),
             'uns_keys':    list(adata.uns.keys()),

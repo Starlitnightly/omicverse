@@ -355,12 +355,15 @@ Object.assign(SingleCellAnalysis.prototype, {
         this.initPointSizeSlider();
 
         // Update embedding options
+        // data.embeddings now contains actual obsm keys (e.g. 'X_umap', 'UMAP').
+        // Use the full key as the option value so the backend can look it up
+        // exactly; strip the leading 'X_' only for the human-readable label.
         const embeddingSelect = document.getElementById('embedding-select');
         embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
         data.embeddings.forEach(emb => {
             const option = document.createElement('option');
             option.value = emb;
-            option.textContent = emb.toUpperCase();
+            option.textContent = (emb.startsWith('X_') ? emb.slice(2) : emb).toUpperCase();
             embeddingSelect.appendChild(option);
         });
 
@@ -421,7 +424,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             data.embeddings.forEach(emb => {
                 const option = document.createElement('option');
                 option.value = emb;
-                option.textContent = emb.toUpperCase();
+                option.textContent = (emb.startsWith('X_') ? emb.slice(2) : emb).toUpperCase();
                 embeddingSelect.appendChild(option);
             });
             if (data.embeddings.includes(prevEmbedding)) {

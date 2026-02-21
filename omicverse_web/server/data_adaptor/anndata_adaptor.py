@@ -191,9 +191,23 @@ class HighPerformanceAnndataAdaptor:
         if embedding_name == 'random' or embedding_name == 'X_random':
             coords = self._get_random_embedding()
         else:
-            embedding_key = f'X_{embedding_name}' if not embedding_name.startswith('X_') else embedding_name
-            if embedding_key not in self.adata.obsm:
-                raise KeyError(f"Embedding '{embedding_name}' not found")
+            # Smart key resolution: try direct → X_-prefixed → stripped → case-insensitive
+            if embedding_name in self.adata.obsm:
+                embedding_key = embedding_name
+            elif f'X_{embedding_name}' in self.adata.obsm:
+                embedding_key = f'X_{embedding_name}'
+            else:
+                # Case-insensitive fallback
+                name_lower = embedding_name.lower()
+                embedding_key = next(
+                    (k for k in self.adata.obsm
+                     if k.lower() == name_lower
+                     or k.lower() == f'x_{name_lower}'
+                     or (k.startswith('X_') and k[2:].lower() == name_lower)),
+                    None
+                )
+                if embedding_key is None:
+                    raise KeyError(f"Embedding '{embedding_name}' not found in obsm")
             coords = self.adata.obsm[embedding_key]
 
         # Convert to DataFrame for consistent serialization
