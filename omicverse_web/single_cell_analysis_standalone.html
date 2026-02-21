@@ -657,6 +657,177 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- ── Trajectory Analysis Visualization ── -->
+                        <div id="traj-viz-panel" class="control-panel mt-3" style="display:none;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="mb-0" style="color:var(--accent-primary,#7aa2f7);">
+                                    <i class="fas fa-route me-2"></i>
+                                    <span data-i18n="traj.title">Trajectory Visualization</span>
+                                </h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleTrajViz()" title="Collapse">
+                                    <i class="fas fa-chevron-up" id="traj-viz-toggle-icon"></i>
+                                </button>
+                            </div>
+
+                            <div id="traj-viz-body" class="row g-3">
+
+                                <!-- ── Left sub-card: Pseudotime Embedding ── -->
+                                <div class="col-md-6">
+                                    <div class="card h-100" style="background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border-color,#313244);">
+                                        <div class="card-header py-2 d-flex align-items-center justify-content-between"
+                                             style="background:var(--bg-tertiary,#181825);border-bottom:1px solid var(--border-color,#313244);">
+                                            <span class="small fw-semibold">
+                                                <i class="fas fa-map me-1 text-primary"></i>
+                                                <span data-i18n="traj.embTitle">Pseudotime Embedding</span>
+                                            </span>
+                                            <button class="btn btn-sm btn-primary py-0 px-2"
+                                                    onclick="singleCellApp.generateTrajEmbedding()">
+                                                <i class="fas fa-play me-1"></i>
+                                                <span data-i18n="traj.generate">Generate</span>
+                                            </button>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <!-- Image output -->
+                                            <div id="traj-embedding-img"
+                                                 class="d-flex align-items-center justify-content-center rounded mb-2"
+                                                 style="min-height:220px;background:var(--bg-primary,#1a1a2e);">
+                                                <span class="text-muted small" data-i18n="traj.clickGenerate">Click Generate to render</span>
+                                            </div>
+                                            <!-- Embedding parameters -->
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.pseudotimeCol">Pseudotime column</label>
+                                                    <select class="form-select form-select-sm" id="traj-pseudotime-col">
+                                                        <option value="" data-i18n="traj.autoDetect">Auto-detect</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.basis">Embedding</label>
+                                                    <select class="form-select form-select-sm" id="traj-basis"></select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.colormap">Colormap</label>
+                                                    <select class="form-select form-select-sm" id="traj-cmap">
+                                                        <option value="Reds">Reds</option>
+                                                        <option value="viridis">Viridis</option>
+                                                        <option value="plasma">Plasma</option>
+                                                        <option value="magma">Magma</option>
+                                                        <option value="RdBu_r">RdBu_r</option>
+                                                        <option value="YlOrRd">YlOrRd</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.pointSize">Point size</label>
+                                                    <input type="number" class="form-control form-control-sm"
+                                                           id="traj-point-size" value="3" min="0.5" max="30" step="0.5">
+                                                </div>
+                                            </div>
+
+                                            <!-- PAGA overlay sub-card -->
+                                            <div class="card mt-2" style="background:var(--bg-primary,#13131f);border:1px solid var(--border-color,#313244);">
+                                                <div class="card-header py-1 px-2"
+                                                     style="background:transparent;border-bottom:1px solid var(--border-color,#313244);">
+                                                    <div class="form-check mb-0">
+                                                        <input class="form-check-input" type="checkbox" id="traj-paga-overlay"
+                                                               onchange="singleCellApp.togglePagaOptions(this.checked)">
+                                                        <label class="form-check-label small" for="traj-paga-overlay"
+                                                               data-i18n="traj.pagaOverlay">Overlay PAGA graph</label>
+                                                    </div>
+                                                </div>
+                                                <div class="card-body py-2 px-2" id="traj-paga-options" style="display:none;">
+                                                    <div class="row g-2">
+                                                        <div class="col-12">
+                                                            <label class="form-label form-label-sm" data-i18n="traj.pagaGroups">Cluster column (groups)</label>
+                                                            <select class="form-select form-select-sm" id="traj-paga-groups">
+                                                                <option value="" data-i18n="traj.selectCol">-- Select --</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label form-label-sm" data-i18n="traj.minEdge">Min edge width</label>
+                                                            <input type="number" class="form-control form-control-sm"
+                                                                   id="traj-paga-min-edge" value="2" min="0" max="10" step="0.5">
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label form-label-sm" data-i18n="traj.nodeScale">Node size scale</label>
+                                                            <input type="number" class="form-control form-control-sm"
+                                                                   id="traj-paga-node-scale" value="1.5" min="0.1" max="5" step="0.1">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- end PAGA sub-card -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- ── end Left sub-card ── -->
+
+                                <!-- ── Right sub-card: Gene Trend Heatmap ── -->
+                                <div class="col-md-6">
+                                    <div class="card h-100" style="background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border-color,#313244);">
+                                        <div class="card-header py-2 d-flex align-items-center justify-content-between"
+                                             style="background:var(--bg-tertiary,#181825);border-bottom:1px solid var(--border-color,#313244);">
+                                            <span class="small fw-semibold">
+                                                <i class="fas fa-th me-1 text-warning"></i>
+                                                <span data-i18n="traj.hmTitle">Gene Trend Heatmap</span>
+                                            </span>
+                                            <button class="btn btn-sm btn-warning py-0 px-2"
+                                                    onclick="singleCellApp.generateTrajHeatmap()">
+                                                <i class="fas fa-play me-1"></i>
+                                                <span data-i18n="traj.generate">Generate</span>
+                                            </button>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <!-- Image output -->
+                                            <div id="traj-heatmap-img"
+                                                 class="d-flex align-items-center justify-content-center rounded mb-2"
+                                                 style="min-height:220px;background:var(--bg-primary,#1a1a2e);">
+                                                <span class="text-muted small" data-i18n="traj.hmHint">Enter genes then click Generate</span>
+                                            </div>
+                                            <!-- Heatmap parameters -->
+                                            <div class="row g-2">
+                                                <div class="col-12">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.genes">Genes (comma or newline separated)</label>
+                                                    <textarea class="form-control form-control-sm" id="traj-heatmap-genes"
+                                                              rows="2" placeholder="Ins2, Pax4, Gcg, Sst"></textarea>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.pseudotimeCol">Pseudotime column</label>
+                                                    <select class="form-select form-select-sm" id="traj-heatmap-pseudotime">
+                                                        <option value="" data-i18n="traj.autoDetect">Auto-detect</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.layer">Data layer</label>
+                                                    <select class="form-select form-select-sm" id="traj-heatmap-layer">
+                                                        <option value="">X (default)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.bins">Pseudotime bins</label>
+                                                    <input type="number" class="form-control form-control-sm"
+                                                           id="traj-heatmap-bins" value="50" min="10" max="500">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label form-label-sm" data-i18n="traj.hmColormap">Colormap</label>
+                                                    <select class="form-select form-select-sm" id="traj-heatmap-cmap">
+                                                        <option value="RdBu_r">RdBu_r</option>
+                                                        <option value="viridis">Viridis</option>
+                                                        <option value="magma">Magma</option>
+                                                        <option value="YlOrRd">YlOrRd</option>
+                                                        <option value="Blues">Blues</option>
+                                                        <option value="Reds">Reds</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- ── end Right sub-card ── -->
+
+                            </div><!-- /#traj-viz-body -->
+                        </div><!-- /#traj-viz-panel -->
+
                     </div>
                 </div>
                 </div>

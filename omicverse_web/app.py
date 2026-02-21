@@ -398,6 +398,90 @@ def execute_code_stream():
 # Tools Routes
 # ============================================================================
 
+def _analyze_data_state(adata):
+    """Heuristically analyze the preprocessing state of an AnnData object.
+
+    Returns a dict with:
+        x_max, x_min, is_int, is_log1p, is_normalized,
+        estimated_target_sum, is_scaled
+    """
+    import numpy as _np
+    import scipy.sparse as _sp
+
+    try:
+        X = adata.X
+        # Sample up to 5000 cells for speed
+        n_sample = min(adata.n_obs, 5000)
+        if adata.n_obs > n_sample:
+            idx = _np.random.choice(adata.n_obs, n_sample, replace=False)
+            X_sample = X[idx]
+        else:
+            X_sample = X
+
+        # Convert to dense only if not too large
+        if _sp.issparse(X_sample):
+            x_max_val = float(X_sample.max())
+            x_min_val = float(X_sample.min())
+            # Check for integer values using a small slice of nonzero entries
+            coo = X_sample.tocoo()
+            nz = coo.data[:500] if len(coo.data) > 500 else coo.data
+            X_dense_sample = X_sample[:200].toarray() if X_sample.shape[0] >= 200 else X_sample.toarray()
+        else:
+            X_sample_arr = _np.asarray(X_sample)
+            x_max_val = float(_np.nanmax(X_sample_arr))
+            x_min_val = float(_np.nanmin(X_sample_arr))
+            nz_mask = X_sample_arr != 0
+            nz = X_sample_arr[nz_mask][:500]
+            X_dense_sample = X_sample_arr[:200]
+
+        # is_int: are nonzero values all integers?
+        is_int = bool(len(nz) > 0 and _np.all(_np.abs(nz - _np.round(nz)) < 1e-4))
+
+        # is_log1p: reliable check = 'log1p' key in uns
+        is_log1p_uns = 'log1p' in adata.uns
+        # Fallback heuristic: max < 20 and not integer
+        is_log1p_heuristic = (not is_int) and (x_max_val < 30)
+        is_log1p = bool(is_log1p_uns or is_log1p_heuristic)
+
+        has_negative = bool(x_min_val < 0)
+
+        # is_scaled: data has negative values and max ≤ 50 (typical post-scale range)
+        is_scaled = bool(has_negative and x_max_val <= 50)
+
+        # is_normalized: check coefficient of variation of row sums
+        row_sums = _np.asarray(X_dense_sample.sum(axis=1)).ravel().astype(float)
+        row_sums = row_sums[row_sums > 0]
+        if len(row_sums) >= 5:
+            cv = float(_np.std(row_sums) / _np.mean(row_sums)) if _np.mean(row_sums) > 0 else 1.0
+            is_normalized = bool(cv < 0.05)
+        else:
+            is_normalized = False
+
+        # estimated_target_sum — only computable for non-log1p normalized data
+        estimated_target_sum = None
+        _COMMON_TS = [500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000]
+        if is_normalized and not is_scaled and not is_log1p:
+            row_sums_all = _np.asarray(X_dense_sample.sum(axis=1)).ravel()
+            row_sums_all = row_sums_all[row_sums_all > 0]
+            if len(row_sums_all) > 0:
+                median_ts = float(_np.median(row_sums_all))
+                closest = min(_COMMON_TS, key=lambda v: abs(v - median_ts))
+                estimated_target_sum = closest if abs(closest - median_ts) / (median_ts + 1e-9) < 0.5 else None
+
+        return {
+            'x_max': round(x_max_val, 4),
+            'x_min': round(x_min_val, 4),
+            'is_int': is_int,
+            'is_log1p': is_log1p,
+            'is_normalized': is_normalized,
+            'is_scaled': is_scaled,
+            'estimated_target_sum': estimated_target_sum,
+        }
+    except Exception as _e:
+        logging.warning(f"_analyze_data_state failed: {_e}")
+        return {}
+
+
 def _snapshot_adata(adata):
     """Capture the structural state of an AnnData for before/after comparison."""
     return {
@@ -442,7 +526,9 @@ def run_tool(tool):
         params = request.json if request.json else {}
         snap_before = _snapshot_adata(state.current_adata)
         t0 = _time.time()
-        predicted_col = None  # set by annotation tools
+        predicted_col  = None  # set by annotation tools
+        pseudotime_col = None  # set by trajectory tools
+        tool_figures   = []    # figures produced by tools (e.g., PAGA)
 
         # ── Preprocessing ────────────────────────────────────────────────────
         if tool == 'normalize':
@@ -640,6 +726,122 @@ def run_tool(tool):
             )
             predicted_col = 'scsa_prediction'
 
+        # ── Trajectory Analysis ──────────────────────────────────────────────
+        elif tool == 'diffusion_map':
+            import omicverse as ov
+            groupby = params.get('groupby', 'leiden')
+            use_rep = params.get('use_rep', 'X_pca')
+            n_comps = int(params.get('n_comps', 50))
+            origin  = params.get('origin_cells', '').strip()
+            basis   = params.get('basis', 'X_umap')
+            if use_rep not in state.current_adata.obsm:
+                use_rep = next((k for k in state.current_adata.obsm if 'pca' in k.lower()),
+                               list(state.current_adata.obsm.keys())[0])
+            if basis not in state.current_adata.obsm:
+                basis = list(state.current_adata.obsm.keys())[0]
+            Traj = ov.single.TrajInfer(state.current_adata, basis=basis,
+                                       groupby=groupby, use_rep=use_rep, n_comps=n_comps)
+            if origin:
+                Traj.set_origin_cells(origin)
+            Traj.inference(method='diffusion_map')
+            pseudotime_col = 'dpt_pseudotime'
+
+        elif tool == 'slingshot':
+            import omicverse as ov
+            groupby    = params.get('groupby', 'leiden')
+            use_rep    = params.get('use_rep', 'X_pca')
+            n_comps    = int(params.get('n_comps', 50))
+            origin     = params.get('origin_cells', '').strip()
+            terminal   = params.get('terminal_cells', '').strip()
+            num_epochs = int(params.get('num_epochs', 1))
+            basis      = params.get('basis', 'X_umap')
+            if use_rep not in state.current_adata.obsm:
+                use_rep = next((k for k in state.current_adata.obsm if 'pca' in k.lower()),
+                               list(state.current_adata.obsm.keys())[0])
+            if basis not in state.current_adata.obsm:
+                basis = list(state.current_adata.obsm.keys())[0]
+            Traj = ov.single.TrajInfer(state.current_adata, basis=basis,
+                                       groupby=groupby, use_rep=use_rep, n_comps=n_comps)
+            if origin:
+                Traj.set_origin_cells(origin)
+            if terminal:
+                Traj.set_terminal_cells([t.strip() for t in terminal.split(',') if t.strip()])
+            Traj.inference(method='slingshot', num_epochs=num_epochs)
+            pseudotime_col = 'slingshot_pseudotime'
+
+        elif tool == 'palantir':
+            import omicverse as ov
+            groupby       = params.get('groupby', 'leiden')
+            use_rep       = params.get('use_rep', 'X_pca')
+            n_comps       = int(params.get('n_comps', 50))
+            origin        = params.get('origin_cells', '').strip()
+            terminal      = params.get('terminal_cells', '').strip()
+            num_waypoints = int(params.get('num_waypoints', 500))
+            basis         = params.get('basis', 'X_umap')
+            if use_rep not in state.current_adata.obsm:
+                use_rep = next((k for k in state.current_adata.obsm if 'pca' in k.lower()),
+                               list(state.current_adata.obsm.keys())[0])
+            if basis not in state.current_adata.obsm:
+                basis = list(state.current_adata.obsm.keys())[0]
+            Traj = ov.single.TrajInfer(state.current_adata, basis=basis,
+                                       groupby=groupby, use_rep=use_rep, n_comps=n_comps)
+            if origin:
+                Traj.set_origin_cells(origin)
+            if terminal:
+                Traj.set_terminal_cells([t.strip() for t in terminal.split(',') if t.strip()])
+            Traj.inference(method='palantir', num_waypoints=num_waypoints)
+            pseudotime_col = 'palantir_pseudotime'
+
+        elif tool == 'paga':
+            import omicverse as ov
+            import base64
+            import matplotlib.pyplot as plt
+            use_time_prior = params.get('use_time_prior', '').strip()
+            groups         = params.get('groups', 'leiden')
+            use_rep        = params.get('use_rep', 'X_pca')
+            basis          = params.get('basis', 'umap')   # plot_paga uses no X_ prefix
+            if use_rep not in state.current_adata.obsm:
+                use_rep = next((k for k in state.current_adata.obsm if 'pca' in k.lower()), None)
+            if use_rep:
+                sc.pp.neighbors(state.current_adata, use_rep=use_rep)
+            elif 'neighbors' not in state.current_adata.uns:
+                sc.pp.neighbors(state.current_adata)
+            paga_kw = dict(vkey='paga', groups=groups)
+            if use_time_prior and use_time_prior in state.current_adata.obs.columns:
+                paga_kw['use_time_prior'] = use_time_prior
+            ov.utils.cal_paga(state.current_adata, **paga_kw)
+            before_figs = set(plt.get_fignums())
+            ov.utils.plot_paga(state.current_adata, basis=basis, size=50, alpha=0.1,
+                               title=f'PAGA ({use_time_prior or groups})',
+                               min_edge_width=2, node_size_scale=1.5,
+                               show=False, legend_loc=False)
+            after_figs = set(plt.get_fignums())
+            for fig_num in [n for n in after_figs if n not in before_figs]:
+                fig = plt.figure(fig_num)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+                tool_figures.append(base64.b64encode(buf.getvalue()).decode('ascii'))
+                plt.close(fig)
+
+        elif tool == 'sctour':
+            import omicverse as ov
+            groupby          = params.get('groupby', 'leiden')
+            use_rep          = params.get('use_rep', 'X_pca')
+            n_comps          = int(params.get('n_comps', 50))
+            alpha_recon_lec  = float(params.get('alpha_recon_lec', 0.5))
+            alpha_recon_lode = float(params.get('alpha_recon_lode', 0.5))
+            basis            = params.get('basis', 'X_umap')
+            if use_rep not in state.current_adata.obsm:
+                use_rep = next((k for k in state.current_adata.obsm if 'pca' in k.lower()),
+                               list(state.current_adata.obsm.keys())[0])
+            if basis not in state.current_adata.obsm:
+                basis = list(state.current_adata.obsm.keys())[0]
+            Traj = ov.single.TrajInfer(state.current_adata, basis=basis,
+                                       groupby=groupby, use_rep=use_rep, n_comps=n_comps)
+            Traj.inference(method='sctour',
+                           alpha_recon_lec=alpha_recon_lec, alpha_recon_lode=alpha_recon_lode)
+            pseudotime_col = 'sctour_pseudotime'
+
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
 
@@ -657,10 +859,16 @@ def run_tool(tool):
             'obs_columns':   list(state.current_adata.obs.columns),
             'var_columns':   list(state.current_adata.var.columns),
             'uns_keys':      list(state.current_adata.uns.keys()),
+            'layers':        list(state.current_adata.layers.keys()),
             'diff':          diff,
         }
+        resp['data_state'] = _analyze_data_state(state.current_adata)
         if predicted_col:
             resp['predicted_col'] = predicted_col
+        if pseudotime_col and pseudotime_col in state.current_adata.obs.columns:
+            resp['pseudotime_col'] = pseudotime_col
+        if tool_figures:
+            resp['figures'] = tool_figures
         return jsonify(resp)
 
     except Exception as e:
@@ -682,7 +890,210 @@ def get_status():
         'obs_columns': list(state.current_adata.obs.columns),
         'var_columns': list(state.current_adata.var.columns),
         'uns_keys':    list(state.current_adata.uns.keys()),
+        'layers':      list(state.current_adata.layers.keys()),
+        'data_state':  _analyze_data_state(state.current_adata),
     })
+
+
+# ============================================================================
+# Trajectory Visualization Endpoints
+# ============================================================================
+
+@app.route('/api/trajectory/plot_embedding', methods=['POST'])
+def trajectory_plot_embedding():
+    """Render a pseudotime-colored embedding with optional PAGA overlay."""
+    if state.current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        import base64
+        import omicverse as ov
+        import numpy as _np
+
+        params = request.json or {}
+        pseudotime_col      = params.get('pseudotime_col', '').strip()
+        basis               = params.get('basis', 'X_umap')
+        cmap                = params.get('cmap', 'Reds')
+        point_size          = float(params.get('point_size', 3))
+        paga_overlay        = bool(params.get('paga_overlay', False))
+        paga_groups         = params.get('paga_groups', '').strip()
+        paga_min_edge_width = float(params.get('paga_min_edge_width', 2))
+        paga_node_scale     = float(params.get('paga_node_size_scale', 1.5))
+
+        adata = state.current_adata
+
+        # Auto-detect pseudotime column
+        if not pseudotime_col:
+            for col in ('dpt_pseudotime', 'palantir_pseudotime',
+                        'slingshot_pseudotime', 'sctour_pseudotime'):
+                if col in adata.obs.columns:
+                    pseudotime_col = col
+                    break
+        if not pseudotime_col or pseudotime_col not in adata.obs.columns:
+            return jsonify({'error': '未找到拟时序列，请先运行轨迹推断工具'}), 400
+
+        # Validate / fall-back basis
+        if basis not in adata.obsm:
+            basis = next((k for k in adata.obsm if 'umap' in k.lower()),
+                         list(adata.obsm.keys())[0])
+
+        coords    = adata.obsm[basis]
+        pseudotime = _np.array(adata.obs[pseudotime_col].values, dtype=float)
+
+        fig, ax = plt.subplots(figsize=(6, 5))
+        sc_plot = ax.scatter(
+            coords[:, 0], coords[:, 1],
+            c=pseudotime, cmap=cmap, s=point_size,
+            alpha=0.8, linewidths=0, rasterized=True
+        )
+        plt.colorbar(sc_plot, ax=ax, label=pseudotime_col,
+                     fraction=0.046, pad=0.04)
+
+        # PAGA overlay
+        if paga_overlay:
+            basis_name = basis.replace('X_', '')
+            # Ensure PAGA is computed with correct groups
+            try:
+                if paga_groups and paga_groups in adata.obs.columns:
+                    if 'neighbors' not in adata.uns:
+                        sc.pp.neighbors(adata)
+                    paga_kw = dict(vkey='paga', groups=paga_groups)
+                    if pseudotime_col in adata.obs.columns:
+                        paga_kw['use_time_prior'] = pseudotime_col
+                    ov.utils.cal_paga(adata, **paga_kw)
+                ov.utils.plot_paga(
+                    adata, basis=basis_name, size=0, alpha=0.0,
+                    title='', min_edge_width=paga_min_edge_width,
+                    node_size_scale=paga_node_scale,
+                    show=False, legend_loc=False, ax=ax
+                )
+            except Exception as paga_err:
+                logging.warning(f"PAGA overlay failed: {paga_err}")
+
+        basis_label = basis.replace('X_', '').upper()
+        ax.set_xlabel(f'{basis_label} 1', fontsize=9)
+        ax.set_ylabel(f'{basis_label} 2', fontsize=9)
+        ax.set_title(pseudotime_col, fontsize=10)
+        ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=120)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"trajectory_plot_embedding failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/trajectory/plot_heatmap', methods=['POST'])
+def trajectory_plot_heatmap():
+    """Render a gene-expression × pseudotime heatmap."""
+    if state.current_adata is None:
+        return jsonify({'error': 'No data loaded'}), 400
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import base64
+        import numpy as _np
+
+        params = request.json or {}
+        genes_raw      = params.get('genes', '')
+        pseudotime_col = params.get('pseudotime_col', '').strip()
+        layer          = params.get('layer', '').strip()
+        n_bins         = max(5, int(params.get('n_bins', 50)))
+        cmap           = params.get('cmap', 'RdBu_r')
+
+        adata = state.current_adata
+
+        # Parse gene list (comma / newline separated)
+        genes = [g.strip() for g in genes_raw.replace('\n', ',').split(',')
+                 if g.strip()]
+        if not genes:
+            return jsonify({'error': '请输入至少一个基因名称'}), 400
+        genes = [g for g in genes if g in adata.var_names]
+        if not genes:
+            return jsonify({'error': '所有输入基因均不在数据集中，请检查基因名称'}), 400
+
+        # Auto-detect pseudotime
+        if not pseudotime_col:
+            for col in ('dpt_pseudotime', 'palantir_pseudotime',
+                        'slingshot_pseudotime', 'sctour_pseudotime'):
+                if col in adata.obs.columns:
+                    pseudotime_col = col
+                    break
+        if not pseudotime_col or pseudotime_col not in adata.obs.columns:
+            return jsonify({'error': '未找到拟时序列，请先运行轨迹推断工具'}), 400
+
+        # Build expression matrix
+        if layer and layer in adata.layers:
+            X = adata.layers[layer]
+        else:
+            X = adata.X
+        if hasattr(X, 'toarray'):
+            X = X.toarray()
+        else:
+            X = _np.asarray(X)
+
+        # Gene indices
+        var_names = list(adata.var_names)
+        gene_idx  = [var_names.index(g) for g in genes]
+        expr      = X[:, gene_idx]           # (n_cells, n_genes)
+
+        # Sort by pseudotime, drop NaN cells
+        pt = _np.array(adata.obs[pseudotime_col].values, dtype=float)
+        valid = ~_np.isnan(pt)
+        pt, expr = pt[valid], expr[valid]
+        order     = _np.argsort(pt)
+        expr      = expr[order]              # (n_valid_cells, n_genes)
+
+        # Bin into n_bins equal-size groups
+        n_cells  = len(order)
+        bin_size = max(1, n_cells // n_bins)
+        bins     = []
+        for i in range(n_bins):
+            s, e = i * bin_size, min((i + 1) * bin_size, n_cells)
+            if s >= n_cells:
+                break
+            bins.append(expr[s:e].mean(axis=0))
+        heatmap = _np.array(bins).T           # (n_genes, n_actual_bins)
+
+        # Row-wise 0-1 normalisation per gene
+        rmin = heatmap.min(axis=1, keepdims=True)
+        rmax = heatmap.max(axis=1, keepdims=True)
+        denom = _np.where(rmax - rmin > 1e-10, rmax - rmin, 1.0)
+        heatmap_norm = (heatmap - rmin) / denom
+
+        # Draw
+        n_actual = heatmap_norm.shape[1]
+        fig_h = max(3, len(genes) * 0.55 + 1.5)
+        fig, ax = plt.subplots(figsize=(8, fig_h))
+        im = ax.imshow(heatmap_norm, aspect='auto', cmap=cmap,
+                       interpolation='bilinear', vmin=0, vmax=1)
+        ax.set_yticks(range(len(genes)))
+        ax.set_yticklabels(genes, fontsize=9)
+        tick_pos = [0, n_actual // 4, n_actual // 2, 3 * n_actual // 4, n_actual - 1]
+        ax.set_xticks(tick_pos)
+        ax.set_xticklabels(['0%', '25%', '50%', '75%', '100%'], fontsize=8)
+        ax.set_xlabel('Pseudotime →', fontsize=9)
+        ax.set_title(f'Gene trends  ({pseudotime_col})', fontsize=10)
+        plt.colorbar(im, ax=ax, label='Norm. expression', fraction=0.025, pad=0.04)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=130)
+        plt.close(fig)
+        return jsonify({'figure': base64.b64encode(buf.getvalue()).decode('ascii')})
+
+    except Exception as e:
+        logging.error(f"trajectory_plot_heatmap failed: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================

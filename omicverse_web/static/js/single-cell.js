@@ -121,6 +121,17 @@ class SingleCellAnalysis {
                 'status.genes': 'genes',
                 'status.save': 'Save',
                 'status.reset': 'Reset',
+                'status.dsMax': 'max',
+                'status.dsInt': 'int',
+                'status.dsFloat': 'float',
+                'status.dsNorm': 'normalized',
+                'status.dsNormTip': 'Row sums are uniform — data appears normalized',
+                'status.dsRaw': 'raw counts',
+                'status.dsRawTip': 'Row sums vary significantly — data appears to be raw counts',
+                'status.dsLog1pTip': 'log1p transformation has been applied',
+                'status.dsScaled': 'scaled',
+                'status.dsScaledTip': 'Data has negative values — sc.pp.scale may have been applied',
+                'status.dsTargetTip': 'Estimated normalization target_sum',
                 'controls.embedding': 'Embedding',
                 'controls.embeddingPlaceholder': 'Select embedding',
                 'controls.colorBy': 'Color by',
@@ -281,13 +292,13 @@ class SingleCellAnalysis {
                 'tools.scsa': 'SCSA',
                 'tools.scsaDesc': 'Score-based cell type annotation',
                 'tools.diffusionmap': 'Diffusion Map',
-                'tools.diffusionmapDesc': 'Diffusion map trajectory analysis',
+                'tools.diffusionmapDesc': 'Diffusion map trajectory + DPT pseudotime',
                 'tools.slingshot': 'Slingshot',
                 'tools.slingshotDesc': 'Cell lineage and pseudotime inference',
                 'tools.palantir': 'Palantir',
                 'tools.palantirDesc': 'Cell fate prediction via diffusion',
-                'tools.pyvia': 'pyVIA',
-                'tools.pyviaDesc': 'Graph-based trajectory analysis',
+                'tools.paga': 'PAGA',
+                'tools.pagaDesc': 'Partition-based graph abstraction visualization',
                 'tools.sctour': 'scTour',
                 'tools.sctourDesc': 'Deep learning-based trajectory analysis',
                 'gene.error': 'Gene expression error',
@@ -310,6 +321,26 @@ class SingleCellAnalysis {
                 'tool.failed': 'failed',
                 'tool.completed': 'completed',
                 'tool.execFailed': 'failed to run',
+                'traj.title': 'Trajectory Visualization',
+                'traj.embTitle': 'Pseudotime Embedding',
+                'traj.hmTitle': 'Gene Trend Heatmap',
+                'traj.generate': 'Generate',
+                'traj.clickGenerate': 'Click Generate to render',
+                'traj.hmHint': 'Enter genes then click Generate',
+                'traj.pseudotimeCol': 'Pseudotime column',
+                'traj.autoDetect': 'Auto-detect',
+                'traj.basis': 'Embedding',
+                'traj.colormap': 'Colormap',
+                'traj.pointSize': 'Point size',
+                'traj.pagaOverlay': 'Overlay PAGA graph',
+                'traj.pagaGroups': 'Cluster column (groups)',
+                'traj.selectCol': 'Select',
+                'traj.minEdge': 'Min edge width',
+                'traj.nodeScale': 'Node size scale',
+                'traj.genes': 'Genes (comma or newline separated)',
+                'traj.layer': 'Data layer',
+                'traj.bins': 'Pseudotime bins',
+                'traj.hmColormap': 'Colormap',
                 'notebook.selectIpynb': 'Please select a .ipynb file',
                 'notebook.importConfirm': 'Importing a notebook will replace current cells. Continue?',
                 'notebook.openConfirm': 'Opening a notebook will replace current cells. Continue?',
@@ -407,6 +438,17 @@ class SingleCellAnalysis {
                 'status.genes': '基因',
                 'status.save': '保存',
                 'status.reset': '重置',
+                'status.dsMax': '最大值',
+                'status.dsInt': '整数',
+                'status.dsFloat': '浮点数',
+                'status.dsNorm': '已标准化',
+                'status.dsNormTip': '各细胞行和均匀，数据已完成标准化',
+                'status.dsRaw': '原始计数',
+                'status.dsRawTip': '各细胞行和差异显著，数据为原始计数',
+                'status.dsLog1pTip': '已执行 log1p 变换',
+                'status.dsScaled': '已缩放',
+                'status.dsScaledTip': '数据存在负值，可能已执行 sc.pp.scale',
+                'status.dsTargetTip': '推测的标准化 target_sum',
                 'controls.embedding': '降维方法',
                 'controls.embeddingPlaceholder': '选择降维方法',
                 'controls.colorBy': '着色方式',
@@ -567,13 +609,13 @@ class SingleCellAnalysis {
                 'tools.scsa': 'SCSA',
                 'tools.scsaDesc': '基于打分系统的细胞类型注释',
                 'tools.diffusionmap': 'Diffusion Map',
-                'tools.diffusionmapDesc': '扩散映射轨迹分析',
+                'tools.diffusionmapDesc': '扩散映射轨迹分析，计算 DPT 拟时序',
                 'tools.slingshot': 'Slingshot',
                 'tools.slingshotDesc': '细胞谱系与拟时序推断',
                 'tools.palantir': 'Palantir',
                 'tools.palantirDesc': '基于扩散过程的细胞命运预测',
-                'tools.pyvia': 'pyVIA',
-                'tools.pyviaDesc': '基于图的细胞轨迹分析',
+                'tools.paga': 'PAGA',
+                'tools.pagaDesc': '基于分区的图抽象可视化',
                 'tools.sctour': 'scTour',
                 'tools.sctourDesc': '基于深度学习的轨迹分析',
                 'gene.error': '基因表达错误',
@@ -596,6 +638,26 @@ class SingleCellAnalysis {
                 'tool.failed': '失败',
                 'tool.completed': '完成',
                 'tool.execFailed': '执行失败',
+                'traj.title': '轨迹分析可视化',
+                'traj.embTitle': '拟时序嵌入图',
+                'traj.hmTitle': '基因拟时序热图',
+                'traj.generate': '生成',
+                'traj.clickGenerate': '点击「生成」显示嵌入图',
+                'traj.hmHint': '选择基因后点击「生成」',
+                'traj.pseudotimeCol': '拟时序列',
+                'traj.autoDetect': '自动检测',
+                'traj.basis': '嵌入方法',
+                'traj.colormap': '配色',
+                'traj.pointSize': '点大小',
+                'traj.pagaOverlay': '叠加 PAGA 图',
+                'traj.pagaGroups': '聚类列 (groups)',
+                'traj.selectCol': '选择',
+                'traj.minEdge': '最小边宽',
+                'traj.nodeScale': '节点大小缩放',
+                'traj.genes': '基因列表（逗号或换行分隔）',
+                'traj.layer': '数据层',
+                'traj.bins': '拟时序分箱数',
+                'traj.hmColormap': '热图配色',
                 'notebook.selectIpynb': '请选择 .ipynb 文件',
                 'notebook.importConfirm': '导入笔记本会替换当前代码单元，是否继续？',
                 'notebook.openConfirm': '打开笔记本会替换当前代码单元，是否继续？',
@@ -762,6 +824,31 @@ class SingleCellAnalysis {
             ['参考数据库', 'Reference database'],
             ['组织', 'Tissue'],
             ['留空=All', 'blank=All'],
+            // Trajectory forms
+            ['聚类列', 'Cluster column'],
+            ['低维表示', 'Low-dim representation'],
+            ['主成分数', 'Number of PCs'],
+            ['起始细胞类型', 'Origin cell type'],
+            ['终止细胞类型', 'Terminal cell types'],
+            ['逗号分隔', 'comma-separated'],
+            ['训练轮数', 'Training epochs'],
+            ['路标点数', 'Waypoints'],
+            ['拟时序列', 'Pseudotime column'],
+            ['低维表示 (use_rep，用于重算邻居)', 'Low-dim rep (use_rep, for neighbor recompute)'],
+            ['可视化嵌入', 'Visualization embedding'],
+            ['lec 重建权重', 'lec reconstruction weight'],
+            ['lode 重建权重', 'lode reconstruction weight'],
+            ['将在 obs 中添加 dpt_pseudotime 列，可用于可视化着色。', 'Adds dpt_pseudotime column to obs for coloring.'],
+            ['将在 obs 中添加 slingshot_pseudotime 列。', 'Adds slingshot_pseudotime column to obs.'],
+            ['将在 obs 中添加 palantir_pseudotime 和 palantir_entropy 列。', 'Adds palantir_pseudotime and palantir_entropy columns to obs.'],
+            ['将生成 PAGA 图并在结果区域显示。', 'Generates a PAGA graph shown in the result overlay.'],
+            ['需要原始 count 数据在 adata.X。将在 obs 中添加 sctour_pseudotime 列。', 'Requires raw counts in adata.X. Adds sctour_pseudotime column to obs.'],
+            ['-- 选择列 --', '-- Select column --'],
+            ['-- 自动检测 --', '-- Auto-detect --'],
+            ['-- 不设置 --', '-- Not set --'],
+            ['例如: Ductal', 'e.g. Ductal'],
+            ['例如: Alpha,Beta', 'e.g. Alpha,Beta'],
+            ['例如: Alpha,Beta,Delta', 'e.g. Alpha,Beta,Delta'],
             // Save modal
             ['文件名', 'Filename'],
             ['文件将下载到浏览器默认下载目录', 'File will be saved to the browser default download folder'],
@@ -1712,6 +1799,13 @@ class SingleCellAnalysis {
                 this.pendingPlotRefresh = true;
             }
         }
+
+        // Auto-show trajectory visualization panel if pseudotime data is present
+        const obs = (data && data.obs_columns) ? data.obs_columns : [];
+        const hasPseudotime = obs.some(c =>
+            c.includes('pseudotime') || c === 'dpt_pseudotime'
+        );
+        if (hasPseudotime) this.showTrajViz();
     }
 
     updateParameterPanel() {
@@ -2669,6 +2763,39 @@ class SingleCellAnalysis {
         const obsm = (data.embeddings || []).map(e => `X_${e}`);
         if (obsm.length) html += row('obsm', obsm.map(chip).join(''));
 
+        const lyr = data.layers || [];
+        if (lyr.length) html += row('layers', lyr.map(chip).join(''));
+
+        // ── Data state (preprocessing status) ───────────────────────────────
+        const ds = data.data_state;
+        if (ds && Object.keys(ds).length > 0) {
+            const badge = (label, color, title='') =>
+                `<span class="badge rounded-pill text-bg-${color} me-1" style="font-size:0.65rem" ${title ? `title="${title}"` : ''}>${label}</span>`;
+
+            // X max / type row
+            const dtype = ds.is_int ? this.t('status.dsInt') : this.t('status.dsFloat');
+            const maxVal = ds.x_max !== undefined ? ds.x_max.toLocaleString(undefined, {maximumFractionDigits: 3}) : '?';
+            html += row('X', `<span class="adata-key-chip">${this.t('status.dsMax')}: <b>${maxVal}</b></span> <span class="adata-key-chip">${dtype}</span>`);
+
+            // State badges row
+            let stateBadges = '';
+            if (ds.is_normalized === true)
+                stateBadges += badge(this.t('status.dsNorm'), 'success', this.t('status.dsNormTip'));
+            else if (ds.is_normalized === false)
+                stateBadges += badge(this.t('status.dsRaw'), 'secondary', this.t('status.dsRawTip'));
+
+            if (ds.is_log1p === true)
+                stateBadges += badge('log1p', 'info', this.t('status.dsLog1pTip'));
+
+            if (ds.is_scaled === true)
+                stateBadges += badge(this.t('status.dsScaled'), 'warning', this.t('status.dsScaledTip'));
+
+            if (ds.estimated_target_sum)
+                stateBadges += badge(`target_sum ≈ ${ds.estimated_target_sum.toLocaleString()}`, 'primary', this.t('status.dsTargetTip'));
+
+            if (stateBadges) html += row('state', stateBadges);
+        }
+
         // ── Last operation diff (reset each time) ───────────────────────────
         if (diff) {
             const [cb, gb] = diff.shape_before;
@@ -2757,11 +2884,10 @@ class SingleCellAnalysis {
                 { id: 'scsa',         nameKey: 'tools.scsa',         icon: 'fas fa-star',   descKey: 'tools.scsaDesc' }
             ],
             'trajectory': [
-                { id: 'coming_soon', nameKey: 'tools.diffusionmap', icon: 'fas fa-project-diagram', descKey: 'tools.diffusionmapDesc' },
-                { id: 'coming_soon', nameKey: 'tools.slingshot', icon: 'fas fa-route', descKey: 'tools.slingshotDesc' },
-                { id: 'coming_soon', nameKey: 'tools.palantir', icon: 'fas fa-compass', descKey: 'tools.palantirDesc' },
-                { id: 'coming_soon', nameKey: 'tools.pyvia', icon: 'fas fa-code-branch', descKey: 'tools.pyviaDesc' },
-                { id: 'coming_soon', nameKey: 'tools.sctour', icon: 'fas fa-brain', descKey: 'tools.sctourDesc' }
+                { id: 'diffusion_map', nameKey: 'tools.diffusionmap', icon: 'fas fa-project-diagram', descKey: 'tools.diffusionmapDesc' },
+                { id: 'slingshot',     nameKey: 'tools.slingshot',    icon: 'fas fa-route',           descKey: 'tools.slingshotDesc' },
+                { id: 'palantir',      nameKey: 'tools.palantir',     icon: 'fas fa-compass',         descKey: 'tools.palantirDesc' },
+                { id: 'sctour',        nameKey: 'tools.sctour',       icon: 'fas fa-brain',           descKey: 'tools.sctourDesc' }
             ]
         };
         
@@ -3421,8 +3547,129 @@ class SingleCellAnalysis {
                     <label>分辨率</label>
                     <input type="number" class="form-control" id="resolution" value="1.0" min="0.1" max="3.0" step="0.1">
                 </div>
-            `
+            `,
         };
+
+        // ── Trajectory tools (built dynamically from current obs columns) ──────
+        const obsColumns = (this.currentData && this.currentData.obs_columns) ? this.currentData.obs_columns : [];
+        const embeddingKeys = (this.currentData && this.currentData.embeddings) ? this.currentData.embeddings : [];
+        const clusterOpts = ['<option value="">-- 选择列 --</option>']
+            .concat(obsColumns.map(c => `<option value="${c}">${c}</option>`)).join('');
+        const embeddingOpts = ['<option value="">-- 自动检测 --</option>',
+            '<option value="X_pca">X_pca</option>']
+            .concat(embeddingKeys.filter(k => k !== 'pca').map(k => `<option value="X_${k}">X_${k}</option>`))
+            .join('');
+        const pseudotimeOpts = ['<option value="">-- 不设置 --</option>']
+            .concat(obsColumns.filter(c => c.includes('pseudotime') || c.includes('dpt') || c.includes('paga'))
+                .map(c => `<option value="${c}">${c}</option>`)).join('');
+
+        const trajCommonFields = `
+            <div class="row g-2">
+                <div class="col-12">
+                    <label class="form-label">聚类列 (groupby)</label>
+                    <select class="form-control" id="groupby">${clusterOpts}</select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">低维表示 (use_rep)</label>
+                    <select class="form-control" id="use_rep">${embeddingOpts}</select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">主成分数 (n_comps)</label>
+                    <input type="number" class="form-control" id="n_comps" value="50" min="10" max="200">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">起始细胞类型 (origin_cells)</label>
+                    <input type="text" class="form-control" id="origin_cells" placeholder="例如: Ductal">
+                </div>`;
+
+        const trajParameterMap = {
+            'diffusion_map': trajCommonFields + `
+            </div>
+            <small class="text-muted d-block mt-2">将在 obs 中添加 dpt_pseudotime 列，可用于可视化着色。</small>`,
+
+            'slingshot': trajCommonFields + `
+                <div class="col-12">
+                    <label class="form-label">终止细胞类型 (terminal_cells，逗号分隔)</label>
+                    <input type="text" class="form-control" id="terminal_cells" placeholder="例如: Alpha,Beta">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">训练轮数 (num_epochs)</label>
+                    <input type="number" class="form-control" id="num_epochs" value="1" min="1" max="100">
+                </div>
+            </div>
+            <small class="text-muted d-block mt-2">将在 obs 中添加 slingshot_pseudotime 列。</small>`,
+
+            'palantir': trajCommonFields + `
+                <div class="col-12">
+                    <label class="form-label">终止细胞类型 (terminal_cells，逗号分隔)</label>
+                    <input type="text" class="form-control" id="terminal_cells" placeholder="例如: Alpha,Beta,Delta">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">路标点数 (num_waypoints)</label>
+                    <input type="number" class="form-control" id="num_waypoints" value="500" min="100" max="2000">
+                </div>
+            </div>
+            <small class="text-muted d-block mt-2">将在 obs 中添加 palantir_pseudotime 和 palantir_entropy 列。</small>`,
+
+            'paga': (() => {
+                const basisOpts = ['<option value="umap">umap</option>',
+                    '<option value="tsne">tsne</option>',
+                    '<option value="draw_graph_fa">draw_graph_fa</option>']
+                    .concat(embeddingKeys.filter(k => !['umap','tsne','draw_graph_fa'].includes(k))
+                        .map(k => `<option value="${k}">${k}</option>`)).join('');
+                return `
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label">聚类列 (groups)</label>
+                        <select class="form-control" id="groups">${clusterOpts}</select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">拟时序列 (use_time_prior)</label>
+                        <select class="form-control" id="use_time_prior">
+                            <option value="">-- 不设置 --</option>
+                            ${obsColumns.filter(c => c.includes('pseudotime') || c.includes('dpt') || c.includes('entropy'))
+                                .map(c => `<option value="${c}">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">低维表示 (use_rep，用于重算邻居)</label>
+                        <select class="form-control" id="use_rep">${embeddingOpts}</select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">可视化嵌入 (basis)</label>
+                        <select class="form-control" id="basis">${basisOpts}</select>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">将生成 PAGA 图并在结果区域显示。</small>`;
+            })(),
+
+            'sctour': `
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label">聚类列 (groupby)</label>
+                        <select class="form-control" id="groupby">${clusterOpts}</select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">低维表示 (use_rep)</label>
+                        <select class="form-control" id="use_rep">${embeddingOpts}</select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">主成分数 (n_comps)</label>
+                        <input type="number" class="form-control" id="n_comps" value="50" min="10" max="200">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">lec 重建权重 (alpha_recon_lec)</label>
+                        <input type="number" class="form-control" id="alpha_recon_lec" value="0.5" min="0" max="1" step="0.1">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">lode 重建权重 (alpha_recon_lode)</label>
+                        <input type="number" class="form-control" id="alpha_recon_lode" value="0.5" min="0" max="1" step="0.1">
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">需要原始 count 数据在 adata.X。将在 obs 中添加 sctour_pseudotime 列。</small>`
+        };
+
+        if (tool in trajParameterMap) return trajParameterMap[tool];
 
         return parameters[tool] || `<p>${this.t('parameter.none')}</p>`;
     }
@@ -3457,6 +3704,11 @@ class SingleCellAnalysis {
             'celltypist':    this.t('tools.celltypist'),
             'gpt4celltype':  this.t('tools.gpt4celltype'),
             'scsa':          this.t('tools.scsa'),
+            'diffusion_map': this.t('tools.diffusionmap'),
+            'slingshot':     this.t('tools.slingshot'),
+            'palantir':      this.t('tools.palantir'),
+            'paga':          this.t('tools.paga'),
+            'sctour':        this.t('tools.sctour'),
         };
         const toolName = toolNames[tool] || tool;
         const runningText = this.currentLang === 'zh'
@@ -3497,6 +3749,22 @@ class SingleCellAnalysis {
                         this.updatePlot();
                     }
                 }
+
+                // Auto-color by pseudotime column if returned by trajectory tools
+                if (data.pseudotime_col) {
+                    const colorSelect = document.getElementById('color-select');
+                    if (colorSelect) {
+                        colorSelect.value = 'obs:' + data.pseudotime_col;
+                        this.updatePlot();
+                    }
+                    // Show trajectory visualization panel
+                    this.showTrajViz();
+                }
+
+                // Display figures returned by tools (e.g., PAGA graph)
+                if (data.figures && data.figures.length > 0) {
+                    this.showToolFigures(data.figures, toolName);
+                }
             }
         })
         .catch(error => {
@@ -3506,6 +3774,173 @@ class SingleCellAnalysis {
             alert(this.formatToolMessage(toolName, this.t('tool.execFailed'), error.message));
         });
     }
+
+    showToolFigures(figures, toolName) {
+        // Show tool-generated figures (e.g., PAGA graph) in a modal overlay
+        const modalId = 'tool-figures-modal';
+        let modal = document.getElementById(modalId);
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = '';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1e1e2e;border-radius:12px;padding:20px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;';
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
+        header.innerHTML = `<h6 style="color:#cdd6f4;margin:0">${toolName}</h6>
+            <button style="background:none;border:none;color:#cdd6f4;font-size:1.2rem;cursor:pointer;" onclick="document.getElementById('${modalId}').remove()">✕</button>`;
+        box.appendChild(header);
+        figures.forEach(fig => {
+            const img = document.createElement('img');
+            img.src = `data:image/png;base64,${fig}`;
+            img.style.cssText = 'max-width:100%;border-radius:8px;display:block;margin-bottom:8px;';
+            box.appendChild(img);
+        });
+        modal.appendChild(box);
+    }
+
+    // ── Trajectory Visualization ───────────────────────────────────────────
+
+    showTrajViz() {
+        const panel = document.getElementById('traj-viz-panel');
+        if (panel) {
+            panel.style.display = '';
+            this.updateTrajVizSelects();
+        }
+    }
+
+    toggleTrajViz() {
+        const body = document.getElementById('traj-viz-body');
+        const icon = document.getElementById('traj-viz-toggle-icon');
+        if (!body) return;
+        const collapsed = body.style.display === 'none';
+        body.style.display = collapsed ? '' : 'none';
+        if (icon) {
+            icon.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+        }
+    }
+
+    togglePagaOptions(checked) {
+        const opts = document.getElementById('traj-paga-options');
+        if (opts) opts.style.display = checked ? '' : 'none';
+    }
+
+    updateTrajVizSelects() {
+        if (!this.currentData) return;
+        const obs      = this.currentData.obs_columns  || [];
+        const embeddings = this.currentData.embeddings || [];
+        const layers   = this.currentData.layers       || [];
+
+        // Pseudotime columns (for both embedding and heatmap)
+        const ptCols = obs.filter(c =>
+            c.includes('pseudotime') || c.includes('dpt_') || c === 'dpt_pseudotime'
+        );
+        const ptOpts = '<option value="">' + this.t('traj.autoDetect') + '</option>' +
+            ptCols.map(c => `<option value="${c}">${c}</option>`).join('');
+        for (const id of ['traj-pseudotime-col', 'traj-heatmap-pseudotime']) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = ptOpts;
+        }
+
+        // Embedding bases
+        const basisSel = document.getElementById('traj-basis');
+        if (basisSel) {
+            basisSel.innerHTML = embeddings
+                .map(e => `<option value="X_${e}">${e.toUpperCase()}</option>`)
+                .join('');
+        }
+
+        // PAGA groups (obs columns, prefer categorical)
+        const grpSel = document.getElementById('traj-paga-groups');
+        if (grpSel) {
+            grpSel.innerHTML = `<option value="">-- ${this.t('traj.selectCol')} --</option>` +
+                obs.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        // Layer selector
+        const layerSel = document.getElementById('traj-heatmap-layer');
+        if (layerSel) {
+            layerSel.innerHTML = '<option value="">X (default)</option>' +
+                layers.map(l => `<option value="${l}">${l}</option>`).join('');
+        }
+    }
+
+    generateTrajEmbedding() {
+        const imgDiv = document.getElementById('traj-embedding-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div>';
+
+        const params = {
+            pseudotime_col:      (document.getElementById('traj-pseudotime-col')   || {}).value || '',
+            basis:               (document.getElementById('traj-basis')             || {}).value || 'X_umap',
+            cmap:                (document.getElementById('traj-cmap')              || {}).value || 'Reds',
+            point_size:          (document.getElementById('traj-point-size')        || {}).value || 3,
+            paga_overlay:        (document.getElementById('traj-paga-overlay')      || {}).checked || false,
+            paga_groups:         (document.getElementById('traj-paga-groups')       || {}).value || '',
+            paga_min_edge_width: (document.getElementById('traj-paga-min-edge')     || {}).value || 2,
+            paga_node_size_scale:(document.getElementById('traj-paga-node-scale')   || {}).value || 1.5,
+        };
+
+        fetch('/api/trajectory/plot_embedding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML =
+                    `<img src="data:image/png;base64,${data.figure}"
+                          style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                          onclick="singleCellApp.showToolFigures(['${data.figure}'], 'Pseudotime Embedding')">`;
+            }
+        })
+        .catch(e => {
+            imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`;
+        });
+    }
+
+    generateTrajHeatmap() {
+        const imgDiv = document.getElementById('traj-heatmap-img');
+        if (!imgDiv) return;
+        imgDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div>';
+
+        const params = {
+            genes:          (document.getElementById('traj-heatmap-genes')      || {}).value || '',
+            pseudotime_col: (document.getElementById('traj-heatmap-pseudotime') || {}).value || '',
+            layer:          (document.getElementById('traj-heatmap-layer')      || {}).value || '',
+            n_bins:         (document.getElementById('traj-heatmap-bins')       || {}).value || 50,
+            cmap:           (document.getElementById('traj-heatmap-cmap')       || {}).value || 'RdBu_r',
+        };
+
+        fetch('/api/trajectory/plot_heatmap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                imgDiv.innerHTML = `<span class="text-danger small p-2">${data.error}</span>`;
+            } else {
+                imgDiv.innerHTML =
+                    `<img src="data:image/png;base64,${data.figure}"
+                          style="max-width:100%;border-radius:6px;cursor:zoom-in;"
+                          onclick="singleCellApp.showToolFigures(['${data.figure}'], 'Gene Trend Heatmap')">`;
+            }
+        })
+        .catch(e => {
+            imgDiv.innerHTML = `<span class="text-danger small p-2">${e.message}</span>`;
+        });
+    }
+
+    // ── end Trajectory Visualization ──────────────────────────────────────
 
     saveData() {
         if (!this.currentData) return;
