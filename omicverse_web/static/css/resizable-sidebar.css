@@ -115,3 +115,44 @@ body.resizing-sidebar * {
     left: var(--sidebar-width) !important;
     transition: left 0.05s ease !important;
 }
+
+/* ========================================
+   Collapsible Cards — global auto-init
+   ======================================== */
+
+/* Card body transition when collapsing / expanding */
+.card-body.cc-animated {
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding-top 0.25s ease, padding-bottom 0.25s ease;
+}
+
+/* Card header becomes a row with toggle at right */
+.card-header.cc-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* The small toggle button injected into every header */
+.card-collapse-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0 0 0 8px;
+    line-height: 1;
+    opacity: 0.55;
+    color: inherit;
+    transition: opacity 0.15s;
+}
+.card-collapse-btn:hover { opacity: 1; }
+
+/* Chevron rotates when collapsed */
+.card-collapse-btn .cc-chevron {
+    display: inline-block;
+    transition: transform 0.25s ease;
+}
+.card-collapse-btn.collapsed .cc-chevron {
+    transform: rotate(180deg);
+}

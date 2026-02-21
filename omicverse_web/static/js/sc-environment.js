@@ -247,6 +247,11 @@ Object.assign(SingleCellAnalysis.prototype, {
 
             loading.style.display = 'none';
             content.style.display = '';
+            // Init collapsible cards now that env-info cards have content
+            const envRoot = document.getElementById('env-info-content');
+            if (envRoot && typeof this.initCollapsibleCards === 'function') {
+                this.initCollapsibleCards(envRoot);
+            }
         } catch (e) {
             loading.style.display = 'none';
             errEl.textContent = 'Failed to load environment info: ' + e.message;

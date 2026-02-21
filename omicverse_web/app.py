@@ -156,6 +156,37 @@ def get_uns_colors(adata, col_name, n_categories):
     return [_color_to_hex(uns[i % len(uns)]) for i in range(n_categories)]
 
 
+def get_uns_colors_for_labels(adata, col_name, labels):
+    """
+    Return hex colors from adata.uns['{col_name}_colors'] aligned to *labels*.
+
+    This is safer than get_uns_colors because it maps colors by category NAME
+    rather than by index, preventing colour mismatches when the category order
+    produced by ``vals.astype('category')`` differs from the original order
+    stored in ``adata.obs[col_name].cat.categories``.
+    """
+    key = f'{col_name}_colors'
+    if adata is None or key not in adata.uns:
+        return None
+    uns_colors = list(adata.uns[key])
+    # Build a name→hex mapping from the original adata category order
+    try:
+        orig_col = adata.obs[col_name]
+        if hasattr(orig_col, 'cat'):
+            orig_cats = list(orig_col.cat.categories)
+            color_map = {
+                cat: _color_to_hex(uns_colors[i % len(uns_colors)])
+                for i, cat in enumerate(orig_cats)
+            }
+            result = [color_map.get(lbl) for lbl in labels]
+            if all(c is not None for c in result):
+                return result
+    except Exception:
+        pass
+    # Fallback: assume same order (old behaviour)
+    return [_color_to_hex(uns_colors[i % len(uns_colors)]) for i in range(len(labels))]
+
+
 _PALETTE_NAME_MAP = {
     # Correct case-insensitive names for matplotlib qualitative palettes
     'set1': 'Set1', 'set2': 'Set2', 'set3': 'Set3',
@@ -1413,11 +1444,42 @@ def plot_data_legacy():
         fbs_data = state.current_adaptor.get_embedding_fbs(embedding)
         coords_df = decode_matrix_fbs(fbs_data)
 
+        x_raw = coords_df['x'].tolist()
+        y_raw = coords_df['y'].tolist()
+        n_cells = len(x_raw)
+
+        # ── For large datasets apply spatial decimation ────────────────────────
+        # Keep at most 150 K representative points so Plotly stays responsive.
+        # The kept_indices list is used below to sub-select color/hover arrays.
+        kept_indices = None
+        if n_cells > _LARGE_DATASET_THRESHOLD:
+            x_dec, y_dec, _, kept_indices = _spatial_decimate(
+                x_raw, y_raw, None, target_n=150_000)
+            x_raw, y_raw = x_dec, y_dec
+            decimated = True
+        else:
+            decimated = False
+
         plot_data = {
-            'x': coords_df['x'].tolist(),
-            'y': coords_df['y'].tolist(),
-            'hover_text': [f'Cell {i}' for i in range(len(coords_df))]
+            'x': x_raw,
+            'y': y_raw,
+            'hover_text': [f'Cell {i}' for i in (kept_indices if kept_indices else range(n_cells))],
+            'decimated': decimated,
+            'n_total': n_cells,
+            'n_shown': len(x_raw),
         }
+
+        # Helper: sub-select a full-length array by kept_indices (if decimated)
+        def _subset(arr):
+            if kept_indices is None:
+                return arr
+            return [arr[i] for i in kept_indices]
+
+        def _subset_np(arr):
+            if kept_indices is None:
+                return arr
+            import numpy as _np2
+            return _np2.asarray(arr)[kept_indices]
 
         # Handle coloring if requested
         if color_by:
@@ -1429,7 +1491,7 @@ def plot_data_legacy():
                 if col_name in obs_df.columns:
                     values = obs_df[col_name]
                     if pd.api.types.is_numeric_dtype(values):
-                        colors_array = values.values
+                        colors_array = _subset_np(values.values)
                         if vmin is not None or vmax is not None:
                             colors_array = np.clip(colors_array,
                                                    vmin if vmin is not None else colors_array.min(),
@@ -1442,21 +1504,24 @@ def plot_data_legacy():
                         if vmax is not None:
                             plot_data['cmax'] = vmax
                     else:
+                        # Compute categories on full column, sub-select codes only
                         categories = values.astype('category') if not pd.api.types.is_categorical_dtype(values) else values
                         plot_data['color_label'] = col_name
-                        plot_data['category_labels'] = categories.cat.categories.tolist()
-                        plot_data['category_codes'] = categories.cat.codes.tolist()
-                        n_categories = len(categories.cat.categories)
+                        cat_label_list = categories.cat.categories.tolist()
+                        plot_data['category_labels'] = cat_label_list
+                        codes_sub = _subset_np(categories.cat.codes.values)
+                        plot_data['category_codes'] = codes_sub.tolist()
+                        n_categories = len(cat_label_list)
                         if category_palette:
                             # User explicitly chose a palette — respect it
                             discrete_colors = get_discrete_colors(n_categories, category_palette)
                         else:
-                            # Default: prefer adata.uns colors, fall back to built-in
+                            # Default: prefer adata.uns colors aligned to current label order
                             discrete_colors = (
-                                get_uns_colors(state.current_adata, col_name, n_categories)
+                                get_uns_colors_for_labels(state.current_adata, col_name, cat_label_list)
                                 or get_discrete_colors(n_categories, None)
                             )
-                        plot_data['colors'] = [discrete_colors[code] for code in categories.cat.codes]
+                        plot_data['colors'] = [discrete_colors[code] for code in codes_sub]
                         plot_data['discrete_colors'] = discrete_colors
 
             elif color_by.startswith('gene:'):
@@ -1465,7 +1530,7 @@ def plot_data_legacy():
                     expr_fbs = state.current_adaptor.get_expression_fbs([gene_name])
                     expr_df = decode_matrix_fbs(expr_fbs)
                     if gene_name in expr_df.columns:
-                        expression = expr_df[gene_name].values
+                        expression = _subset_np(expr_df[gene_name].values)
                         if vmin is not None or vmax is not None:
                             expression = np.clip(expression,
                                                vmin if vmin is not None else expression.min(),
@@ -1484,6 +1549,423 @@ def plot_data_legacy():
 
     except Exception as e:
         logging.error(f"Legacy plot failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# Large-scale Raster Plot (Datashader / fallback decimation)
+# ============================================================================
+
+# Number of cells above which we switch to raster / decimation mode.
+_LARGE_DATASET_THRESHOLD = 200_000
+
+def _spatial_decimate(x, y, colors, target_n=150_000):
+    """Grid-based spatial decimation that preserves cluster structure.
+
+    Divides the 2-D embedding into a grid and keeps at most one point per
+    cell so that visual density is represented uniformly. Unlike random
+    subsampling this retains rare cell types that occupy sparse regions.
+    """
+    n = len(x)
+    if n <= target_n:
+        return x, y, colors, list(range(n))
+
+    import numpy as _np
+    x = _np.asarray(x, dtype=_np.float32)
+    y = _np.asarray(y, dtype=_np.float32)
+
+    # Desired grid resolution: sqrt of target_n gives a square grid.
+    grid_side = int(_np.sqrt(target_n))
+    x_min, x_max = x.min(), x.max()
+    y_min, y_max = y.min(), y.max()
+    eps = 1e-6
+    xi = ((x - x_min) / (x_max - x_min + eps) * (grid_side - 1)).astype(_np.int32)
+    yi = ((y - y_min) / (y_max - y_min + eps) * (grid_side - 1)).astype(_np.int32)
+    cell_key = xi * grid_side + yi
+
+    # Shuffle first so grid occupation is random-fair, then keep first hit per cell.
+    rng = _np.random.default_rng(42)
+    order = rng.permutation(n)
+    seen = {}
+    kept = []
+    for idx in order:
+        k = int(cell_key[idx])
+        if k not in seen:
+            seen[k] = True
+            kept.append(int(idx))
+
+    kept = sorted(kept)
+    colors_out = [colors[i] for i in kept] if colors is not None else None
+    return x[kept].tolist(), y[kept].tolist(), colors_out, kept
+
+
+@app.route('/api/plot_raster', methods=['POST'])
+def plot_raster():
+    """Server-side rasterized scatter using Datashader (falls back to PNG via matplotlib).
+
+    Request body (JSON):
+        embedding   – obsm key  (e.g. 'X_umap')
+        color_by    – 'obs:<col>' | 'gene:<name>' | ''
+        width       – canvas pixel width  (default 800)
+        height      – canvas pixel height (default 600)
+        x_range     – [xmin, xmax]  (optional, for zoom)
+        y_range     – [ymin, ymax]  (optional, for zoom)
+        palette     – colormap name (default 'Viridis')
+        category_palette – categorical colormap name
+        spread      – datashader pixel spread radius (default 1)
+
+    Response JSON:
+        image       – base64-encoded PNG
+        x_range     – [xmin, xmax] of rendered region
+        y_range     – [ymin, ymax] of rendered region
+        n_total     – total cell count
+        n_rendered  – cells in the current viewport (if x/y_range given)
+        legend      – [{label, color}, …]  (categorical only)
+        engine      – 'datashader' | 'matplotlib'
+    """
+    if state.current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        from server.common.fbs.matrix import decode_matrix_fbs
+        from utils.adata_helpers import resolve_embedding_key as _resolve_key
+        import base64, io as _io
+        import numpy as _np
+
+        req        = request.json or {}
+        embedding  = req.get('embedding', '')
+        color_by   = req.get('color_by', '')
+        width      = int(req.get('width',  800))
+        height     = int(req.get('height', 600))
+        x_range    = req.get('x_range')   # [xmin, xmax] or None
+        y_range    = req.get('y_range')   # [ymin, ymax] or None
+        palette    = req.get('palette', 'Viridis')
+        cat_pal    = req.get('category_palette', None)
+        spread     = int(req.get('spread', 1))
+
+        if not embedding:
+            return jsonify({'error': 'embedding required'}), 400
+
+        # ── coordinates ───────────────────────────────────────────────────────
+        fbs_data  = state.current_adaptor.get_embedding_fbs(embedding)
+        coords_df = decode_matrix_fbs(fbs_data)
+        x_all = _np.asarray(coords_df['x'], dtype=_np.float64)
+        y_all = _np.asarray(coords_df['y'], dtype=_np.float64)
+        n_total = len(x_all)
+
+        # Determine viewport bounds
+        xmin = float(x_range[0]) if x_range else float(x_all.min())
+        xmax = float(x_range[1]) if x_range else float(x_all.max())
+        ymin = float(y_range[0]) if y_range else float(y_all.min())
+        ymax = float(y_range[1]) if y_range else float(y_all.max())
+
+        # ── colour values ─────────────────────────────────────────────────────
+        color_values = None     # numpy array or None
+        color_labels = None     # list[str] for categories
+        discrete_colors = None  # list[str] hex colours  (len == n_categories)
+        is_categorical = False
+        color_label = ''
+
+        if color_by.startswith('obs:'):
+            col_name = color_by[4:]
+            obs_fbs  = state.current_adaptor.get_obs_fbs([col_name])
+            obs_df   = decode_matrix_fbs(obs_fbs)
+            if col_name in obs_df.columns:
+                vals = obs_df[col_name]
+                color_label = col_name
+                if pd.api.types.is_numeric_dtype(vals):
+                    color_values = vals.to_numpy(dtype=_np.float64)
+                else:
+                    cats = vals.astype('category')
+                    color_labels  = cats.cat.categories.tolist()
+                    color_values  = cats.cat.codes.to_numpy(dtype=_np.int32)
+                    is_categorical = True
+                    n_cats = len(color_labels)
+                    if cat_pal:
+                        # User explicitly chose a palette — respect it
+                        discrete_colors = get_discrete_colors(n_cats, cat_pal)
+                    else:
+                        discrete_colors = (
+                            get_uns_colors_for_labels(state.current_adata, col_name, color_labels)
+                            or get_discrete_colors(n_cats, None)
+                        )
+
+        elif color_by.startswith('gene:'):
+            gene_name = color_by[5:]
+            color_label = f'{gene_name} expression'
+            try:
+                expr_fbs = state.current_adaptor.get_expression_fbs([gene_name])
+                expr_df  = decode_matrix_fbs(expr_fbs)
+                if gene_name in expr_df.columns:
+                    color_values = expr_df[gene_name].to_numpy(dtype=_np.float64)
+            except Exception:
+                pass
+
+        # ── try Datashader first ───────────────────────────────────────────────
+        engine = 'datashader'
+        try:
+            import datashader as ds
+            import datashader.transfer_functions as tf
+            import pandas as _pd_ds
+
+            df_ds = _pd_ds.DataFrame({'x': x_all, 'y': y_all})
+            canvas = ds.Canvas(plot_width=width, plot_height=height,
+                               x_range=(xmin, xmax), y_range=(ymin, ymax))
+
+            if is_categorical and color_values is not None:
+                df_ds['cat'] = color_values.astype(str)
+                agg = canvas.points(df_ds, 'x', 'y', ds.count_cat('cat'))
+                # Build color_key from our discrete palette
+                color_key = {str(i): c for i, c in enumerate(discrete_colors or [])}
+                img = tf.shade(agg, color_key=color_key or None, how='eq_hist')
+            elif color_values is not None and not is_categorical:
+                df_ds['val'] = color_values
+                agg = canvas.points(df_ds, 'x', 'y', ds.mean('val'))
+                # Map palette name to colorcet / matplotlib
+                cmap_name = palette.lower()
+                img = tf.shade(agg, cmap=cmap_name, how='eq_hist')
+            else:
+                agg = canvas.points(df_ds, 'x', 'y', ds.count())
+                img = tf.shade(agg, cmap=['#c6dbef', '#08306b'], how='eq_hist')
+
+            if spread > 1:
+                img = tf.spread(img, px=spread - 1)
+
+            buf = _io.BytesIO()
+            img.to_pil().save(buf, format='PNG')
+            img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        except ImportError:
+            # ── Datashader not available — fall back to matplotlib rasterize ──
+            engine = 'matplotlib'
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as _plt
+            import matplotlib.colors as _mcolors
+
+            dpi = 96
+            fig_w = width  / dpi
+            fig_h = height / dpi
+            fig, ax = _plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+            fig.patch.set_facecolor('white')
+            ax.set_facecolor('white')
+
+            # Filter to viewport
+            mask = ((x_all >= xmin) & (x_all <= xmax) &
+                    (y_all >= ymin) & (y_all <= ymax))
+            xv = x_all[mask]
+            yv = y_all[mask]
+            cv = color_values[mask] if color_values is not None else None
+
+            n_view = int(mask.sum())
+            pt = max(0.5, min(3.0, 50_000 / max(n_view, 1)))
+
+            if is_categorical and cv is not None:
+                for code, label in enumerate(color_labels or []):
+                    cidx = cv == code
+                    hex_c = discrete_colors[code] if discrete_colors else None
+                    ax.scatter(xv[cidx], yv[cidx], s=pt, c=hex_c,
+                               linewidths=0, rasterized=True, label=label)
+            elif cv is not None:
+                sc = ax.scatter(xv, yv, c=cv, s=pt, cmap=palette,
+                                linewidths=0, rasterized=True)
+                _plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+            else:
+                ax.scatter(xv, yv, s=pt, c='#3182bd',
+                           linewidths=0, rasterized=True)
+
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+            ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+            for sp in ax.spines.values():
+                sp.set_visible(False)
+            _plt.tight_layout(pad=0.1)
+
+            buf = _io.BytesIO()
+            fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight')
+            _plt.close(fig)
+            img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        # ── build legend for categories ────────────────────────────────────────
+        legend = []
+        if is_categorical and color_labels and discrete_colors:
+            legend = [{'label': lbl, 'color': discrete_colors[i % len(discrete_colors)]}
+                      for i, lbl in enumerate(color_labels)]
+
+        return jsonify({
+            'image':      img_b64,
+            'x_range':    [xmin, xmax],
+            'y_range':    [ymin, ymax],
+            'n_total':    n_total,
+            'legend':     legend,
+            'color_label': color_label,
+            'engine':     engine,
+        })
+
+    except Exception as e:
+        logging.error(f"plot_raster failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# GPU (deck.gl) scatter – binary endpoint
+# ============================================================================
+
+@app.route('/api/plot_gpu', methods=['POST'])
+def plot_gpu():
+    """Return scatter data as a compact binary buffer for deck.gl rendering.
+
+    Binary layout (all little-endian):
+        [0-3]               : n_cells   (uint32)
+        [4-7]               : json_len  (uint32)
+        [8 .. 8+json_len)   : JSON metadata (UTF-8)
+        [padded to 8 bytes] : float32 positions  x0,y0,x1,y1,… (n*8 bytes)
+        [above + n*8]       : uint8  colors  r,g,b,a per cell   (n*4 bytes)
+        [above + n*4]       : float32 hover_values per cell      (n*4 bytes)
+                              (category code as float, raw value for continuous, NaN if none)
+
+    JSON metadata fields:
+        n_total, color_label, is_categorical,
+        category_labels (list|null), colorscale (str|null)
+    """
+    if state.current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        import struct as _struct, json as _json
+        from server.common.fbs.matrix import decode_matrix_fbs
+        import numpy as _np
+
+        req            = request.json or {}
+        embedding      = req.get('embedding', '')
+        color_by       = req.get('color_by', '')
+        palette        = req.get('palette', 'viridis')
+        cat_pal        = req.get('category_palette', None)
+        vmin_req       = req.get('vmin', None)
+        vmax_req       = req.get('vmax', None)
+
+        if not embedding:
+            return jsonify({'error': 'embedding required'}), 400
+
+        # ── positions ─────────────────────────────────────────────────────────
+        fbs_data  = state.current_adaptor.get_embedding_fbs(embedding)
+        coords_df = decode_matrix_fbs(fbs_data)
+        x_all = _np.asarray(coords_df['x'], dtype=_np.float32)
+        y_all = _np.asarray(coords_df['y'], dtype=_np.float32)
+        n = len(x_all)
+
+        # interleaved x,y float32
+        positions = _np.empty(n * 2, dtype=_np.float32)
+        positions[0::2] = x_all
+        positions[1::2] = y_all
+
+        # ── colours ───────────────────────────────────────────────────────────
+        colors_rgba   = _np.full((n, 4), [100, 149, 237, 200], dtype=_np.uint8)
+        hover_values  = _np.full(n, _np.nan, dtype=_np.float32)
+
+        meta = {
+            'n_total':         n,
+            'color_label':     '',
+            'is_categorical':  False,
+            'category_labels': None,
+            'colorscale':      None,
+        }
+
+        if color_by.startswith('obs:'):
+            col_name = color_by[4:]
+            obs_fbs  = state.current_adaptor.get_obs_fbs([col_name])
+            obs_df   = decode_matrix_fbs(obs_fbs)
+            if col_name in obs_df.columns:
+                vals = obs_df[col_name]
+                meta['color_label'] = col_name
+
+                if pd.api.types.is_numeric_dtype(vals):
+                    v    = vals.to_numpy(dtype=_np.float64)
+                    vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
+                    vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
+                    span = max(vhi - vlo, 1e-10)
+                    t    = _np.clip((v - vlo) / span, 0.0, 1.0)
+                    from matplotlib import colormaps as _cmaps
+                    cmap = _cmaps.get_cmap(palette.lower() if palette else 'viridis')
+                    rgba_f      = cmap(t)                           # (n,4) float [0,1]
+                    colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
+                    hover_values = v.astype(_np.float32)
+                    meta['colorscale'] = palette or 'viridis'
+                    meta['vmin'] = round(vlo, 6)
+                    meta['vmax'] = round(vhi, 6)
+
+                else:
+                    cats   = vals.astype('category')
+                    labels = cats.cat.categories.tolist()
+                    codes  = cats.cat.codes.to_numpy(dtype=_np.int32)
+                    n_cats = len(labels)
+                    if cat_pal:
+                        disc = get_discrete_colors(n_cats, cat_pal)
+                    else:
+                        disc = (
+                            get_uns_colors_for_labels(state.current_adata, col_name, labels)
+                            or get_discrete_colors(n_cats, None)
+                        )
+                    cat_hex_list = []
+                    for code, hex_c in enumerate(disc):
+                        mask = codes == code
+                        try:
+                            r = int(hex_c[1:3], 16)
+                            g = int(hex_c[3:5], 16)
+                            b = int(hex_c[5:7], 16)
+                        except Exception:
+                            r, g, b = 100, 149, 237
+                            hex_c = '#6495ed'
+                        if mask.any():
+                            colors_rgba[mask] = [r, g, b, 200]
+                        cat_hex_list.append(hex_c)
+                    hover_values = codes.astype(_np.float32)
+                    meta['is_categorical']    = True
+                    meta['category_labels']   = labels
+                    meta['category_colors']   = cat_hex_list   # exact hex per category
+
+        elif color_by.startswith('gene:'):
+            gene_name = color_by[5:]
+            meta['color_label'] = f'{gene_name} expression'
+            try:
+                expr_fbs = state.current_adaptor.get_expression_fbs([gene_name])
+                expr_df  = decode_matrix_fbs(expr_fbs)
+                if gene_name in expr_df.columns:
+                    v    = expr_df[gene_name].to_numpy(dtype=_np.float64)
+                    vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
+                    vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
+                    span = max(vhi - vlo, 1e-10)
+                    t    = _np.clip((v - vlo) / span, 0.0, 1.0)
+                    from matplotlib import colormaps as _cmaps
+                    cmap = _cmaps.get_cmap(palette.lower() if palette else 'viridis')
+                    rgba_f      = cmap(t)
+                    colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
+                    hover_values = v.astype(_np.float32)
+                    meta['colorscale'] = palette
+            except Exception as _ge:
+                logging.warning(f'plot_gpu gene expr {gene_name}: {_ge}')
+
+        # ── pack binary ───────────────────────────────────────────────────────
+        meta_json   = _json.dumps(meta).encode('utf-8')
+        json_len    = len(meta_json)
+        total_hdr   = 8 + json_len
+        pad         = (8 - (total_hdr % 8)) % 8   # align next section to 8 bytes
+
+        buf = (
+            _struct.pack('<II', n, json_len)        # 8 bytes header
+            + meta_json                              # json_len bytes
+            + b'\x00' * pad                         # alignment padding
+            + positions.tobytes()                    # n * 8 bytes  (float32 x,y)
+            + colors_rgba.tobytes()                  # n * 4 bytes  (uint8  r,g,b,a)
+            + hover_values.tobytes()                 # n * 4 bytes  (float32 values)
+        )
+
+        from flask import Response as _Resp
+        return _Resp(buf, mimetype='application/octet-stream',
+                     headers={'Cache-Control': 'no-cache'})
+
+    except Exception as e:
+        logging.error(f'plot_gpu failed: {e}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -1616,6 +2098,150 @@ def static_proxy(path):
     if os.path.exists(os.path.join(ui_dist, 'index.html')):
         return send_from_directory(ui_dist, 'index.html')
     return send_from_directory(app.root_path, 'index.html')
+
+
+# ============================================================================
+# GPU (deck.gl) – color-only update (faster: no position fetch/encode)
+# ============================================================================
+
+@app.route('/api/plot_gpu_colors', methods=['POST'])
+def plot_gpu_colors():
+    """Return ONLY the colour + hover arrays for deck.gl (position unchanged).
+
+    Use this endpoint when the embedding hasn't changed so we avoid re-fetching
+    and re-encoding the large position FlatBuffers.
+
+    Binary layout (all little-endian):
+        [0-3]              uint32  n_cells
+        [4-7]              uint32  json_len
+        [8 .. 8+json_len)  UTF-8 JSON metadata (same schema as /api/plot_gpu)
+        [padded to 4 bytes] uint8[n*4]   r,g,b,a colours
+        [above + n*4]       float32[n]   hover_values
+    """
+    if state.current_adaptor is None:
+        return jsonify({'error': 'No data loaded'}), 400
+
+    try:
+        import struct as _struct, json as _json
+        from server.common.fbs.matrix import decode_matrix_fbs
+        import numpy as _np
+
+        req       = request.json or {}
+        color_by  = req.get('color_by', '')
+        palette   = req.get('palette', 'viridis')
+        cat_pal   = req.get('category_palette', None)
+        vmin_req  = req.get('vmin', None)
+        vmax_req  = req.get('vmax', None)
+        n         = req.get('n_cells', None)   # supplied by frontend
+
+        # If n_cells unknown, fetch from adaptor
+        if n is None:
+            n = state.current_adaptor.n_obs
+
+        colors_rgba  = _np.full((n, 4), [100, 149, 237, 200], dtype=_np.uint8)
+        hover_values = _np.full(n, _np.nan, dtype=_np.float32)
+
+        meta = {
+            'n_total':         n,
+            'color_label':     '',
+            'is_categorical':  False,
+            'category_labels': None,
+            'colorscale':      None,
+        }
+
+        if color_by.startswith('obs:'):
+            col_name = color_by[4:]
+            obs_fbs  = state.current_adaptor.get_obs_fbs([col_name])
+            obs_df   = decode_matrix_fbs(obs_fbs)
+            if col_name in obs_df.columns:
+                vals = obs_df[col_name]
+                meta['color_label'] = col_name
+                if pd.api.types.is_numeric_dtype(vals):
+                    v    = vals.to_numpy(dtype=_np.float64)
+                    vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
+                    vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
+                    span = max(vhi - vlo, 1e-10)
+                    t    = _np.clip((v - vlo) / span, 0.0, 1.0)
+                    from matplotlib import colormaps as _cmaps
+                    cmap        = _cmaps.get_cmap(palette.lower() if palette else 'viridis')
+                    rgba_f      = cmap(t)
+                    colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
+                    hover_values = v.astype(_np.float32)
+                    meta['colorscale'] = palette or 'viridis'
+                    meta['vmin'] = round(vlo, 6)
+                    meta['vmax'] = round(vhi, 6)
+                else:
+                    cats   = vals.astype('category')
+                    labels = cats.cat.categories.tolist()
+                    codes  = cats.cat.codes.to_numpy(dtype=_np.int32)
+                    n_cats = len(labels)
+                    if cat_pal:
+                        disc = get_discrete_colors(n_cats, cat_pal)
+                    else:
+                        disc = (
+                            get_uns_colors_for_labels(state.current_adata, col_name, labels)
+                            or get_discrete_colors(n_cats, None)
+                        )
+                    cat_hex_list = []
+                    for code, hex_c in enumerate(disc):
+                        mask = codes == code
+                        try:
+                            r = int(hex_c[1:3], 16)
+                            g = int(hex_c[3:5], 16)
+                            b = int(hex_c[5:7], 16)
+                        except Exception:
+                            r, g, b = 100, 149, 237
+                            hex_c = '#6495ed'
+                        if mask.any():
+                            colors_rgba[mask] = [r, g, b, 200]
+                        cat_hex_list.append(hex_c)
+                    hover_values = codes.astype(_np.float32)
+                    meta['is_categorical']    = True
+                    meta['category_labels']   = labels
+                    meta['category_colors']   = cat_hex_list
+
+        elif color_by.startswith('gene:'):
+            gene_name = color_by[5:]
+            meta['color_label'] = f'{gene_name} expression'
+            try:
+                expr_fbs = state.current_adaptor.get_expression_fbs([gene_name])
+                expr_df  = decode_matrix_fbs(expr_fbs)
+                if gene_name in expr_df.columns:
+                    v    = expr_df[gene_name].to_numpy(dtype=_np.float64)
+                    vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
+                    vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
+                    span = max(vhi - vlo, 1e-10)
+                    t    = _np.clip((v - vlo) / span, 0.0, 1.0)
+                    from matplotlib import colormaps as _cmaps
+                    cmap        = _cmaps.get_cmap(palette.lower() if palette else 'viridis')
+                    rgba_f      = cmap(t)
+                    colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
+                    hover_values = v.astype(_np.float32)
+                    meta['colorscale'] = palette
+            except Exception as _ge:
+                logging.warning(f'plot_gpu_colors gene {gene_name}: {_ge}')
+
+        # ── pack binary: header + json + colors + hover ───────────────────────
+        meta_json = _json.dumps(meta).encode('utf-8')
+        json_len  = len(meta_json)
+        total_hdr = 8 + json_len
+        pad       = (4 - (total_hdr % 4)) % 4   # align to 4 bytes (uint8/float32)
+
+        buf = (
+            _struct.pack('<II', n, json_len)
+            + meta_json
+            + b'\x00' * pad
+            + colors_rgba.tobytes()   # n * 4 bytes
+            + hover_values.tobytes()  # n * 4 bytes
+        )
+
+        from flask import Response as _Resp
+        return _Resp(buf, mimetype='application/octet-stream',
+                     headers={'Cache-Control': 'no-cache'})
+
+    except Exception as e:
+        logging.error(f'plot_gpu_colors failed: {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================

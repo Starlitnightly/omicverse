@@ -1183,6 +1183,36 @@ Object.assign(SingleCellAnalysis.prototype, {
 
             const vminmaxRow = document.getElementById('vminmax-row');
             if (vminmaxRow) vminmaxRow.style.display = 'none';
+
+            // ── deck.gl WebGL renderer cleanup ────────────────────────────────
+            // Must be done here (not in sc-plot.js monkey-patch) because
+            // Object.assign overwrites any previously patched prototype method.
+            if (this._deckglRenderer) {
+                this._deckglRenderer.destroy();
+                this._deckglRenderer         = null;
+                this._deckglCurrentEmbedding = null;
+                this._deckglCurrentColorBy   = null;
+            }
+            this._forceRenderer = null;
+            // Remove the deck.gl wrapper element from the DOM
+            const deckWrap = document.getElementById('deckgl-wrap');
+            if (deckWrap) deckWrap.remove();
+            // Reset renderer toggle buttons to "auto"
+            this._syncRendererButtons('auto');
+            // Ensure Plotly div is visible again for the next upload
+            const plotlyDiv = document.getElementById('plotly-div');
+            if (plotlyDiv) {
+                plotlyDiv.style.display = '';
+                // Purge Plotly data so hasExistingPlot check resets cleanly
+                if (typeof Plotly !== 'undefined') {
+                    try { Plotly.purge('plotly-div'); } catch (_) {}
+                }
+            }
+            // Reset embedding/color selects
+            const embSel = document.getElementById('embedding-select');
+            if (embSel) embSel.innerHTML = '<option value="">Select embedding</option>';
+            const colSel = document.getElementById('color-select');
+            if (colSel) colSel.innerHTML = '<option value="">None</option>';
         }
     }
 

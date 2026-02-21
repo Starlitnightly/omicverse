@@ -348,6 +348,12 @@ Object.assign(SingleCellAnalysis.prototype, {
         document.getElementById('viz-controls').style.display = 'block';
         document.getElementById('viz-panel').style.display = 'block';
 
+        // Init collapsible cards that were inside hidden containers on page load
+        requestAnimationFrame(() => {
+            const vizCtrl = document.getElementById('viz-controls');
+            if (vizCtrl) this.initCollapsibleCards(vizCtrl);
+        });
+
         // Sync left-panel height to match data-status + viz-panel
         requestAnimationFrame(() => this.syncPanelHeight());
 
@@ -485,16 +491,27 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     syncPanelHeight() {
-        const leftMain  = document.getElementById('left-main-panel');
-        const dataStatus = document.getElementById('data-status');
-        const vizPanel  = document.getElementById('viz-panel');
+        const leftMain    = document.getElementById('left-main-panel');
+        const dataStatus  = document.getElementById('data-status');
+        const vizPanel    = document.getElementById('viz-panel');
+        const adataCard   = document.getElementById('adata-status-section');
         if (!leftMain || !vizPanel) return;
+
+        // If adata-status is collapsed (flex shrunken to auto), let the left
+        // panel shrink naturally so the Analysis-Status card moves up and no
+        // blank space remains at the bottom.
+        const adataCollapsed = adataCard &&
+            adataCard.querySelector('.card-collapse-btn.collapsed') !== null;
+
+        if (adataCollapsed) {
+            leftMain.style.minHeight = '';
+            return;
+        }
+
         const dsH = (dataStatus && !dataStatus.classList.contains('d-none'))
             ? dataStatus.offsetHeight : 0;
         const vpH = vizPanel.offsetHeight;
-        if (dsH + vpH > 0) {
-            leftMain.style.minHeight = (dsH + vpH) + 'px';
-        }
+        leftMain.style.minHeight = (dsH + vpH > 0) ? (dsH + vpH) + 'px' : '';
     },
 
     checkStatus() {
@@ -857,6 +874,124 @@ Object.assign(SingleCellAnalysis.prototype, {
                 }
             })
             .catch(() => {/* silent fail */});
-    }
+    },
+
+    // ── Collapsible Cards ─────────────────────────────────────────────────────
+    /**
+     * initCollapsibleCards([root])
+     *
+     * Scans every `.card` inside `root` (default: document) that has both a
+     * `.card-header` and a `.card-body`, and injects a toggle button that lets
+     * the user collapse / expand the card body.
+     *
+     * Cards opt-out with the  data-no-collapse  attribute.
+     * State is persisted in sessionStorage so panels remember their position
+     * after a soft refresh.
+     *
+     * Safe to call multiple times — already-initialised cards are skipped.
+     */
+    initCollapsibleCards(root) {
+        root = root || document;
+        root.querySelectorAll('.card').forEach((card, idx) => {
+            // ── opt-out ────────────────────────────────────────────────────
+            if ('noCollapse' in card.dataset) return;
+
+            const header = card.querySelector(':scope > .card-header');
+            const body   = card.querySelector(':scope > .card-body');
+            if (!header || !body) return;
+
+            // Already initialised?
+            if (header.querySelector('.card-collapse-btn')) return;
+
+            // ── stable unique ID for sessionStorage ────────────────────────
+            // Walk up to find a real id, or assign a data-cc-id to the card.
+            if (!card.dataset.ccId) {
+                card.dataset.ccId = card.id || `cc-${Date.now()}-${idx}`;
+            }
+            const storageKey = `cc-${card.dataset.ccId}`;
+
+            // ── inject toggle button ───────────────────────────────────────
+            const btn = document.createElement('button');
+            btn.type      = 'button';
+            btn.className = 'card-collapse-btn';
+            btn.setAttribute('aria-label', 'Toggle card');
+            btn.innerHTML = '<span class="cc-chevron"><i class="fas fa-chevron-up"></i></span>';
+
+            header.classList.add('cc-header');
+            header.appendChild(btn);
+
+            // ── prepare body for CSS transition ───────────────────────────
+            body.classList.add('cc-animated');
+
+            // ── save original flex value so we can restore it on expand ──
+            // Cards with flex:1 (e.g. adata-status) must shrink when collapsed
+            // so sibling cards below them can move up.
+            const origFlex = card.style.flex || '';
+
+            // ── toggle logic (shared by button and header click) ──────────
+            const toggle = () => {
+                const isCollapsed = btn.classList.contains('collapsed');
+                if (isCollapsed) {
+                    // Expand: restore flex first so the card can grow
+                    card.style.flex          = origFlex;
+                    body.style.paddingTop    = '';
+                    body.style.paddingBottom = '';
+                    body.style.maxHeight     = body.scrollHeight + 'px';
+                    btn.classList.remove('collapsed');
+                    sessionStorage.removeItem(storageKey);
+                    // After animation, remove max-height so dynamic content can grow
+                    body.addEventListener('transitionend', function onEnd() {
+                        if (!btn.classList.contains('collapsed')) {
+                            body.style.maxHeight = '';
+                            requestAnimationFrame(() => this.syncPanelHeight());
+                        }
+                        body.removeEventListener('transitionend', onEnd);
+                    }.bind(this));
+                } else {
+                    // Collapse: pin current height first, then animate to 0
+                    body.style.maxHeight = body.scrollHeight + 'px';
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        body.style.maxHeight     = '0';
+                        body.style.paddingTop    = '0';
+                        body.style.paddingBottom = '0';
+                    }));
+                    btn.classList.add('collapsed');
+                    sessionStorage.setItem(storageKey, '1');
+                    // After animation: shrink card and re-sync panel height
+                    body.addEventListener('transitionend', function onEnd() {
+                        if (btn.classList.contains('collapsed')) {
+                            card.style.flex = '0 0 auto';
+                            // Let layout reflow, then recalculate min-height
+                            requestAnimationFrame(() => this.syncPanelHeight());
+                        }
+                        body.removeEventListener('transitionend', onEnd);
+                    }.bind(this));
+                }
+            };
+
+            btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+
+            // Clicking the header itself (not interactive child elements) also toggles
+            header.addEventListener('click', e => {
+                if (e.target.closest('button:not(.card-collapse-btn), input, select, a, label')) return;
+                toggle();
+            });
+
+            // ── restore persisted collapsed state ─────────────────────────
+            // Do this AFTER wiring events so the card is fully set up.
+            // If the card is inside a hidden container (scrollHeight === 0),
+            // skip setting maxHeight – it will be initialised on first interaction.
+            if (sessionStorage.getItem(storageKey) === '1') {
+                body.style.maxHeight     = '0';
+                body.style.paddingTop    = '0';
+                body.style.paddingBottom = '0';
+                btn.classList.add('collapsed');
+                // Immediately shrink the card so siblings are not pushed down
+                card.style.flex = '0 0 auto';
+            }
+        });
+    },
 
 });
+
+

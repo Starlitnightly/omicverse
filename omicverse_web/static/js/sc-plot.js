@@ -15,8 +15,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (!embedding) return;
 
         // Gene expression takes priority: if gene-input has a value use it,
-        // regardless of what color-select says. This ensures palette/style
-        // changes don't accidentally revert to the obs categorical variable.
+        // regardless of what color-select says.
         const geneInput = document.getElementById('gene-input');
         const geneValue = geneInput ? geneInput.value.trim() : '';
         const colorBy = geneValue
@@ -26,15 +25,24 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Update palette visibility based on color type
         this.updatePaletteVisibility(colorBy);
 
-        // 检查是否已经有图表存在
+        // ── deck.gl path ─────────────────────────────────────────────────────
+        // Check _forceRenderer FIRST so switching controls always works in WebGL mode.
+        const nCells  = this.currentData ? (this.currentData.n_cells || 0) : 0;
+        const useDeck = this._forceRenderer === 'deckgl'
+            || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
+
+        if (useDeck) {
+            this.createDeckGLPlot(embedding, colorBy);
+            return;
+        }
+
+        // ── Plotly path ───────────────────────────────────────────────────────
         const plotDiv = document.getElementById('plotly-div');
         const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
 
         if (hasExistingPlot) {
-            // 如果有现有图表，使用动画过渡
             this.updatePlotWithAnimation(embedding, colorBy);
         } else {
-            // 如果没有现有图表，直接创建新图表
             this.createNewPlot(embedding, colorBy);
         }
     },
@@ -118,6 +126,15 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     updatePlotWithAnimation(embedding, colorBy) {
+        // Route to deck.gl when forced or when dataset is large
+        const nCells  = this.currentData ? (this.currentData.n_cells || 0) : 0;
+        const useDeck = this._forceRenderer === 'deckgl'
+            || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
+        if (useDeck) {
+            this.createDeckGLPlot(embedding, colorBy);
+            return;
+        }
+
         const isEmbeddingChange = (this.currentEmbedding !== embedding);
         this.showStatus(
             isEmbeddingChange ? this.t('plot.switchEmbedding') : this.t('plot.updateColor'),
@@ -604,15 +621,33 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     applyPointStyleLive() {
-        const plotDiv = document.getElementById('plotly-div');
-        if (!plotDiv || !plotDiv.data || plotDiv.data.length === 0) return;
         const size    = this.getMarkerSize();
         const opacity = this.getMarkerOpacity();
+
+        // ── deck.gl path ──────────────────────────────────────────────────────
+        if (this._deckglRenderer && this._deckglRenderer._positions) {
+            this._deckglRenderer.updateStyle(size, opacity);
+            return;
+        }
+
+        // ── Plotly path ───────────────────────────────────────────────────────
+        const plotDiv = document.getElementById('plotly-div');
+        if (!plotDiv || !plotDiv.data || plotDiv.data.length === 0) return;
         const traceIndices = plotDiv.data.map((_, i) => i);
         Plotly.restyle('plotly-div', { 'marker.size': size, 'marker.opacity': opacity }, traceIndices);
     },
 
     plotData(data) {
+        // Show decimation notice when backend returned a subset
+        if (data.decimated) {
+            const shown = data.n_shown ? Math.round(data.n_shown / 1000) : '?';
+            const total = data.n_total ? Math.round(data.n_total / 1000) : '?';
+            this.addToLog(
+                `⚠️ ${this.t('plot.decimatedNotice') || `Showing ${shown}K / ${total}K cells (spatially sampled)`}`,
+                'warning'
+            );
+        }
+
         // 处理颜色配置
         let markerConfig = {
             size: this.getMarkerSize(),
@@ -1182,6 +1217,639 @@ Object.assign(SingleCellAnalysis.prototype, {
         });
         
         console.log('Legend已添加到图表右上角');
-    }
+    },
+
+    // =========================================================================
+    // deck.gl WebGL renderer (replaces the old Datashader raster approach)
+    // =========================================================================
+
+    /** Threshold above which we switch from Plotly to the deck.gl WebGL renderer. */
+    _rasterThreshold: 200_000,
+
+    /** deck.gl renderer instance (created on first use). */
+    _deckglRenderer: null,
+
+    /** Embedding / colorBy currently displayed by deck.gl. */
+    _deckglCurrentEmbedding: null,
+    _deckglCurrentColorBy:   null,
+
+    /**
+     * Main entry point for large datasets.  Fetches binary data from
+     * /api/plot_gpu and hands it to DeckGLRenderer.
+     * Falls back to the old raster PNG path if deck.gl is unavailable.
+     */
+    createDeckGLPlot(embedding, colorBy) {
+        this.showStatus(this.t('plot.generating'), true);
+
+        // ── ensure deck.gl container exists ──────────────────────────────────
+        const plotlyDiv = document.getElementById('plotly-div');
+        const parentEl  = plotlyDiv ? plotlyDiv.parentElement : null;
+        if (!parentEl) { this.showStatus('viz container not found', false); return; }
+
+        let wrap = document.getElementById('deckgl-wrap');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'deckgl-wrap';
+            // Do NOT put background here – let CSS (including dark-mode.css) handle it
+            wrap.style.cssText = 'position:relative; width:100%; min-height:480px; flex:1 1 auto;';
+            parentEl.insertBefore(wrap, plotlyDiv);
+        }
+        if (plotlyDiv) plotlyDiv.style.display = 'none';
+        wrap.style.display = 'block';
+
+        // ── init renderer once ────────────────────────────────────────────────
+        if (!this._deckglRenderer) {
+            if (typeof DeckGLRenderer === 'undefined') {
+                // deck.gl not loaded → fall back to raster
+                wrap.style.display = 'none';
+                if (plotlyDiv) plotlyDiv.style.display = '';
+                this.createRasterPlot(embedding, colorBy);
+                return;
+            }
+            this._deckglRenderer = new DeckGLRenderer(wrap);
+            if (!this._deckglRenderer.init()) {
+                this._deckglRenderer = null;
+                wrap.style.display = 'none';
+                if (plotlyDiv) plotlyDiv.style.display = '';
+                this.createRasterPlot(embedding, colorBy);
+                return;
+            }
+            this._buildDeckGLOverlays(wrap);
+        }
+
+        // ── collect palette / range controls ─────────────────────────────────
+        const palSel    = document.getElementById('palette-select');
+        const catPalSel = document.getElementById('category-palette-select');
+        const vminEl    = document.getElementById('vmin-input');
+        const vmaxEl    = document.getElementById('vmax-input');
+        const body = {
+            embedding,
+            color_by:         colorBy,
+            palette:          (palSel    && palSel.value    !== 'default') ? palSel.value    : 'viridis',
+            category_palette: (catPalSel && catPalSel.value !== 'default') ? catPalSel.value : null,
+            vmin: (vminEl && vminEl.value) ? parseFloat(vminEl.value) : null,
+            vmax: (vmaxEl && vmaxEl.value) ? parseFloat(vmaxEl.value) : null,
+        };
+
+        const isEmbeddingChange = this._deckglCurrentEmbedding !== embedding;
+        const hasExisting       = this._deckglRenderer._positions !== null;
+
+        // ── color-only update: skip position fetch/encode (3× faster) ────────
+        if (!isEmbeddingChange && hasExisting) {
+            const colorBody = {
+                color_by:         body.color_by,
+                palette:          body.palette,
+                category_palette: body.category_palette,
+                vmin:             body.vmin,
+                vmax:             body.vmax,
+                n_cells:          this._deckglRenderer._n,
+            };
+            fetch('/api/plot_gpu_colors', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(colorBody),
+            })
+            .then(r => {
+                if (!r.ok) return r.json().then(e => Promise.reject(e.error || 'server error'));
+                return r.arrayBuffer();
+            })
+            .then(buf => {
+                this.hideStatus();
+                const { n, meta, colors, hoverValues } = parseColorOnlyBuffer(buf);
+                this._deckglRenderer.animateToColors(colors, meta, hoverValues);
+                this._updateDeckGLLegend(wrap, meta);
+                this._deckglCurrentColorBy = colorBy;
+                this.showStatus(`${this.t('plot.colorUpdated')} · WebGL · ${(n / 1000).toFixed(0)}K cells`, false);
+            })
+            .catch(err => {
+                this.hideStatus();
+                this.showStatus(`${this.t('plot.failedPrefix')}: ${err}`, false);
+            });
+            return;
+        }
+
+        // ── full fetch: embedding changed or first render ─────────────────────
+        fetch('/api/plot_gpu', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(body),
+        })
+        .then(r => {
+            if (!r.ok) return r.json().then(e => Promise.reject(e.error || 'server error'));
+            return r.arrayBuffer();
+        })
+        .then(buf => {
+            this.hideStatus();
+            const { n, meta, positions, colors, hoverValues } = parsePlotGPUBuffer(buf);
+
+            if (isEmbeddingChange && hasExisting) {
+                this._deckglRenderer.animateToPositions(positions, colors, meta, hoverValues);
+            } else {
+                this._deckglRenderer.setData(positions, colors, meta, hoverValues);
+            }
+
+            this._updateDeckGLLegend(wrap, meta);
+            this._deckglCurrentEmbedding = embedding;
+            this._deckglCurrentColorBy   = colorBy;
+
+            const action = isEmbeddingChange ? this.t('plot.embeddingSwitched') : this.t('plot.done');
+            this.showStatus(`${action} · WebGL · ${(n / 1000).toFixed(0)}K cells`, false);
+        })
+        .catch(err => {
+            this.hideStatus();
+            this.showStatus(`${this.t('plot.failedPrefix')}: ${err}`, false);
+        });
+    },
+
+    /** Build badge + legend + control-bar overlays inside the deck.gl wrapper. */
+    _buildDeckGLOverlays(wrap) {
+        const self = this;
+
+        // Info badge (top-left)
+        const badge = document.createElement('div');
+        badge.id = 'deckgl-badge';
+        badge.style.cssText = [
+            'position:absolute; top:6px; left:8px; z-index:10;',
+            'font-size:0.68rem; padding:2px 8px; border-radius:4px;',
+            'background:rgba(0,0,0,0.5); color:#fff; pointer-events:none;',
+        ].join('');
+        badge.textContent = 'WebGL · deck.gl';
+        wrap.appendChild(badge);
+
+        // Categorical legend (top-right)
+        const legend = document.createElement('div');
+        legend.id = 'deckgl-legend';
+        legend.style.cssText = [
+            'position:absolute; top:6px; right:8px; z-index:10;',
+            'max-height:70%; overflow-y:auto; display:none;',
+            'font-size:0.7rem; background:rgba(var(--bs-body-bg-rgb,255,255,255),0.9);',
+            'border:1px solid var(--bs-border-color,#dee2e6); border-radius:5px;',
+            'padding:4px 8px;',
+        ].join('');
+        wrap.appendChild(legend);
+
+        // Control bar (bottom-right): switch to Plotly
+        const mkBtn = (label, title, onClick) => {
+            const b = document.createElement('button');
+            b.className = 'btn btn-sm btn-light border';
+            b.style.cssText = 'width:28px; height:28px; padding:0; font-size:14px; line-height:1;';
+            b.textContent = label;
+            b.title = title;
+            b.addEventListener('click', onClick);
+            return b;
+        };
+        const bar = document.createElement('div');
+        bar.style.cssText = 'position:absolute; bottom:8px; right:8px; z-index:10; display:flex; gap:4px;';
+        bar.appendChild(mkBtn('⊞', 'Switch to Plotly (slower for large datasets)', () => {
+            self._switchDeckGLToPlotly();
+        }));
+        wrap.appendChild(bar);
+    },
+
+    /** Update the categorical legend panel in the deck.gl wrapper. */
+    _updateDeckGLLegend(wrap, meta) {
+        const legend = document.getElementById('deckgl-legend');
+        const badge  = document.getElementById('deckgl-badge');
+        if (!legend) return;
+
+        const n = meta.n_total || 0;
+        if (badge) badge.textContent = `WebGL · ${(n / 1000).toFixed(0)}K cells`;
+
+        // ── continuous colorbar ──────────────────────────────────────────────
+        if (!meta.is_categorical) {
+            if (meta.colorscale) {
+                const cs = meta.colorscale || 'viridis';
+                const vminLabel = (meta.vmin !== undefined) ? meta.vmin.toFixed(3) : '';
+                const vmaxLabel = (meta.vmax !== undefined) ? meta.vmax.toFixed(3) : '';
+                const grad = this._colormapGradient(cs);
+                legend.style.display = 'block';
+                legend.innerHTML =
+                    (meta.color_label ? `<div style="font-weight:600;margin-bottom:4px;font-size:0.72rem;">${meta.color_label}</div>` : '') +
+                    `<div style="width:12px;height:80px;border-radius:3px;background:${grad};` +
+                    `border:1px solid rgba(128,128,128,0.3);display:inline-block;vertical-align:middle;"></div>` +
+                    `<div style="display:inline-block;vertical-align:middle;margin-left:4px;font-size:0.67rem;line-height:1.3;">` +
+                    `<div>${vmaxLabel}</div><div style="margin-top:60px;">${vminLabel}</div></div>`;
+            } else {
+                legend.style.display = 'none';
+            }
+            return;
+        }
+
+        // ── categorical legend ───────────────────────────────────────────────
+        legend.style.display = 'block';
+        legend.innerHTML = meta.color_label
+            ? `<div style="font-weight:600;margin-bottom:4px;font-size:0.72rem;">${meta.color_label}</div>` : '';
+
+        // Prefer backend-supplied per-category colours; fall back to the same
+        // OmicVerse default palette used on the backend so the legend is never
+        // all-grey even if the server runs an older build (no category_colors key).
+        const _OV_SC_COLOR = [
+            '#1F577B','#A56BA7','#E0A7C8','#E069A6','#941456',
+            '#FCBC10','#EF7B77','#279AD7','#F0EEF0','#EAEFC5',
+            '#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED',
+            '#866017','#9F987F','#E0DFED','#01A0A7','#75C8CC',
+            '#F0D7BC','#D5B26C','#D5DA48','#B6B812','#9DC3C3',
+            '#A89C92','#FEE00C','#FEF2A1',
+        ];
+        const catColors = (meta.category_colors && meta.category_colors.length)
+            ? meta.category_colors : null;
+
+        meta.category_labels.forEach((label, code) => {
+            // Use backend color → fallback to OV default palette (by index)
+            const color = (catColors && catColors[code]) || _OV_SC_COLOR[code % _OV_SC_COLOR.length];
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:5px;margin:1px 0;white-space:nowrap;';
+            row.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;` +
+                            `background:${color};flex-shrink:0;border:1px solid rgba(0,0,0,0.15);"></span>` +
+                            `<span style="overflow:hidden;text-overflow:ellipsis;max-width:140px;">${label}</span>`;
+            legend.appendChild(row);
+        });
+    },
+
+    /**
+     * Return a CSS linear-gradient string that approximates a named matplotlib colormap.
+     * Used for the continuous colorbar in the deck.gl legend panel.
+     */
+    _colormapGradient(name) {
+        const maps = {
+            viridis:  '#440154,#482878,#3e4989,#31688e,#26828e,#1f9e89,#35b779,#6ece58,#b5de2b,#fde725',
+            plasma:   '#0d0887,#46039f,#7201a8,#9c179e,#bd3786,#d8576b,#ed7953,#fb9f3a,#fdcf18,#f0f921',
+            magma:    '#000004,#1b1044,#3b0f70,#641a80,#8c2981,#b5367a,#de4968,#f7705c,#fe9f6d,#fcfdbf',
+            inferno:  '#000004,#1f0c48,#550f6d,#88226a,#ac5765,#cc7b5c,#e69c5b,#f4c86a,#f8e88e,#fcffa4',
+            cividis:  '#002051,#0b307f,#35499d,#5762ad,#767ab5,#9592bb,#b4adc6,#d3cade,#ede0c6,#fee8a0',
+            coolwarm: '#3b4cc0,#6688ee,#98b4fa,#c9d8ef,#eddbc7,#f7a789,#e36a53,#b40426',
+            RdYlBu:   '#d73027,#f46d43,#fdae61,#fee090,#ffffbf,#e0f3f8,#abd9e9,#74add1,#4575b4',
+            RdBu:     '#ca0020,#f4a582,#f7f7f7,#92c5de,#0571b0',
+            bwr:      '#0000ff,#ffffff,#ff0000',
+            hot:      '#000000,#ff0000,#ffff00,#ffffff',
+            Blues:    '#f7fbff,#deebf7,#c6dbef,#9ecae1,#6baed6,#4292c6,#2171b5,#08519c,#08306b',
+            Reds:     '#fff5f0,#fee0d2,#fcbba1,#fc9272,#fb6a4a,#ef3b2c,#cb181d,#a50f15,#67000d',
+            Greens:   '#f7fcf5,#e5f5e0,#c7e9c0,#a1d99b,#74c476,#41ab5d,#238b45,#006d2c,#00441b',
+            YlOrRd:   '#ffffcc,#ffeda0,#fed976,#feb24c,#fd8d3c,#fc4e2a,#e31a1c,#bd0026,#800026',
+            Spectral: '#9e0142,#d53e4f,#f46d43,#fdae61,#fee08b,#ffffbf,#e6f598,#abdda4,#66c2a5,#3288bd,#5e4fa2',
+            tab10:    '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
+        };
+        const key = (name || 'viridis').toLowerCase().replace(/_/g, '');
+        const stops = maps[key] || maps[name] || maps.viridis;
+        // Build a top-to-bottom gradient (high → low so max is at top)
+        return `linear-gradient(to bottom, ${stops.split(',').reverse().join(',')})`;
+    },
+
+    /** User clicked "switch to Plotly" in the deck.gl panel. */
+    _switchDeckGLToPlotly() {
+        const wrap = document.getElementById('deckgl-wrap');
+        if (wrap) wrap.style.display = 'none';
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = '';
+        // Force a fresh Plotly render (large dataset — warn user)
+        if (this._deckglCurrentEmbedding) {
+            const _origThreshold = this._rasterThreshold;
+            this._rasterThreshold = Infinity; // temporarily disable auto-routing
+            this.createNewPlot(this._deckglCurrentEmbedding, this._deckglCurrentColorBy);
+            this._rasterThreshold = _origThreshold;
+        }
+    },
+
+    // ── Legacy raster path (kept as fallback when deck.gl is unavailable) ────
+
+    /** Threshold alias (same value, kept for back-compat). */
+    _rasterViewport: null,
+
+    /**
+     * Raster (Datashader / matplotlib PNG) fallback.
+     * Only called when deck.gl is not available.
+     */
+    createRasterPlot(embedding, colorBy) {
+        this.showStatus(this.t('plot.generating'), true);
+
+        const paletteSelect = document.getElementById('palette-select');
+        const catPaletteSelect = document.getElementById('category-palette-select');
+        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : 'Viridis';
+        const catPalette = catPaletteSelect && catPaletteSelect.value !== 'default' ? catPaletteSelect.value : null;
+
+        const plotDiv = document.getElementById('plotly-div');
+        const panelEl = plotDiv ? plotDiv.parentElement : null;
+        const w = panelEl ? panelEl.clientWidth : 800;
+        const h = panelEl ? panelEl.clientHeight : 600;
+
+        const body = {
+            embedding, color_by: colorBy,
+            width: Math.max(400, w),
+            height: Math.max(300, h),
+            palette, category_palette: catPalette,
+            x_range: this._rasterViewport ? this._rasterViewport.x_range : null,
+            y_range: this._rasterViewport ? this._rasterViewport.y_range : null,
+        };
+
+        fetch('/api/plot_raster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.hideStatus();
+            if (data.error) {
+                this.showStatus(`${this.t('plot.failedPrefix')}: ${data.error}`, false);
+                return;
+            }
+            this._rasterViewport = { x_range: data.x_range, y_range: data.y_range };
+            this._renderRasterImage(data, embedding, colorBy);
+        })
+        .catch(err => {
+            this.hideStatus();
+            this.showStatus(`${this.t('plot.failedPrefix')}: ${err.message}`, false);
+        });
+    },
+
+    /** Render the returned PNG into the raster overlay panel. */
+    _renderRasterImage(data, embedding, colorBy) {
+        // Ensure raster panel exists
+        let panel = document.getElementById('raster-plot-panel');
+        if (!panel) {
+            panel = this._buildRasterPanel();
+        }
+
+        // Show raster, hide Plotly
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = 'none';
+        panel.style.display = 'flex';
+
+        // Update image
+        const img = panel.querySelector('#raster-img');
+        if (img) img.src = `data:image/png;base64,${data.image}`;
+
+        // Update badge
+        const badge = panel.querySelector('#raster-badge');
+        if (badge) {
+            const engine = data.engine === 'datashader' ? 'Datashader' : 'Matplotlib';
+            badge.textContent = `${engine} · ${(data.n_total / 1000).toFixed(0)}K cells`;
+            badge.title = `Rendered with ${engine}. Zoom/pan triggers re-render.`;
+        }
+
+        // Update legend
+        this._renderRasterLegend(panel, data);
+
+        // Save current embedding/colorBy for re-render on zoom
+        this._currentRasterEmbedding = embedding;
+        this._currentRasterColorBy   = colorBy;
+
+        this.showStatus(`${this.t('plot.done')} (raster, ${(data.n_total/1000).toFixed(0)}K cells)`, false);
+    },
+
+    /** Build the raster panel DOM once. */
+    _buildRasterPanel() {
+        const container = document.getElementById('plotly-div')?.parentElement;
+        if (!container) return document.createElement('div');
+
+        const panel = document.createElement('div');
+        panel.id = 'raster-plot-panel';
+        panel.style.cssText = 'display:none; flex-direction:column; width:100%; height:100%; position:relative; overflow:hidden; background:var(--bs-body-bg);';
+
+        // Image (fills panel, preserves aspect ratio)
+        const img = document.createElement('img');
+        img.id = 'raster-img';
+        img.style.cssText = 'width:100%; height:100%; object-fit:contain; cursor:crosshair;';
+        img.alt = 'Raster scatter plot';
+        panel.appendChild(img);
+
+        // Engine/count badge
+        const badge = document.createElement('div');
+        badge.id = 'raster-badge';
+        badge.style.cssText = [
+            'position:absolute; top:6px; left:8px;',
+            'font-size:0.68rem; padding:2px 7px; border-radius:4px;',
+            'background:rgba(0,0,0,0.55); color:#fff; pointer-events:none;',
+        ].join('');
+        panel.appendChild(badge);
+
+        // Legend overlay (top-right)
+        const legend = document.createElement('div');
+        legend.id = 'raster-legend';
+        legend.style.cssText = [
+            'position:absolute; top:6px; right:8px; max-height:70%; overflow-y:auto;',
+            'font-size:0.7rem; background:rgba(var(--bs-body-bg-rgb,255,255,255),0.88);',
+            'border:1px solid var(--bs-border-color,#dee2e6); border-radius:5px;',
+            'padding:4px 8px; display:none;',
+        ].join('');
+        panel.appendChild(legend);
+
+        // Zoom controls
+        const zoomBar = document.createElement('div');
+        zoomBar.style.cssText = 'position:absolute; bottom:8px; right:8px; display:flex; gap:4px;';
+        const mkBtn = (label, title, onClick) => {
+            const b = document.createElement('button');
+            b.className = 'btn btn-sm btn-light border';
+            b.style.cssText = 'width:28px; height:28px; padding:0; font-size:14px; line-height:1;';
+            b.textContent = label;
+            b.title = title;
+            b.addEventListener('click', onClick);
+            return b;
+        };
+        zoomBar.appendChild(mkBtn('⟳', 'Reset zoom', () => {
+            this._rasterViewport = null;
+            this.createRasterPlot(this._currentRasterEmbedding, this._currentRasterColorBy);
+        }));
+        zoomBar.appendChild(mkBtn('⊞', 'Switch to Plotly (may be slow for large data)', () => {
+            this._switchToPlotly();
+        }));
+        panel.appendChild(zoomBar);
+
+        // Drag-to-zoom: draw a selection rectangle on the image
+        this._attachRasterZoom(img, panel);
+
+        container.appendChild(panel);
+        return panel;
+    },
+
+    /** Drag-rectangle zoom on the raster image. */
+    _attachRasterZoom(img, panel) {
+        let dragging = false, startX, startY;
+        let rect = null;
+
+        const getImgCoords = (clientX, clientY) => {
+            const r = img.getBoundingClientRect();
+            const fx = (clientX - r.left)  / r.width;
+            const fy = (clientY - r.top)   / r.height;
+            return { fx: Math.max(0, Math.min(1, fx)), fy: Math.max(0, Math.min(1, fy)) };
+        };
+
+        img.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            dragging = true;
+            startX = e.clientX; startY = e.clientY;
+            // selection box
+            rect = document.createElement('div');
+            rect.style.cssText = [
+                'position:absolute; border:2px dashed rgba(59,130,246,0.9);',
+                'background:rgba(59,130,246,0.08); pointer-events:none;',
+            ].join('');
+            panel.appendChild(rect);
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!dragging || !rect) return;
+            const ir = img.getBoundingClientRect();
+            const pr = panel.getBoundingClientRect();
+            const x1 = Math.min(startX, e.clientX) - pr.left;
+            const y1 = Math.min(startY, e.clientY) - pr.top;
+            const w  = Math.abs(e.clientX - startX);
+            const h  = Math.abs(e.clientY - startY);
+            rect.style.left   = x1 + 'px';
+            rect.style.top    = y1 + 'px';
+            rect.style.width  = w  + 'px';
+            rect.style.height = h  + 'px';
+        });
+
+        window.addEventListener('mouseup', e => {
+            if (!dragging) return;
+            dragging = false;
+            if (rect) { rect.remove(); rect = null; }
+
+            const dx = Math.abs(e.clientX - startX);
+            const dy = Math.abs(e.clientY - startY);
+            if (dx < 8 || dy < 8) return; // too small — ignore
+
+            const p1 = getImgCoords(startX, startY);
+            const p2 = getImgCoords(e.clientX, e.clientY);
+            const vp = this._rasterViewport;
+            if (!vp) return;
+
+            const [xlo, xhi] = vp.x_range;
+            const [ylo, yhi] = vp.y_range;
+            const xspan = xhi - xlo;
+            const yspan = yhi - ylo;
+
+            // image y-axis is flipped (top=ymax)
+            const newX = [xlo + Math.min(p1.fx, p2.fx) * xspan,
+                          xlo + Math.max(p1.fx, p2.fx) * xspan];
+            const newY = [yhi - Math.max(p1.fy, p2.fy) * yspan,
+                          yhi - Math.min(p1.fy, p2.fy) * yspan];
+
+            this._rasterViewport = { x_range: newX, y_range: newY };
+            this.createRasterPlot(this._currentRasterEmbedding, this._currentRasterColorBy);
+        });
+    },
+
+    /** Render categorical legend into the raster panel. */
+    _renderRasterLegend(panel, data) {
+        const legend = panel.querySelector('#raster-legend');
+        if (!legend) return;
+        if (!data.legend || data.legend.length === 0) { legend.style.display = 'none'; return; }
+        legend.style.display = 'block';
+        legend.innerHTML = data.color_label
+            ? `<div style="font-weight:600;margin-bottom:3px;font-size:0.72rem;">${data.color_label}</div>`
+            : '';
+        data.legend.forEach(({ label, color }) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:5px;margin:1px 0;white-space:nowrap;';
+            row.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0;"></span>${label}`;
+            legend.appendChild(row);
+        });
+    },
+
+    /** Switch back from raster panel to Plotly (user override). */
+    _switchToPlotly() {
+        const panel = document.getElementById('raster-plot-panel');
+        if (panel) panel.style.display = 'none';
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = '';
+        this._rasterViewport = null;
+        this.createNewPlot(this._currentRasterEmbedding, this._currentRasterColorBy);
+    },
 
 });
+
+// ============================================================================
+// Renderer selection helpers
+// ============================================================================
+
+/**
+ * _forceRenderer: null | 'deckgl' | 'plotly'
+ *   null  → auto (deck.gl when n > threshold, Plotly otherwise)
+ *   'deckgl' → always deck.gl regardless of cell count
+ *   'plotly' → always Plotly regardless of cell count
+ */
+SingleCellAnalysis.prototype._forceRenderer = null;
+
+/** Update the renderer toggle buttons to reflect the active mode. */
+SingleCellAnalysis.prototype._syncRendererButtons = function (active /* 'deckgl'|'plotly'|'auto' */) {
+    const btnDeck   = document.getElementById('renderer-btn-deckgl');
+    const btnPlotly = document.getElementById('renderer-btn-plotly');
+    const btnAuto   = document.getElementById('renderer-btn-auto');
+    [btnDeck, btnPlotly, btnAuto].forEach(b => b && b.classList.remove('active'));
+
+    if (active === 'deckgl')       { if (btnDeck)   btnDeck.classList.add('active'); }
+    else if (active === 'plotly')  { if (btnPlotly) btnPlotly.classList.add('active'); }
+    else                           { if (btnAuto)   btnAuto.classList.add('active'); }
+};
+
+/**
+ * Public: called by the toggle buttons.
+ * mode: 'deckgl' | 'plotly' | 'auto'
+ */
+SingleCellAnalysis.prototype.setRenderer = function (mode) {
+    this._forceRenderer = (mode === 'auto') ? null : mode;
+
+    const emb     = document.getElementById('embedding-select') && document.getElementById('embedding-select').value;
+    const colorBy = (() => {
+        const geneEl  = document.getElementById('gene-input');
+        const geneVal = geneEl ? geneEl.value.trim() : '';
+        return geneVal ? 'gene:' + geneVal : (document.getElementById('color-select') || {}).value || '';
+    })();
+
+    if (!emb) return; // nothing to render yet
+
+    if (mode === 'deckgl') {
+        this._syncRendererButtons('deckgl');
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = 'none';
+        this.createDeckGLPlot(emb, colorBy);
+    } else if (mode === 'plotly') {
+        this._syncRendererButtons('plotly');
+        const wrap = document.getElementById('deckgl-wrap');
+        if (wrap) wrap.style.display = 'none';
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = '';
+        const savedThreshold = this._rasterThreshold;
+        this._rasterThreshold = Infinity;
+        _origCreateNewPlot.call(this, emb, colorBy);
+        this._rasterThreshold = savedThreshold;
+    } else {
+        // auto: re-render with default routing
+        this._syncRendererButtons('auto');
+        this.updatePlot();
+    }
+};
+
+// ============================================================================
+// Auto-routing patch: respects _forceRenderer, then falls back to threshold
+// ============================================================================
+const _origCreateNewPlot = SingleCellAnalysis.prototype.createNewPlot;
+SingleCellAnalysis.prototype.createNewPlot = function (embedding, colorBy) {
+    const nCells   = this.currentData ? (this.currentData.n_cells || 0) : 0;
+    const useDeck  = this._forceRenderer === 'deckgl'
+        || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
+
+    if (useDeck) {
+        if (this._forceRenderer !== 'deckgl') this._syncRendererButtons('auto');
+        else this._syncRendererButtons('deckgl');
+        this.createDeckGLPlot(embedding, colorBy);
+    } else {
+        if (this._forceRenderer !== 'plotly') this._syncRendererButtons('auto');
+        else this._syncRendererButtons('plotly');
+        // Hide deck.gl wrap and old raster panel
+        const wrap = document.getElementById('deckgl-wrap');
+        if (wrap) wrap.style.display = 'none';
+        const rasterPanel = document.getElementById('raster-plot-panel');
+        if (rasterPanel) rasterPanel.style.display = 'none';
+        // Show Plotly
+        const plotlyDiv = document.getElementById('plotly-div');
+        if (plotlyDiv) plotlyDiv.style.display = '';
+        _origCreateNewPlot.call(this, embedding, colorBy);
+    }
+};
+
+// Note: deck.gl renderer cleanup is handled inside resetData() in sc-tools.js,
+// because Object.assign there would overwrite any monkey-patch set here.

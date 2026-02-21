@@ -26,6 +26,9 @@
     <link rel="stylesheet" href="static/css/custom-theme.css">
     <!-- Plotly.js for visualization -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- deck.gl for GPU-accelerated WebGL scatter (large datasets > 200 K cells) -->
+    <!-- Works on any Mac: Apple Silicon GPU, Intel Iris, or integrated graphics -->
+    <script src="https://unpkg.com/deck.gl@9.1/dist.min.js"></script>
     <!-- High-performance visualization dependencies -->
     <script src="node_modules/regl/dist/regl.js"></script>
     <script src="node_modules/gl-matrix/gl-matrix.js"></script>
@@ -523,30 +526,40 @@
                 <div class="row">
                     <!-- Parameter Settings Panel (left of UMAP) -->
                     <div class="col-lg-3 d-flex flex-column">
-                        <!-- left-main-panel: parameter + adata-status, height-synced to right panel -->
-                        <div id="left-main-panel" class="d-flex flex-column">
-                            <!-- Parameter Settings Section -->
-                            <div class="parameter-section" id="parameter-panel" style="flex:0 0 auto">
-                                <h6>
-                                    <i class="fas fa-cog"></i><span data-i18n="panel.parameters">Parameters</span>
-                                </h6>
-                                <div id="parameter-content"></div>
+                        <!-- left-main-panel: all three left cards share one flex column
+                             so collapsing adata-status lets analysis-status move up -->
+                        <div id="left-main-panel" class="d-flex flex-column gap-2">
+                            <!-- Parameter Settings Card -->
+                            <div class="card" id="parameter-panel" style="flex:0 0 auto">
+                                <div class="card-header py-2 small fw-semibold">
+                                    <i class="fas fa-cog me-1"></i><span data-i18n="panel.parameters">Parameters</span>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div id="parameter-content"></div>
+                                </div>
                             </div>
 
                             <!-- adata Status Card -->
-                            <div class="adata-status-section mt-3" id="adata-status-section" style="flex:1;min-height:0;overflow-y:auto">
-                                <h6><i class="fas fa-database"></i><span data-i18n="panel.adataStatus">adata 状态</span></h6>
-                                <div id="adata-status-content"></div>
+                            <div class="card" id="adata-status-section" style="flex:1;min-height:0;overflow-y:auto">
+                                <div class="card-header py-2 small fw-semibold">
+                                    <i class="fas fa-database me-1"></i><span data-i18n="panel.adataStatus">adata 状态</span>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div id="adata-status-content"></div>
+                                </div>
                             </div>
-                        </div>
 
-                        <!-- Analysis Status Section -->
-                        <div class="analysis-log-section mt-3" style="flex:0 0 auto">
-                            <h6>
-                                <i class="fas fa-info-circle"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
-                            </h6>
-                            <div id="analysis-log" class="bg-light p-3 rounded analysis-log">
-                                <div class="text-muted" data-i18n="panel.waitingUpload">Waiting for data upload...</div>
+                            <!-- Analysis Status Card (inside left-main-panel so it
+                                 floats up when adata-status collapses) -->
+                            <div class="card" style="flex:0 0 auto">
+                                <div class="card-header py-2 small fw-semibold">
+                                    <i class="fas fa-info-circle me-1"></i><span data-i18n="panel.analysisStatus">Analysis Status</span>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div id="analysis-log" class="p-3 analysis-log">
+                                        <div class="text-muted" data-i18n="panel.waitingUpload">Waiting for data upload...</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -587,25 +600,28 @@
 
                         <!-- Data Status -->
                         <div id="data-status" class="status-info d-none">
-                            <!-- Preview mode banner (hidden when in analysis mode) -->
-                            <div id="preview-mode-banner" class="alert alert-warning d-none py-2 px-3 mb-2" style="border-radius:6px; font-size:0.85rem;">
-                                <i class="fas fa-eye me-1"></i>
-                                <strong data-i18n="preview.bannerTitle">预览模式</strong>
-                                <span data-i18n="preview.bannerDesc"> — 分析功能已禁用，数据以低内存方式读取</span>
-                                <button type="button" class="btn btn-sm btn-warning ms-2 py-0 px-2"
-                                        onclick="singleCellApp.switchToAnalysisMode()"
-                                        data-i18n="preview.switchBtn">切换分析读取</button>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1" id="filename-display" data-i18n="status.filename">Filename</h6>
+                            <!-- Row 1: filename + action buttons -->
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div style="min-width:0; flex:1;">
+                                    <h6 class="mb-0" id="filename-display" data-i18n="status.filename">Filename</h6>
                                     <small class="text-muted">
                                         <span id="cell-count">0</span> <span data-i18n="status.cells">cells</span> •
                                         <span id="gene-count">0</span> <span data-i18n="status.genes">genes</span>
                                     </small>
+                                    <!-- Preview mode hint (inline, below filename) -->
+                                    <div id="preview-mode-banner" class="d-none mt-1" style="font-size:0.78rem; color: var(--bs-warning-text, #856404);">
+                                        <i class="fas fa-eye me-1"></i>
+                                        <span data-i18n="preview.bannerTitle">预览模式</span>
+                                        <span data-i18n="preview.bannerDesc"> — 分析功能已禁用，数据以低内存方式读取</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <button type="button" class="btn btn-sm btn-success me-2" onclick="saveData()" id="save-btn">
+                                <div class="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
+                                    <!-- Switch-to-analysis button (only visible in preview mode) -->
+                                    <button type="button" id="switch-analysis-btn"
+                                            class="btn btn-sm btn-warning d-none"
+                                            onclick="singleCellApp.switchToAnalysisMode()"
+                                            data-i18n="preview.switchBtn">切换分析读取</button>
+                                    <button type="button" class="btn btn-sm btn-success" onclick="saveData()" id="save-btn">
                                         <i class="fas fa-download me-1"></i><span data-i18n="status.save">Save</span>
                                     </button>
                                     <button type="button" class="btn btn-sm btn-secondary" onclick="resetData()">
@@ -633,7 +649,12 @@
                         </div>
 
                         <!-- Visualization Controls (below chart) -->
-                        <div id="viz-controls" class="control-panel mt-3" style="display: none;">
+                        <div id="viz-controls" class="mt-3" style="display: none;">
+                          <div class="card">
+                            <div class="card-header py-2 small fw-semibold">
+                                <i class="fas fa-sliders-h me-1"></i><span data-i18n="controls.title">可视化控制</span>
+                            </div>
+                            <div class="card-body p-2">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-3">
                                     <label for="embedding-select" class="form-label form-label-sm" data-i18n="controls.embedding">Embedding</label>
@@ -735,7 +756,43 @@
                                             data-i18n="controls.resetStyle">Reset style</button>
                                 </div>
                             </div>
-                        </div>
+
+                            <!-- Renderer toggle -->
+                            <div class="row g-2 mt-2 align-items-center">
+                                <div class="col-auto">
+                                    <span class="form-label form-label-sm mb-0 text-muted" style="line-height:28px;">
+                                        <i class="fas fa-tv me-1"></i><span data-i18n="controls.renderer">Renderer</span>
+                                    </span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="btn-group btn-group-sm" role="group" id="renderer-toggle-group"
+                                         title="Choose between Plotly (interactive, ≤200K cells) and WebGL/deck.gl (GPU-accelerated, any size)">
+                                        <button type="button" id="renderer-btn-plotly"
+                                                class="btn btn-outline-secondary active"
+                                                onclick="singleCellApp.setRenderer('plotly')">
+                                            <i class="fas fa-chart-scatter me-1"></i>Plotly
+                                        </button>
+                                        <button type="button" id="renderer-btn-deckgl"
+                                                class="btn btn-outline-secondary"
+                                                onclick="singleCellApp.setRenderer('deckgl')">
+                                            <i class="fas fa-microchip me-1"></i>WebGL
+                                        </button>
+                                        <button type="button" id="renderer-btn-auto"
+                                                class="btn btn-outline-secondary"
+                                                onclick="singleCellApp.setRenderer('auto')"
+                                                data-i18n="controls.rendererAuto"
+                                                title="Auto: WebGL for >200K cells, Plotly otherwise">Auto</button>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <small class="text-muted" id="renderer-hint" style="font-size:0.68rem;">
+                                        <span data-i18n="controls.rendererHint">WebGL supports hover, zoom &amp; animations for any dataset size</span>
+                                    </small>
+                                </div>
+                            </div>
+                            </div><!-- /card-body -->
+                          </div><!-- /card -->
+                        </div><!-- /viz-controls -->
 
                         <!-- ── Trajectory Analysis Visualization ── -->
                         <div id="traj-viz-panel" class="control-panel mt-3" style="display:none;">
@@ -803,7 +860,7 @@
                                             </div>
 
                                             <!-- PAGA overlay sub-card -->
-                                            <div class="card mt-2">
+                                            <div class="card mt-2" data-no-collapse>
                                                 <div class="card-header py-1 px-2">
                                                     <div class="form-check mb-0">
                                                         <input class="form-check-input" type="checkbox" id="traj-paga-overlay"
@@ -1093,7 +1150,7 @@
             </div>
 
             <!-- All installed packages (collapsible) -->
-            <div class="card">
+            <div class="card" data-no-collapse>
               <div class="card-header py-2 fw-semibold small d-flex align-items-center justify-content-between"
                    style="cursor:pointer;" onclick="singleCellApp.toggleEnvAllPkgs()">
                 <span><i class="feather-list me-1"></i><span data-i18n="envInfo.allPkgs">所有已安装包</span>
@@ -1131,6 +1188,7 @@
     <script src="static/js/sc-kernel.js"></script>
     <script src="static/js/sc-filesystem.js"></script>
     <script src="static/js/sc-plot.js"></script>
+    <script src="static/js/sc-deckgl.js"></script>
     <script src="static/js/sc-tools.js"></script>
     <script src="static/js/sc-notebook.js"></script>
     <script src="static/js/sc-environment.js"></script>

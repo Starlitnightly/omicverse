@@ -66,6 +66,8 @@ class SingleCellAnalysis {
         this.applyCodeFontSize();
         this.fetchKernelVars();
         window.addEventListener('resize', () => this.syncPanelHeight());
+        // Initialise collapsible cards (runs after all HTML is parsed)
+        this.initCollapsibleCards();
     }
 }
 

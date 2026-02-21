@@ -419,6 +419,25 @@
     background-color: var(--nxl-white) !important;
 }
 
+/* deck.gl WebGL container – light & dark */
+#deckgl-wrap {
+    min-height: 480px;
+    background-color: #ffffff;          /* light mode default */
+}
+.app-skin-dark #deckgl-wrap {
+    background-color: #111827 !important;   /* dark mode */
+}
+.app-skin-dark #deckgl-legend {
+    background: rgba(31, 41, 55, 0.92) !important;
+    border-color: #4b5563 !important;
+    color: #e5e7eb;
+}
+/* Badge adapts to dark too */
+.app-skin-dark #deckgl-badge {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: #e5e7eb !important;
+}
+
 /* Dark Mode Scrollbars */
 .app-skin-dark ::-webkit-scrollbar {
     width: 8px;
@@ -488,14 +507,13 @@
     border-color: var(--nxl-gray-500) !important;
 }
 
-/* ── Preview mode banner — dark mode ─────────────────────────────────────── */
-.app-skin-dark #preview-mode-banner.alert-warning {
-    background-color: #3d2e00 !important;
-    border-color: #7a5c00 !important;
+/* ── Preview mode hint text — dark mode ─────────────────────────────────── */
+.app-skin-dark #preview-mode-banner {
     color: #ffd966 !important;
 }
 
-.app-skin-dark #preview-mode-banner .btn-warning {
+/* Switch-to-analysis button in dark mode */
+.app-skin-dark #switch-analysis-btn {
     background-color: #a07800 !important;
     border-color: #a07800 !important;
     color: #fff !important;

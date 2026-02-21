@@ -131,9 +131,11 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     /** Show/hide the preview-mode banner and dim the Save button */
     updatePreviewModeBanner(isPreview) {
-        const banner = document.getElementById('preview-mode-banner');
-        const saveBtn = document.getElementById('save-btn');
-        if (banner) banner.classList.toggle('d-none', !isPreview);
+        const banner    = document.getElementById('preview-mode-banner');
+        const switchBtn = document.getElementById('switch-analysis-btn');
+        const saveBtn   = document.getElementById('save-btn');
+        if (banner)    banner.classList.toggle('d-none', !isPreview);
+        if (switchBtn) switchBtn.classList.toggle('d-none', !isPreview);
         if (saveBtn) {
             saveBtn.disabled = isPreview;
             saveBtn.title = isPreview ? (this.t('preview.saveDisabled') || '预览模式下无法保存') : '';
