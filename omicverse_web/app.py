@@ -133,11 +133,45 @@ _CUSTOM_PALETTES = {
 }
 
 
+def _color_to_hex(color):
+    """Convert any matplotlib-compatible color string to hex."""
+    try:
+        import matplotlib.colors as mcolors
+        return mcolors.to_hex(color)
+    except Exception:
+        return str(color)
+
+
+def get_uns_colors(adata, col_name, n_categories):
+    """
+    Return colors from adata.uns['{col_name}_colors'] if available, else None.
+    AnnData stores per-category colors in this key aligned with category order.
+    """
+    key = f'{col_name}_colors'
+    if adata is None or key not in adata.uns:
+        return None
+    uns = list(adata.uns[key])
+    # Cycle if uns has fewer colors than categories
+    return [_color_to_hex(uns[i % len(uns)]) for i in range(n_categories)]
+
+
+_PALETTE_NAME_MAP = {
+    # Correct case-insensitive names for matplotlib qualitative palettes
+    'set1': 'Set1', 'set2': 'Set2', 'set3': 'Set3',
+    'paired': 'Paired', 'accent': 'Accent',
+    'dark2': 'Dark2', 'pastel1': 'Pastel1', 'pastel2': 'Pastel2',
+}
+
+
 def get_discrete_colors(n_categories, palette_name=None):
     """Get discrete color palette for categorical data."""
     import matplotlib.pyplot as plt
     import matplotlib.colors as mcolors
     from matplotlib.colors import ListedColormap
+
+    # Normalize palette name (frontend may send lowercase)
+    if palette_name:
+        palette_name = _PALETTE_NAME_MAP.get(palette_name.lower(), palette_name)
 
     # OmicVerse custom palettes
     if palette_name in _CUSTOM_PALETTES:
@@ -1408,7 +1442,15 @@ def plot_data_legacy():
                         plot_data['category_labels'] = categories.cat.categories.tolist()
                         plot_data['category_codes'] = categories.cat.codes.tolist()
                         n_categories = len(categories.cat.categories)
-                        discrete_colors = get_discrete_colors(n_categories, category_palette)
+                        if category_palette:
+                            # User explicitly chose a palette — respect it
+                            discrete_colors = get_discrete_colors(n_categories, category_palette)
+                        else:
+                            # Default: prefer adata.uns colors, fall back to built-in
+                            discrete_colors = (
+                                get_uns_colors(state.current_adata, col_name, n_categories)
+                                or get_discrete_colors(n_categories, None)
+                            )
                         plot_data['colors'] = [discrete_colors[code] for code in categories.cat.codes]
                         plot_data['discrete_colors'] = discrete_colors
 

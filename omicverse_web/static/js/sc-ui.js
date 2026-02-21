@@ -1,0 +1,785 @@
+/**
+ * OmicVerse Single Cell Analysis — UI Components, Navigation & Status
+ */
+
+Object.assign(SingleCellAnalysis.prototype, {
+
+    setupNavigation() {
+        // Setup navigation menu toggle functionality
+        const navItems = document.querySelectorAll('.nxl-item.nxl-hasmenu');
+        
+        navItems.forEach(item => {
+            const link = item.querySelector('.nxl-link');
+            const submenu = item.querySelector('.nxl-submenu');
+            
+            if (link && submenu) {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.toggleSubmenu(item);
+                });
+            }
+        });
+
+        // Mobile menu toggle
+        const mobileToggle = document.getElementById('mobile-collapse');
+
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', () => {
+                this.toggleMobileMenu();
+            });
+        }
+    },
+
+    setupSidebarResize() {
+        // JupyterLab-like resizable sidebar using CSS variables
+        const handle = document.getElementById('sidebar-resize-handle');
+        const sidebar = document.querySelector('.nxl-navigation');
+
+        if (!handle || !sidebar) return;
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+        const minWidth = 200;  // Minimum sidebar width
+        const maxWidth = 600;  // Maximum sidebar width
+
+        // Function to update CSS variable for sidebar width
+        const setSidebarWidth = (width) => {
+            document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+        };
+
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+
+            // Get current width from CSS variable
+            const currentWidth = getComputedStyle(document.documentElement)
+                .getPropertyValue('--sidebar-width');
+            startWidth = parseInt(currentWidth);
+
+            // Add visual feedback
+            handle.classList.add('resizing');
+            document.body.classList.add('resizing-sidebar');
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            const delta = e.clientX - startX;
+            const newWidth = Math.min(Math.max(startWidth + delta, minWidth), maxWidth);
+
+            // Update CSS variable - this updates all elements using var(--sidebar-width)
+            setSidebarWidth(newWidth);
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isResizing) return;
+
+            isResizing = false;
+            handle.classList.remove('resizing');
+            document.body.classList.remove('resizing-sidebar');
+
+            // Save the width to localStorage
+            const currentWidth = getComputedStyle(document.documentElement)
+                .getPropertyValue('--sidebar-width');
+            localStorage.setItem('omicverse.sidebarWidth', parseInt(currentWidth));
+        });
+
+        // Restore saved width on load
+        const savedWidth = localStorage.getItem('omicverse.sidebarWidth');
+        if (savedWidth) {
+            const width = parseInt(savedWidth);
+            if (width >= minWidth && width <= maxWidth) {
+                setSidebarWidth(width);
+            }
+        }
+    },
+
+    setupNotebookManager() {
+        const fileInput = document.getElementById('notebook-file-input');
+        if (!fileInput) return;
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            this.importNotebookFile(files[0]);
+            fileInput.value = '';
+        });
+        this.fetchFileTree();
+        this.fetchKernelStats();
+        this.fetchKernelVars();
+        document.addEventListener('click', () => this.hideContextMenu());
+    },
+
+    setupThemeToggle() {
+        // Setup click handlers for existing theme toggle buttons
+        const themeToggle = document.getElementById('theme-toggle');
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleTheme();
+            });
+        }
+    },
+
+    setupGeneAutocomplete() {
+        const geneInput = document.getElementById('gene-input');
+        const autocompleteDiv = document.getElementById('gene-autocomplete');
+
+        if (!geneInput || !autocompleteDiv) return;
+
+        let geneList = [];
+        let selectedIndex = -1;
+
+        // Fetch gene list when data is loaded
+        const fetchGeneList = () => {
+            if (!this.currentData) return;
+
+            fetch('/api/genes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.genes) {
+                        geneList = data.genes;
+                    }
+                })
+                .catch(error => {
+                    console.log('Failed to fetch gene list:', error);
+                });
+        };
+
+        // Input event listener
+        geneInput.addEventListener('input', (e) => {
+            const value = e.target.value.trim().toLowerCase();
+            selectedIndex = -1;
+
+            if (value.length < 1) {
+                autocompleteDiv.style.display = 'none';
+                return;
+            }
+
+            if (geneList.length === 0) {
+                fetchGeneList();
+                return;
+            }
+
+            // Filter genes
+            const matches = geneList.filter(gene =>
+                gene.toLowerCase().includes(value)
+            ).slice(0, 20); // Limit to 20 results
+
+            if (matches.length === 0) {
+                autocompleteDiv.style.display = 'none';
+                return;
+            }
+
+            // Display matches
+            autocompleteDiv.innerHTML = matches.map((gene, index) =>
+                `<button type="button" class="list-group-item list-group-item-action" data-index="${index}" data-gene="${gene}">
+                    ${gene}
+                </button>`
+            ).join('');
+            autocompleteDiv.style.display = 'block';
+
+            // Add click handlers
+            autocompleteDiv.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const gene = e.currentTarget.getAttribute('data-gene');
+                    geneInput.value = gene;
+                    autocompleteDiv.style.display = 'none';
+                    this.colorByGene();
+                });
+            });
+        });
+
+        // Keyboard navigation
+        geneInput.addEventListener('keydown', (e) => {
+            const items = autocompleteDiv.querySelectorAll('button');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    const gene = items[selectedIndex].getAttribute('data-gene');
+                    geneInput.value = gene;
+                    autocompleteDiv.style.display = 'none';
+                    this.colorByGene();
+                } else {
+                    this.colorByGene();
+                }
+            } else if (e.key === 'Escape') {
+                autocompleteDiv.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
+
+        const updateSelection = (items) => {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        };
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!geneInput.contains(e.target) && !autocompleteDiv.contains(e.target)) {
+                autocompleteDiv.style.display = 'none';
+                selectedIndex = -1;
+            }
+        });
+
+        // Store reference for later use
+        this.fetchGeneList = fetchGeneList;
+    },
+
+    setupBeforeUnloadWarning() {
+        // Warn user before leaving/refreshing if data is loaded
+        window.addEventListener('beforeunload', (e) => {
+            if (this.currentData) {
+                // Modern browsers require returnValue to be set
+                e.preventDefault();
+                // Chrome requires returnValue to be set
+                e.returnValue = '';
+                // Some browsers show a custom message (though most modern browsers ignore it)
+                return this.t('status.beforeLeave');
+            }
+        });
+    },
+
+    toggleSubmenu(item) {
+        const isOpen = item.classList.contains('open');
+        
+        // Close all other submenus
+        document.querySelectorAll('.nxl-item.nxl-hasmenu.open').forEach(openItem => {
+            if (openItem !== item) {
+                openItem.classList.remove('open');
+            }
+        });
+        
+        // Toggle current submenu
+        if (isOpen) {
+            item.classList.remove('open');
+        } else {
+            item.classList.add('open');
+        }
+    },
+
+    toggleMobileMenu() {
+        const navigation = document.querySelector('.nxl-navigation');
+        navigation.classList.toggle('open');
+    },
+
+    toggleTheme() {
+        const html = document.documentElement;
+        const icon = document.getElementById('theme-toggle-icon');
+        
+        if (html.classList.contains('app-skin-dark')) {
+            // Switch to light mode
+            html.classList.remove('app-skin-dark');
+            localStorage.setItem('app-skin-dark', 'app-skin-light');
+            this.currentTheme = 'light';
+            if (icon) {
+                icon.classList.remove('feather-sun');
+                icon.classList.add('feather-moon');
+            }
+        } else {
+            // Switch to dark mode
+            html.classList.add('app-skin-dark');
+            localStorage.setItem('app-skin-dark', 'app-skin-dark');
+            this.currentTheme = 'dark';
+            if (icon) {
+                icon.classList.remove('feather-moon');
+                icon.classList.add('feather-sun');
+            }
+        }
+        
+        // Update Plotly theme and status bar theme
+        this.updatePlotlyTheme();
+        this.updateStatusBarTheme();
+    },
+
+    updateUI(data) {
+        // ── Reset all controls when switching datasets ───────────────────────
+        const geneInput = document.getElementById('gene-input');
+        if (geneInput) geneInput.value = '';
+
+        const paletteSelect = document.getElementById('palette-select');
+        if (paletteSelect) paletteSelect.value = 'default';
+
+        const catPaletteSelect = document.getElementById('category-palette-select');
+        if (catPaletteSelect) catPaletteSelect.value = 'default';
+
+        // Clear any stale Plotly chart from the previous dataset
+        const plotDiv = document.getElementById('plotly-div');
+        if (plotDiv && typeof Plotly !== 'undefined') Plotly.purge(plotDiv);
+
+        // Reset point-size slider to auto mode
+        const sizeSlider = document.getElementById('point-size-slider');
+        if (sizeSlider) sizeSlider.dataset.auto = 'true';
+
+        // Hide palette visibility rows (will be re-evaluated after plot)
+        this.updatePaletteVisibility('');
+
+        // ── Hide upload section ──────────────────────────────────────────────
+        document.getElementById('upload-section').style.display = 'none';
+
+        // Show data status
+        const statusDiv = document.getElementById('data-status');
+        statusDiv.classList.remove('d-none');
+        document.getElementById('filename-display').textContent = data.filename;
+        document.getElementById('cell-count').textContent = data.n_cells;
+        document.getElementById('gene-count').textContent = data.n_genes;
+
+        // Show controls and visualization
+        document.getElementById('viz-controls').style.display = 'block';
+        document.getElementById('viz-panel').style.display = 'block';
+
+        // Sync left-panel height to match data-status + viz-panel
+        requestAnimationFrame(() => this.syncPanelHeight());
+
+        // Initialise point-size slider to auto default for this dataset
+        this.initPointSizeSlider();
+
+        // Update embedding options
+        const embeddingSelect = document.getElementById('embedding-select');
+        embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
+        data.embeddings.forEach(emb => {
+            const option = document.createElement('option');
+            option.value = emb;
+            option.textContent = emb.toUpperCase();
+            embeddingSelect.appendChild(option);
+        });
+
+        // Update color options
+        const colorSelect = document.getElementById('color-select');
+        colorSelect.innerHTML = `<option value="">${this.t('controls.colorNone')}</option>`;
+        data.obs_columns.forEach(col => {
+            const option = document.createElement('option');
+            option.value = 'obs:' + col;
+            option.textContent = col;
+            colorSelect.appendChild(option);
+        });
+
+        // Update parameter panel to enable buttons
+        this.updateParameterPanel();
+        if (this.fetchGeneList) {
+            this.fetchGeneList();
+        }
+
+        // Fetch gene list for autocomplete
+        if (this.fetchGeneList) {
+            this.fetchGeneList();
+        }
+
+        // Reset parameter panel back to tool-list view (clear any open tool form)
+        if (this.currentCategory) {
+            this.selectAnalysisCategory(this.currentCategory, { silent: true });
+        } else {
+            this.showParameterPlaceholder();
+        }
+
+        // Auto-select first embedding and update plot
+        if (data.embeddings.length > 0) {
+            embeddingSelect.value = data.embeddings[0];
+            this.updatePlot();
+        }
+    },
+
+    refreshDataFromKernel(data) {
+        if (!data) return;
+        this.currentData = data;
+        const statusDiv = document.getElementById('data-status');
+        if (statusDiv) statusDiv.classList.remove('d-none');
+        const filenameDisplay = document.getElementById('filename-display');
+        if (filenameDisplay) filenameDisplay.textContent = data.filename || '';
+        const cellCount = document.getElementById('cell-count');
+        if (cellCount) cellCount.textContent = data.n_cells;
+        const geneCount = document.getElementById('gene-count');
+        if (geneCount) geneCount.textContent = data.n_genes;
+
+        const embeddingSelect = document.getElementById('embedding-select');
+        const colorSelect = document.getElementById('color-select');
+        const prevEmbedding = embeddingSelect ? embeddingSelect.value : '';
+        const prevColor = colorSelect ? colorSelect.value : '';
+
+        if (embeddingSelect) {
+            embeddingSelect.innerHTML = `<option value="">${this.t('controls.embeddingPlaceholder')}</option>`;
+            data.embeddings.forEach(emb => {
+                const option = document.createElement('option');
+                option.value = emb;
+                option.textContent = emb.toUpperCase();
+                embeddingSelect.appendChild(option);
+            });
+            if (data.embeddings.includes(prevEmbedding)) {
+                embeddingSelect.value = prevEmbedding;
+            } else if (data.embeddings.length > 0) {
+                embeddingSelect.value = data.embeddings[0];
+            }
+        }
+
+        if (colorSelect) {
+            colorSelect.innerHTML = `<option value="">${this.t('controls.colorNone')}</option>`;
+            data.obs_columns.forEach(col => {
+                const option = document.createElement('option');
+                option.value = 'obs:' + col;
+                option.textContent = col;
+                colorSelect.appendChild(option);
+            });
+            if (prevColor && prevColor.startsWith('obs:')) {
+                const rawCol = prevColor.replace('obs:', '');
+                if (data.obs_columns.includes(rawCol)) {
+                    colorSelect.value = prevColor;
+                }
+            }
+        }
+
+        this.updateParameterPanel();
+
+        if (embeddingSelect && embeddingSelect.value) {
+            if (this.currentView === 'visualization') {
+                this.updatePlot();
+                this.pendingPlotRefresh = false;
+            } else {
+                this.pendingPlotRefresh = true;
+            }
+        }
+
+        // Keep adata status panel in sync
+        this.updateAdataStatus(data);
+    },
+
+    updateParameterPanel() {
+        // Re-enable all parameter buttons now that data is loaded
+        const buttons = document.querySelectorAll('#parameter-content button');
+        buttons.forEach(button => {
+            if (!button.onclick || !button.onclick.toString().includes('showComingSoon')) {
+                button.disabled = false;
+            }
+        });
+    },
+
+    updatePlotlyTheme() {
+        // If there's an existing plot, update it with new theme
+        const plotDiv = document.getElementById('plotly-div');
+        if (plotDiv && plotDiv.data) {
+            const layout = this.getPlotlyLayout();
+            Plotly.relayout(plotDiv, layout);
+        }
+    },
+
+    syncPanelHeight() {
+        const leftMain  = document.getElementById('left-main-panel');
+        const dataStatus = document.getElementById('data-status');
+        const vizPanel  = document.getElementById('viz-panel');
+        if (!leftMain || !vizPanel) return;
+        const dsH = (dataStatus && !dataStatus.classList.contains('d-none'))
+            ? dataStatus.offsetHeight : 0;
+        const vpH = vizPanel.offsetHeight;
+        if (dsH + vpH > 0) {
+            leftMain.style.minHeight = (dsH + vpH) + 'px';
+        }
+    },
+
+    checkStatus() {
+        fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.loaded) return;
+            // Guard: ensure the response has the fields updateUI needs
+            if (!Array.isArray(data.embeddings)) {
+                console.warn('checkStatus: /api/status response missing embeddings field', data);
+                return;
+            }
+            // Server has adata in memory — restore full UI without re-uploading
+            this.currentData = data;
+            this.updateUI(data);
+            this.updateAdataStatus(data);
+            requestAnimationFrame(() => this.syncPanelHeight());
+            this.addToLog(
+                `${this.t('upload.successDetail')}: ${data.n_cells} ${this.t('status.cells')}, ${data.n_genes} ${this.t('status.genes')}`
+            );
+        })
+        .catch(err => { console.warn('checkStatus error:', err); });
+    },
+
+    showLoading(text = null) {
+        const loadingText = document.getElementById('loading-text');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        const resolved = text || this.t('loading.processing');
+        if (loadingText) loadingText.textContent = resolved;
+        if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    },
+
+    hideLoading() {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+    },
+
+    addToLog(message, type = 'info') {
+        const log = document.getElementById('analysis-log');
+        if (!log) return;
+
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+
+        if (type === 'error') {
+            logEntry.className = 'mb-1 text-danger';
+            logEntry.innerHTML = `<small class="text-muted">[${timestamp}]</small> ${message}`;
+        } else if (type === 'stdout') {
+            // Render captured Python print output as monospace terminal block
+            logEntry.className = 'mb-1';
+            const pre = document.createElement('pre');
+            pre.style.cssText = [
+                'font-size:0.75rem',
+                'margin:2px 0 2px 0',
+                'padding:4px 8px',
+                'background:var(--bs-light, #f8f9fa)',
+                'border-left:3px solid #6c757d',
+                'border-radius:0 4px 4px 0',
+                'white-space:pre-wrap',
+                'word-break:break-all',
+                'color:#495057'
+            ].join(';');
+            pre.textContent = message;
+            logEntry.appendChild(pre);
+        } else {
+            logEntry.className = 'mb-1 text-dark';
+            logEntry.innerHTML = `<small class="text-muted">[${timestamp}]</small> ${message}`;
+        }
+
+        log.appendChild(logEntry);
+        log.scrollTop = log.scrollHeight;
+    },
+
+    showStatus(message, showSpinner = false) {
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const statusSpinner = document.getElementById('status-spinner');
+        const statusTime = document.getElementById('status-time');
+        
+        if (!statusBar || !statusText || !statusSpinner || !statusTime) return;
+        
+        // 应用主题样式
+        this.updateStatusBarTheme();
+        
+        statusText.textContent = message;
+        statusTime.textContent = new Date().toLocaleTimeString();
+        
+        if (showSpinner) {
+            statusSpinner.style.display = 'inline-block';
+        } else {
+            statusSpinner.style.display = 'none';
+        }
+        
+        statusBar.style.display = 'block';
+    },
+
+    hideStatus() {
+        const statusBar = document.getElementById('status-bar');
+        if (statusBar) {
+            statusBar.style.display = 'none';
+        }
+    },
+
+    updateStatus(message, showSpinner = false) {
+        const statusText = document.getElementById('status-text');
+        const statusSpinner = document.getElementById('status-spinner');
+        const statusTime = document.getElementById('status-time');
+        
+        if (!statusText || !statusSpinner || !statusTime) return;
+        
+        statusText.textContent = message;
+        statusTime.textContent = new Date().toLocaleTimeString();
+        
+        if (showSpinner) {
+            statusSpinner.style.display = 'inline-block';
+        } else {
+            statusSpinner.style.display = 'none';
+        }
+    },
+
+    updateStatusBarTheme() {
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const statusTime = document.getElementById('status-time');
+        
+        if (!statusBar || !statusText || !statusTime) return;
+        
+        const isDark = document.documentElement.classList.contains('app-skin-dark');
+        
+        if (isDark) {
+            statusBar.style.backgroundColor = '#1f2937';
+            statusBar.style.borderColor = '#374151';
+            statusText.style.color = '#e5e7eb';
+            statusTime.style.color = '#9ca3af';
+        } else {
+            statusBar.style.backgroundColor = '#ffffff';
+            statusBar.style.borderColor = '#e5e7eb';
+            statusText.style.color = '#283c50';
+            statusTime.style.color = '#6b7280';
+        }
+    },
+
+    showComingSoon() {
+        alert(this.t('common.comingSoon'));
+    },
+
+    switchView(view) {
+        this.currentView = view;
+
+        const vizView = document.getElementById('visualization-view');
+        const codeView = document.getElementById('code-editor-view');
+        const agentView = document.getElementById('agent-view');
+        const vizBtn = document.getElementById('view-viz-btn');
+        const codeBtn = document.getElementById('view-code-btn');
+        const agentBtn = document.getElementById('view-agent-btn');
+        const vizToolbar = document.getElementById('viz-toolbar');
+        const codeToolbarRow = document.getElementById('code-editor-toolbar-row');
+        const pageTitle = document.getElementById('page-title');
+        const breadcrumbTitle = document.getElementById('breadcrumb-title');
+        const analysisNav = document.getElementById('analysis-nav');
+        const agentConfigNav = document.getElementById('agent-config-nav');
+        const fileManager = document.getElementById('file-manager');
+
+        if (view === 'visualization') {
+            vizView.style.display = 'block';
+            codeView.style.display = 'none';
+            if (agentView) agentView.style.display = 'none';
+            vizBtn.classList.remove('btn-outline-primary');
+            vizBtn.classList.add('btn-primary');
+            codeBtn.classList.remove('btn-primary');
+            codeBtn.classList.add('btn-outline-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-primary');
+                agentBtn.classList.add('btn-outline-primary');
+            }
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'flex';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+
+            // Scroll to top when switching to visualization view (JupyterLab-like behavior)
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Update page title
+            if (pageTitle) pageTitle.textContent = this.t('breadcrumb.title');
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.title');
+            if (analysisNav) analysisNav.style.display = 'block';
+            if (agentConfigNav) agentConfigNav.style.display = 'none';
+            if (fileManager) fileManager.style.display = 'none';
+            if (this.pendingPlotRefresh) {
+                const embeddingSelect = document.getElementById('embedding-select');
+                if (embeddingSelect && embeddingSelect.value) {
+                    this.updatePlot();
+                }
+                this.pendingPlotRefresh = false;
+            }
+        } else if (view === 'code') {
+            vizView.style.display = 'none';
+            codeView.style.display = 'block';
+            if (agentView) agentView.style.display = 'none';
+            vizBtn.classList.remove('btn-primary');
+            vizBtn.classList.add('btn-outline-primary');
+            codeBtn.classList.remove('btn-outline-primary');
+            codeBtn.classList.add('btn-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-outline-primary');
+                agentBtn.classList.add('btn-primary');
+            }
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'none';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'flex';
+
+            // Update page title
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-code me-2"></i>${this.t('view.codeTitle')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.code');
+            if (analysisNav) analysisNav.style.display = 'none';
+            if (agentConfigNav) agentConfigNav.style.display = 'none';
+            if (fileManager) fileManager.style.display = 'block';
+            if (!this.fileTreeLoaded) {
+                this.fetchFileTree();
+                this.fileTreeLoaded = true;
+            }
+            this.fetchKernelStats();
+            this.fetchKernelVars();
+            // Ensure visualization adata is synced to kernel as odata when entering code view
+            if (this.currentData) {
+                fetch('/api/kernel/sync_odata', { method: 'POST' }).catch(() => {});
+            }
+            if (this.openTabs.length === 0) {
+                this.openFileFromServer('default.ipynb');
+            }
+
+            // Add a default cell if none exists
+            if (this.codeCells.length === 0) {
+                this.addCodeCell();
+            }
+        } else if (view === 'agent') {
+            vizView.style.display = 'none';
+            codeView.style.display = 'none';
+            if (agentView) agentView.style.display = 'block';
+            vizBtn.classList.remove('btn-primary');
+            vizBtn.classList.add('btn-outline-primary');
+            codeBtn.classList.remove('btn-primary');
+            codeBtn.classList.add('btn-outline-primary');
+            if (agentBtn) {
+                agentBtn.classList.remove('btn-outline-primary');
+                agentBtn.classList.add('btn-primary');
+            }
+
+            // Toggle toolbars
+            if (vizToolbar) vizToolbar.style.display = 'none';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+
+            // Update page title
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-message-circle me-2"></i>${this.t('view.agentTitle')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.agent');
+            if (analysisNav) analysisNav.style.display = 'none';
+            if (agentConfigNav) agentConfigNav.style.display = 'block';
+            if (fileManager) fileManager.style.display = 'none';
+        }
+    },
+
+    applyCodeFontSize() {
+        const size = `${this.codeFontSize}px`;
+        document.querySelectorAll('.code-input').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-highlight').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-highlight code').forEach(el => {
+            el.style.fontSize = size;
+        });
+        document.querySelectorAll('.code-cell-output').forEach(el => {
+            el.style.fontSize = size;
+        });
+        const textEditor = document.getElementById('text-file-editor');
+        if (textEditor) {
+            textEditor.style.fontSize = size;
+        }
+    },
+
+    adjustFontSize(delta) {
+        const next = Math.min(20, Math.max(10, this.codeFontSize + delta));
+        this.codeFontSize = next;
+        this.applyCodeFontSize();
+    }
+
+});
