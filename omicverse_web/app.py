@@ -91,24 +91,75 @@ def sync_adaptor_with_adata():
 
 
 # Helper function for discrete colors
+# ── OmicVerse built-in discrete palettes ─────────────────────────────────────
+_OV_SC_COLOR = [
+    '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456',
+    '#FCBC10', '#EF7B77', '#279AD7', '#F0EEF0', '#EAEFC5',
+    '#7CBB5F', '#368650', '#A499CC', '#5E4D9A', '#78C2ED',
+    '#866017', '#9F987F', '#E0DFED', '#01A0A7', '#75C8CC',
+    '#F0D7BC', '#D5B26C', '#D5DA48', '#B6B812', '#9DC3C3',
+    '#A89C92', '#FEE00C', '#FEF2A1',
+]
+
+_OV_CET = [
+    '#d60000','#8c3bff','#018700','#00acc6','#97ff00','#ff7ed1','#6b004f','#ffa52f',
+    '#00009c','#857067','#004942','#4f2a00','#00fdcf','#bcb6ff','#95b379','#bf03b8',
+    '#2466a1','#280041','#dbb3af','#fdf490','#4f445b','#a37c00','#ff7066','#3f806e',
+    '#82000c','#a37bb3','#344d00','#9ae4ff','#eb0077','#2d000a','#5d90ff','#00c61f',
+    '#5701aa','#001d00','#9a4600','#959ea5','#9a425b','#001f31','#c8c300','#ffcfff',
+    '#00bd9a','#3615ff','#2d2424','#df57ff','#bde6bf','#7e4497','#524f3b','#d86600',
+    '#647438','#c17287','#6e7489','#809c03','#bd8a64','#623338','#cacdda','#6beb82',
+    '#213f69','#a17eff','#fd03ca','#75bcfd','#d8c382','#cda3cd','#6d4f00','#006974',
+    '#469e5d','#93c6bf','#f9ff00','#bf5444','#00643b','#5b4fa8','#521f64','#4f5eff',
+    '#7e8e77','#b808f9','#8a91c3','#b30034','#87607e','#9e0075','#ffddc3','#500800',
+    '#1a0800','#4b89b5','#00dfdf','#c8fff9','#2f3415','#ff2646','#ff97aa','#03001a',
+    '#c860b1','#c3a136','#7c4f3a','#f99e77','#566464','#d193ff','#2d1f69','#411a34',
+    '#af9397','#629e99','#bcdd7b','#ff5d93','#0f2823','#b8bdac','#743b64','#0f000c',
+    '#7e6ebc','#9e6b3b','#ff4600','#7e0087','#ffcd3d','#2f3b42','#fda5ff','#89013d',
+]
+
+_OV_VIBRANT = [
+    '#FF0000','#00CC00','#0000FF','#FFAA00','#FF00FF','#00CCCC',
+    '#FF6600','#CC0066','#66CC00','#0066CC','#6600CC','#00CC66',
+    '#FF3333','#33AA33','#3333FF','#FFCC33','#FF33CC','#33CCCC',
+    '#FF8833','#CC3388','#88CC33','#3388CC','#8833CC','#33CC88',
+]
+
+_CUSTOM_PALETTES = {
+    'omicverse':    _OV_SC_COLOR,
+    'omicverse_56': _OV_CET[:56],
+    'omicverse_112': _OV_CET[:112],
+    'vibrant':      _OV_VIBRANT,
+}
+
+
 def get_discrete_colors(n_categories, palette_name=None):
     """Get discrete color palette for categorical data."""
     import matplotlib.pyplot as plt
     import matplotlib.colors as mcolors
+    from matplotlib.colors import ListedColormap
 
-    if palette_name and palette_name in plt.colormaps():
+    # OmicVerse custom palettes
+    if palette_name in _CUSTOM_PALETTES:
+        base = _CUSTOM_PALETTES[palette_name]
+        return [base[i % len(base)] for i in range(n_categories)]
+
+    # Default → OmicVerse sc_color
+    if not palette_name or palette_name == 'default':
+        return [_OV_SC_COLOR[i % len(_OV_SC_COLOR)] for i in range(n_categories)]
+
+    # Matplotlib named palette
+    try:
         cmap = plt.get_cmap(palette_name)
-        colors = [mcolors.to_hex(cmap(i / max(1, n_categories - 1))) for i in range(n_categories)]
-    else:
-        # Default: use tab20 or Set3
-        if n_categories <= 20:
-            cmap = plt.get_cmap('tab20')
-            colors = [mcolors.to_hex(cmap(i)) for i in range(n_categories)]
+        if isinstance(cmap, ListedColormap):
+            # Qualitative: pick discrete slots (cycling if needed)
+            return [mcolors.to_hex(cmap.colors[i % len(cmap.colors)]) for i in range(n_categories)]
         else:
-            cmap = plt.get_cmap('hsv')
-            colors = [mcolors.to_hex(cmap(i / n_categories)) for i in range(n_categories)]
-
-    return colors
+            # Continuous: spread evenly across [0, 1]
+            return [mcolors.to_hex(cmap(i / max(1, n_categories - 1))) for i in range(n_categories)]
+    except Exception:
+        # Fallback to default
+        return [_OV_SC_COLOR[i % len(_OV_SC_COLOR)] for i in range(n_categories)]
 
 
 # ============================================================================
@@ -391,6 +442,7 @@ def run_tool(tool):
         params = request.json if request.json else {}
         snap_before = _snapshot_adata(state.current_adata)
         t0 = _time.time()
+        predicted_col = None  # set by annotation tools
 
         # ── Preprocessing ────────────────────────────────────────────────────
         if tool == 'normalize':
@@ -533,6 +585,61 @@ def run_tool(tool):
         elif tool == 'louvain':
             sc.tl.louvain(state.current_adata, resolution=params.get('resolution', 1.0))
 
+        # ── Cell Annotation ──────────────────────────────────────────────────
+        elif tool == 'celltypist':
+            import omicverse as ov
+            pkl_path = params.get('pkl_path', '').strip()
+            if not pkl_path:
+                return jsonify({'error': 'CellTypist 模型路径不能为空，请先下载模型'}), 400
+            if not os.path.exists(pkl_path):
+                return jsonify({'error': f'模型文件不存在: {pkl_path}'}), 400
+            obj = ov.single.Annotation(state.current_adata)
+            obj.add_reference_pkl(pkl_path)
+            obj.annotate(method='celltypist')
+            predicted_col = 'celltypist_prediction'
+
+        elif tool == 'gpt4celltype':
+            import omicverse as ov
+            cluster_key = params.get('cluster_key', 'leiden')
+            if cluster_key not in state.current_adata.obs.columns:
+                return jsonify({'error': f'聚类键 {cluster_key} 不存在，请先运行聚类'}), 400
+            api_key = params.get('api_key', '').strip()
+            if api_key:
+                os.environ['AGI_API_KEY'] = api_key
+            kw = dict(
+                tissuename=params.get('tissuename', ''),
+                speciename=params.get('speciename', 'human'),
+                model=params.get('model', 'qwen-plus'),
+                provider=params.get('provider', 'qwen'),
+                topgenenumber=int(params.get('topgenenumber', 10)),
+            )
+            base_url = params.get('base_url', '').strip()
+            if base_url:
+                kw['base_url'] = base_url
+            obj = ov.single.Annotation(state.current_adata)
+            obj.annotate(method='gpt4celltype', cluster_key=cluster_key, **kw)
+            predicted_col = 'gpt4celltype_prediction'
+
+        elif tool == 'scsa':
+            import omicverse as ov
+            cluster_key = params.get('cluster_key', 'leiden')
+            if cluster_key not in state.current_adata.obs.columns:
+                return jsonify({'error': f'聚类键 {cluster_key} 不存在，请先运行聚类'}), 400
+            db_path = params.get('db_path', '').strip()
+            obj = ov.single.Annotation(state.current_adata)
+            if db_path and os.path.exists(db_path):
+                obj.add_reference_scsa_db(db_path)
+            obj.annotate(
+                method='scsa',
+                cluster_key=cluster_key,
+                foldchange=float(params.get('foldchange', 1.5)),
+                pvalue=float(params.get('pvalue', 0.05)),
+                celltype=params.get('celltype', 'normal'),
+                target=params.get('target', 'cellmarker'),
+                tissue=params.get('tissue', 'All'),
+            )
+            predicted_col = 'scsa_prediction'
+
         else:
             return jsonify({'error': f'Unknown tool: {tool}'}), 400
 
@@ -542,16 +649,19 @@ def run_tool(tool):
 
         sync_adaptor_with_adata()
 
-        return jsonify({
-            'success':     True,
-            'n_cells':     state.current_adata.n_obs,
-            'n_genes':     state.current_adata.n_vars,
-            'embeddings':  [k.replace('X_', '') for k in state.current_adata.obsm.keys()],
-            'obs_columns': list(state.current_adata.obs.columns),
-            'var_columns': list(state.current_adata.var.columns),
-            'uns_keys':    list(state.current_adata.uns.keys()),
-            'diff':        diff,
-        })
+        resp = {
+            'success':       True,
+            'n_cells':       state.current_adata.n_obs,
+            'n_genes':       state.current_adata.n_vars,
+            'embeddings':    [k.replace('X_', '') for k in state.current_adata.obsm.keys()],
+            'obs_columns':   list(state.current_adata.obs.columns),
+            'var_columns':   list(state.current_adata.var.columns),
+            'uns_keys':      list(state.current_adata.uns.keys()),
+            'diff':          diff,
+        }
+        if predicted_col:
+            resp['predicted_col'] = predicted_col
+        return jsonify(resp)
 
     except Exception as e:
         logging.error(f"Tool {tool} failed: {e}")
@@ -573,6 +683,101 @@ def get_status():
         'var_columns': list(state.current_adata.var.columns),
         'uns_keys':    list(state.current_adata.uns.keys()),
     })
+
+
+# ============================================================================
+# Annotation Helper Endpoints
+# ============================================================================
+
+@app.route('/api/annotation/celltypist_models', methods=['GET'])
+def get_celltypist_models():
+    """Fetch the CellTypist model registry and return as JSON list."""
+    try:
+        from omicverse.single._annotation import _celltypist_models_description
+        df = _celltypist_models_description()
+        keep = ['model', 'description', 'No_celltypes', 'source', 'date', 'default']
+        cols = [c for c in keep if c in df.columns]
+        records = df[cols].where(df[cols].notna(), None).to_dict(orient='records')
+        return jsonify({'models': records})
+    except Exception as e:
+        logging.error(f"CellTypist model list failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/annotation/download_celltypist_model', methods=['POST'])
+def download_celltypist_model():
+    """Download a CellTypist model pkl file and return its absolute path."""
+    try:
+        payload = request.json or {}
+        model_name = payload.get('model_name', '').strip()
+        if not model_name:
+            return jsonify({'error': 'model_name 不能为空'}), 400
+
+        from omicverse.single._annotation import _celltypist_models_description
+        from omicverse.datasets import download_data
+
+        df = _celltypist_models_description()
+        row = df[df['model'] == model_name]
+        if row.empty:
+            return jsonify({'error': f'模型 {model_name} 未在 CellTypist 注册表中找到'}), 404
+
+        url = row.iloc[0].get('url')
+        if not url:
+            return jsonify({'error': f'模型 {model_name} 缺少下载 URL'}), 500
+
+        save_dir = os.path.join(os.getcwd(), 'models')
+        os.makedirs(save_dir, exist_ok=True)
+        downloaded = download_data(url, file_path=model_name, dir=save_dir)
+        abs_path = os.path.abspath(downloaded)
+        return jsonify({'success': True, 'path': abs_path})
+    except Exception as e:
+        logging.error(f"CellTypist model download failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/annotation/download_scsa_db', methods=['POST'])
+def download_scsa_db():
+    """Download the SCSA marker database and return its absolute path."""
+    try:
+        from omicverse.datasets import download_data
+
+        save_dir = os.path.join(os.getcwd(), 'temp')
+        os.makedirs(save_dir, exist_ok=True)
+        db_name = 'pySCSA_2024_v1_plus.db'
+        mirrors = [
+            'https://stacks.stanford.edu/file/cv694yk7414/pySCSA_2023_v2_plus.db',
+            'https://figshare.com/ndownloader/files/41369037',
+        ]
+        abs_path = None
+        for url in mirrors:
+            try:
+                downloaded = download_data(url, file_path=db_name, dir=save_dir)
+                abs_path = os.path.abspath(downloaded)
+                break
+            except Exception as dl_err:
+                logging.warning(f"SCSA DB download from {url} failed: {dl_err}")
+
+        if abs_path is None:
+            return jsonify({'error': 'SCSA 数据库下载失败，请检查网络连接'}), 500
+        return jsonify({'success': True, 'path': abs_path})
+    except Exception as e:
+        logging.error(f"SCSA DB download failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/annotation/celltypist_model_path', methods=['GET'])
+def get_celltypist_model_path():
+    """Return the local path for a CellTypist model if it has already been downloaded."""
+    model_name = request.args.get('model_name', '').strip()
+    if not model_name:
+        return jsonify({'error': 'model_name is required'}), 400
+    save_dir = os.path.join(os.getcwd(), 'models')
+    # Try common extensions that download_data might produce
+    for ext in ('', '.pkl', '.gz'):
+        candidate = os.path.join(save_dir, model_name + ext)
+        if os.path.exists(candidate):
+            return jsonify({'exists': True, 'path': os.path.abspath(candidate)})
+    return jsonify({'exists': False})
 
 
 @app.route('/api/plot', methods=['POST'])

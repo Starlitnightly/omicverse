@@ -351,5 +351,17 @@ def kernel_load_adata():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/sync_odata', methods=['POST'])
+def sync_odata():
+    """Sync current visualization adata into kernel namespace as both 'adata' and 'odata'."""
+    if bp.state.current_adata is None:
+        return jsonify({'success': False, 'message': 'No data loaded'})
+    try:
+        bp.state.kernel_executor.sync_adata(bp.state.current_adata)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 # Initialize blueprint with dependencies (will be set by app.py)
 bp.state = None

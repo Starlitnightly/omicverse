@@ -75,7 +75,8 @@ class InProcessKernelExecutor:
 
     def sync_adata(self, adata):
         self._ensure_kernel()
-        self.shell.user_ns['adata'] = adata
+        # Expose as 'odata' only — keeps 'adata' free for user-defined variables
+        self.shell.user_ns['odata'] = adata
 
     def execute(self, code, adata=None, user_ns=None, timeout=300, stdout=None, stderr=None):
         """Execute code with interrupt support.
@@ -159,7 +160,7 @@ class InProcessKernelExecutor:
                 if user_ns is not None:
                     self.shell.user_ns = user_ns
                 if adata is not None:
-                    self.shell.user_ns['adata'] = adata
+                    self.shell.user_ns['odata'] = adata
 
                 # Use provided streams or create new buffers
                 stdout_buf = stdout if stdout is not None else io.StringIO()

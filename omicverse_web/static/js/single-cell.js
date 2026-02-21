@@ -9,6 +9,7 @@ class SingleCellAnalysis {
         this.currentTheme = 'light';
         this.currentView = 'visualization';
         this.currentLang = 'en';
+        this.paramCache = {};  // persists tool parameter values across re-renders
         this.codeCells = [];
         this.cellCounter = 0;
         this.pendingPlotRefresh = false;
@@ -131,19 +132,17 @@ class SingleCellAnalysis {
                 'controls.paletteDiverging': 'RdBu (diverging)',
                 'controls.paletteSpectral': 'Spectral (diverging)',
                 'controls.categoryPalette': 'Categorical palette',
+                'controls.ovDefault': 'OmicVerse (28 colors)',
+                'controls.ov56': 'OmicVerse 56',
+                'controls.ov112': 'OmicVerse 112',
+                'controls.vibrant': 'Vibrant (24)',
                 'controls.paletteDefaultScanpy': 'Default (Scanpy)',
-                'controls.tab10': 'Tab10 (10 colors)',
-                'controls.tab20': 'Tab20 (20 colors)',
-                'controls.tab20b': 'Tab20b (20 colors)',
-                'controls.tab20c': 'Tab20c (20 colors)',
-                'controls.set1': 'Set1 (9, vivid)',
-                'controls.set2': 'Set2 (8, soft)',
-                'controls.set3': 'Set3 (12, gentle)',
+                'controls.tab10': 'Tab10 (10)',
+                'controls.tab20': 'Tab20 (20)',
+                'controls.set1': 'Set1 (9)',
+                'controls.set2': 'Set2 (8)',
+                'controls.set3': 'Set3 (12)',
                 'controls.paired': 'Paired (12)',
-                'controls.pastel1': 'Pastel1 (9)',
-                'controls.pastel2': 'Pastel2 (8)',
-                'controls.dark2': 'Dark2 (8)',
-                'controls.accent': 'Accent (8)',
                 'controls.vmin': 'Min (vmin)',
                 'controls.vmax': 'Max (vmax)',
                 'controls.auto': 'Auto',
@@ -419,19 +418,17 @@ class SingleCellAnalysis {
                 'controls.paletteDiverging': 'RdBu（发散）',
                 'controls.paletteSpectral': 'Spectral（发散）',
                 'controls.categoryPalette': '分类调色板',
+                'controls.ovDefault': 'OmicVerse（28色）',
+                'controls.ov56': 'OmicVerse 56',
+                'controls.ov112': 'OmicVerse 112',
+                'controls.vibrant': 'Vibrant（24色）',
                 'controls.paletteDefaultScanpy': '默认（Scanpy）',
                 'controls.tab10': 'Tab10（10色）',
                 'controls.tab20': 'Tab20（20色）',
-                'controls.tab20b': 'Tab20b（20色）',
-                'controls.tab20c': 'Tab20c（20色）',
-                'controls.set1': 'Set1（9色，鲜艳）',
-                'controls.set2': 'Set2（8色，柔和）',
-                'controls.set3': 'Set3（12色，淡雅）',
+                'controls.set1': 'Set1（9色）',
+                'controls.set2': 'Set2（8色）',
+                'controls.set3': 'Set3（12色）',
                 'controls.paired': 'Paired（12色）',
-                'controls.pastel1': 'Pastel1（9色）',
-                'controls.pastel2': 'Pastel2（8色）',
-                'controls.dark2': 'Dark2（8色）',
-                'controls.accent': 'Accent（8色）',
                 'controls.vmin': '最小值 (vmin)',
                 'controls.vmax': '最大值 (vmax)',
                 'controls.auto': '自动',
@@ -680,7 +677,14 @@ class SingleCellAnalysis {
         if (langToggle) {
             langToggle.textContent = this.t('lang.toggle');
         }
-        this.refreshParameterFormLanguage();
+        // Re-render dynamic content in the parameter panel
+        if (this.currentTool) {
+            // A tool form is open — re-render it (saves & restores values)
+            this.refreshParameterFormLanguage();
+        } else if (this.currentCategory) {
+            // The tool list is showing — re-render so category labels update
+            this.selectAnalysisCategory(this.currentCategory, { silent: true });
+        }
         this.updateCodeCellPlaceholders();
     }
 
@@ -725,7 +729,43 @@ class SingleCellAnalysis {
             ['分辨率', 'Resolution'],
             ['该工具无需参数设置', 'No parameters required.'],
             ['返回工具列表', 'Back to tools'],
-            ['运行', 'Run']
+            ['运行', 'Run'],
+            // Annotation forms
+            ['模型文件路径', 'Model file path'],
+            ['本地 .pkl', 'local .pkl'],
+            ['下载后自动填入，或手动输入路径', 'Auto-filled after download, or enter path manually'],
+            ['从 CellTypist 获取模型列表', 'Fetch CellTypist model list'],
+            ['获取中...', 'Fetching...'],
+            ['模型列表已加载', 'Model list loaded'],
+            ['-- 选择模型 --', '-- Select model --'],
+            ['下载选中模型', 'Download selected model'],
+            ['下载中...', 'Downloading...'],
+            ['✓ 已下载', '✓ Downloaded'],
+            ['✓ 已找到本地模型: ', '✓ Found local model: '],
+            ['运行注释', 'Run annotation'],
+            ['聚类键', 'Cluster key'],
+            ['组织类型', 'Tissue type'],
+            ['物种', 'Species'],
+            ['LLM 提供商', 'LLM Provider'],
+            ['通义千问', 'Tongyi Qianwen'],
+            ['模型名称', 'Model name'],
+            ['留空则读取 AGI_API_KEY 环境变量', 'Leave blank to use AGI_API_KEY env var'],
+            ['(可选)', '(optional)'],
+            ['自定义 OpenAI 兼容端点', 'Custom OpenAI-compatible endpoint'],
+            ['Top marker 基因数', 'Top marker genes'],
+            ['SCSA 数据库路径', 'SCSA database path'],
+            ['留空将自动下载', 'Leave blank to auto-download'],
+            ['下载', 'Download'],
+            ['倍数变化阈值', 'Fold change threshold'],
+            ['P 值阈值', 'P-value threshold'],
+            ['细胞类型', 'Cell type'],
+            ['参考数据库', 'Reference database'],
+            ['组织', 'Tissue'],
+            ['留空=All', 'blank=All'],
+            // Save modal
+            ['文件名', 'Filename'],
+            ['文件将下载到浏览器默认下载目录', 'File will be saved to the browser default download folder'],
+            ['确认下载', 'Confirm download']
         ];
         let output = html;
         replacements.forEach(([from, to]) => {
@@ -1678,7 +1718,7 @@ class SingleCellAnalysis {
         // Re-enable all parameter buttons now that data is loaded
         const buttons = document.querySelectorAll('#parameter-content button');
         buttons.forEach(button => {
-            if (!button.onclick.toString().includes('showComingSoon')) {
+            if (!button.onclick || !button.onclick.toString().includes('showComingSoon')) {
                 button.disabled = false;
             }
         });
@@ -2712,9 +2752,9 @@ class SingleCellAnalysis {
                 { id: 'coming_soon', nameKey: 'tools.enrichment', icon: 'fas fa-sitemap', descKey: 'tools.enrichmentDesc' }
             ],
             'cell_annotation': [
-                { id: 'coming_soon', nameKey: 'tools.celltypist', icon: 'fas fa-tag', descKey: 'tools.celltypistDesc' },
-                { id: 'coming_soon', nameKey: 'tools.gpt4celltype', icon: 'fas fa-robot', descKey: 'tools.gpt4celltypeDesc' },
-                { id: 'coming_soon', nameKey: 'tools.scsa', icon: 'fas fa-star', descKey: 'tools.scsaDesc' }
+                { id: 'celltypist',   nameKey: 'tools.celltypist',   icon: 'fas fa-tag',    descKey: 'tools.celltypistDesc' },
+                { id: 'gpt4celltype', nameKey: 'tools.gpt4celltype', icon: 'fas fa-robot',  descKey: 'tools.gpt4celltypeDesc' },
+                { id: 'scsa',         nameKey: 'tools.scsa',         icon: 'fas fa-star',   descKey: 'tools.scsaDesc' }
             ],
             'trajectory': [
                 { id: 'coming_soon', nameKey: 'tools.diffusionmap', icon: 'fas fa-project-diagram', descKey: 'tools.diffusionmapDesc' },
@@ -2764,7 +2804,31 @@ class SingleCellAnalysis {
 
     showParameterDialog(tool) { this.renderParameterForm(tool); }
 
+    /** Save / restore parameter values across form re-renders. */
+    _restoreAndTrackParams(tool, container) {
+        const cache = this.paramCache[tool] || {};
+        container.querySelectorAll('input, select').forEach(el => {
+            if (!el.id) return;
+            // Restore cached value
+            if (el.id in cache) {
+                if (el.type === 'checkbox') el.checked = !!cache[el.id];
+                else el.value = cache[el.id];
+            }
+            // Track future changes
+            const save = () => {
+                if (!this.paramCache[tool]) this.paramCache[tool] = {};
+                this.paramCache[tool][el.id] = el.type === 'checkbox' ? el.checked : el.value;
+            };
+            el.addEventListener('input', save);
+            el.addEventListener('change', save);
+        });
+    }
+
     renderParameterForm(tool, toolName = '', toolDesc = '') {
+        // Annotation tools use a custom multi-step renderer
+        if (tool === 'celltypist' || tool === 'gpt4celltype' || tool === 'scsa') {
+            return this.renderAnnotationForm(tool, toolName, toolDesc);
+        }
         this.currentTool = tool;
         const resolvedName = toolName && toolName.startsWith('tools.') ? this.t(toolName) : toolName;
         const resolvedDesc = toolDesc && toolDesc.startsWith('tools.') ? this.t(toolDesc) : toolDesc;
@@ -2805,6 +2869,7 @@ class SingleCellAnalysis {
                 </div>
             </div>`;
         parameterContent.innerHTML = this.translateFormHtml(formHTML);
+        this._restoreAndTrackParams(tool, parameterContent);
 
         const runBtn = document.getElementById('inlineRunBtn');
         if (runBtn) {
@@ -2864,6 +2929,301 @@ class SingleCellAnalysis {
                 target.value = value;
             }
         });
+    }
+
+    // ── Annotation Tools ──────────────────────────────────────────────────────
+
+    renderAnnotationForm(tool, toolNameKey = '', toolDescKey = '') {
+        this.currentTool = tool;
+        this.currentToolLabelKey = toolNameKey;
+        this.currentToolDescKey = toolDescKey;
+        this.currentToolLabel = toolNameKey.startsWith('tools.') ? this.t(toolNameKey) : toolNameKey;
+        this.currentToolDesc  = toolDescKey.startsWith('tools.')  ? this.t(toolDescKey)  : toolDescKey;
+
+        const paramEl = document.getElementById('parameter-content');
+        if (!paramEl) return;
+
+        const backCat = this.currentCategory || 'cell_annotation';
+        const obsOpts = (this.currentData?.obs_columns || [])
+            .map(c => `<option value="${c}">${c}</option>`).join('');
+
+        const header = `
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                    <h6 class="mb-1"><i class="fas fa-sliders-h me-2 text-primary"></i>${this.currentToolLabel}</h6>
+                    <small class="text-muted">${this.currentToolDesc}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary"
+                    onclick="singleCellApp.selectAnalysisCategory('${backCat}')">返回工具列表</button>
+            </div>`;
+
+        let body = '';
+        if (tool === 'celltypist') {
+            body = `
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">模型文件路径 <span class="text-muted">(本地 .pkl)</span></label>
+                <input type="text" class="form-control form-control-sm" id="pkl_path"
+                    placeholder="下载后自动填入，或手动输入路径">
+            </div>
+            <div class="mb-2">
+                <button class="btn btn-sm btn-outline-secondary w-100" id="fetchModelsBtn">
+                    <i class="fas fa-cloud-download-alt me-1"></i>从 CellTypist 获取模型列表
+                </button>
+                <div id="ct-model-list" class="mt-2" style="display:none">
+                    <select class="form-select form-select-sm" id="celltypist_model_select">
+                        <option value="">-- 选择模型 --</option>
+                    </select>
+                    <div id="ct-model-desc" class="text-muted small mt-1"></div>
+                    <button class="btn btn-sm btn-primary mt-2 w-100" id="downloadModelBtn" disabled>
+                        <i class="fas fa-download me-1"></i>下载选中模型
+                    </button>
+                    <div id="ct-dl-status" class="text-muted small mt-1"></div>
+                </div>
+            </div>
+            <div class="d-grid mt-3">
+                <button class="btn btn-success" id="annoRunBtn">
+                    <i class="fas fa-play me-1"></i>运行注释
+                </button>
+            </div>`;
+        } else if (tool === 'gpt4celltype') {
+            body = `
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">聚类键</label>
+                <select class="form-select form-select-sm" id="cluster_key">
+                    ${obsOpts || '<option value="leiden">leiden</option>'}
+                </select>
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">组织类型</label>
+                <input type="text" class="form-control form-control-sm" id="tissuename"
+                    placeholder="e.g. PBMC, Brain, Liver">
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">物种</label>
+                <input type="text" class="form-control form-control-sm" id="speciename" value="human">
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">LLM 提供商</label>
+                <select class="form-select form-select-sm" id="provider">
+                    <option value="qwen">Qwen (通义千问)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="kimi">Kimi (Moonshot)</option>
+                </select>
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">模型名称</label>
+                <input type="text" class="form-control form-control-sm" id="model" value="qwen-plus">
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">API Key</label>
+                <input type="password" class="form-control form-control-sm" id="api_key"
+                    placeholder="留空则读取 AGI_API_KEY 环境变量">
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">Base URL <span class="text-muted">(可选)</span></label>
+                <input type="text" class="form-control form-control-sm" id="base_url"
+                    placeholder="自定义 OpenAI 兼容端点">
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">Top marker 基因数</label>
+                <input type="number" class="form-control form-control-sm" id="topgenenumber"
+                    value="10" min="3" max="50">
+            </div>
+            <div class="d-grid mt-3">
+                <button class="btn btn-success" id="annoRunBtn">
+                    <i class="fas fa-play me-1"></i>运行注释
+                </button>
+            </div>`;
+        } else if (tool === 'scsa') {
+            body = `
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">聚类键</label>
+                <select class="form-select form-select-sm" id="cluster_key">
+                    ${obsOpts || '<option value="leiden">leiden</option>'}
+                </select>
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">SCSA 数据库路径</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" id="db_path"
+                        placeholder="留空将自动下载">
+                    <button class="btn btn-outline-secondary" id="downloadDbBtn" type="button">
+                        <i class="fas fa-download"></i> 下载
+                    </button>
+                </div>
+                <div id="scsa-dl-status" class="text-muted small mt-1"></div>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label class="form-label small fw-semibold">倍数变化阈值</label>
+                    <input type="number" class="form-control form-control-sm" id="foldchange"
+                        value="1.5" min="0.5" max="10" step="0.5">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold">P 值阈值</label>
+                    <input type="number" class="form-control form-control-sm" id="pvalue"
+                        value="0.05" min="0.001" max="0.1" step="0.005">
+                </div>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label class="form-label small fw-semibold">细胞类型</label>
+                    <select class="form-select form-select-sm" id="celltype">
+                        <option value="normal">Normal</option>
+                        <option value="cancer">Cancer</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold">参考数据库</label>
+                    <select class="form-select form-select-sm" id="target">
+                        <option value="cellmarker">CellMarker</option>
+                        <option value="panglaoDB">PanglaoDB</option>
+                        <option value="cancersea">CancerSEA</option>
+                    </select>
+                </div>
+            </div>
+            <div class="parameter-input mb-2">
+                <label class="form-label small fw-semibold">组织 <span class="text-muted">(留空=All)</span></label>
+                <input type="text" class="form-control form-control-sm" id="tissue" value="All">
+            </div>
+            <div class="d-grid mt-3">
+                <button class="btn btn-success" id="annoRunBtn">
+                    <i class="fas fa-play me-1"></i>运行注释
+                </button>
+            </div>`;
+        }
+
+        paramEl.innerHTML = this.translateFormHtml(`<div class="mb-3">${header}<div class="border rounded p-3">${body}</div></div>`);
+
+        // ── Attach events ──────────────────────────────────────────────────
+        if (tool === 'celltypist') {
+            const fetchBtn    = document.getElementById('fetchModelsBtn');
+            const modelList   = document.getElementById('ct-model-list');
+            const modelSelect = document.getElementById('celltypist_model_select');
+            const dlBtn       = document.getElementById('downloadModelBtn');
+            const dlStatus    = document.getElementById('ct-dl-status');
+            const modelDesc   = document.getElementById('ct-model-desc');
+            const pklInput    = document.getElementById('pkl_path');
+
+            fetchBtn.addEventListener('click', () => {
+                fetchBtn.disabled = true;
+                fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>获取中...';
+                fetch('/api/annotation/celltypist_models')
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.error) throw new Error(d.error);
+                        modelSelect.innerHTML = '<option value="">-- 选择模型 --</option>' +
+                            d.models.map(m => {
+                                const label = `${m.model}  (${m.No_celltypes || '?'} 类型)`;
+                                return `<option value="${m.model}" data-desc="${(m.description||'').replace(/"/g,"'")}">${label}</option>`;
+                            }).join('');
+                        modelList.style.display = 'block';
+                        fetchBtn.innerHTML = '<i class="fas fa-check me-1"></i>模型列表已加载';
+                    })
+                    .catch(err => {
+                        fetchBtn.disabled = false;
+                        fetchBtn.innerHTML = '<i class="fas fa-cloud-download-alt me-1"></i>从 CellTypist 获取模型列表';
+                        alert('获取模型列表失败: ' + err.message);
+                    });
+            });
+
+            modelSelect.addEventListener('change', () => {
+                const opt = modelSelect.options[modelSelect.selectedIndex];
+                modelDesc.textContent = opt?.dataset.desc || '';
+                dlBtn.disabled = !modelSelect.value;
+                // Auto-fill path if already downloaded
+                const modelName = modelSelect.value;
+                if (modelName) {
+                    fetch(`/api/annotation/celltypist_model_path?model_name=${encodeURIComponent(modelName)}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.exists) {
+                                pklInput.value = d.path;
+                                dlStatus.textContent = '✓ 已找到本地模型: ' + d.path;
+                                dlBtn.innerHTML = '<i class="fas fa-check me-1"></i>已下载';
+                            } else {
+                                pklInput.value = '';
+                                dlStatus.textContent = '';
+                                dlBtn.disabled = false;
+                                dlBtn.innerHTML = '<i class="fas fa-download me-1"></i>下载选中模型';
+                            }
+                        })
+                        .catch(() => {});
+                } else {
+                    pklInput.value = '';
+                    dlStatus.textContent = '';
+                }
+            });
+
+            dlBtn.addEventListener('click', () => {
+                const modelName = modelSelect.value;
+                if (!modelName) return;
+                dlBtn.disabled = true;
+                dlBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>下载中...';
+                dlStatus.textContent = '正在下载，请稍候...';
+                fetch('/api/annotation/download_celltypist_model', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_name: modelName})
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.error) throw new Error(d.error);
+                    pklInput.value = d.path;
+                    dlStatus.textContent = '✓ 下载完成: ' + d.path;
+                    dlBtn.innerHTML = '<i class="fas fa-check me-1"></i>已下载';
+                })
+                .catch(err => {
+                    dlBtn.disabled = false;
+                    dlBtn.innerHTML = '<i class="fas fa-download me-1"></i>下载选中模型';
+                    dlStatus.textContent = '下载失败: ' + err.message;
+                });
+            });
+        }
+
+        if (tool === 'scsa') {
+            const dlBtn    = document.getElementById('downloadDbBtn');
+            const dlStatus = document.getElementById('scsa-dl-status');
+            const dbInput  = document.getElementById('db_path');
+
+            dlBtn.addEventListener('click', () => {
+                dlBtn.disabled = true;
+                dlBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                dlStatus.textContent = '正在下载 SCSA 数据库，请稍候（约 15 MB）...';
+                fetch('/api/annotation/download_scsa_db', {method: 'POST'})
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.error) throw new Error(d.error);
+                        dbInput.value = d.path;
+                        dlStatus.textContent = '✓ 下载完成: ' + d.path;
+                        dlBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    })
+                    .catch(err => {
+                        dlBtn.disabled = false;
+                        dlBtn.innerHTML = '<i class="fas fa-download"></i> 下载';
+                        dlStatus.textContent = '下载失败: ' + err.message;
+                    });
+            });
+        }
+
+        // Common run button
+        const runBtn = document.getElementById('annoRunBtn');
+        if (runBtn) {
+            runBtn.addEventListener('click', () => {
+                const params = {};
+                paramEl.querySelectorAll('input, select').forEach(el => {
+                    if (!el.id) return;
+                    if (el.type === 'number') {
+                        if (el.value !== '') params[el.id] = parseFloat(el.value);
+                    } else if (el.type === 'checkbox') {
+                        params[el.id] = el.checked;
+                    } else {
+                        if (el.value !== '') params[el.id] = el.value;
+                    }
+                });
+                this.runTool(tool, params);
+            });
+        }
     }
 
     updateCodeCellPlaceholders() {
@@ -3090,10 +3450,13 @@ class SingleCellAnalysis {
             'neighbors': this.t('tools.neighbors'),
             'leiden': this.t('tools.leiden'),
             'louvain': this.t('tools.louvain'),
-            'filter_cells': this.t('tools.filterCells'),
-            'filter_genes': this.t('tools.filterGenes'),
+            'filter_cells':  this.t('tools.filterCells'),
+            'filter_genes':  this.t('tools.filterGenes'),
             'filter_outliers': this.t('tools.filterOutliers'),
-            'doublets': this.t('tools.doublets')
+            'doublets':      this.t('tools.doublets'),
+            'celltypist':    this.t('tools.celltypist'),
+            'gpt4celltype':  this.t('tools.gpt4celltype'),
+            'scsa':          this.t('tools.scsa'),
         };
         const toolName = toolNames[tool] || tool;
         const runningText = this.currentLang === 'zh'
@@ -3118,16 +3481,21 @@ class SingleCellAnalysis {
                 alert(this.formatToolMessage(toolName, this.t('tool.execFailed'), data.error));
             } else {
                 this.currentData = data;
-                this.updateUI(data);
+                // Use refreshDataFromKernel so the current embedding/color selection
+                // is preserved instead of being reset to the first option.
+                this.refreshDataFromKernel(data);
                 this.addToLog(this.formatToolMessage(toolName, this.t('tool.completed')));
                 this.updateAdataStatus(data, data.diff || null);
                 requestAnimationFrame(() => this.syncPanelHeight());
                 this.showStatus(this.formatToolMessage(toolName, this.t('tool.completed')), false);
 
-                // Auto-update plot if embedding is available
-                const embeddingSelect = document.getElementById('embedding-select');
-                if (embeddingSelect.value) {
-                    this.updatePlot();
+                // Auto-color by predicted annotation column if returned
+                if (data.predicted_col) {
+                    const colorSelect = document.getElementById('color-select');
+                    if (colorSelect) {
+                        colorSelect.value = 'obs:' + data.predicted_col;
+                        this.updatePlot();
+                    }
                 }
             }
         })
@@ -3141,25 +3509,44 @@ class SingleCellAnalysis {
 
     saveData() {
         if (!this.currentData) return;
-        
+
+        const suggestedName = (this.currentData.filename || 'data')
+            .replace(/\.h5ad$/i, '') + '.h5ad';
+
         this.showStatus(this.t('status.downloadingData'), true);
         this.addToLog(this.t('status.downloadStart'));
-        
-        fetch('/api/save', {
-            method: 'POST'
-        })
+
+        fetch('/api/save', { method: 'POST' })
         .then(response => {
-            if (response.ok) {
-                return response.blob();
-            } else {
-                throw new Error(this.t('status.saveFailed'));
-            }
+            if (response.ok) return response.blob();
+            throw new Error(this.t('status.saveFailed'));
         })
-        .then(blob => {
+        .then(async blob => {
+            // Use native Save-As dialog when available (Chrome/Edge on HTTPS or localhost)
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName,
+                        types: [{ description: 'AnnData H5AD', accept: { 'application/x-hdf5': ['.h5ad'] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    this.hideStatus();
+                    this.addToLog(this.t('status.dataSaved'));
+                    this.showStatus(this.t('status.dataSaved'), false);
+                    return;
+                } catch (e) {
+                    // User cancelled the dialog — don't show error
+                    if (e.name === 'AbortError') { this.hideStatus(); return; }
+                    // Any other error: fall through to blob download
+                }
+            }
+            // Fallback: trigger browser download (browser will ask save location if configured to)
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `processed_${this.currentData.filename}`;
+            a.download = suggestedName;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -3457,6 +3844,10 @@ class SingleCellAnalysis {
             }
             this.fetchKernelStats();
             this.fetchKernelVars();
+            // Ensure visualization adata is synced to kernel as odata when entering code view
+            if (this.currentData) {
+                fetch('/api/kernel/sync_odata', { method: 'POST' }).catch(() => {});
+            }
             if (this.openTabs.length === 0) {
                 this.openFileFromServer('default.ipynb');
             }
