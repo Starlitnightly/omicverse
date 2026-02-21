@@ -59,6 +59,7 @@ class AppState:
         self.current_adaptor = None
         self.current_adata = None
         self.current_filename = None
+        self.is_preview_mode = False   # True when opened with backed='r'
         self.thread_pool = ThreadPoolExecutor(max_workers=4)
         self.kernel_lock = threading.Lock()
         self.kernel_executor = None
@@ -835,16 +836,17 @@ def get_status():
     if state.current_adata is None:
         return jsonify({'loaded': False})
     return jsonify({
-        'loaded':      True,
-        'filename':    state.current_filename or 'data.h5ad',
-        'n_cells':     state.current_adata.n_obs,
-        'n_genes':     state.current_adata.n_vars,
-        'embeddings':  [k.replace('X_', '') for k in state.current_adata.obsm.keys()],
-        'obs_columns': list(state.current_adata.obs.columns),
-        'var_columns': list(state.current_adata.var.columns),
-        'uns_keys':    list(state.current_adata.uns.keys()),
-        'layers':      list(state.current_adata.layers.keys()),
-        'data_state':  _analyze_data_state(state.current_adata),
+        'loaded':        True,
+        'filename':      state.current_filename or 'data.h5ad',
+        'n_cells':       state.current_adata.n_obs,
+        'n_genes':       state.current_adata.n_vars,
+        'embeddings':    [k.replace('X_', '') for k in state.current_adata.obsm.keys()],
+        'obs_columns':   list(state.current_adata.obs.columns),
+        'var_columns':   list(state.current_adata.var.columns),
+        'uns_keys':      list(state.current_adata.uns.keys()),
+        'layers':        list(state.current_adata.layers.keys()),
+        'data_state':    _analyze_data_state(state.current_adata),
+        'preview_mode':  getattr(state, 'is_preview_mode', False),
     })
 
 

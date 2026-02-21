@@ -96,3 +96,13 @@ body.resizing-sidebar * {
     width: 100% !important;
     max-width: var(--sidebar-width) !important;
 }
+
+/* ========================================
+   Memory Bar — sticky at sidebar bottom
+   ======================================== */
+#memory-bar-container {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 10 !important;
+    width: 100% !important;
+}

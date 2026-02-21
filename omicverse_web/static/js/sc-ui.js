@@ -504,10 +504,13 @@ Object.assign(SingleCellAnalysis.prototype, {
                 console.warn('checkStatus: /api/status response missing embeddings field', data);
                 return;
             }
+            // Restore preview mode flag from server state
+            this.isPreviewMode = !!data.preview_mode;
             // Server has adata in memory — restore full UI without re-uploading
             this.currentData = data;
             this.updateUI(data);
             this.updateAdataStatus(data);
+            this.updatePreviewModeBanner(this.isPreviewMode);
             requestAnimationFrame(() => this.syncPanelHeight());
             this.addToLog(
                 `${this.t('upload.successDetail')}: ${data.n_cells} ${this.t('status.cells')}, ${data.n_genes} ${this.t('status.genes')}`
@@ -637,6 +640,11 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     showComingSoon() {
         alert(this.t('common.comingSoon'));
+    },
+
+    showPreviewModeAlert() {
+        alert(this.t('preview.toolDisabledAlert') ||
+            '⚠️ 预览模式下无法进行分析操作。\n\n如需分析，请点击数据状态栏中的「切换分析读取」按钮，\n以完整加载模式重新打开文件。');
     },
 
     switchView(view) {
@@ -780,6 +788,72 @@ Object.assign(SingleCellAnalysis.prototype, {
         const next = Math.min(20, Math.max(10, this.codeFontSize + delta));
         this.codeFontSize = next;
         this.applyCodeFontSize();
+    },
+
+    // ── Memory Bar ──────────────────────────────────────────────────────────
+
+    startMemoryMonitor() {
+        // Fetch immediately, then poll every 5 seconds
+        this.updateMemoryBar();
+        setInterval(() => this.updateMemoryBar(), 5000);
+    },
+
+    updateMemoryBar() {
+        fetch('/api/memory')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                const processMb = data.process_mb;
+                const totalMb   = data.total_mb;
+                const usedMb    = data.used_mb;   // total system used (includes this process)
+
+                const fmtGb = mb => mb != null ? (mb / 1024).toFixed(1) + ' GB' : '--';
+
+                const barProcess = document.getElementById('memory-bar-process');
+                const barOther   = document.getElementById('memory-bar-other');
+                const barText    = document.getElementById('memory-bar-text');
+                const lblProcess = document.getElementById('memory-label-process');
+                const lblOther   = document.getElementById('memory-label-other');
+
+                if (!barProcess || !barOther || !barText) return;
+
+                const isDark = document.documentElement.classList.contains('app-skin-dark');
+                const otherColor = isDark ? '#5a6172' : '#adb5bd';
+
+                // Sync legend dot color with current theme
+                const otherDot = document.getElementById('memory-other-dot');
+                if (otherDot) otherDot.style.background = otherColor;
+                if (barOther) barOther.style.background = otherColor;
+
+                if (totalMb && processMb != null) {
+                    // Green  = this process
+                    // Gray   = rest of system used (usedMb - processMb)
+                    const otherMb = Math.max(0, (usedMb || 0) - processMb);
+                    const pPct = Math.min(100, (processMb / totalMb) * 100);
+                    const oPct = Math.min(100 - pPct, (otherMb  / totalMb) * 100);
+
+                    barProcess.style.width = pPct.toFixed(1) + '%';
+                    barOther.style.left    = pPct.toFixed(1) + '%';
+                    barOther.style.width   = oPct.toFixed(1) + '%';
+
+                    // Top text: "已用 Y.Y GB / 总 Z.Z GB"
+                    barText.textContent = fmtGb(usedMb) + ' / ' + fmtGb(totalMb);
+
+                    // Bottom labels:
+                    //   绿色 → 本程序占用 (e.g. "0.8 GB")
+                    //   灰色 → 本机已用   (total used, e.g. "6.2 GB")
+                    if (lblProcess) lblProcess.textContent = fmtGb(processMb);
+                    if (lblOther)   lblOther.textContent   = fmtGb(usedMb);
+                } else if (processMb != null) {
+                    // No system total available — just show process usage
+                    barProcess.style.width = '100%';
+                    barOther.style.width   = '0%';
+                    barText.textContent    = fmtGb(processMb);
+                    if (lblProcess) lblProcess.textContent = fmtGb(processMb);
+                    if (lblOther)   lblOther.textContent   = '--';
+                }
+            })
+            .catch(() => {/* silent fail */});
     }
 
 });

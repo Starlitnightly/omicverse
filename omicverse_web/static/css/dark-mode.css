@@ -449,3 +449,71 @@
         background-color: var(--nxl-white) !important;
     }
 }
+
+/* ── Memory Bar — dark mode ──────────────────────────────────────────────── */
+.app-skin-dark #memory-bar-container {
+    background-color: var(--nxl-white) !important;
+    border-top-color: var(--nxl-border-color) !important;
+}
+
+.app-skin-dark #memory-bar-container .text-muted,
+.app-skin-dark #memory-bar-container span {
+    color: var(--nxl-muted) !important;
+}
+
+/* track (empty area) */
+.app-skin-dark #memory-bar-track {
+    background: var(--nxl-gray-300) !important;
+}
+
+/* "other processes" gray segment */
+.app-skin-dark #memory-bar-other {
+    background: var(--nxl-gray-500) !important;
+}
+
+/* ── Upload section — dark mode ──────────────────────────────────────────── */
+.app-skin-dark .file-upload-area {
+    background-color: var(--nxl-gray-100) !important;
+    border-color: var(--nxl-border-color) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark .file-upload-area.dragover {
+    background-color: var(--nxl-gray-200) !important;
+    border-color: var(--nxl-primary) !important;
+}
+
+/* Preview drop zone secondary dashed border */
+.app-skin-dark #dropZonePreview {
+    border-color: var(--nxl-gray-500) !important;
+}
+
+/* ── Preview mode banner — dark mode ─────────────────────────────────────── */
+.app-skin-dark #preview-mode-banner.alert-warning {
+    background-color: #3d2e00 !important;
+    border-color: #7a5c00 !important;
+    color: #ffd966 !important;
+}
+
+.app-skin-dark #preview-mode-banner .btn-warning {
+    background-color: #a07800 !important;
+    border-color: #a07800 !important;
+    color: #fff !important;
+}
+
+/* ── Analysis log — dark mode ────────────────────────────────────────────── */
+.app-skin-dark .analysis-log,
+.app-skin-dark #analysis-log {
+    background-color: var(--nxl-gray-100) !important;
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark #analysis-log .text-dark {
+    color: var(--nxl-body-color) !important;
+}
+
+.app-skin-dark #analysis-log pre {
+    background: var(--nxl-gray-200) !important;
+    color: var(--nxl-gray-900) !important;
+    border-left-color: var(--nxl-gray-500) !important;
+}

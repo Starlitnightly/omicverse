@@ -41,6 +41,119 @@ Object.assign(SingleCellAnalysis.prototype, {
         dropZone.addEventListener('click', (e) => {
             fileInput.click();
         });
+
+        // ── Preview Mode drop zone ────────────────────────────────────────────
+        const dropZonePreview = document.getElementById('dropZonePreview');
+        const fileInputPreview = document.getElementById('fileInputPreview');
+
+        if (dropZonePreview && fileInputPreview) {
+            dropZonePreview.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZonePreview.classList.add('dragover');
+            });
+            dropZonePreview.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZonePreview.classList.remove('dragover');
+            });
+            dropZonePreview.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZonePreview.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) this.handleFileUploadPreview(files[0]);
+            });
+            fileInputPreview.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) this.handleFileUploadPreview(e.target.files[0]);
+            });
+            dropZonePreview.addEventListener('click', () => fileInputPreview.click());
+        }
+    },
+
+    handleFileUploadPreview(file) {
+        if (!file.name.endsWith('.h5ad')) {
+            alert(this.t('upload.invalidFormat'));
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        this.showStatus(this.t('upload.previewUploading') || '正在以预览模式读取…', true);
+        this.addToLog((this.t('upload.previewStart') || '预览读取') + ': ' + file.name);
+
+        fetch('/api/upload_preview', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                let text = '';
+                try { text = await response.text(); } catch (e) {}
+                try {
+                    const js = JSON.parse(text);
+                    throw new Error(js.error || text || `HTTP ${response.status}`);
+                } catch (e) {
+                    if (text && text.trim().startsWith('<!DOCTYPE')) {
+                        throw new Error(this.t('upload.htmlError') + ` (HTTP ${response.status})`);
+                    }
+                    throw new Error(text || `HTTP ${response.status}`);
+                }
+            }
+            if (contentType.includes('application/json')) return response.json();
+            const text = await response.text();
+            try { return JSON.parse(text); } catch (e) { throw new Error(this.t('upload.invalidResponse')); }
+        })
+        .then(data => {
+            this.hideStatus();
+            if (data.error) {
+                this.addToLog(this.t('common.error') + ': ' + data.error, 'error');
+                this.showStatus(this.t('upload.failed') + ': ' + data.error, false);
+                alert(this.t('upload.failed') + ': ' + data.error);
+            } else {
+                // Mark frontend as preview mode
+                data.preview_mode = true;
+                this.isPreviewMode = true;
+                this.currentData = data;
+                this.updateUI(data);
+                this.updateAdataStatus(data);
+                this.updatePreviewModeBanner(true);
+                this.addToLog((this.t('upload.previewSuccess') || '预览读取成功') + ': ' + data.n_cells + ' ' + this.t('status.cells') + ', ' + data.n_genes + ' ' + this.t('status.genes'));
+                this.showStatus(this.t('upload.previewSuccess') || '预览模式已加载', false);
+            }
+        })
+        .catch(error => {
+            this.hideStatus();
+            this.addToLog(this.t('upload.failed') + ': ' + error.message, 'error');
+            this.showStatus(this.t('upload.failed') + ': ' + error.message, false);
+            alert(this.t('upload.failed') + ': ' + error.message);
+        });
+    },
+
+    /** Show/hide the preview-mode banner and dim the Save button */
+    updatePreviewModeBanner(isPreview) {
+        const banner = document.getElementById('preview-mode-banner');
+        const saveBtn = document.getElementById('save-btn');
+        if (banner) banner.classList.toggle('d-none', !isPreview);
+        if (saveBtn) {
+            saveBtn.disabled = isPreview;
+            saveBtn.title = isPreview ? (this.t('preview.saveDisabled') || '预览模式下无法保存') : '';
+        }
+    },
+
+    /** Switch current backed file to full analysis mode by re-uploading from cache */
+    switchToAnalysisMode() {
+        if (!this.currentData || !this.currentData.filename) return;
+        const msg = this.t('preview.switchConfirm') || '切换分析模式将完整加载数据到内存，可能需要一些时间。确定继续？';
+        if (!confirm(msg)) return;
+        // Reset preview flag immediately so the upload section reappears
+        this.isPreviewMode = false;
+        this.currentData = null;
+        document.getElementById('upload-section').style.display = '';
+        document.getElementById('data-status').classList.add('d-none');
+        document.getElementById('viz-controls').style.display = 'none';
+        document.getElementById('viz-panel').style.display = 'none';
+        this.updatePreviewModeBanner(false);
+        this.addToLog(this.t('preview.switchHint') || '请在左侧"分析读取模式"区域重新上传文件以完整加载数据。');
     },
 
     triggerNotebookUpload() {
@@ -191,9 +304,13 @@ Object.assign(SingleCellAnalysis.prototype, {
                 this.showStatus(this.t('upload.failed') + ': ' + data.error, false);
                 alert(this.t('upload.failed') + ': ' + data.error);
             } else {
+                // Normal full-load — clear preview mode
+                this.isPreviewMode = false;
+                data.preview_mode = false;
                 this.currentData = data;
                 this.updateUI(data);
                 this.updateAdataStatus(data);
+                this.updatePreviewModeBanner(false);
                 this.addToLog(this.t('upload.successDetail') + ': ' + data.n_cells + ' ' + this.t('status.cells') + ', ' + data.n_genes + ' ' + this.t('status.genes'));
                 this.showStatus(this.t('upload.success'), false);
             }

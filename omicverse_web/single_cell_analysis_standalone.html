@@ -244,6 +244,38 @@
                 </div>
             </div>
         </div>
+        <!-- Memory Usage Bar — pinned at bottom of sidebar -->
+        <div id="memory-bar-container" style="padding: 8px 12px 10px; border-top: 1px solid; flex-shrink: 0;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small text-muted" data-i18n="memory.title" style="font-size:0.72rem;">内存占用</span>
+                <span class="small text-muted" id="memory-bar-text" style="font-size:0.72rem; font-variant-numeric: tabular-nums;">-- / -- GB</span>
+            </div>
+            <!-- Combined stacked bar: green = this process, gray = other used -->
+            <div id="memory-bar-track" style="height:8px; border-radius:4px; overflow:hidden; position:relative; background:#dee2e6;">
+                <div id="memory-bar-process" style="
+                    position:absolute; left:0; top:0; bottom:0; width:0%;
+                    background: linear-gradient(90deg,#28a745,#34ce57);
+                    border-radius:4px;
+                    transition: width 0.5s ease;
+                "></div>
+                <div id="memory-bar-other" style="
+                    position:absolute; top:0; bottom:0; left:0; width:0%;
+                    background: #adb5bd;
+                    border-radius:0 4px 4px 0;
+                    transition: left 0.5s ease, width 0.5s ease;
+                "></div>
+            </div>
+            <div class="d-flex justify-content-between mt-1" style="font-size:0.68rem;">
+                <span class="text-muted">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#28a745;margin-right:3px;vertical-align:middle;"></span>
+                    <span data-i18n="memory.process">本程序</span>&nbsp;<span id="memory-label-process" style="font-variant-numeric:tabular-nums;">--</span>
+                </span>
+                <span class="text-muted">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#adb5bd;margin-right:3px;vertical-align:middle;" id="memory-other-dot"></span>
+                    <span data-i18n="memory.other">本机已用</span>&nbsp;<span id="memory-label-other" style="font-variant-numeric:tabular-nums;">--</span>
+                </span>
+            </div>
+        </div>
         <!-- Resizable sidebar handle (JupyterLab-like) -->
         <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
     </nav>
@@ -521,21 +553,49 @@
 
                     <!-- Main Visualization Panel -->
                     <div class="col-lg-9">
-                        <!-- File Upload Area -->
+                        <!-- File Upload Area — split into Analysis & Preview -->
                         <div id="upload-section" class="mb-4">
-                            <div class="file-upload-area" id="dropZone" style="cursor: pointer;">
-                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                <h5 data-i18n="upload.title">Upload H5AD File</h5>
-                                <p class="text-muted" data-i18n="upload.subtitle">Drag & drop or click to select a file</p>
-                                <input type="file" id="fileInput" accept=".h5ad" style="display: none;">
-                                <button type="button" class="btn btn-primary" style="pointer-events: none;">
-                                    <i class="fas fa-folder-open me-2"></i><span data-i18n="upload.button">Select File</span>
-                                </button>
+                            <div class="row g-3">
+                                <!-- Left: Analysis Mode (full load) -->
+                                <div class="col-md-6">
+                                    <div class="file-upload-area" id="dropZone" style="cursor: pointer; height: 100%; min-height: 180px;">
+                                        <i class="fas fa-cloud-upload-alt fa-2x text-primary mb-2"></i>
+                                        <h6 class="fw-bold text-primary" data-i18n="upload.analysisMode">分析读取模式</h6>
+                                        <p class="text-muted small mb-2" data-i18n="upload.analysisModeDesc">完整加载数据到内存，支持所有分析功能</p>
+                                        <p class="text-muted small" data-i18n="upload.subtitle">拖放或点击选择文件</p>
+                                        <input type="file" id="fileInput" accept=".h5ad" style="display: none;">
+                                        <button type="button" class="btn btn-primary btn-sm" style="pointer-events: none;">
+                                            <i class="fas fa-folder-open me-1"></i><span data-i18n="upload.button">选择文件</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Right: Preview Mode (backed='r') -->
+                                <div class="col-md-6">
+                                    <div class="file-upload-area border-secondary" id="dropZonePreview" style="cursor: pointer; height: 100%; min-height: 180px; border-style: dashed; border-color: #6c757d !important;">
+                                        <i class="fas fa-eye fa-2x text-secondary mb-2"></i>
+                                        <h6 class="fw-bold text-secondary" data-i18n="upload.previewMode">仅预览模式</h6>
+                                        <p class="text-muted small mb-2" data-i18n="upload.previewModeDesc">低内存读取，不支持分析操作（backed='r'）</p>
+                                        <p class="text-muted small" data-i18n="upload.subtitle">拖放或点击选择文件</p>
+                                        <input type="file" id="fileInputPreview" accept=".h5ad" style="display: none;">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" style="pointer-events: none;">
+                                            <i class="fas fa-eye me-1"></i><span data-i18n="upload.previewButton">预览文件</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <!-- Data Status -->
                         <div id="data-status" class="status-info d-none">
+                            <!-- Preview mode banner (hidden when in analysis mode) -->
+                            <div id="preview-mode-banner" class="alert alert-warning d-none py-2 px-3 mb-2" style="border-radius:6px; font-size:0.85rem;">
+                                <i class="fas fa-eye me-1"></i>
+                                <strong data-i18n="preview.bannerTitle">预览模式</strong>
+                                <span data-i18n="preview.bannerDesc"> — 分析功能已禁用，数据以低内存方式读取</span>
+                                <button type="button" class="btn btn-sm btn-warning ms-2 py-0 px-2"
+                                        onclick="singleCellApp.switchToAnalysisMode()"
+                                        data-i18n="preview.switchBtn">切换分析读取</button>
+                            </div>
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1" id="filename-display" data-i18n="status.filename">Filename</h6>
@@ -545,7 +605,7 @@
                                     </small>
                                 </div>
                                 <div>
-                                    <button type="button" class="btn btn-sm btn-success me-2" onclick="saveData()">
+                                    <button type="button" class="btn btn-sm btn-success me-2" onclick="saveData()" id="save-btn">
                                         <i class="fas fa-download me-1"></i><span data-i18n="status.save">Save</span>
                                     </button>
                                     <button type="button" class="btn btn-sm btn-secondary" onclick="resetData()">

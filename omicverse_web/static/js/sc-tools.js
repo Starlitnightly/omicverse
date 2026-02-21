@@ -61,13 +61,29 @@ Object.assign(SingleCellAnalysis.prototype, {
         tools.forEach(tool => {
             const toolDiv = document.createElement('div');
             toolDiv.className = 'mb-3 p-3 border rounded fade-in c-pointer';
+
+            // In preview mode we overlay a lock badge on each tool
+            const previewBadge = this.isPreviewMode
+                ? `<span class="badge bg-warning text-dark ms-auto" style="font-size:0.65rem;"><i class="fas fa-lock me-1"></i>${this.t('preview.modeBadge') || '预览模式'}</span>`
+                : '';
+
             toolDiv.innerHTML = `
                 <div class="d-flex align-items-center mb-2">
-                    <i class="${tool.icon} me-2 text-primary"></i>
+                    <i class="${tool.icon} me-2 ${this.isPreviewMode ? 'text-secondary' : 'text-primary'}"></i>
                     <strong>${this.t(tool.nameKey)}</strong>
+                    ${previewBadge}
                 </div>
                 <p class="text-muted small mb-0">${this.t(tool.descKey)}</p>`;
-            if (tool.id === 'coming_soon') {
+
+            if (this.isPreviewMode) {
+                // Disable all tools in preview mode — show tooltip on click
+                toolDiv.style.opacity = 0.65;
+                toolDiv.style.cursor = 'not-allowed';
+                toolDiv.title = this.t('preview.toolDisabledTip') || '预览模式下无法进行分析，如需分析请切换成"分析读取"模式';
+                toolDiv.onclick = () => {
+                    this.showPreviewModeAlert();
+                };
+            } else if (tool.id === 'coming_soon') {
                 toolDiv.onclick = () => this.showComingSoon();
             } else if (this.currentData) {
                 toolDiv.onclick = () => this.renderParameterForm(tool.id, tool.nameKey, tool.descKey, category);
@@ -1127,12 +1143,22 @@ Object.assign(SingleCellAnalysis.prototype, {
     resetData() {
         if (confirm(this.t('status.resetConfirm'))) {
             this.currentData = null;
+            // Reset preview mode on data reset
+            this.isPreviewMode = false;
+            this.updatePreviewModeBanner(false);
             document.getElementById('upload-section').style.display = 'block';
             document.getElementById('data-status').classList.add('d-none');
             document.getElementById('viz-controls').style.display = 'none';
             document.getElementById('viz-panel').style.display = 'none';
             document.getElementById('analysis-log').innerHTML = `<div class="text-muted">${this.t('panel.waitingUpload')}</div>`;
             document.getElementById('fileInput').value = '';
+            const previewInput = document.getElementById('fileInputPreview');
+            if (previewInput) previewInput.value = '';
+
+            // Reset adata status panel to placeholder
+            this.updateAdataStatus(null);
+            // Reset parameter panel to placeholder
+            this.showParameterPlaceholder();
 
             // Clear gene input
             const geneInput = document.getElementById('gene-input');

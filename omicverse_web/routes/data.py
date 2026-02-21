@@ -17,6 +17,36 @@ from server.data_adaptor.anndata_adaptor import HighPerformanceAnndataAdaptor
 bp = Blueprint('data', __name__)
 
 
+@bp.route('/memory', methods=['GET'])
+def get_memory():
+    """Return system and current-process memory usage for the memory bar."""
+    try:
+        import psutil, os as _os
+        proc = psutil.Process(_os.getpid())
+        process_mb = proc.memory_info().rss / (1024 * 1024)
+        vm = psutil.virtual_memory()
+        total_mb = vm.total / (1024 * 1024)
+        used_mb  = vm.used  / (1024 * 1024)
+        return jsonify({
+            'process_mb': round(process_mb, 1),
+            'total_mb':   round(total_mb, 1),
+            'used_mb':    round(used_mb, 1),
+        })
+    except ImportError:
+        # psutil not available – fall back to resource module (Unix)
+        try:
+            import resource
+            rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            # macOS returns bytes, Linux returns KB
+            process_mb = rss / (1024 * 1024) if rss > 10**7 else rss / 1024
+            return jsonify({'process_mb': round(process_mb, 1), 'total_mb': None, 'used_mb': None})
+        except Exception:
+            return jsonify({'process_mb': None, 'total_mb': None, 'used_mb': None})
+    except Exception as e:
+        logging.warning(f'Memory query failed: {e}')
+        return jsonify({'process_mb': None, 'total_mb': None, 'used_mb': None})
+
+
 @bp.route('/upload', methods=['POST'])
 def upload_file():
     """Upload h5ad file and create data adaptor."""
@@ -41,6 +71,8 @@ def upload_file():
         # Expose underlying AnnData for tool endpoints
         bp.state.current_adata = bp.state.current_adaptor.adata
         bp.state.current_filename = filename
+        # Normal (full) load — clear preview flag
+        bp.state.is_preview_mode = False
 
         # Always store a deterministic random 2D embedding in obsm so it:
         #  - persists across tool runs (obsm is auto-subset on cell filtering)
@@ -88,6 +120,58 @@ def upload_file():
 
     except Exception as e:
         logging.error(f"Upload failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/upload_preview', methods=['POST'])
+def upload_file_preview():
+    """Upload h5ad file and open in backed='r' (preview / memory-efficient) mode."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.endswith('.h5ad'):
+        return jsonify({'error': 'File must be .h5ad format'}), 400
+
+    try:
+        import scanpy as sc
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(bp.upload_folder, filename)
+        file.save(filepath)
+
+        # Open in backed read-only mode — does NOT load X into RAM
+        adata_backed = sc.read_h5ad(filepath, backed='r')
+
+        # Store in state so visualisation endpoints can use it
+        bp.state.current_adata = adata_backed
+        bp.state.current_filename = filename
+        # Mark as preview (backed) so API tools can refuse to mutate it
+        bp.state.is_preview_mode = True
+
+        # Pass the already-opened backed adata to the adaptor (avoids re-loading fully)
+        bp.state.current_adaptor = HighPerformanceAnndataAdaptor(adata_backed)
+
+        embeddings = [k.replace('X_', '') for k in adata_backed.obsm.keys()]
+
+        response_data = {
+            'filename': filename,
+            'n_cells':      adata_backed.n_obs,
+            'n_genes':      adata_backed.n_vars,
+            'embeddings':   embeddings,
+            'obs_columns':  list(adata_backed.obs.columns),
+            'var_columns':  list(adata_backed.var.columns),
+            'uns_keys':     list(adata_backed.uns.keys()),
+            'layers':       list(adata_backed.layers.keys()) if adata_backed.layers else [],
+            'preview_mode': True,
+            'success': True,
+        }
+        return jsonify(response_data)
+
+    except Exception as e:
+        logging.error(f"Preview upload failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 

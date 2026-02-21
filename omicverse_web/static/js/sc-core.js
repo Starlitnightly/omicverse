@@ -9,6 +9,7 @@ class SingleCellAnalysis {
         this.currentTheme = 'light';
         this.currentView = 'visualization';
         this.currentLang = 'en';
+        this.isPreviewMode = false;  // true when file is opened in backed='r' mode
         this.paramCache = {};  // persists tool parameter values across re-renders
         this.codeCells = [];
         this.cellCounter = 0;
@@ -60,6 +61,7 @@ class SingleCellAnalysis {
         this.setupSidebarResize(); // JupyterLab-like resizable sidebar
         this.checkStatus();
         this.showParameterPlaceholder();
+        this.startMemoryMonitor();
         this.updateAdataStatus(null);
         this.applyCodeFontSize();
         this.fetchKernelVars();
