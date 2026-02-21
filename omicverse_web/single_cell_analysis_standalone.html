@@ -115,12 +115,14 @@
                         <a href="javascript:void(0);" class="nxl-link" onclick="singleCellApp.showEnvManager()">
                             <span class="nxl-micon"><i class="feather-package"></i></span>
                             <span class="nxl-mtext" data-i18n="nav.envInstall">Python 包安装</span>
+                            <span class="nxl-arrow"></span>
                         </a>
                     </li>
                     <li class="nxl-item">
                         <a href="javascript:void(0);" class="nxl-link" onclick="singleCellApp.showEnvInfo()">
                             <span class="nxl-micon"><i class="feather-info"></i></span>
                             <span class="nxl-mtext" data-i18n="nav.envInfo">Python 环境信息</span>
+                            <span class="nxl-arrow"></span>
                         </a>
                     </li>
                 </ul>
@@ -691,9 +693,8 @@
 
                                 <!-- ── Left sub-card: Pseudotime Embedding ── -->
                                 <div class="col-md-6">
-                                    <div class="card h-100" style="background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border-color,#313244);">
-                                        <div class="card-header py-2 d-flex align-items-center justify-content-between"
-                                             style="background:var(--bg-tertiary,#181825);border-bottom:1px solid var(--border-color,#313244);">
+                                    <div class="card h-100">
+                                        <div class="card-header py-2 d-flex align-items-center justify-content-between">
                                             <span class="small fw-semibold">
                                                 <i class="fas fa-map me-1 text-primary"></i>
                                                 <span data-i18n="traj.embTitle">Pseudotime Embedding</span>
@@ -707,8 +708,8 @@
                                         <div class="card-body p-2">
                                             <!-- Image output -->
                                             <div id="traj-embedding-img"
-                                                 class="d-flex align-items-center justify-content-center rounded mb-2"
-                                                 style="min-height:220px;background:var(--bg-primary,#1a1a2e);">
+                                                 class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                 style="min-height:220px;">
                                                 <span class="text-muted small" data-i18n="traj.clickGenerate">Click Generate to render</span>
                                             </div>
                                             <!-- Embedding parameters -->
@@ -742,9 +743,8 @@
                                             </div>
 
                                             <!-- PAGA overlay sub-card -->
-                                            <div class="card mt-2" style="background:var(--bg-primary,#13131f);border:1px solid var(--border-color,#313244);">
-                                                <div class="card-header py-1 px-2"
-                                                     style="background:transparent;border-bottom:1px solid var(--border-color,#313244);">
+                                            <div class="card mt-2">
+                                                <div class="card-header py-1 px-2">
                                                     <div class="form-check mb-0">
                                                         <input class="form-check-input" type="checkbox" id="traj-paga-overlay"
                                                                onchange="singleCellApp.togglePagaOptions(this.checked)">
@@ -781,9 +781,8 @@
 
                                 <!-- ── Right sub-card: Gene Trend Heatmap ── -->
                                 <div class="col-md-6">
-                                    <div class="card h-100" style="background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border-color,#313244);">
-                                        <div class="card-header py-2 d-flex align-items-center justify-content-between"
-                                             style="background:var(--bg-tertiary,#181825);border-bottom:1px solid var(--border-color,#313244);">
+                                    <div class="card h-100">
+                                        <div class="card-header py-2 d-flex align-items-center justify-content-between">
                                             <span class="small fw-semibold">
                                                 <i class="fas fa-th me-1 text-warning"></i>
                                                 <span data-i18n="traj.hmTitle">Gene Trend Heatmap</span>
@@ -797,8 +796,8 @@
                                         <div class="card-body p-2">
                                             <!-- Image output -->
                                             <div id="traj-heatmap-img"
-                                                 class="d-flex align-items-center justify-content-center rounded mb-2"
-                                                 style="min-height:220px;background:var(--bg-primary,#1a1a2e);">
+                                                 class="d-flex align-items-center justify-content-center rounded mb-2 bg-body-tertiary"
+                                                 style="min-height:220px;">
                                                 <span class="text-muted small" data-i18n="traj.hmHint">Enter genes then click Generate</span>
                                             </div>
                                             <!-- Heatmap parameters -->

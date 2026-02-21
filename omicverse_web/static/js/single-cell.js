@@ -1874,13 +1874,6 @@ class SingleCellAnalysis {
             }
         }
 
-        // Auto-show trajectory visualization panel if pseudotime data is present
-        const obs = (data && data.obs_columns) ? data.obs_columns : [];
-        const hasPseudotime = obs.some(c =>
-            c.includes('pseudotime') || c === 'dpt_pseudotime'
-        );
-        if (hasPseudotime) this.showTrajViz();
-
         // Keep adata status panel in sync
         this.updateAdataStatus(data);
     }
@@ -2984,6 +2977,17 @@ class SingleCellAnalysis {
             parameterContent.appendChild(toolDiv);
         });
         
+        // Show traj-viz-panel only for trajectory category, hide for all others
+        const trajPanel = document.getElementById('traj-viz-panel');
+        if (trajPanel) {
+            if (category === 'trajectory') {
+                trajPanel.style.display = '';
+                this.updateTrajVizSelects();
+            } else {
+                trajPanel.style.display = 'none';
+            }
+        }
+
         if (!silent) this.addToLog(this.t('panel.categorySelected') + ` ${this.getCategoryName(category)}`);
     }
 
