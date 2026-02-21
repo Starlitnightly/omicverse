@@ -124,6 +124,7 @@ register_provider(ProviderInfo(
     wire_api=WireAPI.GEMINI_GENERATE,
     model_prefixes=("gemini/",),
     models={
+        "gemini/gemini-3-flash-preview": "Gemini 3 Flash Preview",
         "gemini/gemini-2.5-pro": "Gemini 2.5 Pro",
         "gemini/gemini-2.5-flash": "Gemini 2.5 Flash",
         "gemini/gemini-2.0-pro": "Gemini 2.0 Pro",
@@ -273,6 +274,8 @@ _RAW_MODEL_ALIASES = {
     "claude-3-haiku": "anthropic/claude-3-haiku-20240307",
     "claude-haiku-3": "anthropic/claude-3-haiku-20240307",
     # Gemini
+    "gemini-3-flash-preview": "gemini/gemini-3-flash-preview",
+    "gemini-3-flash": "gemini/gemini-3-flash-preview",
     "gemini-2.5-pro": "gemini/gemini-2.5-pro",
     "gemini-2-5-pro": "gemini/gemini-2.5-pro",
     "gemini-2.5-flash": "gemini/gemini-2.5-flash",

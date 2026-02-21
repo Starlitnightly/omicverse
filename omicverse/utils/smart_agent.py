@@ -252,18 +252,18 @@ class OmicVerseAgent:
     requests and automatically execute appropriate OmicVerse functions.
 
     Usage:
-        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-2.5-flash by default
+        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-3-flash-preview by default
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
+    def __init__(self, model: str = "gemini-3-flash-preview", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
         Parameters
         ----------
         model : str
-            LLM model to use for reasoning (default: "gemini-2.5-flash")
+            LLM model to use for reasoning (default: "gemini-3-flash-preview")
         api_key : str, optional
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
@@ -468,6 +468,11 @@ class OmicVerseAgent:
                     print(f"   ⚠️  Filesystem context disabled (init failed: {e})")
             else:
                 print(f"   ⚡ Filesystem context disabled")
+
+            # Initialize MCP connections if configured
+            self._mcp_manager = None
+            self._biocontext = None
+            self._init_mcp()
 
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
@@ -709,6 +714,173 @@ You can reference previous results without explicitly searching:
 - Relevant context is retrieved based on the current task
 """
 
+    # -- MCP helpers ---------------------------------------------------------
+
+    @staticmethod
+    def _biocontext_is_eager(value) -> bool:
+        """Return True when enable_biocontext means 'connect at init'."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("yes", "true", "1")
+        return bool(value)
+
+    @staticmethod
+    def _biocontext_is_disabled(value) -> bool:
+        """Return True when enable_biocontext means 'never connect'."""
+        if isinstance(value, bool):
+            return not value
+        if isinstance(value, str):
+            return value.lower() in ("no", "false", "0")
+        return not value
+
+    def _lazy_connect_biocontext(self) -> bool:
+        """Lazily connect to BioContext and rebuild the LLM prompt.
+
+        Returns True if connection succeeded and MCP tools are now
+        available, False otherwise.
+        """
+        if self._biocontext and self._biocontext.is_connected:
+            return True  # already connected
+
+        from .agent_config import MCPConfig
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+
+        try:
+            from .mcp_client import MCPClientManager
+            from .biocontext_bridge import BioContextBridge
+        except Exception as exc:
+            logger.warning("MCP modules not available: %s", exc)
+            return False
+
+        if self._mcp_manager is None:
+            self._mcp_manager = MCPClientManager()
+
+        self._biocontext = BioContextBridge(
+            mode=mcp_cfg.biocontext_mode,
+            context_manager=self._filesystem_context,
+            cache_ttl=mcp_cfg.cache_ttl,
+        )
+        try:
+            info = self._biocontext.connect()
+            self._merge_biocontext_into_manager()
+            print(f"   🔗 BioContext MCP auto-connected: {len(info.tools)} tools available")
+        except Exception as exc:
+            logger.warning("BioContext lazy connection failed: %s", exc)
+            print(f"   ⚠️  BioContext MCP auto-connection failed: {exc}")
+            self._biocontext = None
+            return False
+
+        # Rebuild the LLM system prompt with MCP tools injected
+        try:
+            with self._temporary_api_keys():
+                self._setup_agent()
+        except Exception as exc:
+            logger.warning("Failed to rebuild agent prompt after MCP connect: %s", exc)
+
+        return True
+
+    def _merge_biocontext_into_manager(self) -> None:
+        """Copy BioContext bridge's client state into the main MCP manager."""
+        if not self._biocontext or not self._biocontext.manager:
+            return
+        for name, srv in self._biocontext.manager._servers.items():
+            self._mcp_manager._servers[name] = srv
+        for tool_name, srv_name in self._biocontext.manager._tool_map.items():
+            self._mcp_manager._tool_map[tool_name] = srv_name
+        for name, client in self._biocontext.manager._http_clients.items():
+            self._mcp_manager._http_clients[name] = client
+
+    def _init_mcp(self) -> None:
+        """Initialize MCP connections based on configuration.
+
+        For ``enable_biocontext="auto"`` (default), BioContext is NOT
+        connected here — it will be lazily connected when a query that
+        needs external databases is detected in ``run_async``.
+        """
+        from .agent_config import MCPConfig
+
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+        bc_setting = mcp_cfg.enable_biocontext
+
+        # Determine if we need to do anything at init time
+        eager_bc = self._biocontext_is_eager(bc_setting)
+        is_auto = isinstance(bc_setting, str) and bc_setting.lower() == "auto"
+        has_servers = bool(mcp_cfg.servers)
+
+        if not eager_bc and not has_servers:
+            if is_auto:
+                print(f"   🔗 BioContext MCP: auto mode (will connect on demand)")
+            return
+
+        try:
+            from .mcp_client import MCPClientManager
+            from .biocontext_bridge import BioContextBridge
+        except Exception as exc:
+            logger.warning("MCP modules not available: %s", exc)
+            return
+
+        self._mcp_manager = MCPClientManager()
+
+        # Eager-connect BioContext (enable_biocontext=True or "yes")
+        if eager_bc:
+            self._biocontext = BioContextBridge(
+                mode=mcp_cfg.biocontext_mode,
+                context_manager=self._filesystem_context,
+                cache_ttl=mcp_cfg.cache_ttl,
+            )
+            try:
+                info = self._biocontext.connect()
+                self._merge_biocontext_into_manager()
+                print(f"   🔗 BioContext MCP connected: {len(info.tools)} tools available")
+            except Exception as exc:
+                logger.warning("BioContext connection failed: %s", exc)
+                print(f"   ⚠️  BioContext MCP connection failed: {exc}")
+                self._biocontext = None
+
+        # Connect additional user-provided servers
+        for srv_kwargs in mcp_cfg.servers:
+            srv_name = srv_kwargs.get("name", "unknown")
+            try:
+                self._mcp_manager.connect(**srv_kwargs)
+                srv_info = self._mcp_manager.server_info(srv_name)
+                n_tools = len(srv_info.tools) if srv_info else 0
+                print(f"   🔗 MCP server '{srv_name}' connected: {n_tools} tools")
+            except Exception as exc:
+                logger.warning("MCP server '%s' failed: %s", srv_name, exc)
+                print(f"   ⚠️  MCP server '{srv_name}' connection failed: {exc}")
+
+    def _build_mcp_tools_instructions(self) -> str:
+        """Build MCP tools section for the LLM system prompt."""
+        if not self._mcp_manager or not self._mcp_manager.connected_servers:
+            return ""
+
+        tools_text = self._mcp_manager.tools_for_llm_prompt()
+        if not tools_text:
+            return ""
+
+        return f"""
+
+## External Database Tools (MCP)
+
+You have access to external biomedical databases via the Model Context Protocol.
+To query these databases in your generated code, use:
+
+```python
+result = mcp_call("tool_name", {{"param": "value"}})
+```
+
+The `mcp_call` function is pre-loaded in the execution environment.
+Results are automatically cached — repeated queries with the same parameters
+return cached results without network calls.
+
+**IMPORTANT**: Only call MCP tools when the user's request explicitly needs
+external database information (e.g., protein interactions, pathway data,
+gene markers). Do NOT call MCP tools for standard analysis operations.
+
+{tools_text}
+"""
+
     @contextmanager
     def _temporary_api_keys(self):
         """Temporarily inject API keys into the environment and clean up afterwards."""
@@ -857,7 +1029,13 @@ User request: "quality control with nUMI>500, mito<0.2"
         # Add filesystem context instructions if enabled
         if self.enable_filesystem_context and self._filesystem_context:
             instructions += self._build_filesystem_context_instructions()
-        
+
+        # Add MCP tools instructions if connected
+        mcp_cfg = getattr(self._config, "mcp", None)
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            if mcp_cfg is None or mcp_cfg.inject_tools_in_prompt:
+                instructions += self._build_mcp_tools_instructions()
+
         # Prepare API key environment pin if passed (non-destructive)
         if self.api_key:
             required_key = PROVIDER_API_KEYS.get(self.model)
@@ -873,7 +1051,38 @@ User request: "quality control with nUMI>500, mito<0.2"
             max_tokens=8192,
             temperature=0.2,
         )
+
+        # Create / reset the context compactor
+        from .context_compactor import ContextCompactor
+        self._compactor = ContextCompactor(
+            llm_backend=self._llm,
+            model=self.model,
+            soft_threshold=120_000,
+            hard_threshold=170_000,
+        )
     
+    async def _ensure_context_fits(self, user_prompt: str = "") -> None:
+        """Compress the system prompt if it exceeds the soft token threshold.
+
+        This is called before major LLM calls (code generation, reflection,
+        result review) to ensure the total context stays within model limits.
+        The compactor caches its result so only the first call per session
+        triggers an actual LLM summarisation.
+        """
+        compactor = getattr(self, "_compactor", None)
+        if compactor is None or self._llm is None:
+            return
+        level = compactor.needs_compaction(
+            self._llm.config.system_prompt, user_prompt
+        )
+        if level == "none":
+            return
+        print(f"📦 Context approaching limit — compressing system prompt ({level})...")
+        compacted = await compactor.compact(
+            self._llm.config.system_prompt, user_prompt
+        )
+        self._llm.config.system_prompt = compacted
+
     def _search_functions(self, query: str) -> str:
         """
         Search for functions in the OmicVerse registry.
@@ -953,13 +1162,14 @@ User request: "quality control with nUMI>500, mito<0.2"
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
-    async def _analyze_task_complexity(self, request: str) -> str:
+    async def _analyze_task_complexity(self, request: str) -> Dict[str, Any]:
         """
-        Analyze the complexity of a user request to determine the appropriate execution strategy.
+        Analyze the complexity of a user request and whether it needs external databases.
 
         This method uses a combination of pattern matching and LLM reasoning to classify
         whether a task can be handled with a single function call (simple) or requires
-        a multi-step workflow (complex).
+        a multi-step workflow (complex), and whether the task needs external biomedical
+        database queries via MCP (e.g. STRING, UniProt, KEGG, PanglaoDB).
 
         Parameters
         ----------
@@ -968,22 +1178,19 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         Returns
         -------
-        str
-            Complexity classification: 'simple' or 'complex'
+        dict
+            ``{"complexity": "simple"|"complex", "needs_mcp": bool}``
 
         Examples
         --------
-        Simple tasks:
-        - "quality control with nUMI>500"
-        - "normalize data"
-        - "run PCA"
-        - "leiden clustering"
+        Simple, no MCP:
+        - "quality control with nUMI>500"  → {"complexity": "simple", "needs_mcp": False}
 
-        Complex tasks:
-        - "complete bulk RNA-seq DEG analysis pipeline"
-        - "perform spatial deconvolution from start to finish"
-        - "full single-cell preprocessing workflow"
-        - "analyze my data and generate report"
+        Complex, no MCP:
+        - "complete preprocessing pipeline" → {"complexity": "complex", "needs_mcp": False}
+
+        Simple/Complex, needs MCP:
+        - "find TP53 interaction partners"  → {"complexity": "simple", "needs_mcp": True}
         """
 
         # Pattern-based quick classification (fast path, no LLM needed)
@@ -1025,94 +1232,109 @@ User request: "quality control with nUMI>500, mito<0.2"
         simple_score = sum(1 for keyword in simple_keywords if keyword in request_lower)
         function_matches = sum(1 for func in simple_functions if func in request_lower)
 
-        # Pattern-based decision rules
+        # Pattern-based decision rules (fast path — still delegates MCP to LLM below)
+        pattern_complexity = None
         if complex_score >= 2:
-            # Multiple complexity indicators = definitely complex
+            pattern_complexity = 'complex'
             logger.debug(f"Complexity: complex (pattern match, score={complex_score})")
-            return 'complex'
-
-        if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
-            # Short request with function name, no complexity indicators = simple
+        elif function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
-            return 'simple'
-
-        # Report/summary tasks: simple_score keywords indicate non-computational tasks
-        # These should NOT trigger UMAP/MDE visualizations or complex workflows
-        if simple_score >= 2 and complex_score == 0:
-            # Multiple simple indicators (e.g., "plain-language markdown report") = simple
+        elif simple_score >= 2 and complex_score == 0:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (report/summary pattern, simple_score={simple_score})")
-            return 'simple'
-
-        if simple_score >= 1 and complex_score == 0 and function_matches == 0:
-            # Simple task indicator without function match (likely report/summary)
+        elif simple_score >= 1 and complex_score == 0 and function_matches == 0:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (simple keyword match, score={simple_score})")
-            return 'simple'
 
-        # Ambiguous cases: Use LLM for classification
-        logger.debug("Complexity: using LLM classifier for ambiguous request")
+        # If BioContext auto-mode is disabled, skip MCP detection entirely
+        from .agent_config import MCPConfig
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+        bc_setting = mcp_cfg.enable_biocontext
+        skip_mcp_detection = self._biocontext_is_disabled(bc_setting) or self._biocontext_is_eager(bc_setting)
 
-        classification_prompt = f"""You are a task complexity analyzer for bioinformatics workflows.
+        if pattern_complexity and skip_mcp_detection:
+            # Fast path: pattern decided complexity AND MCP detection not needed
+            return {"complexity": pattern_complexity, "needs_mcp": False}
 
-Analyze this user request and classify it as either SIMPLE or COMPLEX:
+        # Use LLM for classification (handles ambiguous complexity AND MCP detection)
+        logger.debug("Using LLM classifier for request analysis")
+
+        # Build the MCP detection clause only when auto-mode is active
+        mcp_clause = ""
+        mcp_response_clause = ""
+        if not skip_mcp_detection:
+            mcp_clause = """
+
+Also determine whether this request needs EXTERNAL BIOMEDICAL DATABASE queries.
+
+NEEDS_MCP = YES when the task requires data that is NOT in the local dataset:
+- Protein-protein interactions (e.g., "interaction partners", "PPI network", "STRING")
+- Protein/gene annotation from databases (e.g., "UniProt", "gene function")
+- Pathway information (e.g., "KEGG pathway", "Reactome", "pathway lookup")
+- Cell-type marker genes from databases (e.g., "PanglaoDB markers", "known markers for T cells")
+- Drug/disease target info (e.g., "Open Targets", "drug target")
+- Literature search (e.g., "search papers", "PubMed", "EuropePMC")
+
+NEEDS_MCP = NO for standard local analysis operations:
+- QC, normalization, PCA, clustering, DEG, visualization, etc.
+- Using marker genes already computed from the user's own data
+- Any operation that only needs the local adata object"""
+
+            mcp_response_clause = ' Then on a NEW LINE, write "mcp:yes" or "mcp:no".'
+
+        classification_prompt = f"""You are a task analyzer for bioinformatics workflows.
+
+Analyze this user request:
 
 Request: "{request}"
 
-Classification rules:
+1. Classify COMPLEXITY as SIMPLE or COMPLEX:
 
 SIMPLE tasks:
 - Single operation or function call
 - One specific action (e.g., "quality control", "normalize", "cluster", "plot")
 - Direct parameter specification (e.g., "with nUMI>500")
-- Examples:
-  - "quality control with nUMI>500, mito<0.2"
-  - "normalize using log transformation"
-  - "run PCA with 50 components"
-  - "leiden clustering with resolution=1.0"
-  - "plot UMAP"
 
 COMPLEX tasks:
 - Multiple steps or operations needed
 - Full workflows or pipelines
-- Phrases like "complete analysis", "full pipeline", "from start to finish"
-- Multiple operations in sequence (e.g., "do X and then Y")
-- Vague requests needing multiple steps (e.g., "analyze my data")
-- Examples:
-  - "complete bulk RNA-seq DEG analysis pipeline"
-  - "full preprocessing workflow for single-cell data"
-  - "spatial deconvolution from start to finish"
-  - "perform clustering and generate visualizations"
-  - "analyze my data and create a report"
+- Multiple operations in sequence
+- Vague requests needing multiple steps
+{mcp_clause}
 
-Respond with ONLY one word: either "simple" or "complex"
+Respond with ONLY "simple" or "complex" on the first line.{mcp_response_clause}
 """
 
         try:
             with self._temporary_api_keys():
                 if not self._llm:
-                    # Fallback to conservative default if LLM unavailable
-                    logger.warning("LLM unavailable for complexity classification, defaulting to 'complex'")
-                    return 'complex'
+                    logger.warning("LLM unavailable for classification, defaulting to 'complex'")
+                    return {"complexity": pattern_complexity or "complex", "needs_mcp": False}
 
                 response_text = await self._llm.run(classification_prompt)
-
-                # Extract classification from response
                 response_clean = response_text.strip().lower()
 
-                if 'simple' in response_clean:
-                    logger.debug(f"Complexity: simple (LLM classified)")
-                    return 'simple'
-                elif 'complex' in response_clean:
-                    logger.debug(f"Complexity: complex (LLM classified)")
-                    return 'complex'
+                # Parse complexity
+                first_line = response_clean.split('\n')[0].strip()
+                if 'simple' in first_line:
+                    complexity = 'simple'
+                elif 'complex' in first_line:
+                    complexity = 'complex'
                 else:
-                    # Unable to parse, default to complex (safer)
-                    logger.warning(f"Could not parse LLM complexity response: {response_text}, defaulting to 'complex'")
-                    return 'complex'
+                    complexity = pattern_complexity or 'complex'
+
+                # Parse MCP need
+                needs_mcp = False
+                if not skip_mcp_detection and 'mcp:yes' in response_clean:
+                    needs_mcp = True
+
+                logger.debug(f"LLM analysis: complexity={complexity}, needs_mcp={needs_mcp}")
+                return {"complexity": complexity, "needs_mcp": needs_mcp}
 
         except Exception as exc:
-            # On any error, default to complex (safer, won't break functionality)
-            logger.warning(f"Complexity classification failed: {exc}, defaulting to 'complex'")
-            return 'complex'
+            logger.warning(f"Task analysis failed: {exc}, defaulting to 'complex'")
+            return {"complexity": pattern_complexity or "complex", "needs_mcp": False}
 
     async def _run_registry_workflow(self, request: str, adata: Any) -> Any:
         """
@@ -1215,6 +1437,7 @@ Now generate code for: "{request}"
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
 
+            await self._ensure_context_fits(priority1_prompt)
             response_text = await self._llm.run(priority1_prompt)
             self.last_usage = self._llm.last_usage
 
@@ -1407,8 +1630,16 @@ Now generate code for: "{request}"
                 f"{skill_guidance_text}\n"
             )
 
-        # Step 3: Build comprehensive prompt (registry + skills)
+        # Step 3: Build comprehensive prompt (registry + skills + MCP)
         functions_info = self._get_available_functions_info()
+
+        mcp_section = ""
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            mcp_section = (
+                "\nExternal Database Tools (MCP):\n"
+                "Use `mcp_call(tool_name, args_dict)` to query external databases.\n"
+                f"{self._mcp_manager.tools_for_llm_prompt()}\n"
+            )
 
         priority2_prompt = f'''You are a workflow orchestrator for OmicVerse. This is a COMPLEX task requiring multiple steps.
 
@@ -1420,6 +1651,7 @@ Dataset info:
 Available OmicVerse Functions (Registry):
 {functions_info}
 {skill_guidance_section}
+{mcp_section}
 
 INSTRUCTIONS:
 1. This is a COMPLEX task - generate a complete multi-step workflow
@@ -1451,6 +1683,7 @@ Now generate a complete workflow for: "{request}"
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
 
+            await self._ensure_context_fits(priority2_prompt)
             response_text = await self._llm.run(priority2_prompt)
             self.last_usage = self._llm.last_usage
 
@@ -2061,6 +2294,7 @@ IMPORTANT:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(review_prompt)
                 response_text = await self._llm.run(review_prompt)
 
                 # Track review token usage
@@ -2264,6 +2498,7 @@ IMPORTANT:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(reflection_prompt)
                 response_text = await self._llm.run(reflection_prompt)
 
                 # Track reflection token usage
@@ -2879,6 +3114,20 @@ if 'batch' in adata.obs.columns:
             sandbox_globals.setdefault("sc", allowed_modules["scanpy"])
         if "omicverse" in allowed_modules:
             sandbox_globals.setdefault("ov", allowed_modules["omicverse"])
+
+        # Inject MCP tool caller if connected
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            _mcp_mgr = self._mcp_manager
+            _bc = self._biocontext
+
+            def mcp_call(tool_name: str, arguments: dict = None):
+                """Call an MCP tool and return the result."""
+                return _mcp_mgr.call(tool_name, arguments or {})
+
+            sandbox_globals["mcp_call"] = mcp_call
+            if _bc:
+                sandbox_globals["biocontext"] = _bc
+
         return sandbox_globals
 
     def _detect_direct_python_request(self, request: str) -> Optional[str]:
@@ -3002,11 +3251,22 @@ if 'batch' in adata.obs.columns:
         if self.provider == "python":
             raise ValueError("Python provider requires executable Python code in the request.")
 
-        # Step 1: Analyze task complexity
-        print(f"📊 Analyzing task complexity...")
-        complexity = await self._analyze_task_complexity(request)
-        print(f"   Classification: {complexity.upper()}")
+        # Step 1: Analyze task complexity + MCP need (single LLM call)
+        print(f"📊 Analyzing task...")
+        analysis = await self._analyze_task_complexity(request)
+        complexity = analysis["complexity"]
+        needs_mcp = analysis.get("needs_mcp", False)
+        print(f"   Complexity: {complexity.upper()}")
+        if needs_mcp:
+            print(f"   External databases: needed")
         print()
+
+        # Step 1b: Auto-connect BioContext if the LLM determined it's needed
+        if needs_mcp:
+            bc_already = self._biocontext and self._biocontext.is_connected
+            if not bc_already:
+                print(f"🔗 External database query detected — connecting BioContext MCP...")
+                self._lazy_connect_biocontext()
 
         # Track which priority was used for metrics
         priority_used = None
@@ -3151,6 +3411,7 @@ Example workflow:
         with self._temporary_api_keys():
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
+            await self._ensure_context_fits(code_generation_request)
             response_text = await self._llm.run(code_generation_request)
             # Copy usage information from backend to agent
             self.last_usage = self._llm.last_usage
@@ -3477,6 +3738,7 @@ Example workflow:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(code_generation_request)
                 async for chunk in self._llm.stream(code_generation_request):
                     response_chunks.append(chunk)
                     yield {'type': 'llm_chunk', 'content': chunk}
@@ -3595,7 +3857,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> agent.run("preprocess data", adata)
         >>> info = agent.get_current_session_info()
         >>> print(f"Session: {info['session_id']}")
@@ -3626,7 +3888,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> agent.run("step 1", adata)
         >>> agent.run("step 2", adata)
         >>> # Force new session
@@ -3662,7 +3924,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> # ... run several prompts causing session restarts ...
         >>> history = agent.get_session_history()
         >>> for session in history:
@@ -3950,6 +4212,13 @@ Example workflow:
             except:
                 pass
 
+        # Cleanup MCP connections
+        if hasattr(self, '_mcp_manager') and self._mcp_manager:
+            try:
+                self._mcp_manager.disconnect_all()
+            except:
+                pass
+
 
 def list_supported_models(show_all: bool = False) -> str:
     """
@@ -3973,7 +4242,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-3-flash-preview", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: str = "auto", biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -3983,7 +4252,7 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gemini-2.5-flash"). Use list_supported_models() to see all options
+        LLM model to use (default: "gemini-3-flash-preview"). Use list_supported_models() to see all options
     api_key : str, optional
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional
@@ -4014,6 +4283,16 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         selective context retrieval. Default: True.
     context_storage_dir : str, optional
         Directory for storing context files. Defaults to ~/.ovagent/context/
+    mcp_servers : list[dict], optional
+        List of MCP server connection dicts, each with keys like
+        ``{"name": "biocontext", "url": "https://mcp.biocontext.ai/mcp/"}``.
+    enable_biocontext : str, optional
+        BioContext connection strategy (default: ``"auto"``).
+        ``"auto"`` — connect lazily when a query needs external databases.
+        ``True`` / ``"yes"`` — connect eagerly at Agent init.
+        ``False`` / ``"no"`` — never connect.
+    biocontext_mode : str, optional
+        BioContext connection mode: "remote", "local", or "auto" (default: "remote").
 
     Returns
     -------
@@ -4062,6 +4341,29 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     >>> info = agent.get_current_session_info()
     >>> print(f"Session: {info['session_id']}, Prompts: {info['prompt_count']}/{info['max_prompts']}")
     """
+    # Build config with MCP settings if not already provided
+    if config is None:
+        config = AgentConfig.from_flat_kwargs(
+            model=model,
+            api_key=api_key,
+            endpoint=endpoint,
+            enable_reflection=enable_reflection,
+            reflection_iterations=reflection_iterations,
+            enable_result_review=enable_result_review,
+            use_notebook_execution=use_notebook_execution,
+            max_prompts_per_session=max_prompts_per_session,
+            notebook_storage_dir=notebook_storage_dir,
+            keep_execution_notebooks=keep_execution_notebooks,
+            notebook_timeout=notebook_timeout,
+            strict_kernel_validation=strict_kernel_validation,
+            enable_filesystem_context=enable_filesystem_context,
+            context_storage_dir=context_storage_dir,
+            mcp_servers=mcp_servers,
+            enable_biocontext=enable_biocontext,
+            biocontext_mode=biocontext_mode,
+        )
+        config.verbose = verbose
+
     return OmicVerseAgent(
         model=model,
         api_key=api_key,
