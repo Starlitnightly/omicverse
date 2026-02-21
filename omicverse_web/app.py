@@ -485,6 +485,7 @@ def execute_code_stream():
 from utils.adata_helpers import (
     analyze_data_state as _analyze_data_state,
     canonical_embedding_keys as _canonical_embedding_keys,
+    resolve_embedding_key as _resolve_embedding_key,
 )
 
 
@@ -887,18 +888,29 @@ def get_status():
     """Return current adata state so the frontend can restore UI after a page refresh."""
     if state.current_adata is None:
         return jsonify({'loaded': False})
+    import numpy as _np_stat
+    adata_stat = state.current_adata
+    # Build obsm_ndims: {key: ndim} for the custom axis dim picker
+    obsm_ndims = {}
+    for k, v in adata_stat.obsm.items():
+        try:
+            arr = _np_stat.asarray(v)
+            obsm_ndims[k] = int(arr.shape[1]) if arr.ndim >= 2 else 1
+        except Exception:
+            obsm_ndims[k] = 2
     return jsonify({
         'loaded':        True,
         'filename':      state.current_filename or 'data.h5ad',
-        'n_cells':       state.current_adata.n_obs,
-        'n_genes':       state.current_adata.n_vars,
-        'embeddings':    _canonical_embedding_keys(state.current_adata),
-        'obs_columns':   list(state.current_adata.obs.columns),
-        'var_columns':   list(state.current_adata.var.columns),
-        'uns_keys':      list(state.current_adata.uns.keys()),
-        'layers':        list(state.current_adata.layers.keys()),
-        'data_state':    _analyze_data_state(state.current_adata),
+        'n_cells':       adata_stat.n_obs,
+        'n_genes':       adata_stat.n_vars,
+        'embeddings':    _canonical_embedding_keys(adata_stat),
+        'obs_columns':   list(adata_stat.obs.columns),
+        'var_columns':   list(adata_stat.var.columns),
+        'uns_keys':      list(adata_stat.uns.keys()),
+        'layers':        list(adata_stat.layers.keys()),
+        'data_state':    _analyze_data_state(adata_stat),
         'preview_mode':  getattr(state, 'is_preview_mode', False),
+        'obsm_ndims':    obsm_ndims,
     })
 
 
@@ -2039,21 +2051,41 @@ def plot_data_legacy():
 
         data_req = request.json
         embedding = data_req.get('embedding', '')
+        x_axis_str = data_req.get('x_axis', '')
+        y_axis_str = data_req.get('y_axis', '')
         color_by = data_req.get('color_by', '')
         palette = data_req.get('palette', None)
         category_palette = data_req.get('category_palette', None)
         vmin = data_req.get('vmin', None)
         vmax = data_req.get('vmax', None)
 
-        if not embedding:
-            return jsonify({'error': 'No embedding specified'}), 400
+        if x_axis_str and y_axis_str:
+            # ── Custom axes path ─────────────────────────────────────────────
+            adata = state.current_adata
+            x_raw_np, x_label = _resolve_axis(adata, x_axis_str)
+            y_raw_np, y_label = _resolve_axis(adata, y_axis_str)
+            import numpy as _np2
+            x_raw = _np2.asarray(x_raw_np, dtype=float).tolist()
+            y_raw = _np2.asarray(y_raw_np, dtype=float).tolist()
+            axis_labels = {'x': x_label, 'y': y_label}
+        elif embedding == 'random':
+            # ── Random layout ────────────────────────────────────────────────
+            import numpy as _np2
+            n_cells_r = state.current_adata.n_obs
+            _rng = _np2.random.default_rng(42)
+            x_raw = _rng.standard_normal(n_cells_r).tolist()
+            y_raw = _rng.standard_normal(n_cells_r).tolist()
+            axis_labels = {'x': 'Random 1', 'y': 'Random 2'}
+        elif embedding:
+            # ── Default embedding path ───────────────────────────────────────
+            fbs_data = state.current_adaptor.get_embedding_fbs(embedding)
+            coords_df = decode_matrix_fbs(fbs_data)
+            x_raw = coords_df['x'].tolist()
+            y_raw = coords_df['y'].tolist()
+            axis_labels = None
+        else:
+            return jsonify({'error': 'No embedding or axis specified'}), 400
 
-        # Get embedding data
-        fbs_data = state.current_adaptor.get_embedding_fbs(embedding)
-        coords_df = decode_matrix_fbs(fbs_data)
-
-        x_raw = coords_df['x'].tolist()
-        y_raw = coords_df['y'].tolist()
         n_cells = len(x_raw)
 
         # ── For large datasets apply spatial decimation ────────────────────────
@@ -2076,6 +2108,8 @@ def plot_data_legacy():
             'n_total': n_cells,
             'n_shown': len(x_raw),
         }
+        if axis_labels:
+            plot_data['axis_labels'] = axis_labels
 
         # Helper: sub-select a full-length array by kept_indices (if decimated)
         def _subset(arr):
@@ -2166,6 +2200,74 @@ def plot_data_legacy():
 
 # Number of cells above which we switch to raster / decimation mode.
 _LARGE_DATASET_THRESHOLD = 200_000
+
+
+def _resolve_axis(adata, axis_str: str):
+    """Resolve an axis descriptor string to a 1-D numpy float array.
+
+    Supported formats
+    -----------------
+    ``obsm:<key>:<dim>``   – slice of adata.obsm[key][:, dim]
+    ``obs:<col>``          – adata.obs[col].values (numeric only)
+    ``gene:<name>``        – expression vector for a single gene
+
+    Returns (values_1d_np, label_str).
+    Raises ValueError with a user-friendly message on failure.
+    """
+    import numpy as _np
+    import scipy.sparse as _sp
+
+    parts = axis_str.split(':')
+    src = parts[0]
+
+    if src == 'obsm':
+        if len(parts) < 3:
+            raise ValueError(f'Invalid obsm axis spec: "{axis_str}". Expected obsm:<key>:<dim>')
+        key = ':'.join(parts[1:-1])
+        dim = int(parts[-1])
+        key = _resolve_embedding_key(adata, key) or key
+        if key not in adata.obsm:
+            raise ValueError(f'obsm key "{key}" not found in adata.obsm')
+        arr = adata.obsm[key]
+        if hasattr(arr, 'toarray'):
+            arr = arr.toarray()
+        arr = _np.asarray(arr, dtype=float)
+        if arr.ndim == 1:
+            return arr, f'{key}'
+        if dim >= arr.shape[1]:
+            raise ValueError(f'Dimension {dim} out of range for obsm "{key}" (shape {arr.shape})')
+        label = (key[2:] if key.startswith('X_') else key).upper() + f'_{dim + 1}'
+        return arr[:, dim], label
+
+    elif src == 'obs':
+        if len(parts) < 2:
+            raise ValueError(f'Invalid obs axis spec: "{axis_str}". Expected obs:<col>')
+        col = ':'.join(parts[1:])
+        if col not in adata.obs.columns:
+            raise ValueError(f'obs column "{col}" not found')
+        vals = adata.obs[col]
+        try:
+            return _np.asarray(vals, dtype=float), col
+        except (ValueError, TypeError):
+            raise ValueError(f'obs column "{col}" is not numeric and cannot be used as an axis')
+
+    elif src == 'gene':
+        if len(parts) < 2:
+            raise ValueError(f'Invalid gene axis spec: "{axis_str}". Expected gene:<name>')
+        gene = ':'.join(parts[1:])
+        if gene not in adata.var_names:
+            raise ValueError(f'Gene "{gene}" not found in adata.var_names')
+        gi = list(adata.var_names).index(gene)
+        X = adata.X
+        if _sp.issparse(X):
+            vals = _np.asarray(X[:, gi].todense()).flatten()
+        else:
+            vals = _np.asarray(X[:, gi], dtype=float).flatten()
+        return vals, gene
+
+    else:
+        raise ValueError(f'Unknown axis source "{src}". Use obsm, obs, or gene.')
+
 
 def _spatial_decimate(x, y, colors, target_n=150_000):
     """Grid-based spatial decimation that preserves cluster structure.
@@ -2446,20 +2548,37 @@ def plot_gpu():
 
         req            = request.json or {}
         embedding      = req.get('embedding', '')
+        x_axis_str     = req.get('x_axis', '')
+        y_axis_str     = req.get('y_axis', '')
         color_by       = req.get('color_by', '')
         palette        = req.get('palette', 'viridis')
         cat_pal        = req.get('category_palette', None)
         vmin_req       = req.get('vmin', None)
         vmax_req       = req.get('vmax', None)
 
-        if not embedding:
-            return jsonify({'error': 'embedding required'}), 400
-
         # ── positions ─────────────────────────────────────────────────────────
-        fbs_data  = state.current_adaptor.get_embedding_fbs(embedding)
-        coords_df = decode_matrix_fbs(fbs_data)
-        x_all = _np.asarray(coords_df['x'], dtype=_np.float32)
-        y_all = _np.asarray(coords_df['y'], dtype=_np.float32)
+        if x_axis_str and y_axis_str:
+            adata = state.current_adata
+            x_arr, x_label = _resolve_axis(adata, x_axis_str)
+            y_arr, y_label = _resolve_axis(adata, y_axis_str)
+            x_all = _np.asarray(x_arr, dtype=_np.float32)
+            y_all = _np.asarray(y_arr, dtype=_np.float32)
+            axis_labels = {'x': x_label, 'y': y_label}
+        elif embedding == 'random':
+            _rng2 = _np.random.default_rng(42)
+            n_r   = state.current_adata.n_obs
+            x_all = _rng2.standard_normal(n_r).astype(_np.float32)
+            y_all = _rng2.standard_normal(n_r).astype(_np.float32)
+            axis_labels = {'x': 'Random 1', 'y': 'Random 2'}
+        elif embedding:
+            fbs_data  = state.current_adaptor.get_embedding_fbs(embedding)
+            coords_df = decode_matrix_fbs(fbs_data)
+            x_all = _np.asarray(coords_df['x'], dtype=_np.float32)
+            y_all = _np.asarray(coords_df['y'], dtype=_np.float32)
+            axis_labels = None
+        else:
+            return jsonify({'error': 'embedding or x_axis/y_axis required'}), 400
+
         n = len(x_all)
 
         # interleaved x,y float32
@@ -2478,6 +2597,8 @@ def plot_gpu():
             'category_labels': None,
             'colorscale':      None,
         }
+        if axis_labels:
+            meta['axis_labels'] = axis_labels
 
         if color_by.startswith('obs:'):
             col_name = color_by[4:]

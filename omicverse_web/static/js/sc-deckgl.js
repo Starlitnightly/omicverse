@@ -232,6 +232,15 @@
         this.deckgl.setProps({ layers: [this._makeLayer(this._positions, this._colors)] });
     };
 
+    /**
+     * updateColors – apply a pre-built color buffer without touching this._colors.
+     * Used by the legend filter so the original colors survive for animation blending.
+     */
+    DeckGLRenderer.prototype.updateColors = function (filteredColors) {
+        if (!this._positions) return;
+        this.deckgl.setProps({ layers: [this._makeLayer(this._positions, filteredColors)] });
+    };
+
     // ------------------------------------------------------------------
     // _fitView – zoom/pan to show all points
     // ------------------------------------------------------------------

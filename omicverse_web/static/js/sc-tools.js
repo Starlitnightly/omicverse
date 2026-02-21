@@ -1865,6 +1865,8 @@ Object.assign(SingleCellAnalysis.prototype, {
             document.getElementById('data-status').classList.add('d-none');
             document.getElementById('viz-controls').style.display = 'none';
             document.getElementById('viz-panel').style.display = 'none';
+            const _lp2 = document.getElementById('viz-legend-panel');
+            if (_lp2) _lp2.style.display = 'none';
             document.getElementById('analysis-log').innerHTML = `<div class="text-muted">${this.t('panel.waitingUpload')}</div>`;
             document.getElementById('fileInput').value = '';
             const previewInput = document.getElementById('fileInputPreview');

@@ -154,6 +154,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         document.getElementById('data-status').classList.add('d-none');
         document.getElementById('viz-controls').style.display = 'none';
         document.getElementById('viz-panel').style.display = 'none';
+        const _lp = document.getElementById('viz-legend-panel');
+        if (_lp) _lp.style.display = 'none';
         this.updatePreviewModeBanner(false);
         this.addToLog(this.t('preview.switchHint') || '请在左侧"分析读取模式"区域重新上传文件以完整加载数据。');
     },

@@ -12,7 +12,9 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     updatePlot() {
         const embedding = document.getElementById('embedding-select').value;
-        if (!embedding) return;
+        // Allow plotting even without a preset embedding if custom axes are active
+        const xyAxes = this.getXYAxes ? this.getXYAxes() : null;
+        if (!embedding && !xyAxes) return;
 
         // Gene expression takes priority: if gene-input has a value use it,
         // regardless of what color-select says.
@@ -32,7 +34,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
 
         if (useDeck) {
-            this.createDeckGLPlot(embedding, colorBy);
+            this.createDeckGLPlot(embedding, colorBy, xyAxes);
             return;
         }
 
@@ -41,10 +43,45 @@ Object.assign(SingleCellAnalysis.prototype, {
         const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
 
         if (hasExistingPlot) {
-            this.updatePlotWithAnimation(embedding, colorBy);
+            this.updatePlotWithAnimation(embedding, colorBy, xyAxes);
         } else {
-            this.createNewPlot(embedding, colorBy);
+            this.createNewPlot(embedding, colorBy, xyAxes);
         }
+    },
+
+    /**
+     * Build the base payload for /api/plot.
+     * Injects x_axis/y_axis when custom axes are active; otherwise uses embedding.
+     */
+    _buildPlotPayload(embedding, colorBy, xyAxes) {
+        const paletteSelect = document.getElementById('palette-select');
+        const categoryPaletteSelect = document.getElementById('category-palette-select');
+        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
+        const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
+        const vminInput = document.getElementById('vmin-input');
+        const vmaxInput = document.getElementById('vmax-input');
+        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
+        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
+
+        const payload = {
+            color_by: colorBy,
+            palette: palette,
+            category_palette: categoryPalette,
+            vmin: vmin,
+            vmax: vmax,
+        };
+
+        if (xyAxes) {
+            // Custom axes override the embedding
+            payload.x_axis = xyAxes.x_axis;
+            payload.y_axis = xyAxes.y_axis;
+            // Also pass embedding for backward compat / axis label
+            payload.embedding = embedding;
+        } else {
+            payload.embedding = embedding;
+        }
+
+        return payload;
     },
 
     updatePaletteVisibility(colorBy) {
@@ -76,35 +113,14 @@ Object.assign(SingleCellAnalysis.prototype, {
         this.updatePlot();
     },
 
-    createNewPlot(embedding, colorBy) {
+    createNewPlot(embedding, colorBy, xyAxes) {
         this.currentEmbedding = this.currentEmbedding;
         this.showStatus(this.t('plot.generating'), true);
 
-        // Get selected palettes
-        const paletteSelect = document.getElementById('palette-select');
-        const categoryPaletteSelect = document.getElementById('category-palette-select');
-        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
-        const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
-
-        // Get vmin/vmax values
-        const vminInput = document.getElementById('vmin-input');
-        const vmaxInput = document.getElementById('vmax-input');
-        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
-        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
-
         fetch('/api/plot', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                embedding: embedding,
-                color_by: colorBy,
-                palette: palette,
-                category_palette: categoryPalette,
-                vmin: vmin,
-                vmax: vmax
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this._buildPlotPayload(embedding, colorBy, xyAxes))
         })
         .then(response => response.json())
         .then(data => {
@@ -115,6 +131,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             } else {
                 this.plotData(data);
                 this.currentEmbedding = embedding;
+                this._currentAxesKey = xyAxes ? `${xyAxes.x_axis}|${xyAxes.y_axis}` : embedding;
                 this.showStatus(this.t('plot.done'), false);
             }
         })
@@ -125,47 +142,33 @@ Object.assign(SingleCellAnalysis.prototype, {
         });
     },
 
-    updatePlotWithAnimation(embedding, colorBy) {
+    updatePlotWithAnimation(embedding, colorBy, xyAxes) {
         // Route to deck.gl when forced or when dataset is large
         const nCells  = this.currentData ? (this.currentData.n_cells || 0) : 0;
         const useDeck = this._forceRenderer === 'deckgl'
             || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
         if (useDeck) {
-            this.createDeckGLPlot(embedding, colorBy);
+            this.createDeckGLPlot(embedding, colorBy, xyAxes);
             return;
         }
 
-        const isEmbeddingChange = (this.currentEmbedding !== embedding);
+        // Build a full coordinate identity key that includes custom axes.
+        // This ensures switching obs/gene axes is treated as a position change,
+        // even when the embedding-select value hasn't changed.
+        const axesKey = xyAxes ? `${xyAxes.x_axis}|${xyAxes.y_axis}` : embedding;
+        const isEmbeddingChange = (this._currentAxesKey !== undefined)
+            ? (this._currentAxesKey !== axesKey)
+            : (this.currentEmbedding !== embedding);
+
         this.showStatus(
             isEmbeddingChange ? this.t('plot.switchEmbedding') : this.t('plot.updateColor'),
             true
         );
 
-        // Get selected palettes
-        const paletteSelect = document.getElementById('palette-select');
-        const categoryPaletteSelect = document.getElementById('category-palette-select');
-        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
-        const categoryPalette = categoryPaletteSelect && categoryPaletteSelect.value !== 'default' ? categoryPaletteSelect.value : null;
-
-        // Get vmin/vmax values
-        const vminInput = document.getElementById('vmin-input');
-        const vmaxInput = document.getElementById('vmax-input');
-        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
-        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
-
         fetch('/api/plot', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                embedding: embedding,
-                color_by: colorBy,
-                palette: palette,
-                category_palette: categoryPalette,
-                vmin: vmin,
-                vmax: vmax
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this._buildPlotPayload(embedding, colorBy, xyAxes))
         })
         .then(response => response.json())
         .then(data => {
@@ -187,6 +190,8 @@ Object.assign(SingleCellAnalysis.prototype, {
                             this.plotData(data);
                         } else {
                             this.updateColorsOnly(data);
+                            // Ensure axis labels are updated even in color-only mode
+                            this._applyAxisLabels(data);
                         }
                     }
                     this.showStatus(this.t('plot.colorUpdated'), false);
@@ -210,6 +215,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                     const minLen = Math.min(curX.length, (data.x||[]).length);
                     this.animatePositionTransitionForAnyData(curX, curY, data, minLen);
                     this.currentEmbedding = embedding;
+                    this._currentAxesKey = axesKey;
                     this.showStatus(this.t('plot.embeddingSwitched'), false);
                 }
             }
@@ -219,6 +225,22 @@ Object.assign(SingleCellAnalysis.prototype, {
             this.addToLog(`${this.t('plot.failedPrefix')}: ${error.message}`, 'error');
             this.showStatus(`${this.t('plot.failedPrefix')}: ${error.message}`, false);
         });
+    },
+
+    /**
+     * Update Plotly axis titles from data.axis_labels without a full redraw.
+     * Called after color-only updates to keep axis titles in sync.
+     */
+    _applyAxisLabels(data) {
+        if (!data || !data.axis_labels) return;
+        this._currentAxisLabels = data.axis_labels;
+        const axLbls = data.axis_labels;
+        try {
+            Plotly.relayout('plotly-div', {
+                'xaxis.title': axLbls.x || 'Dimension 1',
+                'yaxis.title': axLbls.y || 'Dimension 2',
+            });
+        } catch (e) { /* ignore if no plot yet */ }
     },
 
     animatePlotTransition(data) {
@@ -307,12 +329,13 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (data.colors) {
             markerConfig.color = data.colors;
             markerConfig.colorscale = data.colorscale || 'Viridis';
-            markerConfig.showscale = true;
-            markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
+            markerConfig.showscale = false; // colorbar shown in custom panel below
         } else {
             markerConfig.color = 'blue';
             markerConfig.showscale = false;
         }
+        // Update the custom legend panel
+        this._renderLegendPanel(data, 'plotly');
         
         // 使用平滑的颜色过渡
         const duration = 300;
@@ -638,6 +661,9 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     plotData(data) {
+        // Stash axis labels so getPlotlyLayout() can use them
+        this._currentAxisLabels = data.axis_labels || null;
+
         // Show decimation notice when backend returned a subset
         if (data.decimated) {
             const shown = data.n_shown ? Math.round(data.n_shown / 1000) : '?';
@@ -689,7 +715,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                             y: categoryY,
                             mode: 'markers',
                             type: 'scattergl',
-                            name: category, // 设置trace名称，这将显示在legend中
+                            name: category,
                             marker: {
                                 color: color,
                                 size: this.getMarkerSize(),
@@ -697,18 +723,17 @@ Object.assign(SingleCellAnalysis.prototype, {
                             },
                             text: categoryText,
                             hovertemplate: '%{text}<extra></extra>',
-                            showlegend: true // 启用legend显示
+                            showlegend: false // Legend rendered in custom panel below chart
                         };
 
                         traces.push(trace);
                     }
                 }
             } else {
-                // 数值数据：使用连续颜色映射
+                // 数值数据：使用连续颜色映射 (colorbar rendered in custom panel below)
                 markerConfig.color = data.colors;
                 markerConfig.colorscale = data.colorscale || 'Viridis';
-                markerConfig.showscale = true;
-                markerConfig.colorbar = data.color_label ? {title: data.color_label} : undefined;
+                markerConfig.showscale = false;
 
                 // Apply cmin/cmax if specified
                 if (data.cmin !== undefined) {
@@ -778,53 +803,243 @@ Object.assign(SingleCellAnalysis.prototype, {
             traces.push(defaultTrace);
         }
         
-        console.log('Plotting traces:', traces.length, 'traces');
-        console.log('First trace sample:', traces[0] ? {
-            x_length: traces[0].x ? traces[0].x.length : 0,
-            y_length: traces[0].y ? traces[0].y.length : 0,
-            marker: traces[0].marker
-        } : 'no traces');
-
-        // 直接使用 Plotly.react 来确保legend正确更新
+        // 直接使用 Plotly.react 来确保正确更新
         Plotly.react('plotly-div', traces, layout, config);
+
+        // Render custom legend panel below the chart
+        this._renderLegendPanel(data, 'plotly');
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Custom Legend Panel  (below the visualization canvas)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** OmicVerse default categorical palette (matches backend). */
+    _OV_SC_COLOR: [
+        '#1F577B','#A56BA7','#E0A7C8','#E069A6','#941456',
+        '#FCBC10','#EF7B77','#279AD7','#F0EEF0','#EAEFC5',
+        '#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED',
+        '#866017','#9F987F','#E0DFED','#01A0A7','#75C8CC',
+        '#F0D7BC','#D5B26C','#D5DA48','#B6B812','#9DC3C3',
+        '#A89C92','#FEE00C','#FEF2A1',
+    ],
+
+    /**
+     * Render the custom HTML legend below the visualization.
+     * @param {object} data   – Plotly data object OR deck.gl meta object
+     * @param {string} renderer – 'plotly' | 'deckgl'
+     */
+    _renderLegendPanel(data, renderer) {
+        const panel   = document.getElementById('viz-legend-panel');
+        const content = document.getElementById('viz-legend-content');
+        if (!panel || !content) return;
+
+        // Normalise field names between Plotly (data.*) and deck.gl (meta.*)
+        const isCategorical  = !!(data.category_labels && data.category_labels.length);
+        const isContinuous   = !isCategorical && !!(data.colorscale || data.colors);
+        const colorLabel     = data.color_label || '';
+        const catLabels      = data.category_labels  || [];
+        const catColors      = data.category_colors  || data.discrete_colors || null;
+        const colorscaleName = data.colorscale || 'viridis';
+        const vmin           = (data.vmin !== undefined && data.vmin !== null) ? data.vmin.toFixed(3) : '';
+        const vmax           = (data.vmax !== undefined && data.vmax !== null) ? data.vmax.toFixed(3) : '';
+
+        // Reset selection state when new data arrives
+        this._legendRenderer  = renderer;
+        this._legendData      = data;
+        this._legendSelected  = new Set();
+
+        content.innerHTML = '';
+
+        if (!isCategorical && !isContinuous) {
+            panel.style.display = 'none';
+            return;
+        }
+        panel.style.display = '';
+
+        // Optional label prefix
+        if (colorLabel) {
+            const lbl = document.createElement('span');
+            lbl.className = 'fw-semibold small text-muted me-2 flex-shrink-0';
+            lbl.textContent = colorLabel + ':';
+            content.appendChild(lbl);
+        }
+
+        if (isCategorical) {
+            catLabels.forEach((label, idx) => {
+                const color = (catColors && catColors[idx])
+                    || this._OV_SC_COLOR[idx % this._OV_SC_COLOR.length];
+                const chip = document.createElement('div');
+                chip.className = 'legend-chip';
+                chip.dataset.legendIdx = idx;
+                chip.innerHTML =
+                    `<span class="legend-dot" style="background:${color};border-color:rgba(0,0,0,.15);"></span>` +
+                    `<span>${label}</span>`;
+                chip.addEventListener('click', () => this._onLegendItemClick(idx));
+                content.appendChild(chip);
+            });
+        } else {
+            // Horizontal continuous colorbar
+            const grad = this._colormapGradientH(colorscaleName);
+            const wrap = document.createElement('div');
+            wrap.className = 'legend-colorbar-wrap';
+            wrap.innerHTML =
+                `<span class="legend-colorbar-val text-end">${vmin}</span>` +
+                `<div class="legend-colorbar-bar" style="background:${grad};"></div>` +
+                `<span class="legend-colorbar-val">${vmax}</span>`;
+            content.appendChild(wrap);
+        }
+    },
+
+    /**
+     * Handle a legend chip click – toggle selection, update visuals, filter plot.
+     */
+    _onLegendItemClick(idx) {
+        if (!this._legendSelected) this._legendSelected = new Set();
+        if (this._legendSelected.has(idx)) {
+            this._legendSelected.delete(idx);
+        } else {
+            this._legendSelected.add(idx);
+        }
+        this._updateLegendChipStates();
+        this._applyLegendFilter();
+    },
+
+    /** Sync the visual state (dim/selected) of legend chips to _legendSelected. */
+    _updateLegendChipStates() {
+        const chips        = document.querySelectorAll('#viz-legend-content .legend-chip');
+        const hasSelection = this._legendSelected && this._legendSelected.size > 0;
+        chips.forEach(chip => {
+            const idx        = parseInt(chip.dataset.legendIdx);
+            const isSelected = !hasSelection || this._legendSelected.has(idx);
+            chip.classList.toggle('legend-chip--dim',      !isSelected);
+            chip.classList.toggle('legend-chip--selected', isSelected && hasSelection);
+        });
+    },
+
+    /** Apply the current legend selection as a dim filter to Plotly or deck.gl. */
+    _applyLegendFilter() {
+        if (this._legendRenderer === 'plotly') {
+            this._applyPlotlyLegendFilter();
+        } else if (this._legendRenderer === 'deckgl') {
+            this._applyDeckGLLegendFilter();
+        }
+    },
+
+    _applyPlotlyLegendFilter() {
+        const plotDiv = document.getElementById('plotly-div');
+        if (!plotDiv || !plotDiv.data) return;
+        const hasSelection = this._legendSelected && this._legendSelected.size > 0;
+        const baseOpacity  = this.getMarkerOpacity() || 0.8;
+        const dimOpacity   = 0.05;
+
+        // Map trace index → category index.
+        // Because plotData creates traces in category order, traceIdx === categoryIdx
+        // for the traces that were created (skipped empty categories shift things).
+        // We stored category info in _legendData — use the catLabels order.
+        const catLabels = (this._legendData && this._legendData.category_labels) || [];
+
+        // Build a lookup: trace.name → category index
+        let traceOpacities = [];
+        let catIdx = 0;
+        for (let ti = 0; ti < plotDiv.data.length; ti++) {
+            const traceName  = plotDiv.data[ti].name || '';
+            const foundIdx   = catLabels.indexOf(traceName);
+            const selected   = !hasSelection || (foundIdx >= 0 && this._legendSelected.has(foundIdx));
+            traceOpacities.push(selected ? baseOpacity : dimOpacity);
+        }
+
+        traceOpacities.forEach((op, ti) => {
+            Plotly.restyle('plotly-div', { 'marker.opacity': op }, [ti]);
+        });
+    },
+
+    _applyDeckGLLegendFilter() {
+        const dr = this._deckglRenderer;
+        if (!dr || !dr._hoverValues || !dr._colors) return;
+        const hov          = dr._hoverValues;
+        const origColors   = dr._colors;   // _colors is never modified by updateColors → always original
+        const n            = dr._n;
+        const hasSelection = this._legendSelected && this._legendSelected.size > 0;
+
+        if (!hasSelection) {
+            // Restore original colors
+            dr.updateColors(origColors);
+            return;
+        }
+
+        const filteredColors = new Uint8Array(origColors); // copy
+        for (let i = 0; i < n; i++) {
+            const code = Math.round(hov[i]);
+            if (!this._legendSelected.has(code)) {
+                filteredColors[i * 4]     = 180;
+                filteredColors[i * 4 + 1] = 180;
+                filteredColors[i * 4 + 2] = 180;
+                filteredColors[i * 4 + 3] = 35;
+            }
+        }
+        dr.updateColors(filteredColors);
+    },
+
+    /**
+     * Return a horizontal (left→right) CSS linear-gradient for a named colormap.
+     * Low values on the left, high on the right.
+     */
+    _colormapGradientH(name) {
+        const maps = {
+            viridis:  '#440154,#482878,#3e4989,#31688e,#26828e,#1f9e89,#35b779,#6ece58,#b5de2b,#fde725',
+            plasma:   '#0d0887,#46039f,#7201a8,#9c179e,#bd3786,#d8576b,#ed7953,#fb9f3a,#fdcf18,#f0f921',
+            magma:    '#000004,#1b1044,#3b0f70,#641a80,#8c2981,#b5367a,#de4968,#f7705c,#fe9f6d,#fcfdbf',
+            inferno:  '#000004,#1f0c48,#550f6d,#88226a,#ac5765,#cc7b5c,#e69c5b,#f4c86a,#f8e88e,#fcffa4',
+            cividis:  '#002051,#0b307f,#35499d,#5762ad,#767ab5,#9592bb,#b4adc6,#d3cade,#ede0c6,#fee8a0',
+            coolwarm: '#3b4cc0,#6688ee,#98b4fa,#c9d8ef,#eddbc7,#f7a789,#e36a53,#b40426',
+            RdYlBu:   '#d73027,#f46d43,#fdae61,#fee090,#ffffbf,#e0f3f8,#abd9e9,#74add1,#4575b4',
+            RdBu:     '#ca0020,#f4a582,#f7f7f7,#92c5de,#0571b0',
+            bwr:      '#0000ff,#ffffff,#ff0000',
+            hot:      '#000000,#ff0000,#ffff00,#ffffff',
+            Blues:    '#f7fbff,#deebf7,#c6dbef,#9ecae1,#6baed6,#4292c6,#2171b5,#08519c,#08306b',
+            Reds:     '#fff5f0,#fee0d2,#fcbba1,#fc9272,#fb6a4a,#ef3b2c,#cb181d,#a50f15,#67000d',
+            Greens:   '#f7fcf5,#e5f5e0,#c7e9c0,#a1d99b,#74c476,#41ab5d,#238b45,#006d2c,#00441b',
+            YlOrRd:   '#ffffcc,#ffeda0,#fed976,#feb24c,#fd8d3c,#fc4e2a,#e31a1c,#bd0026,#800026',
+            Spectral: '#9e0142,#d53e4f,#f46d43,#fdae61,#fee08b,#ffffbf,#e6f598,#abdda4,#66c2a5,#3288bd,#5e4fa2',
+            tab10:    '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
+        };
+        const key   = (name || 'viridis').toLowerCase().replace(/_/g, '');
+        const stops = maps[key] || maps[name] || maps.viridis;
+        return `linear-gradient(to right, ${stops})`;
     },
 
     getPlotlyLayout() {
         const isDark = document.documentElement.classList.contains('app-skin-dark');
         
+        const axLbls = this._currentAxisLabels;
+        const embVal = (document.getElementById('embedding-select') || {}).value || '';
+        const titleText = axLbls
+            ? `${axLbls.x} vs ${axLbls.y}`
+            : (embVal ? embVal.toUpperCase() + ' Plot' : 'Embedding Plot');
+        const xTitle = axLbls ? axLbls.x : 'Dimension 1';
+        const yTitle = axLbls ? axLbls.y : 'Dimension 2';
+        
         const baseLayout = {
             title: {
-                text: document.getElementById('embedding-select').value.toUpperCase() + ' Plot',
+                text: titleText,
                 font: {color: isDark ? '#e5e7eb' : '#283c50'}
             },
             xaxis: {
-                title: 'Dimension 1',
+                title: xTitle,
                 color: isDark ? '#e5e7eb' : '#283c50',
                 gridcolor: isDark ? '#374151' : '#e5e7eb',
                 linecolor: isDark ? '#4b5563' : '#d1d5db'
             },
             yaxis: {
-                title: 'Dimension 2',
+                title: yTitle,
                 color: isDark ? '#e5e7eb' : '#283c50',
                 gridcolor: isDark ? '#374151' : '#e5e7eb',
                 linecolor: isDark ? '#4b5563' : '#d1d5db'
             },
             hovermode: 'closest',
-            showlegend: true, // 启用plotly默认legend
-            legend: {
-                x: 1.02, // 将legend放在图表右侧
-                y: 1,
-                xanchor: 'left',
-                yanchor: 'top',
-                bgcolor: isDark ? 'rgba(31,41,55,0.8)' : 'rgba(255,255,255,0.8)',
-                bordercolor: isDark ? 'rgba(75,85,99,0.3)' : 'rgba(0,0,0,0.1)',
-                borderwidth: 1,
-                font: {
-                    color: isDark ? '#e5e7eb' : '#283c50',
-                    size: 12
-                }
-            },
-            margin: {l: 50, r: 150, t: 50, b: 50} // 为legend留出空间
+            showlegend: false, // Legend is rendered in the custom panel below the chart
+            margin: {l: 50, r: 30, t: 50, b: 50}
         };
 
         if (isDark) {
@@ -1238,7 +1453,7 @@ Object.assign(SingleCellAnalysis.prototype, {
      * /api/plot_gpu and hands it to DeckGLRenderer.
      * Falls back to the old raster PNG path if deck.gl is unavailable.
      */
-    createDeckGLPlot(embedding, colorBy) {
+    createDeckGLPlot(embedding, colorBy, xyAxes) {
         this.showStatus(this.t('plot.generating'), true);
 
         // ── ensure deck.gl container exists ──────────────────────────────────
@@ -1290,8 +1505,15 @@ Object.assign(SingleCellAnalysis.prototype, {
             vmin: (vminEl && vminEl.value) ? parseFloat(vminEl.value) : null,
             vmax: (vmaxEl && vmaxEl.value) ? parseFloat(vmaxEl.value) : null,
         };
+        // Inject custom axes if active
+        if (xyAxes) {
+            body.x_axis = xyAxes.x_axis;
+            body.y_axis = xyAxes.y_axis;
+        }
 
-        const isEmbeddingChange = this._deckglCurrentEmbedding !== embedding;
+        // Use a combined key so that switching custom axes also triggers a full refetch
+        const axesKey = xyAxes ? `${xyAxes.x_axis}|${xyAxes.y_axis}` : embedding;
+        const isEmbeddingChange = this._deckglCurrentEmbedding !== axesKey;
         const hasExisting       = this._deckglRenderer._positions !== null;
 
         // ── color-only update: skip position fetch/encode (3× faster) ────────
@@ -1349,7 +1571,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             }
 
             this._updateDeckGLLegend(wrap, meta);
-            this._deckglCurrentEmbedding = embedding;
+            this._deckglCurrentEmbedding = axesKey;
             this._deckglCurrentColorBy   = colorBy;
 
             const action = isEmbeddingChange ? this.t('plot.embeddingSwitched') : this.t('plot.done');
@@ -1361,7 +1583,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         });
     },
 
-    /** Build badge + legend + control-bar overlays inside the deck.gl wrapper. */
+    /** Build badge + control-bar overlays inside the deck.gl wrapper.
+     *  Legend is now rendered in the shared #viz-legend-panel below the chart. */
     _buildDeckGLOverlays(wrap) {
         const self = this;
 
@@ -1375,18 +1598,6 @@ Object.assign(SingleCellAnalysis.prototype, {
         ].join('');
         badge.textContent = 'WebGL · deck.gl';
         wrap.appendChild(badge);
-
-        // Categorical legend (top-right)
-        const legend = document.createElement('div');
-        legend.id = 'deckgl-legend';
-        legend.style.cssText = [
-            'position:absolute; top:6px; right:8px; z-index:10;',
-            'max-height:70%; overflow-y:auto; display:none;',
-            'font-size:0.7rem; background:rgba(var(--bs-body-bg-rgb,255,255,255),0.9);',
-            'border:1px solid var(--bs-border-color,#dee2e6); border-radius:5px;',
-            'padding:4px 8px;',
-        ].join('');
-        wrap.appendChild(legend);
 
         // Control bar (bottom-right): switch to Plotly
         const mkBtn = (label, title, onClick) => {
@@ -1406,93 +1617,14 @@ Object.assign(SingleCellAnalysis.prototype, {
         wrap.appendChild(bar);
     },
 
-    /** Update the categorical legend panel in the deck.gl wrapper. */
+    /** Update the legend panel (now shared below the chart, not in the canvas overlay). */
     _updateDeckGLLegend(wrap, meta) {
-        const legend = document.getElementById('deckgl-legend');
-        const badge  = document.getElementById('deckgl-badge');
-        if (!legend) return;
-
+        const badge = document.getElementById('deckgl-badge');
         const n = meta.n_total || 0;
         if (badge) badge.textContent = `WebGL · ${(n / 1000).toFixed(0)}K cells`;
 
-        // ── continuous colorbar ──────────────────────────────────────────────
-        if (!meta.is_categorical) {
-            if (meta.colorscale) {
-                const cs = meta.colorscale || 'viridis';
-                const vminLabel = (meta.vmin !== undefined) ? meta.vmin.toFixed(3) : '';
-                const vmaxLabel = (meta.vmax !== undefined) ? meta.vmax.toFixed(3) : '';
-                const grad = this._colormapGradient(cs);
-                legend.style.display = 'block';
-                legend.innerHTML =
-                    (meta.color_label ? `<div style="font-weight:600;margin-bottom:4px;font-size:0.72rem;">${meta.color_label}</div>` : '') +
-                    `<div style="width:12px;height:80px;border-radius:3px;background:${grad};` +
-                    `border:1px solid rgba(128,128,128,0.3);display:inline-block;vertical-align:middle;"></div>` +
-                    `<div style="display:inline-block;vertical-align:middle;margin-left:4px;font-size:0.67rem;line-height:1.3;">` +
-                    `<div>${vmaxLabel}</div><div style="margin-top:60px;">${vminLabel}</div></div>`;
-            } else {
-                legend.style.display = 'none';
-            }
-            return;
-        }
-
-        // ── categorical legend ───────────────────────────────────────────────
-        legend.style.display = 'block';
-        legend.innerHTML = meta.color_label
-            ? `<div style="font-weight:600;margin-bottom:4px;font-size:0.72rem;">${meta.color_label}</div>` : '';
-
-        // Prefer backend-supplied per-category colours; fall back to the same
-        // OmicVerse default palette used on the backend so the legend is never
-        // all-grey even if the server runs an older build (no category_colors key).
-        const _OV_SC_COLOR = [
-            '#1F577B','#A56BA7','#E0A7C8','#E069A6','#941456',
-            '#FCBC10','#EF7B77','#279AD7','#F0EEF0','#EAEFC5',
-            '#7CBB5F','#368650','#A499CC','#5E4D9A','#78C2ED',
-            '#866017','#9F987F','#E0DFED','#01A0A7','#75C8CC',
-            '#F0D7BC','#D5B26C','#D5DA48','#B6B812','#9DC3C3',
-            '#A89C92','#FEE00C','#FEF2A1',
-        ];
-        const catColors = (meta.category_colors && meta.category_colors.length)
-            ? meta.category_colors : null;
-
-        meta.category_labels.forEach((label, code) => {
-            // Use backend color → fallback to OV default palette (by index)
-            const color = (catColors && catColors[code]) || _OV_SC_COLOR[code % _OV_SC_COLOR.length];
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:5px;margin:1px 0;white-space:nowrap;';
-            row.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;` +
-                            `background:${color};flex-shrink:0;border:1px solid rgba(0,0,0,0.15);"></span>` +
-                            `<span style="overflow:hidden;text-overflow:ellipsis;max-width:140px;">${label}</span>`;
-            legend.appendChild(row);
-        });
-    },
-
-    /**
-     * Return a CSS linear-gradient string that approximates a named matplotlib colormap.
-     * Used for the continuous colorbar in the deck.gl legend panel.
-     */
-    _colormapGradient(name) {
-        const maps = {
-            viridis:  '#440154,#482878,#3e4989,#31688e,#26828e,#1f9e89,#35b779,#6ece58,#b5de2b,#fde725',
-            plasma:   '#0d0887,#46039f,#7201a8,#9c179e,#bd3786,#d8576b,#ed7953,#fb9f3a,#fdcf18,#f0f921',
-            magma:    '#000004,#1b1044,#3b0f70,#641a80,#8c2981,#b5367a,#de4968,#f7705c,#fe9f6d,#fcfdbf',
-            inferno:  '#000004,#1f0c48,#550f6d,#88226a,#ac5765,#cc7b5c,#e69c5b,#f4c86a,#f8e88e,#fcffa4',
-            cividis:  '#002051,#0b307f,#35499d,#5762ad,#767ab5,#9592bb,#b4adc6,#d3cade,#ede0c6,#fee8a0',
-            coolwarm: '#3b4cc0,#6688ee,#98b4fa,#c9d8ef,#eddbc7,#f7a789,#e36a53,#b40426',
-            RdYlBu:   '#d73027,#f46d43,#fdae61,#fee090,#ffffbf,#e0f3f8,#abd9e9,#74add1,#4575b4',
-            RdBu:     '#ca0020,#f4a582,#f7f7f7,#92c5de,#0571b0',
-            bwr:      '#0000ff,#ffffff,#ff0000',
-            hot:      '#000000,#ff0000,#ffff00,#ffffff',
-            Blues:    '#f7fbff,#deebf7,#c6dbef,#9ecae1,#6baed6,#4292c6,#2171b5,#08519c,#08306b',
-            Reds:     '#fff5f0,#fee0d2,#fcbba1,#fc9272,#fb6a4a,#ef3b2c,#cb181d,#a50f15,#67000d',
-            Greens:   '#f7fcf5,#e5f5e0,#c7e9c0,#a1d99b,#74c476,#41ab5d,#238b45,#006d2c,#00441b',
-            YlOrRd:   '#ffffcc,#ffeda0,#fed976,#feb24c,#fd8d3c,#fc4e2a,#e31a1c,#bd0026,#800026',
-            Spectral: '#9e0142,#d53e4f,#f46d43,#fdae61,#fee08b,#ffffbf,#e6f598,#abdda4,#66c2a5,#3288bd,#5e4fa2',
-            tab10:    '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
-        };
-        const key = (name || 'viridis').toLowerCase().replace(/_/g, '');
-        const stops = maps[key] || maps[name] || maps.viridis;
-        // Build a top-to-bottom gradient (high → low so max is at top)
-        return `linear-gradient(to bottom, ${stops.split(',').reverse().join(',')})`;
+        // Render legend in the shared panel below the visualization
+        this._renderLegendPanel(meta, 'deckgl');
     },
 
     /** User clicked "switch to Plotly" in the deck.gl panel. */

@@ -333,6 +333,17 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Clear any stale Plotly chart from the previous dataset
         const plotDiv = document.getElementById('plotly-div');
         if (plotDiv && typeof Plotly !== 'undefined') Plotly.purge(plotDiv);
+        // Reset axis tracking so next plot starts fresh
+        this.currentEmbedding = '';
+        this._currentAxesKey = undefined;
+        this._currentAxisLabels = null;
+        // Hide and reset the legend panel
+        const legendPanel = document.getElementById('viz-legend-panel');
+        const legendContent = document.getElementById('viz-legend-content');
+        if (legendPanel) legendPanel.style.display = 'none';
+        if (legendContent) legendContent.innerHTML = '';
+        this._legendSelected = new Set();
+        this._legendData = null;
 
         // Reset point-size slider to auto mode
         const sizeSlider = document.getElementById('point-size-slider');
@@ -390,6 +401,26 @@ Object.assign(SingleCellAnalysis.prototype, {
             colorSelect.appendChild(option);
         });
 
+        // Populate custom axis key selectors (obsm + obs options)
+        this._customAxesData = {
+            embeddings:  data.embeddings   || [],
+            obs_columns: data.obs_columns  || [],
+            obsm_ndims:  data.obsm_ndims   || {},
+        };
+        this._populateAxisKeySels('x');
+        this._populateAxisKeySels('y');
+
+        // Reset custom axes state when data changes
+        this._customAxesActive = false;
+        const customRow  = document.getElementById('custom-axes-row');
+        const badge      = document.getElementById('custom-axes-badge');
+        const embSel     = document.getElementById('embedding-select');
+        const icon       = document.getElementById('custom-axes-icon');
+        if (customRow) customRow.style.display  = 'none';
+        if (badge)     badge.style.display       = 'none';
+        if (embSel)    embSel.style.display      = '';
+        if (icon)      { icon.classList.remove('fa-undo'); icon.classList.add('fa-pen-alt'); }
+
         // Update parameter panel to enable buttons
         this.updateParameterPanel();
         if (this.fetchGeneList) {
@@ -411,6 +442,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Auto-select first embedding and update plot
         if (data.embeddings.length > 0) {
             embeddingSelect.value = data.embeddings[0];
+            this._syncCustomAxesToPreset(data.embeddings[0]);
             this.updatePlot();
         }
     },
@@ -708,7 +740,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         [vizView, codeView, agentView, termView].forEach(v => { if (v) v.style.display = 'none'; });
         _deactivateAll();
         if (vizToolbar)    vizToolbar.style.display    = 'none';
-        if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
         if (analysisNav)   analysisNav.style.display   = 'none';
         if (agentConfigNav) agentConfigNav.style.display = 'none';
         if (fileManager)   fileManager.style.display   = 'none';
@@ -981,6 +1013,221 @@ Object.assign(SingleCellAnalysis.prototype, {
         });
     },
 
+    // ── Custom X/Y Axes ──────────────────────────────────────────────────────
+
+    /**
+     * Toggle the custom axes row visibility.
+     */
+    toggleCustomAxes(event) {
+        if (event) event.preventDefault();
+        const row     = document.getElementById('custom-axes-row');
+        const embSel  = document.getElementById('embedding-select');
+        const icon    = document.getElementById('custom-axes-icon');
+        if (!row) return;
+
+        const isOpen = row.style.display !== 'none' && row.style.display !== '';
+
+        if (!isOpen) {
+            // ── Open custom axes ────────────────────────────────────────────
+            row.style.display = '';
+            // Sync selectors to current embedding as a starting point (once only)
+            if (!this._customAxesActive) {
+                const emb = (embSel || {}).value;
+                if (emb && emb !== 'random') this._syncCustomAxesToPreset(emb);
+            }
+            // Hide the embedding select to make it clear it's not used
+            if (embSel) embSel.style.display = 'none';
+            if (icon)   { icon.classList.remove('fa-pen-alt'); icon.classList.add('fa-undo'); }
+        } else {
+            // ── Close custom axes — revert to preset mode ───────────────────
+            row.style.display = 'none';
+            this._customAxesActive = false;
+            if (embSel) embSel.style.display = '';
+            if (icon)   { icon.classList.remove('fa-undo'); icon.classList.add('fa-pen-alt'); }
+            const badge = document.getElementById('custom-axes-badge');
+            if (badge) badge.style.display = 'none';
+            // Re-trigger plot with the preset
+            const emb = (embSel || {}).value;
+            if (emb) this.updatePlot();
+        }
+    },
+
+    /**
+     * Called when the user picks a quick embedding preset.
+     * Syncs the custom X/Y pickers to match and triggers a plot update.
+     */
+    onEmbeddingPresetChange() {
+        const embSel = document.getElementById('embedding-select');
+        const emb    = (embSel || {}).value;
+        if (!emb) return;
+        // Sync custom pickers to this embedding (if it's a real obsm key, not random)
+        if (emb !== 'random') this._syncCustomAxesToPreset(emb);
+        // Clear custom mode — user is back to preset
+        this._customAxesActive = false;
+        const badge = document.getElementById('custom-axes-badge');
+        const row   = document.getElementById('custom-axes-row');
+        const icon  = document.getElementById('custom-axes-icon');
+        if (badge) badge.style.display = 'none';
+        if (row)   row.style.display   = 'none';
+        if (icon)  { icon.classList.remove('fa-undo'); icon.classList.add('fa-pen-alt'); }
+        if (embSel) embSel.style.display = '';  // ensure visible
+        this.updatePlot();
+    },
+
+    /**
+     * Sync the custom X/Y selectors to obsm:embKey:0 / obsm:embKey:1.
+     */
+    _syncCustomAxesToPreset(embKey) {
+        for (const ax of ['x', 'y']) {
+            const srcSel = document.getElementById(`${ax}-axis-source`);
+            const dimSel = document.getElementById(`${ax}-axis-dim`);
+            if (srcSel) srcSel.value = 'obsm';
+            this._populateAxisKeySels(ax);  // re-fill with obsm keys
+            const keySel = document.getElementById(`${ax}-axis-key-select`);
+            if (keySel) keySel.value = embKey;
+            this._updateAxisDims(ax, embKey);
+            if (dimSel) dimSel.value = ax === 'x' ? '0' : '1';
+            // Show select, hide input
+            const inp = document.getElementById(`${ax}-axis-key-input`);
+            if (keySel) keySel.style.display = '';
+            if (inp)    inp.style.display    = 'none';
+            if (dimSel) dimSel.style.display = '';
+        }
+    },
+
+    /**
+     * Populate the key select for a given axis based on the current source type.
+     */
+    _populateAxisKeySels(ax) {
+        const source  = (document.getElementById(`${ax}-axis-source`) || {}).value || 'obsm';
+        const keySel  = document.getElementById(`${ax}-axis-key-select`);
+        const keyInp  = document.getElementById(`${ax}-axis-key-input`);
+        const dimSel  = document.getElementById(`${ax}-axis-dim`);
+        const data    = this._customAxesData || {};
+
+        if (!keySel) return;
+
+        if (source === 'obsm') {
+            keySel.style.display = '';
+            if (keyInp) keyInp.style.display = 'none';
+            if (dimSel) dimSel.style.display = '';
+            keySel.innerHTML = (data.embeddings || [])
+                .map(e => `<option value="${e}">${(e.startsWith('X_') ? e.slice(2) : e).toUpperCase()}</option>`)
+                .join('');
+            // Fill dims for first item
+            const firstEmb = (data.embeddings || [])[0] || '';
+            this._updateAxisDims(ax, firstEmb);
+        } else if (source === 'obs') {
+            keySel.style.display = '';
+            if (keyInp) keyInp.style.display = 'none';
+            if (dimSel) dimSel.style.display = 'none';
+            keySel.innerHTML = (data.obs_columns || [])
+                .map(c => `<option value="${c}">${c}</option>`)
+                .join('');
+        } else {
+            // gene
+            keySel.style.display = 'none';
+            if (keyInp) keyInp.style.display = '';
+            if (dimSel) dimSel.style.display = 'none';
+        }
+    },
+
+    /**
+     * Fill the dimension picker for an obsm key (infer ndim from adata or default to 0/1/2).
+     */
+    _updateAxisDims(ax, embKey) {
+        const dimSel = document.getElementById(`${ax}-axis-dim`);
+        if (!dimSel) return;
+        // Try to get ndim from stored currentData obsm info (if available)
+        const ndim = (this._customAxesData && this._customAxesData.obsm_ndims && embKey)
+            ? (this._customAxesData.obsm_ndims[embKey] || 10)
+            : 10;
+        const count = Math.min(ndim, 10);  // Show up to 10 dims
+        dimSel.innerHTML = Array.from({ length: count }, (_, i) =>
+            `<option value="${i}">${i + 1}</option>`
+        ).join('');
+    },
+
+    /**
+     * Called when the axis source (obsm/obs/gene) changes.
+     */
+    onAxisSourceChange(ax) {
+        this._populateAxisKeySels(ax);
+        this._markCustomAxes();
+        this.onCustomAxisApply();
+    },
+
+    /**
+     * Called when the key select changes (for obsm: update dims).
+     */
+    onAxisKeyChange(ax) {
+        const source = (document.getElementById(`${ax}-axis-source`) || {}).value;
+        if (source === 'obsm') {
+            const key = (document.getElementById(`${ax}-axis-key-select`) || {}).value;
+            this._updateAxisDims(ax, key);
+        }
+        this._markCustomAxes();
+        this.onCustomAxisApply();
+    },
+
+    /**
+     * Show the "Custom" badge on the embedding preset and mark custom mode active.
+     */
+    _markCustomAxes() {
+        this._customAxesActive = true;
+        const badge  = document.getElementById('custom-axes-badge');
+        const preset = document.getElementById('embedding-select');
+        const icon   = document.getElementById('custom-axes-icon');
+        // Show badge, ensure embedding select is hidden (it's irrelevant)
+        if (badge)  badge.style.display = '';
+        if (preset) preset.style.display = 'none';
+        if (icon)   { icon.classList.remove('fa-pen-alt'); icon.classList.add('fa-undo'); }
+    },
+
+    /**
+     * Trigger a plot update when any custom axis changes.
+     */
+    onCustomAxisApply() {
+        // Small debounce for text inputs
+        clearTimeout(this._customAxesTimer);
+        this._customAxesTimer = setTimeout(() => this.updatePlot(), 300);
+    },
+
+    /**
+     * Return the current x_axis / y_axis encoded strings for the backend.
+     * Format:  obsm:<key>:<dim>   obs:<col>   gene:<name>
+     * Returns null if not in custom mode or no valid selection.
+     */
+    getXYAxes() {
+        const row = document.getElementById('custom-axes-row');
+        const customVisible = row && row.style.display !== 'none';
+        if (!customVisible && !this._customAxesActive) return null;
+
+        const _encode = (ax) => {
+            const source = (document.getElementById(`${ax}-axis-source`) || {}).value || 'obsm';
+            if (source === 'obsm') {
+                const key = (document.getElementById(`${ax}-axis-key-select`) || {}).value;
+                const dim = (document.getElementById(`${ax}-axis-dim`) || {}).value || '0';
+                if (!key) return null;
+                return `obsm:${key}:${dim}`;
+            } else if (source === 'obs') {
+                const key = (document.getElementById(`${ax}-axis-key-select`) || {}).value;
+                if (!key) return null;
+                return `obs:${key}`;
+            } else {
+                const gene = ((document.getElementById(`${ax}-axis-key-input`) || {}).value || '').trim();
+                if (!gene) return null;
+                return `gene:${gene}`;
+            }
+        };
+
+        const x = _encode('x');
+        const y = _encode('y');
+        if (!x || !y) return null;
+        return { x_axis: x, y_axis: y };
+    },
+
 });
+
 
 

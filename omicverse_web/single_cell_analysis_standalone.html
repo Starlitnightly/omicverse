@@ -680,6 +680,15 @@
                             </div>
                         </div>
 
+                        <!-- Legend panel — below visualization canvas, avoids overlap & resize -->
+                        <div id="viz-legend-panel" class="mt-2" style="display:none;">
+                            <div class="card border shadow-sm">
+                                <div class="card-body py-2 px-3">
+                                    <div id="viz-legend-content" class="d-flex flex-wrap gap-1 align-items-center"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Visualization Controls (below chart) -->
                         <div id="viz-controls" class="mt-3" style="display: none;">
                           <div class="card">
@@ -689,26 +698,36 @@
                             <div class="card-body p-2">
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-3">
-                                    <label for="embedding-select" class="form-label form-label-sm" data-i18n="controls.embedding">Embedding</label>
-                                    <select class="form-select form-select-sm" id="embedding-select" onchange="updatePlot()">
+                                    <label for="embedding-select" class="form-label form-label-sm d-flex align-items-center justify-content-between mb-1">
+                                        <span id="embedding-label-text" data-i18n="controls.embedding">坐标轴预设</span>
+                                        <span class="d-flex align-items-center gap-1">
+                                            <span id="custom-axes-badge" class="badge bg-warning text-dark" style="display:none;font-size:0.62rem;" data-i18n="controls.customBadge">Custom</span>
+                                            <a href="#" id="custom-axes-toggle" onclick="singleCellApp.toggleCustomAxes(event)"
+                                               class="text-muted" style="font-size:0.78rem;" title="Custom X/Y">
+                                                <i id="custom-axes-icon" class="fas fa-pen-alt"></i>
+                                            </a>
+                                        </span>
+                                    </label>
+                                    <select class="form-select form-select-sm" id="embedding-select" onchange="singleCellApp.onEmbeddingPresetChange()">
                                         <option value="" data-i18n="controls.embeddingPlaceholder">Select embedding</option>
+                                        <option value="random" data-i18n="controls.randomEmbedding">🎲 Random</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="color-select" class="form-label form-label-sm" data-i18n="controls.colorBy">Color by</label>
+                                    <label for="color-select" class="form-label form-label-sm mb-1" data-i18n="controls.colorBy">Color by</label>
                                     <select class="form-select form-select-sm" id="color-select" onchange="singleCellApp.onColorSelectChange()">
                                         <option value="" data-i18n="controls.colorNone">None</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="gene-input" class="form-label form-label-sm" data-i18n="controls.gene">Gene Expression</label>
+                                    <label for="gene-input" class="form-label form-label-sm mb-1" data-i18n="controls.gene">Gene Expression</label>
                                     <div class="position-relative">
                                         <input type="text" class="form-control form-control-sm" id="gene-input" placeholder="Enter gene name" data-i18n-placeholder="controls.genePlaceholder" autocomplete="off">
                                         <div id="gene-autocomplete" class="list-group position-absolute w-100" style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="palette-select" class="form-label form-label-sm">
+                                    <label for="palette-select" class="form-label form-label-sm mb-1">
                                         <span id="palette-label" data-i18n="controls.paletteContinuous">Palette (continuous)</span>
                                     </label>
                                     <select class="form-select form-select-sm" id="palette-select" onchange="updatePlot()">
@@ -727,6 +746,54 @@
                                     </select>
                                 </div>
                             </div>
+                            <!-- Custom Axes Row (hidden by default) -->
+                            <div class="row g-2 mt-1" id="custom-axes-row" style="display:none;">
+                                <!-- X axis -->
+                                <div class="col-md-6">
+                                    <label class="form-label form-label-sm" data-i18n="controls.xAxis">X Axis</label>
+                                    <div class="d-flex gap-1">
+                                        <select class="form-select form-select-sm flex-shrink-0" id="x-axis-source"
+                                                style="width:70px;"
+                                                onchange="singleCellApp.onAxisSourceChange('x')">
+                                            <option value="obsm">obsm</option>
+                                            <option value="obs">obs</option>
+                                            <option value="gene">gene</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="x-axis-key-select"
+                                                style="flex:1;min-width:0;"
+                                                onchange="singleCellApp.onAxisKeyChange('x')"></select>
+                                        <input type="text" class="form-control form-control-sm" id="x-axis-key-input"
+                                               style="flex:1;min-width:0;display:none;" placeholder="Gene…"
+                                               oninput="singleCellApp.onCustomAxisApply()">
+                                        <select class="form-select form-select-sm flex-shrink-0" id="x-axis-dim"
+                                                style="width:52px;"
+                                                onchange="singleCellApp.onCustomAxisApply()"></select>
+                                    </div>
+                                </div>
+                                <!-- Y axis -->
+                                <div class="col-md-6">
+                                    <label class="form-label form-label-sm" data-i18n="controls.yAxis">Y Axis</label>
+                                    <div class="d-flex gap-1">
+                                        <select class="form-select form-select-sm flex-shrink-0" id="y-axis-source"
+                                                style="width:70px;"
+                                                onchange="singleCellApp.onAxisSourceChange('y')">
+                                            <option value="obsm">obsm</option>
+                                            <option value="obs">obs</option>
+                                            <option value="gene">gene</option>
+                                        </select>
+                                        <select class="form-select form-select-sm" id="y-axis-key-select"
+                                                style="flex:1;min-width:0;"
+                                                onchange="singleCellApp.onAxisKeyChange('y')"></select>
+                                        <input type="text" class="form-control form-control-sm" id="y-axis-key-input"
+                                               style="flex:1;min-width:0;display:none;" placeholder="Gene…"
+                                               oninput="singleCellApp.onCustomAxisApply()">
+                                        <select class="form-select form-select-sm flex-shrink-0" id="y-axis-dim"
+                                                style="width:52px;"
+                                                onchange="singleCellApp.onCustomAxisApply()"></select>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="row g-2 mt-1" id="category-palette-row" style="display: none;">
                                 <div class="col-md-12">
                                     <label for="category-palette-select" class="form-label form-label-sm" data-i18n="controls.categoryPalette">Categorical palette</label>

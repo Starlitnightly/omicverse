@@ -425,6 +425,69 @@ html.app-skin-dark .logo-circle {
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
+/* ── Legend panel chips ─────────────────────────────────────── */
+.legend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: opacity 0.18s, border-color 0.18s, background 0.18s;
+    font-size: 0.74rem;
+    user-select: none;
+    line-height: 1.7;
+    white-space: nowrap;
+}
+.legend-chip:hover {
+    border-color: var(--bs-border-color, #dee2e6);
+    background: rgba(0, 0, 0, 0.04);
+}
+.legend-chip--dim {
+    opacity: 0.22;
+}
+.legend-chip--selected {
+    border-color: #0d6efd;
+    background: rgba(13, 110, 253, 0.07);
+}
+.legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+}
+.legend-colorbar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+.legend-colorbar-bar {
+    width: 160px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    flex-shrink: 0;
+}
+.legend-colorbar-val {
+    font-size: 0.7rem;
+    color: var(--bs-secondary-color, #6c757d);
+    min-width: 44px;
+}
+/* Dark-mode overrides */
+.app-skin-dark .legend-chip:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+.app-skin-dark .legend-chip--selected {
+    background: rgba(13, 110, 253, 0.15);
+}
+.app-skin-dark .legend-dot {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
 /* Ensure proper z-index for overlays */
 .loading-overlay {
     z-index: 1050;

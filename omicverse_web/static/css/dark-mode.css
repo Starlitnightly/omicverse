@@ -630,6 +630,22 @@
     color: var(--nxl-muted) !important;
 }
 
+/* ── Results table sticky headers — dark mode ───────────────────────────────
+   Both DEG and DCT tables use:
+     <thead class="sticky-top" style="background:var(--bs-body-bg,#fff)">
+   Since --bs-body-bg is never defined in this NXL theme, it falls back to
+   #fff in dark mode, making light-coloured text invisible on the white header.
+   Override with the card surface colour so the header blends correctly.
+   ─────────────────────────────────────────────────────────────────────── */
+.app-skin-dark .table thead.sticky-top {
+    background-color: var(--nxl-white) !important;
+    color: var(--nxl-body-color) !important;
+}
+.app-skin-dark .table thead.sticky-top th {
+    color: var(--nxl-body-color) !important;
+    border-color: var(--nxl-border-color) !important;
+}
+
 /* ── Terminal nav panel — dark mode ────────────────────────────────────────
    #term-nav-panel sits inside .nxl-navigation which already adapts;
    just tweak item colours to match the dark sidebar.
