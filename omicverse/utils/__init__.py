@@ -129,8 +129,6 @@ from .agent_errors import (
 from .agent_reporter import AgentEvent, EventLevel, Reporter, make_reporter
 from .context_compactor import ContextCompactor, estimate_tokens
 from .session_history import SessionHistory, HistoryEntry
-from .mcp_client import MCPClientManager, MCPTool, MCPServerInfo
-from .biocontext_bridge import BioContextBridge
 
 # Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
 # This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
@@ -280,10 +278,4 @@ __all__ = [
     "list_supported_models",
     # @ verifier
     "verifier",
-    # @ mcp_client
-    "MCPClientManager",
-    "MCPTool",
-    "MCPServerInfo",
-    # @ biocontext_bridge
-    "BioContextBridge",
 ]
