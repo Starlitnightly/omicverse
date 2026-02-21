@@ -1051,7 +1051,38 @@ User request: "quality control with nUMI>500, mito<0.2"
             max_tokens=8192,
             temperature=0.2,
         )
+
+        # Create / reset the context compactor
+        from .context_compactor import ContextCompactor
+        self._compactor = ContextCompactor(
+            llm_backend=self._llm,
+            model=self.model,
+            soft_threshold=120_000,
+            hard_threshold=170_000,
+        )
     
+    async def _ensure_context_fits(self, user_prompt: str = "") -> None:
+        """Compress the system prompt if it exceeds the soft token threshold.
+
+        This is called before major LLM calls (code generation, reflection,
+        result review) to ensure the total context stays within model limits.
+        The compactor caches its result so only the first call per session
+        triggers an actual LLM summarisation.
+        """
+        compactor = getattr(self, "_compactor", None)
+        if compactor is None or self._llm is None:
+            return
+        level = compactor.needs_compaction(
+            self._llm.config.system_prompt, user_prompt
+        )
+        if level == "none":
+            return
+        print(f"📦 Context approaching limit — compressing system prompt ({level})...")
+        compacted = await compactor.compact(
+            self._llm.config.system_prompt, user_prompt
+        )
+        self._llm.config.system_prompt = compacted
+
     def _search_functions(self, query: str) -> str:
         """
         Search for functions in the OmicVerse registry.
@@ -1406,6 +1437,7 @@ Now generate code for: "{request}"
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
 
+            await self._ensure_context_fits(priority1_prompt)
             response_text = await self._llm.run(priority1_prompt)
             self.last_usage = self._llm.last_usage
 
@@ -1651,6 +1683,7 @@ Now generate a complete workflow for: "{request}"
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
 
+            await self._ensure_context_fits(priority2_prompt)
             response_text = await self._llm.run(priority2_prompt)
             self.last_usage = self._llm.last_usage
 
@@ -2261,6 +2294,7 @@ IMPORTANT:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(review_prompt)
                 response_text = await self._llm.run(review_prompt)
 
                 # Track review token usage
@@ -2464,6 +2498,7 @@ IMPORTANT:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(reflection_prompt)
                 response_text = await self._llm.run(reflection_prompt)
 
                 # Track reflection token usage
@@ -3376,6 +3411,7 @@ Example workflow:
         with self._temporary_api_keys():
             if not self._llm:
                 raise RuntimeError("LLM backend is not initialized")
+            await self._ensure_context_fits(code_generation_request)
             response_text = await self._llm.run(code_generation_request)
             # Copy usage information from backend to agent
             self.last_usage = self._llm.last_usage
@@ -3702,6 +3738,7 @@ Example workflow:
                 if not self._llm:
                     raise RuntimeError("LLM backend is not initialized")
 
+                await self._ensure_context_fits(code_generation_request)
                 async for chunk in self._llm.stream(code_generation_request):
                     response_chunks.append(chunk)
                     yield {'type': 'llm_chunk', 'content': chunk}
