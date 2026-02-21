@@ -398,88 +398,7 @@ def execute_code_stream():
 # Tools Routes
 # ============================================================================
 
-def _analyze_data_state(adata):
-    """Heuristically analyze the preprocessing state of an AnnData object.
-
-    Returns a dict with:
-        x_max, x_min, is_int, is_log1p, is_normalized,
-        estimated_target_sum, is_scaled
-    """
-    import numpy as _np
-    import scipy.sparse as _sp
-
-    try:
-        X = adata.X
-        # Sample up to 5000 cells for speed
-        n_sample = min(adata.n_obs, 5000)
-        if adata.n_obs > n_sample:
-            idx = _np.random.choice(adata.n_obs, n_sample, replace=False)
-            X_sample = X[idx]
-        else:
-            X_sample = X
-
-        # Convert to dense only if not too large
-        if _sp.issparse(X_sample):
-            x_max_val = float(X_sample.max())
-            x_min_val = float(X_sample.min())
-            # Check for integer values using a small slice of nonzero entries
-            coo = X_sample.tocoo()
-            nz = coo.data[:500] if len(coo.data) > 500 else coo.data
-            X_dense_sample = X_sample[:200].toarray() if X_sample.shape[0] >= 200 else X_sample.toarray()
-        else:
-            X_sample_arr = _np.asarray(X_sample)
-            x_max_val = float(_np.nanmax(X_sample_arr))
-            x_min_val = float(_np.nanmin(X_sample_arr))
-            nz_mask = X_sample_arr != 0
-            nz = X_sample_arr[nz_mask][:500]
-            X_dense_sample = X_sample_arr[:200]
-
-        # is_int: are nonzero values all integers?
-        is_int = bool(len(nz) > 0 and _np.all(_np.abs(nz - _np.round(nz)) < 1e-4))
-
-        # is_log1p: reliable check = 'log1p' key in uns
-        is_log1p_uns = 'log1p' in adata.uns
-        # Fallback heuristic: max < 20 and not integer
-        is_log1p_heuristic = (not is_int) and (x_max_val < 30)
-        is_log1p = bool(is_log1p_uns or is_log1p_heuristic)
-
-        has_negative = bool(x_min_val < 0)
-
-        # is_scaled: data has negative values and max ≤ 50 (typical post-scale range)
-        is_scaled = bool(has_negative and x_max_val <= 50)
-
-        # is_normalized: check coefficient of variation of row sums
-        row_sums = _np.asarray(X_dense_sample.sum(axis=1)).ravel().astype(float)
-        row_sums = row_sums[row_sums > 0]
-        if len(row_sums) >= 5:
-            cv = float(_np.std(row_sums) / _np.mean(row_sums)) if _np.mean(row_sums) > 0 else 1.0
-            is_normalized = bool(cv < 0.05)
-        else:
-            is_normalized = False
-
-        # estimated_target_sum — only computable for non-log1p normalized data
-        estimated_target_sum = None
-        _COMMON_TS = [500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000]
-        if is_normalized and not is_scaled and not is_log1p:
-            row_sums_all = _np.asarray(X_dense_sample.sum(axis=1)).ravel()
-            row_sums_all = row_sums_all[row_sums_all > 0]
-            if len(row_sums_all) > 0:
-                median_ts = float(_np.median(row_sums_all))
-                closest = min(_COMMON_TS, key=lambda v: abs(v - median_ts))
-                estimated_target_sum = closest if abs(closest - median_ts) / (median_ts + 1e-9) < 0.5 else None
-
-        return {
-            'x_max': round(x_max_val, 4),
-            'x_min': round(x_min_val, 4),
-            'is_int': is_int,
-            'is_log1p': is_log1p,
-            'is_normalized': is_normalized,
-            'is_scaled': is_scaled,
-            'estimated_target_sum': estimated_target_sum,
-        }
-    except Exception as _e:
-        logging.warning(f"_analyze_data_state failed: {_e}")
-        return {}
+from utils.adata_helpers import analyze_data_state as _analyze_data_state
 
 
 def _snapshot_adata(adata):
@@ -1189,6 +1108,246 @@ def get_celltypist_model_path():
         if os.path.exists(candidate):
             return jsonify({'exists': True, 'path': os.path.abspath(candidate)})
     return jsonify({'exists': False})
+
+
+# ============================================================================
+# Python Environment Management Endpoints
+# ============================================================================
+
+_PYPI_MIRRORS = [
+    {'name': 'PyPI (official)',   'url': 'https://pypi.org/simple'},
+    {'name': '清华 Tsinghua',     'url': 'https://pypi.tuna.tsinghua.edu.cn/simple'},
+    {'name': '阿里 Aliyun',      'url': 'https://mirrors.aliyun.com/pypi/simple'},
+    {'name': '中科大 USTC',      'url': 'https://pypi.mirrors.ustc.edu.cn/simple'},
+]
+
+
+@app.route('/api/env/info', methods=['GET'])
+def env_info():
+    """Return current Python environment information."""
+    import sys, platform, importlib.metadata as _meta, shutil, subprocess
+
+    # ── System ───────────────────────────────────────────────────────────────
+    system = {
+        'os':       platform.system(),
+        'os_ver':   platform.version(),
+        'machine':  platform.machine(),
+        'hostname': platform.node(),
+    }
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        system['ram_total_gb'] = round(mem.total / 1024**3, 1)
+        system['ram_used_gb']  = round(mem.used  / 1024**3, 1)
+        system['cpu_count']    = psutil.cpu_count(logical=True)
+    except ImportError:
+        pass
+
+    # ── Python ───────────────────────────────────────────────────────────────
+    python_info = {
+        'version':    sys.version,
+        'executable': sys.executable,
+        'prefix':     sys.prefix,
+    }
+    # pip version from metadata — zero subprocess overhead
+    try:
+        python_info['pip'] = _meta.version('pip')
+    except _meta.PackageNotFoundError:
+        pass
+
+    # uv version via subprocess (uv starts in <100ms, no heavy runtime)
+    uv_path = shutil.which('uv')
+    if uv_path:
+        try:
+            python_info['uv'] = subprocess.check_output(
+                [uv_path, '--version'], stderr=subprocess.STDOUT, timeout=2, text=True
+            ).strip().split('\n')[0]
+        except Exception:
+            python_info['uv'] = uv_path
+
+    # ── GPU ──────────────────────────────────────────────────────────────────
+    # Get torch version from metadata (no import needed — fast)
+    gpu_info = {'cuda_available': False, 'mps_available': False, 'devices': []}
+    try:
+        gpu_info['torch_version'] = _meta.version('torch')
+    except _meta.PackageNotFoundError:
+        pass
+    # Only query CUDA/MPS if torch is already loaded in this process (no cold import)
+    import sys as _sys
+    if 'torch' in _sys.modules:
+        torch = _sys.modules['torch']
+        try:
+            if torch.cuda.is_available():
+                gpu_info['cuda_available'] = True
+                gpu_info['cuda_version'] = torch.version.cuda
+                gpu_info['devices'] = [
+                    {'index': i, 'name': torch.cuda.get_device_name(i),
+                     'mem_gb': round(torch.cuda.get_device_properties(i).total_memory / 1024**3, 1)}
+                    for i in range(torch.cuda.device_count())
+                ]
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                gpu_info['mps_available'] = True
+                gpu_info['devices'] = [{'index': 0, 'name': 'Apple MPS', 'mem_gb': None}]
+        except Exception:
+            pass
+
+    # ── Key packages ─────────────────────────────────────────────────────────
+    _KEY_PKGS = [
+        'omicverse', 'scanpy', 'anndata', 'numpy', 'pandas', 'scipy',
+        'matplotlib', 'torch', 'torchvision', 'scvi-tools', 'harmonypy',
+        'leidenalg', 'umap-learn', 'pynndescent', 'sklearn', 'scikit-learn',
+        'cellrank', 'scvelo', 'squidpy', 'pertpy',
+    ]
+    key_pkgs = []
+    for name in _KEY_PKGS:
+        try:
+            ver = _meta.version(name)
+            key_pkgs.append({'name': name, 'version': ver, 'installed': True})
+        except _meta.PackageNotFoundError:
+            key_pkgs.append({'name': name, 'version': None, 'installed': False})
+
+    # ── All installed packages ────────────────────────────────────────────────
+    all_pkgs = sorted(
+        [{'name': d.metadata['Name'], 'version': d.version}
+         for d in _meta.distributions()
+         if d.metadata.get('Name')],
+        key=lambda x: x['name'].lower()
+    )
+
+    return jsonify({
+        'system':   system,
+        'python':   python_info,
+        'gpu':      gpu_info,
+        'key_pkgs': key_pkgs,
+        'all_pkgs': all_pkgs,
+    })
+
+
+@app.route('/api/env/search_pypi', methods=['GET'])
+def env_search_pypi():
+    """Look up a package on PyPI and return its metadata."""
+    import urllib.request, urllib.error
+    name = request.args.get('package', '').strip()
+    if not name:
+        return jsonify({'error': 'package name required'}), 400
+    try:
+        url = f'https://pypi.org/pypi/{name}/json'
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read())
+        info = data.get('info', {})
+        return jsonify({
+            'found': True,
+            'name': info.get('name', name),
+            'version': info.get('version', ''),
+            'summary': info.get('summary', ''),
+            'home_page': info.get('home_page') or info.get('project_url', ''),
+            'license': info.get('license', ''),
+            'requires_python': info.get('requires_python', ''),
+        })
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return jsonify({'found': False, 'name': name})
+        return jsonify({'error': str(e)}), 502
+    except Exception as e:
+        return jsonify({'error': str(e)}), 502
+
+
+@app.route('/api/env/test_mirrors', methods=['GET'])
+def env_test_mirrors():
+    """Measure latency to each PyPI mirror and return sorted results."""
+    import urllib.request, urllib.error, time as _time
+    results = []
+    for m in _PYPI_MIRRORS:
+        t0 = _time.time()
+        try:
+            req = urllib.request.Request(m['url'], method='HEAD')
+            with urllib.request.urlopen(req, timeout=5):
+                pass
+            latency = round((_time.time() - t0) * 1000)
+            results.append({'name': m['name'], 'url': m['url'],
+                            'latency_ms': latency, 'ok': True})
+        except Exception:
+            results.append({'name': m['name'], 'url': m['url'],
+                            'latency_ms': 9999, 'ok': False})
+    results.sort(key=lambda x: x['latency_ms'])
+    return jsonify({'mirrors': results})
+
+
+@app.route('/api/env/install_pip', methods=['POST'])
+def env_install_pip():
+    """Stream uv pip install output via SSE."""
+    import subprocess, shutil
+    payload = request.json or {}
+    package  = payload.get('package', '').strip()
+    mirror   = payload.get('mirror', '').strip()
+    extra    = payload.get('extra_args', '').strip()
+    if not package:
+        return jsonify({'error': 'package name required'}), 400
+
+    uv_path = shutil.which('uv') or 'uv'
+    cmd = [uv_path, 'pip', 'install', package]
+    if mirror:
+        cmd += ['--index-url', mirror]
+    if extra:
+        cmd += extra.split()
+
+    def generate():
+        yield f"data: {json.dumps({'type': 'cmd', 'text': ' '.join(cmd)})}\n\n"
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                yield f"data: {json.dumps({'type': 'output', 'text': line})}\n\n"
+            proc.wait()
+            ok = proc.returncode == 0
+            yield f"data: {json.dumps({'type': 'complete', 'success': ok, 'returncode': proc.returncode})}\n\n"
+        except FileNotFoundError:
+            yield f"data: {json.dumps({'type': 'error', 'text': 'uv not found. Run: pip install uv'})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+@app.route('/api/env/install_conda', methods=['POST'])
+def env_install_conda():
+    """Stream mamba install output via SSE."""
+    import subprocess, shutil
+    payload  = request.json or {}
+    package  = payload.get('package', '').strip()
+    channels = payload.get('channels', ['conda-forge', 'bioconda'])
+    extra    = payload.get('extra_args', '').strip()
+    if not package:
+        return jsonify({'error': 'package name required'}), 400
+
+    mamba_path = shutil.which('mamba') or shutil.which('conda') or 'mamba'
+    cmd = [mamba_path, 'install', '-y']
+    for ch in channels:
+        cmd += ['-c', ch]
+    cmd.append(package)
+    if extra:
+        cmd += extra.split()
+
+    def generate():
+        yield f"data: {json.dumps({'type': 'cmd', 'text': ' '.join(cmd)})}\n\n"
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                yield f"data: {json.dumps({'type': 'output', 'text': line})}\n\n"
+            proc.wait()
+            ok = proc.returncode == 0
+            yield f"data: {json.dumps({'type': 'complete', 'success': ok, 'returncode': proc.returncode})}\n\n"
+        except FileNotFoundError:
+            yield f"data: {json.dumps({'type': 'error', 'text': 'mamba/conda not found. Install mamba: conda install -c conda-forge mamba'})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/api/plot', methods=['POST'])

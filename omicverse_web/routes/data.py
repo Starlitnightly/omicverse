@@ -63,15 +63,20 @@ def upload_file():
         chunk_info = bp.state.current_adaptor.get_chunk_info()
 
         # Build response compatible with legacy UI expectations
-        embeddings = [k.replace('X_', '') for k in bp.state.current_adata.obsm.keys()]
+        from utils.adata_helpers import analyze_data_state as _analyze_data_state
+        adata = bp.state.current_adata
+        embeddings = [k.replace('X_', '') for k in adata.obsm.keys()]
         response_data = {
             'filename': filename,
             # Legacy/UI fields used by single-cell.js
-            'n_cells': bp.state.current_adata.n_obs,
-            'n_genes': bp.state.current_adata.n_vars,
+            'n_cells': adata.n_obs,
+            'n_genes': adata.n_vars,
             'embeddings': embeddings,
-            'obs_columns': list(bp.state.current_adaptor.adata.obs.columns),
-            'var_columns': list(bp.state.current_adaptor.adata.var.columns),
+            'obs_columns': list(adata.obs.columns),
+            'var_columns': list(adata.var.columns),
+            'uns_keys':    list(adata.uns.keys()),
+            'layers':      list(adata.layers.keys()),
+            'data_state':  _analyze_data_state(adata),
             # New high-performance metadata
             'schema': schema,
             'chunk_info': chunk_info,

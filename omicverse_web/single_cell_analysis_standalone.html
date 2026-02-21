@@ -106,6 +106,23 @@
                             <li class="nxl-item"><a class="nxl-link" href="javascript:selectAnalysisCategory('trajectory')" data-i18n="nav.trajectory">Trajectory Analysis</a></li>
                         </ul>
                     </li>
+
+                    <!-- Python Environment -->
+                    <li class="nxl-item nxl-caption">
+                        <label data-i18n="nav.envSection">环境管理</label>
+                    </li>
+                    <li class="nxl-item">
+                        <a href="javascript:void(0);" class="nxl-link" onclick="singleCellApp.showEnvManager()">
+                            <span class="nxl-micon"><i class="feather-package"></i></span>
+                            <span class="nxl-mtext" data-i18n="nav.envInstall">Python 包安装</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item">
+                        <a href="javascript:void(0);" class="nxl-link" onclick="singleCellApp.showEnvInfo()">
+                            <span class="nxl-micon"><i class="feather-info"></i></span>
+                            <span class="nxl-mtext" data-i18n="nav.envInfo">Python 环境信息</span>
+                        </a>
+                    </li>
                 </ul>
                 <ul class="nxl-navbar" id="agent-config-nav" style="display: none;">
                     <li class="nxl-item nxl-caption">
@@ -934,7 +951,275 @@
     <script src="static/js/util/typedCrossfilter/index.js" type="module"></script>
     <script src="static/js/components/scatterplot/scatterplot.js" type="module"></script>
 
+    <!-- ── Python Environment Info Modal ───────────────────────────────── -->
+    <div id="env-info-modal" style="
+        display:none; position:fixed; inset:0; z-index:9900;
+        background:rgba(0,0,0,.55); overflow-y:auto;">
+      <div style="
+          background:var(--bs-body-bg,#fff); border-radius:12px;
+          margin:32px auto; max-width:820px; width:95%;
+          box-shadow:0 16px 48px rgba(0,0,0,.3); overflow:hidden;">
+
+        <!-- header -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:16px 20px; border-bottom:1px solid var(--bs-border-color,#dee2e6);
+                    background:var(--bs-tertiary-bg,#f8f9fa);">
+          <span style="font-weight:600; font-size:1rem;">
+            <i class="feather-info me-2 text-primary"></i>
+            <span data-i18n="envInfo.title">Python 环境信息</span>
+          </span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.loadEnvInfo()" data-i18n="common.refresh">
+              <i class="feather-refresh-cw"></i>
+            </button>
+            <button class="btn btn-sm btn-light" onclick="singleCellApp.hideEnvInfo()">
+              <i class="feather-x"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- body -->
+        <div style="padding:20px;">
+          <div id="env-info-loading" class="text-center text-muted py-4">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span data-i18n="envInfo.loading">Loading environment info...</span>
+          </div>
+          <div id="env-info-content" style="display:none;">
+
+            <!-- System + Python -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <div class="card h-100">
+                  <div class="card-header py-2 fw-semibold small">
+                    <i class="feather-cpu me-1"></i><span data-i18n="envInfo.system">系统信息</span>
+                  </div>
+                  <div class="card-body p-3" id="env-info-system"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card h-100">
+                  <div class="card-header py-2 fw-semibold small">
+                    <i class="feather-code me-1"></i><span data-i18n="envInfo.python">Python 环境</span>
+                  </div>
+                  <div class="card-body p-3" id="env-info-python"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- GPU -->
+            <div class="card mb-3">
+              <div class="card-header py-2 fw-semibold small">
+                <i class="feather-zap me-1"></i><span data-i18n="envInfo.gpu">GPU / 加速</span>
+              </div>
+              <div class="card-body p-3" id="env-info-gpu"></div>
+            </div>
+
+            <!-- Key packages -->
+            <div class="card mb-3">
+              <div class="card-header py-2 fw-semibold small d-flex align-items-center justify-content-between">
+                <span><i class="feather-box me-1"></i><span data-i18n="envInfo.keyPkgs">核心包版本</span></span>
+              </div>
+              <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0" style="font-size:0.8rem;">
+                  <thead class="table-light">
+                    <tr>
+                      <th class="ps-3" data-i18n="envInfo.pkgName">包名</th>
+                      <th data-i18n="envInfo.pkgVersion">版本</th>
+                      <th data-i18n="envInfo.pkgStatus">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="env-info-pkgs"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- All installed packages (collapsible) -->
+            <div class="card">
+              <div class="card-header py-2 fw-semibold small d-flex align-items-center justify-content-between"
+                   style="cursor:pointer;" onclick="singleCellApp.toggleEnvAllPkgs()">
+                <span><i class="feather-list me-1"></i><span data-i18n="envInfo.allPkgs">所有已安装包</span>
+                  <span id="env-info-pkg-count" class="badge text-bg-secondary ms-1"></span>
+                </span>
+                <i id="env-allpkgs-icon" class="feather-chevron-down"></i>
+              </div>
+              <div id="env-allpkgs-body" style="display:none;">
+                <div class="p-2">
+                  <input type="text" class="form-control form-control-sm mb-2"
+                         placeholder="Filter packages..."
+                         data-i18n-placeholder="envInfo.filter"
+                         oninput="singleCellApp.filterEnvPkgs(this.value)">
+                </div>
+                <div style="max-height:260px; overflow-y:auto;">
+                  <table class="table table-sm mb-0" style="font-size:0.75rem;">
+                    <tbody id="env-allpkgs-table"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /env-info-content -->
+          <div id="env-info-error" class="alert alert-danger" style="display:none;"></div>
+        </div>
+
+      </div>
+    </div><!-- /env-info-modal -->
+
     <!-- Main application -->
     <script src="static/js/single-cell.js"></script>
+
+    <!-- ── Python Environment Manager Modal ────────────────────────────── -->
+    <div id="env-manager-modal" style="
+        display:none; position:fixed; inset:0; z-index:9900;
+        background:rgba(0,0,0,.55); overflow-y:auto;">
+      <div style="
+          background:var(--bs-body-bg,#fff); border-radius:12px;
+          margin:32px auto; max-width:860px; width:95%;
+          box-shadow:0 16px 48px rgba(0,0,0,.3); overflow:hidden;">
+
+        <!-- header -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:16px 20px; border-bottom:1px solid var(--bs-border-color,#dee2e6);
+                    background:var(--bs-tertiary-bg,#f8f9fa);">
+          <span style="font-weight:600; font-size:1rem;">
+            <i class="feather-package me-2 text-primary"></i>
+            <span data-i18n="env.title">Python 环境管理</span>
+          </span>
+          <button type="button" class="btn btn-sm btn-light"
+                  onclick="singleCellApp.hideEnvManager()">
+            <i class="feather-x"></i>
+          </button>
+        </div>
+
+        <!-- body -->
+        <div style="padding:20px;">
+
+          <!-- ① Search row -->
+          <div class="d-flex gap-2 mb-3">
+            <input type="text" id="env-pkg-input" class="form-control"
+                   placeholder="e.g. sctour, scvi-tools, harmonypy"
+                   data-i18n-placeholder="env.pkgPlaceholder"
+                   oninput="singleCellApp._envUpdatePipPreview();singleCellApp._envUpdateCondaPreview()"
+                   onkeydown="if(event.key==='Enter')singleCellApp.envSearch()">
+            <button class="btn btn-primary" onclick="singleCellApp.envSearch()" data-i18n="env.search">
+              <i class="fas fa-search me-1"></i>Search
+            </button>
+          </div>
+
+          <!-- ② Package info card -->
+          <div id="env-pkg-info" style="display:none;"
+               class="alert alert-light border mb-3 p-3">
+            <div class="d-flex align-items-start justify-content-between">
+              <div>
+                <span id="env-pkg-name" class="fw-bold fs-6"></span>
+                <span id="env-pkg-version" class="badge text-bg-success ms-2"></span>
+                <span id="env-pkg-pyver" class="badge text-bg-secondary ms-1"></span>
+              </div>
+              <span id="env-pkg-found-badge"></span>
+            </div>
+            <p id="env-pkg-summary" class="text-muted small mb-0 mt-1"></p>
+          </div>
+          <div id="env-pkg-notfound" class="alert alert-warning mb-3" style="display:none;" data-i18n="env.notFound">
+            Package not found on PyPI.
+          </div>
+
+          <!-- tabs -->
+          <ul class="nav nav-tabs mb-3" id="env-tabs">
+            <li class="nav-item">
+              <button class="nav-link active" id="env-tab-pip"
+                      onclick="singleCellApp.switchEnvTab('pip')" data-i18n="env.tabPip">
+                <i class="fas fa-cube me-1"></i>uv pip
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" id="env-tab-conda"
+                      onclick="singleCellApp.switchEnvTab('conda')" data-i18n="env.tabConda">
+                <i class="fas fa-dragon me-1"></i>mamba / conda
+              </button>
+            </li>
+          </ul>
+
+          <!-- ③a pip panel -->
+          <div id="env-panel-pip">
+            <!-- Mirror speed test -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="text-muted small" data-i18n="env.mirror">Mirror:</span>
+              <select id="env-mirror-select" class="form-select form-select-sm" style="max-width:280px;"
+                      onchange="singleCellApp._envUpdatePipPreview()">
+                <option value="">PyPI (official) — https://pypi.org/simple</option>
+              </select>
+              <button class="btn btn-sm btn-outline-secondary"
+                      onclick="singleCellApp.envTestMirrors()" data-i18n="env.testMirrors">
+                <i class="fas fa-tachometer-alt me-1"></i>Test Speed
+              </button>
+            </div>
+            <!-- Extra args -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="text-muted small" data-i18n="env.extraArgs">Extra args:</span>
+              <input type="text" id="env-pip-extra" class="form-control form-control-sm"
+                     placeholder="--no-deps --upgrade ..." style="max-width:300px;">
+            </div>
+            <!-- Command preview + install button -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <code id="env-pip-preview" class="flex-grow-1 small text-muted"
+                    style="background:#f8f9fa; padding:4px 8px; border-radius:4px; overflow-x:auto;">
+                uv pip install &lt;package&gt;
+              </code>
+              <button class="btn btn-sm btn-success" onclick="singleCellApp.envInstallPip()" data-i18n="env.install">
+                <i class="fas fa-download me-1"></i>Install
+              </button>
+            </div>
+          </div>
+
+          <!-- ③b conda panel -->
+          <div id="env-panel-conda" style="display:none;">
+            <!-- Channel checkboxes -->
+            <div class="mb-2">
+              <span class="text-muted small d-block mb-1" data-i18n="env.channels">Channels:</span>
+              <div class="d-flex flex-wrap gap-2" id="env-channel-list">
+                <!-- populated by JS -->
+              </div>
+              <div class="d-flex gap-2 mt-2">
+                <input type="text" id="env-custom-channel" class="form-control form-control-sm"
+                       placeholder="custom-channel" style="max-width:200px;"
+                       data-i18n-placeholder="env.customChannel">
+                <button class="btn btn-sm btn-outline-secondary"
+                        onclick="singleCellApp.envAddChannel()" data-i18n="env.addChannel">+ Add</button>
+              </div>
+            </div>
+            <!-- Extra args -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="text-muted small" data-i18n="env.extraArgs">Extra args:</span>
+              <input type="text" id="env-conda-extra" class="form-control form-control-sm"
+                     placeholder="--no-pin ..." style="max-width:300px;">
+            </div>
+            <!-- Command preview + install -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <code id="env-conda-preview" class="flex-grow-1 small text-muted"
+                    style="background:#f8f9fa; padding:4px 8px; border-radius:4px; overflow-x:auto;">
+                mamba install -c conda-forge &lt;package&gt;
+              </code>
+              <button class="btn btn-sm btn-success" onclick="singleCellApp.envInstallConda()" data-i18n="env.install">
+                <i class="fas fa-download me-1"></i>Install
+              </button>
+            </div>
+          </div>
+
+          <!-- ④ output console -->
+          <div class="mt-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="text-muted small fw-semibold" data-i18n="env.output">Output</span>
+              <button class="btn btn-sm btn-link text-muted p-0"
+                      onclick="document.getElementById('env-console').textContent=''" data-i18n="env.clear">Clear</button>
+            </div>
+            <pre id="env-console"
+                 style="background:#1e1e2e; color:#cdd6f4; border-radius:8px;
+                        padding:12px; font-size:0.72rem; min-height:120px; max-height:300px;
+                        overflow-y:auto; white-space:pre-wrap; word-break:break-all;"
+                 data-i18n="env.consolePlaceholder">Ready.</pre>
+          </div>
+
+        </div><!-- /body -->
+      </div>
+    </div><!-- /env-manager-modal -->
 </body>
 </html>

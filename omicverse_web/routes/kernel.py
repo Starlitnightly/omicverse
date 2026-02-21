@@ -330,13 +330,18 @@ def kernel_load_adata():
             pass
 
         # Return data info
+        from utils.adata_helpers import analyze_data_state as _analyze_data_state
+        adata = bp.state.current_adata
         data_info = {
             'filename': bp.state.current_filename,
-            'n_cells': bp.state.current_adata.n_obs,
-            'n_genes': bp.state.current_adata.n_vars,
-            'embeddings': [emb.replace('X_', '') for emb in bp.state.current_adata.obsm.keys()],
-            'obs_columns': list(bp.state.current_adata.obs.columns),
-            'var_columns': list(bp.state.current_adata.var.columns)
+            'n_cells': adata.n_obs,
+            'n_genes': adata.n_vars,
+            'embeddings': [emb.replace('X_', '') for emb in adata.obsm.keys()],
+            'obs_columns': list(adata.obs.columns),
+            'var_columns': list(adata.var.columns),
+            'uns_keys':    list(adata.uns.keys()),
+            'layers':      list(adata.layers.keys()),
+            'data_state':  _analyze_data_state(adata),
         }
 
         return jsonify({
