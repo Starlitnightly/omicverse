@@ -24,7 +24,7 @@ class SandboxFallbackPolicy(Enum):
 @dataclass
 class LLMConfig:
     """LLM connection settings."""
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3-flash-preview"
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     reasoning_effort: str = "high"  # "low" | "medium" | "high" for GPT-5
@@ -91,7 +91,7 @@ class AgentConfig:
         cd = kw.get("context_storage_dir")
         return cls(
             llm=LLMConfig(
-                model=kw.get("model", "gemini-2.5-flash"),
+                model=kw.get("model", "gemini-3-flash-preview"),
                 api_key=kw.get("api_key"),
                 endpoint=kw.get("endpoint"),
             ),

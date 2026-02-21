@@ -252,18 +252,18 @@ class OmicVerseAgent:
     requests and automatically execute appropriate OmicVerse functions.
 
     Usage:
-        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-2.5-flash by default
+        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-3-flash-preview by default
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
+    def __init__(self, model: str = "gemini-3-flash-preview", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
         Parameters
         ----------
         model : str
-            LLM model to use for reasoning (default: "gemini-2.5-flash")
+            LLM model to use for reasoning (default: "gemini-3-flash-preview")
         api_key : str, optional
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
@@ -3820,7 +3820,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> agent.run("preprocess data", adata)
         >>> info = agent.get_current_session_info()
         >>> print(f"Session: {info['session_id']}")
@@ -3851,7 +3851,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> agent.run("step 1", adata)
         >>> agent.run("step 2", adata)
         >>> # Force new session
@@ -3887,7 +3887,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gemini-3-flash-preview")
         >>> # ... run several prompts causing session restarts ...
         >>> history = agent.get_session_history()
         >>> for session in history:
@@ -4205,7 +4205,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: str = "auto", biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-3-flash-preview", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: str = "auto", biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -4215,7 +4215,7 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gemini-2.5-flash"). Use list_supported_models() to see all options
+        LLM model to use (default: "gemini-3-flash-preview"). Use list_supported_models() to see all options
     api_key : str, optional
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional

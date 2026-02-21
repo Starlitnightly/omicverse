@@ -31,6 +31,7 @@ MODEL_CONTEXT_WINDOWS: Dict[str, int] = {
     "gpt-4o-mini": 128_000,
     "gpt-5": 256_000,
     "gpt-5-mini": 128_000,
+    "gemini/gemini-3-flash-preview": 1_000_000,
     "gemini/gemini-2.5-flash": 1_000_000,
     "gemini/gemini-2.5-pro": 1_000_000,
     "anthropic/claude-sonnet-4-20250514": 200_000,
