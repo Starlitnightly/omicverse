@@ -64,7 +64,7 @@ class ContextConfig:
 class MCPConfig:
     """MCP (Model Context Protocol) server connection settings."""
     servers: List[Dict[str, Any]] = field(default_factory=list)
-    enable_biocontext: bool = False
+    enable_biocontext: str = "auto"   # "auto" | True/"yes" | False/"no"
     biocontext_mode: str = "remote"   # "remote" | "local" | "auto"
     cache_ttl: int = 3600             # seconds before cached result expires
     inject_tools_in_prompt: bool = True
@@ -114,7 +114,7 @@ class AgentConfig:
             ),
             mcp=MCPConfig(
                 servers=kw.get("mcp_servers") or [],
-                enable_biocontext=kw.get("enable_biocontext", False),
+                enable_biocontext=kw.get("enable_biocontext", "auto"),
                 biocontext_mode=kw.get("biocontext_mode", "remote"),
                 cache_ttl=kw.get("mcp_cache_ttl", 3600),
             ),

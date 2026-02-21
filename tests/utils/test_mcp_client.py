@@ -435,7 +435,7 @@ class TestMCPConfig:
     def test_default_config(self):
         from omicverse.utils.agent_config import MCPConfig
         cfg = MCPConfig()
-        assert cfg.enable_biocontext is False
+        assert cfg.enable_biocontext == "auto"
         assert cfg.servers == []
         assert cfg.biocontext_mode == "remote"
         assert cfg.cache_ttl == 3600
@@ -444,7 +444,12 @@ class TestMCPConfig:
         from omicverse.utils.agent_config import AgentConfig
         cfg = AgentConfig()
         assert hasattr(cfg, "mcp")
-        assert cfg.mcp.enable_biocontext is False
+        assert cfg.mcp.enable_biocontext == "auto"
+
+    def test_from_flat_kwargs_default_is_auto(self):
+        from omicverse.utils.agent_config import AgentConfig
+        cfg = AgentConfig.from_flat_kwargs()
+        assert cfg.mcp.enable_biocontext == "auto"
 
     def test_from_flat_kwargs_with_mcp(self):
         from omicverse.utils.agent_config import AgentConfig
@@ -456,3 +461,67 @@ class TestMCPConfig:
         assert cfg.mcp.enable_biocontext is True
         assert cfg.mcp.biocontext_mode == "auto"
         assert len(cfg.mcp.servers) == 1
+
+
+# ---------------------------------------------------------------------------
+# Auto-detection logic
+# ---------------------------------------------------------------------------
+
+class TestBioContextAutoDetection:
+    """Test the keyword-based auto-detection used by run_async.
+
+    We import OmicVerseAgent only for its class-level constants and
+    static helpers — no instantiation needed.
+    """
+
+    @staticmethod
+    def _detect(request: str) -> bool:
+        """Reproduce the detection logic without instantiating the agent."""
+        from omicverse.utils.smart_agent import OmicVerseAgent
+        keywords = OmicVerseAgent._BIOCONTEXT_TRIGGER_KEYWORDS
+        lower = request.lower()
+        return any(kw in lower for kw in keywords)
+
+    def test_detects_english_protein_interaction(self):
+        assert self._detect("find protein interaction partners for TP53")
+
+    def test_detects_chinese_protein_interaction(self):
+        assert self._detect("查找TP53的蛋白互作伙伴")
+
+    def test_detects_kegg_pathway(self):
+        assert self._detect("look up KEGG pathway hsa04110")
+
+    def test_detects_cell_markers(self):
+        assert self._detect("get cell type markers for T cells from PanglaoDB")
+
+    def test_detects_drug_target(self):
+        assert self._detect("查询BRAF的药物靶点信息")
+
+    def test_detects_literature_search(self):
+        assert self._detect("search PubMed for CRISPR screen papers")
+
+    def test_no_trigger_for_normal_analysis(self):
+        assert not self._detect("quality control with nUMI>500")
+
+    def test_no_trigger_for_clustering(self):
+        assert not self._detect("leiden clustering with resolution 1.0")
+
+    def test_no_trigger_for_deg(self):
+        assert not self._detect("find differentially expressed genes between clusters")
+
+    def test_biocontext_is_eager(self):
+        from omicverse.utils.smart_agent import OmicVerseAgent
+        assert OmicVerseAgent._biocontext_is_eager(True)
+        assert OmicVerseAgent._biocontext_is_eager("yes")
+        assert OmicVerseAgent._biocontext_is_eager("true")
+        assert not OmicVerseAgent._biocontext_is_eager(False)
+        assert not OmicVerseAgent._biocontext_is_eager("auto")
+        assert not OmicVerseAgent._biocontext_is_eager("no")
+
+    def test_biocontext_is_disabled(self):
+        from omicverse.utils.smart_agent import OmicVerseAgent
+        assert OmicVerseAgent._biocontext_is_disabled(False)
+        assert OmicVerseAgent._biocontext_is_disabled("no")
+        assert OmicVerseAgent._biocontext_is_disabled("false")
+        assert not OmicVerseAgent._biocontext_is_disabled("auto")
+        assert not OmicVerseAgent._biocontext_is_disabled(True)

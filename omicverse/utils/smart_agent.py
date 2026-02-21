@@ -714,12 +714,133 @@ You can reference previous results without explicitly searching:
 - Relevant context is retrieved based on the current task
 """
 
+    # -- MCP helpers ---------------------------------------------------------
+
+    @staticmethod
+    def _biocontext_is_eager(value) -> bool:
+        """Return True when enable_biocontext means 'connect at init'."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("yes", "true", "1")
+        return bool(value)
+
+    @staticmethod
+    def _biocontext_is_disabled(value) -> bool:
+        """Return True when enable_biocontext means 'never connect'."""
+        if isinstance(value, bool):
+            return not value
+        if isinstance(value, str):
+            return value.lower() in ("no", "false", "0")
+        return not value
+
+    # Keywords that signal the query needs external biomedical databases.
+    _BIOCONTEXT_TRIGGER_KEYWORDS: List[str] = [
+        # Database names
+        "string", "uniprot", "kegg", "reactome", "panglao",
+        "open targets", "opentargets", "europe pmc", "europepmc",
+        # Biological concepts that need external lookup
+        "protein interaction", "protein-protein", "ppi network",
+        "interaction partner", "interactome",
+        "pathway lookup", "pathway database", "pathway info",
+        "cell type marker", "cell marker", "marker gene",
+        "drug target", "target info", "disease association",
+        "literature search", "pubmed", "paper search",
+        "gene annotation", "protein function",
+        # Chinese equivalents
+        "蛋白互作", "蛋白质互作", "互作网络", "互作伙伴",
+        "通路数据库", "通路查询", "通路信息",
+        "细胞标记", "标记基因", "marker基因",
+        "药物靶点", "疾病关联",
+        "文献搜索", "文献检索",
+    ]
+
+    def _detect_biocontext_need(self, request: str) -> bool:
+        """Fast keyword check: does this query need external databases?
+
+        This is intentionally lightweight (no LLM call) so it adds
+        negligible latency on every request.
+        """
+        lower = request.lower()
+        return any(kw in lower for kw in self._BIOCONTEXT_TRIGGER_KEYWORDS)
+
+    def _lazy_connect_biocontext(self) -> bool:
+        """Lazily connect to BioContext and rebuild the LLM prompt.
+
+        Returns True if connection succeeded and MCP tools are now
+        available, False otherwise.
+        """
+        if self._biocontext and self._biocontext.is_connected:
+            return True  # already connected
+
+        from .agent_config import MCPConfig
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+
+        try:
+            from .mcp_client import MCPClientManager
+            from .biocontext_bridge import BioContextBridge
+        except Exception as exc:
+            logger.warning("MCP modules not available: %s", exc)
+            return False
+
+        if self._mcp_manager is None:
+            self._mcp_manager = MCPClientManager()
+
+        self._biocontext = BioContextBridge(
+            mode=mcp_cfg.biocontext_mode,
+            context_manager=self._filesystem_context,
+            cache_ttl=mcp_cfg.cache_ttl,
+        )
+        try:
+            info = self._biocontext.connect()
+            self._merge_biocontext_into_manager()
+            print(f"   🔗 BioContext MCP auto-connected: {len(info.tools)} tools available")
+        except Exception as exc:
+            logger.warning("BioContext lazy connection failed: %s", exc)
+            print(f"   ⚠️  BioContext MCP auto-connection failed: {exc}")
+            self._biocontext = None
+            return False
+
+        # Rebuild the LLM system prompt with MCP tools injected
+        try:
+            with self._temporary_api_keys():
+                self._setup_agent()
+        except Exception as exc:
+            logger.warning("Failed to rebuild agent prompt after MCP connect: %s", exc)
+
+        return True
+
+    def _merge_biocontext_into_manager(self) -> None:
+        """Copy BioContext bridge's client state into the main MCP manager."""
+        if not self._biocontext or not self._biocontext.manager:
+            return
+        for name, srv in self._biocontext.manager._servers.items():
+            self._mcp_manager._servers[name] = srv
+        for tool_name, srv_name in self._biocontext.manager._tool_map.items():
+            self._mcp_manager._tool_map[tool_name] = srv_name
+        for name, client in self._biocontext.manager._http_clients.items():
+            self._mcp_manager._http_clients[name] = client
+
     def _init_mcp(self) -> None:
-        """Initialize MCP connections based on configuration."""
+        """Initialize MCP connections based on configuration.
+
+        For ``enable_biocontext="auto"`` (default), BioContext is NOT
+        connected here — it will be lazily connected when a query that
+        needs external databases is detected in ``run_async``.
+        """
         from .agent_config import MCPConfig
 
         mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
-        if not mcp_cfg.enable_biocontext and not mcp_cfg.servers:
+        bc_setting = mcp_cfg.enable_biocontext
+
+        # Determine if we need to do anything at init time
+        eager_bc = self._biocontext_is_eager(bc_setting)
+        is_auto = isinstance(bc_setting, str) and bc_setting.lower() == "auto"
+        has_servers = bool(mcp_cfg.servers)
+
+        if not eager_bc and not has_servers:
+            if is_auto:
+                print(f"   🔗 BioContext MCP: auto mode (will connect on demand)")
             return
 
         try:
@@ -731,8 +852,8 @@ You can reference previous results without explicitly searching:
 
         self._mcp_manager = MCPClientManager()
 
-        # Auto-connect BioContext if enabled
-        if mcp_cfg.enable_biocontext:
+        # Eager-connect BioContext (enable_biocontext=True or "yes")
+        if eager_bc:
             self._biocontext = BioContextBridge(
                 mode=mcp_cfg.biocontext_mode,
                 context_manager=self._filesystem_context,
@@ -740,14 +861,7 @@ You can reference previous results without explicitly searching:
             )
             try:
                 info = self._biocontext.connect()
-                # Share the manager's server registry
-                if self._biocontext.manager:
-                    for name, srv in self._biocontext.manager._servers.items():
-                        self._mcp_manager._servers[name] = srv
-                    for tool_name, srv_name in self._biocontext.manager._tool_map.items():
-                        self._mcp_manager._tool_map[tool_name] = srv_name
-                    for name, client in self._biocontext.manager._http_clients.items():
-                        self._mcp_manager._http_clients[name] = client
+                self._merge_biocontext_into_manager()
                 print(f"   🔗 BioContext MCP connected: {len(info.tools)} tools available")
             except Exception as exc:
                 logger.warning("BioContext connection failed: %s", exc)
@@ -3125,6 +3239,18 @@ if 'batch' in adata.obs.columns:
         print(f"   Classification: {complexity.upper()}")
         print()
 
+        # Step 1b: Auto-connect BioContext if the query needs external databases
+        from .agent_config import MCPConfig
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+        bc_setting = mcp_cfg.enable_biocontext
+        is_auto = isinstance(bc_setting, str) and bc_setting.lower() == "auto"
+        if is_auto and not self._biocontext_is_disabled(bc_setting):
+            if self._detect_biocontext_need(request):
+                bc_already = self._biocontext and self._biocontext.is_connected
+                if not bc_already:
+                    print(f"🔗 External database query detected — connecting BioContext MCP...")
+                    self._lazy_connect_biocontext()
+
         # Track which priority was used for metrics
         priority_used = None
         fallback_occurred = False
@@ -4097,7 +4223,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: bool = False, biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: str = "auto", biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -4141,8 +4267,11 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     mcp_servers : list[dict], optional
         List of MCP server connection dicts, each with keys like
         ``{"name": "biocontext", "url": "https://mcp.biocontext.ai/mcp/"}``.
-    enable_biocontext : bool, optional
-        Automatically connect to the BioContext MCP server (default: False).
+    enable_biocontext : str, optional
+        BioContext connection strategy (default: ``"auto"``).
+        ``"auto"`` — connect lazily when a query needs external databases.
+        ``True`` / ``"yes"`` — connect eagerly at Agent init.
+        ``False`` / ``"no"`` — never connect.
     biocontext_mode : str, optional
         BioContext connection mode: "remote", "local", or "auto" (default: "remote").
 
