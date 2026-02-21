@@ -145,7 +145,6 @@ class FilesystemContextManager:
         "snapshots": "Data state snapshots",
         "figures": "Generated figure paths",
         "errors": "Error logs and debugging info",
-        "mcp_cache": "Cached MCP tool query results",
     }
 
     def __init__(

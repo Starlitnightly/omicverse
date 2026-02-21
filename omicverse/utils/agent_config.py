@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 
 class SandboxFallbackPolicy(Enum):
@@ -24,7 +24,7 @@ class SandboxFallbackPolicy(Enum):
 @dataclass
 class LLMConfig:
     """LLM connection settings."""
-    model: str = "gemini-3-flash-preview"
+    model: str = "gemini-2.5-flash"
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     reasoning_effort: str = "high"  # "low" | "medium" | "high" for GPT-5
@@ -61,23 +61,12 @@ class ContextConfig:
 
 
 @dataclass
-class MCPConfig:
-    """MCP (Model Context Protocol) server connection settings."""
-    servers: List[Dict[str, Any]] = field(default_factory=list)
-    enable_biocontext: str = "auto"   # "auto" | True/"yes" | False/"no"
-    biocontext_mode: str = "remote"   # "remote" | "local" | "auto"
-    cache_ttl: int = 3600             # seconds before cached result expires
-    inject_tools_in_prompt: bool = True
-
-
-@dataclass
 class AgentConfig:
     """Aggregated agent configuration."""
     llm: LLMConfig = field(default_factory=LLMConfig)
     reflection: ReflectionConfig = field(default_factory=ReflectionConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
-    mcp: MCPConfig = field(default_factory=MCPConfig)
     verbose: bool = True
     history_enabled: bool = False
     history_path: Optional[Path] = None
@@ -91,7 +80,7 @@ class AgentConfig:
         cd = kw.get("context_storage_dir")
         return cls(
             llm=LLMConfig(
-                model=kw.get("model", "gemini-3-flash-preview"),
+                model=kw.get("model", "gemini-2.5-flash"),
                 api_key=kw.get("api_key"),
                 endpoint=kw.get("endpoint"),
             ),
@@ -111,11 +100,5 @@ class AgentConfig:
             context=ContextConfig(
                 enabled=kw.get("enable_filesystem_context", True),
                 storage_dir=Path(cd) if cd else None,
-            ),
-            mcp=MCPConfig(
-                servers=kw.get("mcp_servers") or [],
-                enable_biocontext=kw.get("enable_biocontext", "auto"),
-                biocontext_mode=kw.get("biocontext_mode", "remote"),
-                cache_ttl=kw.get("mcp_cache_ttl", 3600),
             ),
         )
