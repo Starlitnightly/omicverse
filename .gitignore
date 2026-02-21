@@ -36,3 +36,7 @@ progress.json
 .ruff*
 coverage.json
 htmlcov/
+
+#omicverse_web
+omicverse_web/models/
+omicverse_web/data/
