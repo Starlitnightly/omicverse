@@ -14,7 +14,9 @@ def test_complexity_classifier_pattern_matching_simple():
     from omicverse.utils.smart_agent import OmicVerseAgent
 
     # Create a minimal agent instance for testing
+    from omicverse.utils.agent_config import AgentConfig
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent._config = AgentConfig()
 
     # Test simple tasks (should be classified by pattern matching, no LLM call)
     simple_requests = [
@@ -30,15 +32,18 @@ def test_complexity_classifier_pattern_matching_simple():
 
     for request in simple_requests:
         result = asyncio.run(agent._analyze_task_complexity(request))
-        assert result == 'simple', f"Expected 'simple' for '{request}', got '{result}'"
-        print(f"✓ '{request}' -> {result}")
+        complexity = result["complexity"] if isinstance(result, dict) else result
+        assert complexity == 'simple', f"Expected 'simple' for '{request}', got '{complexity}'"
+        print(f"✓ '{request}' -> {complexity}")
 
 
 def test_complexity_classifier_pattern_matching_complex():
     """Test pattern-based classification for complex tasks."""
     from omicverse.utils.smart_agent import OmicVerseAgent
+    from omicverse.utils.agent_config import AgentConfig
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent._config = AgentConfig()
 
     # Test complex tasks (should be classified by pattern matching, no LLM call)
     complex_requests = [
@@ -52,15 +57,18 @@ def test_complexity_classifier_pattern_matching_complex():
 
     for request in complex_requests:
         result = asyncio.run(agent._analyze_task_complexity(request))
-        assert result == 'complex', f"Expected 'complex' for '{request}', got '{result}'"
-        print(f"✓ '{request}' -> {result}")
+        complexity = result["complexity"] if isinstance(result, dict) else result
+        assert complexity == 'complex', f"Expected 'complex' for '{request}', got '{complexity}'"
+        print(f"✓ '{request}' -> {complexity}")
 
 
 def test_complexity_classifier_keyword_detection():
     """Test that keyword detection works correctly."""
     from omicverse.utils.smart_agent import OmicVerseAgent
+    from omicverse.utils.agent_config import AgentConfig
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent._config = AgentConfig()
 
     # Test cases with expected results
     test_cases = [
@@ -76,15 +84,18 @@ def test_complexity_classifier_keyword_detection():
 
     for request, expected in test_cases:
         result = asyncio.run(agent._analyze_task_complexity(request))
-        assert result == expected, f"Expected '{expected}' for '{request}', got '{result}'"
-        print(f"✓ '{request}' -> {result} (expected: {expected})")
+        complexity = result["complexity"] if isinstance(result, dict) else result
+        assert complexity == expected, f"Expected '{expected}' for '{request}', got '{complexity}'"
+        print(f"✓ '{request}' -> {complexity} (expected: {expected})")
 
 
 def test_complexity_classifier_multilingual():
     """Test multilingual support (Chinese + English)."""
     from omicverse.utils.smart_agent import OmicVerseAgent
+    from omicverse.utils.agent_config import AgentConfig
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent._config = AgentConfig()
 
     # Chinese simple tasks
     chinese_simple = [
@@ -97,15 +108,18 @@ def test_complexity_classifier_multilingual():
 
     for request in chinese_simple:
         result = asyncio.run(agent._analyze_task_complexity(request))
-        assert result == 'simple', f"Expected 'simple' for Chinese '{request}', got '{result}'"
-        print(f"✓ '{request}' (Chinese) -> {result}")
+        complexity = result["complexity"] if isinstance(result, dict) else result
+        assert complexity == 'simple', f"Expected 'simple' for Chinese '{request}', got '{complexity}'"
+        print(f"✓ '{request}' (Chinese) -> {complexity}")
 
 
 def test_complexity_classifier_edge_cases():
     """Test edge cases and ambiguous requests."""
     from omicverse.utils.smart_agent import OmicVerseAgent
+    from omicverse.utils.agent_config import AgentConfig
 
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent._config = AgentConfig()
 
     # Edge cases - these may go to LLM or use defaults
     edge_cases = [
@@ -117,9 +131,10 @@ def test_complexity_classifier_edge_cases():
 
     for request in edge_cases:
         result = asyncio.run(agent._analyze_task_complexity(request))
+        complexity = result["complexity"] if isinstance(result, dict) else result
         # Just verify it returns a valid value, don't assert specific result
-        assert result in ['simple', 'complex'], f"Invalid result '{result}' for '{request}'"
-        print(f"✓ '{request}' -> {result}")
+        assert complexity in ['simple', 'complex'], f"Invalid result '{complexity}' for '{request}'"
+        print(f"✓ '{request}' -> {complexity}")
 
 
 if __name__ == "__main__":

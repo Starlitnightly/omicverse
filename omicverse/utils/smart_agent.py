@@ -734,36 +734,6 @@ You can reference previous results without explicitly searching:
             return value.lower() in ("no", "false", "0")
         return not value
 
-    # Keywords that signal the query needs external biomedical databases.
-    _BIOCONTEXT_TRIGGER_KEYWORDS: List[str] = [
-        # Database names
-        "string", "uniprot", "kegg", "reactome", "panglao",
-        "open targets", "opentargets", "europe pmc", "europepmc",
-        # Biological concepts that need external lookup
-        "protein interaction", "protein-protein", "ppi network",
-        "interaction partner", "interactome",
-        "pathway lookup", "pathway database", "pathway info",
-        "cell type marker", "cell marker", "marker gene",
-        "drug target", "target info", "disease association",
-        "literature search", "pubmed", "paper search",
-        "gene annotation", "protein function",
-        # Chinese equivalents
-        "蛋白互作", "蛋白质互作", "互作网络", "互作伙伴",
-        "通路数据库", "通路查询", "通路信息",
-        "细胞标记", "标记基因", "marker基因",
-        "药物靶点", "疾病关联",
-        "文献搜索", "文献检索",
-    ]
-
-    def _detect_biocontext_need(self, request: str) -> bool:
-        """Fast keyword check: does this query need external databases?
-
-        This is intentionally lightweight (no LLM call) so it adds
-        negligible latency on every request.
-        """
-        lower = request.lower()
-        return any(kw in lower for kw in self._BIOCONTEXT_TRIGGER_KEYWORDS)
-
     def _lazy_connect_biocontext(self) -> bool:
         """Lazily connect to BioContext and rebuild the LLM prompt.
 
@@ -1161,13 +1131,14 @@ User request: "quality control with nUMI>500, mito<0.2"
         except Exception as e:
             return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
-    async def _analyze_task_complexity(self, request: str) -> str:
+    async def _analyze_task_complexity(self, request: str) -> Dict[str, Any]:
         """
-        Analyze the complexity of a user request to determine the appropriate execution strategy.
+        Analyze the complexity of a user request and whether it needs external databases.
 
         This method uses a combination of pattern matching and LLM reasoning to classify
         whether a task can be handled with a single function call (simple) or requires
-        a multi-step workflow (complex).
+        a multi-step workflow (complex), and whether the task needs external biomedical
+        database queries via MCP (e.g. STRING, UniProt, KEGG, PanglaoDB).
 
         Parameters
         ----------
@@ -1176,22 +1147,19 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         Returns
         -------
-        str
-            Complexity classification: 'simple' or 'complex'
+        dict
+            ``{"complexity": "simple"|"complex", "needs_mcp": bool}``
 
         Examples
         --------
-        Simple tasks:
-        - "quality control with nUMI>500"
-        - "normalize data"
-        - "run PCA"
-        - "leiden clustering"
+        Simple, no MCP:
+        - "quality control with nUMI>500"  → {"complexity": "simple", "needs_mcp": False}
 
-        Complex tasks:
-        - "complete bulk RNA-seq DEG analysis pipeline"
-        - "perform spatial deconvolution from start to finish"
-        - "full single-cell preprocessing workflow"
-        - "analyze my data and generate report"
+        Complex, no MCP:
+        - "complete preprocessing pipeline" → {"complexity": "complex", "needs_mcp": False}
+
+        Simple/Complex, needs MCP:
+        - "find TP53 interaction partners"  → {"complexity": "simple", "needs_mcp": True}
         """
 
         # Pattern-based quick classification (fast path, no LLM needed)
@@ -1233,94 +1201,109 @@ User request: "quality control with nUMI>500, mito<0.2"
         simple_score = sum(1 for keyword in simple_keywords if keyword in request_lower)
         function_matches = sum(1 for func in simple_functions if func in request_lower)
 
-        # Pattern-based decision rules
+        # Pattern-based decision rules (fast path — still delegates MCP to LLM below)
+        pattern_complexity = None
         if complex_score >= 2:
-            # Multiple complexity indicators = definitely complex
+            pattern_complexity = 'complex'
             logger.debug(f"Complexity: complex (pattern match, score={complex_score})")
-            return 'complex'
-
-        if function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
-            # Short request with function name, no complexity indicators = simple
+        elif function_matches >= 1 and complex_score == 0 and len(request.split()) <= 10:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (pattern match, function_matches={function_matches})")
-            return 'simple'
-
-        # Report/summary tasks: simple_score keywords indicate non-computational tasks
-        # These should NOT trigger UMAP/MDE visualizations or complex workflows
-        if simple_score >= 2 and complex_score == 0:
-            # Multiple simple indicators (e.g., "plain-language markdown report") = simple
+        elif simple_score >= 2 and complex_score == 0:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (report/summary pattern, simple_score={simple_score})")
-            return 'simple'
-
-        if simple_score >= 1 and complex_score == 0 and function_matches == 0:
-            # Simple task indicator without function match (likely report/summary)
+        elif simple_score >= 1 and complex_score == 0 and function_matches == 0:
+            pattern_complexity = 'simple'
             logger.debug(f"Complexity: simple (simple keyword match, score={simple_score})")
-            return 'simple'
 
-        # Ambiguous cases: Use LLM for classification
-        logger.debug("Complexity: using LLM classifier for ambiguous request")
+        # If BioContext auto-mode is disabled, skip MCP detection entirely
+        from .agent_config import MCPConfig
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+        bc_setting = mcp_cfg.enable_biocontext
+        skip_mcp_detection = self._biocontext_is_disabled(bc_setting) or self._biocontext_is_eager(bc_setting)
 
-        classification_prompt = f"""You are a task complexity analyzer for bioinformatics workflows.
+        if pattern_complexity and skip_mcp_detection:
+            # Fast path: pattern decided complexity AND MCP detection not needed
+            return {"complexity": pattern_complexity, "needs_mcp": False}
 
-Analyze this user request and classify it as either SIMPLE or COMPLEX:
+        # Use LLM for classification (handles ambiguous complexity AND MCP detection)
+        logger.debug("Using LLM classifier for request analysis")
+
+        # Build the MCP detection clause only when auto-mode is active
+        mcp_clause = ""
+        mcp_response_clause = ""
+        if not skip_mcp_detection:
+            mcp_clause = """
+
+Also determine whether this request needs EXTERNAL BIOMEDICAL DATABASE queries.
+
+NEEDS_MCP = YES when the task requires data that is NOT in the local dataset:
+- Protein-protein interactions (e.g., "interaction partners", "PPI network", "STRING")
+- Protein/gene annotation from databases (e.g., "UniProt", "gene function")
+- Pathway information (e.g., "KEGG pathway", "Reactome", "pathway lookup")
+- Cell-type marker genes from databases (e.g., "PanglaoDB markers", "known markers for T cells")
+- Drug/disease target info (e.g., "Open Targets", "drug target")
+- Literature search (e.g., "search papers", "PubMed", "EuropePMC")
+
+NEEDS_MCP = NO for standard local analysis operations:
+- QC, normalization, PCA, clustering, DEG, visualization, etc.
+- Using marker genes already computed from the user's own data
+- Any operation that only needs the local adata object"""
+
+            mcp_response_clause = ' Then on a NEW LINE, write "mcp:yes" or "mcp:no".'
+
+        classification_prompt = f"""You are a task analyzer for bioinformatics workflows.
+
+Analyze this user request:
 
 Request: "{request}"
 
-Classification rules:
+1. Classify COMPLEXITY as SIMPLE or COMPLEX:
 
 SIMPLE tasks:
 - Single operation or function call
 - One specific action (e.g., "quality control", "normalize", "cluster", "plot")
 - Direct parameter specification (e.g., "with nUMI>500")
-- Examples:
-  - "quality control with nUMI>500, mito<0.2"
-  - "normalize using log transformation"
-  - "run PCA with 50 components"
-  - "leiden clustering with resolution=1.0"
-  - "plot UMAP"
 
 COMPLEX tasks:
 - Multiple steps or operations needed
 - Full workflows or pipelines
-- Phrases like "complete analysis", "full pipeline", "from start to finish"
-- Multiple operations in sequence (e.g., "do X and then Y")
-- Vague requests needing multiple steps (e.g., "analyze my data")
-- Examples:
-  - "complete bulk RNA-seq DEG analysis pipeline"
-  - "full preprocessing workflow for single-cell data"
-  - "spatial deconvolution from start to finish"
-  - "perform clustering and generate visualizations"
-  - "analyze my data and create a report"
+- Multiple operations in sequence
+- Vague requests needing multiple steps
+{mcp_clause}
 
-Respond with ONLY one word: either "simple" or "complex"
+Respond with ONLY "simple" or "complex" on the first line.{mcp_response_clause}
 """
 
         try:
             with self._temporary_api_keys():
                 if not self._llm:
-                    # Fallback to conservative default if LLM unavailable
-                    logger.warning("LLM unavailable for complexity classification, defaulting to 'complex'")
-                    return 'complex'
+                    logger.warning("LLM unavailable for classification, defaulting to 'complex'")
+                    return {"complexity": pattern_complexity or "complex", "needs_mcp": False}
 
                 response_text = await self._llm.run(classification_prompt)
-
-                # Extract classification from response
                 response_clean = response_text.strip().lower()
 
-                if 'simple' in response_clean:
-                    logger.debug(f"Complexity: simple (LLM classified)")
-                    return 'simple'
-                elif 'complex' in response_clean:
-                    logger.debug(f"Complexity: complex (LLM classified)")
-                    return 'complex'
+                # Parse complexity
+                first_line = response_clean.split('\n')[0].strip()
+                if 'simple' in first_line:
+                    complexity = 'simple'
+                elif 'complex' in first_line:
+                    complexity = 'complex'
                 else:
-                    # Unable to parse, default to complex (safer)
-                    logger.warning(f"Could not parse LLM complexity response: {response_text}, defaulting to 'complex'")
-                    return 'complex'
+                    complexity = pattern_complexity or 'complex'
+
+                # Parse MCP need
+                needs_mcp = False
+                if not skip_mcp_detection and 'mcp:yes' in response_clean:
+                    needs_mcp = True
+
+                logger.debug(f"LLM analysis: complexity={complexity}, needs_mcp={needs_mcp}")
+                return {"complexity": complexity, "needs_mcp": needs_mcp}
 
         except Exception as exc:
-            # On any error, default to complex (safer, won't break functionality)
-            logger.warning(f"Complexity classification failed: {exc}, defaulting to 'complex'")
-            return 'complex'
+            logger.warning(f"Task analysis failed: {exc}, defaulting to 'complex'")
+            return {"complexity": pattern_complexity or "complex", "needs_mcp": False}
 
     async def _run_registry_workflow(self, request: str, adata: Any) -> Any:
         """
@@ -3233,23 +3216,22 @@ if 'batch' in adata.obs.columns:
         if self.provider == "python":
             raise ValueError("Python provider requires executable Python code in the request.")
 
-        # Step 1: Analyze task complexity
-        print(f"📊 Analyzing task complexity...")
-        complexity = await self._analyze_task_complexity(request)
-        print(f"   Classification: {complexity.upper()}")
+        # Step 1: Analyze task complexity + MCP need (single LLM call)
+        print(f"📊 Analyzing task...")
+        analysis = await self._analyze_task_complexity(request)
+        complexity = analysis["complexity"]
+        needs_mcp = analysis.get("needs_mcp", False)
+        print(f"   Complexity: {complexity.upper()}")
+        if needs_mcp:
+            print(f"   External databases: needed")
         print()
 
-        # Step 1b: Auto-connect BioContext if the query needs external databases
-        from .agent_config import MCPConfig
-        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
-        bc_setting = mcp_cfg.enable_biocontext
-        is_auto = isinstance(bc_setting, str) and bc_setting.lower() == "auto"
-        if is_auto and not self._biocontext_is_disabled(bc_setting):
-            if self._detect_biocontext_need(request):
-                bc_already = self._biocontext and self._biocontext.is_connected
-                if not bc_already:
-                    print(f"🔗 External database query detected — connecting BioContext MCP...")
-                    self._lazy_connect_biocontext()
+        # Step 1b: Auto-connect BioContext if the LLM determined it's needed
+        if needs_mcp:
+            bc_already = self._biocontext and self._biocontext.is_connected
+            if not bc_already:
+                print(f"🔗 External database query detected — connecting BioContext MCP...")
+                self._lazy_connect_biocontext()
 
         # Track which priority was used for metrics
         priority_used = None
