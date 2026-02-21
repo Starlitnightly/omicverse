@@ -469,6 +469,11 @@ class OmicVerseAgent:
             else:
                 print(f"   ⚡ Filesystem context disabled")
 
+            # Initialize MCP connections if configured
+            self._mcp_manager = None
+            self._biocontext = None
+            self._init_mcp()
+
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
@@ -709,6 +714,89 @@ You can reference previous results without explicitly searching:
 - Relevant context is retrieved based on the current task
 """
 
+    def _init_mcp(self) -> None:
+        """Initialize MCP connections based on configuration."""
+        from .agent_config import MCPConfig
+
+        mcp_cfg = getattr(self._config, "mcp", None) or MCPConfig()
+        if not mcp_cfg.enable_biocontext and not mcp_cfg.servers:
+            return
+
+        try:
+            from .mcp_client import MCPClientManager
+            from .biocontext_bridge import BioContextBridge
+        except Exception as exc:
+            logger.warning("MCP modules not available: %s", exc)
+            return
+
+        self._mcp_manager = MCPClientManager()
+
+        # Auto-connect BioContext if enabled
+        if mcp_cfg.enable_biocontext:
+            self._biocontext = BioContextBridge(
+                mode=mcp_cfg.biocontext_mode,
+                context_manager=self._filesystem_context,
+                cache_ttl=mcp_cfg.cache_ttl,
+            )
+            try:
+                info = self._biocontext.connect()
+                # Share the manager's server registry
+                if self._biocontext.manager:
+                    for name, srv in self._biocontext.manager._servers.items():
+                        self._mcp_manager._servers[name] = srv
+                    for tool_name, srv_name in self._biocontext.manager._tool_map.items():
+                        self._mcp_manager._tool_map[tool_name] = srv_name
+                    for name, client in self._biocontext.manager._http_clients.items():
+                        self._mcp_manager._http_clients[name] = client
+                print(f"   🔗 BioContext MCP connected: {len(info.tools)} tools available")
+            except Exception as exc:
+                logger.warning("BioContext connection failed: %s", exc)
+                print(f"   ⚠️  BioContext MCP connection failed: {exc}")
+                self._biocontext = None
+
+        # Connect additional user-provided servers
+        for srv_kwargs in mcp_cfg.servers:
+            srv_name = srv_kwargs.get("name", "unknown")
+            try:
+                self._mcp_manager.connect(**srv_kwargs)
+                srv_info = self._mcp_manager.server_info(srv_name)
+                n_tools = len(srv_info.tools) if srv_info else 0
+                print(f"   🔗 MCP server '{srv_name}' connected: {n_tools} tools")
+            except Exception as exc:
+                logger.warning("MCP server '%s' failed: %s", srv_name, exc)
+                print(f"   ⚠️  MCP server '{srv_name}' connection failed: {exc}")
+
+    def _build_mcp_tools_instructions(self) -> str:
+        """Build MCP tools section for the LLM system prompt."""
+        if not self._mcp_manager or not self._mcp_manager.connected_servers:
+            return ""
+
+        tools_text = self._mcp_manager.tools_for_llm_prompt()
+        if not tools_text:
+            return ""
+
+        return f"""
+
+## External Database Tools (MCP)
+
+You have access to external biomedical databases via the Model Context Protocol.
+To query these databases in your generated code, use:
+
+```python
+result = mcp_call("tool_name", {{"param": "value"}})
+```
+
+The `mcp_call` function is pre-loaded in the execution environment.
+Results are automatically cached — repeated queries with the same parameters
+return cached results without network calls.
+
+**IMPORTANT**: Only call MCP tools when the user's request explicitly needs
+external database information (e.g., protein interactions, pathway data,
+gene markers). Do NOT call MCP tools for standard analysis operations.
+
+{tools_text}
+"""
+
     @contextmanager
     def _temporary_api_keys(self):
         """Temporarily inject API keys into the environment and clean up afterwards."""
@@ -857,7 +945,13 @@ User request: "quality control with nUMI>500, mito<0.2"
         # Add filesystem context instructions if enabled
         if self.enable_filesystem_context and self._filesystem_context:
             instructions += self._build_filesystem_context_instructions()
-        
+
+        # Add MCP tools instructions if connected
+        mcp_cfg = getattr(self._config, "mcp", None)
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            if mcp_cfg is None or mcp_cfg.inject_tools_in_prompt:
+                instructions += self._build_mcp_tools_instructions()
+
         # Prepare API key environment pin if passed (non-destructive)
         if self.api_key:
             required_key = PROVIDER_API_KEYS.get(self.model)
@@ -1407,8 +1501,16 @@ Now generate code for: "{request}"
                 f"{skill_guidance_text}\n"
             )
 
-        # Step 3: Build comprehensive prompt (registry + skills)
+        # Step 3: Build comprehensive prompt (registry + skills + MCP)
         functions_info = self._get_available_functions_info()
+
+        mcp_section = ""
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            mcp_section = (
+                "\nExternal Database Tools (MCP):\n"
+                "Use `mcp_call(tool_name, args_dict)` to query external databases.\n"
+                f"{self._mcp_manager.tools_for_llm_prompt()}\n"
+            )
 
         priority2_prompt = f'''You are a workflow orchestrator for OmicVerse. This is a COMPLEX task requiring multiple steps.
 
@@ -1420,6 +1522,7 @@ Dataset info:
 Available OmicVerse Functions (Registry):
 {functions_info}
 {skill_guidance_section}
+{mcp_section}
 
 INSTRUCTIONS:
 1. This is a COMPLEX task - generate a complete multi-step workflow
@@ -2879,6 +2982,20 @@ if 'batch' in adata.obs.columns:
             sandbox_globals.setdefault("sc", allowed_modules["scanpy"])
         if "omicverse" in allowed_modules:
             sandbox_globals.setdefault("ov", allowed_modules["omicverse"])
+
+        # Inject MCP tool caller if connected
+        if self._mcp_manager and self._mcp_manager.connected_servers:
+            _mcp_mgr = self._mcp_manager
+            _bc = self._biocontext
+
+            def mcp_call(tool_name: str, arguments: dict = None):
+                """Call an MCP tool and return the result."""
+                return _mcp_mgr.call(tool_name, arguments or {})
+
+            sandbox_globals["mcp_call"] = mcp_call
+            if _bc:
+                sandbox_globals["biocontext"] = _bc
+
         return sandbox_globals
 
     def _detect_direct_python_request(self, request: str) -> Optional[str]:
@@ -3950,6 +4067,13 @@ Example workflow:
             except:
                 pass
 
+        # Cleanup MCP connections
+        if hasattr(self, '_mcp_manager') and self._mcp_manager:
+            try:
+                self._mcp_manager.disconnect_all()
+            except:
+                pass
+
 
 def list_supported_models(show_all: bool = False) -> str:
     """
@@ -3973,7 +4097,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, mcp_servers: Optional[List[Dict[str, Any]]] = None, enable_biocontext: bool = False, biocontext_mode: str = "remote", config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -4014,6 +4138,13 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
         selective context retrieval. Default: True.
     context_storage_dir : str, optional
         Directory for storing context files. Defaults to ~/.ovagent/context/
+    mcp_servers : list[dict], optional
+        List of MCP server connection dicts, each with keys like
+        ``{"name": "biocontext", "url": "https://mcp.biocontext.ai/mcp/"}``.
+    enable_biocontext : bool, optional
+        Automatically connect to the BioContext MCP server (default: False).
+    biocontext_mode : str, optional
+        BioContext connection mode: "remote", "local", or "auto" (default: "remote").
 
     Returns
     -------
@@ -4062,6 +4193,29 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     >>> info = agent.get_current_session_info()
     >>> print(f"Session: {info['session_id']}, Prompts: {info['prompt_count']}/{info['max_prompts']}")
     """
+    # Build config with MCP settings if not already provided
+    if config is None:
+        config = AgentConfig.from_flat_kwargs(
+            model=model,
+            api_key=api_key,
+            endpoint=endpoint,
+            enable_reflection=enable_reflection,
+            reflection_iterations=reflection_iterations,
+            enable_result_review=enable_result_review,
+            use_notebook_execution=use_notebook_execution,
+            max_prompts_per_session=max_prompts_per_session,
+            notebook_storage_dir=notebook_storage_dir,
+            keep_execution_notebooks=keep_execution_notebooks,
+            notebook_timeout=notebook_timeout,
+            strict_kernel_validation=strict_kernel_validation,
+            enable_filesystem_context=enable_filesystem_context,
+            context_storage_dir=context_storage_dir,
+            mcp_servers=mcp_servers,
+            enable_biocontext=enable_biocontext,
+            biocontext_mode=biocontext_mode,
+        )
+        config.verbose = verbose
+
     return OmicVerseAgent(
         model=model,
         api_key=api_key,
