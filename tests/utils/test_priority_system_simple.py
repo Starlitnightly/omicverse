@@ -63,7 +63,7 @@ def test_phase2_priority1_workflow():
     source = read_smart_agent()
 
     # Check for method definition
-    assert re.search(r'async def _run_registry_workflow\s*\(\s*self\s*,\s*request\b.*adata\b.*\)\s*->\s*Any\s*:', source), \
+    assert re.search(r'async def _run_registry_workflow\s*\(\s*self\s*,\s*request\s*:\s*str\s*,\s*adata\s*:\s*Any\s*\)\s*->\s*Any\s*:', source), \
         "Missing _run_registry_workflow method"
     print("✓ Method _run_registry_workflow defined")
 
@@ -103,7 +103,7 @@ def test_phase3_priority2_workflow():
     source = read_smart_agent()
 
     # Check for method definition
-    assert re.search(r'async def _run_skills_workflow\s*\(\s*self\s*,\s*request\b.*adata\b.*\)\s*->\s*Any\s*:', source), \
+    assert re.search(r'async def _run_skills_workflow\s*\(\s*self\s*,\s*request\s*:\s*str\s*,\s*adata\s*:\s*Any\s*\)\s*->\s*Any\s*:', source), \
         "Missing _run_skills_workflow method"
     print("✓ Method _run_skills_workflow defined")
 
@@ -188,12 +188,12 @@ def test_phase5_integration():
     print("✓ Calls _analyze_task_complexity")
 
     # Check for Priority 1 call
-    assert re.search(r'await\s+self\._run_registry_workflow\(\s*request\s*,\s*adata\b.*\)', source), \
+    assert re.search(r'await\s+self\._run_registry_workflow\(\s*request\s*,\s*adata\s*\)', source), \
         "Missing Priority 1 call"
     print("✓ Calls _run_registry_workflow")
 
     # Check for Priority 2 call
-    assert re.search(r'await\s+self\._run_skills_workflow\(\s*request\s*,\s*adata\b.*\)', source), \
+    assert re.search(r'await\s+self\._run_skills_workflow\(\s*request\s*,\s*adata\s*\)', source), \
         "Missing Priority 2 call"
     print("✓ Calls _run_skills_workflow")
 
