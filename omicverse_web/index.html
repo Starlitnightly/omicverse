@@ -1404,6 +1404,51 @@
         .app-skin-dark .code-block {
             border-color: rgba(148, 163, 184, 0.3) !important;
         }
+        html:not(.app-skin-dark) .paper-card {
+            background: #ffffff !important;
+            border: 1px solid rgba(15, 23, 42, 0.14) !important;
+            box-shadow: 0 16px 36px -28px rgba(15, 23, 42, 0.45) !important;
+        }
+        html:not(.app-skin-dark) .paper-title {
+            color: #0f172a !important;
+        }
+        html:not(.app-skin-dark) .paper-authors {
+            color: #475569 !important;
+        }
+        html:not(.app-skin-dark) .paper-doi {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0;
+            color: #0f172a !important;
+        }
+        html:not(.app-skin-dark) .bibtex-pre {
+            background: #0b1220 !important;
+            border-color: #1f2937 !important;
+            color: #d1fae5 !important;
+        }
+        .app-skin-dark .paper-card {
+            background: #0b120f !important;
+            border: 1px solid rgba(148, 163, 184, 0.24) !important;
+            box-shadow: 0 20px 40px -28px rgba(0, 0, 0, 0.8) !important;
+        }
+        .app-skin-dark .paper-journal {
+            color: #86efac !important;
+        }
+        .app-skin-dark .paper-title {
+            color: #e7f5ec !important;
+        }
+        .app-skin-dark .paper-authors {
+            color: #a7bbb0 !important;
+        }
+        .app-skin-dark .paper-doi {
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(148, 163, 184, 0.28) !important;
+            color: #d7e4dd !important;
+        }
+        .app-skin-dark .bibtex-pre {
+            background: #050a08 !important;
+            border-color: rgba(148, 163, 184, 0.24) !important;
+            color: #d1fae5 !important;
+        }
 
         /* ── Title Side Glow ───────────────────────────────────────────── */
         .hero-title,
@@ -2047,9 +2092,9 @@ pip install -e .</div>
                 <div class="paper-card">
                     <div class="row g-4 align-items-start">
                         <div class="col-md-8">
-                            <div class="paper-journal">Nature Communications · 2024</div>
+                            <div class="paper-journal">Nature Communications · 15:5983 · 2024</div>
                             <div class="paper-title">OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing</div>
-                            <div class="paper-authors">Zehua Zeng, Yuqing Ma, Tairan Zhong, Guangyuan Liao, et al.</div>
+                            <div class="paper-authors">Zehua Zeng, Yuqing Ma, Lu Hu, et al.</div>
                             <div><span class="paper-doi">DOI: 10.1038/s41467-024-50194-3</span></div>
                         </div>
                         <div class="col-md-4 d-flex flex-column gap-2">
@@ -2069,9 +2114,10 @@ pip install -e .</div>
                             <pre class="bibtex-pre" id="bibtex-text">@article{zeng2024omicverse,
   title     = {OmicVerse: a framework for bridging and deepening
                insights across bulk and single-cell sequencing},
-  author    = {Zeng, Zehua and Ma, Yuqing and Zhong, Tairan and others},
+  author    = {Zeng, Zehua and Ma, Yuqing and Hu, Lu and others},
   journal   = {Nature Communications},
   volume    = {15},
+  pages     = {5983},
   year      = {2024},
   doi       = {10.1038/s41467-024-50194-3},
   publisher = {Springer Nature}
