@@ -2781,6 +2781,12 @@ def handle_file_too_large(e):
 
 @app.route('/')
 def index():
+    """Serve the OmicVerse homepage."""
+    return send_from_directory(app.root_path, 'index.html')
+
+
+@app.route('/analysis')
+def analysis():
     """Serve single cell analysis interface."""
     return send_from_directory(app.root_path, 'single_cell_analysis_standalone.html')
 

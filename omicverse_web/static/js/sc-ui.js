@@ -144,6 +144,14 @@ Object.assign(SingleCellAnalysis.prototype, {
                 .then(data => {
                     if (data.genes) {
                         geneList = data.genes;
+                        this._geneList = data.genes; // store for custom-axes datalists
+
+                        // Populate datalists for custom axes gene selection
+                        const opts = data.genes.map(g => `<option value="${g}">`).join('');
+                        ['x-axis-gene-datalist', 'y-axis-gene-datalist'].forEach(id => {
+                            const dl = document.getElementById(id);
+                            if (dl) dl.innerHTML = opts;
+                        });
                     }
                 })
                 .catch(error => {
@@ -439,12 +447,27 @@ Object.assign(SingleCellAnalysis.prototype, {
             this.showParameterPlaceholder();
         }
 
-        // Auto-select first embedding and update plot
-        if (data.embeddings.length > 0) {
+        // Restore persisted dynamic inputs (embedding, color, etc.)
+        const _restoredDynamic = this.restoreDynamicInputs ? this.restoreDynamicInputs() : new Set();
+
+        // Auto-select first embedding only if nothing was restored from cache
+        if (!_restoredDynamic.has('embedding-select') && data.embeddings.length > 0) {
             embeddingSelect.value = data.embeddings[0];
-            this._syncCustomAxesToPreset(data.embeddings[0]);
-            this.updatePlot();
         }
+        // Sync custom axes to match current embedding ONLY if custom axes were NOT restored
+        // (if custom axes were restored, they're already set up correctly)
+        if (embeddingSelect.value && !this._customAxesActive) {
+            this._syncCustomAxesToPreset(embeddingSelect.value);
+        }
+        // Restore renderer after a short delay (plot needs to exist first)
+        setTimeout(() => { if (this.restoreRenderer) this.restoreRenderer(); }, 300);
+        
+        // Trigger plot update after a brief delay to ensure all DOM updates are complete
+        // This is especially important for custom axes restoration, where UI elements
+        // need to be populated before getXYAxes() can return valid values
+        setTimeout(() => {
+            this.updatePlot();
+        }, 50);
     },
 
     refreshDataFromKernel(data) {
@@ -708,6 +731,7 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     switchView(view) {
         this.currentView = view;
+        this.persistView(view); // persist across refreshes
 
         const vizView      = document.getElementById('visualization-view');
         const codeView     = document.getElementById('code-editor-view');
@@ -906,7 +930,7 @@ Object.assign(SingleCellAnalysis.prototype, {
      * the user collapse / expand the card body.
      *
      * Cards opt-out with the  data-no-collapse  attribute.
-     * State is persisted in sessionStorage so panels remember their position
+     * State is persisted in localStorage so panels remember their position
      * after a soft refresh.
      *
      * Safe to call multiple times — already-initialised cards are skipped.
@@ -924,12 +948,12 @@ Object.assign(SingleCellAnalysis.prototype, {
             // Already initialised?
             if (header.querySelector('.card-collapse-btn')) return;
 
-            // ── stable unique ID for sessionStorage ────────────────────────
+            // ── stable unique ID for localStorage ──────────────────────────
             // Walk up to find a real id, or assign a data-cc-id to the card.
             if (!card.dataset.ccId) {
                 card.dataset.ccId = card.id || `cc-${Date.now()}-${idx}`;
             }
-            const storageKey = `cc-${card.dataset.ccId}`;
+            const storageKey = `ov:a:cc-${card.dataset.ccId}`;
 
             // ── inject toggle button ───────────────────────────────────────
             const btn = document.createElement('button');
@@ -959,7 +983,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                     body.style.paddingBottom = '';
                     body.style.maxHeight     = body.scrollHeight + 'px';
                     btn.classList.remove('collapsed');
-                    sessionStorage.removeItem(storageKey);
+                    localStorage.removeItem(storageKey);
                     // After animation, remove max-height so dynamic content can grow
                     body.addEventListener('transitionend', function onEnd() {
                         if (!btn.classList.contains('collapsed')) {
@@ -977,7 +1001,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                         body.style.paddingBottom = '0';
                     }));
                     btn.classList.add('collapsed');
-                    sessionStorage.setItem(storageKey, '1');
+                    localStorage.setItem(storageKey, '1');
                     // After animation: shrink card and re-sync panel height
                     body.addEventListener('transitionend', function onEnd() {
                         if (btn.classList.contains('collapsed')) {
@@ -1002,7 +1026,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             // Do this AFTER wiring events so the card is fully set up.
             // If the card is inside a hidden container (scrollHeight === 0),
             // skip setting maxHeight – it will be initialised on first interaction.
-            if (sessionStorage.getItem(storageKey) === '1') {
+            if (localStorage.getItem(storageKey) === '1') {
                 body.style.maxHeight     = '0';
                 body.style.paddingTop    = '0';
                 body.style.paddingBottom = '0';
@@ -1038,6 +1062,9 @@ Object.assign(SingleCellAnalysis.prototype, {
             // Hide the embedding select to make it clear it's not used
             if (embSel) embSel.style.display = 'none';
             if (icon)   { icon.classList.remove('fa-pen-alt'); icon.classList.add('fa-undo'); }
+            this._customAxesActive = true;
+            // Persist activation state
+            try { localStorage.setItem(this._PERSIST_NS_SESSION + '__custom-axes-active', 'true'); } catch(_) {}
         } else {
             // ── Close custom axes — revert to preset mode ───────────────────
             row.style.display = 'none';
@@ -1046,6 +1073,8 @@ Object.assign(SingleCellAnalysis.prototype, {
             if (icon)   { icon.classList.remove('fa-undo'); icon.classList.add('fa-pen-alt'); }
             const badge = document.getElementById('custom-axes-badge');
             if (badge) badge.style.display = 'none';
+            // Clear activation state
+            try { localStorage.removeItem(this._PERSIST_NS_SESSION + '__custom-axes-active'); } catch(_) {}
             // Re-trigger plot with the preset
             const emb = (embSel || {}).value;
             if (emb) this.updatePlot();
@@ -1229,5 +1258,323 @@ Object.assign(SingleCellAnalysis.prototype, {
 
 });
 
+// ============================================================================
+// ── Input & State Persistence ────────────────────────────────────────────────
+// Comprehensive localStorage-based persistence for all user inputs and UI state.
+// Namespace  ov:a:  → always kept (agent/env settings, view, etc.)
+// Namespace  ov:s:  → session (cleared on explicit "Reset" click)
+// ============================================================================
+Object.assign(SingleCellAnalysis.prototype, {
 
+    // ── initialisation ───────────────────────────────────────────────────────
 
+    /**
+     * Call once on startup (before data loads).
+     * Initialises constants as OWN properties (avoids prototype-chain lookup
+     * inside event callbacks), restores all static persisted inputs, and
+     * wires event listeners for future saves.
+     */
+    initInputPersistence() {
+        // ── constants as own instance properties ───────────────────────────
+        this._PERSIST_NS_ALWAYS  = 'ov:a:';
+        this._PERSIST_NS_SESSION = 'ov:s:';
+
+        /** IDs that must NEVER be persisted */
+        this._PERSIST_EXCLUDE = new Set([
+            'fileInput', 'fileInputPreview', 'notebook-file-input',
+            'agent-input',          // temporary query textarea
+            'text-file-editor', 'md-file-editor',  // file content editors
+            'kernel-select',        // depends on live kernels
+        ]);
+
+        /**
+         * IDs whose <option> list is built dynamically from loaded data.
+         * Restored AFTER updateUI() populates the options.
+         */
+        this._PERSIST_DYNAMIC_IDS = new Set([
+            'embedding-select', 'color-select',
+            'traj-pseudotime-col', 'traj-basis', 'traj-paga-groups',
+            'traj-heatmap-pseudotime', 'traj-heatmap-layer',
+            'deg-violin-groupby', 'deg-violin-layer',
+            // Note: x-axis-key-select, y-axis-key-select are restored in custom axes logic
+        ]);
+
+        /** IDs in the ALWAYS namespace (never cleared by clearPersistedSession) */
+        this._PERSIST_ALWAYS_IDS = new Set([
+            'agent-api-base', 'agent-api-key', 'agent-model',
+            'agent-temperature', 'agent-top-p', 'agent-max-tokens',
+            'agent-timeout', 'agent-system-prompt',
+            'env-mirror-select', 'env-pip-extra',
+            'env-custom-channel', 'env-conda-extra',
+        ]);
+
+        // 1. Restore static (non-dynamic) inputs right away
+        this._restoreAllStatic();
+
+        // 2. Restore extra UI state (active view, renderer, etc.)
+        this._restoreUIState();
+
+        // 3. Wire save listeners on every input/change event (capture phase
+        //    so we catch events before any stopPropagation in components)
+        document.addEventListener('change', e => this._persistOnEvent(e), true);
+        document.addEventListener('input',  e => this._persistOnEvent(e), true);
+    },
+
+    // ── event handler ────────────────────────────────────────────────────────
+
+    _persistOnEvent(e) {
+        const el = e.target;
+        if (!el || !el.id) return;
+        if (this._PERSIST_EXCLUDE.has(el.id)) return;
+        if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) return;
+        this._persistSaveEl(el);
+    },
+
+    // ── low-level save / restore ─────────────────────────────────────────────
+
+    /** Save one element's current value to localStorage */
+    _persistSaveEl(el) {
+        try {
+            const val = (el.type === 'checkbox') ? String(el.checked) : el.value;
+            const ns  = this._PERSIST_ALWAYS_IDS.has(el.id)
+                ? this._PERSIST_NS_ALWAYS
+                : this._PERSIST_NS_SESSION;
+            localStorage.setItem(ns + el.id, val);
+        } catch (_) {}
+    },
+
+    /** Save an arbitrary key/value into the session namespace */
+    persistStateVal(key, val) {
+        try {
+            localStorage.setItem(this._PERSIST_NS_SESSION + '__' + key, String(val));
+        } catch (_) {}
+    },
+
+    /** Load an arbitrary key from session namespace */
+    loadStateVal(key, defaultVal = null) {
+        try {
+            const v = localStorage.getItem(this._PERSIST_NS_SESSION + '__' + key);
+            return (v !== null) ? v : defaultVal;
+        } catch (_) { return defaultVal; }
+    },
+
+    /** Save an arbitrary key/value into the always namespace */
+    persistAlwaysVal(key, val) {
+        try {
+            localStorage.setItem(this._PERSIST_NS_ALWAYS + '__' + key, String(val));
+        } catch (_) {}
+    },
+
+    loadAlwaysVal(key, defaultVal = null) {
+        try {
+            const v = localStorage.getItem(this._PERSIST_NS_ALWAYS + '__' + key);
+            return (v !== null) ? v : defaultVal;
+        } catch (_) { return defaultVal; }
+    },
+
+    /**
+     * Restore one element by id.
+     * For <select>, only restores if the saved value actually exists
+     * in the current options (guards against stale data).
+     */
+    _persistRestoreOne(id, ns) {
+        try {
+            const el  = document.getElementById(id);
+            const val = localStorage.getItem(ns + id);
+            if (!el || val === null) return false;
+            if (el.type === 'checkbox') {
+                el.checked = (val === 'true');
+            } else if (el.tagName === 'SELECT') {
+                if ([...el.options].some(o => o.value === val)) {
+                    el.value = val;
+                } else {
+                    return false;
+                }
+            } else {
+                el.value = val;
+            }
+            return true;
+        } catch (_) { return false; }
+    },
+
+    // ── batch restore helpers ────────────────────────────────────────────────
+
+    /** Restore all persisted static (non-dynamic) inputs from localStorage */
+    _restoreAllStatic() {
+        try {
+            const skipIds = new Set([
+                ...this._PERSIST_EXCLUDE,
+                ...this._PERSIST_DYNAMIC_IDS,
+            ]);
+            for (const ns of [this._PERSIST_NS_SESSION, this._PERSIST_NS_ALWAYS]) {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!key || !key.startsWith(ns)) continue;
+                    const id = key.slice(ns.length);
+                    if (id.startsWith('__')) continue;  // state keys, not element ids
+                    if (skipIds.has(id)) continue;
+                    this._persistRestoreOne(id, ns);
+                }
+            }
+        } catch (_) {}
+    },
+
+    /**
+     * Restore data-dependent selects AND controls that are programmatically
+     * reset by updateUI() (e.g. point-size-slider via initPointSizeSlider).
+     * Called at the END of updateUI(), after options have been populated.
+     * Returns a Set of IDs that were successfully restored.
+     */
+    restoreDynamicInputs() {
+        const ns = this._PERSIST_NS_SESSION;
+        const restored = new Set();
+
+        // ── data-dependent selects ────────────────────────────────────────
+        for (const id of this._PERSIST_DYNAMIC_IDS) {
+            if (this._persistRestoreOne(id, ns)) restored.add(id);
+        }
+
+        // ── custom axes text/select inputs ────────────────────────────────
+        // Step 1: Restore source values first (needed to determine which UI to show)
+        const xSourceRestored = this._persistRestoreOne('x-axis-source', ns);
+        const ySourceRestored = this._persistRestoreOne('y-axis-source', ns);
+        const hasCustomAxes = xSourceRestored || ySourceRestored;
+
+        // Step 2: Check if custom axes mode was active
+        const wasActive = localStorage.getItem(ns + '__custom-axes-active') === 'true';
+
+        // Step 3: If custom axes were used, restore the full UI state
+        if (hasCustomAxes && wasActive) {
+            // Activate custom axes mode
+            const customRow = document.getElementById('custom-axes-row');
+            const embSelect = document.getElementById('embedding-select');
+            const badge     = document.getElementById('custom-axes-badge');
+            const icon      = document.getElementById('custom-axes-icon');
+            const toggleBtn = document.getElementById('custom-axes-toggle');
+
+            if (customRow) customRow.style.display = '';
+            if (embSelect) embSelect.style.display = 'none';
+            if (badge)     badge.style.display = '';
+            if (icon)      { icon.classList.remove('fa-pen-alt'); icon.classList.add('fa-undo'); }
+            if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-undo-alt me-1"></i>';
+            this._customAxesActive = true;
+
+            // Step 4: For each axis, populate UI based on source, then restore values
+            ['x', 'y'].forEach(ax => {
+                // Populate options based on restored source
+                this._populateAxisKeySels(ax);
+                // Restore key-select/key-input value AFTER populating options
+                const source = (document.getElementById(`${ax}-axis-source`) || {}).value;
+                if (source === 'obsm' || source === 'obs') {
+                    if (this._persistRestoreOne(`${ax}-axis-key-select`, ns)) {
+                        restored.add(`${ax}-axis-key-select`);
+                    }
+                    // If obsm, also restore dim and update dim options
+                    if (source === 'obsm') {
+                        const key = (document.getElementById(`${ax}-axis-key-select`) || {}).value;
+                        if (key) this._updateAxisDims(ax, key);
+                        if (this._persistRestoreOne(`${ax}-axis-dim`, ns)) {
+                            restored.add(`${ax}-axis-dim`);
+                        }
+                    }
+                } else if (source === 'gene') {
+                    if (this._persistRestoreOne(`${ax}-axis-key-input`, ns)) {
+                        restored.add(`${ax}-axis-key-input`);
+                    }
+                }
+            });
+            // Mark that custom axes were restored
+            restored.add('custom-axes');
+        } else {
+            // If custom axes were not active, still restore the values (for future use)
+            // but don't activate the UI
+            ['x-axis-key-input', 'y-axis-key-input',
+             'x-axis-dim',       'y-axis-dim'].forEach(id => {
+                this._persistRestoreOne(id, ns);
+            });
+        }
+
+        // ── point-size slider (reset to auto by initPointSizeSlider) ─────
+        try {
+            const sizeSlider = document.getElementById('point-size-slider');
+            const sizeLabel  = document.getElementById('point-size-value');
+            const savedSize  = localStorage.getItem(ns + 'point-size-slider');
+            const isAuto     = localStorage.getItem(ns + '__point-size-auto') !== 'false';
+            if (sizeSlider && savedSize !== null && !isAuto) {
+                sizeSlider.value       = savedSize;
+                sizeSlider.dataset.auto = 'false';
+                if (sizeLabel) sizeLabel.textContent = parseFloat(savedSize).toFixed(1);
+                restored.add('point-size-slider');
+            }
+        } catch (_) {}
+
+        // ── opacity slider (update display label after restore) ───────────
+        try {
+            const opacitySlider = document.getElementById('opacity-slider');
+            const opacityLabel  = document.getElementById('opacity-value');
+            const savedOpacity  = localStorage.getItem(ns + 'opacity-slider');
+            if (opacitySlider && savedOpacity !== null) {
+                opacitySlider.value = savedOpacity;
+                if (opacityLabel) opacityLabel.textContent = parseFloat(savedOpacity).toFixed(2);
+                restored.add('opacity-slider');
+            }
+        } catch (_) {}
+
+        // ── static controls that need label updates ───────────────────────
+        // (vmin-input, vmax-input, gene-input, palette-select, category-palette-select
+        //  are restored by _restoreAllStatic() on page load and are stable here)
+
+        return restored;
+    },
+
+    // ── extra UI state (view, renderer, custom-axes) ─────────────────────────
+
+    _restoreUIState() {
+        // Restore active view tab
+        const view = this.loadAlwaysVal('activeView');
+        if (view && view !== 'visualization') {
+            // Defer to after DOM is ready
+            requestAnimationFrame(() => {
+                if (this.switchView) this.switchView(view);
+            });
+        }
+        // Renderer is restored after data loads (see restoreDynamicInputs)
+    },
+
+    /** Persist the active view name whenever it changes */
+    persistView(view) {
+        this.persistAlwaysVal('activeView', view);
+    },
+
+    /** Persist renderer mode whenever it changes */
+    persistRenderer(mode) {
+        this.persistStateVal('renderer', mode || 'auto');
+    },
+
+    /** Restore renderer mode — called after data loads */
+    restoreRenderer() {
+        const mode = this.loadStateVal('renderer', 'auto');
+        if (mode && mode !== 'auto' && this.setRenderer) {
+            // Use requestAnimationFrame to ensure the plot is ready
+            requestAnimationFrame(() => this.setRenderer(mode));
+        }
+    },
+
+    // ── clear session (called on Reset) ──────────────────────────────────────
+
+    /**
+     * Remove all session-scoped keys from localStorage.
+     * Always-scoped keys (agent/env settings) are kept.
+     * Card collapse states are also reset.
+     */
+    clearPersistedSession() {
+        try {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(this._PERSIST_NS_SESSION)) keys.push(k);
+            }
+            keys.forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
+    },
+});

@@ -6,7 +6,14 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     onColorSelectChange() {
         const geneInput = document.getElementById('gene-input');
-        if (geneInput) geneInput.value = '';
+        if (geneInput) {
+            geneInput.value = '';
+            // Clear gene-input from localStorage too (programmatic clear doesn't fire events)
+            try { localStorage.removeItem('ov:s:gene-input'); } catch (_) {}
+        }
+        // Save the new color-select value explicitly (belt + suspenders)
+        const colSel = document.getElementById('color-select');
+        if (colSel && this._persistSaveEl) this._persistSaveEl(colSel);
         this.updatePlot();
     },
 
@@ -605,6 +612,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         const label  = document.getElementById('point-size-value');
         if (slider) slider.dataset.auto = 'false';
         if (label)  label.textContent = parseFloat(value).toFixed(1);
+        // Persist auto=false flag so restore knows user set a manual size
+        try { localStorage.setItem('ov:s:__point-size-auto', 'false'); } catch(_){}
         this.applyPointStyleLive();
     },
 
@@ -630,6 +639,12 @@ Object.assign(SingleCellAnalysis.prototype, {
             opacitySlider.value = 0.7;
             if (opacityLabel) opacityLabel.textContent = '0.70';
         }
+        // Persist the reset state
+        try {
+            localStorage.setItem('ov:s:__point-size-auto', 'true');
+            localStorage.removeItem('ov:s:point-size-slider'); // forget manual size
+            localStorage.setItem('ov:s:opacity-slider', '0.7');
+        } catch(_) {}
         this.applyPointStyleLive();
     },
 
@@ -1054,70 +1069,14 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     colorByGene() {
+        // Delegate entirely to updatePlot() which already:
+        //   - reads gene-input value and uses it as color_by
+        //   - handles both Plotly and WebGL (deck.gl) render paths
+        //   - correctly passes custom xyAxes when active
+        //   - calls updatePaletteVisibility internally
         const gene = document.getElementById('gene-input').value.trim();
         if (!gene) return;
-
-        const embedding = document.getElementById('embedding-select').value;
-        if (!embedding) {
-            alert(this.t('controls.embeddingPlaceholder'));
-            return;
-        }
-
-        // Update palette visibility for gene expression (continuous)
-        this.updatePaletteVisibility('gene:' + gene);
-
-        // 检查是否已经有图表存在
-        const plotDiv = document.getElementById('plotly-div');
-        const hasExistingPlot = plotDiv && plotDiv.data && plotDiv.data.length > 0;
-
-        if (hasExistingPlot) {
-            this.showStatus(this.t('gene.updating'), true);
-        } else {
-            this.showStatus(this.t('gene.loading'), true);
-        }
-
-        // Get selected palette (only continuous for gene expression)
-        const paletteSelect = document.getElementById('palette-select');
-        const palette = paletteSelect && paletteSelect.value !== 'default' ? paletteSelect.value : null;
-
-        // Get vmin/vmax values
-        const vminInput = document.getElementById('vmin-input');
-        const vmaxInput = document.getElementById('vmax-input');
-        const vmin = vminInput && vminInput.value ? parseFloat(vminInput.value) : null;
-        const vmax = vmaxInput && vmaxInput.value ? parseFloat(vmaxInput.value) : null;
-
-        fetch('/api/plot', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                embedding: embedding,
-                color_by: 'gene:' + gene,
-                palette: palette,
-                category_palette: null,
-                vmin: vmin,
-                vmax: vmax
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            this.hideStatus();
-            if (data.error) {
-                this.addToLog(this.t('gene.error') + ': ' + data.error, 'error');
-                this.showStatus(this.t('gene.notFound') + ': ' + gene, false);
-                alert(this.t('gene.notFound') + ': ' + gene);
-            } else {
-                this.plotData(data);
-                this.addToLog(this.t('gene.showing') + ': ' + gene);
-                this.showStatus(this.t('gene.loaded'), false);
-            }
-        })
-        .catch(error => {
-            this.hideStatus();
-            this.addToLog(this.t('gene.loadFailed') + ': ' + error.message, 'error');
-            this.showStatus(this.t('gene.loadFailed') + ': ' + error.message, false);
-        });
+        this.updatePlot();
     },
 
     updateAdataStatus(data, diff = null) {
@@ -1637,7 +1596,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (this._deckglCurrentEmbedding) {
             const _origThreshold = this._rasterThreshold;
             this._rasterThreshold = Infinity; // temporarily disable auto-routing
-            this.createNewPlot(this._deckglCurrentEmbedding, this._deckglCurrentColorBy);
+            const xyAxes = this.getXYAxes ? this.getXYAxes() : null;
+            this.createNewPlot(this._deckglCurrentEmbedding, this._deckglCurrentColorBy, xyAxes);
             this._rasterThreshold = _origThreshold;
         }
     },
@@ -1888,7 +1848,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         const plotlyDiv = document.getElementById('plotly-div');
         if (plotlyDiv) plotlyDiv.style.display = '';
         this._rasterViewport = null;
-        this.createNewPlot(this._currentRasterEmbedding, this._currentRasterColorBy);
+        const xyAxes = this.getXYAxes ? this.getXYAxes() : null;
+        this.createNewPlot(this._currentRasterEmbedding, this._currentRasterColorBy, xyAxes);
     },
 
 });
@@ -1923,21 +1884,25 @@ SingleCellAnalysis.prototype._syncRendererButtons = function (active /* 'deckgl'
  */
 SingleCellAnalysis.prototype.setRenderer = function (mode) {
     this._forceRenderer = (mode === 'auto') ? null : mode;
+    if (this.persistRenderer) this.persistRenderer(mode); // cache for page refresh
 
     const emb     = document.getElementById('embedding-select') && document.getElementById('embedding-select').value;
+    // Get custom axes if active (same logic as updatePlot)
+    const xyAxes = this.getXYAxes ? this.getXYAxes() : null;
+    // Allow rendering even without preset embedding if custom axes are active
+    if (!emb && !xyAxes) return; // nothing to render yet
+
     const colorBy = (() => {
         const geneEl  = document.getElementById('gene-input');
         const geneVal = geneEl ? geneEl.value.trim() : '';
         return geneVal ? 'gene:' + geneVal : (document.getElementById('color-select') || {}).value || '';
     })();
 
-    if (!emb) return; // nothing to render yet
-
     if (mode === 'deckgl') {
         this._syncRendererButtons('deckgl');
         const plotlyDiv = document.getElementById('plotly-div');
         if (plotlyDiv) plotlyDiv.style.display = 'none';
-        this.createDeckGLPlot(emb, colorBy);
+        this.createDeckGLPlot(emb, colorBy, xyAxes);
     } else if (mode === 'plotly') {
         this._syncRendererButtons('plotly');
         const wrap = document.getElementById('deckgl-wrap');
@@ -1946,7 +1911,7 @@ SingleCellAnalysis.prototype.setRenderer = function (mode) {
         if (plotlyDiv) plotlyDiv.style.display = '';
         const savedThreshold = this._rasterThreshold;
         this._rasterThreshold = Infinity;
-        _origCreateNewPlot.call(this, emb, colorBy);
+        _origCreateNewPlot.call(this, emb, colorBy, xyAxes);
         this._rasterThreshold = savedThreshold;
     } else {
         // auto: re-render with default routing
@@ -1959,7 +1924,7 @@ SingleCellAnalysis.prototype.setRenderer = function (mode) {
 // Auto-routing patch: respects _forceRenderer, then falls back to threshold
 // ============================================================================
 const _origCreateNewPlot = SingleCellAnalysis.prototype.createNewPlot;
-SingleCellAnalysis.prototype.createNewPlot = function (embedding, colorBy) {
+SingleCellAnalysis.prototype.createNewPlot = function (embedding, colorBy, xyAxes) {
     const nCells   = this.currentData ? (this.currentData.n_cells || 0) : 0;
     const useDeck  = this._forceRenderer === 'deckgl'
         || (this._forceRenderer !== 'plotly' && nCells > this._rasterThreshold);
@@ -1967,7 +1932,7 @@ SingleCellAnalysis.prototype.createNewPlot = function (embedding, colorBy) {
     if (useDeck) {
         if (this._forceRenderer !== 'deckgl') this._syncRendererButtons('auto');
         else this._syncRendererButtons('deckgl');
-        this.createDeckGLPlot(embedding, colorBy);
+        this.createDeckGLPlot(embedding, colorBy, xyAxes);
     } else {
         if (this._forceRenderer !== 'plotly') this._syncRendererButtons('auto');
         else this._syncRendererButtons('plotly');
@@ -1979,7 +1944,7 @@ SingleCellAnalysis.prototype.createNewPlot = function (embedding, colorBy) {
         // Show Plotly
         const plotlyDiv = document.getElementById('plotly-div');
         if (plotlyDiv) plotlyDiv.style.display = '';
-        _origCreateNewPlot.call(this, embedding, colorBy);
+        _origCreateNewPlot.call(this, embedding, colorBy, xyAxes);
     }
 };
 

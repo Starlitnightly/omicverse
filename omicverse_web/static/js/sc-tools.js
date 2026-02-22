@@ -1857,6 +1857,8 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     resetData() {
         if (confirm(this.t('status.resetConfirm'))) {
+            // Clear all session-persisted state (inputs, renderer, view prefs)
+            if (this.clearPersistedSession) this.clearPersistedSession();
             this.currentData = null;
             // Reset preview mode on data reset
             this.isPreviewMode = false;

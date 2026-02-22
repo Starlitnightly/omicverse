@@ -763,8 +763,10 @@
                                                 style="flex:1;min-width:0;"
                                                 onchange="singleCellApp.onAxisKeyChange('x')"></select>
                                         <input type="text" class="form-control form-control-sm" id="x-axis-key-input"
+                                               list="x-axis-gene-datalist"
                                                style="flex:1;min-width:0;display:none;" placeholder="Gene…"
                                                oninput="singleCellApp.onCustomAxisApply()">
+                                        <datalist id="x-axis-gene-datalist"></datalist>
                                         <select class="form-select form-select-sm flex-shrink-0" id="x-axis-dim"
                                                 style="width:52px;"
                                                 onchange="singleCellApp.onCustomAxisApply()"></select>
@@ -785,8 +787,10 @@
                                                 style="flex:1;min-width:0;"
                                                 onchange="singleCellApp.onAxisKeyChange('y')"></select>
                                         <input type="text" class="form-control form-control-sm" id="y-axis-key-input"
+                                               list="y-axis-gene-datalist"
                                                style="flex:1;min-width:0;display:none;" placeholder="Gene…"
                                                oninput="singleCellApp.onCustomAxisApply()">
+                                        <datalist id="y-axis-gene-datalist"></datalist>
                                         <select class="form-select form-select-sm flex-shrink-0" id="y-axis-dim"
                                                 style="width:52px;"
                                                 onchange="singleCellApp.onCustomAxisApply()"></select>

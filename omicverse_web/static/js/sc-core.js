@@ -69,6 +69,8 @@ class SingleCellAnalysis {
         window.addEventListener('resize', () => this.syncPanelHeight());
         // Initialise collapsible cards (runs after all HTML is parsed)
         this.initCollapsibleCards();
+        // Initialise input & state persistence (restores cached values)
+        this.initInputPersistence();
     }
 }
 
