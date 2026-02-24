@@ -59,12 +59,10 @@ Notes:
     - All methods are thoroughly tested and validated
     - Regular updates incorporate latest algorithmic advances
 """
-from . import (scSLAT,CEFCON,mofapy2,GNTD,spaceflow,STT,
-               tosica,STAGATE_pyG,STAligner,spatrio,PROST,cytotrace2,
-               GraphST,commot,cnmf,starfysh,flowsig,PyWGCNA,
-               CAST,scanorama,scdiffusion,BINARY,cellanova,VIA,gaston,pyscenic,
-                bin2cell,sude_py,harmony
-               )
+
+# Cache for lazy-loaded modules
+_lazy_modules = {}
+
 __all__ = [
     'scSLAT',
     'CEFCON',
@@ -96,4 +94,63 @@ __all__ = [
     'bin2cell',
     'sude_py',
     'harmony',
+    'datacollect',
 ]
+
+
+def __getattr__(name):
+    """
+    Lazy import modules on first access.
+    
+    This function is called when an attribute is accessed that doesn't exist
+    in the module's namespace. It dynamically imports the requested module
+    only when it's actually needed, avoiding the overhead of importing all
+    external modules at once.
+    
+    Parameters
+    ----------
+    name : str
+        The name of the module to import
+        
+    Returns
+    -------
+    module
+        The imported module
+        
+    Raises
+    ------
+    AttributeError
+        If the requested module is not available or not in __all__
+    """
+    if name not in __all__:
+        raise AttributeError(
+            f"module '{__name__}' has no attribute '{name}'"
+        )
+    
+    # Check cache first
+    if name in _lazy_modules:
+        return _lazy_modules[name]
+    
+    # Import the module dynamically
+    try:
+        import importlib
+        module = importlib.import_module(f'.{name}', package='omicverse.external')
+        _lazy_modules[name] = module
+        return module
+    except ImportError as e:
+        raise AttributeError(
+            f"module '{__name__}' has no attribute '{name}'. "
+            f"Failed to import: {e}"
+        ) from e
+
+
+def __dir__():
+    """
+    Provide a complete list of available attributes for tab completion.
+    
+    Returns
+    -------
+    list
+        List of available module names
+    """
+    return __all__
