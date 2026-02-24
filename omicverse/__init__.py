@@ -42,6 +42,8 @@ Examples:
 # Fix PyArrow compatibility issue
 # PyExtensionType was renamed to ExtensionType in newer versions
 import os
+import sys
+import importlib
 try:
     import pyarrow
     if hasattr(pyarrow, 'ExtensionType') and not hasattr(pyarrow, 'PyExtensionType'):
@@ -111,6 +113,26 @@ _LAZY_ATTRS = {
     'AnnData': ('anndata', 'AnnData'),
     'concat': ('anndata', 'concat'),
 }
+
+_DEFAULT_CORE_PACKAGES = (
+    "scanpy",
+    "anndata",
+    "numpy",
+    "pandas",
+    "matplotlib.pyplot",
+    "scipy",
+    "sklearn",
+    "torch",
+)
+
+_DEFAULT_OMICVERSE_MODULES = (
+    "pp",
+    "single",
+    "pl",
+    "bulk",
+    "space",
+    "utils",
+)
 
 name = "omicverse"
 try:
@@ -224,10 +246,90 @@ def __dir__():
 
         # Version
         "__version__",
+        "load_package",
     ]
     # Add utils to lazy modules for proper handling
     lazy_modules_with_utils = _LAZY_MODULES | {'utils', 'datacollect'}
     return sorted(set(base_attrs + list(lazy_modules_with_utils)))
+
+
+def load_package(
+    packages=None,
+    omicverse_modules=None,
+    include_omicverse_modules=True,
+    show_summary=True,
+):
+    """
+    Preload core dependencies to warm up lazy imports.
+
+    Parameters
+    ----------
+    packages : list[str] | tuple[str] | None
+        External package import paths. Defaults to common heavy dependencies
+        such as scanpy and torch.
+    omicverse_modules : list[str] | tuple[str] | None
+        Top-level omicverse modules to preload via lazy getattr.
+    include_omicverse_modules : bool
+        Whether to preload omicverse lazy modules in addition to external
+        dependencies.
+    show_summary : bool
+        Whether to print a short success/failure summary at the end.
+
+    Returns
+    -------
+    dict
+        Dict containing `loaded`, `failed`, and `results`.
+    """
+    package_list = tuple(packages) if packages is not None else _DEFAULT_CORE_PACKAGES
+    module_list = tuple(omicverse_modules) if omicverse_modules is not None else _DEFAULT_OMICVERSE_MODULES
+
+    tasks = [("package", p) for p in package_list]
+    if include_omicverse_modules:
+        tasks.extend(("omicverse", m) for m in module_list)
+
+    try:
+        from tqdm.auto import tqdm
+        iterator = tqdm(tasks, desc="ov.load_package", unit="item")
+    except Exception:
+        tqdm = None
+        iterator = tasks
+
+    results = []
+    current_module = sys.modules[__name__]
+
+    for task_type, target in iterator:
+        error = None
+        try:
+            if task_type == "package":
+                importlib.import_module(target)
+            else:
+                getattr(current_module, target)
+        except Exception as exc:
+            error = str(exc)
+
+        success = error is None
+        results.append(
+            {
+                "type": task_type,
+                "name": target,
+                "success": success,
+                "error": error,
+            }
+        )
+        if tqdm is not None:
+            status = "OK" if success else "FAIL"
+            iterator.set_postfix_str(f"{status}: {target}")
+
+    loaded = [r["name"] for r in results if r["success"]]
+    failed = [r for r in results if not r["success"]]
+
+    if show_summary:
+        print(f"ov.load_package loaded {len(loaded)}/{len(results)} targets.")
+        if failed:
+            failed_names = ", ".join(f"{r['type']}:{r['name']}" for r in failed)
+            print(f"Failed targets: {failed_names}")
+
+    return {"loaded": loaded, "failed": failed, "results": results}
 
 
 __all__ = [
@@ -276,6 +378,7 @@ __all__ = [
     "pd",
     "AnnData",
     "concat",
+    "load_package",
 
     # Version
     "__version__",
