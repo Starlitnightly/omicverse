@@ -10,7 +10,7 @@
 | CI/CD   |  [![pre-commit.ci status][precommit-badge]][precommit-link]               |
 | Docs    | [![Documentation Status][readthedocs-badge]][readthedocs-link] [![Preprint][preprint-badge]][preprint-link]                                            |
 | Package | [![PyPI - Version][pypi-badge]][pypi-link] [![pypi download][pypi-download-badge]][pypi-download-link] [![Conda-forge badge][conda-forge-badge]][anaconda-link] [![Docker image][docker-badge]][docker-link] |
-| Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link]            |
+| Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link] [![Star][star-badge]][star-link] [![Citations][citation-badge]][citation-link]           |
 
 
 [precommit-badge]: https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg
@@ -31,6 +31,10 @@
 [license-link]: https://img.shields.io/apm/l/vim-mode
 [scverse-badge]: https://img.shields.io/badge/scverse-ecosystem-blue.svg?labelColor=yellow
 [scverse-link]: https://scverse.org/
+[star-badge]:https://img.shields.io/github/stars/Starlitnightly/omicverse
+[star-link]:https://github.com/Starlitnightly/omicverse
+[citation-badge]:https://citations.njzjz.win/10.1038/s41467-024-50194-3
+[citation-link]:https://doi.org/10.1038/s41467-024-50194-3
 </div>
 
 
@@ -208,8 +212,17 @@ omicverse基于以下四种数据结构实现。
 
   <tr>
     <td align="center">scvelo<br><a href="https://github.com/theislab/scvelo">📦</a> <a href="http://dx.doi.org/10.1038/s41587-020-0591-3">📖</a></td>
-    <td align="center">Dyanmo<br><a href="https://github.com/aristoteleo/dynamo-release">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S0092867421015774">📖</a></td>
-
+    <td align="center">Dynamo<br><a href="https://github.com/aristoteleo/dynamo-release">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S0092867421015774">📖</a></td>
+    <td align="center">CONCORD<br><a href="https://github.com/Gartner-Lab/Concord/">📦</a> <a href="https://www.nature.com/articles/s41587-025-02950-z">📖</a></td>
+    <td align="center">FlashDeconv<br><a href="https://github.com/cafferychen777/FlashDeconv">📦</a> <a href="https://doi.org/10.64898/2025.12.22.696108">📖</a></td>
+    <td align="center">Hospot<br><a href="https://github.com/yoseflab/hotspot">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S2405471221001149?via%3Dihub">📖</a></td>
+    <td align="center">Banksy<br><a href="https://github.com/prabhakarlab/Banksy_py">📦</a> <a href="https://www.nature.com/articles/s41588-024-01664-3#citeas">📖</a></td>
+  </tr>
+  <tr>
+    <td align="center">STAR<br><a href="https://github.com/alexdobin/STAR">📦</a> <a href="https://pubmed.ncbi.nlm.nih.gov/23104886/">📖</a></td>
+    <td align="center">fastp<br><a href="https://github.com/aristoteleo/dynamo-release">📦</a> <a href="https://www.sciencedirect.com/science/article/pii/S0092867421015774">📖</a></td>
+    <td align="center">featureCounts<br><a href="https://github.com/ShiLab-Bioinformatics/subread">📦</a> <a href="https://pubmed.ncbi.nlm.nih.gov/24227677/">📖</a></td>
+    <td align="center">edgeR<br><a href="https://bioconductor.org/packages/devel/bioc/html/edgeR.html">📦</a> <a href="https://academic.oup.com/nar/article/doi/10.1093/nar/gkaf018/7973897">📖</a></td>
   </tr>
 </table>
 </div>
@@ -230,6 +243,20 @@ omicverse基于以下四种数据结构实现。
 ## `6` [开发者指南和贡献](#)
 
 如果您想为omicverse贡献代码，请参考我们的[开发者文档](https://omicverse.readthedocs.io/en/latest/Developer_guild/)。
+
+### 本地运行测试
+
+安装测试依赖并使用 `pytest` 运行测试：
+
+```bash
+pip install -e .[tests]
+# 或安装最新固定依赖
+pip install -r requirements-latest.txt
+
+pytest
+```
+
+可选的 `tests` extra 和 `requirements-latest.txt` 文件已经包含 `pytest-asyncio>=0.23`，这是 `tests/utils/` 目录下异步流式测试所必需的。
 
 <table align="center">
     <tr>
@@ -257,9 +284,9 @@ omicverse基于以下四种数据结构实现。
 
 > **CellOntologyMapper: Consensus mapping of cell type annotation**
 >
-> Zeng, Z., Wang, X., Du, H.
+> Zeng, Z., Wang, X., Du, H. et al.
 >
-> _bioRxiv_ 2025年6月20日. doi: [10.1101/2025.06.10.658951](https://doi.org/10.1101/2025.06.10.658951).
+> _imetaomics_ 2025年11月6日. doi: [10.1002/imo2.70064](https://doi.org/10.1002/imo2.70064).
 
 ## `8` [其他](#)
 
