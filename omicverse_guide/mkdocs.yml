@@ -12,6 +12,9 @@ nav:
 - Installation: Installation_guild.md
 - Tutorial:
     - Bulk:
+        - Upstream:
+            - Bulk RNA-seq alignment with STAR: Tutorials-bulk/t_alignment_STAR.ipynb
+            - Bulk RNA-seq alignment with kb-python: Tutorials-bulk/t_alignment_kbpython.ipynb
         - Preprocessing:
             - Batch correction in Bulk RNA-seq or microarray data: Tutorials-bulk/t_bulk_combat.ipynb
         - Downstream:

@@ -222,7 +222,7 @@ def __getattr__(name):
                 return module
             except ImportError as e:
                 raise AttributeError(
-                    f"Module 'omicverse' has no attribute '{name}'"
+                    f"Maybe some package not installed, checked the other outputss for more details."
                 ) from e
 
     # If not found, raise AttributeError
