@@ -470,14 +470,44 @@ def rank_genes_groups_df(
     log2fc_min: float | None = None,
 ) -> pd.DataFrame:
     """Return a DataFrame with the results of rank_genes_groups."""
+    import numpy as np
+
+    result = adata.uns[key]
+
+    # Resolve group index (needed for plain 2D arrays stored by cosg)
+    names_data = result.get("names")
+    group_index: int | None = None
+    if names_data is not None:
+        if isinstance(names_data, pd.DataFrame):
+            cols = names_data.columns.tolist()
+        elif hasattr(names_data, "dtype") and names_data.dtype.names:
+            cols = list(names_data.dtype.names)
+        else:
+            cols = []
+        if group in cols:
+            group_index = cols.index(group)
+
+    def _extract(data, grp: str, gi: int | None):
+        """Extract the column for `grp` from various storage formats."""
+        if isinstance(data, pd.DataFrame):
+            return data[grp].values if grp in data.columns else None
+        if hasattr(data, "dtype") and data.dtype.names:
+            return data[grp] if grp in data.dtype.names else None
+        # Plain 2D ndarray — use positional index
+        if gi is not None and isinstance(data, np.ndarray) and data.ndim == 2:
+            return data[:, gi]
+        return None
+
     d = pd.DataFrame()
     for k in ['names', 'scores', 'logfoldchanges', 'pvals', 'pvals_adj']:
-        if k in adata.uns[key]:
-            d[k] = pd.DataFrame(adata.uns[key][k])[group]
-    
-    if log2fc_min is not None:
+        if k in result:
+            col = _extract(result[k], group, group_index)
+            if col is not None:
+                d[k] = col
+
+    if log2fc_min is not None and 'logfoldchanges' in d.columns:
         d = d[d['logfoldchanges'].abs() > log2fc_min]
-    
+
     return d
 
 def _get_values_to_plot(
@@ -693,3 +723,104 @@ def rank_genes_groups_dotplot(
     elif not show:
         return _pl
     return None
+
+
+@register_function(
+    aliases=["标记基因点图", "markers_dotplot", "marker点图", "marker_dotplot", "markers_dot"],
+    category="pl",
+    description="Create a dot plot from marker genes — a clean drop-in replacement for rank_genes_groups_dotplot",
+    examples=[
+        "# Basic usage after find_markers",
+        "ov.single.find_markers(adata, groupby='leiden')",
+        "ov.pl.markers_dotplot(adata, groupby='leiden')",
+        "",
+        "# Custom gene count and colormap",
+        "ov.pl.markers_dotplot(adata, groupby='leiden', n_genes=5, cmap='RdBu_r')",
+        "",
+        "# Use a custom key (e.g. from cosg with key_added)",
+        "ov.pl.markers_dotplot(adata, groupby='leiden', key='leiden_cosg', n_genes=3)",
+        "",
+        "# Standard-scale by variable and disable dendrogram",
+        "ov.pl.markers_dotplot(adata, groupby='leiden', standard_scale='var',",
+        "                      dendrogram=False, n_genes=5)",
+    ],
+    related=["pl.rank_genes_groups_dotplot", "pl.dotplot", "single.find_markers", "single.get_markers"],
+)
+def markers_dotplot(
+    adata: AnnData,
+    groupby: Optional[str] = None,
+    key: Optional[str] = None,
+    n_genes: int = 5,
+    groups: Optional[Union[str, Sequence[str]]] = None,
+    standard_scale: Optional[Literal["var", "group"]] = "var",
+    cmap: Union[Colormap, str, None] = "Spectral_r",
+    dendrogram: bool = False,
+    min_logfoldchange: Optional[float] = None,
+    use_raw: Optional[bool] = None,
+    layer: Optional[str] = None,
+    figsize: Optional[Tuple[float, float]] = None,
+    show: Optional[bool] = None,
+    save: Optional[Union[str, bool]] = None,
+    return_fig: bool = False,
+    **kwds,
+) -> Optional[Any]:
+    r"""Dot plot of marker genes — clean drop-in for :func:`rank_genes_groups_dotplot`.
+
+    Wraps :func:`rank_genes_groups_dotplot` with more convenient defaults:
+    ``standard_scale='var'``, ``cmap='Spectral_r'``, and ``dendrogram=False``.
+
+    Arguments:
+        adata: Annotated data matrix.
+        groupby: Key in ``adata.obs`` to group by. If ``None``, the value
+            stored in ``adata.uns[key]['params']['groupby']`` is used.
+        key: Key in ``adata.uns`` containing the ``rank_genes_groups`` results.
+            Default: ``'rank_genes_groups'``.
+        n_genes: Number of top marker genes per group to display. Default: ``5``.
+        groups: Groups to include in the plot. ``None`` shows all groups.
+            Default: ``None``.
+        standard_scale: Standardise colour values. ``'var'`` (per-gene) or
+            ``'group'`` (per-cell-type). Default: ``'var'``.
+        cmap: Colormap for mean expression. Default: ``'Spectral_r'``.
+        dendrogram: Add a dendrogram to the plot. Default: ``False``.
+        min_logfoldchange: Minimum absolute log fold change to filter genes.
+            Default: ``None``.
+        use_raw: Use ``adata.raw`` for expression values. ``None`` auto-detects.
+            Default: ``None``.
+        layer: Layer to use for expression. Default: ``None``.
+        figsize: Figure size ``(width, height)`` in inches. Default: ``None``.
+        show: Show the figure. Default: ``None``.
+        save: Path or ``True`` to save the figure. Default: ``None``.
+        return_fig: Return the figure object. Default: ``False``.
+        **kwds: Additional keyword arguments forwarded to :func:`dotplot`.
+
+    Returns:
+        Figure or axes object when ``return_fig=True`` or ``show=False``;
+        ``None`` otherwise.
+
+    Examples:
+        >>> import omicverse as ov
+        >>> ov.single.find_markers(adata, groupby='leiden', method='cosg')
+        >>> ov.pl.markers_dotplot(adata, groupby='leiden', n_genes=5)
+        >>> # Using wilcoxon results stored under a different key
+        >>> ov.single.find_markers(adata, groupby='leiden', method='wilcoxon',
+        ...                        key_added='wilcoxon_markers')
+        >>> ov.pl.markers_dotplot(adata, groupby='leiden', key='wilcoxon_markers')
+    """
+    return rank_genes_groups_dotplot(
+        adata,
+        groups=groups,
+        n_genes=n_genes,
+        groupby=groupby,
+        key=key,
+        standard_scale=standard_scale,
+        cmap=cmap,
+        dendrogram=dendrogram,
+        min_logfoldchange=min_logfoldchange,
+        use_raw=use_raw,
+        layer=layer,
+        figsize=figsize,
+        show=show,
+        save=save,
+        return_fig=return_fig,
+        **kwds,
+    )

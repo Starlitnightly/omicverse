@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 from .._registry import register_function
 
+test_color=[
+    "#264653", "#2A9D8F", "#8AB17D", "#B5E48C", "#1D3557", "#457B9D",
+  "#6D597A", "#B56576", "#E56B6F", "#6930C3", "#A06CD5", "#DEC9E9",
+  "#588157", "#3D5A80", "#98C1D9", "#2F3E46", "#52796F", "#84A59D",
+  "#E76F51", "#F4A261", "#E9C46A", "#FFD166", "#BC6C25", "#DDA15E",
+  "#00F5D4", "#00BBF9", "#9B5DE5", "#F15BB5", "#FEE440", "#3A0CA3",
+  "#003049", "#D62828", "#F77F00", "#7209B7", "#4361EE", "#4CC9F0"
+]
+
 sc_color=[
  '#1F577B', '#A56BA7', '#E0A7C8', '#E069A6', '#941456', 
  '#FCBC10', '#EF7B77', '#279AD7','#F0EEF0',

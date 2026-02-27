@@ -113,6 +113,7 @@ from ._annotation import Annotation
 from ._annotation_ref import AnnotationRef
 from ._velo import Velo,velocity_embedding
 from ._milo_dev import Milo
+from ._markers import find_markers, get_markers
 
 
 __all__ = [
@@ -256,5 +257,8 @@ __all__ = [
     'Annotation',   # cell type annotation
     'AnnotationRef', # cell type annotation with reference
     'Milo',
+    # Marker gene utilities
+    'find_markers',
+    'get_markers',
 ]
 

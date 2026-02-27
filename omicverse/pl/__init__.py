@@ -132,7 +132,7 @@ from ._flowsig import curved_graph, curved_line, plot_curve_network, plot_flowsi
 from ._embedding import embedding_atlas
 from ._density import add_density_contour, calculate_gene_density
 from ._cpdbviz import CellChatViz
-from ._dotplot import dotplot, rank_genes_groups_dotplot, rank_genes_groups_df
+from ._dotplot import dotplot, rank_genes_groups_dotplot, rank_genes_groups_df, markers_dotplot
 from ._spatial import spatial_segment,spatial_segment_overlay
 from ._violin import violin
 from ._animation_lines import (
@@ -236,6 +236,7 @@ __all__ = [
     "dotplot",
     "rank_genes_groups_dotplot",
     "rank_genes_groups_df",
+    "markers_dotplot",
     # @ _spatial
     "spatial_segment",
     "spatial_segment_overlay",
