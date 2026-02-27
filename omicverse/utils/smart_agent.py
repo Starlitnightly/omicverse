@@ -2436,6 +2436,15 @@ if 'batch' in adata.obs.columns:
         compiled = compile(code, "<omicverse-agent>", "exec")
         sandbox_globals = self._build_sandbox_globals()
         sandbox_locals = {"adata": adata}
+        # Common aliases occasionally emitted by LLM-generated code.
+        # Keep these as locals (not globals) so user code can override them normally.
+        try:
+            if hasattr(adata, "obs_names"):
+                sandbox_locals.setdefault("obs_names", adata.obs_names)
+            if hasattr(adata, "var_names"):
+                sandbox_locals.setdefault("var_names", adata.var_names)
+        except Exception:
+            pass
 
         # Normalize HVG column naming so generated code can access either alias
         try:
@@ -2855,6 +2864,42 @@ if 'batch' in adata.obs.columns:
                     stacklevel=2,
                 )
 
+        def _apply_scvi_shims() -> None:
+            """Apply small runtime patches for known scvi-tools API footguns.
+
+            Context (ovbench):
+            - In scvi-tools 1.4.x, `scvi.model.MULTIVI.train` accepts `**kwargs` and
+              internally forwards early-stopping settings to a TrainRunner.
+            - LLM-generated code often passes `early_stopping_patience=...` into
+              `MULTIVI.train(...)`, which can raise:
+                TypeError: TrainRunner() got multiple values for keyword argument 'early_stopping_patience'
+
+            We defensively drop that kwarg to keep benchmark runs deterministic and
+            avoid a purely API-shape failure mode.
+            """
+            try:
+                import functools
+                from scvi.model import MULTIVI
+            except Exception:
+                return
+
+            try:
+                already = getattr(MULTIVI.train, "_ovbench_patched", False)
+            except Exception:
+                already = False
+            if already:
+                return
+
+            orig_train = MULTIVI.train
+
+            @functools.wraps(orig_train)
+            def _train_wrapper(self, *args, **kwargs):
+                kwargs.pop("early_stopping_patience", None)
+                return orig_train(self, *args, **kwargs)
+
+            _train_wrapper._ovbench_patched = True  # type: ignore[attr-defined]
+            MULTIVI.train = _train_wrapper  # type: ignore[assignment]
+
         def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
             root_name = name.split(".")[0]
             if root_name in deny_roots:
@@ -2864,6 +2909,8 @@ if 'batch' in adata.obs.columns:
             if root_name not in allowed_modules:
                 # Allow additional safe imports needed by skills; cache them after first load
                 allowed_modules[root_name] = __import__(root_name)
+            if root_name == "scvi":
+                _apply_scvi_shims()
             return __import__(name, globals, locals, fromlist, level)
 
         safe_builtins["__import__"] = limited_import
