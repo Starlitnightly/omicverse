@@ -749,64 +749,98 @@ class OmicVerseLLMBackend:
                 # Extract text from Responses API format with fallback chain
                 logger.debug("Attempting to extract text from GPT-5 response...")
 
-                # Try output_text first (most common)
-                if hasattr(resp, 'output_text') and resp.output_text:
-                    logger.debug(f"✓ Extracted via output_text (length: {len(resp.output_text)} chars)")
-                    logger.debug(f"Response preview (first 200 chars): {resp.output_text[:200]}")
-                    return resp.output_text
+                # Try output_text first (most common). Some SDK versions expose it as a method.
+                output_text = getattr(resp, 'output_text', None)
+                if callable(output_text):
+                    try:
+                        output_text = output_text()
+                    except TypeError:
+                        pass
+                    except Exception:
+                        output_text = None
+                if isinstance(output_text, str) and output_text:
+                    logger.debug(f"✓ Extracted via output_text (length: {len(output_text)} chars)")
+                    logger.debug(f"Response preview (first 200 chars): {output_text[:200]}")
+                    return output_text
 
-                # Try output.text
-                if hasattr(resp, 'output'):
-                    output = resp.output
+                def _log_and_return(text: str, via: str) -> str:
+                    logger.debug(f"✓ Extracted via {via} (length: {len(text)} chars)")
+                    return text
+
+                def _extract_from_parts(parts: Any, via_prefix: str) -> Optional[str]:
+                    try:
+                        for i, p in enumerate(parts):
+                            # p may be object or dict
+                            t = getattr(p, 'text', None)
+                            if isinstance(t, str) and t:
+                                return _log_and_return(t, f"{via_prefix}[{i}].text")
+                            if isinstance(p, dict):
+                                t2 = p.get('text')
+                                if isinstance(t2, str) and t2:
+                                    return _log_and_return(t2, f"{via_prefix}[{i}]['text']")
+                    except Exception as e:
+                        logger.debug(f"Error iterating {via_prefix}: {e}")
+                    return None
+
+                # Try resp.output (Responses API canonical structure)
+                output = getattr(resp, 'output', None)
+                if output is not None:
                     logger.debug(f"Found output attribute: type={type(output).__name__}")
 
-                    # Direct string
-                    if isinstance(output, str):
-                        logger.debug(f"✓ Extracted via output (direct string, length: {len(output)} chars)")
-                        return output
-                    # Object with .text
-                    if hasattr(output, 'text') and getattr(output, 'text'):
-                        text = getattr(output, 'text')
-                        logger.debug(f"✓ Extracted via output.text (length: {len(text)} chars)")
-                        return text
-                    # Object with .content (list of parts)
-                    if hasattr(output, 'content'):
-                        parts = getattr(output, 'content')
-                        logger.debug(f"Found output.content: type={type(parts)}, length={len(parts) if hasattr(parts, '__len__') else 'N/A'}")
-                        try:
-                            for i, p in enumerate(parts):
-                                # p may be object or dict
-                                if hasattr(p, 'text') and getattr(p, 'text'):
-                                    text = getattr(p, 'text')
-                                    logger.debug(f"✓ Extracted via output.content[{i}].text (length: {len(text)} chars)")
-                                    return text
-                                if isinstance(p, dict) and p.get('text'):
-                                    text = p['text']
-                                    logger.debug(f"✓ Extracted via output.content[{i}]['text'] (length: {len(text)} chars)")
-                                    return text
-                        except Exception as e:
-                            logger.debug(f"Error iterating output.content: {e}")
-                            pass
-                    # List (first element may be dict or object)
-                    if isinstance(output, list) and len(output) > 0:
-                        first = output[0]
-                        logger.debug(f"Output is a list, first element type: {type(first).__name__}")
-                        if isinstance(first, str):
-                            logger.debug(f"✓ Extracted via output[0] (direct string, length: {len(first)} chars)")
-                            return first
-                        if hasattr(first, 'text') and getattr(first, 'text'):
-                            text = getattr(first, 'text')
-                            logger.debug(f"✓ Extracted via output[0].text (length: {len(text)} chars)")
-                            return text
-                        if isinstance(first, dict) and first.get('text'):
-                            text = first['text']
-                            logger.debug(f"✓ Extracted via output[0]['text'] (length: {len(text)} chars)")
-                            return text
+                    if isinstance(output, str) and output:
+                        return _log_and_return(output, "output (direct string)")
+
+                    if isinstance(output, dict):
+                        t = output.get('text')
+                        if isinstance(t, str) and t:
+                            return _log_and_return(t, "output['text']")
+                        parts = output.get('content')
+                        if parts:
+                            got = _extract_from_parts(parts, "output['content']")
+                            if got is not None:
+                                return got
+
+                    # Some SDK versions use output as a list of items; each item usually has .content[...].text
+                    if isinstance(output, list):
+                        for oi, item in enumerate(output):
+                            if isinstance(item, str) and item:
+                                return _log_and_return(item, f"output[{oi}]")
+
+                            if isinstance(item, dict):
+                                t = item.get('text')
+                                if isinstance(t, str) and t:
+                                    return _log_and_return(t, f"output[{oi}]['text']")
+                                parts = item.get('content')
+                                if parts:
+                                    got = _extract_from_parts(parts, f"output[{oi}]['content']")
+                                    if got is not None:
+                                        return got
+
+                            t = getattr(item, 'text', None)
+                            if isinstance(t, str) and t:
+                                return _log_and_return(t, f"output[{oi}].text")
+
+                            parts = getattr(item, 'content', None)
+                            if parts:
+                                got = _extract_from_parts(parts, f"output[{oi}].content")
+                                if got is not None:
+                                    return got
+
+                    # Object with .text or .content
+                    t = getattr(output, 'text', None)
+                    if isinstance(t, str) and t:
+                        return _log_and_return(t, "output.text")
+
+                    parts = getattr(output, 'content', None)
+                    if parts:
+                        got = _extract_from_parts(parts, "output.content")
+                        if got is not None:
+                            return got
 
                 # Fallback: try text attribute directly
-                if hasattr(resp, 'text') and resp.text:
-                    logger.debug(f"✓ Extracted via text attribute (length: {len(resp.text)} chars)")
-                    return resp.text
+                text_attr = getattr(resp, 'text', None)
+                if isinstance(text_attr, str) and text_attr:
+                    return _log_and_return(text_attr, "text attribute")
 
                 # If nothing worked, provide diagnostic info
                 logger.error("❌ Could not extract text from GPT-5 response")
