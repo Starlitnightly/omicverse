@@ -102,6 +102,7 @@ nav:
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
+        - Palette optimization for publication-quality single-cell & spatial plots: Tutorials-plotting/t_palette.ipynb
         - Color system: Tutorials-plotting/t_visualize_colorsystem.ipynb
 - GPU Support: GPU_supported_registry_functions.md
 - API documentation: $api/omicverse.***

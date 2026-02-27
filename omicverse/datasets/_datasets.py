@@ -98,6 +98,14 @@ DATA_DOWNLOAD_LINK_DICT = {
         'figshare':'https://figshare.com/ndownloader/files/59192927',
         'stanford':'https://stacks.stanford.edu/file/cv694yk7414/COVID_PBMC_sc_ref.h5ad',
     },
+    'pbmc8k':{
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/pbmc8k.h5ad',
+        'figshare':'',
+    },
+    'seqfish':{
+        'stanford':'https://stacks.stanford.edu/file/cv694yk7414/seqfish.h5ad',
+        'figshare':'https://exampledata.scverse.org/squidpy/figshare/seqfish.h5ad',
+    },
 }
 
 def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
@@ -716,26 +724,26 @@ def paul15(
         return create_mock_dataset(n_cells=2730, n_genes=3451, n_cell_types=13, with_clustering=True)
 
 
-def pbmc68k_reduced(
-    url: str = "https://falexwolf.de/data/pbmc68k_reduced.h5ad", 
-    filename: str = "pbmc68k_reduced.h5ad"
+def pbmc8k(
+    url: str = "https://stacks.stanford.edu/file/cv694yk7414/pbmc8k.h5ad", 
+    filename: str = "pbmc8k.h5ad"
 ) -> AnnData:
-    """Subsampled and processed 68k PBMCs.
-
-    PBMC 68k dataset from 10x Genomics, preprocessed and subsampled.
-    The original PBMC 68k dataset was preprocessed and saved keeping 
-    only 724 cells and 221 highly variable genes.
-    
-    Contains cell type annotations, UMAP coordinates, and clustering results.
+    """PBMC 8k dataset from 10x Genomics.
     """
-    print(f"{Colors.HEADER}🩸 Downloading PBMC 68k reduced dataset{Colors.ENDC}")
+    print(f"{Colors.HEADER}🩸 Downloading PBMC 8k dataset{Colors.ENDC}")
+    url = get_dataset_url("pbmc8k")
     adata = get_adata(url, filename)
-    if adata is None:
-        print(f"{Colors.WARNING}🔄 Generating mock PBMC68k reduced data{Colors.ENDC}")
-        adata = create_mock_dataset(n_cells=724, n_genes=765, n_cell_types=8, with_clustering=True)
-        # Add typical PBMC cell types
-        cell_types = ['CD4+ T', 'CD8+ T', 'NK', 'B', 'Monocytes', 'Dendritic', 'Megakaryocytes', 'Other']
-        adata.obs['bulk_labels'] = np.random.choice(cell_types, adata.n_obs)
+    return adata
+
+def seqfish(
+    url: str = "https://stacks.stanford.edu/file/cv694yk7414/seqfish.h5ad", 
+    filename: str = "seqfish.h5ad"
+) -> AnnData:
+    """SeqFish dataset from 10x Genomics.
+    """
+    print(f"{Colors.HEADER}🐟 Downloading SeqFish dataset{Colors.ENDC}")
+    url = get_dataset_url("seqfish")
+    adata = get_adata(url, filename)
     return adata
 
 

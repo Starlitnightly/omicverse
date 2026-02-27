@@ -68,6 +68,7 @@ from ._palette import (
     red_color,
     sc_color,
     vibrant_palette,
+    palplot,
 )
 from ._single import (
     ConvexHull,
@@ -165,6 +166,7 @@ __all__ = [
     "red_color",
     "sc_color",
     "vibrant_palette",
+    "palplot",
     # @ _single
     "ConvexHull",
     "add_arrow",

@@ -60,7 +60,6 @@ from ._datasets import (
     burczynski06,
     moignard15,
     paul15,
-    pbmc68k_reduced,
     toggleswitch,
     krumsiek11,
     
@@ -95,4 +94,6 @@ from ._datasets import (
     decov_bulk_covid_single,
 
     sc_ref_Lymph_Node,
+    pbmc8k,
+    seqfish,
 )

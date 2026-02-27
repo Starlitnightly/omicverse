@@ -2,9 +2,23 @@ import random
 from typing import List, Tuple, Union
 
 import numpy as np
-from colormath.color_conversions import Lab_to_XYZ, XYZ_to_Luv, convert_color
-from colormath.color_objects import LabColor, XYZColor, sRGBColor
-from pyciede2000 import ciede2000
+try:
+    from colormath.color_conversions import Lab_to_XYZ, XYZ_to_Luv, convert_color
+    from colormath.color_objects import LabColor, XYZColor, sRGBColor
+except ImportError:
+    raise ImportError(
+        "The 'colormath' package is required for spaco but is not installed.\n"
+        "Please install it with:\n\n"
+        "    pip install colormath\n"
+    )
+try:
+    from pyciede2000 import ciede2000
+except ImportError:
+    raise ImportError(
+        "The 'pyciede2000' package is required for spaco but is not installed.\n"
+        "Please install it with:\n\n"
+        "    pip install pyciede2000\n"
+    )
 from scipy.spatial import ConvexHull
 from skimage import color
 
