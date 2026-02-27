@@ -717,6 +717,8 @@ ov.alignment.single(
 - Removed misleading warnings about dropout genes in SCENIC correlation calculations
 - Restored memory-efficient pairwise correlation computation (prevents OOM with >20k genes)
 - SCENIC now uses original approach: calculate correlations only for specific TF-target pairs instead of creating full gene×gene matrices
+- Added `ov.single.find_markers` for unified marker gene identification supporting five methods: `cosg`, `t-test`, `t-test_overestim_var`, `wilcoxon`, and `logreg`; statistical methods are natively ported from scanpy with no scanpy runtime dependency and numerically consistent results (rtol=1e-4)
+- Added `ov.single.get_markers` to extract top marker genes from results as a `DataFrame` or `dict`, with support for single/multiple cluster filtering and optional filtering by `min_logfoldchange`, `min_score`, and `min_pval_adj`; output includes `pct_group` and `pct_rest` columns showing cell expression proportions within and outside each cluster
 
 ### Space Module
 - Added `FlashDeconv` for fast, GPU-free deconvolution in Visium spatial transcriptomics
@@ -737,6 +739,8 @@ ov.alignment.single(
 - Enhanced categorical legend handling for scatterplot embeddings
 - Added `legend_loc='on data'` option for direct annotation on plots
 - Improved visualization clarity for complex datasets
+- Added `ov.pl.markers_dotplot` as a cleaner drop-in for `rank_genes_groups_dotplot` with improved defaults (`standard_scale='var'`, `cmap='Spectral_r'`, `dendrogram=False`)
+- Fixed `KeyError` in `rank_genes_groups_df` when cluster names are numeric strings (e.g., leiden `'0'`, `'1'`); now correctly handles structured arrays, DataFrames, and plain 2D arrays from all marker methods
 
 ### Datasets Module
 - Added comprehensive dataset URLs for easier data access

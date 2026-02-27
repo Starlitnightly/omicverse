@@ -36,6 +36,8 @@ progress.json
 .ruff*
 coverage.json
 htmlcov/
+.pantheon/
+.notebook_contexts.json
 
 #omicverse_web
 omicverse_web/models/
