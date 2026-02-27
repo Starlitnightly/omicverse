@@ -167,9 +167,7 @@ def __getattr__(name):
                 _lazy_attrs[name] = attr
                 return attr
         except (ImportError, AttributeError) as e:
-            raise AttributeError(
-                f"Cannot import '{name}' from {module_path}"
-            ) from e
+            raise type(e)(str(e)) from e
 
     # Check if it's a lazy module
     if name in _LAZY_MODULES:

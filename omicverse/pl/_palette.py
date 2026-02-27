@@ -2219,3 +2219,20 @@ class ForbiddenCity:
             html += '</tr>'
         html += '</table>'
         return html
+
+
+def palplot(colors, size=1):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    n = len(colors)
+    fig, ax = plt.subplots(figsize=(n * size, size))
+    
+    # 构造一个 1×N 的矩阵
+    data = np.arange(n).reshape(1, -1)
+    
+    ax.imshow(data, cmap=plt.matplotlib.colors.ListedColormap(colors),
+              aspect='auto')
+    
+    ax.set_xticks([])
+    ax.set_yticks([])
+    return fig,ax
