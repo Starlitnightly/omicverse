@@ -252,18 +252,18 @@ class OmicVerseAgent:
     requests and automatically execute appropriate OmicVerse functions.
 
     Usage:
-        agent = ov.Agent(api_key="your-api-key")  # Uses gemini-2.5-flash by default
+        agent = ov.Agent(api_key="your-api-key")  # Uses gpt-5.2 by default
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
     
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
+    def __init__(self, model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
         Parameters
         ----------
         model : str
-            LLM model to use for reasoning (default: "gemini-2.5-flash")
+            LLM model to use for reasoning (default: "gpt-5.2")
         api_key : str, optional
             API key for the model provider. If not provided, will use environment variable
         endpoint : str, optional
@@ -1158,12 +1158,14 @@ Respond with ONLY one word: either "simple" or "complex"
         # Build registry-only prompt (no skills, focused on single function)
         functions_info = self._get_available_functions_info()
 
+        dataset_info = f"- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes" if adata is not None and hasattr(adata, 'shape') else "- No dataset provided (knowledge query mode)"
+
         priority1_prompt = f"""You are a fast function executor for OmicVerse. Your task is to find and execute the SINGLE BEST function for this request.
 
 Request: "{request}"
 
 Dataset info:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{dataset_info}
 
 Available OmicVerse Functions (Registry):
 {functions_info}
@@ -1282,10 +1284,11 @@ Now generate code for: "{request}"
             original_adata = adata
             result_adata = self._execute_generated_code(code, adata)
             print(f"   ✅ Execution successful!")
-            print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+            if result_adata is not None and hasattr(result_adata, 'shape'):
+                print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
 
             # Result review (if enabled)
-            if self.enable_result_review:
+            if self.enable_result_review and result_adata is not None and hasattr(result_adata, 'shape'):
                 print(f"   📋 Reviewing result...")
                 review_result = await self._review_result(original_adata, result_adata, request, code)
 
@@ -1336,7 +1339,8 @@ Now generate code for: "{request}"
                 try:
                     result_adata = self._execute_generated_code(fixed_code, adata)
                     print(f"   ✅ Retry successful after fix!")
-                    print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+                    if result_adata is not None and hasattr(result_adata, 'shape'):
+                        print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
                     return result_adata
                 except Exception as retry_e:
                     print(f"   ❌ Retry also failed: {retry_e}")
@@ -1410,12 +1414,14 @@ Now generate code for: "{request}"
         # Step 3: Build comprehensive prompt (registry + skills)
         functions_info = self._get_available_functions_info()
 
+        dataset_info_p2 = f"- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes" if adata is not None and hasattr(adata, 'shape') else "- No dataset provided (knowledge query mode)"
+
         priority2_prompt = f'''You are a workflow orchestrator for OmicVerse. This is a COMPLEX task requiring multiple steps.
 
 Request: "{request}"
 
 Dataset info:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{dataset_info_p2}
 
 Available OmicVerse Functions (Registry):
 {functions_info}
@@ -1531,10 +1537,11 @@ Now generate a complete workflow for: "{request}"
             original_adata = adata
             result_adata = self._execute_generated_code(code, adata)
             print(f"   ✅ Workflow execution successful!")
-            print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+            if result_adata is not None and hasattr(result_adata, 'shape'):
+                print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
 
             # Step 8: Result review (if enabled)
-            if self.enable_result_review:
+            if self.enable_result_review and result_adata is not None and hasattr(result_adata, 'shape'):
                 print(f"   📋 Reviewing workflow result...")
                 review_result = await self._review_result(original_adata, result_adata, request, code)
 
@@ -1603,7 +1610,8 @@ Now generate a complete workflow for: "{request}"
                 try:
                     result_adata = self._execute_generated_code(fixed_code, adata)
                     print(f"   ✅ Retry successful after fix!")
-                    print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+                    if result_adata is not None and hasattr(result_adata, 'shape'):
+                        print(f"   📊 Result: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
                     return result_adata
                 except Exception as retry_e:
                     print(f"   ❌ Retry also failed: {retry_e}")
@@ -2149,7 +2157,7 @@ Generated Code (Iteration {iteration}):
 ```
 
 Dataset Information:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{f"- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes" if adata is not None and hasattr(adata, 'shape') else "- No dataset provided (knowledge query mode)"}
 
 Your task is to review this code and provide feedback:
 
@@ -3026,7 +3034,10 @@ if 'batch' in adata.obs.columns:
         print(f"🤖 OmicVerse Agent Processing Request")
         print(f"{'=' * 70}")
         print(f"Request: \"{request}\"")
-        print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
+        if adata is not None and hasattr(adata, 'shape'):
+            print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
+        else:
+            print(f"Dataset: None (knowledge query)")
         print(f"{'=' * 70}\n")
 
         # Direct execution path for explicit Python snippets (no LLM required)
@@ -3167,6 +3178,7 @@ if 'batch' in adata.obs.columns:
             )
 
         # Ask backend to generate the appropriate function call code
+        _ds_info_gen = f"- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes" if adata is not None and hasattr(adata, 'shape') else "- No dataset provided (knowledge query mode)"
         code_generation_request = f'''
 Please analyze this OmicVerse request: "{request}"
 
@@ -3177,7 +3189,7 @@ Your task:
 4. Generate executable Python code that calls the correct OmicVerse function with proper parameters
 
 Dataset info:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{_ds_info_gen}
 - Request: {request}
 {skill_guidance_section}
 
@@ -3284,10 +3296,11 @@ Example workflow:
             original_adata = adata
             result_adata = self._execute_generated_code(code, adata)
             print(f"✅ Code executed successfully!")
-            print(f"📊 Result shape: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
+            if result_adata is not None and hasattr(result_adata, 'shape'):
+                print(f"📊 Result shape: {result_adata.shape[0]} cells × {result_adata.shape[1]} genes")
 
             # Result review: Validate output matches user intent
-            if self.enable_result_review:
+            if self.enable_result_review and result_adata is not None and hasattr(result_adata, 'shape'):
                 print(f"\n📋 Reviewing result to validate task completion...")
                 review_result = await self._review_result(original_adata, result_adata, request, code)
 
@@ -3491,6 +3504,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
             )
 
         # Build code generation request
+        _ds_info_refl = f"- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes" if adata is not None and hasattr(adata, 'shape') else "- No dataset provided (knowledge query mode)"
         code_generation_request = f'''
 Please analyze this OmicVerse request: "{request}"
 
@@ -3501,7 +3515,7 @@ Your task:
 4. Generate executable Python code that calls the correct OmicVerse function with proper parameters
 
 Dataset info:
-- Shape: {adata.shape[0]} cells × {adata.shape[1]} genes
+{_ds_info_refl}
 - Request: {request}
 {skill_guidance_section}
 
@@ -3561,7 +3575,7 @@ Example workflow:
             yield {
                 'type': 'result',
                 'content': result_adata,
-                'shape': (result_adata.shape[0], result_adata.shape[1])
+                'shape': (result_adata.shape[0], result_adata.shape[1]) if result_adata is not None and hasattr(result_adata, 'shape') else None
             }
         except Exception as e:
             yield {
@@ -3646,7 +3660,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gpt-5.2")
         >>> agent.run("preprocess data", adata)
         >>> info = agent.get_current_session_info()
         >>> print(f"Session: {info['session_id']}")
@@ -3677,7 +3691,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gpt-5.2")
         >>> agent.run("step 1", adata)
         >>> agent.run("step 2", adata)
         >>> # Force new session
@@ -3713,7 +3727,7 @@ Example workflow:
 
         Examples
         --------
-        >>> agent = ov.Agent(model="gemini-2.5-flash")
+        >>> agent = ov.Agent(model="gpt-5.2")
         >>> # ... run several prompts causing session restarts ...
         >>> history = agent.get_session_history()
         >>> for session in history:
@@ -4024,7 +4038,7 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -4034,7 +4048,7 @@ def Agent(model: str = "gemini-2.5-flash", api_key: Optional[str] = None, endpoi
     Parameters
     ----------
     model : str, optional
-        LLM model to use (default: "gemini-2.5-flash"). Use list_supported_models() to see all options
+        LLM model to use (default: "gpt-5.2"). Use list_supported_models() to see all options
     api_key : str, optional
         API key for the model provider. If not provided, will use environment variable
     endpoint : str, optional
