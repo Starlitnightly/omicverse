@@ -64,6 +64,7 @@ _lazy_attrs = {}
 # Define which modules should be lazy-loaded
 _LAZY_MODULES = {
     'alignment',
+    'biocontext',
     'bulk',
     'single',
     'bulk2single',
