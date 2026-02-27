@@ -2903,9 +2903,13 @@ if 'batch' in adata.obs.columns:
         def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
             root_name = name.split(".")[0]
             if root_name in deny_roots:
-                raise ImportError(
-                    f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
-                )
+                # Allow omicverse internal modules (e.g. biocontext HTTP client)
+                # to import denied modules; agent-generated code has no __package__
+                caller_pkg = (globals or {}).get("__package__", "") or ""
+                if not caller_pkg.startswith("omicverse"):
+                    raise ImportError(
+                        f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
+                    )
             if root_name not in allowed_modules:
                 # Allow additional safe imports needed by skills; cache them after first load
                 allowed_modules[root_name] = __import__(root_name)
