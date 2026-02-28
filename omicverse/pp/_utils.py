@@ -9,7 +9,6 @@ from scipy import sparse
 from sklearn.random_projection import sample_without_replacement
 
 from ._compat import DaskArray, _CSMatrix, njit
-from ._scale import axis_sum
 
 if TYPE_CHECKING:
     from typing import Literal, Union
@@ -36,6 +35,7 @@ def elem_mul(X, Y):
 
 @singledispatch
 def axis_mean(X: DaskArray, *, axis: Literal[0, 1], dtype: DTypeLike) -> DaskArray:
+    from ._scale import axis_sum
     total = axis_sum(X, axis=axis, dtype=dtype)
     return total / X.shape[axis]
 
