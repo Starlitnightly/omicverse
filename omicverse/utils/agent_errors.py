@@ -53,3 +53,17 @@ class ExecutionError(OVAgentError):
 class SandboxDeniedError(ExecutionError):
     """Notebook / sandbox execution failed or was denied."""
     pass
+
+
+class SecurityViolationError(SandboxDeniedError):
+    """Pre-execution security scan detected dangerous code patterns.
+
+    Attributes
+    ----------
+    violations : list
+        List of ``SecurityViolation`` objects describing each finding.
+    """
+
+    def __init__(self, message: str, *, violations: list | None = None) -> None:
+        super().__init__(message)
+        self.violations = violations or []

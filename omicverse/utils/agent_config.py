@@ -11,7 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional
+
+from .agent_sandbox import ApprovalMode, SecurityConfig, SecurityLevel
 
 
 class SandboxFallbackPolicy(Enum):
@@ -51,6 +53,57 @@ class ExecutionConfig:
     timeout: int = 600
     strict_kernel_validation: bool = True
     sandbox_fallback_policy: SandboxFallbackPolicy = SandboxFallbackPolicy.WARN_AND_FALLBACK
+    # Self-repair settings
+    auto_install_packages: bool = True
+    package_blocklist: List[str] = field(default_factory=lambda: [
+        "os", "sys", "subprocess", "shutil", "signal", "ctypes",
+    ])
+    max_execution_retries: int = 2
+    validate_outputs: bool = True
+    # Agentic loop settings
+    agent_mode: str = "agentic"    # "agentic" (tool-calling loop) | "legacy" (Priority 1/2)
+    max_agent_turns: int = 15      # max iterations in agentic loop
+
+
+@dataclass
+class SubagentConfig:
+    """Configuration for a subagent type (explore / plan / execute)."""
+    agent_type: str
+    allowed_tools: List[str]
+    max_turns: int
+    can_mutate_adata: bool
+    temperature: float = 0.2
+
+
+SUBAGENT_CONFIGS = {
+    "explore": SubagentConfig(
+        agent_type="explore",
+        allowed_tools=["inspect_data", "run_snippet", "search_functions", "finish"],
+        max_turns=5,
+        can_mutate_adata=False,
+        temperature=0.1,
+    ),
+    "plan": SubagentConfig(
+        agent_type="plan",
+        allowed_tools=[
+            "inspect_data", "run_snippet", "search_functions",
+            "search_skills", "finish",
+        ],
+        max_turns=8,
+        can_mutate_adata=False,
+        temperature=0.3,
+    ),
+    "execute": SubagentConfig(
+        agent_type="execute",
+        allowed_tools=[
+            "inspect_data", "execute_code", "run_snippet",
+            "search_functions", "finish",
+        ],
+        max_turns=10,
+        can_mutate_adata=True,
+        temperature=0.1,
+    ),
+}
 
 
 @dataclass
@@ -67,6 +120,7 @@ class AgentConfig:
     reflection: ReflectionConfig = field(default_factory=ReflectionConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
     verbose: bool = True
     history_enabled: bool = False
     history_path: Optional[Path] = None
@@ -78,6 +132,12 @@ class AgentConfig:
         """Build from the original OmicVerseAgent.__init__ keyword args."""
         sd = kw.get("notebook_storage_dir")
         cd = kw.get("context_storage_dir")
+
+        # Security config from flat kwargs
+        approval_raw = kw.get("approval_mode", "never")
+        if isinstance(approval_raw, str):
+            approval_raw = ApprovalMode(approval_raw)
+
         return cls(
             llm=LLMConfig(
                 model=kw.get("model", "gemini-2.5-flash"),
@@ -96,9 +156,31 @@ class AgentConfig:
                 keep_notebooks=kw.get("keep_execution_notebooks", True),
                 timeout=kw.get("notebook_timeout", 600),
                 strict_kernel_validation=kw.get("strict_kernel_validation", True),
+                auto_install_packages=kw.get("auto_install_packages", True),
+                max_execution_retries=kw.get("max_execution_retries", 2),
+                validate_outputs=kw.get("validate_outputs", True),
+                agent_mode=kw.get("agent_mode", "agentic"),
+                max_agent_turns=kw.get("max_agent_turns", 15),
             ),
             context=ContextConfig(
                 enabled=kw.get("enable_filesystem_context", True),
                 storage_dir=Path(cd) if cd else None,
             ),
+            security=cls._build_security_config(kw, approval_raw),
+        )
+
+    @staticmethod
+    def _build_security_config(kw: dict, approval_mode: ApprovalMode) -> SecurityConfig:
+        """Build SecurityConfig, preferring security_level preset if given."""
+        level_raw = kw.get("security_level")
+        if level_raw:
+            config = SecurityConfig.from_level(level_raw)
+            # Allow overriding approval_mode even with a preset
+            if "approval_mode" in kw:
+                config.approval_mode = approval_mode
+            return config
+        return SecurityConfig(
+            approval_mode=approval_mode,
+            allow_dynamic_imports=kw.get("allow_dynamic_imports", False),
+            restrict_introspection=kw.get("restrict_introspection", True),
         )
