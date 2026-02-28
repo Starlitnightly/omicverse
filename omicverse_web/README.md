@@ -63,6 +63,12 @@ Start (recommended):
 python3 start_server.py
 ```
 
+Remote-friendly start (fixed host/port, debug off):
+
+```bash
+python3 start_server.py --host 0.0.0.0 --port 5050 --no-debug
+```
+
 or:
 
 ```bash
@@ -73,6 +79,24 @@ Access:
 
 - Landing page: `http://localhost:5050/`
 - Analysis page: `http://localhost:5050/analysis`
+
+## 3.1 Remote Server + Local Browser
+
+If OmicVerse Web runs on a remote server, the safest approach is local port forwarding.
+
+SSH tunnel example (open in local browser at `http://localhost:5050`):
+
+```bash
+ssh -L 5050:127.0.0.1:5050 <user>@<remote-host>
+```
+
+Then start the server remotely:
+
+```bash
+python3 start_server.py --host 127.0.0.1 --port 5050 --no-debug
+```
+
+If using your KohakuRiver workflow, use its forward command with the same remote port.
 
 ## 4. Main Routes and APIs (selected)
 
