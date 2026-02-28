@@ -1785,12 +1785,12 @@
                     <ul class="nav nav-tabs px-3 pt-2" id="codeRefTabs">
                         <li class="nav-item">
                             <a class="nav-link active" id="codeTab" href="#" onclick="singleCellApp._switchCodeRefTab('code'); return false;">
-                                <i class="fas fa-file-code me-1"></i>代码
+                                <i class="fas fa-file-code me-1"></i>Code
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" id="paramsTab" href="#" onclick="singleCellApp._switchCodeRefTab('params'); return false;">
-                                <i class="fas fa-list me-1"></i>参数说明
+                                <i class="fas fa-list me-1"></i>Parameters
                             </a>
                         </li>
                     </ul>
@@ -1806,10 +1806,10 @@
                             <table class="table table-sm table-bordered align-middle" id="codeRefParamTable">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width:18%">参数名</th>
-                                        <th style="width:12%">类型</th>
-                                        <th style="width:15%">默认值</th>
-                                        <th>说明</th>
+                                        <th style="width:18%">Parameter</th>
+                                        <th style="width:12%">Type</th>
+                                        <th style="width:15%">Default</th>
+                                        <th>Description</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -1818,10 +1818,10 @@
                     </div>
                 </div>
                 <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp._copyCodeRef()">
-                        <i class="fas fa-copy me-1"></i>复制代码
+                    <button type="button" id="copyCodeBtn" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp._copyCodeRef()">
+                        <i class="fas fa-copy me-1"></i>Copy Code
                     </button>
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal"><span id="closeCodeModalBtnText">Close</span></button>
                 </div>
             </div>
         </div>

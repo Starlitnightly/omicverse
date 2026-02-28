@@ -772,6 +772,9 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (termNavPanel)  termNavPanel.style.display  = 'none';
         if (navbarContent) navbarContent.style.display = '';
 
+        // Toggle body class so CSS can zero out main-content padding in code view
+        // document.body.classList.toggle('view-code-active', view === 'code');
+
         if (view === 'visualization') {
             if (vizView) vizView.style.display = 'block';
             if (vizBtn)  { vizBtn.classList.remove('btn-outline-primary'); vizBtn.classList.add('btn-primary'); }
