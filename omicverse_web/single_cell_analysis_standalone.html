@@ -1768,5 +1768,64 @@
         </div><!-- /body -->
       </div>
     </div><!-- /env-manager-modal -->
+
+    <!-- Code Reference Modal -->
+    <div class="modal fade" id="codeRefModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <div>
+                        <h6 class="modal-title mb-0"><i class="fas fa-code me-2 text-primary"></i><span id="codeRefModalTitle">代码参考</span></h6>
+                        <small class="text-muted" id="codeRefModalSubtitle"></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs px-3 pt-2" id="codeRefTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="codeTab" href="#" onclick="singleCellApp._switchCodeRefTab('code'); return false;">
+                                <i class="fas fa-file-code me-1"></i>代码
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="paramsTab" href="#" onclick="singleCellApp._switchCodeRefTab('params'); return false;">
+                                <i class="fas fa-list me-1"></i>参数说明
+                            </a>
+                        </li>
+                    </ul>
+                    <!-- Code Tab -->
+                    <div id="codeRefTabCode" class="p-3">
+                        <div class="position-relative">
+                            <pre id="codeRefPre" style="background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:16px;font-size:0.82rem;line-height:1.6;overflow-x:auto;white-space:pre;margin:0;max-height:420px;overflow-y:auto;"></pre>
+                        </div>
+                    </div>
+                    <!-- Params Tab -->
+                    <div id="codeRefTabParams" class="p-3" style="display:none">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle" id="codeRefParamTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:18%">参数名</th>
+                                        <th style="width:12%">类型</th>
+                                        <th style="width:15%">默认值</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp._copyCodeRef()">
+                        <i class="fas fa-copy me-1"></i>复制代码
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div><!-- /codeRefModal -->
+
 </body>
 </html>

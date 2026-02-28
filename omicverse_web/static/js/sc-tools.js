@@ -205,7 +205,10 @@ Object.assign(SingleCellAnalysis.prototype, {
                         <h6 class="mb-1"><i class="fas fa-sliders-h me-2 text-primary"></i>${title}</h6>
                         ${desc ? `<small class="text-muted">${desc}</small>` : ''}
                     </div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.selectAnalysisCategory('${singleCellApp.currentCategory || 'preprocessing'}')">返回工具列表</button>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-info" onclick="singleCellApp.showCodeModal('${tool}')"><i class="fas fa-code me-1"></i>${this.t('tools.codeRef')}</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.selectAnalysisCategory('${singleCellApp.currentCategory || 'preprocessing'}')">${this.t('tools.backToList')}</button>
+                    </div>
                 </div>
                 <div class="border rounded p-3">
                     ${this.getParameterHTML(tool)}
@@ -271,8 +274,11 @@ Object.assign(SingleCellAnalysis.prototype, {
                     <h6 class="mb-1"><i class="fas fa-sliders-h me-2 text-primary"></i>${this.currentToolLabel}</h6>
                     <small class="text-muted">${this.currentToolDesc}</small>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary"
-                    onclick="singleCellApp.selectAnalysisCategory('${backCat}')">返回工具列表</button>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-info" onclick="singleCellApp.showCodeModal('${tool}')"><i class="fas fa-code me-1"></i>${this.t('tools.codeRef')}</button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                        onclick="singleCellApp.selectAnalysisCategory('${backCat}')">${this.t('tools.backToList')}</button>
+                </div>
             </div>`;
 
         let body = '';
@@ -1120,12 +1126,55 @@ Object.assign(SingleCellAnalysis.prototype, {
 
     /** Render DEG parameter form into the parameter-content panel. */
     renderDegParamForm(container) {
-        const obs    = this.currentData ? (this.currentData.obs_columns || []) : [];
-        const layers = this.currentData ? (this.currentData.layers      || []) : [];
+        // First level: method selection cards (like Leiden / Louvain)
+        const methods = [
+            { id: 'wilcoxon', label: 'Wilcoxon', icon: 'fas fa-chart-bar', descKey: 'deg.methodWilcoxonDesc' },
+            { id: 't-test',   label: 'T-test',   icon: 'fas fa-flask',     descKey: 'deg.methodTtestDesc' },
+        ];
+        container.innerHTML = '';
+        methods.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'mb-3 p-3 border rounded fade-in c-pointer';
+            card.innerHTML = `
+                <div class="d-flex align-items-center mb-2">
+                    <i class="${m.icon} me-2 text-primary"></i>
+                    <strong>${m.label}</strong>
+                </div>
+                <p class="text-muted small mb-0">${this.t(m.descKey)}</p>`;
+            if (this.currentData) {
+                card.onclick = () => this.renderDegMethodForm(m.id, m.label, container);
+            } else {
+                card.style.opacity = 0.6;
+                card.title = this.t('status.uploadFirst');
+            }
+            container.appendChild(card);
+        });
+    },
+
+    renderDegMethodForm(method, methodLabel, container) {
+        const obs     = this.currentData ? (this.currentData.obs_columns || []) : [];
         const colOpts = `<option value="">${this.t('deg.selectCol')}</option>` +
             obs.map(c => `<option value="${c}">${c}</option>`).join('');
+
         container.innerHTML = `
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0 small fw-semibold">
+                <i class="fas fa-not-equal me-1 text-primary"></i>
+                DEG — ${methodLabel}
+            </h6>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-info"
+                        onclick="singleCellApp.showCodeModal('deg_expression')">
+                    <i class="fas fa-code me-1"></i>${this.t('tools.codeRef')}
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        onclick="singleCellApp.renderDegParamForm(document.getElementById('parameter-content'))">
+                    ${this.t('tools.backToList')}
+                </button>
+            </div>
+        </div>
         <div class="row g-2">
+            <input type="hidden" id="deg-method" value="${method}">
             <div class="col-12">
                 <label class="form-label form-label-sm">${this.t('deg.conditionCol')}</label>
                 <select class="form-select form-select-sm" id="deg-condition-col"
@@ -1160,14 +1209,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                 </select>
                 <small class="text-muted d-block mt-1">${this.t('deg.celltypeHint')}</small>
             </div>
-            <div class="col-6">
-                <label class="form-label form-label-sm">${this.t('deg.method')}</label>
-                <select class="form-select form-select-sm" id="deg-method">
-                    <option value="wilcoxon">Wilcoxon</option>
-                    <option value="t-test">T-test</option>
-                </select>
-            </div>
-            <div class="col-6">
+            <div class="col-12">
                 <label class="form-label form-label-sm">${this.t('deg.maxCells')}</label>
                 <input type="number" class="form-control form-control-sm"
                        id="deg-max-cells" value="100000" min="100" max="1000000" step="1000">
@@ -1504,25 +1546,71 @@ Object.assign(SingleCellAnalysis.prototype, {
     // DCT (Differential Cell Type) Analysis helpers
     // -----------------------------------------------------------------------
 
-    /** Render DCT parameter form into the parameter-content panel. */
+    /** Render DCT method selection cards (first level). */
     renderDctParamForm(container) {
-        const obs      = this.currentData ? (this.currentData.obs_columns || []) : [];
-        const embeddings = this.currentData ? (this.currentData.embeddings || []) : [];
-        const colOpts  = `<option value="">${this.t('dct.selectCol')}</option>` +
+        const methods = [
+            { id: 'sccoda', label: 'scCODA', icon: 'fas fa-wave-square', descKey: 'dct.methodScocodaDesc' },
+            { id: 'milopy', label: 'milopy', icon: 'fas fa-broom',       descKey: 'dct.methodMilopyDesc' },
+        ];
+        container.innerHTML = '';
+        methods.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'mb-3 p-3 border rounded fade-in c-pointer';
+            card.innerHTML = `
+                <div class="d-flex align-items-center mb-2">
+                    <i class="${m.icon} me-2 text-primary"></i>
+                    <strong>${m.label}</strong>
+                </div>
+                <p class="text-muted small mb-0">${this.t(m.descKey)}</p>`;
+            if (this.currentData) {
+                card.onclick = () => this.renderDctMethodForm(m.id, m.label, container);
+            } else {
+                card.style.opacity = 0.6;
+                card.title = this.t('status.uploadFirst');
+            }
+            container.appendChild(card);
+        });
+    },
+
+    /** Render DCT parameter form for a specific method (second level). */
+    renderDctMethodForm(method, methodLabel, container) {
+        const obs        = this.currentData ? (this.currentData.obs_columns || []) : [];
+        const embeddings = this.currentData ? (this.currentData.embeddings  || []) : [];
+        const colOpts    = `<option value="">${this.t('dct.selectCol')}</option>` +
             obs.map(c => `<option value="${c}">${c}</option>`).join('');
-        const repOpts  = embeddings.map(e => `<option value="${e}">${e.replace(/^X_/, '')}</option>`).join('') ||
-                         `<option value="X_pca">PCA</option>`;
+        const repOpts    = embeddings.map(e => `<option value="${e}">${e.replace(/^X_/, '')}</option>`).join('') ||
+                           `<option value="X_pca">PCA</option>`;
+
+        const isMilopy = method === 'milopy';
+        const samplePlaceholder = isMilopy ? this.t('dct.sampleKeySelect') : this.t('dct.sampleKeyOptional');
+        const sampleHint        = isMilopy ? this.t('dct.sampleKeyHintMilopy') : this.t('dct.sampleKeyHintSccoda');
+        const sampleRequired    = isMilopy ? `<span class="text-danger ms-1" title="required">*</span>` : '';
+
+        // Update DCT viz panel titles when method changes
+        const effectTitle = document.getElementById('dct-effects-title');
+        const effectIcon  = document.getElementById('dct-effects-icon');
+        if (effectTitle) effectTitle.textContent = isMilopy ? this.t('dct.beeswarmTitle') : this.t('dct.effectsTitle');
+        if (effectIcon)  effectIcon.className    = isMilopy ? 'fas fa-broom me-1 text-warning' : 'fas fa-wave-square me-1 text-primary';
 
         container.innerHTML = `
-        <div class="row g-2">
-            <div class="col-12">
-                <label class="form-label form-label-sm">${this.t('dct.method')}</label>
-                <select class="form-select form-select-sm" id="dct-method"
-                        onchange="singleCellApp.onDctMethodChange(this.value)">
-                    <option value="sccoda">scCODA</option>
-                    <option value="milopy">milopy</option>
-                </select>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0 small fw-semibold">
+                <i class="fas fa-chart-pie me-1 text-primary"></i>
+                DCT — ${methodLabel}
+            </h6>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-info"
+                        onclick="singleCellApp.showCodeModal('dct')">
+                    <i class="fas fa-code me-1"></i>${this.t('tools.codeRef')}
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        onclick="singleCellApp.renderDctParamForm(document.getElementById('parameter-content'))">
+                    ${this.t('tools.backToList')}
+                </button>
             </div>
+        </div>
+        <div class="row g-2">
+            <input type="hidden" id="dct-method" value="${method}">
             <div class="col-12">
                 <label class="form-label form-label-sm">${this.t('dct.conditionCol')}</label>
                 <select class="form-select form-select-sm" id="dct-condition-col"
@@ -1549,28 +1637,28 @@ Object.assign(SingleCellAnalysis.prototype, {
                 </select>
             </div>
             <div class="col-12">
-                <label class="form-label form-label-sm" id="dct-sample-label">
-                    ${this.t('dct.sampleKey')}
-                    <span id="dct-sample-required" class="text-danger ms-1" style="display:none;" title="required">*</span>
+                <label class="form-label form-label-sm">
+                    ${this.t('dct.sampleKey')}${sampleRequired}
                 </label>
                 <select class="form-select form-select-sm" id="dct-sample-key">
-                    <option value="">${this.t('dct.sampleKeyOptional')}</option>
+                    <option value="">${samplePlaceholder}</option>
                     ${obs.map(c => `<option value="${c}">${c}</option>`).join('')}
                 </select>
-                <small class="text-muted d-block mt-1" id="dct-sample-hint">${this.t('dct.sampleKeyHintSccoda')}</small>
+                <small class="text-muted d-block mt-1">${sampleHint}</small>
             </div>
-            <div class="col-12" id="dct-use-rep-row" style="display:none;">
+            ${isMilopy ? `
+            <div class="col-12">
                 <label class="form-label form-label-sm">${this.t('dct.useRep')}</label>
                 <select class="form-select form-select-sm" id="dct-use-rep">
                     ${repOpts}
                 </select>
-            </div>
-            <div class="col-12" id="dct-est-fdr-row">
+            </div>` : `
+            <div class="col-12">
                 <label class="form-label form-label-sm">${this.t('dct.estFdr')} <strong id="dct-est-fdr-val">0.20</strong></label>
                 <input type="range" class="form-range" id="dct-est-fdr"
                        min="0.05" max="0.5" step="0.05" value="0.2"
                        oninput="document.getElementById('dct-est-fdr-val').textContent=parseFloat(this.value).toFixed(2)">
-            </div>
+            </div>`}
             <div class="col-12 mt-1">
                 <button class="btn btn-success btn-sm w-100" id="dct-run-btn"
                         onclick="singleCellApp.runDctAnalysis()">
@@ -1585,29 +1673,16 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     onDctMethodChange(method) {
-        const useRepRow      = document.getElementById('dct-use-rep-row');
-        const estFdrRow      = document.getElementById('dct-est-fdr-row');
-        const sampleHint     = document.getElementById('dct-sample-hint');
-        const sampleRequired = document.getElementById('dct-sample-required');
-        const sampleSel      = document.getElementById('dct-sample-key');
-        const effectTitle    = document.getElementById('dct-effects-title');
-        const effectIcon     = document.getElementById('dct-effects-icon');
+        // Kept for compatibility — no longer drives the form (each method has its own form now)
+        // Still updates the DCT viz panel titles if called externally
+        const effectTitle = document.getElementById('dct-effects-title');
+        const effectIcon  = document.getElementById('dct-effects-icon');
         if (method === 'milopy') {
-            if (useRepRow)      useRepRow.style.display         = '';
-            if (estFdrRow)      estFdrRow.style.display         = 'none';
-            if (sampleHint)     sampleHint.textContent          = this.t('dct.sampleKeyHintMilopy');
-            if (sampleRequired) sampleRequired.style.display    = '';   // show * required
-            if (sampleSel)      sampleSel.querySelector('option[value=""]').textContent = this.t('dct.sampleKeySelect');
-            if (effectTitle)    effectTitle.textContent         = this.t('dct.beeswarmTitle');
-            if (effectIcon)     effectIcon.className            = 'fas fa-broom me-1 text-warning';
+            if (effectTitle) effectTitle.textContent = this.t('dct.beeswarmTitle');
+            if (effectIcon)  effectIcon.className    = 'fas fa-broom me-1 text-warning';
         } else {
-            if (useRepRow)      useRepRow.style.display         = 'none';
-            if (estFdrRow)      estFdrRow.style.display         = '';
-            if (sampleHint)     sampleHint.textContent          = this.t('dct.sampleKeyHintSccoda');
-            if (sampleRequired) sampleRequired.style.display    = 'none';  // optional for scCODA
-            if (sampleSel)      sampleSel.querySelector('option[value=""]').textContent = this.t('dct.sampleKeyOptional');
-            if (effectTitle)    effectTitle.textContent         = this.t('dct.effectsTitle');
-            if (effectIcon)     effectIcon.className            = 'fas fa-wave-square me-1 text-primary';
+            if (effectTitle) effectTitle.textContent = this.t('dct.effectsTitle');
+            if (effectIcon)  effectIcon.className    = 'fas fa-wave-square me-1 text-primary';
         }
     },
 
@@ -1933,6 +2008,737 @@ Object.assign(SingleCellAnalysis.prototype, {
             const colSel = document.getElementById('color-select');
             if (colSel) colSel.innerHTML = '<option value="">None</option>';
         }
+    },
+
+    // ── Code Reference Modal ──────────────────────────────────────────────────
+
+    showCodeModal(tool) {
+        // Collect current parameter values from the form
+        const params = {};
+        const container = document.getElementById('parameter-content');
+        if (container) {
+            container.querySelectorAll('input, select').forEach(el => {
+                if (!el.id) return;
+                if (el.type === 'checkbox') params[el.id] = el.checked;
+                else if (el.value !== '') params[el.id] = el.value;
+            });
+        }
+
+        const specialLabels = {
+            'deg_expression': this.t('deg.title'),
+            'dct': this.t('dct.title'),
+        };
+        const toolLabel = specialLabels[tool] || this.currentToolLabel || tool;
+        const code = this.getToolCodeTemplate(tool, params);
+        const paramDocs = this.getToolParamDocs(tool);
+
+        // Populate modal
+        const titleEl = document.getElementById('codeRefModalTitle');
+        const subtitleEl = document.getElementById('codeRefModalSubtitle');
+        const preEl = document.getElementById('codeRefPre');
+        const tbody = document.querySelector('#codeRefParamTable tbody');
+
+        if (titleEl) titleEl.textContent = `${this.t('tools.codeRef')} — ${toolLabel}`;
+        if (subtitleEl) subtitleEl.textContent = this.t('tools.codeRefSubtitle') || 'adata is the current AnnData object';
+        if (preEl) preEl.textContent = code;
+
+        if (tbody) {
+            tbody.innerHTML = paramDocs.map(p => `
+                <tr>
+                    <td><code class="text-danger">${p.name}</code></td>
+                    <td><span class="badge bg-secondary">${p.type}</span></td>
+                    <td><code>${p.default}</code></td>
+                    <td class="small">${p.desc}</td>
+                </tr>`).join('');
+        }
+
+        // Store code for copy
+        this._codeRefCurrentCode = code;
+
+        // Reset to code tab
+        this._switchCodeRefTab('code');
+
+        // Show modal
+        const el = document.getElementById('codeRefModal');
+        if (el) {
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            modal.show();
+        }
+    },
+
+    _switchCodeRefTab(tab) {
+        const codeDiv  = document.getElementById('codeRefTabCode');
+        const paramsDiv = document.getElementById('codeRefTabParams');
+        const codeLink  = document.getElementById('codeTab');
+        const paramsLink = document.getElementById('paramsTab');
+        if (tab === 'code') {
+            if (codeDiv) codeDiv.style.display = '';
+            if (paramsDiv) paramsDiv.style.display = 'none';
+            if (codeLink) codeLink.classList.add('active');
+            if (paramsLink) paramsLink.classList.remove('active');
+        } else {
+            if (codeDiv) codeDiv.style.display = 'none';
+            if (paramsDiv) paramsDiv.style.display = '';
+            if (codeLink) codeLink.classList.remove('active');
+            if (paramsLink) paramsLink.classList.add('active');
+        }
+    },
+
+    _copyCodeRef() {
+        const code = this._codeRefCurrentCode || '';
+        navigator.clipboard.writeText(code).then(() => {
+            const btn = document.querySelector('#codeRefModal .btn-outline-secondary');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>已复制';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                }, 1500);
+            }
+        }).catch(() => {
+            // Fallback
+            const ta = document.createElement('textarea');
+            ta.value = code;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        });
+    },
+
+    getToolCodeTemplate(tool, params = {}) {
+        const p = params;
+        const templates = {
+            'normalize': () => {
+                const t = p.target_sum || 1e4;
+                return `import scanpy as sc
+
+# 对每个细胞进行总计数标准化，使每个细胞的总计数等于 target_sum
+sc.pp.normalize_total(adata, target_sum=${t})`;
+            },
+            'log1p': () => `import scanpy as sc
+
+# 对数据进行 log(x+1) 变换，减小极端值影响
+sc.pp.log1p(adata)`,
+
+            'scale': () => {
+                const mv = p.max_value || 10;
+                return `import scanpy as sc
+
+# 对基因表达量进行 z-score 标准化，并截断到 max_value
+sc.pp.scale(adata, max_value=${mv})`;
+            },
+
+            'hvg': () => {
+                const n = p.n_genes || 2000;
+                const flavor = p.method || 'seurat';
+                return `import scanpy as sc
+
+# 选择高变基因（HVG），保留信息量最大的基因
+sc.pp.highly_variable_genes(
+    adata,
+    flavor='${flavor}',   # 算法: seurat / cell_ranger / seurat_v3
+    n_top_genes=${n}       # 保留的高变基因数量
+)
+
+# 仅保留高变基因（可选，减少后续计算量）
+adata = adata[:, adata.var.highly_variable].copy()`;
+            },
+
+            'filter_cells': () => {
+                const minC = p.min_counts || 500;
+                const minG = p.min_genes || 200;
+                const maxC = p.max_counts ? `\nsc.pp.filter_cells(adata, max_counts=${p.max_counts})` : '';
+                const maxG = p.max_genes ? `\nsc.pp.filter_cells(adata, max_genes=${p.max_genes})` : '';
+                return `import scanpy as sc
+
+# 过滤低质量细胞
+sc.pp.filter_cells(adata, min_counts=${minC})  # 最小 UMI 数
+sc.pp.filter_cells(adata, min_genes=${minG})   # 最小检测到的基因数${maxC}${maxG}`;
+            },
+
+            'filter_genes': () => {
+                const minCells = p.min_cells || 3;
+                const minCounts = p.g_min_counts ? `\nsc.pp.filter_genes(adata, min_counts=${p.g_min_counts})` : '';
+                return `import scanpy as sc
+
+# 过滤低表达基因
+sc.pp.filter_genes(adata, min_cells=${minCells})  # 至少在 N 个细胞中表达${minCounts}`;
+            },
+
+            'filter_outliers': () => {
+                const maxMt = p.max_mt_percent || 20;
+                const maxRibo = p.max_ribo_percent ? `\nadata = adata[adata.obs['pct_counts_ribo'] <= ${p.max_ribo_percent}].copy()` : '';
+                const maxHb = p.max_hb_percent ? `\nadata = adata[adata.obs['pct_counts_hb'] <= ${p.max_hb_percent}].copy()` : '';
+                return `import scanpy as sc
+
+# 计算 QC 指标（线粒体/核糖体/血红蛋白基因比例）
+adata.var['mt']   = adata.var_names.str.startswith('MT-')
+adata.var['ribo'] = adata.var_names.str.startswith(('RPS', 'RPL'))
+adata.var['hb']   = adata.var_names.str.contains('^HB[^P]', regex=True)
+
+sc.pp.calculate_qc_metrics(
+    adata, qc_vars=['mt', 'ribo', 'hb'], inplace=True, log1p=True
+)
+
+# 按阈值过滤离群细胞
+adata = adata[adata.obs['pct_counts_mt'] <= ${maxMt}].copy()${maxRibo}${maxHb}`;
+            },
+
+            'doublets': () => {
+                const bk = p.batch_key ? `, batch_key='${p.batch_key}'` : '';
+                const edr = p.expected_doublet_rate || 0.05;
+                const sdr = p.sim_doublet_ratio || 2.0;
+                return `import scanpy as sc
+
+# 使用 Scrublet 检测并去除双联体（doublets）
+sc.pp.scrublet(
+    adata${bk},
+    expected_doublet_rate=${edr},  # 预期双联体比例
+    sim_doublet_ratio=${sdr},      # 模拟双联体的倍数
+)
+
+# 去除预测为双联体的细胞
+adata = adata[~adata.obs['predicted_doublet']].copy()`;
+            },
+
+            'pca': () => {
+                const n = p.n_comps || 50;
+                return `import scanpy as sc
+
+# 主成分分析（PCA）降维
+sc.pp.pca(adata, n_comps=${n})
+
+# 结果存储在 adata.obsm['X_pca'] 和 adata.uns['pca']`;
+            },
+
+            'neighbors': () => {
+                const nn = p.n_neighbors || 15;
+                return `import scanpy as sc
+
+# 计算细胞邻居图（用于 UMAP/聚类的基础）
+sc.pp.neighbors(
+    adata,
+    n_neighbors=${nn},  # 邻居数量
+    n_pcs=50            # 使用的 PCA 主成分数
+)`;
+            },
+
+            'umap': () => {
+                const md = p.min_dist || 0.5;
+                return `import scanpy as sc
+
+# UMAP 降维可视化
+# 需要先运行 sc.pp.neighbors()
+sc.tl.umap(
+    adata,
+    min_dist=${md}  # 相邻点之间的最小距离，越小点越聚集
+)
+
+# 结果存储在 adata.obsm['X_umap']`;
+            },
+
+            'tsne': () => {
+                const perp = p.perplexity || 30;
+                return `import scanpy as sc
+
+# t-SNE 降维可视化
+sc.tl.tsne(
+    adata,
+    perplexity=${perp}  # 困惑度，通常取 5-50
+)
+
+# 结果存储在 adata.obsm['X_tsne']`;
+            },
+
+            'leiden': () => {
+                const res = p.resolution || 1.0;
+                return `import scanpy as sc
+
+# Leiden 聚类（需要先运行 sc.pp.neighbors()）
+sc.tl.leiden(
+    adata,
+    resolution=${res}  # 分辨率，越大聚类数越多
+)
+
+# 结果存储在 adata.obs['leiden']`;
+            },
+
+            'louvain': () => {
+                const res = p.resolution || 1.0;
+                return `import scanpy as sc
+
+# Louvain 聚类（需要先运行 sc.pp.neighbors()）
+sc.tl.louvain(
+    adata,
+    resolution=${res}  # 分辨率，越大聚类数越多
+)
+
+# 结果存储在 adata.obs['louvain']`;
+            },
+
+            'celltypist': () => {
+                const pkl = p.pkl_path || '/path/to/model.pkl';
+                return `import omicverse as ov
+
+# 使用 CellTypist 进行细胞类型注释
+obj = ov.single.Annotation(adata)
+obj.add_reference_pkl('${pkl}')   # 加载下载好的模型文件
+obj.annotate(method='celltypist')
+
+# 注释结果存储在 adata.obs['celltypist_prediction']
+adata = obj.adata`;
+            },
+
+            'gpt4celltype': () => {
+                const ck = p.cluster_key || 'leiden';
+                const tissue = p.tissuename || 'PBMC';
+                const species = p.speciename || 'human';
+                const provider = p.provider || 'qwen';
+                const model = p.model || 'qwen-plus';
+                const topn = p.topgenenumber || 10;
+                return `import omicverse as ov
+import os
+
+# 使用大语言模型（LLM）进行细胞类型注释
+os.environ['AGI_API_KEY'] = 'your_api_key'  # 或提前设置环境变量
+
+obj = ov.single.Annotation(adata)
+obj.annotate(
+    method='gpt4celltype',
+    cluster_key='${ck}',     # 已有的聚类列名
+    tissuename='${tissue}',  # 组织类型（如 PBMC, Brain, Liver）
+    speciename='${species}', # 物种（human / mouse）
+    provider='${provider}',  # LLM 提供商: qwen / openai / kimi
+    model='${model}',        # 模型名称
+    topgenenumber=${topn},   # 每个聚类使用的 top marker 基因数
+)
+
+# 注释结果存储在 adata.obs['gpt4celltype_prediction']
+adata = obj.adata`;
+            },
+
+            'scsa': () => {
+                const ck = p.cluster_key || 'leiden';
+                const fc = p.foldchange || 1.5;
+                const pv = p.pvalue || 0.05;
+                const ct = p.celltype || 'normal';
+                const tgt = p.target || 'cellmarker';
+                const tissue = p.tissue || 'All';
+                return `import omicverse as ov
+
+# 使用 SCSA 数据库进行细胞类型注释
+obj = ov.single.Annotation(adata)
+# obj.add_reference_scsa_db('/path/to/scsa.db')  # 可选：指定本地数据库路径
+
+obj.annotate(
+    method='scsa',
+    cluster_key='${ck}',  # 已有的聚类列名
+    foldchange=${fc},      # 差异表达倍数变化阈值
+    pvalue=${pv},          # 显著性阈值
+    celltype='${ct}',      # 细胞类型: normal / cancer
+    target='${tgt}',       # 参考数据库: cellmarker / panglaoDB / cancersea
+    tissue='${tissue}',    # 组织类型（'All' 表示不限制）
+)
+
+# 注释结果存储在 adata.obs['scsa_prediction']
+adata = obj.adata`;
+            },
+
+            'diffusion_map': () => {
+                const gb = p.groupby || 'leiden';
+                const rep = p.use_rep || 'X_pca';
+                const nc = p.n_comps || 50;
+                const orig = p.origin_cells || 'YourStartCellType';
+                return `import omicverse as ov
+
+# 使用扩散图（Diffusion Map）推断细胞轨迹
+Traj = ov.single.TrajInfer(
+    adata,
+    basis='X_umap',    # 可视化嵌入（用于绘图）
+    groupby='${gb}',   # 分组列（通常为聚类结果）
+    use_rep='${rep}',  # 低维表示
+    n_comps=${nc}      # 使用的主成分数
+)
+
+Traj.set_origin_cells('${orig}')  # 设置起始细胞类型
+Traj.inference(method='diffusion_map')
+
+# 拟时序结果存储在 adata.obs['dpt_pseudotime']`;
+            },
+
+            'slingshot': () => {
+                const gb = p.groupby || 'leiden';
+                const rep = p.use_rep || 'X_pca';
+                const nc = p.n_comps || 50;
+                const orig = p.origin_cells || 'YourStartCellType';
+                const term = p.terminal_cells || 'TerminalCellType';
+                const epochs = p.num_epochs || 1;
+                return `import omicverse as ov
+
+# 使用 Slingshot 推断细胞轨迹
+Traj = ov.single.TrajInfer(
+    adata,
+    basis='X_umap',
+    groupby='${gb}',
+    use_rep='${rep}',
+    n_comps=${nc}
+)
+
+Traj.set_origin_cells('${orig}')
+Traj.set_terminal_cells(['${term}'])  # 逗号分隔多个终止状态
+
+Traj.inference(method='slingshot', num_epochs=${epochs})
+
+# 拟时序结果存储在 adata.obs['slingshot_pseudotime']`;
+            },
+
+            'palantir': () => {
+                const gb = p.groupby || 'leiden';
+                const rep = p.use_rep || 'X_pca';
+                const nc = p.n_comps || 50;
+                const orig = p.origin_cells || 'YourStartCellType';
+                const term = p.terminal_cells || 'TerminalCellType';
+                const nwp = p.num_waypoints || 500;
+                return `import omicverse as ov
+
+# 使用 Palantir 推断细胞轨迹和分支概率
+Traj = ov.single.TrajInfer(
+    adata,
+    basis='X_umap',
+    groupby='${gb}',
+    use_rep='${rep}',
+    n_comps=${nc}
+)
+
+Traj.set_origin_cells('${orig}')
+Traj.set_terminal_cells(['${term}'])
+
+Traj.inference(method='palantir', num_waypoints=${nwp})
+
+# 结果存储在:
+# adata.obs['palantir_pseudotime']  — 拟时序
+# adata.obs['palantir_entropy']     — 细胞命运不确定性`;
+            },
+
+            'paga': () => {
+                const grps = p.groups || 'leiden';
+                const rep = p.use_rep || 'X_pca';
+                const basis = p.basis || 'umap';
+                const timePrior = p.use_time_prior || '';
+                const pagaKwExtra = timePrior
+                    ? `\nov.utils.cal_paga(adata, vkey='paga', groups='${grps}', use_time_prior='${timePrior}')`
+                    : `\nov.utils.cal_paga(adata, vkey='paga', groups='${grps}')`;
+                return `import omicverse as ov
+import scanpy as sc
+
+# PAGA 轨迹分析（基于图的伪时序）
+sc.pp.neighbors(adata, use_rep='${rep}')
+${pagaKwExtra}
+
+# 可视化 PAGA 图（使用 omicverse 绘图接口，与后端一致）
+ov.utils.plot_paga(
+    adata,
+    basis='${basis}',      # 可视化嵌入（umap / tsne 等）
+    size=50,
+    alpha=0.1,
+    min_edge_width=2,
+    node_size_scale=1.5,
+    show=True,
+    legend_loc='on data',
+)`;
+            },
+
+            'sctour': () => {
+                const gb = p.groupby || 'leiden';
+                const rep = p.use_rep || 'X_pca';
+                const nc = p.n_comps || 50;
+                const lec = p.alpha_recon_lec || 0.5;
+                const lode = p.alpha_recon_lode || 0.5;
+                return `import omicverse as ov
+
+# 使用 scTour 推断细胞轨迹（需要原始 count 数据在 adata.X）
+Traj = ov.single.TrajInfer(
+    adata,
+    basis='X_umap',
+    groupby='${gb}',
+    use_rep='${rep}',
+    n_comps=${nc}
+)
+
+Traj.inference(
+    method='sctour',
+    alpha_recon_lec=${lec},   # lec 重建权重
+    alpha_recon_lode=${lode}  # lode 重建权重
+)
+
+# 拟时序结果存储在 adata.obs['sctour_pseudotime']`;
+            },
+
+            'deg_expression': () => {
+                const condition = p['deg-condition-col'] || 'condition';
+                const ctrl = p['deg-ctrl-group'] || 'control';
+                const test = p['deg-test-group'] || 'treatment';
+                const ctKey = p['deg-celltype-key'] || 'leiden';
+                const method = p['deg-method'] || 'wilcoxon';
+                const maxCells = p['deg-max-cells'] || 100000;
+                return `import omicverse as ov
+
+# 差异表达分析（DEG Analysis）
+# 比较两组细胞之间的基因表达差异
+deg_obj = ov.single.DEG(
+    adata,
+    condition='${condition}',    # 分组条件列（obs 中的列名）
+    ctrl_group='${ctrl}',        # 对照组名称
+    test_group='${test}',        # 实验组名称
+    method='${method}',          # 统计方法: wilcoxon / t-test
+)
+
+deg_obj.run(
+    celltype_key='${ctKey}',     # 细胞类型列（每个细胞类型单独计算 DEG）
+    celltype_group=None,         # None 表示分析所有细胞类型，或传入列表指定
+    max_cells=${maxCells},       # 每组最大细胞数（防止内存溢出）
+)
+
+# 获取结果 DataFrame（含 log2FC、pvalue、padj、sig 列）
+results = deg_obj.get_results()
+print(results.head())
+
+# 可视化：火山图
+deg_obj.plot_volcano(
+    fc_threshold=1.0,    # 倍数变化阈值（log2FC）
+    padj_threshold=0.05  # 校正 p 值阈值
+)`;
+            },
+
+            'dct': () => {
+                const condition = p['dct-condition-col'] || 'condition';
+                const ctrl = p['dct-ctrl-group'] || 'control';
+                const test = p['dct-test-group'] || 'treatment';
+                const ctKey = p['dct-celltype-key'] || 'leiden';
+                const method = p['dct-method'] || 'sccoda';
+                const sampleKey = p['dct-sample-key'] || '';
+                const estFdr = p['dct-est-fdr'] || 0.2;
+                const useRep = p['dct-use-rep'] || 'X_pca';
+
+                if (method === 'milopy') {
+                    const sk = sampleKey || 'sample';
+                    return `import omicverse as ov
+import scanpy as sc
+from omicverse.single._milo_dev import Milo
+
+# 差异细胞类型组成分析 — milopy（Milo，omicverse 封装）
+# 先过滤出需要比较的两组细胞
+adata_sub = adata[adata.obs['${condition}'].isin(['${ctrl}', '${test}'])].copy()
+
+# 1. 构建 Milo 对象
+milo = Milo()
+mdata = milo.load(adata_sub)
+
+# 2. 计算邻居图（在 mdata['rna'] 上）
+sc.pp.neighbors(mdata['rna'], use_rep='${useRep}', n_neighbors=150)
+
+# 3. 分配邻域（prop 控制采样比例）
+milo.make_nhoods(mdata['rna'], prop=0.1)
+
+# 4. 按样本统计邻域细胞数
+mdata = milo.count_nhoods(mdata, sample_col='${sk}')
+
+# 5. DA 检验（差异丰度检验）
+milo.da_nhoods(
+    mdata,
+    design='~${condition}',
+    model_contrasts='${condition}[${test}]-${condition}[${ctrl}]',
+    solver='edger',
+)
+
+# 6. 构建邻域可视化图 & 标注细胞类型
+milo.build_nhood_graph(mdata, basis='${useRep}')
+milo.annotate_nhoods(mdata, anno_col='${ctKey}')
+
+# 结果存储在 mdata['milo'].var`;
+                } else {
+                    const sk = sampleKey || 'sample';
+                    return `import pertpy as pt
+
+# 差异细胞类型组成分析 — scCODA
+# 使用贝叶斯层次模型检测细胞类型比例变化
+# 先过滤出需要比较的两组细胞
+adata_sub = adata[adata.obs['${condition}'].isin(['${ctrl}', '${test}'])].copy()
+
+# 1. 构建 scCODA 模型并加载数据
+model = pt.tl.Sccoda()
+sccoda_data = model.load(
+    adata_sub,
+    type='cell_level',
+    cell_type_identifier='${ctKey}',   # 细胞类型列
+    sample_identifier='${sk}',         # 样本标识列（每个样本一行计数）
+    covariate_obs=['${condition}'],     # 条件列
+)
+
+# 2. 准备模型公式
+sccoda_data = model.prepare(
+    sccoda_data,
+    modality_key='coda',
+    formula='${condition}',            # 条件列名（直接传列名）
+)
+
+# 3. 运行 NUTS 贝叶斯采样
+model.run_nuts(
+    sccoda_data,
+    modality_key='coda',
+    num_samples=5000,    # 采样数
+    num_warmup=500,      # 预热步数
+)
+
+# 4. 设置 FDR 阈值并获取可信效果
+model.credible_effects(sccoda_data, modality_key='coda')
+model.set_fdr(sccoda_data, modality_key='coda', est_fdr=${estFdr})
+
+# 5. 获取结果 DataFrame
+results = model.get_effect_df(sccoda_data, modality_key='coda')
+print(results)`;
+                }
+            },
+        };
+
+        const fn = templates[tool];
+        if (fn) return fn();
+        return `# ${tool} 暂无代码模板`;
+    },
+
+    getToolParamDocs(tool) {
+        const docs = {
+            'normalize': [
+                { name: 'target_sum', type: 'float', default: '1e4', desc: '标准化后每个细胞的目标总计数。常用值: 1e4 (10000)、1e6 (TPM)。' },
+            ],
+            'log1p': [],
+            'scale': [
+                { name: 'max_value', type: 'float', default: '10', desc: '截断阈值，将 z-score 超过该值的表达量截断，防止极端值影响。' },
+            ],
+            'hvg': [
+                { name: 'n_top_genes', type: 'int', default: '2000', desc: '保留的高变基因数量，通常取 1000–5000。' },
+                { name: 'flavor', type: 'str', default: '"seurat"', desc: '算法选择: seurat（推荐）、cell_ranger、seurat_v3。' },
+            ],
+            'filter_cells': [
+                { name: 'min_counts', type: 'int', default: '500', desc: '每个细胞最少 UMI 总数，低于此值的细胞被过滤。' },
+                { name: 'min_genes', type: 'int', default: '200', desc: '每个细胞最少检测到的基因数，用于去除空液滴。' },
+                { name: 'max_counts', type: 'int', default: 'None', desc: '每个细胞最大 UMI 数，用于去除可能的双联体。' },
+                { name: 'max_genes', type: 'int', default: 'None', desc: '每个细胞最多检测到的基因数。' },
+            ],
+            'filter_genes': [
+                { name: 'min_cells', type: 'int', default: '3', desc: '基因最少在多少个细胞中表达，低于此值的基因被过滤。' },
+                { name: 'min_counts', type: 'int', default: 'None', desc: '基因的最小总 UMI 数（可选）。' },
+            ],
+            'filter_outliers': [
+                { name: 'max_mt_percent', type: 'float', default: '20', desc: '线粒体基因比例上限（百分比），高线粒体比例通常表示细胞质量差。' },
+                { name: 'mt_prefixes', type: 'str', default: '"MT-"', desc: '线粒体基因前缀，多个用逗号分隔，如 "MT-,mt-"。' },
+                { name: 'max_ribo_percent', type: 'float', default: 'None', desc: '核糖体基因比例上限（可选）。' },
+                { name: 'max_hb_percent', type: 'float', default: 'None', desc: '血红蛋白基因比例上限（可选）。' },
+            ],
+            'doublets': [
+                { name: 'expected_doublet_rate', type: 'float', default: '0.05', desc: '预期双联体比例（0~1），10x Genomics 通常为 0.05–0.08。' },
+                { name: 'sim_doublet_ratio', type: 'float', default: '2.0', desc: '相对于实际细胞数模拟的双联体倍数。' },
+                { name: 'batch_key', type: 'str', default: 'None', desc: '批次列名，若有多批次数据需要分别计算则设置此参数。' },
+                { name: 'n_prin_comps', type: 'int', default: '30', desc: 'Scrublet 内部 PCA 主成分数。' },
+            ],
+            'pca': [
+                { name: 'n_comps', type: 'int', default: '50', desc: '计算的主成分数量，通常取 30–100，视数据复杂度而定。' },
+            ],
+            'neighbors': [
+                { name: 'n_neighbors', type: 'int', default: '15', desc: '每个细胞的邻居数量，越大图越平滑，聚类更粗糙；越小越精细。' },
+                { name: 'n_pcs', type: 'int', default: '50', desc: '用于计算邻居的 PCA 主成分数，通常与 PCA 步骤一致。' },
+            ],
+            'umap': [
+                { name: 'min_dist', type: 'float', default: '0.5', desc: '相邻点之间的最小距离（0.0–1.0），越小点越聚集，越大布局越均匀。' },
+            ],
+            'tsne': [
+                { name: 'perplexity', type: 'float', default: '30', desc: '困惑度，相当于局部邻居数量，通常取 5–50。较大数据集可适当增大。' },
+            ],
+            'leiden': [
+                { name: 'resolution', type: 'float', default: '1.0', desc: '聚类分辨率，越大聚类数越多越细；越小聚类数越少越粗。' },
+            ],
+            'louvain': [
+                { name: 'resolution', type: 'float', default: '1.0', desc: '聚类分辨率，越大聚类数越多；越小聚类数越少。' },
+            ],
+            'celltypist': [
+                { name: 'pkl_path', type: 'str', default: '""', desc: 'CellTypist 模型文件路径（.pkl），可从 CellTypist 官网下载。' },
+            ],
+            'gpt4celltype': [
+                { name: 'cluster_key', type: 'str', default: '"leiden"', desc: '已有聚类结果的 obs 列名，如 leiden、louvain。' },
+                { name: 'tissuename', type: 'str', default: '""', desc: '样本组织来源，如 PBMC、Brain、Liver，帮助 LLM 缩小判断范围。' },
+                { name: 'speciename', type: 'str', default: '"human"', desc: '物种（human / mouse），影响基因名解读。' },
+                { name: 'provider', type: 'str', default: '"qwen"', desc: 'LLM 提供商: qwen（通义千问）、openai、kimi。' },
+                { name: 'model', type: 'str', default: '"qwen-plus"', desc: '使用的模型名称，需与 provider 匹配，如 gpt-4o、qwen-plus。' },
+                { name: 'topgenenumber', type: 'int', default: '10', desc: '每个聚类用于注释的 top marker 基因数量。' },
+            ],
+            'scsa': [
+                { name: 'cluster_key', type: 'str', default: '"leiden"', desc: '已有聚类结果的 obs 列名。' },
+                { name: 'foldchange', type: 'float', default: '1.5', desc: '差异表达倍数变化阈值，用于筛选 marker 基因。' },
+                { name: 'pvalue', type: 'float', default: '0.05', desc: '统计显著性阈值（p-value）。' },
+                { name: 'celltype', type: 'str', default: '"normal"', desc: '细胞类型模式：normal（正常细胞）或 cancer（癌细胞）。' },
+                { name: 'target', type: 'str', default: '"cellmarker"', desc: '参考数据库：cellmarker / panglaoDB / cancersea。' },
+                { name: 'tissue', type: 'str', default: '"All"', desc: '限制查询的组织类型，"All" 表示不限制。' },
+            ],
+            'diffusion_map': [
+                { name: 'groupby', type: 'str', default: '"leiden"', desc: '分组列（通常为聚类结果），用于指定细胞群体。' },
+                { name: 'use_rep', type: 'str', default: '"X_pca"', desc: '低维表示键（obsm 中的键名），如 X_pca、X_scVI。' },
+                { name: 'n_comps', type: 'int', default: '50', desc: '使用的主成分数。' },
+                { name: 'origin_cells', type: 'str', default: '""', desc: '起始细胞类型名称（groupby 中的某个值），用于确定拟时序方向。' },
+            ],
+            'slingshot': [
+                { name: 'groupby', type: 'str', default: '"leiden"', desc: '分组列（聚类结果）。' },
+                { name: 'use_rep', type: 'str', default: '"X_pca"', desc: '低维表示键。' },
+                { name: 'origin_cells', type: 'str', default: '""', desc: '起始细胞类型。' },
+                { name: 'terminal_cells', type: 'str', default: '""', desc: '终止细胞类型，多个用逗号分隔。' },
+                { name: 'num_epochs', type: 'int', default: '1', desc: 'Slingshot 训练轮数。' },
+            ],
+            'palantir': [
+                { name: 'groupby', type: 'str', default: '"leiden"', desc: '分组列。' },
+                { name: 'use_rep', type: 'str', default: '"X_pca"', desc: '低维表示键。' },
+                { name: 'origin_cells', type: 'str', default: '""', desc: '起始细胞类型。' },
+                { name: 'terminal_cells', type: 'str', default: '""', desc: '终止细胞类型，多个用逗号分隔。' },
+                { name: 'num_waypoints', type: 'int', default: '500', desc: '路标点数量，影响轨迹精度，越多越精确但计算越慢。' },
+            ],
+            'paga': [
+                { name: 'groups', type: 'str', default: '"leiden"', desc: '用于 PAGA 图的节点分组列（聚类结果）。' },
+                { name: 'use_rep', type: 'str', default: '"X_pca"', desc: '重新计算邻居时使用的低维表示。' },
+                { name: 'use_time_prior', type: 'str', default: 'None', desc: '先验拟时序列名（如 dpt_pseudotime），可提升 PAGA 方向性。' },
+                { name: 'basis', type: 'str', default: '"umap"', desc: '可视化嵌入（umap / tsne / draw_graph_fa）。' },
+            ],
+            'sctour': [
+                { name: 'groupby', type: 'str', default: '"leiden"', desc: '分组列（聚类结果）。' },
+                { name: 'use_rep', type: 'str', default: '"X_pca"', desc: '低维表示键。' },
+                { name: 'n_comps', type: 'int', default: '50', desc: '使用的主成分数。' },
+                { name: 'alpha_recon_lec', type: 'float', default: '0.5', desc: 'lec 重建项权重（0–1）。' },
+                { name: 'alpha_recon_lode', type: 'float', default: '0.5', desc: 'lode 重建项权重（0–1）。' },
+            ],
+            'deg_expression': [
+                { name: 'condition', type: 'str', default: '""', desc: 'obs 中的分组条件列名，用于区分对照组和实验组。' },
+                { name: 'ctrl_group', type: 'str', default: '""', desc: '对照组名称（condition 列中的某个值）。' },
+                { name: 'test_group', type: 'str', default: '""', desc: '实验组名称（condition 列中的某个值）。' },
+                { name: 'method', type: 'str', default: '"wilcoxon"', desc: '统计检验方法：wilcoxon（Wilcoxon 秩和检验，推荐）或 t-test（t 检验）。' },
+                { name: 'celltype_key', type: 'str', default: '"leiden"', desc: '细胞类型列名，每个细胞类型将单独进行 DEG 分析。' },
+                { name: 'celltype_group', type: 'list|None', default: 'None', desc: '指定要分析的细胞类型列表；None 表示分析所有细胞类型。' },
+                { name: 'max_cells', type: 'int', default: '100000', desc: '每个条件组最大使用的细胞数，防止内存溢出。' },
+            ],
+            'dct': [
+                { name: 'condition', type: 'str', default: '""', desc: 'obs 中的分组条件列名，用于区分对照组和实验组。' },
+                { name: 'ctrl_group', type: 'str', default: '""', desc: '对照组名称（condition 列中的某个值）。' },
+                { name: 'test_group', type: 'str', default: '""', desc: '实验组名称（condition 列中的某个值）。' },
+                { name: 'cell_type_key', type: 'str', default: '"leiden"', desc: '细胞类型注释列名（obs 中）。' },
+                { name: 'sample_key', type: 'str', default: 'None', desc: '样本标识列名。scCODA 推荐填写；milopy 必填。' },
+                { name: 'est_fdr (scCODA)', type: 'float', default: '0.2', desc: 'scCODA 估计 FDR 阈值（0.05–0.5），越小越严格。调用 model.set_fdr() 时传入。' },
+                { name: 'use_rep (milopy)', type: 'str', default: '"X_pca"', desc: 'milopy 计算邻居图使用的低维嵌入（来自 obsm，如 X_pca）。' },
+                { name: 'prop (milopy)', type: 'float', default: '0.1', desc: 'milopy 中邻域采样比例，控制邻域数量。' },
+                { name: 'n_neighbors (milopy)', type: 'int', default: '150', desc: 'milopy 构建邻居图的邻居数，影响邻域大小。' },
+            ],
+        };
+        return docs[tool] || [];
     }
 
 });
