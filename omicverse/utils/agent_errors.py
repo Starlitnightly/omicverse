@@ -15,10 +15,11 @@ class OVAgentError(Exception):
 
 
 class WorkflowNeedsFallback(OVAgentError):
-    """Registry workflow determined the task needs the full skills workflow.
+    """Deprecated: kept for backward compatibility only.
 
-    This is a *signal*, not a bug.  ``run_async`` catches it and falls back
-    to Priority 2 without logging a traceback.
+    Previously used as a signal for the legacy Priority 1/2 fallback system,
+    which has been removed. The agentic tool-calling loop is now the only
+    execution architecture.
     """
     pass
 

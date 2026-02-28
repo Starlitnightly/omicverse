@@ -3,6 +3,10 @@
 > 借鉴 OpenAI Codex CLI 架构，针对 `agent_backend.py` / `smart_agent.py` / `model_config.py` 的具体改进方案。
 > 每项改进包含：现状分析、目标设计、涉及文件与行号、迁移步骤、Before/After 代码示例、回归验证要点。
 
+> **Note (2026-02-28):** References to "Priority 1/2" fallback system in this
+> document are **superseded**. The legacy Priority 1/2 system has been removed.
+> The agentic tool-calling loop is now the only execution architecture.
+
 ---
 
 ## P0-1: Provider 注册表模式

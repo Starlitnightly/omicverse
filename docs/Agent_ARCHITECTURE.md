@@ -22,8 +22,8 @@ The OmicVerse Agent is a sophisticated natural language interface for single-cel
 ### High-Level Flow
 
 ```
-User Query → Skill Matching → LLM Code Generation → Code Extraction →
-Execution → Result Review → Reflection (if needed) → Final Response
+User Query → Agentic Tool Loop (inspect_data → search_functions →
+search_skills → execute_code → delegate → finish) → Final Response
 ```
 
 ### Component Diagram
@@ -34,8 +34,8 @@ Execution → Result Review → Reflection (if needed) → Final Response
 │  (omicverse/utils/smart_agent.py)                          │
 │                                                             │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐  │
-│  │   Skill     │  │  Code Gen &  │  │   Reflection    │  │
-│  │  Matching   │→ │  Extraction  │→ │   & Review      │  │
+│  │   Agentic   │  │    Tool      │  │   Subagent      │  │
+│  │    Loop     │→ │  Dispatch    │→ │   Delegation    │  │
 │  └─────────────┘  └──────────────┘  └─────────────────┘  │
 │         ↓                                      ↓            │
 └─────────┼──────────────────────────────────────┼───────────┘
