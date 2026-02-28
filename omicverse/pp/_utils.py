@@ -8,16 +8,30 @@ import numpy as np
 from scipy import sparse
 from sklearn.random_projection import sample_without_replacement
 
-from ._compat import njit
-from scanpy._utils import _CSMatrix, axis_sum, elem_mul
+from ._compat import DaskArray, _CSMatrix, njit
+from ._scale import axis_sum
 
 if TYPE_CHECKING:
-    from typing import Literal
+    from typing import Literal, Union
 
     from numpy.typing import DTypeLike, NDArray
 
-    from ._compat import DaskArray, _LegacyRandom
-    from scanpy._utils import _SupportedArray
+    from ._compat import _LegacyRandom
+
+    _SupportedArray = Union[
+        NDArray, sparse.csr_matrix, sparse.csc_matrix,
+        sparse.csr_array, sparse.csc_array,
+    ]
+
+
+def elem_mul(X, Y):
+    """Element-wise multiplication, supporting dense, sparse, and dask arrays."""
+    if isinstance(X, DaskArray):
+        import dask.array as da
+        return da.multiply(X, Y)
+    if sparse.issparse(X):
+        return X.multiply(Y)
+    return X * Y
 
 
 @singledispatch

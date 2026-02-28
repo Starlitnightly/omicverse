@@ -34,7 +34,7 @@ import warnings
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 
@@ -124,6 +124,24 @@ class Usage:
     total_tokens: int
     model: str
     provider: str
+
+
+@dataclass
+class ToolCall:
+    """A tool call requested by the LLM."""
+    id: str
+    name: str
+    arguments: Dict[str, Any]
+
+
+@dataclass
+class ChatResponse:
+    """Structured response from a multi-turn chat with tool-calling support."""
+    content: Optional[str]
+    tool_calls: List[ToolCall]
+    stop_reason: str  # "end_turn", "tool_use", "max_tokens"
+    usage: Optional[Usage] = None
+    raw_message: Optional[Any] = None  # provider-specific message object for re-injection
 
 
 def _coerce_int(value: Any) -> Optional[int]:
@@ -448,6 +466,509 @@ class OmicVerseLLMBackend:
         method = getattr(self, method_name)
         async for chunk in method(user_prompt):
             yield chunk
+
+    # ---------------------------------------------------------------------
+    # Multi-turn chat with tool-calling (agentic loop support)
+    # ---------------------------------------------------------------------
+
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
+    ) -> ChatResponse:
+        """Multi-turn chat with tool-calling support.
+
+        Parameters
+        ----------
+        messages : list of dict
+            Conversation messages (system, user, assistant, tool roles).
+        tools : list of dict, optional
+            Tool definitions in provider-agnostic format:
+            [{"name": "...", "description": "...", "parameters": {...}}]
+        tool_choice : str, optional
+            "auto" (default), "required", or "none".
+
+        Returns
+        -------
+        ChatResponse
+            Structured response with content and/or tool_calls.
+        """
+        self.last_usage = None
+        result = await asyncio.to_thread(
+            self._chat_sync, messages, tools, tool_choice
+        )
+        return result
+
+    def _chat_sync(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]],
+        tool_choice: Optional[str],
+    ) -> ChatResponse:
+        """Dispatch multi-turn chat to the correct provider."""
+        provider_info = get_provider(self.config.provider)
+        if provider_info is None:
+            raise RuntimeError(
+                f"Provider '{self.config.provider}' is not registered."
+            )
+
+        wire = provider_info.wire_api
+        if wire == WireAPI.CHAT_COMPLETIONS:
+            return self._chat_tools_openai(messages, tools, tool_choice)
+        elif wire == WireAPI.ANTHROPIC_MESSAGES:
+            return self._chat_tools_anthropic(messages, tools, tool_choice)
+        elif wire == WireAPI.GEMINI_GENERATE:
+            return self._chat_tools_gemini(messages, tools, tool_choice)
+        elif wire == WireAPI.DASHSCOPE:
+            return self._chat_tools_openai(messages, tools, tool_choice)
+        else:
+            raise RuntimeError(
+                f"Tool-calling chat not supported for wire API '{wire.value}'"
+            )
+
+    def _convert_tools_openai(self, tools: List[Dict]) -> List[Dict]:
+        """Convert provider-agnostic tool defs to OpenAI format."""
+        return [{"type": "function", "function": t} for t in tools]
+
+    def _convert_tools_anthropic(self, tools: List[Dict]) -> List[Dict]:
+        """Convert provider-agnostic tool defs to Anthropic format."""
+        return [{
+            "name": t["name"],
+            "description": t["description"],
+            "input_schema": t["parameters"],
+        } for t in tools]
+
+    def _chat_tools_openai(
+        self,
+        messages: List[Dict],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> ChatResponse:
+        """Multi-turn chat via OpenAI-compatible API with tool support."""
+        info = get_provider(self.config.provider)
+        base_url = self.config.endpoint or (info.base_url if info else "https://api.openai.com/v1")
+        api_key = self._resolve_api_key()
+        if not api_key:
+            raise RuntimeError(
+                f"Missing API key for provider '{self.config.provider}'."
+            )
+
+        try:
+            from openai import OpenAI  # type: ignore
+            client = OpenAI(base_url=base_url, api_key=api_key)
+
+            def _make_call():
+                # GPT-5 series requires max_completion_tokens instead of max_tokens
+                if ModelConfig.requires_responses_api(self.config.model):
+                    token_param = {"max_completion_tokens": self.config.max_tokens}
+                else:
+                    token_param = {"max_tokens": self.config.max_tokens}
+
+                kwargs = {
+                    "model": self.config.model,
+                    "messages": messages,
+                    "temperature": self.config.temperature,
+                    **token_param,
+                }
+                if tools:
+                    kwargs["tools"] = self._convert_tools_openai(tools)
+                    kwargs["tool_choice"] = tool_choice or "auto"
+
+                resp = client.chat.completions.create(**kwargs)
+                choice = (resp.choices or [None])[0]
+                if not choice or not getattr(choice, "message", None):
+                    raise RuntimeError("No choices returned from the model")
+
+                # Capture usage
+                usage_obj = None
+                if hasattr(resp, 'usage') and resp.usage is not None:
+                    usage = resp.usage
+                    pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
+                    ct = _coerce_int(getattr(usage, 'completion_tokens', None))
+                    tt = _compute_total(pt, ct, _coerce_int(getattr(usage, 'total_tokens', None)))
+                    if tt is not None:
+                        usage_obj = Usage(
+                            input_tokens=pt or 0,
+                            output_tokens=ct or 0,
+                            total_tokens=tt,
+                            model=self.config.model,
+                            provider=self.config.provider
+                        )
+                        self.last_usage = usage_obj
+
+                # Extract content and tool calls
+                msg = choice.message
+                content = msg.content or None
+                tc_list = []
+                if msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        args_str = tc.function.arguments
+                        try:
+                            args = json.loads(args_str)
+                        except (json.JSONDecodeError, TypeError):
+                            args = {"raw": args_str}
+                        tc_list.append(ToolCall(
+                            id=tc.id,
+                            name=tc.function.name,
+                            arguments=args,
+                        ))
+
+                stop = "tool_use" if tc_list else "end_turn"
+                if choice.finish_reason == "length":
+                    stop = "max_tokens"
+
+                # Build raw message dict for re-injection into messages list
+                raw_msg = {"role": "assistant", "content": content}
+                if tc_list:
+                    raw_msg["tool_calls"] = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                        }
+                        for tc in tc_list
+                    ]
+
+                return ChatResponse(
+                    content=content,
+                    tool_calls=tc_list,
+                    stop_reason=stop,
+                    usage=usage_obj,
+                    raw_message=raw_msg,
+                )
+
+            return self._retry(_make_call)
+
+        except ImportError:
+            raise RuntimeError(
+                "openai package not installed. Install openai>=1.0 for tool-calling support."
+            )
+
+    def _chat_tools_anthropic(
+        self,
+        messages: List[Dict],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> ChatResponse:
+        """Multi-turn chat via Anthropic Messages API with tool support."""
+        api_key = self._resolve_api_key()
+        if not api_key:
+            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+
+        try:
+            import anthropic  # type: ignore
+            client = anthropic.Anthropic(api_key=api_key)
+
+            # Separate system message from conversation messages
+            system_text = self.config.system_prompt
+            conv_messages = []
+            for m in messages:
+                if m.get("role") == "system":
+                    system_text = m.get("content", system_text)
+                else:
+                    conv_messages.append(m)
+
+            def _make_call():
+                kwargs = {
+                    "model": self.config.model,
+                    "max_tokens": self.config.max_tokens,
+                    "system": system_text,
+                    "messages": conv_messages,
+                    "temperature": self.config.temperature,
+                }
+                if tools:
+                    kwargs["tools"] = self._convert_tools_anthropic(tools)
+                    if tool_choice:
+                        if tool_choice == "auto":
+                            kwargs["tool_choice"] = {"type": "auto"}
+                        elif tool_choice == "required":
+                            kwargs["tool_choice"] = {"type": "any"}
+                        elif tool_choice == "none":
+                            pass  # Don't set tool_choice
+
+                resp = client.messages.create(**kwargs)
+
+                # Capture usage
+                usage_obj = None
+                if hasattr(resp, 'usage') and resp.usage is not None:
+                    usage = resp.usage
+                    it = _coerce_int(getattr(usage, 'input_tokens', None))
+                    ot = _coerce_int(getattr(usage, 'output_tokens', None))
+                    tt = _compute_total(it, ot, None)
+                    if tt is not None:
+                        usage_obj = Usage(
+                            input_tokens=it or 0,
+                            output_tokens=ot or 0,
+                            total_tokens=tt,
+                            model=self.config.model,
+                            provider=self.config.provider
+                        )
+                        self.last_usage = usage_obj
+
+                # Extract content and tool calls
+                content_parts = []
+                tc_list = []
+                raw_content = []
+                for block in getattr(resp, "content", []) or []:
+                    if getattr(block, "type", "") == "text":
+                        content_parts.append(getattr(block, "text", ""))
+                        raw_content.append({"type": "text", "text": getattr(block, "text", "")})
+                    elif getattr(block, "type", "") == "tool_use":
+                        tc_list.append(ToolCall(
+                            id=block.id,
+                            name=block.name,
+                            arguments=block.input,
+                        ))
+                        raw_content.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+
+                content = "\n".join(p for p in content_parts if p) or None
+                stop = getattr(resp, "stop_reason", "end_turn")
+                if stop == "tool_use":
+                    stop = "tool_use"
+                elif stop == "max_tokens":
+                    stop = "max_tokens"
+                else:
+                    stop = "end_turn"
+
+                raw_msg = {"role": "assistant", "content": raw_content}
+
+                return ChatResponse(
+                    content=content,
+                    tool_calls=tc_list,
+                    stop_reason=stop,
+                    usage=usage_obj,
+                    raw_message=raw_msg,
+                )
+
+            return self._retry(_make_call)
+
+        except ImportError:
+            raise RuntimeError(
+                "anthropic package not installed. Install it for tool-calling support."
+            )
+
+    def _chat_tools_gemini(
+        self,
+        messages: List[Dict],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> ChatResponse:
+        """Multi-turn chat via Gemini API with function calling support."""
+        api_key = self._resolve_api_key()
+        if not api_key:
+            raise RuntimeError("Missing GOOGLE_API_KEY for Gemini provider")
+
+        try:
+            import google.generativeai as genai  # type: ignore
+
+            genai.configure(api_key=api_key)
+
+            # Convert tools to Gemini format
+            gemini_tools = None
+            if tools:
+                func_decls = []
+                for t in tools:
+                    fd = genai.protos.FunctionDeclaration(
+                        name=t["name"],
+                        description=t["description"],
+                        parameters=self._json_schema_to_gemini_schema(t.get("parameters", {})),
+                    )
+                    func_decls.append(fd)
+                gemini_tools = [genai.protos.Tool(function_declarations=func_decls)]
+
+            model = genai.GenerativeModel(
+                model_name=self.config.model.split("/", 1)[-1],
+                system_instruction=self.config.system_prompt,
+                tools=gemini_tools,
+            )
+
+            generation_config = genai.types.GenerationConfig(
+                temperature=self.config.temperature,
+                max_output_tokens=self.config.max_tokens,
+            )
+
+            # Convert messages to Gemini Content format
+            gemini_contents = self._messages_to_gemini_contents(messages)
+
+            def _make_call():
+                resp = model.generate_content(
+                    gemini_contents,
+                    generation_config=generation_config,
+                )
+
+                # Capture usage
+                usage_obj = None
+                if hasattr(resp, 'usage_metadata') and resp.usage_metadata is not None:
+                    usage = resp.usage_metadata
+                    it = _coerce_int(getattr(usage, 'prompt_token_count', None))
+                    ot = _coerce_int(getattr(usage, 'candidates_token_count', None))
+                    tt = _compute_total(it, ot, _coerce_int(getattr(usage, 'total_token_count', None)))
+                    if tt is not None:
+                        usage_obj = Usage(
+                            input_tokens=it or 0,
+                            output_tokens=ot or 0,
+                            total_tokens=tt,
+                            model=self.config.model,
+                            provider=self.config.provider
+                        )
+                        self.last_usage = usage_obj
+
+                # Extract content and function calls
+                content_parts = []
+                tc_list = []
+                candidate = (resp.candidates or [None])[0] if hasattr(resp, 'candidates') else None
+                if candidate and hasattr(candidate, 'content') and candidate.content:
+                    for part in candidate.content.parts or []:
+                        if hasattr(part, 'text') and part.text:
+                            content_parts.append(part.text)
+                        if hasattr(part, 'function_call') and part.function_call:
+                            fc = part.function_call
+                            tc_list.append(ToolCall(
+                                id=f"gemini_{fc.name}_{id(fc)}",
+                                name=fc.name,
+                                arguments=dict(fc.args) if fc.args else {},
+                            ))
+
+                content = "\n".join(content_parts) or None
+                stop = "tool_use" if tc_list else "end_turn"
+
+                return ChatResponse(
+                    content=content,
+                    tool_calls=tc_list,
+                    stop_reason=stop,
+                    usage=usage_obj,
+                    raw_message=None,  # Gemini history managed separately
+                )
+
+            return self._retry(_make_call)
+
+        except ImportError:
+            raise RuntimeError(
+                "google-generativeai package not installed. Install it for tool-calling support."
+            )
+
+    @staticmethod
+    def _json_schema_to_gemini_schema(schema: Dict) -> Any:
+        """Convert JSON Schema to Gemini proto Schema (best-effort)."""
+        try:
+            import google.generativeai as genai  # type: ignore
+            Type = genai.protos.Type
+
+            type_map = {
+                "string": Type.STRING,
+                "number": Type.NUMBER,
+                "integer": Type.INTEGER,
+                "boolean": Type.BOOLEAN,
+                "array": Type.ARRAY,
+                "object": Type.OBJECT,
+            }
+
+            props = {}
+            required = schema.get("required", [])
+            for pname, pschema in schema.get("properties", {}).items():
+                ptype = type_map.get(pschema.get("type", "string"), Type.STRING)
+                enum_vals = pschema.get("enum")
+                props[pname] = genai.protos.Schema(
+                    type=ptype,
+                    description=pschema.get("description", ""),
+                    **({"enum": enum_vals} if enum_vals else {}),
+                )
+
+            return genai.protos.Schema(
+                type=Type.OBJECT,
+                properties=props,
+                required=required,
+            )
+        except Exception:
+            return None
+
+    @staticmethod
+    def _messages_to_gemini_contents(messages: List[Dict]) -> List[Any]:
+        """Convert OpenAI-style messages to Gemini Content objects."""
+        try:
+            import google.generativeai as genai  # type: ignore
+        except ImportError:
+            return []
+
+        contents = []
+        for m in messages:
+            role = m.get("role", "user")
+            if role == "system":
+                continue  # system handled via system_instruction
+            gemini_role = "model" if role == "assistant" else "user"
+
+            content = m.get("content", "")
+            if isinstance(content, str):
+                contents.append(genai.protos.Content(
+                    role=gemini_role,
+                    parts=[genai.protos.Part(text=content)],
+                ))
+            elif isinstance(content, list):
+                # Anthropic-style tool_result content blocks
+                parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "tool_result":
+                            parts.append(genai.protos.Part(
+                                function_response=genai.protos.FunctionResponse(
+                                    name=block.get("name", "unknown"),
+                                    response={"result": block.get("content", "")},
+                                )
+                            ))
+                        elif block.get("type") == "text":
+                            parts.append(genai.protos.Part(text=block.get("text", "")))
+                if parts:
+                    contents.append(genai.protos.Content(role=gemini_role, parts=parts))
+
+            # Handle OpenAI tool role
+            if role == "tool":
+                tool_call_id = m.get("tool_call_id", "")
+                tool_name = m.get("name", "unknown")
+                contents.append(genai.protos.Content(
+                    role="user",
+                    parts=[genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=tool_name,
+                            response={"result": m.get("content", "")},
+                        )
+                    )],
+                ))
+
+        return contents
+
+    def format_tool_result_message(
+        self, tool_call_id: str, tool_name: str, result: str
+    ) -> Dict[str, Any]:
+        """Format a tool result for appending to the messages list.
+
+        Returns a message dict in the correct format for the current provider.
+        """
+        provider_info = get_provider(self.config.provider)
+        wire = provider_info.wire_api if provider_info else WireAPI.CHAT_COMPLETIONS
+
+        if wire == WireAPI.ANTHROPIC_MESSAGES:
+            return {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": tool_call_id,
+                    "content": result,
+                }],
+            }
+        else:
+            # OpenAI-compatible format (also used by DashScope)
+            return {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "name": tool_name,
+                "content": result,
+            }
 
     # ---------------------------------------------------------------------
     # Internal helpers
@@ -1080,6 +1601,21 @@ class OmicVerseLLMBackend:
         code = textwrap.dedent(code).strip()
         if not code:
             raise ValueError("No Python code provided for execution")
+
+        # Pre-execution security scan
+        from .agent_sandbox import CodeSecurityScanner
+        from .agent_errors import SecurityViolationError
+        scanner = CodeSecurityScanner()
+        try:
+            violations = scanner.scan(code)
+            if scanner.has_critical(violations):
+                report = scanner.format_report(violations)
+                raise SecurityViolationError(
+                    f"Code blocked by security scanner:\n{report}",
+                    violations=violations,
+                )
+        except SyntaxError:
+            pass  # Syntax errors handled downstream by compile()
 
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -1761,4 +2297,4 @@ class OmicVerseLLMBackend:
             )
 
 
-__all__ = ["OmicVerseLLMBackend", "Usage"]
+__all__ = ["OmicVerseLLMBackend", "Usage", "ChatResponse", "ToolCall"]
