@@ -60,63 +60,22 @@ asyncio.run(stream_analysis())
 
 ## Stream Event Types
 
-The streaming API emits a sequence of events as the agent processes your query. Each event is a dictionary with `event_type` and `data` fields.
+> **Note (2026-02-28):** `stream_async` now wraps the agentic tool-calling
+> loop. Events use `type`/`content` keys. The legacy `skill_match` event
+> has been removed.
 
-### 1. Skill Match Event
+The streaming API emits events as the agentic loop processes your query.
+Each event is a dictionary with `type` and `content` fields.
 
-**When:** After relevant skills are identified for the query
+### 1. LLM Chunk Event
 
-**Structure:**
-```python
-{
-    "event_type": "skill_match",
-    "data": {
-        "matched_skills": List[str],        # List of skill names
-        "skill_scores": Dict[str, float],   # Relevance scores (if available)
-        "method": str                       # "llm" or "algorithmic"
-    }
-}
-```
-
-**Example:**
-```python
-{
-    "event_type": "skill_match",
-    "data": {
-        "matched_skills": [
-            "single-preprocessing",
-            "single-clustering"
-        ],
-        "skill_scores": {
-            "single-preprocessing": 0.95,
-            "single-clustering": 0.88
-        },
-        "method": "llm"
-    }
-}
-```
-
-**Usage:**
-```python
-if event["event_type"] == "skill_match":
-    skills = event["data"]["matched_skills"]
-    print(f"Using skills: {', '.join(skills)}")
-```
-
----
-
-### 2. LLM Chunk Event
-
-**When:** As the LLM generates each token/chunk of the response
+**When:** When the LLM returns a text-only response (no tool calls).
 
 **Structure:**
 ```python
 {
-    "event_type": "llm_chunk",
-    "data": {
-        "chunk": str,              # Current text chunk
-        "cumulative_text": str     # All text so far
-    }
+    "type": "llm_chunk",
+    "content": str     # Full assistant text response
 }
 ```
 

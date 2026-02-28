@@ -61,7 +61,6 @@ class ExecutionConfig:
     max_execution_retries: int = 2
     validate_outputs: bool = True
     # Agentic loop settings
-    agent_mode: str = "agentic"    # "agentic" (tool-calling loop) | "legacy" (Priority 1/2)
     max_agent_turns: int = 15      # max iterations in agentic loop
 
 
@@ -159,7 +158,6 @@ class AgentConfig:
                 auto_install_packages=kw.get("auto_install_packages", True),
                 max_execution_retries=kw.get("max_execution_retries", 2),
                 validate_outputs=kw.get("validate_outputs", True),
-                agent_mode=kw.get("agent_mode", "agentic"),
                 max_agent_turns=kw.get("max_agent_turns", 15),
             ),
             context=ContextConfig(

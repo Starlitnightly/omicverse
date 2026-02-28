@@ -142,7 +142,7 @@ def _can_use_bulk_rnaseq_pipeline(self, missing_prerequisites):
 
 ## P4: 创建FASTQ分析skill文件
 
-**影响**: Agent的Priority 2 (Skills Workflow) 路径无法处理FASTQ分析请求
+**影响**: Agent的agentic loop `search_skills` tool无法处理FASTQ分析请求
 **文件**: 新建 `.claude/skills/fastq-analysis/SKILL.md` 和 `reference.md`
 **改动量**: 新建2个文件，约300行
 
