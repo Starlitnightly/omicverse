@@ -181,15 +181,40 @@ def kernel_var_detail():
         # Try to handle AnnData
         try:
             if value.__class__.__name__ == 'AnnData':
+                def _pack_keys(keys, limit=200):
+                    all_keys = [str(k) for k in keys]
+                    kept = all_keys[:limit]
+                    return {
+                        'keys': kept,
+                        'total': len(all_keys),
+                        'more': max(0, len(all_keys) - len(kept))
+                    }
+
+                obs_pack = _pack_keys(value.obs.columns)
+                var_pack = _pack_keys(value.var.columns)
+                uns_pack = _pack_keys(value.uns.keys()) if value.uns else {'keys': [], 'total': 0, 'more': 0}
+                obsm_pack = _pack_keys(value.obsm.keys()) if value.obsm else {'keys': [], 'total': 0, 'more': 0}
+                layers_pack = _pack_keys(value.layers.keys()) if value.layers else {'keys': [], 'total': 0, 'more': 0}
                 return jsonify({
                     'type': 'anndata',
                     'name': name,
                     'summary': {
                         'shape': list(value.shape),
-                        'obs_columns': list(value.obs.columns),
-                        'var_columns': list(value.var.columns),
-                        'obsm_keys': list(value.obsm.keys()) if value.obsm else [],
-                        'layers': list(value.layers.keys()) if value.layers else []
+                        'obs_columns': obs_pack['keys'],
+                        'obs_columns_total': obs_pack['total'],
+                        'obs_columns_more': obs_pack['more'],
+                        'var_columns': var_pack['keys'],
+                        'var_columns_total': var_pack['total'],
+                        'var_columns_more': var_pack['more'],
+                        'uns_keys': uns_pack['keys'],
+                        'uns_keys_total': uns_pack['total'],
+                        'uns_keys_more': uns_pack['more'],
+                        'obsm_keys': obsm_pack['keys'],
+                        'obsm_keys_total': obsm_pack['total'],
+                        'obsm_keys_more': obsm_pack['more'],
+                        'layers': layers_pack['keys'],
+                        'layers_total': layers_pack['total'],
+                        'layers_more': layers_pack['more']
                     }
                 })
         except Exception:

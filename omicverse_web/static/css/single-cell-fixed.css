@@ -470,6 +470,45 @@ html.app-skin-dark .df-viewer-footer {
     color: #9ca3af;
 }
 
+/* ── AnnData viewer in variable panel ───────────────────────────── */
+.adata-viewer-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 8px 0 10px;
+}
+
+.adata-viewer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px;
+}
+
+.adata-viewer-section {
+    border: 1px solid #d7e3ff;
+    border-radius: 8px;
+    background: #f8fbff;
+    padding: 8px;
+}
+
+.adata-viewer-section-title {
+    font-weight: 700;
+    font-size: 0.76rem;
+    color: #2c4a88;
+    margin-bottom: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+html.app-skin-dark .adata-viewer-section {
+    border-color: #2b3d66;
+    background: #121b2f;
+}
+
+html.app-skin-dark .adata-viewer-section-title {
+    color: #9bb8ff;
+}
+
 /* File upload area */
 html.app-skin-dark .file-upload-area {
     background: #1f2937 !important;

@@ -348,27 +348,77 @@ Object.assign(SingleCellAnalysis.prototype, {
         }
 
         if (detail.type === 'anndata') {
-            const list = document.createElement('div');
-            list.className = 'var-detail-meta';
-            list.innerHTML = `
-                obs columns: ${detail.summary.obs_columns.length}<br/>
-                var columns: ${detail.summary.var_columns.length}<br/>
-                obsm: ${(detail.summary.obsm_keys || []).join(', ') || '—'}<br/>
-                layers: ${(detail.summary.layers || []).join(', ') || '—'}
-            `;
-            varView.appendChild(list);
+            const summary = detail.summary || {};
+            const section = (label, slot, keys, total, more) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'adata-viewer-section';
 
-            // Add "Load to Visualization" button
-            const loadBtn = document.createElement('button');
-            loadBtn.className = 'btn btn-sm btn-primary mt-3';
-            loadBtn.innerHTML = `<i class="feather-eye"></i> ${this.t('var.loadToViz')}`;
-            loadBtn.onclick = () => {
-                console.log('=== Load to Visualization button CLICKED ===');
-                console.log('Variable name:', detail.name);
-                this.loadAnndataToVisualization(detail.name);
+                const title = document.createElement('div');
+                title.className = 'adata-viewer-section-title';
+                title.textContent = `${label} (${Number.isFinite(total) ? total : (keys || []).length})`;
+                wrap.appendChild(title);
+
+                const chips = document.createElement('div');
+                chips.className = 'df-card-cols';
+                (keys || []).forEach((k) => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'adata-key-chip adata-chip-clickable';
+                    chip.dataset.slot = slot;
+                    chip.dataset.key = String(k);
+                    chip.textContent = String(k);
+                    chips.appendChild(chip);
+                });
+                if ((more || 0) > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'df-col-more';
+                    badge.textContent = `+${more} more`;
+                    chips.appendChild(badge);
+                }
+                if (!keys || keys.length === 0) {
+                    const empty = document.createElement('span');
+                    empty.className = 'text-muted';
+                    empty.textContent = '—';
+                    chips.appendChild(empty);
+                }
+                wrap.appendChild(chips);
+                return wrap;
             };
-            varView.appendChild(loadBtn);
-            console.log('Load to Visualization button created for:', detail.name);
+
+            const actionBar = document.createElement('div');
+            actionBar.className = 'adata-viewer-actions';
+            const obsBtn = document.createElement('button');
+            obsBtn.type = 'button';
+            obsBtn.className = 'btn btn-sm btn-outline-secondary';
+            obsBtn.textContent = 'Open .obs';
+            obsBtn.onclick = () => this.openVarTab(`${detail.name}.obs`);
+            const varBtn = document.createElement('button');
+            varBtn.type = 'button';
+            varBtn.className = 'btn btn-sm btn-outline-secondary';
+            varBtn.textContent = 'Open .var';
+            varBtn.onclick = () => this.openVarTab(`${detail.name}.var`);
+            const loadBtn = document.createElement('button');
+            loadBtn.className = 'btn btn-sm btn-primary';
+            loadBtn.innerHTML = `<i class="feather-eye"></i> ${this.t('var.loadToViz')}`;
+            loadBtn.onclick = () => this.loadAnndataToVisualization(detail.name);
+            actionBar.appendChild(obsBtn);
+            actionBar.appendChild(varBtn);
+            actionBar.appendChild(loadBtn);
+            varView.appendChild(actionBar);
+
+            const grid = document.createElement('div');
+            grid.className = 'adata-viewer-grid';
+            grid.appendChild(section('obs', 'obs', summary.obs_columns || [], summary.obs_columns_total, summary.obs_columns_more));
+            grid.appendChild(section('var', 'var', summary.var_columns || [], summary.var_columns_total, summary.var_columns_more));
+            grid.appendChild(section('uns', 'uns', summary.uns_keys || [], summary.uns_keys_total, summary.uns_keys_more));
+            grid.appendChild(section('obsm', 'obsm', summary.obsm_keys || [], summary.obsm_keys_total, summary.obsm_keys_more));
+            grid.appendChild(section('layers', 'layers', summary.layers || [], summary.layers_total, summary.layers_more));
+            grid.addEventListener('click', (e) => {
+                const chip = e.target.closest('.adata-chip-clickable');
+                if (!chip) return;
+                this.showAdataSlotDetail(detail.name, chip.dataset.slot, chip.dataset.key);
+            });
+            varView.appendChild(grid);
             return;
         }
 
@@ -401,9 +451,10 @@ Object.assign(SingleCellAnalysis.prototype, {
             };
         }
         return {
-            bg: `hsla(${hue}, 90%, 93%, 0.95)`,
-            border: `hsla(${hue}, 72%, 58%, 0.4)`,
-            fg: `hsl(${hue}, 64%, 26%)`
+            // Day mode: stronger contrast for readability while keeping column colors.
+            bg: `hsla(${hue}, 88%, 84%, 0.95)`,
+            border: `hsla(${hue}, 78%, 42%, 0.55)`,
+            fg: `hsl(${hue}, 72%, 18%)`
         };
     },
 
@@ -415,9 +466,11 @@ Object.assign(SingleCellAnalysis.prototype, {
             el.style.color = theme.fg;
             el.style.borderColor = theme.border;
         } else {
-            el.style.background = theme.bg;
+            // Keep cells readable in day mode: lighter tint + neutral text.
+            const dark = document.documentElement.classList.contains('app-skin-dark');
+            el.style.background = dark ? theme.bg : `hsla(${(colIdx * 47 + 18) % 360}, 88%, 90%, 0.7)`;
             el.style.borderLeft = `1px solid ${theme.border}`;
-            el.style.color = theme.fg;
+            el.style.color = dark ? theme.fg : '#1f2937';
         }
     },
 
