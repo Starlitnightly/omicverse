@@ -177,6 +177,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                     data.density_message || ''
                 );
                 this.plotData(data);
+                this.applyPointStyleLive();
                 this.currentEmbedding = embedding;
                 this._currentAxesKey = xyAxes ? `${xyAxes.x_axis}|${xyAxes.y_axis}` : embedding;
                 this.showStatus(this.t('plot.done'), false);
@@ -245,6 +246,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                             this._applyAxisLabels(data);
                         }
                     }
+                    this.applyPointStyleLive();
                     this.showStatus(this.t('plot.colorUpdated'), false);
                 } else {
                     const plotDiv = document.getElementById('plotly-div');
@@ -265,6 +267,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                     }
                     const minLen = Math.min(curX.length, (data.x||[]).length);
                     this.animatePositionTransitionForAnyData(curX, curY, data, minLen);
+                    this.applyPointStyleLive();
                     this.currentEmbedding = embedding;
                     this._currentAxesKey = axesKey;
                     this.showStatus(this.t('plot.embeddingSwitched'), false);
@@ -711,6 +714,7 @@ Object.assign(SingleCellAnalysis.prototype, {
     onDensityToggleChange(enabled) {
         try { localStorage.setItem('ov:s:density-enable-toggle', enabled ? 'true' : 'false'); } catch (_) {}
         this._updateDensityControlState();
+        this.applyPointStyleLive();
         this.updatePlot();
     },
 
@@ -724,6 +728,11 @@ Object.assign(SingleCellAnalysis.prototype, {
         const slider = document.getElementById('density-adjust-slider');
         const hint = document.getElementById('density-adjust-hint');
         const toggle = document.getElementById('density-enable-toggle');
+        // Density switch should never disable point size / opacity controls.
+        const sizeSlider = document.getElementById('point-size-slider');
+        const opacitySlider = document.getElementById('opacity-slider');
+        if (sizeSlider) sizeSlider.disabled = false;
+        if (opacitySlider) opacitySlider.disabled = false;
         if (!slider) return;
 
         const active = !!(toggle && toggle.checked);
@@ -1677,6 +1686,7 @@ Object.assign(SingleCellAnalysis.prototype, {
                     meta.density_message || ''
                 );
                 this._deckglRenderer.animateToColors(colors, meta, hoverValues);
+                this.applyPointStyleLive();
                 this._updateDeckGLLegend(wrap, meta);
                 this._deckglCurrentColorBy = colorBy;
                 this.showStatus(`${this.t('plot.colorUpdated')} · WebGL · ${(n / 1000).toFixed(0)}K cells`, false);
@@ -1711,6 +1721,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             } else {
                 this._deckglRenderer.setData(positions, colors, meta, hoverValues);
             }
+            this.applyPointStyleLive();
 
             this._updateDeckGLLegend(wrap, meta);
             this._deckglCurrentEmbedding = axesKey;
