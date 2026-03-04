@@ -234,6 +234,19 @@ html.app-skin-dark .adata-key-chip {
     color: #d1d5db;
 }
 
+.adata-chip-clickable:hover {
+    background: #e8f5e9;
+    border-color: #0b7a27;
+    color: #0b7a27;
+    text-decoration: underline;
+}
+
+html.app-skin-dark .adata-chip-clickable:hover {
+    background: rgba(11, 122, 39, 0.2);
+    border-color: #19a144;
+    color: #19a144;
+}
+
 /* File upload area */
 html.app-skin-dark .file-upload-area {
     background: #1f2937 !important;

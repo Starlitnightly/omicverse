@@ -1049,6 +1049,20 @@ body.view-code-active .nxl-content {
     opacity: 0.5;
 }
 
+/* AnnData rich output */
+.anndata-output {
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.82rem;
+}
+
+html.app-skin-dark .anndata-output {
+    background: #1e2330;
+    border-color: #374151;
+}
+
 /* JupyterLab-like Scrolling */
 #code-cells-container {
     padding-top: 6px !important;

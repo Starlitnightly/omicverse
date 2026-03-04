@@ -249,6 +249,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (imageView) imageView.style.display = 'none';
         if (!varView) return;
         varView.style.display = 'block';
+        varView.scrollTop = 0;
         varView.innerHTML = '';
         const meta = document.createElement('div');
         meta.className = 'var-detail-meta';

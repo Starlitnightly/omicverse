@@ -180,6 +180,128 @@ def kernel_var_detail():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/adata_slot', methods=['GET'])
+def kernel_adata_slot():
+    """Get detail for a specific slot/key within an AnnData variable."""
+    var_name = request.args.get('var_name', '')
+    slot = request.args.get('slot', '')
+    key = request.args.get('key', '')
+    try:
+        kernel_id = request.args.get('kernel_id')
+        executor, ns = get_kernel_context(kernel_id, bp.state.kernel_executor, bp.state.kernel_sessions)
+        executor._ensure_kernel()
+
+        if not var_name or var_name not in ns:
+            return jsonify({'error': f'Variable "{var_name}" not found'}), 404
+
+        adata = ns[var_name]
+        if adata.__class__.__name__ != 'AnnData':
+            return jsonify({'error': f'"{var_name}" is not an AnnData object'}), 400
+
+        import pandas as pd
+        import numpy as np
+
+        slot_obj = getattr(adata, slot, None)
+        if slot_obj is None:
+            return jsonify({'error': f'Slot "{slot}" not found on {var_name}'}), 404
+
+        if slot in ('obs', 'var'):
+            if key:
+                series = slot_obj[key]
+                df = series.to_frame().iloc[:100]
+                return jsonify({
+                    'type': 'dataframe',
+                    'name': f'{var_name}.{slot}["{key}"]',
+                    'shape': [len(slot_obj), 1],
+                    'table': df.to_dict(orient='split')
+                })
+            else:
+                df = slot_obj.iloc[:50, :20]
+                return jsonify({
+                    'type': 'dataframe',
+                    'name': f'{var_name}.{slot}',
+                    'shape': list(slot_obj.shape),
+                    'table': df.to_dict(orient='split')
+                })
+
+        elif slot in ('obsm', 'varm', 'obsp', 'varp'):
+            arr = slot_obj[key]
+            shape = list(arr.shape) if hasattr(arr, 'shape') else []
+            try:
+                if hasattr(arr, 'toarray'):
+                    preview_arr = arr[:10, :10].toarray()
+                elif isinstance(arr, np.ndarray):
+                    preview_arr = arr[:10, :10]
+                else:
+                    preview_arr = None
+                if preview_arr is not None:
+                    cols = [str(i) for i in range(preview_arr.shape[1])]
+                    idx = [str(i) for i in range(preview_arr.shape[0])]
+                    return jsonify({
+                        'type': 'dataframe',
+                        'name': f'{var_name}.{slot}["{key}"]',
+                        'shape': shape,
+                        'table': {'columns': cols, 'index': idx, 'data': preview_arr.tolist()}
+                    })
+            except Exception:
+                pass
+            return jsonify({
+                'type': 'content',
+                'name': f'{var_name}.{slot}["{key}"]',
+                'content': f'shape={shape}\n{str(arr)[:2000]}'
+            })
+
+        elif slot == 'layers':
+            layer = slot_obj[key]
+            shape = list(layer.shape) if hasattr(layer, 'shape') else []
+            try:
+                if hasattr(layer, 'toarray'):
+                    preview_arr = layer[:10, :10].toarray()
+                elif isinstance(layer, np.ndarray):
+                    preview_arr = layer[:10, :10]
+                else:
+                    preview_arr = None
+                if preview_arr is not None:
+                    cols = [str(i) for i in range(preview_arr.shape[1])]
+                    idx = [str(i) for i in range(preview_arr.shape[0])]
+                    return jsonify({
+                        'type': 'dataframe',
+                        'name': f'{var_name}.layers["{key}"]',
+                        'shape': shape,
+                        'table': {'columns': cols, 'index': idx, 'data': preview_arr.tolist()}
+                    })
+            except Exception:
+                pass
+            return jsonify({
+                'type': 'content',
+                'name': f'{var_name}.layers["{key}"]',
+                'content': f'shape={shape}'
+            })
+
+        elif slot == 'uns':
+            val = slot_obj[key]
+            if isinstance(val, pd.DataFrame):
+                df = val.iloc[:50, :20]
+                return jsonify({
+                    'type': 'dataframe',
+                    'name': f'{var_name}.uns["{key}"]',
+                    'shape': list(val.shape),
+                    'table': df.to_dict(orient='split')
+                })
+            return jsonify({
+                'type': 'content',
+                'name': f'{var_name}.uns["{key}"]',
+                'content': str(val)[:5000]
+            })
+
+        else:
+            return jsonify({'error': f'Unsupported slot: {slot}'}), 400
+
+    except Exception as e:
+        logging.error(f'adata_slot failed: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/interrupt', methods=['POST'])
 def kernel_interrupt():
     """Request interrupt of current code execution."""

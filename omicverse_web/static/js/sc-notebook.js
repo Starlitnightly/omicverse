@@ -752,6 +752,12 @@ Object.assign(SingleCellAnalysis.prototype, {
             if (hiddenNote) {
                 hiddenNote.classList.toggle('visible', !!state.hidden);
             }
+            // Re-attach AnnData chip click handlers lost when innerHTML is reassigned
+            outputDiv.querySelectorAll('.adata-chip-clickable').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    this.showAdataSlotDetail(chip.dataset.var, chip.dataset.slot, chip.dataset.key);
+                });
+            });
         });
     },
 
@@ -861,15 +867,122 @@ Object.assign(SingleCellAnalysis.prototype, {
         });
     },
 
+    isAnnDataRepr(text) {
+        return /^AnnData object with n_obs\s*[×x]\s*n_vars\s*=\s*\d/.test(text.trim());
+    },
+
+    parseAnnDataRepr(text) {
+        const lines = text.trim().split('\n');
+        const shapeMatch = lines[0].match(/=\s*([\d,]+)\s*[×x]\s*([\d,]+)/);
+        const n_obs = shapeMatch ? shapeMatch[1].replace(/,/g, '') : '?';
+        const n_vars = shapeMatch ? shapeMatch[2].replace(/,/g, '') : '?';
+        const slots = {};
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            const colonIdx = line.indexOf(':');
+            if (colonIdx === -1) continue;
+            const slot = line.slice(0, colonIdx).trim();
+            const keys = line.slice(colonIdx + 1).trim()
+                .split(',')
+                .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
+                .filter(k => k.length > 0);
+            if (keys.length > 0) slots[slot] = keys;
+        }
+        return { n_obs, n_vars, slots };
+    },
+
+    extractAdataVarName(cellId) {
+        const cell = document.getElementById(cellId);
+        if (!cell) return null;
+        const textarea = cell.querySelector('.code-input');
+        if (!textarea) return null;
+        const lines = textarea.value.split('\n');
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i].trim();
+            if (!line || line.startsWith('#')) continue;
+            if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(line)) return line.split('.')[0];
+            break;
+        }
+        return null;
+    },
+
+    renderAnnDataRepr(text, adataVarName) {
+        const { n_obs, n_vars, slots } = this.parseAnnDataRepr(text);
+        const clickable = adataVarName
+            ? (k, slot) => `<span class="adata-key-chip adata-chip-clickable" data-var="${adataVarName}" data-slot="${slot}" data-key="${k}" title="Click to view ${slot}['${k}']" style="cursor:pointer">${k}</span>`
+            : (k) => `<span class="adata-key-chip">${k}</span>`;
+        const labelStyle = 'font-size:0.72rem;min-width:48px;flex-shrink:0;color:#6c757d;font-weight:600;padding-top:3px;font-family:monospace';
+        const row = (label, valueHtml) =>
+            `<div class="d-flex align-items-start gap-2 mb-1">
+                <span style="${labelStyle}">${label}</span>
+                <span style="line-height:1.8">${valueHtml}</span>
+            </div>`;
+
+        let html = `<div class="anndata-output">`;
+        html += `<div class="d-flex align-items-center gap-2 mb-2">
+            <i class="fas fa-database" style="font-size:0.8rem;color:#6c757d"></i>
+            <span style="font-size:0.8rem;font-weight:600;color:#283c50">AnnData</span>
+            <span class="adata-key-chip" style="font-weight:700;font-size:0.75rem">${parseInt(n_obs).toLocaleString()} × ${parseInt(n_vars).toLocaleString()}</span>
+        </div>`;
+
+        const slotOrder = ['obs', 'var', 'uns', 'obsm', 'varm', 'obsp', 'layers'];
+        const extra = Object.keys(slots).filter(k => !slotOrder.includes(k));
+        for (const slot of [...slotOrder, ...extra]) {
+            if (slots[slot]) html += row(slot, slots[slot].map(k => clickable(k, slot)).join(''));
+        }
+        html += `</div>`;
+        return html;
+    },
+
+    showAdataSlotDetail(varName, slot, key) {
+        if (!varName) return;
+        const kernelId = (this.getActiveKernelId ? this.getActiveKernelId() : null) || 'default.ipynb';
+        const params = new URLSearchParams({ var_name: varName, slot, key });
+        if (kernelId) params.append('kernel_id', kernelId);
+        fetch(`/api/kernel/adata_slot?${params}`)
+            .then(r => r.json())
+            .then(detail => {
+                if (detail.error) { alert(detail.error); return; }
+                const tabId = `adata-${varName}-${slot}-${key}`;
+                if (this.openTabs !== undefined) {
+                    const existing = this.openTabs.find(t => t.id === tabId);
+                    if (!existing) {
+                        this.openTabs.push({ id: tabId, type: 'var', name: detail.name, path: detail.name, detail });
+                    } else {
+                        existing.detail = detail;
+                    }
+                    if (this.setActiveTab) this.setActiveTab(tabId);
+                    else if (this.showVarDetail) this.showVarDetail(detail);
+                } else {
+                    if (this.showVarDetail) this.showVarDetail(detail);
+                }
+            })
+            .catch(err => console.error('adata_slot fetch error:', err));
+    },
+
     renderCodeOutput(outputDiv, payload) {
         outputDiv.className = `code-cell-output has-content ${payload.isError ? 'error' : 'success'}`;
         outputDiv.classList.remove('markdown');
         outputDiv.innerHTML = '';
         if (payload.text) {
-            const pre = document.createElement('pre');
-            pre.className = 'code-output-text';
-            pre.innerHTML = this.ansiToHtml(payload.text);
-            outputDiv.appendChild(pre);
+            if (!payload.isError && this.isAnnDataRepr(payload.text)) {
+                const cellId = outputDiv.id.replace('-output', '');
+                const adataVar = this.extractAdataVarName(cellId);
+                const div = document.createElement('div');
+                div.innerHTML = this.renderAnnDataRepr(payload.text, adataVar);
+                div.addEventListener('click', (e) => {
+                    const chip = e.target.closest('.adata-chip-clickable');
+                    if (!chip) return;
+                    this.showAdataSlotDetail(chip.dataset.var, chip.dataset.slot, chip.dataset.key);
+                });
+                outputDiv.appendChild(div);
+            } else {
+                const pre = document.createElement('pre');
+                pre.className = 'code-output-text';
+                pre.innerHTML = this.ansiToHtml(payload.text);
+                outputDiv.appendChild(pre);
+            }
         }
         if (payload.figures && payload.figures.length > 0) {
             payload.figures.forEach(fig => {

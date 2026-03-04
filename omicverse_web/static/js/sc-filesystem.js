@@ -471,6 +471,10 @@ Object.assign(SingleCellAnalysis.prototype, {
             if (tab.outputs) {
                 this.restoreNotebookOutputs(tab.outputs);
             }
+            if (tab.scrollPos) {
+                const savedPos = tab.scrollPos;
+                requestAnimationFrame(() => this._setNotebookScrollTop(savedPos));
+            }
             this.updateKernelSelectorForTab(tab);
             this.fetchKernelStats(tab.kernelId);
             this.fetchKernelVars(tab.kernelId);
@@ -830,12 +834,30 @@ Object.assign(SingleCellAnalysis.prototype, {
         .catch(err => alert(`${this.t('status.moveFailed')}: ${err.message}`));
     },
 
+    _getNotebookScrollTop() {
+        // Find and return the current scroll position of the notebook area
+        const mc = document.querySelector('.main-content');
+        if (mc && mc.scrollTop > 0) return { target: 'main-content', top: mc.scrollTop };
+        const cc = document.getElementById('code-cells-container');
+        if (cc && cc.scrollTop > 0) return { target: 'code-cells-container', top: cc.scrollTop };
+        return { target: 'main-content', top: 0 };
+    },
+
+    _setNotebookScrollTop(saved) {
+        if (!saved) return;
+        const el = saved.target === 'code-cells-container'
+            ? document.getElementById('code-cells-container')
+            : document.querySelector('.main-content');
+        if (el) el.scrollTop = saved.top || 0;
+    },
+
     persistActiveTab() {
         const active = this.getActiveTab();
         if (!active) return;
         if (active.type === 'notebook') {
             active.cells = this.buildNotebookCellsFromUI();
             active.outputs = this.captureNotebookOutputs();
+            active.scrollPos = this._getNotebookScrollTop();
             return;
         }
         if (active.type === 'markdown' || active.type === 'text') {

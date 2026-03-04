@@ -54,6 +54,25 @@ class InProcessKernelExecutor:
         self.kernel_manager = InProcessKernelManager()
         self.kernel_manager.start_kernel()
         self.shell = self.kernel_manager.kernel.shell
+        # Patch ZMQ displayhook to avoid connection errors when running code
+        # outside the ZMQ message loop (our in-process thread context).
+        # We stub start_displayhook (which tries to access ZMQ parent_header
+        # context vars) and finish (which sends via ZMQ socket) with no-ops,
+        # while leaving update_user_ns intact so 'result.result' is still set.
+        dh = self.shell.displayhook
+        def _noop_start():
+            # Provide minimal msg dict so write_format_data can populate it
+            dh.msg = {'header': {}, 'content': {'data': {}, 'metadata': {}}}
+        dh.start_displayhook = _noop_start
+        # Suppress ZMQ send — method name differs across ipykernel versions
+        dh.finish = lambda: None
+        dh.finish_displayhook = lambda: None
+        # Fallback for showtraceback cascade (parent_header property)
+        dh._parent_header_global = {}
+        # Disable IPython history to avoid SQLite "session/line not unique" errors
+        # when multiple sessions share the same history.sqlite file
+        if hasattr(self.shell, 'history_manager'):
+            self.shell.history_manager.enabled = False
         plt.switch_backend('Agg')
         self.shell.user_ns.update({
             'sc': sc,
