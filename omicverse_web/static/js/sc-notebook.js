@@ -4,7 +4,39 @@
 
 Object.assign(SingleCellAnalysis.prototype, {
 
-    addCodeCell(code = '', outputs = [], cellType = 'code') {
+    _ensureNotebookUndoStack() {
+        if (!Array.isArray(this.notebookUndoStack)) {
+            this.notebookUndoStack = [];
+        }
+        if (typeof this._suppressNotebookUndo !== 'boolean') {
+            this._suppressNotebookUndo = false;
+        }
+    },
+
+    _pushNotebookUndoSnapshot() {
+        this._ensureNotebookUndoStack();
+        if (this._suppressNotebookUndo) return;
+        const snapshot = this.buildNotebookCellsFromUI();
+        if (!snapshot || !snapshot.length) return;
+        this.notebookUndoStack.push(snapshot);
+        if (this.notebookUndoStack.length > 30) {
+            this.notebookUndoStack.shift();
+        }
+    },
+
+    undoLastNotebookAction() {
+        this._ensureNotebookUndoStack();
+        if (this.notebookUndoStack.length === 0) return;
+        const snapshot = this.notebookUndoStack.pop();
+        this._suppressNotebookUndo = true;
+        try {
+            this.loadNotebookCells(snapshot);
+        } finally {
+            this._suppressNotebookUndo = false;
+        }
+    },
+
+    addCodeCell(code = '', outputs = [], cellType = 'code', afterCellId = null) {
         this.cellCounter++;
         const cellId = `cell-${this.cellCounter}`;
 
@@ -47,10 +79,29 @@ Object.assign(SingleCellAnalysis.prototype, {
         `;
 
         const container = document.getElementById('code-cells-container');
-        container.insertAdjacentHTML('beforeend', cellHtml);
+        let insertedAfterId = null;
+        if (afterCellId) {
+            const anchorCell = document.getElementById(afterCellId);
+            if (anchorCell) {
+                anchorCell.insertAdjacentHTML('afterend', cellHtml);
+                insertedAfterId = afterCellId;
+            }
+        }
+        if (!insertedAfterId) {
+            container.insertAdjacentHTML('beforeend', cellHtml);
+        }
         this.applyLanguage(this.currentLang);
 
-        this.codeCells.push(cellId);
+        if (insertedAfterId) {
+            const anchorIndex = this.codeCells.indexOf(insertedAfterId);
+            if (anchorIndex >= 0) {
+                this.codeCells.splice(anchorIndex + 1, 0, cellId);
+            } else {
+                this.codeCells.push(cellId);
+            }
+        } else {
+            this.codeCells.push(cellId);
+        }
         this.setCellType(cellId, cellType);
 
         // Add keyboard shortcut (Shift+Enter to run)
@@ -221,6 +272,14 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (cellType === 'markdown') {
             this.renderMarkdownCell(cellId);
         }
+    },
+
+    addCodeCellAtCurrent() {
+        const anchor = this.lastFocusedCellId && document.getElementById(this.lastFocusedCellId)
+            ? this.lastFocusedCellId
+            : null;
+        this._pushNotebookUndoSnapshot();
+        this.addCodeCell('', [], 'code', anchor);
     },
 
     updateCellNumber(cellId, status) {
@@ -1361,22 +1420,24 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     deleteCodeCell(cellId) {
-        if (confirm(this.t('cell.deleteConfirm'))) {
-            const cell = document.getElementById(cellId);
-            cell.remove();
-            this.codeCells = this.codeCells.filter(id => id !== cellId);
+        const cell = document.getElementById(cellId);
+        if (!cell) return;
+        this._pushNotebookUndoSnapshot();
+        cell.remove();
+        this.codeCells = this.codeCells.filter(id => id !== cellId);
+        if (this.lastFocusedCellId === cellId) {
+            this.lastFocusedCellId = this.codeCells.length ? this.codeCells[Math.max(0, this.codeCells.length - 1)] : null;
         }
     },
 
     clearAllCells() {
-        if (confirm(this.t('cell.clearConfirm'))) {
-            const container = document.getElementById('code-cells-container');
-            container.innerHTML = '';
-            this.codeCells = [];
-            this.cellCounter = 0;
-            // Add one empty cell
-            this.addCodeCell();
-        }
+        this._pushNotebookUndoSnapshot();
+        const container = document.getElementById('code-cells-container');
+        container.innerHTML = '';
+        this.codeCells = [];
+        this.cellCounter = 0;
+        // Add one empty cell
+        this.addCodeCell();
     },
 
     insertTemplate() {

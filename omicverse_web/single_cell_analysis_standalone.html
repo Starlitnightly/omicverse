@@ -485,7 +485,7 @@
                         <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.runCurrentCell()" title="Run current cell" data-i18n-title="toolbar.runCurrent">
                             <i class="feather-play"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCell()" title="Add cell" data-i18n-title="toolbar.addCell">
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.addCodeCellAtCurrent()" title="Add cell" data-i18n-title="toolbar.addCell">
                             <i class="feather-plus"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.saveActiveFile()" title="Save" data-i18n-title="toolbar.save">
@@ -516,6 +516,9 @@
                     <div class="code-toolbar-group">
                         <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.insertTemplate()" title="Insert template" data-i18n-title="toolbar.insertTemplate">
                             <i class="feather-file-text"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.undoLastNotebookAction()" title="Undo last action">
+                            <i class="feather-refresh-cw"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-light" onclick="singleCellApp.clearAllCells()" title="Clear all" data-i18n-title="toolbar.clearAll">
                             <i class="feather-trash-2"></i>
@@ -1376,7 +1379,7 @@
                     <div class="row h-100">
                         <div class="col-12">
                             <!-- Cells Container -->
-                            <div id="code-cells-container" class="overflow-auto p-3" style="max-width: 1200px; margin: 0 auto;">
+                            <div id="code-cells-container" class="overflow-auto p-3" style="max-width: none; margin: 0;">
                                 <!-- Code cells will be added here -->
                             </div>
                             <div id="text-file-view" class="text-file-view">
