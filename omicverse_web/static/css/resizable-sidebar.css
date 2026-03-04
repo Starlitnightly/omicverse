@@ -21,7 +21,9 @@
     bottom: 0 !important;
     width: var(--sidebar-width) !important;
     z-index: 1000 !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;          /* scroll handled by .navbar-content */
+    display: flex !important;
+    flex-direction: column !important;
     transition: width 0.05s ease !important;
 }
 
@@ -36,11 +38,31 @@
     z-index: 999 !important;
     margin-left: 0 !important;
     transition: left 0.05s ease !important;
+    min-height: 66px !important;
 }
 
 .header-wrapper {
     margin-left: 0 !important;
     padding-left: 0 !important;
+}
+
+/* Header items — reduce from theme default 79px to 42px */
+.nxl-h-item {
+    min-height: 42px !important;
+}
+
+.nxl-head-link {
+    padding: 8px 8px !important;
+}
+
+/* Sidebar logo area — reduce from theme default 80px to 42px */
+.m-header {
+    height: 66px !important;
+    padding: 4px 12px !important;
+}
+
+.nxl-navigation .m-header .brand-logo-left {
+    max-height: 60px !important;
 }
 
 /* ========================================
@@ -95,16 +117,35 @@ body.resizing-sidebar * {
 .navbar-wrapper {
     width: 100% !important;
     max-width: var(--sidebar-width) !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+}
+
+/* navbar-content scrolls internally; height:auto overrides theme's calc() */
+.navbar-content {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
 }
 
 /* ========================================
-   Memory Bar — sticky at sidebar bottom
+   Memory Bar — pinned at sidebar bottom, never scrolls away
    ======================================== */
 #memory-bar-container {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 10 !important;
+    flex-shrink: 0 !important;
     width: 100% !important;
+    background: #ffffff !important;
+    border-top-color: #e5e7eb !important;
+    z-index: 10 !important;
+}
+
+html.app-skin-dark #memory-bar-container {
+    background: #1f2937 !important;
+    border-top-color: #374151 !important;
 }
 
 /* ========================================

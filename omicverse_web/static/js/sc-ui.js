@@ -771,9 +771,12 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Hide terminal nav panel and restore navbar-content for non-terminal views
         if (termNavPanel)  termNavPanel.style.display  = 'none';
         if (navbarContent) navbarContent.style.display = '';
+        // editor-tabs only belongs to the code view
+        const editorTabs = document.getElementById('editor-tabs');
+        if (editorTabs) editorTabs.style.display = 'none';
 
         // Toggle body class so CSS can zero out main-content padding in code view
-        // document.body.classList.toggle('view-code-active', view === 'code');
+        document.body.classList.toggle('view-code-active', view === 'code');
 
         if (view === 'visualization') {
             if (vizView) vizView.style.display = 'block';
@@ -795,6 +798,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             if (codeView) codeView.style.display = 'block';
             if (codeBtn)  { codeBtn.classList.remove('btn-outline-primary'); codeBtn.classList.add('btn-primary'); }
             if (codeToolbarRow) codeToolbarRow.style.display = 'flex';
+            if (this.renderTabs) this.renderTabs();
             if (fileManager) fileManager.style.display = 'block';
 
             if (pageTitle) pageTitle.innerHTML = `<i class="feather-code me-2"></i>${this.t('view.codeTitle')}`;

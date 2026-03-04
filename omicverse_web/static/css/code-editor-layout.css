@@ -67,9 +67,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 4px 12px;
+    padding: 0 8px;
+    height: 30px;
+    min-height: 30px;
     background: transparent;
     border-bottom: 1px solid #f0f0f0;
+    box-sizing: border-box;
 }
 
 .code-cell-input {
@@ -248,10 +251,12 @@
 }
 
 .cell-toolbar .form-select {
-    height: 22px;
-    font-size: 11px;
-    padding: 0 6px;
+    height: 22px !important;
+    font-size: 11px !important;
+    padding: 0 6px !important;
     border-radius: 4px;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
 }
 
 .code-cell:hover .cell-toolbar {
@@ -259,8 +264,13 @@
 }
 
 .cell-toolbar .btn {
-    padding: 2px 8px;
-    font-size: 11px;
+    padding: 1px 6px !important;
+    font-size: 11px !important;
+    height: 22px !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
 }
 
 .code-cell-output.collapsed {
@@ -924,7 +934,7 @@
     display: none;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px 0 12px;
+    padding: 6px 12px 0 36px;
     border-bottom: 1px solid #e5e7eb;
     background: #f8fafc;
     margin-top: 0;
@@ -955,6 +965,18 @@
 /* ========================================
    Page Layout
    ======================================== */
+
+/* Code editor view: remove all horizontal/top padding from main-content and nxl-content */
+body.view-code-active .main-content {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+body.view-code-active .nxl-content {
+    padding-left: 0 !important;
+}
+
 #viz-toolbar {
     display: flex;
     align-items: center;
@@ -968,7 +990,7 @@
     border-bottom: 1px solid #e5e7eb;
     background: #f8fafc;
     position: sticky;
-    top: 120px;
+    top: 76px;
     z-index: 1020;
 }
 
@@ -976,13 +998,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 30px;
+    padding: 8px 20px;
     border-top: 1px solid #e5e7eb;
     background: #fff;
 }
 
 .nxl-container {
-    top: 120px;
+    top: 76px;
 }
 
 .header-pagebar .page-header-title h5 {
@@ -1029,6 +1051,7 @@
 
 /* JupyterLab-like Scrolling */
 #code-cells-container {
+    padding-top: 6px !important;
     padding-bottom: 80vh !important;
 }
 
@@ -1042,17 +1065,16 @@
     position: relative;
     padding: 0 !important;
     overflow: hidden;
-    min-height: calc(100vh - 160px);
-    height: calc(100vh - 160px);
+    min-height: calc(100vh - 76px);
+    height: calc(100vh - 76px);
 }
 
 /* ── #term-nav-panel — inside nxl-navigation ──────────────────────────── */
-/* Mirrors the height of .navbar-content from the theme (calc(100vh - 80px))
-   and uses an internal flex-column layout for header / list / footer.     */
+/* Mirrors the height below the sidebar logo (m-header = 42px) */
 #term-nav-panel {
     /* display set to 'flex' via JS when terminal view is active */
     flex-direction: column;
-    height: calc(100vh - 80px);
+    height: calc(100vh - 42px);
     overflow: hidden;
     border-right: 1px solid var(--nxl-border-color, #e5e7eb);
 }

@@ -65,13 +65,13 @@ a:hover { color: var(--ov-primary-dark); }
   width: 100%;
   max-width: 100%;
   height: auto;
-  max-height: 56px; /* fits typical header height */
+  max-height: 32px; /* fits reduced 42px header height */
   object-fit: contain;
   background: transparent; /* let nav background show through */
   display: block;
 }
 .nxl-navigation.mini .m-header .brand-logo-left {
-  max-height: 48px;
+  max-height: 28px;
 }
 /* For non-transparent logo assets in dark mode, blend slightly to match tone */
 html.app-skin-dark .nxl-navigation .m-header .brand-logo-left { mix-blend-mode: multiply; }

@@ -18,17 +18,17 @@ Object.assign(SingleCellAnalysis.prototype, {
                             <option value="markdown" data-i18n="cell.typeMarkdown">Markdown</option>
                             <option value="raw" data-i18n="cell.typeRaw">Raw</option>
                         </select>
-                        <button type="button" class="btn btn-sm btn-success" onclick="singleCellApp.runCodeCell('${cellId}')" title="Run (Shift+Enter)" data-i18n-title="cell.run">
-                            <i class="feather-play"></i> <span data-i18n="cell.run">Run</span>
+                        <button type="button" class="btn btn-sm btn-success" onclick="singleCellApp.runCodeCell('${cellId}')" title="运行 (Shift+Enter)" data-i18n-title="cell.run">
+                            <i class="feather-play"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutput('${cellId}')" title="Toggle output" data-i18n-title="cell.toggleOutput">
-                            <span data-i18n="cell.toggleOutput">Toggle output</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutput('${cellId}')" title="折叠输出" data-i18n-title="cell.toggleOutput">
+                            <i class="fas fa-compress-alt"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutputFull('${cellId}')" title="Hide output" data-i18n-title="cell.hideOutput">
-                            <span data-i18n="cell.hideOutput">Hide output</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.toggleCellOutputFull('${cellId}')" title="隐藏输出" data-i18n-title="cell.hideOutput">
+                            <i class="fas fa-eye-slash"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.clearCellOutput('${cellId}')" title="Clear output" data-i18n-title="cell.clearOutput">
-                            <span data-i18n="cell.clearOutput">Clear output</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.clearCellOutput('${cellId}')" title="清空输出" data-i18n-title="cell.clearOutput">
+                            <i class="fas fa-eraser"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="singleCellApp.deleteCodeCell('${cellId}')" title="Delete" data-i18n-title="cell.delete">
                             <i class="feather-trash-2"></i>
@@ -1002,13 +1002,20 @@ Object.assign(SingleCellAnalysis.prototype, {
         }
         if (type === 'markdown') {
             this.renderMarkdownCell(cellId);
+            if (textarea) this.resizeMarkdownEditor(textarea);
         } else {
             const markdownRender = document.getElementById(`${cellId}-markdown`);
             if (markdownRender) markdownRender.style.display = 'none';
-            if (textarea) textarea.style.display = 'block';
-        }
-        if (type === 'markdown' && textarea) {
-            this.resizeMarkdownEditor(textarea);
+            if (textarea) {
+                textarea.style.display = 'block';
+                // Recalculate height after textarea becomes visible again
+                textarea.style.height = 'auto';
+                setTimeout(() => {
+                    textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+                    const highlightContainer = cell.querySelector('.code-highlight');
+                    if (highlightContainer) highlightContainer.style.height = textarea.style.height;
+                }, 0);
+            }
         }
     },
 

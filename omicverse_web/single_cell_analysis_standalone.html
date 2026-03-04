@@ -326,24 +326,6 @@
     <!-- Header -->
     <header class="nxl-header">
         <div class="header-wrapper">
-            <!-- Header Left -->
-            <div class="header-left d-flex align-items-center gap-4">
-                <!-- Mobile Toggler -->
-                <a href="javascript:void(0);" class="nxl-head-mobile-toggler" id="mobile-collapse">
-                    <div class="hamburger hamburger--arrowturn">
-                        <div class="hamburger-box">
-                            <div class="hamburger-inner"></div>
-                        </div>
-                    </div>
-                </a>
-                <!-- Mega Menu Toggle -->
-                <div class="nxl-lavel-mega-menu-toggle d-flex d-lg-none">
-                    <a href="javascript:void(0);" id="nxl-lavel-mega-menu-open">
-                        <i class="feather-align-left"></i>
-                    </a>
-                </div>
-            </div>
-            
             <!-- Header Right -->
             <div class="header-right ms-auto">
                 <div class="d-flex align-items-center">
@@ -550,6 +532,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Editor Tabs — below toolbar, shared across views -->
+            <div class="editor-tabs" id="editor-tabs"></div>
 
             <!-- Main Content -->
             <div class="main-content">
@@ -1382,7 +1367,6 @@
                 <div id="code-editor-view" class="content-view" style="display: none;">
                     <div class="row h-100">
                         <div class="col-12">
-                            <div class="editor-tabs" id="editor-tabs"></div>
                             <!-- Cells Container -->
                             <div id="code-cells-container" class="overflow-auto p-3" style="max-width: 1200px; margin: 0 auto;">
                                 <!-- Code cells will be added here -->
