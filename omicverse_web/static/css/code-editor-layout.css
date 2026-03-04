@@ -314,6 +314,27 @@
     z-index: 10;
 }
 
+.code-toolbar-group-df-limit {
+    gap: 6px;
+    padding: 0 6px;
+}
+
+.code-toolbar-mini-label {
+    font-size: 11px;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1;
+    user-select: none;
+}
+
+.code-toolbar-mini-input {
+    width: 68px;
+    min-width: 68px;
+    height: 22px !important;
+    font-size: 11px !important;
+    padding: 0 6px !important;
+}
+
 /* Prism.js Integration */
 .code-cell-input pre[class*="language-"] {
     margin: 0;
@@ -1237,4 +1258,3 @@ html.app-skin-dark .anndata-output {
     height: 100% !important;
 }
 .term-panel .xterm-helper-textarea { position: absolute; }
-

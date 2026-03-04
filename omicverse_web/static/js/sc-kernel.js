@@ -254,7 +254,8 @@ Object.assign(SingleCellAnalysis.prototype, {
         const meta = document.createElement('div');
         meta.className = 'var-detail-meta';
         if (detail.type === 'dataframe') {
-            meta.textContent = `${detail.name} · ${this.t('var.dataframeLabel')} ${detail.shape[0]}x${detail.shape[1]} (${this.t('var.preview50')})`;
+            meta.innerHTML = `<strong>${detail.name}</strong> &nbsp;·&nbsp; DataFrame &nbsp;
+                <span class="df-card-shape" style="margin-left:4px">${detail.shape[0].toLocaleString()} rows × ${detail.shape[1]} cols</span>`;
         } else if (detail.type === 'anndata') {
             meta.textContent = `${detail.name} · ${this.t('var.anndataLabel')} ${detail.summary.shape.join('x')}`;
         } else {
@@ -263,35 +264,86 @@ Object.assign(SingleCellAnalysis.prototype, {
         varView.appendChild(meta);
 
         if (detail.type === 'dataframe' && detail.table) {
+            // Dtype header chips
+            if (detail.dtypes) {
+                const dtypeWrap = document.createElement('div');
+                dtypeWrap.className = 'df-dtype-header-chips';
+                detail.table.columns.forEach((col, colIdx) => {
+                    const dtype = detail.dtypes[col] || '';
+                    const chip = document.createElement('span');
+                    chip.className = 'df-col-chip';
+                    chip.textContent = col;
+                    this._applyDfColumnTheme(chip, colIdx, 'chip');
+                    if (dtype) {
+                        const badge = document.createElement('span');
+                        badge.className = `df-dtype-badge ${this._dtypeClass(dtype)}`;
+                        badge.textContent = dtype;
+                        chip.appendChild(badge);
+                    }
+                    dtypeWrap.appendChild(chip);
+                });
+                varView.appendChild(dtypeWrap);
+            }
+
+            // Scrollable table
+            const wrap = document.createElement('div');
+            wrap.className = 'df-viewer-wrap';
+
             const table = document.createElement('table');
-            table.className = 'var-table-view';
+            table.className = 'df-viewer-table';
+
+            // Header
             const thead = document.createElement('thead');
             const headRow = document.createElement('tr');
             const corner = document.createElement('th');
-            corner.textContent = '';
+            corner.className = 'df-th-index';
+            corner.textContent = '#';
             headRow.appendChild(corner);
-            detail.table.columns.forEach(col => {
+            detail.table.columns.forEach((col, colIdx) => {
                 const th = document.createElement('th');
                 th.textContent = col;
+                this._applyDfColumnTheme(th, colIdx, 'header');
+                if (detail.dtypes && detail.dtypes[col]) {
+                    const badge = document.createElement('span');
+                    badge.className = `df-dtype-badge ${this._dtypeClass(detail.dtypes[col])}`;
+                    badge.textContent = detail.dtypes[col];
+                    th.appendChild(badge);
+                }
                 headRow.appendChild(th);
             });
             thead.appendChild(headRow);
             table.appendChild(thead);
+
+            // Body
             const tbody = document.createElement('tbody');
             detail.table.data.forEach((row, idx) => {
                 const tr = document.createElement('tr');
                 const idxCell = document.createElement('td');
                 idxCell.textContent = detail.table.index[idx];
                 tr.appendChild(idxCell);
-                row.forEach(cell => {
+                row.forEach((cell, colIdx) => {
                     const td = document.createElement('td');
-                    td.textContent = cell;
+                    const val = cell !== null && cell !== undefined ? String(cell) : '';
+                    td.textContent = val;
+                    td.title = val;
+                    this._applyDfColumnTheme(td, colIdx, 'cell');
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
             });
             table.appendChild(tbody);
-            varView.appendChild(table);
+            wrap.appendChild(table);
+            varView.appendChild(wrap);
+
+            // Footer: row count info
+            const footer = document.createElement('div');
+            footer.className = 'df-viewer-footer';
+            const total = detail.shape[0];
+            const shown = detail.table.data.length;
+            footer.textContent = shown < total
+                ? `Showing ${shown} of ${total.toLocaleString()} rows × ${detail.shape[1]} columns`
+                : `${total.toLocaleString()} rows × ${detail.shape[1]} columns`;
+            varView.appendChild(footer);
             return;
         }
 
@@ -324,6 +376,49 @@ Object.assign(SingleCellAnalysis.prototype, {
         pre.className = 'code-output-text';
         pre.textContent = detail.content || '';
         varView.appendChild(pre);
+    },
+
+    _dtypeClass(dtype) {
+        if (!dtype) return 'df-dtype-other';
+        const d = dtype.toLowerCase();
+        if (d.includes('int')) return 'df-dtype-int';
+        if (d.includes('float')) return 'df-dtype-float';
+        if (d === 'object' || d === 'string' || d === 'str' || d.startsWith('string')) return 'df-dtype-object';
+        if (d === 'bool') return 'df-dtype-bool';
+        if (d.includes('datetime') || d.includes('timedelta')) return 'df-dtype-datetime';
+        if (d === 'category') return 'df-dtype-category';
+        return 'df-dtype-other';
+    },
+
+    _dfColumnTheme(colIdx) {
+        const hue = (colIdx * 47 + 18) % 360;
+        const dark = document.documentElement.classList.contains('app-skin-dark');
+        if (dark) {
+            return {
+                bg: `hsla(${hue}, 72%, 28%, 0.42)`,
+                border: `hsla(${hue}, 70%, 58%, 0.45)`,
+                fg: `hsl(${hue}, 78%, 84%)`
+            };
+        }
+        return {
+            bg: `hsla(${hue}, 90%, 93%, 0.95)`,
+            border: `hsla(${hue}, 72%, 58%, 0.4)`,
+            fg: `hsl(${hue}, 64%, 26%)`
+        };
+    },
+
+    _applyDfColumnTheme(el, colIdx, role = 'cell') {
+        if (!el) return;
+        const theme = this._dfColumnTheme(colIdx);
+        if (role === 'header' || role === 'chip') {
+            el.style.background = theme.bg;
+            el.style.color = theme.fg;
+            el.style.borderColor = theme.border;
+        } else {
+            el.style.background = theme.bg;
+            el.style.borderLeft = `1px solid ${theme.border}`;
+            el.style.color = theme.fg;
+        }
     },
 
     loadAnndataToVisualization(varName) {
@@ -534,12 +629,13 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (!name) return;
         const kernelId = this.getActiveKernelId();
         if (!kernelId) return;
+        const dfLimits = this.getDataFramePreviewLimits ? this.getDataFramePreviewLimits() : { rows: 50, cols: 20 };
         const existing = this.openTabs.find(t => t.type === 'var' && t.name === name && t.kernelId === kernelId);
         if (existing) {
             this.setActiveTab(existing.id);
             return;
         }
-        fetch(`/api/kernel/var_detail?name=${encodeURIComponent(name)}&kernel_id=${encodeURIComponent(kernelId)}`)
+        fetch(`/api/kernel/var_detail?name=${encodeURIComponent(name)}&kernel_id=${encodeURIComponent(kernelId)}&df_max_rows=${encodeURIComponent(dfLimits.rows)}&df_max_cols=${encodeURIComponent(dfLimits.cols)}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {

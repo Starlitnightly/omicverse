@@ -282,6 +282,7 @@ Object.assign(SingleCellAnalysis.prototype, {
 
         // Execute code on backend with streaming
         const kernelId = this.getActiveKernelId();
+        const dfLimits = this.getDataFramePreviewLimits ? this.getDataFramePreviewLimits() : { rows: 50, cols: 20 };
 
         // Variables to track output across promise chain
         let accumulatedOutput = '';
@@ -295,7 +296,9 @@ Object.assign(SingleCellAnalysis.prototype, {
             },
             body: JSON.stringify({
                 code: code,
-                kernel_id: kernelId
+                kernel_id: kernelId,
+                df_max_rows: dfLimits.rows,
+                df_max_cols: dfLimits.cols
             }),
             signal: this.executionAbortController.signal
         })
@@ -371,9 +374,10 @@ Object.assign(SingleCellAnalysis.prototype, {
                                 });
                             } else {
                                 let finalOutput = data.output || accumulatedOutput || '';
+                                const hasStructuredTable = data.result_kind === 'dataframe' && !!data.result_table;
 
                                 // Add result if present (like Jupyter's auto-display of last expression)
-                                if (data.result !== null && data.result !== undefined) {
+                                if (!hasStructuredTable && data.result !== null && data.result !== undefined) {
                                     const resultStr = String(data.result);
                                     if (resultStr && resultStr !== 'None') {
                                         if (finalOutput) {
@@ -385,14 +389,18 @@ Object.assign(SingleCellAnalysis.prototype, {
                                 }
 
                                 // If still no output, show success message
-                                if (!finalOutput && figures.length === 0) {
+                                if (!finalOutput && figures.length === 0 && !hasStructuredTable) {
                                     finalOutput = this.t('status.noOutput');
                                 }
 
                                 this.renderCodeOutput(outputDiv, {
                                     text: finalOutput,
                                     isError: false,
-                                    figures: figures
+                                    figures: figures,
+                                    resultKind: data.result_kind,
+                                    table: data.result_table,
+                                    dtypes: data.result_dtypes,
+                                    shape: data.result_shape
                                 });
                             }
 
@@ -758,6 +766,12 @@ Object.assign(SingleCellAnalysis.prototype, {
                     this.showAdataSlotDetail(chip.dataset.var, chip.dataset.slot, chip.dataset.key);
                 });
             });
+            // Re-attach DataFrame "Open in Viewer" button handlers
+            outputDiv.querySelectorAll('.df-open-viewer-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (this.openVarTab) this.openVarTab(btn.dataset.var);
+                });
+            });
         });
     },
 
@@ -892,7 +906,77 @@ Object.assign(SingleCellAnalysis.prototype, {
         return { n_obs, n_vars, slots };
     },
 
-    extractAdataVarName(cellId) {
+    isDataFrameRepr(text) {
+        return /\[\d[\d,]* rows [x×] \d[\d,]* columns\]/.test(text);
+    },
+
+    parseDataFrameRepr(text) {
+        const shapeMatch = text.match(/\[(\d[\d,]*) rows [x×] (\d[\d,]*) columns\]/);
+        const n_rows = shapeMatch ? parseInt(shapeMatch[1].replace(/,/g, '')) : 0;
+        const n_cols = shapeMatch ? parseInt(shapeMatch[2].replace(/,/g, '')) : 0;
+        // Parse column names from the first non-empty line (best-effort)
+        const cols = [];
+        const lines = text.trim().split('\n');
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            // Header line: split by 2+ whitespace characters
+            const parts = trimmed.split(/\s{2,}/);
+            if (parts.length >= 1) {
+                parts.forEach(p => { if (p.trim()) cols.push(p.trim()); });
+            }
+            break;
+        }
+        return { n_rows, n_cols, cols };
+    },
+
+    renderDataFrameCard(text, varName) {
+        const escapeHtml = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const { n_rows, n_cols, cols } = this.parseDataFrameRepr(text);
+        const maxCols = 8;
+        const shown = cols.slice(0, maxCols);
+        const extra = cols.length > maxCols ? cols.length - maxCols : 0;
+        const colChips = shown.map(c => `<span class="df-col-chip">${escapeHtml(c)}</span>`).join('');
+        const moreBadge = extra ? `<span class="df-col-more">+${extra} more</span>` : '';
+        const openBtn = varName
+            ? `<button class="df-open-btn df-open-viewer-btn" data-var="${escapeHtml(varName)}" title="Open in variable viewer">Open in Viewer ↗</button>`
+            : '';
+        return `<div class="df-card">
+  <span class="df-card-title">DataFrame</span><span class="df-card-shape">${n_rows.toLocaleString()} rows × ${n_cols} cols</span>
+  <div class="df-card-cols">${colChips}${moreBadge}</div>
+  <div class="df-card-footer">${openBtn}</div>
+</div>`;
+    },
+
+    renderDataFrameCardFromTable(table, shape, varName) {
+        const escapeHtml = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const n_rows = Array.isArray(shape) ? Number(shape[0] || 0) : (table?.index?.length || 0);
+        const n_cols = Array.isArray(shape) ? Number(shape[1] || 0) : (table?.columns?.length || 0);
+        const cols = Array.isArray(table?.columns) ? table.columns.map(String) : [];
+        const maxCols = 10;
+        const shown = cols.slice(0, maxCols);
+        const extra = cols.length > maxCols ? cols.length - maxCols : 0;
+        const colChips = shown.map(c => `<span class="df-col-chip">${escapeHtml(c)}</span>`).join('');
+        const moreBadge = extra ? `<span class="df-col-more">+${extra} more</span>` : '';
+        const openBtn = varName
+            ? `<button class="df-open-btn df-open-viewer-btn" data-var="${escapeHtml(varName)}" title="Open in variable viewer">Open in Viewer ↗</button>`
+            : '';
+        return `<div class="df-card">
+  <span class="df-card-title">DataFrame</span><span class="df-card-shape">${n_rows.toLocaleString()} rows × ${n_cols} cols</span>
+  <div class="df-card-cols">${colChips}${moreBadge}</div>
+  <div class="df-card-footer">${openBtn}</div>
+</div>`;
+    },
+
+    extractLastExpression(cellId) {
         const cell = document.getElementById(cellId);
         if (!cell) return null;
         const textarea = cell.querySelector('.code-input');
@@ -901,10 +985,95 @@ Object.assign(SingleCellAnalysis.prototype, {
         for (let i = lines.length - 1; i >= 0; i--) {
             const line = lines[i].trim();
             if (!line || line.startsWith('#')) continue;
-            if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(line)) return line.split('.')[0];
-            break;
+            return line;
         }
         return null;
+    },
+
+    _normalizeExpressionVarPath(expr) {
+        if (!expr) return null;
+        const raw = String(expr).trim();
+        if (!raw) return null;
+        const wrappers = [
+            /\.head\([^)]*\)\s*$/,
+            /\.tail\([^)]*\)\s*$/,
+            /\.sample\([^)]*\)\s*$/
+        ];
+        let normalized = raw;
+        for (const pattern of wrappers) {
+            normalized = normalized.replace(pattern, '');
+        }
+        if (/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(normalized)) {
+            return normalized;
+        }
+        return null;
+    },
+
+    extractAdataVarName(cellId) {
+        const expr = this.extractLastExpression(cellId);
+        const path = this._normalizeExpressionVarPath(expr);
+        if (!path) return null;
+        return path.split('.')[0];
+    },
+
+    extractDataFrameVarPath(cellId) {
+        const expr = this.extractLastExpression(cellId);
+        return this._normalizeExpressionVarPath(expr);
+    },
+
+    renderDataFrameTable(tableData, dtypes) {
+        if (!tableData || !Array.isArray(tableData.columns) || !Array.isArray(tableData.data)) {
+            return null;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'df-viewer-wrap';
+
+        const table = document.createElement('table');
+        table.className = 'df-viewer-table';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        const corner = document.createElement('th');
+        corner.className = 'df-th-index';
+        corner.textContent = '#';
+        headRow.appendChild(corner);
+
+        tableData.columns.forEach((col, colIdx) => {
+            const th = document.createElement('th');
+            th.textContent = String(col);
+            if (this._applyDfColumnTheme) this._applyDfColumnTheme(th, colIdx, 'header');
+            const dtype = dtypes?.[col];
+            if (dtype) {
+                const badge = document.createElement('span');
+                badge.className = `df-dtype-badge ${this._dtypeClass ? this._dtypeClass(dtype) : 'df-dtype-other'}`;
+                badge.textContent = dtype;
+                th.appendChild(badge);
+            }
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        tableData.data.forEach((row, rowIdx) => {
+            const tr = document.createElement('tr');
+            const idxCell = document.createElement('td');
+            idxCell.textContent = String((tableData.index || [])[rowIdx] ?? rowIdx);
+            tr.appendChild(idxCell);
+            (row || []).forEach((cell, colIdx) => {
+                const td = document.createElement('td');
+                const val = cell !== null && cell !== undefined ? String(cell) : '';
+                td.textContent = val;
+                td.title = val;
+                if (this._applyDfColumnTheme) this._applyDfColumnTheme(td, colIdx, 'cell');
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        return wrap;
     },
 
     renderAnnDataRepr(text, adataVarName) {
@@ -938,8 +1107,11 @@ Object.assign(SingleCellAnalysis.prototype, {
     showAdataSlotDetail(varName, slot, key) {
         if (!varName) return;
         const kernelId = (this.getActiveKernelId ? this.getActiveKernelId() : null) || 'default.ipynb';
+        const dfLimits = this.getDataFramePreviewLimits ? this.getDataFramePreviewLimits() : { rows: 50, cols: 20 };
         const params = new URLSearchParams({ var_name: varName, slot, key });
         if (kernelId) params.append('kernel_id', kernelId);
+        params.append('df_max_rows', String(dfLimits.rows));
+        params.append('df_max_cols', String(dfLimits.cols));
         fetch(`/api/kernel/adata_slot?${params}`)
             .then(r => r.json())
             .then(detail => {
@@ -965,9 +1137,30 @@ Object.assign(SingleCellAnalysis.prototype, {
         outputDiv.className = `code-cell-output has-content ${payload.isError ? 'error' : 'success'}`;
         outputDiv.classList.remove('markdown');
         outputDiv.innerHTML = '';
-        if (payload.text) {
+        const cellId = outputDiv.id.replace('-output', '');
+
+        if (!payload.isError && payload.table) {
+            if (payload.text && payload.text.trim()) {
+                const pre = document.createElement('pre');
+                pre.className = 'code-output-text';
+                pre.innerHTML = this.ansiToHtml(payload.text);
+                outputDiv.appendChild(pre);
+            }
+            const dfVar = this.extractDataFrameVarPath(cellId);
+            const card = document.createElement('div');
+            card.innerHTML = this.renderDataFrameCardFromTable(payload.table, payload.shape, dfVar);
+            card.addEventListener('click', (e) => {
+                const btn = e.target.closest('.df-open-viewer-btn');
+                if (!btn) return;
+                if (this.openVarTab) this.openVarTab(btn.dataset.var);
+            });
+            outputDiv.appendChild(card);
+            const tableWrap = this.renderDataFrameTable(payload.table, payload.dtypes || {});
+            if (tableWrap) {
+                outputDiv.appendChild(tableWrap);
+            }
+        } else if (payload.text) {
             if (!payload.isError && this.isAnnDataRepr(payload.text)) {
-                const cellId = outputDiv.id.replace('-output', '');
                 const adataVar = this.extractAdataVarName(cellId);
                 const div = document.createElement('div');
                 div.innerHTML = this.renderAnnDataRepr(payload.text, adataVar);
@@ -975,6 +1168,16 @@ Object.assign(SingleCellAnalysis.prototype, {
                     const chip = e.target.closest('.adata-chip-clickable');
                     if (!chip) return;
                     this.showAdataSlotDetail(chip.dataset.var, chip.dataset.slot, chip.dataset.key);
+                });
+                outputDiv.appendChild(div);
+            } else if (!payload.isError && this.isDataFrameRepr(payload.text)) {
+                const dfVar = this.extractDataFrameVarPath(cellId);
+                const div = document.createElement('div');
+                div.innerHTML = this.renderDataFrameCard(payload.text, dfVar);
+                div.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.df-open-viewer-btn');
+                    if (!btn) return;
+                    if (this.openVarTab) this.openVarTab(btn.dataset.var);
                 });
                 outputDiv.appendChild(div);
             } else {
@@ -1015,7 +1218,10 @@ Object.assign(SingleCellAnalysis.prototype, {
         const outputPayload = {
             text: payload.text || '',
             figures: payload.figures || [],
-            isError: !!payload.isError
+            isError: !!payload.isError,
+            table: payload.table || null,
+            dtypes: payload.dtypes || null,
+            shape: payload.shape || null
         };
         cell.dataset.outputPayload = JSON.stringify(outputPayload);
     },

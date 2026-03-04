@@ -272,6 +272,53 @@ app.register_blueprint(terminal_bp)
 # Code Execution Routes (not in blueprints due to complexity)
 # ============================================================================
 
+def _serialize_execution_result(raw_result, max_rows=50, max_cols=20):
+    """Serialize execution result with structured table payload when possible."""
+    if raw_result is None:
+        return {'kind': None, 'text': None}
+
+    try:
+        if isinstance(raw_result, pd.DataFrame):
+            df = raw_result.iloc[:max_rows, :max_cols].copy()
+            df = df.astype(object).where(pd.notna(df), None)
+            dtypes = {str(col): str(dtype) for col, dtype in raw_result.dtypes.items()}
+            return {
+                'kind': 'dataframe',
+                'text': None,
+                'shape': [int(raw_result.shape[0]), int(raw_result.shape[1])],
+                'dtypes': dtypes,
+                'table': df.to_dict(orient='split')
+            }
+
+        if isinstance(raw_result, pd.Series):
+            col_name = str(raw_result.name) if raw_result.name is not None else 'value'
+            df = raw_result.to_frame(name=col_name).iloc[:max_rows, :1].copy()
+            df = df.astype(object).where(pd.notna(df), None)
+            return {
+                'kind': 'dataframe',
+                'text': None,
+                'shape': [int(raw_result.shape[0]), 1],
+                'dtypes': {col_name: str(raw_result.dtype)},
+                'table': df.to_dict(orient='split')
+            }
+    except Exception:
+        pass
+
+    try:
+        return {'kind': 'text', 'text': str(raw_result)}
+    except Exception:
+        return {'kind': 'text', 'text': '<unserializable result>'}
+
+
+def _parse_df_limit(value, default_value, minimum, maximum):
+    """Parse and clamp DataFrame preview limit from request payload."""
+    try:
+        parsed = int(value)
+    except Exception:
+        return default_value
+    return max(minimum, min(maximum, parsed))
+
+
 @app.route('/api/execute_code', methods=['POST'])
 def execute_code():
     """Execute Python code with access to current_adata."""
@@ -283,6 +330,8 @@ def execute_code():
 
         kernel_id = normalize_kernel_id(payload.get('kernel_id'))
         timeout = payload.get('timeout', 300)
+        df_max_rows = _parse_df_limit(payload.get('df_max_rows'), 50, 1, 500)
+        df_max_cols = _parse_df_limit(payload.get('df_max_cols'), 20, 1, 200)
         executor, ns = get_kernel_context(kernel_id, state.kernel_executor, state.kernel_sessions)
 
         try:
@@ -311,9 +360,11 @@ def execute_code():
                 'figures': execution.get('figures', [])
             }), 200
 
-        result = execution.get('result')
-        if result is not None:
-            result = str(result)
+        result_info = _serialize_execution_result(
+            execution.get('result'),
+            max_rows=df_max_rows,
+            max_cols=df_max_cols
+        )
 
         new_adata = execution.get('adata')
         data_updated = False
@@ -339,7 +390,11 @@ def execute_code():
 
         return jsonify({
             'output': output,
-            'result': result,
+            'result': result_info.get('text'),
+            'result_kind': result_info.get('kind'),
+            'result_shape': result_info.get('shape'),
+            'result_dtypes': result_info.get('dtypes'),
+            'result_table': result_info.get('table'),
             'figures': execution.get('figures', []),
             'data_updated': data_updated,
             'data_info': data_info,
@@ -363,6 +418,8 @@ def execute_code_stream():
             return jsonify({'error': '没有提供代码'}), 400
         kernel_id = normalize_kernel_id(payload.get('kernel_id'))
         timeout = payload.get('timeout', 300)
+        df_max_rows = _parse_df_limit(payload.get('df_max_rows'), 50, 1, 500)
+        df_max_cols = _parse_df_limit(payload.get('df_max_cols'), 20, 1, 200)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -454,18 +511,23 @@ def execute_code_stream():
             if execution_result['error']:
                 yield f"data: {json.dumps({'type': 'error', 'text': execution_result['error']})}\n\n"
             else:
-                # Convert result to string for JSON serialization
-                result_value = None
+                result_info = {'kind': None, 'text': None}
                 if execution_result['result']:
-                    raw_result = execution_result['result'].get('result')
-                    if raw_result is not None:
-                        result_value = str(raw_result)
+                    result_info = _serialize_execution_result(
+                        execution_result['result'].get('result'),
+                        max_rows=df_max_rows,
+                        max_cols=df_max_cols
+                    )
 
                 result_data = {
                     'type': 'complete',
                     'output': execution_result['result'].get('output', '') if execution_result['result'] else '',
                     'error': execution_result['result'].get('error') if execution_result['result'] else None,
-                    'result': result_value,
+                    'result': result_info.get('text'),
+                    'result_kind': result_info.get('kind'),
+                    'result_shape': result_info.get('shape'),
+                    'result_dtypes': result_info.get('dtypes'),
+                    'result_table': result_info.get('table'),
                     'figures': execution_result['figures'],
                     'data_updated': execution_result['data_info'] is not None,
                     'data_info': execution_result['data_info']

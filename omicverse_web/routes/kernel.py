@@ -28,6 +28,29 @@ from utils.adata_helpers import canonical_embedding_keys as _canonical_embedding
 # Create blueprint
 bp = Blueprint('kernel', __name__)
 
+def _parse_df_limit(value, default_value, minimum, maximum):
+    """Parse and clamp DataFrame preview limit from query."""
+    try:
+        parsed = int(value)
+    except Exception:
+        return default_value
+    return max(minimum, min(maximum, parsed))
+
+
+def _df_payload(name, frame, shape=None, max_rows=50, max_cols=50):
+    """Build JSON-safe payload for DataFrame preview."""
+    import pandas as pd
+    df = frame.iloc[:max_rows, :max_cols].copy()
+    df = df.astype(object).where(pd.notna(df), None)
+    dtypes = {str(col): str(dtype) for col, dtype in frame.dtypes.items()}
+    return {
+        'type': 'dataframe',
+        'name': name,
+        'shape': shape if shape is not None else [int(frame.shape[0]), int(frame.shape[1])],
+        'dtypes': dtypes,
+        'table': df.to_dict(orient='split')
+    }
+
 
 @bp.route('/stats', methods=['GET'])
 def kernel_stats():
@@ -125,6 +148,8 @@ def kernel_var_detail():
     name = request.args.get('name', '')
     try:
         kernel_id = request.args.get('kernel_id')
+        df_max_rows = _parse_df_limit(request.args.get('df_max_rows'), 50, 1, 500)
+        df_max_cols = _parse_df_limit(request.args.get('df_max_cols'), 50, 1, 200)
         executor, ns = get_kernel_context(kernel_id, bp.state.kernel_executor, bp.state.kernel_sessions)
         executor._ensure_kernel()
         value = resolve_var_path(name, ns)
@@ -133,21 +158,23 @@ def kernel_var_detail():
         try:
             import pandas as pd
             if isinstance(value, pd.DataFrame):
-                df = value.iloc[:50, :50]
-                return jsonify({
-                    'type': 'dataframe',
-                    'name': name,
-                    'shape': list(value.shape),
-                    'table': df.to_dict(orient='split')
-                })
+                return jsonify(_df_payload(
+                    name,
+                    value,
+                    shape=list(value.shape),
+                    max_rows=df_max_rows,
+                    max_cols=df_max_cols
+                ))
             elif isinstance(value, pd.Series):
-                df = value.to_frame().iloc[:50, :1]
-                return jsonify({
-                    'type': 'dataframe',
-                    'name': name,
-                    'shape': [len(value), 1],
-                    'table': df.to_dict(orient='split')
-                })
+                col_name = str(value.name) if value.name is not None else 'value'
+                df = value.to_frame(name=col_name)
+                return jsonify(_df_payload(
+                    name,
+                    df,
+                    shape=[len(value), 1],
+                    max_rows=df_max_rows,
+                    max_cols=1
+                ))
         except Exception:
             pass
 
@@ -188,6 +215,8 @@ def kernel_adata_slot():
     key = request.args.get('key', '')
     try:
         kernel_id = request.args.get('kernel_id')
+        df_max_rows = _parse_df_limit(request.args.get('df_max_rows'), 50, 1, 500)
+        df_max_cols = _parse_df_limit(request.args.get('df_max_cols'), 20, 1, 200)
         executor, ns = get_kernel_context(kernel_id, bp.state.kernel_executor, bp.state.kernel_sessions)
         executor._ensure_kernel()
 
@@ -208,21 +237,22 @@ def kernel_adata_slot():
         if slot in ('obs', 'var'):
             if key:
                 series = slot_obj[key]
-                df = series.to_frame().iloc[:100]
-                return jsonify({
-                    'type': 'dataframe',
-                    'name': f'{var_name}.{slot}["{key}"]',
-                    'shape': [len(slot_obj), 1],
-                    'table': df.to_dict(orient='split')
-                })
+                df = series.to_frame(name=str(key))
+                return jsonify(_df_payload(
+                    f'{var_name}.{slot}["{key}"]',
+                    df,
+                    shape=[len(slot_obj), 1],
+                    max_rows=df_max_rows,
+                    max_cols=1
+                ))
             else:
-                df = slot_obj.iloc[:50, :20]
-                return jsonify({
-                    'type': 'dataframe',
-                    'name': f'{var_name}.{slot}',
-                    'shape': list(slot_obj.shape),
-                    'table': df.to_dict(orient='split')
-                })
+                return jsonify(_df_payload(
+                    f'{var_name}.{slot}',
+                    slot_obj,
+                    shape=list(slot_obj.shape),
+                    max_rows=df_max_rows,
+                    max_cols=df_max_cols
+                ))
 
         elif slot in ('obsm', 'varm', 'obsp', 'varp'):
             arr = slot_obj[key]
@@ -281,13 +311,13 @@ def kernel_adata_slot():
         elif slot == 'uns':
             val = slot_obj[key]
             if isinstance(val, pd.DataFrame):
-                df = val.iloc[:50, :20]
-                return jsonify({
-                    'type': 'dataframe',
-                    'name': f'{var_name}.uns["{key}"]',
-                    'shape': list(val.shape),
-                    'table': df.to_dict(orient='split')
-                })
+                return jsonify(_df_payload(
+                    f'{var_name}.uns["{key}"]',
+                    val,
+                    shape=list(val.shape),
+                    max_rows=df_max_rows,
+                    max_cols=df_max_cols
+                ))
             return jsonify({
                 'type': 'content',
                 'name': f'{var_name}.uns["{key}"]',

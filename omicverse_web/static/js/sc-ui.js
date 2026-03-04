@@ -862,6 +862,25 @@ Object.assign(SingleCellAnalysis.prototype, {
         this.applyCodeFontSize();
     },
 
+    getDataFramePreviewLimits() {
+        const rowsInput = document.getElementById('df-preview-max-rows');
+        const colsInput = document.getElementById('df-preview-max-cols');
+
+        let rows = rowsInput ? parseInt(rowsInput.value, 10) : 50;
+        let cols = colsInput ? parseInt(colsInput.value, 10) : 20;
+
+        if (!Number.isFinite(rows)) rows = 50;
+        if (!Number.isFinite(cols)) cols = 20;
+
+        rows = Math.min(500, Math.max(1, rows));
+        cols = Math.min(200, Math.max(1, cols));
+
+        if (rowsInput && String(rowsInput.value) !== String(rows)) rowsInput.value = String(rows);
+        if (colsInput && String(colsInput.value) !== String(cols)) colsInput.value = String(cols);
+
+        return { rows, cols };
+    },
+
     // ── Memory Bar ──────────────────────────────────────────────────────────
 
     startMemoryMonitor() {

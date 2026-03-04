@@ -299,6 +299,16 @@ html.app-skin-dark .var-table-view td {
     border-bottom-color: #1f2937;
 }
 
+html.app-skin-dark .code-toolbar-mini-label {
+    color: #9ca3af;
+}
+
+html.app-skin-dark .code-toolbar-mini-input {
+    background: #111827 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb !important;
+}
+
 /* ========================================
    Dark Theme - Toolbars & Headers
    ======================================== */
