@@ -4,6 +4,38 @@
 
 Object.assign(SingleCellAnalysis.prototype, {
 
+    _computeAxisRangesFromData(xArr, yArr, padFraction = 0.04) {
+        const toNums = (arr) => (arr || [])
+            .map(v => Number(v))
+            .filter(v => Number.isFinite(v));
+
+        const x = toNums(xArr);
+        const y = toNums(yArr);
+        if (!x.length || !y.length) return null;
+
+        let xMin = Math.min(...x), xMax = Math.max(...x);
+        let yMin = Math.min(...y), yMax = Math.max(...y);
+
+        if (xMin === xMax) {
+            const d = Math.abs(xMin || 1) * 0.02 || 1;
+            xMin -= d; xMax += d;
+        }
+        if (yMin === yMax) {
+            const d = Math.abs(yMin || 1) * 0.02 || 1;
+            yMin -= d; yMax += d;
+        }
+
+        const dx = xMax - xMin;
+        const dy = yMax - yMin;
+        const px = Math.max(dx * padFraction, 1e-9);
+        const py = Math.max(dy * padFraction, 1e-9);
+
+        return {
+            xRange: [xMin - px, xMax + px],
+            yRange: [yMin - py, yMax + py]
+        };
+    },
+
     onColorSelectChange() {
         const geneInput = document.getElementById('gene-input');
         if (geneInput) {
@@ -14,6 +46,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Save the new color-select value explicitly (belt + suspenders)
         const colSel = document.getElementById('color-select');
         if (colSel && this._persistSaveEl) this._persistSaveEl(colSel);
+        this._syncDensityControlStateBySelection();
         this.updatePlot();
     },
 
@@ -30,6 +63,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         const colorBy = geneValue
             ? 'gene:' + geneValue
             : document.getElementById('color-select').value;
+        this._syncDensityControlStateBySelection();
 
         // Update palette visibility based on color type
         this.updatePaletteVisibility(colorBy);
@@ -76,6 +110,8 @@ Object.assign(SingleCellAnalysis.prototype, {
             category_palette: categoryPalette,
             vmin: vmin,
             vmax: vmax,
+            density_adjust: this.getDensityAdjust(),
+            density_active: this.isDensityActive(),
         };
 
         if (xyAxes) {
@@ -136,6 +172,10 @@ Object.assign(SingleCellAnalysis.prototype, {
                 this.addToLog(`${this.t('plot.errorPrefix')}: ${data.error}`, 'error');
                 this.showStatus(`${this.t('plot.failedPrefix')}: ${data.error}`, false);
             } else {
+                this._setDensityControlState(
+                    data.density_enabled !== false,
+                    data.density_message || ''
+                );
                 this.plotData(data);
                 this.currentEmbedding = embedding;
                 this._currentAxesKey = xyAxes ? `${xyAxes.x_axis}|${xyAxes.y_axis}` : embedding;
@@ -184,6 +224,10 @@ Object.assign(SingleCellAnalysis.prototype, {
                 this.addToLog(`${this.t('plot.errorPrefix')}: ${data.error}`, 'error');
                 this.showStatus(`${this.t('plot.failedPrefix')}: ${data.error}`, false);
             } else {
+                this._setDensityControlState(
+                    data.density_enabled !== false,
+                    data.density_message || ''
+                );
                 if (!isEmbeddingChange) {
                     // 仅着色变化：不做位置动画
                     if (data.category_labels && data.category_codes) {
@@ -458,12 +502,20 @@ Object.assign(SingleCellAnalysis.prototype, {
 
         // Capture current layout and ranges
         let layout = plotDiv && plotDiv.layout ? JSON.parse(JSON.stringify(plotDiv.layout)) : this.getPlotlyLayout();
+        const startRanges = this._computeAxisRangesFromData(currentX, currentY) || {
+            xRange: [Math.min(...currentX), Math.max(...currentX)],
+            yRange: [Math.min(...currentY), Math.max(...currentY)]
+        };
+        const endRanges = this._computeAxisRangesFromData(newX, newY) || {
+            xRange: [Math.min(...newX), Math.max(...newX)],
+            yRange: [Math.min(...newY), Math.max(...newY)]
+        };
         // Determine start ranges
-        const startXRange = (layout && layout.xaxis && layout.xaxis.range) ? layout.xaxis.range.slice() : [Math.min(...currentX), Math.max(...currentX)];
-        const startYRange = (layout && layout.yaxis && layout.yaxis.range) ? layout.yaxis.range.slice() : [Math.min(...currentY), Math.max(...currentY)];
+        const startXRange = (layout && layout.xaxis && layout.xaxis.range) ? layout.xaxis.range.slice() : startRanges.xRange;
+        const startYRange = (layout && layout.yaxis && layout.yaxis.range) ? layout.yaxis.range.slice() : startRanges.yRange;
         // Determine final ranges
-        const endXRange = [Math.min(...newX), Math.max(...newX)];
-        const endYRange = [Math.min(...newY), Math.max(...newY)];
+        const endXRange = endRanges.xRange;
+        const endYRange = endRanges.yRange;
 
         // If multiple traces, replace with a single anim trace once (preserve ranges)
         if (isMulti || !plotDiv || !plotDiv.data || plotDiv.data.length === 0) {
@@ -607,6 +659,17 @@ Object.assign(SingleCellAnalysis.prototype, {
         return slider ? parseFloat(slider.value) : 0.7;
     },
 
+    getDensityAdjust() {
+        const slider = document.getElementById('density-adjust-slider');
+        if (!slider) return 1.0;
+        return parseFloat(slider.value || '1');
+    },
+
+    isDensityActive() {
+        const toggle = document.getElementById('density-enable-toggle');
+        return !!(toggle && toggle.checked);
+    },
+
     onPointSizeChange(value) {
         const slider = document.getElementById('point-size-slider');
         const label  = document.getElementById('point-size-value');
@@ -623,11 +686,93 @@ Object.assign(SingleCellAnalysis.prototype, {
         this.applyPointStyleLive();
     },
 
+    onDensityAdjustInput(value) {
+        const label = document.getElementById('density-adjust-value');
+        if (label) label.textContent = parseFloat(value).toFixed(2);
+        this._scheduleDensityUpdate(220);
+    },
+
+    onDensityAdjustCommit(value) {
+        const label = document.getElementById('density-adjust-value');
+        if (label) label.textContent = parseFloat(value).toFixed(2);
+        this._scheduleDensityUpdate(0);
+    },
+
+    _scheduleDensityUpdate(delayMs = 220) {
+        const slider = document.getElementById('density-adjust-slider');
+        if (!slider || slider.disabled || !this.isDensityActive()) return;
+        if (this._densityUpdateTimer) clearTimeout(this._densityUpdateTimer);
+        this._densityUpdateTimer = setTimeout(() => {
+            this._densityUpdateTimer = null;
+            this.updatePlot();
+        }, Math.max(0, delayMs || 0));
+    },
+
+    onDensityToggleChange(enabled) {
+        try { localStorage.setItem('ov:s:density-enable-toggle', enabled ? 'true' : 'false'); } catch (_) {}
+        this._updateDensityControlState();
+        this.updatePlot();
+    },
+
+    _setDensityControlState(enabled, reason = '') {
+        this._densityCapable = !!enabled;
+        this._densityReason = reason || '';
+        this._updateDensityControlState();
+    },
+
+    _updateDensityControlState() {
+        const slider = document.getElementById('density-adjust-slider');
+        const hint = document.getElementById('density-adjust-hint');
+        const toggle = document.getElementById('density-enable-toggle');
+        if (!slider) return;
+
+        const active = !!(toggle && toggle.checked);
+        const capable = !!this._densityCapable;
+        const enabled = active && capable;
+        slider.disabled = !enabled;
+        if (enabled) {
+            slider.classList.remove('disabled');
+        } else {
+            slider.classList.add('disabled');
+        }
+        let msg = '';
+        if (!active) {
+            msg = this.t ? this.t('controls.densityDisabledByToggle') : 'Density adjust is off';
+        } else if (!capable) {
+            msg = this._densityReason || (this.t ? this.t('controls.densityDisabledNoFeature') : 'Select a numeric feature');
+        }
+        if (hint) hint.textContent = msg;
+        slider.title = enabled
+            ? 'Adjust density smoothing for numeric features'
+            : (msg || 'Density adjustment is available only for numeric features');
+    },
+
+    _syncDensityControlStateBySelection() {
+        const geneInput = document.getElementById('gene-input');
+        const geneValue = geneInput ? geneInput.value.trim() : '';
+        const colorBy = geneValue
+            ? 'gene:' + geneValue
+            : (document.getElementById('color-select') || {}).value || '';
+        if (!colorBy) {
+            this._setDensityControlState(false, this.t ? this.t('controls.densityDisabledNoFeature') : 'Select a feature to enable density adjustment');
+            return;
+        }
+        if (colorBy.startsWith('gene:')) {
+            this._setDensityControlState(true, '');
+            return;
+        }
+        // obs column type (numeric/categorical) is confirmed by backend response.
+        this._setDensityControlState(true, this.t ? this.t('controls.densityPendingType') : 'Type checking...');
+    },
+
     resetPointStyle() {
         const sizeSlider    = document.getElementById('point-size-slider');
         const opacitySlider = document.getElementById('opacity-slider');
+        const densitySlider = document.getElementById('density-adjust-slider');
+        const densityToggle = document.getElementById('density-enable-toggle');
         const sizeLabel     = document.getElementById('point-size-value');
         const opacityLabel  = document.getElementById('opacity-value');
+        const densityLabel  = document.getElementById('density-adjust-value');
 
         if (sizeSlider) {
             sizeSlider.dataset.auto = 'true';
@@ -639,13 +784,22 @@ Object.assign(SingleCellAnalysis.prototype, {
             opacitySlider.value = 0.7;
             if (opacityLabel) opacityLabel.textContent = '0.70';
         }
+        if (densitySlider) {
+            densitySlider.value = 1;
+            if (densityLabel) densityLabel.textContent = '1.00';
+        }
+        if (densityToggle) densityToggle.checked = false;
         // Persist the reset state
         try {
             localStorage.setItem('ov:s:__point-size-auto', 'true');
             localStorage.removeItem('ov:s:point-size-slider'); // forget manual size
             localStorage.setItem('ov:s:opacity-slider', '0.7');
+            localStorage.setItem('ov:s:density-adjust-slider', '1');
+            localStorage.setItem('ov:s:density-enable-toggle', 'false');
         } catch(_) {}
         this.applyPointStyleLive();
+        this._updateDensityControlState();
+        this.updatePlot();
     },
 
     initPointSizeSlider() {
@@ -656,6 +810,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         slider.value = def;
         slider.dataset.auto = 'true';
         if (label) label.textContent = 'Auto';
+        this._syncDensityControlStateBySelection();
     },
 
     applyPointStyleLive() {
@@ -791,6 +946,15 @@ Object.assign(SingleCellAnalysis.prototype, {
         }
 
         const layout = this.getPlotlyLayout();
+        const dataRanges = this._computeAxisRangesFromData(data.x, data.y);
+        if (dataRanges) {
+            layout.xaxis = layout.xaxis || {};
+            layout.yaxis = layout.yaxis || {};
+            layout.xaxis.autorange = false;
+            layout.yaxis.autorange = false;
+            layout.xaxis.range = dataRanges.xRange;
+            layout.yaxis.range = dataRanges.yRange;
+        }
         
         // 清除自定义annotations，使用plotly默认legend
         layout.annotations = [];
@@ -1044,13 +1208,17 @@ Object.assign(SingleCellAnalysis.prototype, {
                 title: xTitle,
                 color: isDark ? '#e5e7eb' : '#283c50',
                 gridcolor: isDark ? '#374151' : '#e5e7eb',
-                linecolor: isDark ? '#4b5563' : '#d1d5db'
+                linecolor: isDark ? '#4b5563' : '#d1d5db',
+                constrain: 'domain'
             },
             yaxis: {
                 title: yTitle,
                 color: isDark ? '#e5e7eb' : '#283c50',
                 gridcolor: isDark ? '#374151' : '#e5e7eb',
-                linecolor: isDark ? '#4b5563' : '#d1d5db'
+                linecolor: isDark ? '#4b5563' : '#d1d5db',
+                constrain: 'domain',
+                scaleanchor: 'x',
+                scaleratio: 1
             },
             hovermode: 'closest',
             showlegend: false, // Legend is rendered in the custom panel below the chart
@@ -1463,6 +1631,8 @@ Object.assign(SingleCellAnalysis.prototype, {
             category_palette: (catPalSel && catPalSel.value !== 'default') ? catPalSel.value : null,
             vmin: (vminEl && vminEl.value) ? parseFloat(vminEl.value) : null,
             vmax: (vmaxEl && vmaxEl.value) ? parseFloat(vmaxEl.value) : null,
+            density_adjust: this.getDensityAdjust(),
+            density_active: this.isDensityActive(),
         };
         // Inject custom axes if active
         if (xyAxes) {
@@ -1478,11 +1648,16 @@ Object.assign(SingleCellAnalysis.prototype, {
         // ── color-only update: skip position fetch/encode (3× faster) ────────
         if (!isEmbeddingChange && hasExisting) {
             const colorBody = {
+                embedding:        body.embedding,
+                x_axis:           body.x_axis || '',
+                y_axis:           body.y_axis || '',
                 color_by:         body.color_by,
                 palette:          body.palette,
                 category_palette: body.category_palette,
                 vmin:             body.vmin,
                 vmax:             body.vmax,
+                density_adjust:   body.density_adjust,
+                density_active:   body.density_active,
                 n_cells:          this._deckglRenderer._n,
             };
             fetch('/api/plot_gpu_colors', {
@@ -1497,6 +1672,10 @@ Object.assign(SingleCellAnalysis.prototype, {
             .then(buf => {
                 this.hideStatus();
                 const { n, meta, colors, hoverValues } = parseColorOnlyBuffer(buf);
+                this._setDensityControlState(
+                    meta.density_enabled !== false,
+                    meta.density_message || ''
+                );
                 this._deckglRenderer.animateToColors(colors, meta, hoverValues);
                 this._updateDeckGLLegend(wrap, meta);
                 this._deckglCurrentColorBy = colorBy;
@@ -1522,6 +1701,10 @@ Object.assign(SingleCellAnalysis.prototype, {
         .then(buf => {
             this.hideStatus();
             const { n, meta, positions, colors, hoverValues } = parsePlotGPUBuffer(buf);
+            this._setDensityControlState(
+                meta.density_enabled !== false,
+                meta.density_message || ''
+            );
 
             if (isEmbeddingChange && hasExisting) {
                 this._deckglRenderer.animateToPositions(positions, colors, meta, hoverValues);

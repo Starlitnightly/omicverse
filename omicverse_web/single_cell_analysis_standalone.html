@@ -849,6 +849,27 @@
                                            min="0.05" max="1" step="0.05" value="0.7"
                                            oninput="singleCellApp.onOpacityChange(this.value)">
                                 </div>
+                                <div class="col-md-4">
+                                    <label for="density-adjust-slider" class="form-label form-label-sm d-flex justify-content-between">
+                                        <span data-i18n="controls.densityAdjust">Density adjust</span>
+                                        <span id="density-adjust-value" class="text-muted fw-semibold">1.00</span>
+                                    </label>
+                                    <div class="form-check form-switch mb-1">
+                                        <input class="form-check-input" type="checkbox" id="density-enable-toggle"
+                                               onchange="singleCellApp.onDensityToggleChange(this.checked)">
+                                        <label class="form-check-label small text-muted" for="density-enable-toggle" data-i18n="controls.densityEnable">
+                                            Enable density adjust
+                                        </label>
+                                    </div>
+                                    <input type="range" class="form-range" id="density-adjust-slider"
+                                           min="0.2" max="4" step="0.1" value="1"
+                                           oninput="singleCellApp.onDensityAdjustInput(this.value)"
+                                           onchange="singleCellApp.onDensityAdjustCommit(this.value)"
+                                           title="Adjust density smoothing for numeric features only">
+                                    <small id="density-adjust-hint" class="text-muted" style="font-size:0.68rem;"></small>
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-1 align-items-center">
                                 <div class="col-md-4 d-flex align-items-end">
                                     <button type="button" class="btn btn-sm btn-outline-secondary w-100"
                                             onclick="singleCellApp.resetPointStyle()"

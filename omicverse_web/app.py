@@ -2102,6 +2102,76 @@ def env_install_conda():
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
+def _smooth_values_by_density(x_vals, y_vals, values, adjust, grid_size=220):
+    """Fast KDE-like smoothing on a 2D grid for embedding coloring."""
+    try:
+        from scipy.ndimage import gaussian_filter
+    except Exception:
+        return np.asarray(values, dtype=np.float64), False
+
+    try:
+        adj = float(adjust)
+    except Exception:
+        return np.asarray(values, dtype=np.float64), False
+
+    if not np.isfinite(adj):
+        return np.asarray(values, dtype=np.float64), False
+
+    adj = float(np.clip(adj, 0.2, 4.0))
+    x = np.asarray(x_vals, dtype=np.float64)
+    y = np.asarray(y_vals, dtype=np.float64)
+    v = np.asarray(values, dtype=np.float64)
+    if x.size < 8 or y.size != x.size or v.size != x.size:
+        return v, False
+
+    finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(v)
+    if finite.sum() < 8:
+        return v, False
+
+    x = x[finite]
+    y = y[finite]
+    v = v[finite]
+
+    x_min, x_max = float(np.min(x)), float(np.max(x))
+    y_min, y_max = float(np.min(y)), float(np.max(y))
+    x_span = max(x_max - x_min, 1e-9)
+    y_span = max(y_max - y_min, 1e-9)
+
+    n = x.size
+    g = int(np.clip(np.sqrt(n) * 1.4, 80, grid_size))
+    sigma = 0.35 + 2.4 * adj
+
+    xi = np.clip(((x - x_min) / x_span * (g - 1)).astype(np.int32), 0, g - 1)
+    yi = np.clip(((y - y_min) / y_span * (g - 1)).astype(np.int32), 0, g - 1)
+
+    val_grid = np.zeros((g, g), dtype=np.float64)
+    cnt_grid = np.zeros((g, g), dtype=np.float64)
+    np.add.at(val_grid, (yi, xi), v)
+    np.add.at(cnt_grid, (yi, xi), 1.0)
+
+    val_s = gaussian_filter(val_grid, sigma=sigma, mode='nearest')
+    cnt_s = gaussian_filter(cnt_grid, sigma=sigma, mode='nearest')
+    with np.errstate(divide='ignore', invalid='ignore'):
+        sm_grid = np.where(cnt_s > 1e-10, val_s / cnt_s, np.nan)
+    smoothed = sm_grid[yi, xi]
+    smoothed = np.where(np.isfinite(smoothed), smoothed, v)
+
+    out = np.asarray(values, dtype=np.float64).copy()
+    out_idx = np.where(finite)[0]
+    out[out_idx] = smoothed
+    return out, True
+
+
+def _parse_density_adjust(raw, default=1.0):
+    try:
+        val = float(raw)
+    except Exception:
+        val = default
+    if not np.isfinite(val):
+        val = default
+    return float(np.clip(val, 0.2, 4.0))
+
+
 @app.route('/api/plot', methods=['POST'])
 def plot_data_legacy():
     """Legacy plot endpoint - returns JSON data for Plotly."""
@@ -2120,6 +2190,8 @@ def plot_data_legacy():
         category_palette = data_req.get('category_palette', None)
         vmin = data_req.get('vmin', None)
         vmax = data_req.get('vmax', None)
+        density_adjust = _parse_density_adjust(data_req.get('density_adjust', 1.0))
+        density_active = bool(data_req.get('density_active', False))
 
         if x_axis_str and y_axis_str:
             # ── Custom axes path ─────────────────────────────────────────────
@@ -2169,6 +2241,10 @@ def plot_data_legacy():
             'decimated': decimated,
             'n_total': n_cells,
             'n_shown': len(x_raw),
+            'density_enabled': False,
+            'density_applied': False,
+            'density_adjust': density_adjust,
+            'density_message': 'Density adjust is off',
         }
         if axis_labels:
             plot_data['axis_labels'] = axis_labels
@@ -2196,6 +2272,17 @@ def plot_data_legacy():
                     values = obs_df[col_name]
                     if pd.api.types.is_numeric_dtype(values):
                         colors_array = _subset_np(values.values)
+                        density_applied = False
+                        if density_active:
+                            colors_array, density_applied = _smooth_values_by_density(
+                                np.asarray(x_raw, dtype=np.float64),
+                                np.asarray(y_raw, dtype=np.float64),
+                                colors_array,
+                                density_adjust
+                            )
+                        plot_data['density_enabled'] = True
+                        plot_data['density_applied'] = bool(density_applied)
+                        plot_data['density_message'] = '' if density_active else 'Density adjust is off'
                         if vmin is not None or vmax is not None:
                             colors_array = np.clip(colors_array,
                                                    vmin if vmin is not None else colors_array.min(),
@@ -2208,6 +2295,9 @@ def plot_data_legacy():
                         if vmax is not None:
                             plot_data['cmax'] = vmax
                     else:
+                        plot_data['density_enabled'] = False
+                        plot_data['density_applied'] = False
+                        plot_data['density_message'] = 'Density adjust is disabled for non-numeric features'
                         # Compute categories on full column, sub-select codes only
                         categories = values.astype('category') if not pd.api.types.is_categorical_dtype(values) else values
                         plot_data['color_label'] = col_name
@@ -2235,6 +2325,17 @@ def plot_data_legacy():
                     expr_df = decode_matrix_fbs(expr_fbs)
                     if gene_name in expr_df.columns:
                         expression = _subset_np(expr_df[gene_name].values)
+                        density_applied = False
+                        if density_active:
+                            expression, density_applied = _smooth_values_by_density(
+                                np.asarray(x_raw, dtype=np.float64),
+                                np.asarray(y_raw, dtype=np.float64),
+                                expression,
+                                density_adjust
+                            )
+                        plot_data['density_enabled'] = True
+                        plot_data['density_applied'] = bool(density_applied)
+                        plot_data['density_message'] = '' if density_active else 'Density adjust is off'
                         if vmin is not None or vmax is not None:
                             expression = np.clip(expression,
                                                vmin if vmin is not None else expression.min(),
@@ -2617,6 +2718,8 @@ def plot_gpu():
         cat_pal        = req.get('category_palette', None)
         vmin_req       = req.get('vmin', None)
         vmax_req       = req.get('vmax', None)
+        density_adjust = _parse_density_adjust(req.get('density_adjust', 1.0))
+        density_active = bool(req.get('density_active', False))
 
         # ── positions ─────────────────────────────────────────────────────────
         if x_axis_str and y_axis_str:
@@ -2658,6 +2761,10 @@ def plot_gpu():
             'is_categorical':  False,
             'category_labels': None,
             'colorscale':      None,
+            'density_enabled': False,
+            'density_applied': False,
+            'density_adjust':  density_adjust,
+            'density_message': 'Density adjust is off',
         }
         if axis_labels:
             meta['axis_labels'] = axis_labels
@@ -2672,6 +2779,9 @@ def plot_gpu():
 
                 if pd.api.types.is_numeric_dtype(vals):
                     v    = vals.to_numpy(dtype=_np.float64)
+                    density_applied = False
+                    if density_active:
+                        v, density_applied = _smooth_values_by_density(x_all, y_all, v, density_adjust)
                     vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
                     vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
                     span = max(vhi - vlo, 1e-10)
@@ -2684,6 +2794,9 @@ def plot_gpu():
                     meta['colorscale'] = palette or 'viridis'
                     meta['vmin'] = round(vlo, 6)
                     meta['vmax'] = round(vhi, 6)
+                    meta['density_enabled'] = True
+                    meta['density_applied'] = bool(density_applied)
+                    meta['density_message'] = '' if density_active else 'Density adjust is off'
 
                 else:
                     cats   = vals.astype('category')
@@ -2714,6 +2827,9 @@ def plot_gpu():
                     meta['is_categorical']    = True
                     meta['category_labels']   = labels
                     meta['category_colors']   = cat_hex_list   # exact hex per category
+                    meta['density_enabled'] = False
+                    meta['density_applied'] = False
+                    meta['density_message'] = 'Density adjust is disabled for non-numeric features'
 
         elif color_by.startswith('gene:'):
             gene_name = color_by[5:]
@@ -2723,6 +2839,9 @@ def plot_gpu():
                 expr_df  = decode_matrix_fbs(expr_fbs)
                 if gene_name in expr_df.columns:
                     v    = expr_df[gene_name].to_numpy(dtype=_np.float64)
+                    density_applied = False
+                    if density_active:
+                        v, density_applied = _smooth_values_by_density(x_all, y_all, v, density_adjust)
                     vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
                     vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
                     span = max(vhi - vlo, 1e-10)
@@ -2733,6 +2852,9 @@ def plot_gpu():
                     colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
                     hover_values = v.astype(_np.float32)
                     meta['colorscale'] = palette
+                    meta['density_enabled'] = True
+                    meta['density_applied'] = bool(density_applied)
+                    meta['density_message'] = '' if density_active else 'Density adjust is off'
             except Exception as _ge:
                 logging.warning(f'plot_gpu gene expr {gene_name}: {_ge}')
 
@@ -2924,16 +3046,40 @@ def plot_gpu_colors():
         import numpy as _np
 
         req       = request.json or {}
+        embedding = req.get('embedding', '')
+        x_axis_str = req.get('x_axis', '')
+        y_axis_str = req.get('y_axis', '')
         color_by  = req.get('color_by', '')
         palette   = req.get('palette', 'viridis')
         cat_pal   = req.get('category_palette', None)
         vmin_req  = req.get('vmin', None)
         vmax_req  = req.get('vmax', None)
+        density_adjust = _parse_density_adjust(req.get('density_adjust', 1.0))
+        density_active = bool(req.get('density_active', False))
         n         = req.get('n_cells', None)   # supplied by frontend
 
         # If n_cells unknown, fetch from adaptor
         if n is None:
             n = state.current_adaptor.n_obs
+
+        x_all = None
+        y_all = None
+        try:
+            if x_axis_str and y_axis_str:
+                adata = state.current_adata
+                x_arr, _ = _resolve_axis(adata, x_axis_str)
+                y_arr, _ = _resolve_axis(adata, y_axis_str)
+                x_all = _np.asarray(x_arr, dtype=_np.float64)
+                y_all = _np.asarray(y_arr, dtype=_np.float64)
+            elif embedding:
+                fbs_data = state.current_adaptor.get_embedding_fbs(embedding)
+                coords_df = decode_matrix_fbs(fbs_data)
+                x_all = _np.asarray(coords_df['x'], dtype=_np.float64)
+                y_all = _np.asarray(coords_df['y'], dtype=_np.float64)
+        except Exception as _coord_exc:
+            logging.warning(f'plot_gpu_colors resolve coords failed: {_coord_exc}')
+            x_all = None
+            y_all = None
 
         colors_rgba  = _np.full((n, 4), [100, 149, 237, 200], dtype=_np.uint8)
         hover_values = _np.full(n, _np.nan, dtype=_np.float32)
@@ -2944,6 +3090,10 @@ def plot_gpu_colors():
             'is_categorical':  False,
             'category_labels': None,
             'colorscale':      None,
+            'density_enabled': False,
+            'density_applied': False,
+            'density_adjust':  density_adjust,
+            'density_message': 'Density adjust is off',
         }
 
         if color_by.startswith('obs:'):
@@ -2955,6 +3105,10 @@ def plot_gpu_colors():
                 meta['color_label'] = col_name
                 if pd.api.types.is_numeric_dtype(vals):
                     v    = vals.to_numpy(dtype=_np.float64)
+                    if density_active and x_all is not None and y_all is not None and len(x_all) == len(v):
+                        v, density_applied = _smooth_values_by_density(x_all, y_all, v, density_adjust)
+                    else:
+                        density_applied = False
                     vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
                     vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
                     span = max(vhi - vlo, 1e-10)
@@ -2967,6 +3121,9 @@ def plot_gpu_colors():
                     meta['colorscale'] = palette or 'viridis'
                     meta['vmin'] = round(vlo, 6)
                     meta['vmax'] = round(vhi, 6)
+                    meta['density_enabled'] = True
+                    meta['density_applied'] = bool(density_applied)
+                    meta['density_message'] = '' if density_active else 'Density adjust is off'
                 else:
                     cats   = vals.astype('category')
                     labels = cats.cat.categories.tolist()
@@ -2996,6 +3153,9 @@ def plot_gpu_colors():
                     meta['is_categorical']    = True
                     meta['category_labels']   = labels
                     meta['category_colors']   = cat_hex_list
+                    meta['density_enabled'] = False
+                    meta['density_applied'] = False
+                    meta['density_message'] = 'Density adjust is disabled for non-numeric features'
 
         elif color_by.startswith('gene:'):
             gene_name = color_by[5:]
@@ -3005,6 +3165,10 @@ def plot_gpu_colors():
                 expr_df  = decode_matrix_fbs(expr_fbs)
                 if gene_name in expr_df.columns:
                     v    = expr_df[gene_name].to_numpy(dtype=_np.float64)
+                    if density_active and x_all is not None and y_all is not None and len(x_all) == len(v):
+                        v, density_applied = _smooth_values_by_density(x_all, y_all, v, density_adjust)
+                    else:
+                        density_applied = False
                     vlo  = float(vmin_req) if vmin_req is not None else float(v.min())
                     vhi  = float(vmax_req) if vmax_req is not None else float(v.max())
                     span = max(vhi - vlo, 1e-10)
@@ -3015,6 +3179,9 @@ def plot_gpu_colors():
                     colors_rgba = (_np.clip(rgba_f, 0, 1) * 255).astype(_np.uint8)
                     hover_values = v.astype(_np.float32)
                     meta['colorscale'] = palette
+                    meta['density_enabled'] = True
+                    meta['density_applied'] = bool(density_applied)
+                    meta['density_message'] = '' if density_active else 'Density adjust is off'
             except Exception as _ge:
                 logging.warning(f'plot_gpu_colors gene {gene_name}: {_ge}')
 

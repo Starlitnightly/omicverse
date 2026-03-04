@@ -356,6 +356,15 @@ Object.assign(SingleCellAnalysis.prototype, {
         // Reset point-size slider to auto mode
         const sizeSlider = document.getElementById('point-size-slider');
         if (sizeSlider) sizeSlider.dataset.auto = 'true';
+        const densitySlider = document.getElementById('density-adjust-slider');
+        const densityLabel = document.getElementById('density-adjust-value');
+        const densityToggle = document.getElementById('density-enable-toggle');
+        if (densitySlider) densitySlider.value = 1;
+        if (densityLabel) densityLabel.textContent = '1.00';
+        if (densityToggle) densityToggle.checked = false;
+        if (this._setDensityControlState) {
+            this._setDensityControlState(false, this.t('controls.densityDisabledByToggle'));
+        }
 
         // Hide palette visibility rows (will be re-evaluated after plot)
         this.updatePaletteVisibility('');
@@ -466,6 +475,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         // This is especially important for custom axes restoration, where UI elements
         // need to be populated before getXYAxes() can return valid values
         setTimeout(() => {
+            if (this._syncDensityControlStateBySelection) this._syncDensityControlStateBySelection();
             this.updatePlot();
         }, 50);
     },
@@ -548,6 +558,17 @@ Object.assign(SingleCellAnalysis.prototype, {
         const plotDiv = document.getElementById('plotly-div');
         if (plotDiv && plotDiv.data) {
             const layout = this.getPlotlyLayout();
+            const current = plotDiv.layout || {};
+            if (current.xaxis && Array.isArray(current.xaxis.range) && current.xaxis.range.length === 2) {
+                layout.xaxis = layout.xaxis || {};
+                layout.xaxis.autorange = false;
+                layout.xaxis.range = current.xaxis.range.slice();
+            }
+            if (current.yaxis && Array.isArray(current.yaxis.range) && current.yaxis.range.length === 2) {
+                layout.yaxis = layout.yaxis || {};
+                layout.yaxis.autorange = false;
+                layout.yaxis.range = current.yaxis.range.slice();
+            }
             Plotly.relayout(plotDiv, layout);
         }
     },
@@ -1544,6 +1565,29 @@ Object.assign(SingleCellAnalysis.prototype, {
                 if (opacityLabel) opacityLabel.textContent = parseFloat(savedOpacity).toFixed(2);
                 restored.add('opacity-slider');
             }
+        } catch (_) {}
+
+        // ── density adjust slider (label + control state) ─────────────────
+        try {
+            const densitySlider = document.getElementById('density-adjust-slider');
+            const densityLabel  = document.getElementById('density-adjust-value');
+            const densityToggle = document.getElementById('density-enable-toggle');
+            const savedDensity  = localStorage.getItem(ns + 'density-adjust-slider');
+            const savedEnabled  = localStorage.getItem(ns + 'density-enable-toggle');
+            if (densitySlider && savedDensity !== null) {
+                densitySlider.value = savedDensity;
+                if (densityLabel) densityLabel.textContent = parseFloat(savedDensity).toFixed(2);
+                restored.add('density-adjust-slider');
+            } else if (densityLabel) {
+                densityLabel.textContent = parseFloat((densitySlider && densitySlider.value) || '1').toFixed(2);
+            }
+            if (densityToggle && savedEnabled !== null) {
+                densityToggle.checked = (savedEnabled === 'true');
+                restored.add('density-enable-toggle');
+            } else if (densityToggle) {
+                densityToggle.checked = false;
+            }
+            if (this._syncDensityControlStateBySelection) this._syncDensityControlStateBySelection();
         } catch (_) {}
 
         // ── static controls that need label updates ───────────────────────
