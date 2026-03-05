@@ -448,10 +448,17 @@ class SessionNotebookExecutor:
 
             # Re-initialize session imports
             init_code = """
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
+get_ipython().run_line_magic('matplotlib', 'inline')
 print("✓ [OK] Session re-initialized after recovery")
 """
             self._execute_code_in_kernel(init_code, kc)
@@ -535,14 +542,18 @@ print("✓ [OK] Session re-initialized after recovery")
 
         # Initialize session imports
         init_code = """
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
+# Use inline backend so plt.show() emits display_data instead of opening a GUI window
+get_ipython().run_line_magic('matplotlib', 'inline')
 print("✓ Session initialized")
 """
         try:
@@ -676,11 +687,14 @@ print("✓ Session initialized")
                             f"**Started:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"),
 
             new_markdown_cell("## Session Initialization"),
-            new_code_cell("""import omicverse as ov
+            new_code_cell("""import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+%matplotlib inline
+import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')""")

@@ -456,6 +456,10 @@ class OmicVerseAgent:
         else:
             print(f"   ⚠️  {key_msg}")
         
+        # Eagerly import key modules so their @register_function decorators
+        # run before the registry is queried (they are lazy-loaded by default).
+        self._preload_registry_modules()
+
         try:
             with self._temporary_api_keys():
                 self._setup_agent()
@@ -784,6 +788,53 @@ You can reference previous results without explicitly searching:
                     os.environ.pop(key, None)
                 else:
                     os.environ[key] = previous
+
+    def _preload_registry_modules(self) -> None:
+        """Import all lazy-loaded OmicVerse modules so @register_function decorators run.
+
+        omicverse uses lazy loading for every top-level sub-package.  The registry is
+        queried before any user code accesses those packages, so all @register_function
+        decorators would be skipped without this preload step.
+
+        Discovered by scanning the source tree for @register_function occurrences:
+          pl, single, pp, utils (submodules), space, bulk, alignment, biocontext,
+          external (PyWGCNA, GraphST, cnmf).
+
+        Each import is wrapped in try/except so optional C/GPU/LLM deps that are not
+        installed do not block Agent startup.  'llm' and 'agent' are intentionally
+        omitted — they are heavy, optional, and carry no analysis-level functions.
+        """
+        import importlib
+
+        _modules = [
+            # Core analysis packages
+            "omicverse.pp",
+            "omicverse.pl",
+            "omicverse.single",
+            "omicverse.bulk",
+            "omicverse.bulk2single",
+            "omicverse.space",
+            "omicverse.datasets",
+            "omicverse.alignment",
+            "omicverse.biocontext",
+            # utils submodules not auto-imported by utils/__init__.py
+            "omicverse.utils._scatterplot",
+            "omicverse.utils._plot",
+            "omicverse.utils._data",
+            "omicverse.utils._cluster",
+            "omicverse.utils._knn",
+            "omicverse.utils._mde",
+            "omicverse.utils._roe",
+            # external integrations with registered functions
+            "omicverse.external",
+            "omicverse.external.PyWGCNA.wgcna",
+            "omicverse.external.cnmf.cnmf",
+        ]
+        for mod in _modules:
+            try:
+                importlib.import_module(mod)
+            except Exception:
+                pass
 
     def _setup_agent(self):
         """Setup the internal agent backend with dynamic instructions."""
@@ -1753,11 +1804,15 @@ User request: "quality control with nUMI>500, mito<0.2"
             elif response.content:
                 messages.append({"role": "assistant", "content": response.content})
 
+            # Emit reasoning text from this turn (whether tool-calling or final).
+            # This lets streaming UIs (e.g. Telegram bot) show the LLM thinking
+            # in real time instead of only receiving a single chunk at the very end.
+            if response.content:
+                print(f"   💬 Agent response: {response.content[:200]}")
+                await emit({"type": "llm_chunk", "content": response.content})
+
             # If text-only response with no tool calls, treat as done
             if not response.tool_calls:
-                if response.content:
-                    print(f"   💬 Agent response: {response.content[:200]}")
-                    await emit({"type": "llm_chunk", "content": response.content})
                 break
 
             # Process each tool call
@@ -1771,8 +1826,13 @@ User request: "quality control with nUMI>500, mito<0.2"
                     current_adata = result["adata"]
                     tool_output = result.get("output", "Code executed.")
                     if tc.name == "execute_code":
-                        print(f"      ✅ {tc.arguments.get('description', 'Code executed')}")
-                        await emit({"type": "code", "content": tc.arguments.get("code", "")})
+                        desc = tc.arguments.get("description", "Code executed")
+                        print(f"      ✅ {desc}")
+                        await emit({
+                            "type": "code",
+                            "content": tc.arguments.get("code", ""),
+                            "description": desc,
+                        })
                     else:
                         print(f"      ✅ delegate({tc.arguments.get('agent_type', '')}) completed")
                     await emit({
