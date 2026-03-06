@@ -818,17 +818,9 @@ You can reference previous results without explicitly searching:
             "omicverse.alignment",
             "omicverse.biocontext",
             # utils submodules not auto-imported by utils/__init__.py
-            "omicverse.utils._scatterplot",
-            "omicverse.utils._plot",
-            "omicverse.utils._data",
-            "omicverse.utils._cluster",
-            "omicverse.utils._knn",
-            "omicverse.utils._mde",
-            "omicverse.utils._roe",
+            "omicverse.utils",
             # external integrations with registered functions
             "omicverse.external",
-            "omicverse.external.PyWGCNA.wgcna",
-            "omicverse.external.cnmf.cnmf",
         ]
         for mod in _modules:
             try:
@@ -1737,19 +1729,31 @@ User request: "quality control with nUMI>500, mito<0.2"
         args = tool_call.arguments
 
         if name == "inspect_data":
-            return self._tool_inspect_data(current_adata, args.get("aspect", "full"))
+            return await asyncio.to_thread(
+                self._tool_inspect_data, current_adata, args.get("aspect", "full")
+            )
         elif name == "execute_code":
-            return self._tool_execute_code(
+            # execute_code may run for minutes (scanpy/scvelo, notebook I/O).
+            # Run it in a worker thread so the asyncio loop stays responsive
+            # for Telegram polling, /cancel, and status commands.
+            return await asyncio.to_thread(
+                self._tool_execute_code,
                 args.get("code", ""),
                 args.get("description", ""),
                 current_adata,
             )
         elif name == "run_snippet":
-            return self._tool_run_snippet(args.get("code", ""), current_adata)
+            return await asyncio.to_thread(
+                self._tool_run_snippet, args.get("code", ""), current_adata
+            )
         elif name == "search_functions":
-            return self._tool_search_functions(args.get("query", ""))
+            return await asyncio.to_thread(
+                self._tool_search_functions, args.get("query", "")
+            )
         elif name == "search_skills":
-            return self._tool_search_skills(args.get("query", ""))
+            return await asyncio.to_thread(
+                self._tool_search_skills, args.get("query", "")
+            )
         elif name == "delegate":
             agent_type = args.get("agent_type", "explore")
             task = args.get("task", "")

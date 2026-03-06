@@ -143,6 +143,7 @@ skillseeker = [
 
 jarvis = [
   "python-telegram-bot>=20.0",
+  "requests>=2.0",
   "pillow>=9.0",
   "nbformat>=5.0",
 ]

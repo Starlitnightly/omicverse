@@ -182,21 +182,16 @@ class AgentBridge:
         except Exception:
             pass
 
-        scanned: Set[Path] = set()
         png_candidates: List[Path] = []
-        for root in roots:
-            for d in (root, root / "output"):
-                if d in scanned or not d.exists() or not d.is_dir():
-                    continue
-                scanned.add(d)
-                try:
-                    png_candidates.extend(d.glob("*.png"))
-                except Exception:
-                    pass
+        for d in self._candidate_dirs(roots):
+            try:
+                png_candidates.extend(d.rglob("*.png"))
+            except Exception:
+                pass
 
         # Prefer newest figures; ignore files older than this run.
         png_candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
-        for p in png_candidates[:20]:
+        for p in png_candidates[:40]:
             try:
                 st = p.stat()
                 if st.st_mtime + 0.2 < run_started_at:
@@ -233,17 +228,12 @@ class AgentBridge:
         except Exception:
             pass
 
-        scanned: Set[Path] = set()
         md_candidates: List[Path] = []
-        for root in roots:
-            for d in (root, root / "output"):
-                if d in scanned or not d.exists() or not d.is_dir():
-                    continue
-                scanned.add(d)
-                try:
-                    md_candidates.extend(d.glob("*.md"))
-                except Exception:
-                    pass
+        for d in self._candidate_dirs(roots):
+            try:
+                md_candidates.extend(d.rglob("*.md"))
+            except Exception:
+                pass
 
         md_candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
         for p in md_candidates[:5]:
@@ -282,19 +272,14 @@ class AgentBridge:
         roots.append(Path.cwd())
 
         exts = {".md", ".pdf", ".csv", ".tsv", ".txt", ".html", ".xlsx"}
-        scanned: Set[Path] = set()
         candidates: List[Path] = []
-        for root in roots:
-            for d in (root, root / "output"):
-                if d in scanned or not d.exists() or not d.is_dir():
-                    continue
-                scanned.add(d)
-                try:
-                    for p in d.iterdir():
-                        if p.is_file() and p.suffix.lower() in exts:
-                            candidates.append(p)
-                except Exception:
-                    pass
+        for d in self._candidate_dirs(roots):
+            try:
+                for p in d.rglob("*"):
+                    if p.is_file() and p.suffix.lower() in exts:
+                        candidates.append(p)
+            except Exception:
+                pass
 
         candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
         seen_key: Set[str] = set()
@@ -314,3 +299,20 @@ class AgentBridge:
             except Exception:
                 pass
         return artifacts
+
+    @staticmethod
+    def _candidate_dirs(roots: List[Path]) -> List[Path]:
+        """Return unique existing directories to scan (root + root/output + cwd/output)."""
+        dirs: List[Path] = []
+        seen: Set[Path] = set()
+        for root in roots:
+            for d in (root, root / "output"):
+                try:
+                    rd = d.resolve()
+                except Exception:
+                    rd = d
+                if rd in seen or not d.exists() or not d.is_dir():
+                    continue
+                seen.add(rd)
+                dirs.append(d)
+        return dirs

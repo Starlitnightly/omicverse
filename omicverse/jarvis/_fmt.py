@@ -39,12 +39,21 @@ def md_to_html(text: str) -> str:
     Handles: ```code```, `inline`, **bold**, *italic*, # headers
     Escapes raw HTML first so the output is always safe.
     """
-    result = esc(text)
+    src = _normalize_loose_code_markdown(text or "")
+    result = esc(src)
+    code_blocks: List[str] = []
 
-    # Fenced code blocks  (must precede inline code)
+    # Fenced code blocks first; keep placeholders so later markdown rules
+    # never mutate code content.
+    def _code_ph(m: re.Match[str]) -> str:
+        code = m.group(1).strip()
+        idx = len(code_blocks)
+        code_blocks.append(f"<pre>{code}</pre>")
+        return f"@@CODEBLOCK_{idx}@@"
+
     result = re.sub(
         r"```(?:\w+)?\n?(.*?)```",
-        lambda m: f"<pre>{m.group(1).strip()}</pre>",
+        _code_ph,
         result,
         flags=re.DOTALL,
     )
@@ -59,6 +68,8 @@ def md_to_html(text: str) -> str:
     result = re.sub(
         r"^#{1,3}\s+(.+)$", r"<b>\1</b>", result, flags=re.MULTILINE
     )
+    for i, block in enumerate(code_blocks):
+        result = result.replace(f"@@CODEBLOCK_{i}@@", block)
     return result
 
 
@@ -160,11 +171,21 @@ async def send_prose(
     bq_o = "<blockquote expandable>"
     bq_c = "</blockquote>"
     max_body = _MAX_MSG - len(prefix) - len(bq_o) - len(bq_c)
+    has_code = "<pre>" in body
 
     if len(body) <= 600 and not always_expand:
         # Short — send directly, prepend header if any
         msg = f"{prefix}{body}" if prefix else body
         await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+        return
+
+    if has_code:
+        # Code-rich content: avoid blockquote wrapper to preserve pre rendering.
+        first = True
+        for chunk in _html_code_safe_chunks(body, _MAX_MSG - len(prefix)):
+            msg = f"{prefix}{chunk}" if first and prefix else chunk
+            await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            first = False
         return
 
     first = True
@@ -232,3 +253,66 @@ def error_message(exc_text: str) -> str:
 def figure_caption(index: int, total: int) -> str:
     """Caption for a figure photo."""
     return f"🖼  图 {index} / {total}"
+
+
+def _normalize_loose_code_markdown(text: str) -> str:
+    """Patch common malformed markdown where language tag is not fenced.
+
+    Example:
+      8) 导出关键表格（obs/var 摘要）python
+      <code lines...>
+      ---
+    """
+    if "```" in text:
+        return text
+    lines = text.replace("\r\n", "\n").split("\n")
+    out: List[str] = []
+    in_fence = False
+    lang = ""
+
+    for line in lines:
+        if in_fence:
+            if re.match(r"^\s*---+\s*$", line) or re.match(r"^\s*\d+\)\s+", line):
+                out.append("```")
+                in_fence = False
+                lang = ""
+                out.append(line)
+                continue
+            out.append(line)
+            continue
+
+        m = re.match(r"^(.*?[\)\]）】:：])\s*(python|bash|sh)\s*$", line.strip(), flags=re.IGNORECASE)
+        if m:
+            out.append(m.group(1))
+            lang = m.group(2).lower()
+            out.append(f"```{lang}")
+            in_fence = True
+            continue
+        out.append(line)
+
+    if in_fence:
+        out.append("```")
+    return "\n".join(out)
+
+
+def _html_code_safe_chunks(html: str, max_len: int) -> List[str]:
+    """Split HTML while keeping <pre>...</pre> blocks intact and valid."""
+    if len(html) <= max_len:
+        return [html]
+
+    parts: List[str] = []
+    pos = 0
+    for m in re.finditer(r"<pre>.*?</pre>", html, flags=re.DOTALL):
+        if m.start() > pos:
+            parts.extend(_para_chunks(html[pos:m.start()], max_len))
+        code_block = html[m.start():m.end()]
+        if len(code_block) <= max_len:
+            parts.append(code_block)
+        else:
+            inner = code_block[len("<pre>"):-len("</pre>")]
+            for c in _para_chunks(inner, max_len - len("<pre></pre>")):
+                parts.append(f"<pre>{c}</pre>")
+        pos = m.end()
+    if pos < len(html):
+        parts.extend(_para_chunks(html[pos:], max_len))
+    return [p for p in parts if p.strip()]
