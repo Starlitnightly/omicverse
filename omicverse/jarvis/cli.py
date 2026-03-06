@@ -39,9 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-prompts",
         type=int,
-        default=50,
+        default=0,
         dest="max_prompts",
-        help="Max LLM prompts per kernel session before restart (default: 50)",
+        help="Max LLM prompts per kernel session before auto-restart; 0 disables auto-restart (default: 0)",
     )
     parser.add_argument(
         "--session-dir",

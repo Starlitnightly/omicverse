@@ -84,7 +84,7 @@ omicverse jarvis \
   --token "$TELEGRAM_BOT_TOKEN" \
   --model claude-sonnet-4-6 \
   --api-key "$ANTHROPIC_API_KEY" \
-  --max-prompts 50 \
+  --max-prompts 0 \
   --session-dir ~/.ovjarvis \
   --allowed-user your_telegram_username \
   --allowed-user 123456789 \
@@ -96,7 +96,7 @@ omicverse jarvis \
 - `--token`: Telegram Bot Token（或 `TELEGRAM_BOT_TOKEN`）
 - `--model`: 默认 `claude-sonnet-4-6`
 - `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
-- `--max-prompts`: 单 kernel 最大请求数（默认 50）
+- `--max-prompts`: 单 kernel 最大请求数（`0` 表示不自动重启，默认 0）
 - `--session-dir`: 会话根目录（默认 `~/.ovjarvis`）
 - `--allowed-user`: 允许的用户名/ID（可重复）
 - `--verbose`: 详细日志
@@ -109,6 +109,7 @@ omicverse jarvis \
 - `sessions/`: notebook/kernel 数据
 - `context/`: Agent 上下文缓存
 - `current.h5ad`: 当前加载数据快照
+- `kernels/<name>/...`: 额外命名 kernel（通过 `/kernel new <name>` 创建）
 
 ## 6. Telegram 内常用命令
 
@@ -124,7 +125,10 @@ omicverse jarvis \
 ### 6.2 会话与模型
 
 - `/status` 当前状态
-- `/kernel` kernel 健康与 prompt 用量
+- `/kernel` 当前 kernel 健康与 prompt 用量
+- `/kernel ls` 列出 kernels
+- `/kernel new <name>` 新建并切换 kernel
+- `/kernel use <name>` 切换 active kernel
 - `/usage` 最近一次 token 用量
 - `/model [名称]` 查看/切换模型
 - `/memory` 近两天分析历史
@@ -174,4 +178,4 @@ pip install -e ".[jarvis]"
 
 ### 9.4 分析被中断或变量丢失
 
-当接近 `--max-prompts` 上限时 kernel 可能重启。可提高 `--max-prompts`，并定期 `/save`。
+建议使用 `--max-prompts 0` 关闭自动重启，默认维持单一长生命周期 kernel。只有你明确需要新环境时再用 `/reset`。

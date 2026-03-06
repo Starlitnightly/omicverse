@@ -4,6 +4,7 @@ JarvisSession and SessionManager — per-user state for the Telegram bot.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 from dataclasses import dataclass, field
@@ -17,6 +18,8 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 ALLOWED_CMDS = {"ls", "find", "cat", "head", "wc", "file", "du", "pwd", "tree"}
+UNLIMITED_PROMPTS_SENTINEL = 10**9
+DEFAULT_KERNEL_NAME = "main"
 
 
 class WorkspaceShell:
@@ -61,6 +64,7 @@ class JarvisSession:
     user_id: int
     workspace_dir: Path          # ~/.ovjarvis/<user_id>/
     agent: Any                   # ov.Agent (OmicVerseAgent)
+    max_prompts_setting: int = 0
     adata: Optional[Any] = None
     prompt_count: int = 0
     shell: WorkspaceShell = field(default_factory=WorkspaceShell)
@@ -212,12 +216,15 @@ class JarvisSession:
 
     def kernel_status(self) -> dict:
         """Return kernel health info from the underlying notebook executor."""
-        info: dict = {"alive": False, "prompt_count": 0, "max_prompts": "?", "session_id": None}
+        default_max = "∞" if self.max_prompts_setting <= 0 else "?"
+        info: dict = {"alive": False, "prompt_count": 0, "max_prompts": default_max, "session_id": None}
         try:
             executor = getattr(self.agent, "_notebook_executor", None)
             if executor is None:
                 return info
-            info["max_prompts"] = getattr(executor, "max_prompts_per_session", "?")
+            max_prompts = getattr(executor, "max_prompts_per_session", "?")
+            if self.max_prompts_setting > 0:
+                info["max_prompts"] = max_prompts
             info["prompt_count"] = getattr(executor, "session_prompt_count", 0)
             session = getattr(executor, "current_session", None)
             if session is None:
@@ -254,7 +261,7 @@ class JarvisSession:
 # ---------------------------------------------------------------------------
 
 class SessionManager:
-    """Lazy-creates and caches one ``JarvisSession`` per Telegram user."""
+    """Manage per-user multi-kernel sessions with one active kernel pointer."""
 
     def __init__(
         self,
@@ -262,54 +269,127 @@ class SessionManager:
         session_dir: Optional[str] = None,
         model: str = "claude-sonnet-4-6",
         api_key: Optional[str] = None,
-        max_prompts: int = 50,
+        max_prompts: int = 0,
         verbose: bool = False,
     ) -> None:
         self._base      = Path(session_dir or os.path.expanduser("~/.ovjarvis"))
         self._model     = model
         self._api_key   = api_key
-        self._max_prompts = max_prompts  # 50 keeps kernel alive for ~50 analyses
+        self._max_prompts_setting = max_prompts
+        self._max_prompts = (
+            max_prompts if max_prompts > 0 else UNLIMITED_PROMPTS_SENTINEL
+        )
         self._verbose = verbose
-        self._sessions: Dict[int, JarvisSession] = {}
+        self._sessions: Dict[int, Dict[str, JarvisSession]] = {}
+        self._active_kernel: Dict[int, str] = {}
+        self._kernel_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 
     # ------------------------------------------------------------------
 
     def get_or_create(self, user_id: int) -> JarvisSession:
-        """Return existing session or build a new one for *user_id*."""
-        if user_id in self._sessions:
-            return self._sessions[user_id]
+        """Return the active kernel session for *user_id* (default: ``main``)."""
+        active = self.get_active_kernel(user_id)
+        return self._get_or_create_kernel_session(user_id, active)
 
-        user_dir = self._base / str(user_id)
+    def get_active_kernel(self, user_id: int) -> str:
+        if user_id not in self._active_kernel:
+            self._active_kernel[user_id] = DEFAULT_KERNEL_NAME
+        return self._active_kernel[user_id]
 
-        # Create all sub-directories
-        workspace_dir = user_dir / "workspace"
-        sessions_dir  = user_dir / "sessions"
-        context_dir   = user_dir / "context"
-        memory_dir    = workspace_dir / "memory"
-        for d in (user_dir, workspace_dir, sessions_dir, context_dir, memory_dir):
-            d.mkdir(parents=True, exist_ok=True)
+    def list_kernels(self, user_id: int) -> List[str]:
+        names = set(self._discover_kernel_names(user_id))
+        names.update(self._sessions.get(user_id, {}).keys())
+        if not names:
+            names.add(DEFAULT_KERNEL_NAME)
+        return sorted(names)
 
-        agent = self._build_agent(user_id)
-        session = JarvisSession(
-            user_id=user_id,
-            workspace_dir=user_dir,
-            agent=agent,
-        )
-        self._sessions[user_id] = session
+    def switch_kernel(self, user_id: int, kernel_name: str, create: bool = False) -> JarvisSession:
+        name = self.normalize_kernel_name(kernel_name)
+        exists_in_mem = name in self._sessions.get(user_id, {})
+        exists_on_disk = (name == DEFAULT_KERNEL_NAME) or self._kernel_exists_on_disk(user_id, name)
+        if not exists_in_mem and not exists_on_disk and not create:
+            raise KeyError(f"Kernel '{name}' 不存在")
+        session = self._get_or_create_kernel_session(user_id, name)
+        self._active_kernel[user_id] = name
         return session
 
-    def _build_agent(self, user_id: int) -> Any:
+    def create_kernel(self, user_id: int, kernel_name: str, switch: bool = True) -> JarvisSession:
+        name = self.normalize_kernel_name(kernel_name)
+        if self._kernel_exists_on_disk(user_id, name) or name in self._sessions.get(user_id, {}):
+            raise ValueError(f"Kernel '{name}' 已存在")
+        session = self._get_or_create_kernel_session(user_id, name)
+        if switch:
+            self._active_kernel[user_id] = name
+        return session
+
+    def normalize_kernel_name(self, kernel_name: str) -> str:
+        name = (kernel_name or "").strip()
+        if not name:
+            raise ValueError("Kernel 名称不能为空")
+        if not self._kernel_name_re.match(name):
+            raise ValueError("Kernel 名称仅允许字母/数字/._-，且长度 1-32")
+        return name
+
+    def _get_or_create_kernel_session(self, user_id: int, kernel_name: str) -> JarvisSession:
+        user_sessions = self._sessions.setdefault(user_id, {})
+        if kernel_name in user_sessions:
+            return user_sessions[kernel_name]
+
+        kernel_root = self._kernel_root(user_id, kernel_name)
+        self._ensure_kernel_dirs(kernel_root)
+        agent = self._build_agent(kernel_root)
+        session = JarvisSession(
+            user_id=user_id,
+            workspace_dir=kernel_root,
+            agent=agent,
+            max_prompts_setting=self._max_prompts_setting,
+        )
+        user_sessions[kernel_name] = session
+        return session
+
+    def _kernel_root(self, user_id: int, kernel_name: str) -> Path:
+        user_dir = self._base / str(user_id)
+        if kernel_name == DEFAULT_KERNEL_NAME:
+            return user_dir
+        return user_dir / "kernels" / kernel_name
+
+    def _ensure_kernel_dirs(self, kernel_root: Path) -> None:
+        workspace_dir = kernel_root / "workspace"
+        sessions_dir = kernel_root / "sessions"
+        context_dir = kernel_root / "context"
+        memory_dir = workspace_dir / "memory"
+        for d in (kernel_root, workspace_dir, sessions_dir, context_dir, memory_dir):
+            d.mkdir(parents=True, exist_ok=True)
+
+    def _kernel_exists_on_disk(self, user_id: int, kernel_name: str) -> bool:
+        root = self._kernel_root(user_id, kernel_name)
+        if kernel_name == DEFAULT_KERNEL_NAME:
+            return (root / "workspace").exists() or (root / "sessions").exists() or (root / "context").exists()
+        return root.exists()
+
+    def _discover_kernel_names(self, user_id: int) -> List[str]:
+        user_dir = self._base / str(user_id)
+        names: List[str] = []
+        if self._kernel_exists_on_disk(user_id, DEFAULT_KERNEL_NAME):
+            names.append(DEFAULT_KERNEL_NAME)
+        kernels_root = user_dir / "kernels"
+        if kernels_root.exists():
+            for d in sorted(kernels_root.iterdir()):
+                if d.is_dir():
+                    names.append(d.name)
+        return names
+
+    def _build_agent(self, kernel_root: Path) -> Any:
         import omicverse as ov
 
-        user_dir = self._base / str(user_id)
         kwargs: Dict[str, Any] = dict(
             model=self._model,
             use_notebook_execution=True,
             strict_kernel_validation=False,
             verbose=self._verbose,
             max_prompts_per_session=self._max_prompts,
-            notebook_storage_dir=str(user_dir / "sessions"),
-            context_storage_dir=str(user_dir / "context"),
+            notebook_storage_dir=str(kernel_root / "sessions"),
+            context_storage_dir=str(kernel_root / "context"),
             enable_filesystem_context=True,
         )
         if self._api_key:

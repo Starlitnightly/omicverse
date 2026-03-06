@@ -84,7 +84,7 @@ omicverse jarvis \
   --token "$TELEGRAM_BOT_TOKEN" \
   --model claude-sonnet-4-6 \
   --api-key "$ANTHROPIC_API_KEY" \
-  --max-prompts 50 \
+  --max-prompts 0 \
   --session-dir ~/.ovjarvis \
   --allowed-user your_telegram_username \
   --allowed-user 123456789 \
@@ -96,7 +96,7 @@ Parameter reference:
 - `--token`: Telegram token (or `TELEGRAM_BOT_TOKEN`)
 - `--model`: model name (default: `claude-sonnet-4-6`)
 - `--api-key`: LLM key (or `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`)
-- `--max-prompts`: max prompts per kernel session (default: 50)
+- `--max-prompts`: max prompts per kernel session (`0` disables auto-restart; default: 0)
 - `--session-dir`: session root directory (default: `~/.ovjarvis`)
 - `--allowed-user`: allowed username/ID (repeatable)
 - `--verbose`: verbose logging
@@ -109,6 +109,7 @@ Each Telegram user gets `~/.ovjarvis/<user_id>/`:
 - `sessions/`: notebook/kernel session data
 - `context/`: agent context cache
 - `current.h5ad`: current loaded data snapshot
+- `kernels/<name>/...`: additional named kernels (created via `/kernel new <name>`)
 
 ## 6. Common Telegram Commands
 
@@ -124,7 +125,10 @@ Each Telegram user gets `~/.ovjarvis/<user_id>/`:
 ### 6.2 Session & Model
 
 - `/status` current status
-- `/kernel` kernel health and prompt usage
+- `/kernel` active kernel health and prompt usage
+- `/kernel ls` list kernels
+- `/kernel new <name>` create and switch to a new kernel
+- `/kernel use <name>` switch active kernel
 - `/usage` latest token usage
 - `/model [name]` view/switch model
 - `/memory` recent analysis memory (last 2 days)
@@ -174,4 +178,4 @@ After `/model <new_model>`, run `/reset` to apply the model in a new kernel.
 
 ### 9.4 Interrupted analysis or lost variables
 
-Kernel may restart near the `--max-prompts` limit. Increase the limit and save regularly with `/save`.
+Set `--max-prompts 0` to avoid auto-restart and keep one long-lived kernel by default. Use `/reset` when you explicitly want a fresh kernel.
