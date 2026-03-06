@@ -11,6 +11,45 @@ import numpy as np
 from anndata import AnnData
 
 
+class ModelExecutionBlockedError(RuntimeError):
+    """Raised when a model is registered but not runnable in the current env."""
+
+    def __init__(
+        self,
+        model_name: str,
+        reason: str,
+        *,
+        status: str = "blocked",
+        checkpoint_url: Optional[str] = None,
+        required_env_vars: Optional[List[str]] = None,
+        required_checkpoint: bool = True,
+    ):
+        super().__init__(reason)
+        self.model_name = model_name
+        self.status = status
+        self.reason = reason
+        self.checkpoint_url = checkpoint_url
+        self.required_env_vars = required_env_vars or []
+        self.required_checkpoint = required_checkpoint
+
+    def to_result(self, *, task: Optional[str] = None, output_path: Optional[str] = None) -> Dict[str, Any]:
+        result = {
+            "status": self.status,
+            "error": self.reason,
+            "model": self.model_name,
+        }
+        if task is not None:
+            result["task"] = task
+        if output_path is not None:
+            result["output_path"] = output_path
+        if self.checkpoint_url:
+            result["checkpoint_url"] = self.checkpoint_url
+        if self.required_env_vars:
+            result["required_env_vars"] = self.required_env_vars
+        result["required_checkpoint"] = self.required_checkpoint
+        return result
+
+
 class SCLLMBase(ABC):
     """
     Base class for single-cell language models.
