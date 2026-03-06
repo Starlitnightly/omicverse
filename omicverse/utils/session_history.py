@@ -22,9 +22,13 @@ class HistoryEntry:
     session_id: str
     timestamp: float
     request: str
+    trace_id: str = ""
     generated_code: str = ""
     result_summary: str = ""
+    tool_names: List[str] = field(default_factory=list)
+    artifact_refs: List[Dict[str, Any]] = field(default_factory=list)
     usage: Optional[Dict[str, Any]] = None
+    usage_breakdown: Optional[Dict[str, Any]] = None
     priority_used: int = 0
     success: bool = True
 
@@ -79,4 +83,6 @@ class SessionHistory:
             status = "Success" if e.success else "Failed"
             lines.append(f"- Request: {e.request}")
             lines.append(f"  Result: {status} — {e.result_summary}")
+            if e.tool_names:
+                lines.append(f"  Tools: {', '.join(e.tool_names)}")
         return "\n".join(lines)

@@ -367,6 +367,49 @@ html.app-skin-dark .agent-panel-title {
     color: #e5e7eb;
 }
 
+html.app-skin-dark .agent-harness-panel {
+    background: #111827;
+    border-bottom-color: #1f2937;
+}
+
+html.app-skin-dark .agent-harness-title,
+html.app-skin-dark .agent-harness-subtitle {
+    color: #cbd5e1;
+}
+
+html.app-skin-dark .agent-harness-badge {
+    background: #1e293b;
+    color: #c4b5fd;
+    border-color: #4338ca55;
+}
+
+html.app-skin-dark .agent-harness-column {
+    background: #0f172a;
+    border-color: #1f2937;
+}
+
+html.app-skin-dark .agent-harness-list,
+html.app-skin-dark .agent-harness-trace {
+    color: #cbd5e1;
+}
+
+html.app-skin-dark .agent-harness-empty {
+    color: #64748b;
+}
+
+html.app-skin-dark .agent-harness-approval {
+    background: #172554;
+    border-color: #1d4ed855;
+}
+
+html.app-skin-dark .agent-harness-approval-title {
+    color: #93c5fd;
+}
+
+html.app-skin-dark .agent-harness-trace pre {
+    background: #020617;
+}
+
 html.app-skin-dark .agent-messages {
     background: #0b1220;
 }
@@ -394,6 +437,43 @@ html.app-skin-dark .agent-input textarea {
     background: #111827;
     border-color: #1f2937;
     color: #e5e7eb;
+}
+
+/* ---- Dark: streaming cursor ---- */
+html.app-skin-dark .agent-streaming .agent-llm-text::after {
+    background: #6ee7b7;
+}
+
+/* ---- Dark: inline cards ---- */
+html.app-skin-dark .agent-card-tool {
+    background: #1e3a5f;
+    border-color: #2563eb40;
+    color: #93c5fd;
+}
+
+html.app-skin-dark .agent-card-detail {
+    color: #9ca3af;
+}
+
+html.app-skin-dark .agent-card-code {
+    background: #0b1220;
+}
+
+html.app-skin-dark .agent-card-result {
+    background: #064e3b;
+    border-color: #065f4660;
+    color: #a7f3d0;
+}
+
+html.app-skin-dark .agent-card-error {
+    background: #450a0a;
+    border-color: #7f1d1d60;
+    color: #fca5a5;
+}
+
+html.app-skin-dark .agent-session-badge {
+    background: #374151;
+    color: #9ca3af;
 }
 
 /* ========================================

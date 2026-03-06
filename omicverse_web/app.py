@@ -25,7 +25,14 @@ import io
 
 # Import services
 from services.kernel_service import InProcessKernelExecutor, normalize_kernel_id, get_kernel_context
-from services.agent_service import get_agent_instance, run_agent_stream, run_agent_chat
+from services.agent_service import (
+    get_agent_instance, run_agent_stream, run_agent_chat, make_turn_id,
+    stream_agent_events, get_turn_buffer, clear_turn_buffer,
+    cancel_active_turn, get_active_turn_for_session,
+    build_harness_initialize_payload, load_trace,
+    resolve_pending_approval, resolve_pending_question,
+)
+from services.agent_session_service import session_manager
 from utils.notebook_helpers import ensure_default_notebook
 
 # Import blueprints
@@ -52,6 +59,9 @@ log.setLevel(logging.ERROR)
 # Configuration
 app.config['MAX_CONTENT_LENGTH'] = None
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
+
+# Remote mode detection (Phase 4)
+OV_WEB_REMOTE_MODE = os.environ.get('OV_WEB_REMOTE_MODE', '0') == '1'
 
 # Global state container (for easier blueprint access)
 class AppState:
@@ -2883,6 +2893,34 @@ def plot_gpu():
 
 
 # ============================================================================
+# App Config / Remote Mode (Phase 4)
+# ============================================================================
+
+@app.route('/api/config', methods=['GET'])
+def app_config():
+    """Return client-visible application configuration.
+
+    The frontend uses this to adapt behavior (e.g. key storage policy)
+    based on whether the server is running in remote mode.
+    """
+    return jsonify({
+        'remote_mode': OV_WEB_REMOTE_MODE,
+    })
+
+
+if OV_WEB_REMOTE_MODE:
+    @app.after_request
+    def _add_security_headers(response):
+        """Add security headers in remote mode to harden the deployment."""
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        response.headers.setdefault(
+            'Referrer-Policy', 'strict-origin-when-cross-origin'
+        )
+        return response
+
+
+# ============================================================================
 # Agent Routes
 # ============================================================================
 
@@ -2899,10 +2937,12 @@ def agent_run():
     if system_prompt:
         prompt = f"{system_prompt}\n\n{prompt}"
 
+    session_id = request.headers.get('X-Agent-Session-Id', make_turn_id())
+
     try:
         agent = get_agent_instance(config)
         if state.current_adata is None:
-            reply = run_agent_chat(agent, prompt)
+            reply = run_agent_chat(agent, prompt, session_id=session_id)
             return jsonify({
                 'reply': reply,
                 'code': None,
@@ -2910,7 +2950,7 @@ def agent_run():
                 'data_info': None
             })
 
-        result = run_agent_stream(agent, prompt, state.current_adata)
+        result = run_agent_stream(agent, prompt, state.current_adata, session_id=session_id)
     except Exception as exc:
         return jsonify({'error': str(exc)}), 500
 
@@ -2946,6 +2986,324 @@ def agent_run():
         'code': result.get('code'),
         'data_updated': data_updated,
         'data_info': data_info
+    })
+
+
+# ---------------------------------------------------------------------------
+# Streaming chatbot endpoint (Phase 1)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/agent/chat/stream', methods=['POST'])
+def agent_chat_stream():
+    """Stream agent events as SSE for a single chatbot turn.
+
+    Accepts the same payload as ``/api/agent/run``::
+
+        { "message": "...", "config": { "model": "...", ... } }
+
+    Returns ``text/event-stream`` with one JSON object per ``data:`` line.
+    Event types: status, llm_chunk, tool_call, code, result, error, done,
+    usage, heartbeat, stream_end.
+    """
+    payload = request.json if request.json else {}
+    prompt = (payload.get('message') or '').strip()
+    if not prompt:
+        return jsonify({'error': '没有提供问题'}), 400
+
+    config = payload.get('config') or {}
+    system_prompt = (config.get('systemPrompt') or '').strip()
+    if system_prompt:
+        prompt = f"{system_prompt}\n\n{prompt}"
+
+    session_id = request.headers.get('X-Agent-Session-Id', make_turn_id())
+
+    try:
+        agent = get_agent_instance(config)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+    # --- Session-scoped adata (Phase 3) ---
+    # Get or create session; use session adata if available, else global.
+    session = session_manager.get_or_create(session_id, base_adata=state.current_adata)
+    current_adata = session.adata if session.adata is not None else state.current_adata
+
+    # Record user message in session history
+    session.add_message("user", prompt)
+
+    def _commit_adata(ctx):
+        """Called in the producer thread after the agent finishes.
+
+        Commits adata to both session state and global state.
+        Only commits when the turn completed without error.
+        """
+        if (ctx.get('data_updated')
+                and ctx.get('result_adata') is not None
+                and not ctx.get('error')):
+            # Commit to session (copy-on-write)
+            session_manager.commit_session_adata(session_id, ctx['result_adata'])
+            # Also update global state for backward compatibility
+            state.current_adata = ctx['result_adata']
+            sync_adaptor_with_adata()
+            try:
+                state.kernel_executor.sync_adata(state.current_adata)
+            except Exception:
+                pass
+
+        if ctx.get('trace_id'):
+            session.register_trace(ctx['trace_id'])
+
+        # Record assistant response in session history.
+        # Prefer the accumulated LLM text (covers Q&A and analysis turns),
+        # fall back to the done-event summary, then to a data-update note.
+        reply_text = ctx.get('llm_text', '') or ctx.get('summary', '')
+        if not reply_text and ctx.get('data_updated'):
+            shape = ctx.get('result_shape')
+            reply_text = f"Data updated: {shape[0]}x{shape[1]}" if shape else "Data updated"
+        if reply_text:
+            session.add_message("assistant", reply_text)
+
+    def _cleanup_turn(ctx):
+        """Always runs — clear active turn tracking even on cancel."""
+        session.clear_turn()
+
+    # Build conversation history for multi-turn context.
+    # Exclude the current user message (just added above) — it's passed as `prompt`.
+    prior_history = session.get_history_dicts()[:-1]  # all except last (current)
+
+    handle = stream_agent_events(
+        agent, prompt, current_adata,
+        session_id=session_id,
+        history=prior_history,
+        on_complete=_commit_adata,
+        on_finally=_cleanup_turn,
+    )
+
+    # Register active turn in session for cancel support
+    session.register_turn(handle.turn_id, handle.agent_cancel)
+
+    resp = Response(stream_with_context(handle), mimetype='text/event-stream')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['X-Accel-Buffering'] = 'no'
+    resp.headers['X-Agent-Turn-Id'] = handle.turn_id
+    return resp
+
+
+@app.route('/api/agent/chat/turn/<turn_id>', methods=['GET'])
+def agent_chat_turn_replay(turn_id):
+    """Return buffered events for a turn (for reconnection).
+
+    Clients that lose the SSE connection mid-turn can GET this endpoint to
+    retrieve all events emitted so far, then reconnect.
+    """
+    events = get_turn_buffer(turn_id)
+    return jsonify({'turn_id': turn_id, 'events': events})
+
+
+@app.route('/api/agent/harness/initialize', methods=['GET', 'POST'])
+def agent_harness_initialize():
+    """Return the web/client handshake payload for the harness layer."""
+    payload = request.json if request.is_json else {}
+    session_id = (payload.get('session_id') or request.headers.get('X-Agent-Session-Id') or '').strip()
+    return jsonify(build_harness_initialize_payload(session_id))
+
+
+@app.route('/api/agent/trace/<trace_id>', methods=['GET'])
+def agent_trace_replay(trace_id):
+    """Return a persisted harness trace by id."""
+    trace = load_trace(trace_id)
+    if trace is None:
+        return jsonify({'error': 'Trace not found'}), 404
+    return jsonify(trace)
+
+
+# ---------------------------------------------------------------------------
+# Session management endpoints (Phase 3)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/agent/session', methods=['POST'])
+def agent_session_create():
+    """Create or reset a chat session.
+
+    Request body::
+
+        { "session_id": "optional-custom-id" }
+
+    If ``session_id`` is omitted, a new one is generated.
+    If the session already exists, it is reset (history cleared, adata reset).
+    """
+    payload = request.json if request.json else {}
+    session_id = (payload.get('session_id') or '').strip() or make_turn_id()
+    reset = payload.get('reset', False)
+
+    if reset:
+        session_manager.delete_session(session_id)
+
+    session = session_manager.create_session(session_id, base_adata=state.current_adata)
+    return jsonify(session.to_summary())
+
+
+@app.route('/api/agent/session/<session_id>/history', methods=['GET'])
+def agent_session_history(session_id):
+    """Return chat history for a session."""
+    session = session_manager.get_session(session_id)
+    if session is None:
+        # Try loading from persistent storage
+        history = session_manager.load_history(session_id)
+        if history:
+            return jsonify({'session_id': session_id, 'history': history, 'source': 'file'})
+        return jsonify({'error': 'Session not found'}), 404
+
+    return jsonify({
+        'session_id': session_id,
+        'history': session.get_history_dicts(),
+        'trace_ids': list(session.trace_ids),
+        'runtime': session.get_runtime_state(),
+        'source': 'memory',
+    })
+
+
+@app.route('/api/agent/session/<session_id>/approvals', methods=['GET'])
+def agent_session_approvals(session_id):
+    """Return pending approvals for a session."""
+    session = session_manager.get_session(session_id)
+    if session is None:
+        return jsonify({'error': 'Session not found'}), 404
+    return jsonify({
+        'session_id': session_id,
+        'approvals': session.get_pending_approvals(),
+    })
+
+
+@app.route('/api/agent/session/<session_id>/questions', methods=['GET'])
+def agent_session_questions(session_id):
+    """Return pending questions for a session."""
+    session = session_manager.get_session(session_id)
+    if session is None:
+        return jsonify({'error': 'Session not found'}), 404
+    return jsonify({
+        'session_id': session_id,
+        'questions': session.get_pending_questions(),
+    })
+
+
+@app.route('/api/agent/session/<session_id>/tasks', methods=['GET'])
+def agent_session_tasks(session_id):
+    """Return recent runtime tasks for a session."""
+    session = session_manager.get_session(session_id)
+    if session is None:
+        return jsonify({'error': 'Session not found'}), 404
+    return jsonify({
+        'session_id': session_id,
+        'tasks': session.list_tasks(),
+        'runtime': session.get_runtime_state(),
+    })
+
+
+@app.route('/api/agent/session/<session_id>', methods=['DELETE'])
+def agent_session_delete(session_id):
+    """Delete a session and cancel any active turn."""
+    deleted = session_manager.delete_session(session_id)
+    if not deleted:
+        return jsonify({'error': 'Session not found'}), 404
+    return jsonify({'deleted': True, 'session_id': session_id})
+
+
+@app.route('/api/agent/sessions', methods=['GET'])
+def agent_sessions_list():
+    """List all active sessions."""
+    sessions = session_manager.list_sessions()
+    return jsonify({'sessions': sessions})
+
+
+@app.route('/api/agent/chat/cancel', methods=['POST'])
+def agent_chat_cancel():
+    """Cancel the active agent turn for a session.
+
+    Request body::
+
+        { "session_id": "...", "turn_id": "..." }
+
+    Either ``session_id`` or ``turn_id`` can be provided.
+    If ``session_id`` is given, the active turn for that session is cancelled.
+    If ``turn_id`` is given directly, that specific turn is cancelled.
+    """
+    payload = request.json if request.json else {}
+    turn_id = (payload.get('turn_id') or '').strip()
+    session_id = (payload.get('session_id') or '').strip()
+
+    if not turn_id and session_id:
+        # Look up active turn for this session
+        turn_id = get_active_turn_for_session(session_id)
+        if not turn_id:
+            # Also try via session manager
+            cancelled = session_manager.cancel_turn(session_id)
+            if cancelled:
+                return jsonify({'cancelled': True, 'session_id': session_id})
+            return jsonify({'error': 'No active turn for session'}), 404
+
+    if not turn_id:
+        return jsonify({'error': 'Provide session_id or turn_id'}), 400
+
+    cancelled = cancel_active_turn(turn_id)
+    if not cancelled:
+        return jsonify({'error': 'Turn not found or already finished'}), 404
+
+    return jsonify({'cancelled': True, 'turn_id': turn_id})
+
+
+@app.route('/api/agent/chat/approval', methods=['POST'])
+def agent_chat_approval():
+    """Record an approval response for a pending agent turn.
+
+    The decision is persisted in session state and also applied to any
+    currently blocked runtime approval broker for the matching turn.
+    """
+    payload = request.json if request.json else {}
+    session_id = (payload.get('session_id') or '').strip()
+    approval_id = (payload.get('approval_id') or '').strip()
+    decision = (payload.get('decision') or '').strip().lower()
+
+    if not session_id or not approval_id:
+        return jsonify({'error': 'Provide session_id and approval_id'}), 400
+    if decision not in {'approve', 'deny'}:
+        return jsonify({'error': 'decision must be approve or deny'}), 400
+
+    resolved = session_manager.resolve_approval(session_id, approval_id, decision)
+    if resolved is None:
+        return jsonify({'error': 'Approval not found'}), 404
+
+    applied = resolve_pending_approval(approval_id, decision == 'approve')
+
+    return jsonify({
+        'recorded': True,
+        'applied': applied,
+        'approval': resolved,
+    })
+
+
+@app.route('/api/agent/chat/question', methods=['POST'])
+def agent_chat_question():
+    """Record an answer for a pending agent question."""
+    payload = request.json if request.json else {}
+    session_id = (payload.get('session_id') or '').strip()
+    question_id = (payload.get('question_id') or '').strip()
+    answer = str(payload.get('answer') or '').strip()
+
+    if not session_id or not question_id:
+        return jsonify({'error': 'Provide session_id and question_id'}), 400
+    if not answer:
+        return jsonify({'error': 'Provide a non-empty answer'}), 400
+
+    resolved = session_manager.resolve_question(session_id, question_id, answer)
+    if resolved is None:
+        return jsonify({'error': 'Question not found'}), 404
+
+    applied = resolve_pending_question(question_id, answer)
+
+    return jsonify({
+        'recorded': True,
+        'applied': applied,
+        'question': resolved,
     })
 
 
