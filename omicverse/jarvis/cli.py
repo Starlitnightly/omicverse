@@ -14,8 +14,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="omicverse jarvis",
         description=(
-            "Launch OmicVerse Jarvis — a Telegram bot for mobile single-cell analysis."
+            "Launch OmicVerse Jarvis — multi-channel assistant for mobile single-cell analysis."
         ),
+    )
+    parser.add_argument(
+        "--channel",
+        default="telegram",
+        choices=["telegram", "feishu"],
+        help="Channel backend to run (default: telegram)",
     )
     parser.add_argument(
         "--token",
@@ -65,6 +71,37 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--feishu-app-id",
+        default=None,
+        dest="feishu_app_id",
+        help="Feishu app_id (or FEISHU_APP_ID env var)",
+    )
+    parser.add_argument(
+        "--feishu-app-secret",
+        default=None,
+        dest="feishu_app_secret",
+        help="Feishu app_secret (or FEISHU_APP_SECRET env var)",
+    )
+    parser.add_argument(
+        "--feishu-host",
+        default="0.0.0.0",
+        dest="feishu_host",
+        help="Feishu webhook bind host (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--feishu-port",
+        type=int,
+        default=8080,
+        dest="feishu_port",
+        help="Feishu webhook bind port (default: 8080)",
+    )
+    parser.add_argument(
+        "--feishu-path",
+        default="/feishu/events",
+        dest="feishu_path",
+        help="Feishu webhook path (default: /feishu/events)",
+    )
     return parser
 
 
@@ -85,20 +122,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    # Resolve token
-    token = args.token or os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not token:
-        print(
-            "ERROR: Telegram bot token is required.\n"
-            "  Pass --token or set TELEGRAM_BOT_TOKEN env var.",
-            file=sys.stderr,
-        )
-        return 1
-
     api_key = _resolve_api_key(args.api_key)
 
     from .session import SessionManager
-    from .bot import AccessControl, run_bot
 
     sm = SessionManager(
         session_dir=args.session_dir,
@@ -107,10 +133,46 @@ def main(argv: Optional[List[str]] = None) -> int:
         max_prompts=args.max_prompts,
         verbose=args.verbose,
     )
-    ac = AccessControl(allowed=args.allowed_users or None)
 
-    print(f"OmicVerse Jarvis starting (model={args.model}) ...")
-    run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
+    if args.channel == "telegram":
+        token = args.token or os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not token:
+            print(
+                "ERROR: Telegram bot token is required.\n"
+                "  Pass --token or set TELEGRAM_BOT_TOKEN env var.",
+                file=sys.stderr,
+            )
+            return 1
+        from .channels.telegram import AccessControl, run_bot
+
+        ac = AccessControl(allowed=args.allowed_users or None)
+        print(f"OmicVerse Jarvis starting (channel=telegram, model={args.model}) ...")
+        run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
+        return 0
+
+    app_id = args.feishu_app_id or os.environ.get("FEISHU_APP_ID")
+    app_secret = args.feishu_app_secret or os.environ.get("FEISHU_APP_SECRET")
+    if not app_id or not app_secret:
+        print(
+            "ERROR: Feishu app credentials are required.\n"
+            "  Pass --feishu-app-id/--feishu-app-secret or set FEISHU_APP_ID/FEISHU_APP_SECRET.",
+            file=sys.stderr,
+        )
+        return 1
+    from .channels.feishu import run_feishu_bot
+
+    print(
+        f"OmicVerse Jarvis starting (channel=feishu, model={args.model}, "
+        f"listen={args.feishu_host}:{args.feishu_port}{args.feishu_path}) ..."
+    )
+    run_feishu_bot(
+        app_id=app_id,
+        app_secret=app_secret,
+        session_manager=sm,
+        host=args.feishu_host,
+        port=args.feishu_port,
+        path=args.feishu_path,
+    )
     return 0
 
 

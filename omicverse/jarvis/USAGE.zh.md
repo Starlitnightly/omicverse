@@ -77,6 +77,24 @@ export ANTHROPIC_API_KEY="your_api_key"
 omicverse jarvis
 ```
 
+显式使用 Telegram 渠道：
+
+```bash
+omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
+```
+
+Feishu Webhook 渠道：
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-host 0.0.0.0 \
+  --feishu-port 8080 \
+  --feishu-path /feishu/events
+```
+
 完整参数示例（覆盖当前全部 CLI 参数）：
 
 ```bash
@@ -94,6 +112,10 @@ omicverse jarvis \
 参数总览：
 
 - `--token`: Telegram Bot Token（或 `TELEGRAM_BOT_TOKEN`）
+- `--channel`: 渠道后端（`telegram` 或 `feishu`，默认 `telegram`）
+- `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
+- `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
+- `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数
 - `--model`: 默认 `claude-sonnet-4-6`
 - `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
 - `--max-prompts`: 单 kernel 最大请求数（`0` 表示不自动重启，默认 0）

@@ -17,7 +17,8 @@ import time
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Set
 
-from . import _fmt
+from .. import _fmt
+from ..gateway.routing import GatewaySessionRegistry, SessionKey
 
 logger = logging.getLogger("omicverse.jarvis")
 
@@ -72,7 +73,7 @@ def run_bot(
             "Install with: pip install omicverse[jarvis]"
         ) from exc
 
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).concurrent_updates(True).build()
     _register_handlers(app, session_manager, access_control, verbose)
     logger.info("OmicVerse Jarvis bot starting (polling)...")
     app.run_polling(drop_pending_updates=True)
@@ -100,6 +101,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     _pending: Dict[int, List[str]] = {}
     # Per-chat outbound lock (OpenClaw-style channel sequencing)
     _chat_locks: Dict[int, asyncio.Lock] = {}
+    _route_registry = GatewaySessionRegistry(sm)
 
     # ------------------------------------------------------------------
     # Guard / session helpers
@@ -116,7 +118,20 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
     async def _get_session(update: Update):
         try:
-            return sm.get_or_create(update.effective_user.id)
+            chat = update.effective_chat
+            msg = update.effective_message
+            scope_type = "dm" if (chat and chat.type == "private") else "group"
+            scope_id = str(chat.id if chat else update.effective_user.id)
+            thread_id = None
+            if msg is not None:
+                thread_id = getattr(msg, "message_thread_id", None)
+            sk = SessionKey(
+                channel="telegram",
+                scope_type=scope_type,
+                scope_id=scope_id,
+                thread_id=(str(thread_id) if thread_id else None),
+            )
+            return _route_registry.get_or_create(sk)
         except Exception as exc:
             logger.exception("Failed to create session")
             await update.message.reply_text(
@@ -1064,9 +1079,24 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         llm_buf = ""
         last_progress = ""
         EDIT_GAP = 1.5
+        DRAFT_MAX = 2800
+
+        def _trim_for_draft(text: str, max_len: int = DRAFT_MAX) -> str:
+            """Keep draft readable without cutting from a random middle position."""
+            if len(text) <= max_len:
+                return text
+            head = int(max_len * 0.55)
+            tail = max_len - head - 40
+            if tail < 200:
+                tail = 200
+            return (
+                text[:head].rstrip()
+                + "\n\n[...内容较长，已省略中间部分...]\n\n"
+                + text[-tail:].lstrip()
+            )
 
         def _draft_text() -> str:
-            body = _fmt.md_to_html(llm_buf[-2800:]) if llm_buf.strip() else "<i>思考中…</i>"
+            body = _fmt.md_to_html(_trim_for_draft(llm_buf)) if llm_buf.strip() else "<i>思考中…</i>"
             if last_progress:
                 return f"🔄  <code>{_fmt.esc(last_progress[:180])}</code>\n\n💭  {body}"
             return f"💭  {body}"
@@ -1117,7 +1147,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             except Exception:
                 stream_msg_id = None
 
-        from .agent_bridge import AgentBridge
+        from ..agent_bridge import AgentBridge
         bridge = AgentBridge(session.agent, progress_cb, llm_chunk_cb)
 
         try:
@@ -1189,8 +1219,6 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         has_media    = bool(result.figures)
         has_reports  = bool(getattr(result, "reports", None))
         artifacts    = list(getattr(result, "artifacts", []) or [])
-        # Reports are already sent as prose; skip duplicate markdown documents.
-        artifacts    = [a for a in artifacts if not a.filename.lower().endswith(".md")]
         has_artifacts = bool(artifacts)
 
         # OpenClaw lane delivery:
@@ -1226,7 +1254,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         # Text-only, no complex blocks: draft IS the streaming result.
         # Update draft to final LLM text; keyboard goes to a separate fresh message.
         if llm_buf.strip():
-            await _edit_draft(_fmt.md_to_html(llm_buf.strip()), force=True)
+            final_html = _fmt.md_to_html(llm_buf.strip())
+            if len(final_html) > 3200 or "<pre>" in final_html:
+                # Avoid oversized editMessageText failures; send full prose as new blocks.
+                await _edit_draft("✅  分析完成，正文如下。", force=True)
+                await _send_prose_locked(bot, chat_id, llm_buf.strip(), always_expand=False)
+            else:
+                await _edit_draft(final_html, force=True)
         elif stream_msg_id is not None:
             await _edit_draft("✅  分析完成", force=True)
         async with _chat_lock(chat_id):

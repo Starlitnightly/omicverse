@@ -77,6 +77,24 @@ Minimal start:
 omicverse jarvis
 ```
 
+Telegram channel explicitly:
+
+```bash
+omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
+```
+
+Feishu webhook channel:
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-host 0.0.0.0 \
+  --feishu-port 8080 \
+  --feishu-path /feishu/events
+```
+
 Full example (all current CLI arguments):
 
 ```bash
@@ -94,6 +112,10 @@ omicverse jarvis \
 Parameter reference:
 
 - `--token`: Telegram token (or `TELEGRAM_BOT_TOKEN`)
+- `--channel`: backend channel (`telegram` or `feishu`, default: `telegram`)
+- `--feishu-app-id`: Feishu app id (or `FEISHU_APP_ID`)
+- `--feishu-app-secret`: Feishu app secret (or `FEISHU_APP_SECRET`)
+- `--feishu-host/--feishu-port/--feishu-path`: Feishu webhook listen settings
 - `--model`: model name (default: `claude-sonnet-4-6`)
 - `--api-key`: LLM key (or `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`)
 - `--max-prompts`: max prompts per kernel session (`0` disables auto-restart; default: 0)
