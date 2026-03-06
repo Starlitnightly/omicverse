@@ -7,6 +7,7 @@ from scanpy.plotting._anndata import _prepare_dataframe
 import pandas as pd
 from anndata import AnnData
 from ..utils import plotset
+from .._registry import register_function
 
 pycomplexheatmap_install=False
 
@@ -27,6 +28,20 @@ def check_pycomplexheatmap():
             'Please install the tangram: `pip install PyComplexHeatmap`.'
             )
     
+@register_function(
+    aliases=["复杂热图", "complexheatmap", "complex_heatmap", "PyComplexHeatmap"],
+    category="pl",
+    description="Create complex heatmap with annotations using PyComplexHeatmap",
+    examples=[
+        "# Basic complex heatmap grouped by cell type",
+        "ov.pl.complexheatmap(adata, groupby='cell_type', var_names=marker_genes)",
+        "# With marker gene dict",
+        "ov.pl.complexheatmap(adata, groupby='leiden', marker_genes_dict={'T cell': ['CD3D'], 'B cell': ['CD19']})",
+        "# With custom colors and size",
+        "ov.pl.complexheatmap(adata, groupby='cell_type', figsize=(10, 8), cmap='RdBu_r')",
+    ],
+    related=["pl.marker_heatmap", "pl.dotplot", "pl.markers_dotplot"]
+)
 def complexheatmap(adata,
                        groupby ='',
                        figsize =(6,10),
@@ -317,6 +332,20 @@ def complexheatmap(adata,
         plt.show()
     return cm
 
+@register_function(
+    aliases=["marker热图", "marker_heatmap", "标记基因热图", "细胞类型热图"],
+    category="pl",
+    description="Create dot plot heatmap showing marker gene expression across cell types",
+    examples=[
+        "# Define marker genes dict and plot",
+        "marker_genes = {'T cell': ['CD3D', 'CD3E'], 'B cell': ['CD19', 'MS4A1']}",
+        "ov.pl.marker_heatmap(adata, marker_genes_dict=marker_genes, groupby='cell_type')",
+        "# Customize appearance",
+        "ov.pl.marker_heatmap(adata, marker_genes_dict=marker_genes, groupby='leiden',",
+        "                      figsize=(10, 6), color_map='RdBu_r', fontsize=10)",
+    ],
+    related=["pl.complexheatmap", "pl.dotplot", "pl.markers_dotplot"]
+)
 def marker_heatmap(
     adata: AnnData,
     marker_genes_dict: dict = None,

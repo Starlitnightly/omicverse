@@ -530,6 +530,21 @@ def _get_values_to_plot(
     
     return values
 
+@register_function(
+    aliases=["差异基因点图", "rank_genes_dotplot", "DEG点图", "差异基因可视化"],
+    category="pl",
+    description="Create dot plot from rank_genes_groups differential expression results",
+    examples=[
+        "# After running rank_genes_groups, plot top 5 marker genes per cluster",
+        "ov.pp.find_markers(adata, groupby='leiden')",
+        "ov.pl.rank_genes_groups_dotplot(adata, n_genes=5, groupby='leiden')",
+        "# Plot with logfoldchange filter",
+        "ov.pl.rank_genes_groups_dotplot(adata, n_genes=5, groupby='leiden', min_logfoldchange=1.0)",
+        "# Select specific groups",
+        "ov.pl.rank_genes_groups_dotplot(adata, groups=['0', '1', '2'], n_genes=5)",
+    ],
+    related=["pl.markers_dotplot", "pl.dotplot", "single.find_markers"]
+)
 def rank_genes_groups_dotplot(
     adata: AnnData,
     plot_type: str = "dotplot",
