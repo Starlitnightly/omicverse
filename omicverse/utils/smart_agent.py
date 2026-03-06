@@ -2890,6 +2890,9 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
                     # but we can still process plan and update directives
                     self._process_context_directives(code, {})
 
+                if capture_stdout:
+                    session_stdout = getattr(self._notebook_executor, "last_stdout", "") or ""
+                    return {"adata": result_adata, "stdout": session_stdout}
                 return result_adata
 
             except Exception as e:

@@ -90,6 +90,7 @@ class SessionNotebookExecutor:
         self.current_session: Optional[Dict[str, Any]] = None
         self.session_prompt_count: int = 0
         self.session_history: List[Dict[str, Any]] = []
+        self.last_stdout: str = ""
 
         # Conda environment detection
         self.conda_env = self._detect_conda_environment()
@@ -304,18 +305,11 @@ class SessionNotebookExecutor:
             return False
 
         km = self.current_session['kernel_manager']
-        kc = self.current_session['kernel_client']
 
         try:
-            # Check if kernel process is still running
-            if not km.is_alive():
-                return False
-
-            # Try to communicate with kernel
-            kc.kernel_info()
-            reply = kc.get_shell_msg(timeout=2.0)
-            return reply['msg_type'] == 'kernel_info_reply'
-
+            # Avoid shell-channel probing here: pulling one shell message can
+            # consume an unrelated execute reply and create false crash signals.
+            return bool(km.is_alive())
         except Exception:
             return False
 
@@ -717,7 +711,7 @@ warnings.filterwarnings('ignore')""")
             return  # nbformat not available
 
         try:
-            from nbformat.v4 import new_markdown_cell, new_code_cell
+            from nbformat.v4 import new_markdown_cell, new_code_cell, new_output
         except ImportError:
             return
 
@@ -733,38 +727,46 @@ warnings.filterwarnings('ignore')""")
 
         # Add stdout outputs
         if outputs['stdout']:
-            code_cell.outputs.append({
-                'output_type': 'stream',
-                'name': 'stdout',
-                'text': ''.join(outputs['stdout'])
-            })
+            code_cell.outputs.append(
+                new_output(
+                    output_type='stream',
+                    name='stdout',
+                    text=''.join(outputs['stdout']),
+                )
+            )
 
         # Add stderr outputs
         if outputs['stderr']:
-            code_cell.outputs.append({
-                'output_type': 'stream',
-                'name': 'stderr',
-                'text': ''.join(outputs['stderr'])
-            })
+            code_cell.outputs.append(
+                new_output(
+                    output_type='stream',
+                    name='stderr',
+                    text=''.join(outputs['stderr']),
+                )
+            )
 
         # Add error outputs
         if outputs['errors']:
             for error in outputs['errors']:
-                code_cell.outputs.append({
-                    'output_type': 'error',
-                    'ename': error['ename'],
-                    'evalue': error['evalue'],
-                    'traceback': error['traceback']
-                })
+                code_cell.outputs.append(
+                    new_output(
+                        output_type='error',
+                        ename=error['ename'],
+                        evalue=error['evalue'],
+                        traceback=error['traceback'],
+                    )
+                )
 
         # Add display data outputs
         if outputs['display_data']:
             for data in outputs['display_data']:
-                code_cell.outputs.append({
-                    'output_type': 'display_data',
-                    'data': data,
-                    'metadata': {}
-                })
+                code_cell.outputs.append(
+                    new_output(
+                        output_type='display_data',
+                        data=data,
+                        metadata={},
+                    )
+                )
 
         nb.cells.append(code_cell)
 
@@ -862,6 +864,12 @@ warnings.filterwarnings('ignore')""")
             except Empty:
                 continue
 
+            # Only consume IOPub messages belonging to this execute request.
+            parent = msg.get('parent_header') or {}
+            parent_msg_id = parent.get('msg_id')
+            if parent_msg_id and parent_msg_id != msg_id:
+                continue
+
             msg_type = msg['msg_type']
             content = msg['content']
 
@@ -919,19 +927,30 @@ warnings.filterwarnings('ignore')""")
         kc = self.current_session['kernel_client']
         session_dir = self.current_session['session_dir']
 
-        # Save adata to temp file
+        # Save adata to temp file (if provided) and inject into kernel namespace
         temp_input = session_dir / f"temp_input_{self.session_prompt_count}.h5ad"
-        adata.write_h5ad(temp_input)
-
-        # Inject adata into kernel namespace
-        inject_code = f"""
+        if adata is not None:
+            adata.write_h5ad(str(temp_input))
+            inject_code = f"""
 import scanpy as sc
 adata = sc.read_h5ad('{temp_input}')
 print(f"✓ Loaded: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
 """
+        else:
+            inject_code = """
+adata = None
+print("✓ Loaded: adata=None (expect code to initialize it)")
+"""
         inject_outputs = self._execute_code_in_kernel(inject_code, kc)
         if inject_outputs['stdout']:
             print(''.join(inject_outputs['stdout']))
+        if inject_outputs['errors']:
+            error = inject_outputs['errors'][0]
+            traceback_str = '\n'.join(error['traceback'])
+            raise RuntimeError(
+                f"Failed to inject adata into session: {error['ename']}: {error['evalue']}\n"
+                f"{traceback_str}"
+            )
 
         # Execute user's generated code
         print(f"⚙ Executing prompt {self.session_prompt_count + 1}...")
@@ -953,17 +972,36 @@ print(f"✓ Loaded: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
         # Extract adata back from kernel
         temp_output = session_dir / f"temp_output_{self.session_prompt_count}.h5ad"
         extract_code = f"""
-adata.write_h5ad('{temp_output}')
+import os
+if adata is None:
+    raise ValueError("adata is None after code execution; cannot save result")
+_tmp_output = '{temp_output}.tmp'
+adata.write_h5ad(_tmp_output)
+os.replace(_tmp_output, '{temp_output}')
 print(f"✓ Saved: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
 """
         extract_outputs = self._execute_code_in_kernel(extract_code, kc)
         if extract_outputs['stdout']:
             print(''.join(extract_outputs['stdout']))
+        if extract_outputs['errors']:
+            error = extract_outputs['errors'][0]
+            traceback_str = '\n'.join(error['traceback'])
+            raise RuntimeError(
+                f"Failed to save result adata in session: {error['ename']}: {error['evalue']}\n"
+                f"{traceback_str}"
+            )
+
+        # Expose combined stdout for caller-side tool output.
+        self.last_stdout = "".join(
+            inject_outputs.get('stdout', [])
+            + outputs.get('stdout', [])
+            + extract_outputs.get('stdout', [])
+        )
 
         # Load result
         try:
             import scanpy as sc
-            result_adata = sc.read_h5ad(temp_output)
+            result_adata = sc.read_h5ad(str(temp_output))
         except Exception as e:
             raise RuntimeError(
                 f"Failed to load result adata: {e}\n"

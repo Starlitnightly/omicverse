@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Set
@@ -93,6 +94,12 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
     # Per-user background analysis tasks
     _tasks: Dict[int, asyncio.Task] = {}
+    # Human-readable description of each user's running analysis (for concurrent chat)
+    _task_requests: Dict[int, str] = {}
+    # OpenClaw Collect mode: messages queued while analysis runs, coalesced after
+    _pending: Dict[int, List[str]] = {}
+    # Per-chat outbound lock (OpenClaw-style channel sequencing)
+    _chat_locks: Dict[int, asyncio.Lock] = {}
 
     # ------------------------------------------------------------------
     # Guard / session helpers
@@ -122,7 +129,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             return None
 
     async def _cancel_user_task(user_id: int) -> bool:
-        """Cancel running analysis task for user. Returns True if one existed."""
+        """Cancel running analysis task and flush pending queue. Returns True if a task existed."""
+        _pending.pop(user_id, None)
         task = _tasks.get(user_id)
         if task and not task.done():
             task.cancel()
@@ -139,6 +147,213 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             InlineKeyboardButton("📊 状态",  callback_data="jarvis:status"),
             InlineKeyboardButton("🧠 历史",  callback_data="jarvis:memory"),
         ]])
+
+    def _chat_lock(chat_id: int) -> asyncio.Lock:
+        lock = _chat_locks.get(chat_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            _chat_locks[chat_id] = lock
+        return lock
+
+    async def _quick_chat(
+        session: Any,
+        user_text: str,
+        chat_id: int,
+        bot: Any,
+        running_request: str = "",
+        queued: bool = False,
+    ) -> None:
+        """OpenClaw-style concurrent chat: typing indicator + fast LLM reply while analysis runs.
+
+        queued=True hints the system prompt that this message has also been enqueued so the
+        LLM can mention it to the user naturally.
+        """
+        # Typing indicator — instant UX feedback (OpenClaw pattern)
+        try:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
+        except Exception:
+            pass
+
+        try:
+            system_lines = [
+                "You are OmicVerse Jarvis, a bioinformatics AI assistant.",
+                "The user is chatting with you while a background analysis is running in the background.",
+                "Answer concisely and helpfully. Do NOT execute code or call tools.",
+                "Reply in the same language the user uses.",
+            ]
+            if running_request:
+                system_lines.append(f"\nCurrently running analysis: {running_request[:300]}")
+            if queued:
+                system_lines.append(
+                    "If the user's message looks like a new analysis request, "
+                    "inform them it has been queued and will start automatically after the current analysis finishes."
+                )
+            if session.adata is not None:
+                a = session.adata
+                system_lines.append(f"Loaded data: {a.n_obs:,} cells × {a.n_vars:,} genes")
+            memory_ctx = session.get_memory_context()
+            if memory_ctx:
+                system_lines.append(f"\nRecent analysis history:\n{memory_ctx[:600]}")
+
+            messages = [
+                {"role": "system", "content": "\n".join(system_lines)},
+                {"role": "user",   "content": user_text},
+            ]
+            response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
+            reply = (response.content or "").strip() or "💬  分析进行中，稍后再试。"
+            async with _chat_lock(chat_id):
+                await _safe_send_message(
+                    bot, chat_id, _fmt.md_to_html(reply), parse_mode="HTML"
+                )
+        except Exception as exc:
+            logger.warning("Quick chat failed: %s", exc)
+            try:
+                async with _chat_lock(chat_id):
+                    await _safe_send_message(
+                        bot, chat_id,
+                        "⏳  后台分析进行中，请等待完成。使用 <code>/cancel</code> 取消。",
+                        parse_mode="HTML",
+                    )
+            except Exception:
+                pass
+
+    async def _send_photo_or_file(bot: Any, chat_id: int, png_bytes: bytes, caption: str) -> None:
+        try:
+            await bot.send_photo(chat_id=chat_id, photo=BytesIO(png_bytes), caption=caption)
+            return
+        except Exception:
+            pass
+        # Fallback: send as document if Telegram photo pipeline rejects bytes.
+        try:
+            await bot.send_document(
+                chat_id=chat_id,
+                document=BytesIO(png_bytes),
+                filename="figure.png",
+                caption=caption,
+            )
+        except Exception as exc:
+            logger.warning("Failed to send figure as photo/document: %s", exc)
+
+    async def _send_artifact_document(
+        bot: Any,
+        chat_id: int,
+        filename: str,
+        data: bytes,
+    ) -> None:
+        try:
+            await bot.send_document(
+                chat_id=chat_id,
+                document=BytesIO(data),
+                filename=filename,
+                caption=f"📎  {filename}",
+            )
+        except Exception as exc:
+            logger.warning("Failed to send artifact %s: %s", filename, exc)
+
+    def _strip_html(text: str) -> str:
+        return re.sub(r"<[^>]+>", "", text or "")
+
+    # File extensions harvested as artifacts (must stay in sync with agent_bridge.py).
+    _ARTIFACT_EXTS = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
+
+    def _strip_local_paths(text: str) -> str:
+        """Remove local filesystem path references so Telegram doesn't show dead links.
+
+        Files are always delivered as sendDocument instead of clickable local links.
+        """
+        t = text or ""
+        # Backtick-wrapped paths with ≥2 directory levels
+        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
+        # Absolute Unix paths starting with common root prefixes
+        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
+        # ~/paths
+        t = re.sub(r'~[/\\]\S+', '', t)
+        # Relative paths ending with a known artifact extension:
+        #   ./output/report.html  or  output/report.html  (with/without leading ./)
+        _ext = _ARTIFACT_EXTS
+        t = re.sub(
+            rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})',
+            '', t, flags=re.IGNORECASE,
+        )
+        # Collapse whitespace artifacts left by removals
+        t = re.sub(r'[ \t]{2,}', ' ', t)
+        t = re.sub(r'\n{3,}', '\n\n', t)
+        return t.strip()
+
+    async def _safe_send_message(
+        bot: Any,
+        chat_id: int,
+        text: str,
+        *,
+        parse_mode: Optional[str] = "HTML",
+        reply_markup: Any = None,
+    ) -> None:
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            return
+        except Exception:
+            pass
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=_strip_html(text),
+                reply_markup=reply_markup,
+            )
+        except Exception as exc:
+            logger.warning("Failed to send message: %s", exc)
+
+    async def _safe_edit_message(
+        bot: Any,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        *,
+        parse_mode: Optional[str] = "HTML",
+        reply_markup: Any = None,
+    ) -> bool:
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            return True
+        except Exception:
+            pass
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=_strip_html(text),
+                reply_markup=reply_markup,
+            )
+            return True
+        except Exception:
+            return False
+
+    async def _send_prose_locked(
+        bot: Any,
+        chat_id: int,
+        raw_text: str,
+        *,
+        header: str = "",
+        always_expand: bool = False,
+    ) -> None:
+        async with _chat_lock(chat_id):
+            await _fmt.send_prose(
+                bot,
+                chat_id,
+                raw_text,
+                header=header,
+                always_expand=always_expand,
+            )
 
     # ------------------------------------------------------------------
     # /start
@@ -163,7 +378,10 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             "<code>/load</code>       加载数据\n"
             "<code>/shell</code>      执行 shell 命令\n\n"
             "<b>会话命令</b>\n"
-            "<code>/kernel</code>     kernel 状态\n"
+            "<code>/kernel</code>     当前 kernel 状态\n"
+            "<code>/kernel ls</code>  列出所有 kernel\n"
+            "<code>/kernel new x</code> 新建并切换 kernel\n"
+            "<code>/kernel use x</code> 切换 kernel\n"
             "<code>/memory</code>     分析历史\n"
             "<code>/usage</code>      token 用量\n"
             "<code>/model</code>      切换模型\n"
@@ -198,7 +416,10 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             "• <code>/shell &lt;命令&gt;</code> — 执行 shell"
             "（白名单：ls find cat head wc file du pwd tree）\n\n"
             "<b>会话管理</b>\n"
-            "• <code>/kernel</code> — kernel 健康 + prompt 余量\n"
+            "• <code>/kernel</code> — 当前 kernel 健康 + prompt 余量\n"
+            "• <code>/kernel ls</code> — 列出可用 kernels\n"
+            "• <code>/kernel new 名称</code> — 新建并切换 kernel\n"
+            "• <code>/kernel use 名称</code> — 切换到指定 kernel\n"
             "• <code>/memory</code> — 近两天分析日志\n"
             "• <code>/usage</code> — 最近一次 token 用量\n"
             "• <code>/model [名称]</code> — 查看/切换 LLM 模型\n"
@@ -225,6 +446,11 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             return
 
         lines = [f"👤  <b>用户</b>  <code>{user.id}</code>"]
+        try:
+            kname = sm.get_active_kernel(user.id)
+            lines.append(f"🧩  Kernel：<code>{_fmt.esc(kname)}</code>")
+        except Exception:
+            pass
         if session.adata is not None:
             a = session.adata
             lines.append(f"🔬  {a.n_obs:,} cells × {a.n_vars:,} genes")
@@ -244,6 +470,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             if info:
                 p  = info.get("prompt_count", 0)
                 mp = info.get("max_prompts", "?")
+                if getattr(session, "max_prompts_setting", 0) <= 0:
+                    mp = "∞"
                 lines.append(f"💬  会话  {p}/{mp}")
         except Exception:
             pass
@@ -388,39 +616,104 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     async def handle_kernel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await _guard(update):
             return
-        session = await _get_session(update)
-        if session is None:
+        user_id = update.effective_user.id
+        args = context.args or []
+
+        # /kernel  -> status of active kernel
+        if not args:
+            session = await _get_session(update)
+            if session is None:
+                return
+            st    = session.kernel_status()
+            alive = st["alive"]
+            p     = st["prompt_count"]
+            mp    = st["max_prompts"]
+            sid   = st["session_id"] or "—"
+            kname = sm.get_active_kernel(user_id)
+
+            icon      = "🟢" if alive else "🔴"
+            remaining = (mp - p) if isinstance(mp, int) else "∞"
+
+            lines = [
+                "⚙️  <b>Kernel 状态</b>",
+                _fmt._DIV,
+                f"🧩  当前：<code>{_fmt.esc(kname)}</code>",
+                f"{icon}  {'运行中' if alive else '未启动 / 已关闭'}",
+                f"💬  Prompts：<code>{p}</code> / <code>{mp}</code>（剩余 {remaining}）",
+                f"🆔  Session：<code>{_fmt.esc(str(sid))}</code>",
+                "",
+                "子命令：<code>/kernel ls</code> · <code>/kernel new 名称</code> · <code>/kernel use 名称</code>",
+            ]
+            if isinstance(mp, int) and p >= mp * 0.8:
+                lines += [
+                    "",
+                    "⚠️  即将到达上限，下次分析后 kernel 将重启（变量清空）。",
+                    "   可用 <code>/reset</code> 手动重启，或启动时增大 <code>--max-prompts</code>。",
+                ]
+            task = _tasks.get(user_id)
+            if task and not task.done():
+                lines += ["", "⚙️  当前有分析正在运行  ·  <code>/cancel</code> 取消"]
+            await update.message.reply_text("\n".join(lines), parse_mode="HTML")
             return
 
-        st    = session.kernel_status()
-        alive = st["alive"]
-        p     = st["prompt_count"]
-        mp    = st["max_prompts"]
-        sid   = st["session_id"] or "—"
-
-        icon      = "🟢" if alive else "🔴"
-        remaining = (mp - p) if isinstance(mp, int) else "?"
-
-        lines = [
-            "⚙️  <b>Kernel 状态</b>",
-            _fmt._DIV,
-            f"{icon}  {'运行中' if alive else '未启动 / 已关闭'}",
-            f"💬  Prompts：<code>{p}</code> / <code>{mp}</code>（剩余 {remaining}）",
-            f"🆔  Session：<code>{_fmt.esc(str(sid))}</code>",
-        ]
-        if isinstance(mp, int) and p >= mp * 0.8:
+        sub = args[0].lower()
+        if sub in {"ls", "list"}:
+            active = sm.get_active_kernel(user_id)
+            names = sm.list_kernels(user_id)
+            lines = [
+                "🧩  <b>Kernel 列表</b>",
+                _fmt._DIV,
+            ]
+            for name in names:
+                mark = "✅" if name == active else "•"
+                lines.append(f"{mark}  <code>{_fmt.esc(name)}</code>")
             lines += [
                 "",
-                "⚠️  即将到达上限，下次分析后 kernel 将重启（变量清空）。",
-                "   可用 <code>/reset</code> 手动重启，或启动时增大 <code>--max-prompts</code>。",
+                "切换：<code>/kernel use 名称</code>",
+                "新建：<code>/kernel new 名称</code>",
             ]
+            await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+            return
 
-        # Running task indicator
-        task = _tasks.get(update.effective_user.id)
-        if task and not task.done():
-            lines += ["", "⚙️  当前有分析正在运行  ·  <code>/cancel</code> 取消"]
+        if sub in {"new", "create", "use", "switch"}:
+            task = _tasks.get(user_id)
+            if task and not task.done():
+                await update.message.reply_text(
+                    "⏳  当前有分析正在运行，请先等待完成或使用 <code>/cancel</code>。",
+                    parse_mode="HTML",
+                )
+                return
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "用法：<code>/kernel new 名称</code> 或 <code>/kernel use 名称</code>\n"
+                    "名称规则：字母/数字/._-，长度 1-32。",
+                    parse_mode="HTML",
+                )
+                return
+            name = args[1]
+            try:
+                if sub in {"new", "create"}:
+                    sm.create_kernel(user_id, name, switch=True)
+                    action = "新建并切换"
+                else:
+                    sm.switch_kernel(user_id, name, create=False)
+                    action = "切换"
+            except Exception as exc:
+                await update.message.reply_text(
+                    _fmt.error_message(str(exc)), parse_mode="HTML"
+                )
+                return
+            await update.message.reply_text(
+                f"✅  已{action}到 kernel：<code>{_fmt.esc(sm.get_active_kernel(user_id))}</code>",
+                parse_mode="HTML",
+            )
+            return
 
-        await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+        await update.message.reply_text(
+            "用法：<code>/kernel</code> | <code>/kernel ls</code> | "
+            "<code>/kernel new 名称</code> | <code>/kernel use 名称</code>",
+            parse_mode="HTML",
+        )
 
     # ------------------------------------------------------------------
     # /workspace
@@ -588,8 +881,10 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
         text = session.get_recent_memory_text()
-        await _fmt.send_prose(
-            context.bot, update.effective_chat.id, text,
+        await _send_prose_locked(
+            context.bot,
+            update.effective_chat.id,
+            text,
             header="🧠  <b>分析历史</b>（近两天）",
             always_expand=True,
         )
@@ -683,11 +978,74 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         elif data == "jarvis:memory":
             text = session.get_recent_memory_text()
-            await _fmt.send_prose(
-                context.bot, chat_id, text,
+            await _send_prose_locked(
+                context.bot,
+                chat_id,
+                text,
                 header="🧠  <b>分析历史</b>",
                 always_expand=True,
             )
+
+    # ------------------------------------------------------------------
+    # OpenClaw buffered-block dispatcher
+    # ------------------------------------------------------------------
+
+    async def _dispatch_final_blocks(
+        bot: Any,
+        chat_id: int,
+        *,
+        reports: List[str],
+        figures: List[bytes],
+        artifacts: List[Any],
+        explain: str,
+        final_text: str,
+        keyboard: Any,
+    ) -> None:
+        """Deliver all reply blocks in sequence (OpenClaw lane-delivery pattern).
+
+        Block order:  reports → figures (sendPhoto) → artifacts (sendDocument) → summary+keyboard
+
+        Each block type goes through the correct Telegram API.
+        Files are ALWAYS sent via sendDocument — never as local path links.
+        """
+        n_figs = len(figures)
+
+        # Block 1 – Reports (long markdown/text blocks)
+        for i, rep in enumerate(reports, start=1):
+            header = "📝  <b>分析报告</b>" if i == 1 else f"📝  <b>分析报告（续 {i}）</b>"
+            await _send_prose_locked(bot, chat_id, rep, header=header, always_expand=False)
+
+        # Block 2 – Figures → sendPhoto (sendDocument fallback on error)
+        for i, png_bytes in enumerate(figures, start=1):
+            async with _chat_lock(chat_id):
+                await _send_photo_or_file(
+                    bot, chat_id, png_bytes, _fmt.figure_caption(i, n_figs)
+                )
+
+        # Block 3 – Artifacts → sendDocument (never local path links)
+        for art in artifacts:
+            async with _chat_lock(chat_id):
+                await _send_artifact_document(bot, chat_id, art.filename, art.data)
+
+        # Block 4 – Summary + keyboard (final text block)
+        if explain:
+            if len(explain) > 1200:
+                await _send_prose_locked(bot, chat_id, explain)
+                async with _chat_lock(chat_id):
+                    await _safe_send_message(bot, chat_id, _fmt._DIV, reply_markup=keyboard)
+            else:
+                async with _chat_lock(chat_id):
+                    await _safe_send_message(
+                        bot, chat_id,
+                        _fmt.md_to_html(explain),
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+        else:
+            async with _chat_lock(chat_id):
+                await _safe_send_message(
+                    bot, chat_id, final_text, parse_mode="HTML", reply_markup=keyboard
+                )
 
     # ------------------------------------------------------------------
     # Background analysis runner  (OpenClaw sub-agent pattern)
@@ -700,76 +1058,64 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         full_request: str,
         bot:          Any,
     ) -> None:
-        """
-        Runs entirely in background.  Streams LLM tokens by editing a single
-        "thinking" placeholder message (OpenClaw edit-in-place pattern).
-        """
-        # 1. Send streaming placeholder
-        try:
-            stream_msg    = await bot.send_message(
-                chat_id=chat_id,
-                text="💭  <b>思考中…</b>",
-                parse_mode="HTML",
-            )
-            stream_msg_id = stream_msg.message_id
-        except Exception:
-            stream_msg_id = None
-
-        llm_buf   = ""
+        """OpenClaw-style: draft stream first, then finalize via one outbound sequence."""
+        stream_msg_id: Optional[int] = None
         last_edit = 0.0
-        EDIT_GAP  = 1.5   # seconds between edits (Telegram rate limit ~20 edits/min)
+        llm_buf = ""
+        last_progress = ""
+        EDIT_GAP = 1.5
 
-        async def _edit_stream(html: str) -> None:
-            """Edit the single placeholder message, rate-limited."""
+        def _draft_text() -> str:
+            body = _fmt.md_to_html(llm_buf[-2800:]) if llm_buf.strip() else "<i>思考中…</i>"
+            if last_progress:
+                return f"🔄  <code>{_fmt.esc(last_progress[:180])}</code>\n\n💭  {body}"
+            return f"💭  {body}"
+
+        async def _edit_draft(html: str, force: bool = False) -> None:
             nonlocal last_edit
-            if not stream_msg_id:
+            if stream_msg_id is None:
                 return
             now = time.monotonic()
-            if now - last_edit < EDIT_GAP:
+            if (not force) and (now - last_edit < EDIT_GAP):
                 return
-            try:
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=stream_msg_id,
-                    text=html,
-                    parse_mode="HTML",
-                )
-                last_edit = now
-            except Exception:
-                pass
-
-        async def _force_edit(html: str) -> None:
-            """Edit the placeholder immediately, ignoring the rate-limit timer."""
-            nonlocal last_edit
-            if not stream_msg_id:
-                return
-            try:
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=stream_msg_id,
-                    text=html,
-                    parse_mode="HTML",
-                )
-                last_edit = time.monotonic()
-            except Exception:
-                pass
+            async with _chat_lock(chat_id):
+                try:
+                    ok = await _safe_edit_message(
+                        bot,
+                        chat_id,
+                        stream_msg_id,
+                        html,
+                        parse_mode="HTML",
+                    )
+                    if ok:
+                        last_edit = now
+                except Exception:
+                    last_edit = now
+                    pass
 
         async def llm_chunk_cb(chunk: str) -> None:
-            """Accumulate LLM reasoning text; rate-limited edit of placeholder."""
             nonlocal llm_buf
+            if not chunk:
+                return
             llm_buf += chunk
-            if llm_buf.strip():
-                preview = _fmt.md_to_html(llm_buf[-2500:])
-                await _edit_stream(f"💭  {preview}")
+            await _edit_draft(_draft_text(), force=False)
 
         async def progress_cb(msg: str) -> None:
-            """Code-execution event — always updates immediately (discrete, not streamed).
-            Resets the LLM buffer so the next llm_chunk starts fresh text.
-            """
-            nonlocal llm_buf
-            llm_buf = ""
-            snippet = _fmt.esc(msg[:200])
-            await _force_edit(f"🔄  <code>{snippet}</code>")
+            nonlocal last_progress
+            last_progress = msg
+            await _edit_draft(_draft_text(), force=True)
+
+        # Draft placeholder
+        async with _chat_lock(chat_id):
+            try:
+                stream_msg = await bot.send_message(
+                    chat_id=chat_id,
+                    text="💭  <b>思考中…</b>",
+                    parse_mode="HTML",
+                )
+                stream_msg_id = stream_msg.message_id
+            except Exception:
+                stream_msg_id = None
 
         from .agent_bridge import AgentBridge
         bridge = AgentBridge(session.agent, progress_cb, llm_chunk_cb)
@@ -777,18 +1123,10 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         try:
             result = await bridge.run(full_request, session.adata)
         except asyncio.CancelledError:
-            if stream_msg_id:
-                try:
-                    await bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=stream_msg_id,
-                        text="🚫  分析已取消。",
-                    )
-                except Exception:
-                    pass
-            raise   # propagate so the task wrapper can clean up
+            await _edit_draft("🚫  分析已取消。", force=True)
+            raise
 
-        # 2. Persist adata + usage + memory  (before touching the stream message)
+        # Persist state
         if result.adata is not None:
             session.adata = result.adata
             session.prompt_count += 1
@@ -796,13 +1134,12 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
                 session.save_adata()
             except Exception:
                 pass
-
         if result.usage is not None:
             session.last_usage = result.usage
 
+        a_cur = result.adata or session.adata
+        a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
         try:
-            a_cur  = result.adata or session.adata
-            a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
             session.append_memory_log(
                 request=user_text,
                 summary=result.summary or "分析完成",
@@ -811,72 +1148,90 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         except Exception:
             pass
 
-        # 3. Error — edit placeholder to show error (no delete)
+        keyboard = _analysis_keyboard()
+
+        # Error finalization
         if result.error:
             err_text = _fmt.error_message(result.error)
             edited = False
-            if stream_msg_id:
-                try:
-                    await bot.edit_message_text(
-                        chat_id=chat_id, message_id=stream_msg_id,
-                        text=err_text, parse_mode="HTML",
+            if stream_msg_id is not None:
+                async with _chat_lock(chat_id):
+                    edited = await _safe_edit_message(
+                        bot,
+                        chat_id,
+                        stream_msg_id,
+                        err_text,
+                        parse_mode="HTML",
                     )
-                    edited = True
-                except Exception:
-                    pass
             if not edited:
-                await bot.send_message(chat_id=chat_id, text=err_text, parse_mode="HTML")
+                async with _chat_lock(chat_id):
+                    await _safe_send_message(
+                        bot,
+                        chat_id,
+                        err_text,
+                        parse_mode="HTML",
+                    )
             return
 
-        # 4. Figures — send each as a photo.
-        #    The streaming placeholder (with agent reasoning) stays untouched above.
-        n_figs  = len(result.figures)
-        a_final = result.adata or session.adata
-        a_info  = f"{a_final.n_obs:,} cells × {a_final.n_vars:,} genes" if a_final else ""
-
-        for i, png_bytes in enumerate(result.figures, start=1):
-            try:
-                await bot.send_photo(
-                    chat_id=chat_id,
-                    photo=BytesIO(png_bytes),
-                    caption=_fmt.figure_caption(i, n_figs),
-                )
-            except Exception as exc:
-                logger.warning("Failed to send figure %d: %s", i, exc)
-
-        # 5. Keyboard + optional adata info line.
-        #    Skip generic "分析完成" summaries — the LLM reasoning in the stream
-        #    message above is already the real answer.  Only show the summary when
-        #    it carries new information not already visible.
-        keyboard = _analysis_keyboard()
+        # Build final text payload
+        # Strip local path references: OpenClaw pattern — files are sent via
+        # sendDocument, not as clickable local links.
         _BORING = {"分析完成", "分析完成。", "task completed", "done", "完成"}
-        summary  = (result.summary or "").strip()
-        is_boring = summary.lower() in _BORING or not summary
+        summary = _strip_local_paths((result.summary or "").strip())
+        has_summary = bool(summary and summary.lower() not in _BORING)
+        long_summary = has_summary and len(summary) > 1200
+        final_text = _fmt.md_to_html(summary) if has_summary and not long_summary else ""
+        if (not final_text) and a_info:
+            final_text = f"📊  <code>{_fmt.esc(a_info)}</code>"
+        if not final_text:
+            final_text = _fmt._DIV
 
-        if is_boring:
-            # Just send the keyboard with adata info (no redundant "分析完成" text)
-            footer = f"📊  <code>{_fmt.esc(a_info)}</code>" if a_info else _fmt._DIV
-            await bot.send_message(
-                chat_id=chat_id,
-                text=footer,
-                parse_mode="HTML",
-                reply_markup=keyboard,
+        has_media    = bool(result.figures)
+        has_reports  = bool(getattr(result, "reports", None))
+        artifacts    = list(getattr(result, "artifacts", []) or [])
+        # Reports are already sent as prose; skip duplicate markdown documents.
+        artifacts    = [a for a in artifacts if not a.filename.lower().endswith(".md")]
+        has_artifacts = bool(artifacts)
+
+        # OpenClaw lane delivery:
+        #   Draft = intermediate streaming state only.
+        #   Any complex reply (media / reports / artifacts / long text) is routed
+        #   through _dispatch_final_blocks — the unified block dispatcher:
+        #     reports → figures (sendPhoto) → artifacts (sendDocument) → summary+keyboard
+        is_complex = has_media or has_reports or has_artifacts or long_summary
+        if is_complex:
+            if has_media:
+                status = "正在发送图片…"
+            elif has_reports:
+                status = "正在发送报告…"
+            else:
+                status = "结果如下"
+            await _edit_draft(f"✅  {status}", force=True)
+
+            # Prefer agent summary; fall back to stripped LLM stream buffer.
+            explain = summary if has_summary else _strip_local_paths(llm_buf.strip())
+            await _dispatch_final_blocks(
+                bot, chat_id,
+                reports=list(result.reports) if has_reports else [],
+                figures=list(result.figures) if has_media else [],
+                artifacts=artifacts,
+                explain=explain,
+                final_text=final_text,
+                keyboard=keyboard,
             )
-        elif len(summary) <= 600:
-            body = _fmt.md_to_html(summary)
-            await bot.send_message(
-                chat_id=chat_id,
-                text=body,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
-        else:
-            # Long summary → expandable blockquote, keyboard on a follow-up message
-            await _fmt.send_prose(bot, chat_id, summary)
-            await bot.send_message(
-                chat_id=chat_id,
-                text=f"{_fmt._DIV}",
-                reply_markup=keyboard,
+            # OpenClaw: all final blocks delivered — clean up draft → tombstone.
+            await _edit_draft("✅  分析完成", force=True)
+            return
+
+        # Text-only, no complex blocks: draft IS the streaming result.
+        # Update draft to final LLM text; keyboard goes to a separate fresh message.
+        if llm_buf.strip():
+            await _edit_draft(_fmt.md_to_html(llm_buf.strip()), force=True)
+        elif stream_msg_id is not None:
+            await _edit_draft("✅  分析完成", force=True)
+        async with _chat_lock(chat_id):
+            await _safe_send_message(
+                bot, chat_id, final_text, parse_mode="HTML", reply_markup=keyboard
             )
 
     # ------------------------------------------------------------------
@@ -895,15 +1250,21 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
 
-        # Reject if analysis already running
+        # OpenClaw Collect mode: if analysis is running, queue message + respond conversationally
         existing = _tasks.get(user_id)
         if existing and not existing.done():
-            await update.message.reply_text(
-                "⏳  当前有分析正在运行。\n"
-                "请等待完成，或使用 <code>/cancel</code> 取消。",
-                parse_mode="HTML",
+            _pending.setdefault(user_id, []).append(user_text)
+            running_req = _task_requests.get(user_id, "")
+            asyncio.create_task(
+                _quick_chat(
+                    session, user_text, update.effective_chat.id, context.bot,
+                    running_request=running_req, queued=True,
+                )
             )
             return
+
+        chat_id = update.effective_chat.id
+        bot = context.bot
 
         # Acknowledge immediately
         if session.adata is not None:
@@ -929,8 +1290,16 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
                 parse_mode="HTML",
             )
 
-        chat_id = update.effective_chat.id
+        await _spawn_analysis(session, user_text, chat_id, bot, user_id)
 
+    async def _spawn_analysis(
+        session: Any,
+        user_text: str,
+        chat_id: int,
+        bot: Any,
+        user_id: int,
+    ) -> None:
+        """Build context, spawn background analysis task, and drain pending queue when done."""
         # Build context: AGENTS.md + memory + request
         ctx_parts  = []
         agents_md  = session.get_agents_md()
@@ -944,14 +1313,9 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             if ctx_parts else user_text
         )
 
-        # Spawn background task
-        bot = context.bot
-
         async def _wrapper() -> None:
             try:
-                await _run_analysis_bg(
-                    session, user_text, chat_id, full_request, bot
-                )
+                await _run_analysis_bg(session, user_text, chat_id, full_request, bot)
             except asyncio.CancelledError:
                 pass
             except Exception as exc:
@@ -966,9 +1330,27 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
                     pass
             finally:
                 _tasks.pop(user_id, None)
+                _task_requests.pop(user_id, None)
+                # OpenClaw Collect: drain queued messages into a single followup run
+                queued = _pending.pop(user_id, [])
+                if queued:
+                    coalesced = "\n\n".join(queued)
+                    n = len(queued)
+                    try:
+                        await _safe_send_message(
+                            bot, chat_id,
+                            f"⏭  开始执行队列中的 {n} 条请求…",
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        pass
+                    asyncio.create_task(
+                        _spawn_analysis(session, coalesced, chat_id, bot, user_id)
+                    )
 
         task = asyncio.create_task(_wrapper())
         _tasks[user_id] = task
+        _task_requests[user_id] = user_text
 
     # ------------------------------------------------------------------
     # Register all handlers
