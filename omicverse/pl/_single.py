@@ -67,6 +67,20 @@ def mde(adata: AnnData,convert=True, **kwargs):
         print(f"if you want to use MDE to visualize, please set convert=True")
     return embedding(adata, basis='MDE', **kwargs)
 
+@register_function(
+    aliases=["tsne图", "tsne", "tSNE可视化", "tsne_plot", "t-SNE"],
+    category="pl",
+    description="Plot t-SNE embedding with omicverse styling",
+    examples=[
+        "# Basic t-SNE plot colored by cell type",
+        "ov.pl.tsne(adata, color='leiden')",
+        "# Multiple colors",
+        "ov.pl.tsne(adata, color=['leiden', 'cell_type'], ncols=2)",
+        "# Customize point size and colormap",
+        "ov.pl.tsne(adata, color='leiden', size=10, frameon=False)",
+    ],
+    related=["pl.umap", "pl.embedding", "pl.mde", "pp.tsne"]
+)
 def tsne(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot t-SNE embedding.
@@ -109,6 +123,20 @@ def pca(adata: AnnData,convert=True, **kwargs):
         print(f"if you want to use PCA to visualize, please set convert=True")
     return embedding(adata, basis='PCA', **kwargs)
 
+@register_function(
+    aliases=["umap图", "umap", "UMAP可视化", "umap_plot", "UMAP"],
+    category="pl",
+    description="Plot UMAP embedding with omicverse styling",
+    examples=[
+        "# Basic UMAP plot colored by cell type",
+        "ov.pl.umap(adata, color='leiden')",
+        "# Multiple colors side by side",
+        "ov.pl.umap(adata, color=['leiden', 'cell_type'], ncols=2)",
+        "# Customize point size and remove frame",
+        "ov.pl.umap(adata, color='leiden', size=5, frameon=False)",
+    ],
+    related=["pl.tsne", "pl.embedding", "pl.mde", "pp.umap"]
+)
 def umap(adata: AnnData,convert=True, **kwargs):
     r"""
     Plot UMAP embedding.

@@ -489,6 +489,10 @@ class OmicVerseAgent:
         else:
             print(f"   ⚠️  {key_msg}")
         
+        # Eagerly import key modules so their @register_function decorators
+        # run before the registry is queried (they are lazy-loaded by default).
+        self._preload_registry_modules()
+
         try:
             with self._temporary_api_keys():
                 self._setup_agent()
@@ -829,6 +833,45 @@ You can reference previous results without explicitly searching:
                     os.environ.pop(key, None)
                 else:
                     os.environ[key] = previous
+
+    def _preload_registry_modules(self) -> None:
+        """Import all lazy-loaded OmicVerse modules so @register_function decorators run.
+
+        omicverse uses lazy loading for every top-level sub-package.  The registry is
+        queried before any user code accesses those packages, so all @register_function
+        decorators would be skipped without this preload step.
+
+        Discovered by scanning the source tree for @register_function occurrences:
+          pl, single, pp, utils (submodules), space, bulk, alignment, biocontext,
+          external (PyWGCNA, GraphST, cnmf).
+
+        Each import is wrapped in try/except so optional C/GPU/LLM deps that are not
+        installed do not block Agent startup.  'llm' and 'agent' are intentionally
+        omitted — they are heavy, optional, and carry no analysis-level functions.
+        """
+        import importlib
+
+        _modules = [
+            # Core analysis packages
+            "omicverse.pp",
+            "omicverse.pl",
+            "omicverse.single",
+            "omicverse.bulk",
+            "omicverse.bulk2single",
+            "omicverse.space",
+            "omicverse.datasets",
+            "omicverse.alignment",
+            "omicverse.biocontext",
+            # utils submodules not auto-imported by utils/__init__.py
+            "omicverse.utils",
+            # external integrations with registered functions
+            "omicverse.external",
+        ]
+        for mod in _modules:
+            try:
+                importlib.import_module(mod)
+            except Exception:
+                pass
 
     def _setup_agent(self):
         """Setup the internal agent backend with dynamic instructions."""
@@ -1297,6 +1340,16 @@ User request: "quality control with nUMI>500, mito<0.2"
             output_parts = []
             if prereq_warnings:
                 output_parts.append(f"PREREQUISITE WARNINGS: {prereq_warnings}")
+            # If the notebook kernel failed but in-process succeeded, tell the LLM
+            # so it knows to fix the code for future notebook runs.
+            nb_err = getattr(self, '_last_notebook_error', None)
+            if nb_err:
+                output_parts.append(
+                    f"WARNING: Notebook kernel execution FAILED (fell back to in-process):\n"
+                    f"{nb_err[:600]}\n"
+                    f"Please fix the code so it works correctly in the notebook kernel."
+                )
+                self._last_notebook_error = None
             if stdout.strip():
                 output_parts.append(f"stdout:\n{stdout[:3000]}")
             try:
@@ -2429,7 +2482,12 @@ User request: "quality control with nUMI>500, mito<0.2"
             "  except ValueError:\n"
             "      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)\n"
             "- ALWAYS validate batch column before batch operations "
-            "(check existence, fillna, astype('category'))\n\n"
+            "(check existence, fillna, astype('category'))\n"
+            "- sc.pl.dotplot/matrixplot/heatmap/tracksplot with show=False returns a DICT "
+            "of axes, NOT a figure object. Capture the figure with plt.gcf() AFTER the call:\n"
+            "  sc.pl.dotplot(adata, var_names=markers, groupby='cluster', show=False)\n"
+            "  fig = plt.gcf()          # CORRECT\n"
+            "  dp = sc.pl.dotplot(...); fig = dp.figure  # WRONG — dp is a dict!\n\n"
             "Guidelines:\n"
             "- ALWAYS inspect data before writing code that depends on column names or structure\n"
             "- Execute code in logical steps, not one giant block\n"
@@ -2776,20 +2834,32 @@ User request: "quality control with nUMI>500, mito<0.2"
                 cell_type=args.get("cell_type", ""),
             )
         elif name == "inspect_data":
-            return self._tool_inspect_data(current_adata, args.get("aspect", "full"))
+            return await asyncio.to_thread(
+                self._tool_inspect_data, current_adata, args.get("aspect", "full")
+            )
         elif name == "execute_code":
-            return self._tool_execute_code(
+            # execute_code may run for minutes (scanpy/scvelo, notebook I/O).
+            # Run it in a worker thread so the asyncio loop stays responsive
+            # for Telegram polling, /cancel, and status commands.
+            return await asyncio.to_thread(
+                self._tool_execute_code,
                 args.get("code", ""),
                 args.get("description", ""),
                 current_adata,
             )
         elif name == "run_snippet":
-            return self._tool_run_snippet(args.get("code", ""), current_adata)
+            return await asyncio.to_thread(
+                self._tool_run_snippet, args.get("code", ""), current_adata
+            )
         elif name == "search_functions":
-            return self._tool_search_functions(args.get("query", ""))
+            return await asyncio.to_thread(
+                self._tool_search_functions, args.get("query", "")
+            )
         elif name == "search_skills":
-            return self._tool_search_skills(args.get("query", ""))
-        elif name == "Agent":
+            return await asyncio.to_thread(
+                self._tool_search_skills, args.get("query", "")
+            )
+        elif name in {"Agent", "delegate"}:
             agent_type = args.get("subagent_type", args.get("agent_type", "explore"))
             task = args.get("task", "")
             context = args.get("context", "")
@@ -3002,7 +3072,8 @@ User request: "quality control with nUMI>500, mito<0.2"
         meaningful_tool_call_seen = False
         no_tool_retry_count = 0
         # Anthropic benefits from an extra follow-up retry before giving up.
-        _is_anthropic_model = "claude" in (self._llm.config.model or "").lower()
+        llm_model_name = getattr(getattr(self._llm, "config", None), "model", None) or self.model
+        _is_anthropic_model = "claude" in str(llm_model_name).lower()
         max_no_tool_retries = 3 if _is_anthropic_model else 2
         chat_timeout = float(os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "45"))
         self._approval_handler = approval_handler
@@ -4180,6 +4251,26 @@ if 'batch' in adata.obs.columns:
                     logger.debug("Applied fix: Removed assignment from in-place function call")
                     return fixed_code
 
+        # Fix 5: sc.pl.dotplot/matrixplot/heatmap returns a dict of axes when show=False,
+        # NOT a figure/DotPlot object.  Replace `var.figure` with `plt.gcf()`.
+        if "'dict' object has no attribute" in error_str and "figure" in error_str:
+            import re as _re
+            _matrix_plots = ['dotplot', 'matrixplot', 'heatmap', 'tracksplot', 'clustermap']
+            fixed_code = code
+            for _func in _matrix_plots:
+                # Find:  varname = sc.pl.<func>(...)
+                _m = _re.search(rf'(\w+)\s*=\s*sc\.pl\.{_func}\s*\(', fixed_code)
+                if _m:
+                    _varname = _m.group(1)
+                    # Replace varname.figure  →  plt.gcf()
+                    fixed_code = _re.sub(rf'\b{_re.escape(_varname)}\.figure\b', 'plt.gcf()', fixed_code)
+            if fixed_code != code:
+                # Ensure plt is imported
+                if 'import matplotlib.pyplot' not in fixed_code:
+                    fixed_code = 'import matplotlib.pyplot as plt\n' + fixed_code
+                logger.debug("Applied fix: sc.pl matrix-plot .figure -> plt.gcf()")
+                return fixed_code
+
         return None
 
     # ------------------------------------------------------------------
@@ -4448,6 +4539,9 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
         trust, and consider additional isolation (e.g., containers) for untrusted input.
         """
 
+        # Reset per-call notebook-fallback error tracker (read by _tool_execute_code).
+        self._last_notebook_error: Optional[str] = None
+
         # --- Pre-execution security scan ---
         try:
             violations = self._security_scanner.scan(code)
@@ -4494,6 +4588,9 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
                     # but we can still process plan and update directives
                     self._process_context_directives(code, {})
 
+                if capture_stdout:
+                    session_stdout = getattr(self._notebook_executor, "last_stdout", "") or ""
+                    return {"adata": result_adata, "stdout": session_stdout}
                 return result_adata
 
             except Exception as e:
@@ -4515,6 +4612,9 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
                     else:
                         print(f"\u26a0\ufe0f  Session execution failed: {e}")
                         print(f"   Falling back to in-process execution...")
+                # Record the notebook error so _tool_execute_code can surface it to the LLM
+                # even when the in-process fallback ultimately succeeds.
+                self._last_notebook_error = str(e)
                 # SandboxFallbackPolicy.SILENT: fall through silently
 
         # Legacy in-process execution
