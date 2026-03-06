@@ -14,7 +14,21 @@ import anndata as ad
 import numpy as np
 import pytest
 
-pytestmark = [pytest.mark.fm_real, pytest.mark.fm_gpu]
+_RUN_REAL_INFERENCE = os.environ.get("OV_FM_RUN_REAL_INFERENCE", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+pytestmark = [
+    pytest.mark.fm_real,
+    pytest.mark.fm_gpu,
+    pytest.mark.skipif(
+        not _RUN_REAL_INFERENCE,
+        reason="Real FM inference tests are opt-in and should only run in the dedicated model environment.",
+    ),
+]
 
 
 # ---------------------------------------------------------------------------
