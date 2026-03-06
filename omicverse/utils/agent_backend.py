@@ -718,9 +718,12 @@ class OmicVerseLLMBackend:
                 if base.endswith("/v1"):
                     base = base[:-3]
                 client_kwargs["base_url"] = base
-            import httpx
             timeout_s = _request_timeout_seconds()
-            client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s
             client = anthropic.Anthropic(**client_kwargs)
             logger.info(
                 "anthropic_tool_chat_start model=%s timeout_s=%.1f messages=%d tools=%d",
@@ -1750,9 +1753,12 @@ class OmicVerseLLMBackend:
                 if base.endswith("/v1"):
                     base = base[:-3]
                 client_kwargs["base_url"] = base
-            import httpx
             timeout_s = _request_timeout_seconds()
-            client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s
             client = anthropic.Anthropic(**client_kwargs)
 
             wire_model = self._wire_model_name()
@@ -2203,9 +2209,12 @@ class OmicVerseLLMBackend:
             client_kwargs = {"api_key": api_key}
             if self.config.endpoint:
                 client_kwargs["base_url"] = self.config.endpoint
-            import httpx
             timeout_s = _request_timeout_seconds()
-            client_kwargs["timeout"] = httpx.Timeout(timeout_s * 3, connect=10.0)  # streaming gets more time
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s * 3, connect=10.0)  # streaming gets more time
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s * 3
             client = anthropic.Anthropic(**client_kwargs)
             wire_model = self._wire_model_name()
 
