@@ -74,6 +74,7 @@ _LAZY_MODULES = {
     'datasets',
     'external',
     'llm',
+    'fm',
     'agent',
 }
 
@@ -344,6 +345,7 @@ __all__ = [
     "datasets",
     "external",
     "llm",
+    "fm",
     "datacollect",
     "agent",
 

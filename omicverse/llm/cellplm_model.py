@@ -341,12 +341,24 @@ class CellPLMModel(SCLLMBase):
             SCLLMOutput.status(f"Extracting embeddings for {adata.n_obs:,} cells...", 'embedding', indent=1)
             
             # Use CellPLM embedding pipeline with progress tracking
+            # CellEmbeddingPipeline.predict() accepts: inference_config, covariate_fields,
+            # batch_gene_list, ensembl_auto_conversion, device — NOT arbitrary kwargs
+            batch_size = kwargs.pop('batch_size', None)
+            inference_config = kwargs.pop('inference_config', None)
+            if batch_size and not inference_config:
+                inference_config = {'batch_size': batch_size}
+            predict_kwargs = {}
+            if inference_config:
+                predict_kwargs['inference_config'] = inference_config
+            for k in ('covariate_fields', 'batch_gene_list', 'ensembl_auto_conversion'):
+                if k in kwargs:
+                    predict_kwargs[k] = kwargs.pop(k)
             with SCLLMOutput.progress_bar(total=2, desc="Embedding extraction", model_name="CellPLM") as pbar:
                 pbar.set_description("[CellPLM] Computing embeddings...")
                 embeddings = self.embedding_pipeline.predict(
                     adata,
                     device=self.device,
-                    **kwargs
+                    **predict_kwargs
                 )
                 pbar.update(1)
                 pbar.set_description("[CellPLM] Processing embeddings...")
