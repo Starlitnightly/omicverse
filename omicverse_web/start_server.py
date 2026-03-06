@@ -113,13 +113,16 @@ def get_available_port(start_port=5050):
 
 def _parse_args():
     """Parse launcher CLI arguments."""
+    remote_mode = os.environ.get("OV_WEB_REMOTE_MODE", "0") == "1"
+
     parser = argparse.ArgumentParser(
         description="Launch OmicVerse web server."
     )
     parser.add_argument(
         "--host",
-        default=os.environ.get("HOST", "0.0.0.0"),
-        help="Host to bind (default: 0.0.0.0).",
+        # Remote mode defaults to loopback for safety (require tunnel/proxy)
+        default=os.environ.get("HOST", "127.0.0.1" if remote_mode else "0.0.0.0"),
+        help="Host to bind (default: 127.0.0.1 in remote mode, 0.0.0.0 otherwise).",
     )
     parser.add_argument(
         "--port",
@@ -137,6 +140,12 @@ def _parse_args():
         dest="debug",
         action="store_false",
         help="Disable Flask debug mode.",
+    )
+    parser.add_argument(
+        "--remote",
+        action="store_true",
+        default=remote_mode,
+        help="Enable remote mode (bind loopback, require tunnel/proxy).",
     )
     parser.set_defaults(debug=False)
     return parser.parse_args()
@@ -171,16 +180,29 @@ def main():
         return 1
 
     print(f"\n🌐 服务将在端口 {port} 启动")
-    
+
     # Set environment variables
     os.environ['PORT'] = str(port)
     os.environ['FLASK_ENV'] = 'development'
-    
+
+    # Propagate remote mode so app.py can read it
+    if args.remote:
+        os.environ['OV_WEB_REMOTE_MODE'] = '1'
+        # Force loopback bind in remote mode unless explicitly overridden
+        if args.host == '0.0.0.0':
+            args.host = '127.0.0.1'
+
     # Start the server
     print("\n🎯 启动服务器...")
     print("-" * 50)
-    print(f"📱 本地访问: http://localhost:{port}")
-    print(f"🌍 网络访问: http://{args.host}:{port}")
+    if args.remote:
+        print(f"🔒 Remote mode: bound to {args.host}:{port} (loopback only)")
+        print(f"   Access via SSH tunnel:")
+        print(f"     ssh -L {port}:127.0.0.1:{port} user@server")
+        print(f"   Then open: http://localhost:{port}")
+    else:
+        print(f"📱 本地访问: http://localhost:{port}")
+        print(f"🌍 网络访问: http://{args.host}:{port}")
     print("⌨️  按 Ctrl+C 停止服务器")
     print("-" * 50)
     

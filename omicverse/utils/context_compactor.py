@@ -11,6 +11,7 @@ Inspired by Codex ``compact.rs``.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
 from typing import TYPE_CHECKING, Dict, Optional
 
@@ -45,6 +46,34 @@ def get_context_window(model: str) -> int:
     return MODEL_CONTEXT_WINDOWS.get(model, _DEFAULT_CONTEXT_WINDOW)
 
 
+COMPACTION_PROMPT = (
+    "You are compacting OmicVerse agent context for a later handoff. "
+    "Produce a compact but high-signal reference that preserves: "
+    "function names, parameter signatures, prerequisite chains, "
+    "active workflow constraints, unresolved issues, and any user-specific "
+    "requirements that would change future tool selection. "
+    "Remove repetitive examples, verbose prose, and duplicate explanations. "
+    "Do not invent capabilities or results that were not present in the source.\n\n"
+    "Source context:\n"
+)
+
+HANDOFF_PROMPT = (
+    "The following is compacted context from an earlier OVAgent turn. "
+    "Treat it as authoritative prior context. Reconstruct intent, constraints, "
+    "and relevant tool knowledge from it, but do not assume omitted details are true. "
+    "Prefer this summary over recomputing the full original prompt.\n\n"
+    "Compacted context:\n"
+)
+
+
+@dataclass
+class CompactionResult:
+    summary: str
+    handoff_text: str
+    original_tokens: int
+    compacted_tokens: int
+
+
 class ContextCompactor:
     """Compresses the system prompt when it nears the context window limit."""
 
@@ -61,14 +90,19 @@ class ContextCompactor:
         return total > self._context_window * self.COMPACT_THRESHOLD
 
     async def compact(self, system_prompt: str) -> str:
-        """Return a compressed version of *system_prompt*."""
+        """Return a handoff-ready compressed version of *system_prompt*."""
+        return (await self.compact_bundle(system_prompt)).handoff_text
+
+    async def compact_bundle(self, system_prompt: str) -> CompactionResult:
+        """Return both the raw summary and the handoff-wrapped compacted prompt."""
         char_limit = self.MAX_COMPACT_INPUT * 4  # rough token → char
         truncated = system_prompt[:char_limit]
-        prompt = (
-            "Summarize the following OmicVerse function registry and skill "
-            "instructions into a compact reference.  Keep: all function names, "
-            "parameter signatures, prerequisite chains.  Remove: verbose "
-            "descriptions, examples, related-function lists.\n\n"
-            + truncated
+        summary = await self._llm.run(COMPACTION_PROMPT + truncated)
+        summary = summary.strip()
+        handoff_text = HANDOFF_PROMPT + summary
+        return CompactionResult(
+            summary=summary,
+            handoff_text=handoff_text,
+            original_tokens=estimate_tokens(system_prompt),
+            compacted_tokens=estimate_tokens(handoff_text),
         )
-        return await self._llm.run(prompt)
