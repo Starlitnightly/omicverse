@@ -19,6 +19,14 @@ from .end_to_end_verifier import (
     create_verifier,
     VerificationRunConfig,
 )
+from ..harness.server_cli import (
+    dump_json,
+    load_trace_payload,
+    require_server_only_mode,
+    run_cleanup,
+    run_scenario,
+    summarize_trace,
+)
 
 
 def cmd_verify(args):
@@ -279,6 +287,46 @@ def cmd_test_selection(args):
     sys.exit(0)
 
 
+def cmd_replay(args):
+    """Replay a stored harness trace as JSON summary."""
+    require_server_only_mode()
+    payload = load_trace_payload(args.trace_id, root=args.trace_root)
+    summary = summarize_trace(payload)
+    if args.full:
+        dump_json(payload, args.output)
+    else:
+        dump_json(summary, args.output)
+    sys.exit(0)
+
+
+def cmd_scenario(args):
+    """Evaluate one stored harness trace against an expected scenario."""
+    require_server_only_mode()
+    payload = run_scenario(
+        args.trace_id,
+        scenario_name=args.name,
+        expected_events=args.expect_event,
+        expected_tools=args.expect_tool,
+        root=args.trace_root,
+    )
+    dump_json(payload, args.output)
+    sys.exit(0 if payload["passed"] else 1)
+
+
+def cmd_cleanup(args):
+    """Generate a cleanup/drift report for harness assets."""
+    require_server_only_mode()
+    payload = run_cleanup(
+        trace_root=args.trace_root,
+        docs_root=args.docs_root,
+        repo_root=args.repo_root,
+        save_report=args.save_report,
+        report_name=args.report_name,
+    )
+    dump_json(payload, args.output)
+    sys.exit(0)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -438,6 +486,111 @@ def main():
         help='LLM temperature (default: 0.0)'
     )
     test_parser.set_defaults(func=cmd_test_selection)
+
+    # Harness replay command
+    replay_parser = subparsers.add_parser(
+        'replay',
+        help='Replay or summarize a stored OVAgent harness trace (server-only)'
+    )
+    replay_parser.add_argument(
+        'trace_id',
+        type=str,
+        help='Harness trace identifier (e.g. trace_xxxxx)'
+    )
+    replay_parser.add_argument(
+        '--trace-root',
+        type=str,
+        help='Override trace store root directory'
+    )
+    replay_parser.add_argument(
+        '--full',
+        action='store_true',
+        help='Print the full stored trace payload instead of a summary'
+    )
+    replay_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    replay_parser.set_defaults(func=cmd_replay)
+
+    # Harness scenario command
+    scenario_parser = subparsers.add_parser(
+        'scenario',
+        help='Evaluate a stored harness trace against expected events/tools (server-only)'
+    )
+    scenario_parser.add_argument(
+        'trace_id',
+        type=str,
+        help='Harness trace identifier to evaluate'
+    )
+    scenario_parser.add_argument(
+        '--name',
+        type=str,
+        default='adhoc-scenario',
+        help='Scenario name (default: adhoc-scenario)'
+    )
+    scenario_parser.add_argument(
+        '--expect-event',
+        type=str,
+        nargs='*',
+        help='Expected harness event types'
+    )
+    scenario_parser.add_argument(
+        '--expect-tool',
+        type=str,
+        nargs='*',
+        help='Expected tool names'
+    )
+    scenario_parser.add_argument(
+        '--trace-root',
+        type=str,
+        help='Override trace store root directory'
+    )
+    scenario_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    scenario_parser.set_defaults(func=cmd_scenario)
+
+    # Harness cleanup command
+    cleanup_parser = subparsers.add_parser(
+        'cleanup',
+        help='Generate a harness cleanup/drift report (server-only)'
+    )
+    cleanup_parser.add_argument(
+        '--trace-root',
+        type=str,
+        help='Override trace store root directory'
+    )
+    cleanup_parser.add_argument(
+        '--docs-root',
+        type=str,
+        help='Override docs/harness root directory'
+    )
+    cleanup_parser.add_argument(
+        '--repo-root',
+        type=str,
+        help='Override repository root'
+    )
+    cleanup_parser.add_argument(
+        '--save-report',
+        action='store_true',
+        help='Persist the cleanup report under the trace store reports directory'
+    )
+    cleanup_parser.add_argument(
+        '--report-name',
+        type=str,
+        default='cleanup_report',
+        help='Report filename prefix when --save-report is used'
+    )
+    cleanup_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    cleanup_parser.set_defaults(func=cmd_cleanup)
 
     # Parse and execute
     args = parser.parse_args()

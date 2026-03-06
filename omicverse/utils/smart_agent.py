@@ -18,11 +18,15 @@ import re
 import inspect
 import ast
 import textwrap
+import time
 import builtins
 import warnings
 import threading
 import traceback
 import logging
+import mimetypes
+import shutil
+import subprocess
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
@@ -82,6 +86,24 @@ from .agent_reporter import (
     Reporter,
     make_reporter,
 )
+from .harness import (
+    RunTraceRecorder,
+    RunTraceStore,
+    build_stream_event,
+    coerce_usage_payload,
+    hash_code_block,
+    make_turn_id,
+)
+from .harness.runtime_state import runtime_state
+from .harness.tool_catalog import (
+    get_default_loaded_tool_names,
+    get_tool_spec,
+    get_visible_tool_schemas,
+    normalize_tool_name,
+    resolve_tool_search,
+)
+from .context_compactor import ContextCompactor
+from .session_history import HistoryEntry, SessionHistory
 from .skill_registry import (
     SkillMatch,
     SkillMetadata,
@@ -387,20 +409,25 @@ class OmicVerseAgent:
 
         _emit(EventLevel.INFO, "Initializing OmicVerse Smart Agent (internal backend)...", "init")
         
-        # Normalize model ID for aliases and variations, then validate
-        original_model = model
-        try:
-            model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-        except Exception:
-            # Older ModelConfig without normalization: proceed as-is
-            model = model
-        if model != original_model:
-            print(f"   📝 Model ID normalized: {original_model} → {model}")
+        # When using a custom endpoint (proxy), keep the model name as-is.
+        # Proxies expect the exact model name the user typed.
+        if endpoint:
+            print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
+        else:
+            # Normalize model ID for aliases and variations, then validate
+            original_model = model
+            try:
+                model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
+            except Exception:
+                # Older ModelConfig without normalization: proceed as-is
+                model = model
+            if model != original_model:
+                print(f"   📝 Model ID normalized: {original_model} → {model}")
 
-        is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
-        if not is_valid:
-            print(f"❌ {validation_msg}")
-            raise ValueError(validation_msg)
+            is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
+            if not is_valid:
+                print(f"❌ {validation_msg}")
+                raise ValueError(validation_msg)
         
         self.model = model
         self.api_key = api_key
@@ -432,6 +459,12 @@ class OmicVerseAgent:
             'review': [],
             'total': None
         }
+        self._session_history: Optional[SessionHistory] = None
+        self._trace_store: Optional[RunTraceStore] = None
+        self._context_compactor: Optional[ContextCompactor] = None
+        self._last_run_trace = None
+        self._approval_handler = None
+        self._web_session_id = ""
         try:
             self._managed_api_env = self._collect_api_key_env(api_key)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -520,6 +553,18 @@ class OmicVerseAgent:
                     print(f"   ⚠️  Filesystem context disabled (init failed: {e})")
             else:
                 print(f"   ⚡ Filesystem context disabled")
+
+            if getattr(self._config, "history_enabled", False):
+                self._session_history = SessionHistory(path=self._config.history_path)
+                print(f"   📝 Session history enabled")
+
+            harness_config = getattr(self._config, "harness", None)
+            if harness_config is not None and getattr(harness_config, "enable_traces", False):
+                self._trace_store = RunTraceStore(root=harness_config.trace_dir)
+                print(f"   🧰 Harness tracing enabled")
+            if harness_config is not None and getattr(harness_config, "enable_context_compaction", False) and self._llm:
+                self._context_compactor = ContextCompactor(self._llm, self.model)
+                print(f"   🗜️  Harness context compaction enabled")
 
             # Initialize security scanner
             self._security_config: SecurityConfig = getattr(
@@ -1055,134 +1100,144 @@ User request: "quality control with nUMI>500, mito<0.2"
     # Agentic Loop: Tool-calling based autonomous execution
     # =====================================================================
 
-    AGENT_TOOLS = [
+    LEGACY_AGENT_TOOLS = [
         {
             "name": "inspect_data",
-            "description": "Inspect the AnnData object. Returns structural info without modifying data.",
+            "description": "Inspect the AnnData or MuData object without modifying it.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "aspect": {
                         "type": "string",
                         "enum": ["shape", "obs", "var", "obsm", "uns", "layers", "full"],
-                        "description": "What aspect to inspect. 'full' returns all aspects."
                     }
                 },
-                "required": ["aspect"]
-            }
+                "required": ["aspect"],
+            },
         },
         {
             "name": "execute_code",
-            "description": (
-                "Execute Python code in the sandbox. Code has access to: adata, ov (omicverse), "
-                "np (numpy), pd (pandas), sc (scanpy), matplotlib, seaborn, scipy, sklearn. "
-                "Code CAN modify adata. Use for actual data processing steps."
-            ),
+            "description": "Execute Python code against the current dataset.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "Python code to execute"},
-                    "description": {"type": "string", "description": "Brief description of what this code does"}
+                    "code": {"type": "string"},
+                    "description": {"type": "string"},
                 },
-                "required": ["code", "description"]
-            }
+                "required": ["code", "description"],
+            },
         },
         {
             "name": "run_snippet",
-            "description": (
-                "Run a read-only code snippet for exploration/debugging. Returns stdout output. "
-                "Does NOT modify adata (runs on a shallow copy). Good for checking values, "
-                "shapes, column names, or testing small operations."
-            ),
+            "description": "Run read-only Python code on a shallow copy of the current dataset.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "code": {"type": "string", "description": "Python code to run (read-only)"}
-                },
-                "required": ["code"]
-            }
+                "properties": {"code": {"type": "string"}},
+                "required": ["code"],
+            },
         },
         {
             "name": "search_functions",
-            "description": "Search OmicVerse's function registry for relevant functions by keyword.",
+            "description": "Search the OmicVerse function registry.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "What you're looking for (e.g. 'normalize', 'PCA', 'leiden clustering')"
-                    }
-                },
-                "required": ["query"]
-            }
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
         },
         {
             "name": "search_skills",
-            "description": (
-                "Search for domain-specific workflow guidance. Returns step-by-step "
-                "instructions, code patterns, and troubleshooting tips for complex "
-                "bioinformatics tasks like preprocessing, clustering, trajectory analysis, "
-                "batch integration, DEG analysis, etc. Use when you need detailed workflow "
-                "guidance beyond what search_functions provides."
-            ),
+            "description": "Search installed domain-specific skills.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": (
-                            "Domain or workflow to search (e.g. 'preprocessing', "
-                            "'batch correction', 'trajectory analysis', 'DEG')"
-                        )
-                    }
-                },
-                "required": ["query"]
-            }
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
         },
         {
             "name": "delegate",
-            "description": (
-                "Delegate a sub-task to a specialized subagent with its own context window. "
-                "Types: 'explore' (read-only data characterization, fast), "
-                "'plan' (design multi-step workflow, read-only), "
-                "'execute' (focused code execution of a well-defined step, can modify data). "
-                "The subagent's result is returned as a single message."
-            ),
+            "description": "Delegate to an explore, plan, or execute subagent.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "agent_type": {
-                        "type": "string",
-                        "enum": ["explore", "plan", "execute"],
-                        "description": "Type of subagent"
-                    },
-                    "task": {
-                        "type": "string",
-                        "description": "Specific task for the subagent"
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Additional context (previous findings, error messages, constraints)"
-                    }
+                    "agent_type": {"type": "string", "enum": ["explore", "plan", "execute"]},
+                    "task": {"type": "string"},
+                    "context": {"type": "string"},
                 },
-                "required": ["agent_type", "task"]
-            }
+                "required": ["agent_type", "task"],
+            },
+        },
+        {
+            "name": "web_fetch",
+            "description": "Fetch a URL and return readable content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string"},
+                    "prompt": {"type": "string"},
+                },
+                "required": ["url"],
+            },
+        },
+        {
+            "name": "web_search",
+            "description": "Search the web and return results.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "num_results": {"type": "number"},
+                },
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "web_download",
+            "description": "Download a file from a URL to disk.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string"},
+                    "filename": {"type": "string"},
+                    "directory": {"type": "string"},
+                },
+                "required": ["url"],
+            },
         },
         {
             "name": "finish",
-            "description": "Declare the task complete and return the current adata.",
+            "description": "Declare the task complete and return the summary.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "summary": {"type": "string", "description": "Brief summary of what was done"}
-                },
-                "required": ["summary"]
-            }
+                "properties": {"summary": {"type": "string"}},
+                "required": ["summary"],
+            },
         },
     ]
 
+    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + LEGACY_AGENT_TOOLS
+    _URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
+    _ACTION_REQUEST_PATTERN = re.compile(
+        r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|execute|search|lookup|look up|find|process|parse|clone|fix|edit|write)\b",
+        re.IGNORECASE,
+    )
+    _PROMISSORY_PATTERN = re.compile(
+        r"\b(let me|i(?:'ll| will| can)|going to|start by|first(?:,)?\s+i(?:'ll| will)|can continue\?|could continue\?|re-?start)\b",
+        re.IGNORECASE,
+    )
+    _BLOCKER_PATTERN = re.compile(
+        r"\b(can(?:not|'t)|unable|failed|error|need your|please provide|approval required|missing|not installed|permission denied)\b",
+        re.IGNORECASE,
+    )
+    _RESULT_PATTERN = re.compile(
+        r"\b(found|fetched|downloaded|loaded|read|parsed|here (?:is|are)|summary|supplementary|links?)\b",
+        re.IGNORECASE,
+    )
+
     def _tool_inspect_data(self, adata: Any, aspect: str) -> str:
         """Handle inspect_data tool call. Returns formatted string."""
+        if adata is None:
+            return "No dataset is loaded. Use web_download to download a dataset first, then load it with execute_code."
         try:
             parts = []
             dtype = type(adata).__name__
@@ -1455,6 +1510,739 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         return "\n\n".join(results)
 
+    # ----- Web tools -----
+
+    def _tool_web_fetch(self, url: str, prompt: str = None, timeout: int = 15) -> str:
+        """Fetch a URL and return content as readable text."""
+        import urllib.request
+        import urllib.error
+        from html.parser import HTMLParser
+
+        # Simple HTML-to-text converter
+        class _HTMLToText(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self._pieces: list = []
+                self._skip = False
+                self._skip_tags = {"script", "style", "noscript", "svg", "head"}
+
+            def handle_starttag(self, tag, attrs):
+                if tag in self._skip_tags:
+                    self._skip = True
+                elif tag in ("br", "hr"):
+                    self._pieces.append("\n")
+                elif tag in ("p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
+                    self._pieces.append("\n")
+
+            def handle_endtag(self, tag):
+                if tag in self._skip_tags:
+                    self._skip = False
+                elif tag in ("p", "div", "tr", "h1", "h2", "h3", "h4", "h5", "h6"):
+                    self._pieces.append("\n")
+
+            def handle_data(self, data):
+                if not self._skip:
+                    self._pieces.append(data)
+
+            def get_text(self) -> str:
+                raw = "".join(self._pieces)
+                # Collapse whitespace
+                lines = []
+                for line in raw.splitlines():
+                    stripped = " ".join(line.split())
+                    if stripped:
+                        lines.append(stripped)
+                return "\n".join(lines)
+
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "OmicVerseAgent/1.0 (research bot)"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                content_type = resp.headers.get("Content-Type", "")
+                raw_bytes = resp.read(512_000)  # 512KB max
+                charset = "utf-8"
+                if "charset=" in content_type:
+                    charset = content_type.split("charset=")[-1].split(";")[0].strip()
+                body = raw_bytes.decode(charset, errors="replace")
+
+            # Convert HTML to text
+            if "html" in content_type.lower() or body.strip().startswith("<"):
+                parser = _HTMLToText()
+                parser.feed(body)
+                text = parser.get_text()
+            else:
+                text = body
+
+            # Truncate to fit context. Keep this tighter than before because the
+            # fetched page is fed back into follow-up tool-calling turns and some
+            # OpenAI-compatible proxy chains become unstable with larger tool
+            # result payloads.
+            max_chars = 4000 if prompt else 6000
+            if len(text) > max_chars:
+                text = text[:max_chars] + "\n\n... [truncated, page too long]"
+
+            header = f"Content from {url}:\n\n"
+            if prompt:
+                header = f"Content from {url} (focus: {prompt}):\n\n"
+            return header + text
+
+        except urllib.error.HTTPError as e:
+            return f"HTTP error fetching {url}: {e.code} {e.reason}"
+        except urllib.error.URLError as e:
+            return f"URL error fetching {url}: {e.reason}"
+        except Exception as e:
+            return f"Error fetching {url}: {type(e).__name__}: {e}"
+
+    def _tool_web_search(self, query: str, num_results: int = 5) -> str:
+        """Search the web using DuckDuckGo and return results."""
+        import urllib.request
+        import urllib.parse
+        import urllib.error
+        from html.parser import HTMLParser
+
+        num_results = max(1, min(int(num_results), 10))
+
+        # DuckDuckGo HTML endpoint (no API key needed)
+        encoded_q = urllib.parse.urlencode({"q": query})
+        url = f"https://html.duckduckgo.com/html/?{encoded_q}"
+
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "OmicVerseAgent/1.0 (research bot)",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = resp.read(256_000).decode("utf-8", errors="replace")
+        except Exception as e:
+            return f"Search error: {type(e).__name__}: {e}"
+
+        # Parse DuckDuckGo HTML results
+        # Results are in <a class="result__a" href="...">title</a>
+        # Snippets in <a class="result__snippet" ...>text</a>
+        import re
+
+        results = []
+        # Extract result blocks
+        result_blocks = re.findall(
+            r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
+            r'.*?'
+            r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>',
+            body,
+            re.DOTALL,
+        )
+
+        if not result_blocks:
+            # Fallback: try simpler pattern
+            links = re.findall(
+                r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
+                body,
+            )
+            for href, title in links[:num_results]:
+                clean_title = re.sub(r"<[^>]+>", "", title).strip()
+                # DuckDuckGo wraps URLs in a redirect
+                actual_url = href
+                uddg_match = re.search(r'uddg=([^&]+)', href)
+                if uddg_match:
+                    actual_url = urllib.parse.unquote(uddg_match.group(1))
+                results.append(f"- {clean_title}\n  {actual_url}")
+        else:
+            for href, title, snippet in result_blocks[:num_results]:
+                clean_title = re.sub(r"<[^>]+>", "", title).strip()
+                clean_snippet = re.sub(r"<[^>]+>", "", snippet).strip()
+                actual_url = href
+                uddg_match = re.search(r'uddg=([^&]+)', href)
+                if uddg_match:
+                    actual_url = urllib.parse.unquote(uddg_match.group(1))
+                results.append(f"- {clean_title}\n  {actual_url}\n  {clean_snippet}")
+
+        if not results:
+            return f"No results found for '{query}'."
+
+        return f"Search results for '{query}':\n\n" + "\n\n".join(results)
+
+    def _tool_web_download(self, url: str, filename: str = None,
+                           directory: str = None) -> str:
+        """Download a file from a URL and save it to disk."""
+        import urllib.request
+        import urllib.error
+        import urllib.parse
+
+        MAX_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
+
+        # Determine filename
+        if not filename:
+            path_part = urllib.parse.urlparse(url).path
+            filename = os.path.basename(path_part) or "downloaded_file"
+
+        # Determine save directory
+        save_dir = directory or os.getcwd()
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, filename)
+
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "OmicVerseAgent/1.0 (research bot)"},
+            )
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                # Check content-length if available
+                content_length = resp.headers.get("Content-Length")
+                if content_length and int(content_length) > MAX_SIZE:
+                    size_gb = int(content_length) / (1024**3)
+                    return f"File too large ({size_gb:.1f} GB). Max allowed is 2 GB."
+
+                # Stream download with progress
+                downloaded = 0
+                chunk_size = 1024 * 1024  # 1MB chunks
+                with open(save_path, "wb") as f:
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        downloaded += len(chunk)
+                        if downloaded > MAX_SIZE:
+                            f.close()
+                            os.remove(save_path)
+                            return f"Download aborted: exceeded 2GB limit at {downloaded / (1024**3):.1f} GB."
+                        f.write(chunk)
+
+            size_bytes = os.path.getsize(save_path)
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.1f} KB"
+            elif size_bytes < 1024 * 1024 * 1024:
+                size_str = f"{size_bytes / (1024**2):.1f} MB"
+            else:
+                size_str = f"{size_bytes / (1024**3):.2f} GB"
+
+            return (
+                f"Downloaded successfully:\n"
+                f"  File: {save_path}\n"
+                f"  Size: {size_str}\n"
+                f"You can now load this file with execute_code, e.g.:\n"
+                f"  adata = ov.read('{save_path}')"
+            )
+
+        except urllib.error.HTTPError as e:
+            return f"HTTP error downloading {url}: {e.code} {e.reason}"
+        except urllib.error.URLError as e:
+            return f"URL error downloading {url}: {e.reason}"
+        except Exception as e:
+            # Clean up partial file
+            if os.path.exists(save_path):
+                try:
+                    os.remove(save_path)
+                except OSError:
+                    pass
+            return f"Download error: {type(e).__name__}: {e}"
+
+    # ----- Claude-style tool helpers -----
+
+    def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False) -> Path:
+        path = Path(file_path).expanduser()
+        if not path.is_absolute():
+            if not allow_relative:
+                raise ValueError("file_path must be an absolute path")
+            path = Path(self._refresh_runtime_working_directory()) / path
+        return path.resolve()
+
+    def _ensure_server_tool_mode(self, tool_name: str) -> None:
+        harness_config = getattr(self._config, "harness", None)
+        if harness_config is None or not getattr(harness_config, "server_tool_mode", True):
+            raise RuntimeError(f"{tool_name} is disabled because server_tool_mode is off.")
+
+    def _request_interaction(self, payload: dict[str, Any]) -> Any:
+        if self._approval_handler is None:
+            raise RuntimeError("Interactive tool requires a connected session bridge.")
+        return self._approval_handler(payload)
+
+    def _request_tool_approval(self, tool_name: str, *, reason: str, payload: dict[str, Any]) -> None:
+        spec = get_tool_spec(tool_name)
+        if spec is None or not spec.requires_approval:
+            return
+        interaction = {
+            "kind": "approval",
+            "title": f"{tool_name} approval required",
+            "message": reason,
+            "tool_name": tool_name,
+            "payload": payload,
+            "session_id": self._get_runtime_session_id(),
+            "trace_id": getattr(getattr(self, "_last_run_trace", None), "trace_id", ""),
+        }
+        approved = self._request_interaction(interaction)
+        if not approved:
+            raise PermissionError(f"{tool_name} was not approved by the user.")
+
+    def _tool_tool_search(self, query: str, max_results: int = 5) -> str:
+        payload = resolve_tool_search(
+            query,
+            loaded_tools=runtime_state.get_loaded_tools(self._get_runtime_session_id()),
+            max_results=max_results,
+        )
+        selected = payload.get("selected_tools", [])
+        loaded_tools = ()
+        if selected:
+            loaded_tools = runtime_state.load_tools(
+                self._get_runtime_session_id(),
+                selected,
+            )
+        payload["loaded_tools"] = list(runtime_state.get_loaded_tools(self._get_runtime_session_id()))
+        payload["newly_loaded"] = list(loaded_tools)
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _tool_read(self, file_path: str, offset: int = 0, limit: int = 2000, pages: str = "") -> str:
+        path = self._resolve_local_path(file_path)
+        if not path.exists():
+            return f"File not found: {path}"
+        if path.is_dir():
+            return f"Path is a directory, not a file: {path}"
+
+        suffix = path.suffix.lower()
+        if suffix == ".ipynb":
+            try:
+                import nbformat
+            except ImportError:
+                return "Notebook reading requires nbformat to be installed."
+            nb = nbformat.read(path, as_version=4)
+            cells = []
+            for idx, cell in enumerate(nb.cells):
+                if idx < offset:
+                    continue
+                if len(cells) >= max(1, limit):
+                    break
+                source = cell.source if isinstance(cell.source, str) else "".join(cell.source)
+                preview = "\n".join(source.splitlines()[:20])
+                cells.append(f"[{idx}] {cell.cell_type}\n{preview}")
+            return "\n\n".join(cells) if cells else f"No notebook cells in range for {path}"
+
+        if suffix == ".pdf":
+            try:
+                import pypdf
+            except ImportError:
+                return "PDF reading requires pypdf to be installed."
+            reader = pypdf.PdfReader(str(path))
+            page_numbers = []
+            if pages:
+                for part in pages.split(","):
+                    part = part.strip()
+                    if "-" in part:
+                        start, end = part.split("-", 1)
+                        page_numbers.extend(range(max(1, int(start)), min(len(reader.pages), int(end)) + 1))
+                    elif part:
+                        page_numbers.append(int(part))
+            else:
+                page_numbers = list(range(1, min(len(reader.pages), 5) + 1))
+            snippets = []
+            for page_no in page_numbers[:20]:
+                text = reader.pages[page_no - 1].extract_text() or ""
+                snippets.append(f"## Page {page_no}\n{text[:4000]}")
+            return "\n\n".join(snippets) if snippets else f"No readable PDF text in {path}"
+
+        mime = mimetypes.guess_type(path.name)[0] or ""
+        if mime.startswith("image/"):
+            stat = path.stat()
+            return json.dumps(
+                {
+                    "type": "image",
+                    "path": str(path),
+                    "mime": mime,
+                    "size_bytes": stat.st_size,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        segment = lines[max(0, offset): max(0, offset) + max(1, limit)]
+        numbered = [f"{idx + offset + 1:6d}\t{line[:2000]}" for idx, line in enumerate(segment)]
+        return "\n".join(numbered) if numbered else f"(empty file) {path}"
+
+    def _tool_edit(self, file_path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
+        self._ensure_server_tool_mode("Edit")
+        if self._tool_blocked_in_plan_mode("Edit"):
+            return "Edit is blocked while the session is in plan mode."
+        path = self._resolve_local_path(file_path)
+        if not path.exists():
+            return f"File not found: {path}"
+        self._request_tool_approval(
+            "Edit",
+            reason=f"Edit file {path}",
+            payload={"file_path": str(path)},
+        )
+        content = path.read_text(encoding="utf-8", errors="replace")
+        occurrences = content.count(old_string)
+        if occurrences == 0:
+            return f"Edit failed: old_string was not found in {path}"
+        updated = content.replace(old_string, new_string) if replace_all else content.replace(old_string, new_string, 1)
+        path.write_text(updated, encoding="utf-8")
+        return json.dumps(
+            {
+                "file_path": str(path),
+                "replacements": occurrences if replace_all else 1,
+                "status": "updated",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    def _tool_write(self, file_path: str, content: str) -> str:
+        self._ensure_server_tool_mode("Write")
+        if self._tool_blocked_in_plan_mode("Write"):
+            return "Write is blocked while the session is in plan mode."
+        path = self._resolve_local_path(file_path)
+        self._request_tool_approval(
+            "Write",
+            reason=f"Write file {path}",
+            payload={"file_path": str(path)},
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return json.dumps(
+            {"file_path": str(path), "bytes_written": len(content.encode('utf-8'))},
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    def _tool_glob(self, pattern: str, root: str = "", max_results: int = 200) -> str:
+        base = self._resolve_local_path(root, allow_relative=True) if root else Path(self._refresh_runtime_working_directory())
+        matches = sorted(str(path) for path in base.glob(pattern))[: max(1, max_results)]
+        return json.dumps({"root": str(base), "pattern": pattern, "matches": matches}, ensure_ascii=False, indent=2)
+
+    def _tool_grep(self, pattern: str, root: str = "", glob: str = "", max_results: int = 200) -> str:
+        base = self._resolve_local_path(root, allow_relative=True) if root else Path(self._refresh_runtime_working_directory())
+        rg_path = shutil.which("rg")
+        if rg_path:
+            cmd = [rg_path, "-n", pattern, str(base)]
+            if glob:
+                cmd[1:1] = ["-g", glob]
+        else:
+            cmd = ["grep", "-R", "-n", pattern, str(base)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode not in (0, 1):
+            return proc.stderr or proc.stdout or f"Grep failed with exit code {proc.returncode}"
+        lines = [line for line in proc.stdout.splitlines() if line.strip()][: max(1, max_results)]
+        return "\n".join(lines) if lines else f"No matches for {pattern}"
+
+    def _tool_notebook_edit(self, file_path: str, cell_index: int, source: str, cell_type: str = "") -> str:
+        self._ensure_server_tool_mode("NotebookEdit")
+        if self._tool_blocked_in_plan_mode("NotebookEdit"):
+            return "NotebookEdit is blocked while the session is in plan mode."
+        path = self._resolve_local_path(file_path)
+        self._request_tool_approval(
+            "NotebookEdit",
+            reason=f"Edit notebook {path}",
+            payload={"file_path": str(path), "cell_index": cell_index},
+        )
+        try:
+            import nbformat
+        except ImportError:
+            return "NotebookEdit requires nbformat to be installed."
+        nb = nbformat.read(path, as_version=4)
+        if cell_index < 0 or cell_index >= len(nb.cells):
+            return f"Notebook cell index out of range: {cell_index}"
+        nb.cells[cell_index].source = source
+        if cell_type:
+            nb.cells[cell_index].cell_type = cell_type
+        nbformat.write(nb, path)
+        return json.dumps(
+            {"file_path": str(path), "cell_index": cell_index, "status": "updated"},
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    def _tool_create_task(self, title: str, description: str = "", status: str = "pending") -> str:
+        task = runtime_state.create_task(
+            self._get_runtime_session_id(),
+            title=title,
+            description=description,
+            status=status if status else "pending",
+        )
+        return json.dumps(task.to_dict(), ensure_ascii=False, indent=2)
+
+    def _tool_get_task(self, task_id: str) -> str:
+        task = runtime_state.get_task(self._get_runtime_session_id(), task_id)
+        payload = task.to_dict() if task is not None else {"error": "Task not found"}
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _tool_list_tasks(self, status: str = "") -> str:
+        tasks = runtime_state.list_tasks(self._get_runtime_session_id(), status=status)
+        return json.dumps({"tasks": tasks}, ensure_ascii=False, indent=2)
+
+    def _tool_task_output(self, task_id: str, offset: int = 0, limit: int = 200) -> str:
+        payload = runtime_state.read_task_output(self._get_runtime_session_id(), task_id, offset=offset, limit=limit)
+        return json.dumps(payload or {"error": "Task not found"}, ensure_ascii=False, indent=2)
+
+    def _tool_task_stop(self, task_id: str) -> str:
+        self._ensure_server_tool_mode("TaskStop")
+        updated = runtime_state.stop_task(self._get_runtime_session_id(), task_id)
+        payload = updated.to_dict() if updated is not None else {"error": "Task not found"}
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _tool_task_update(self, task_id: str, status: str, summary: str = "") -> str:
+        updated = runtime_state.update_task(
+            self._get_runtime_session_id(),
+            task_id,
+            status=status,
+            summary=summary,
+        )
+        payload = updated.to_dict() if updated is not None else {"error": "Task not found"}
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _tool_enter_plan_mode(self, reason: str = "") -> str:
+        payload = runtime_state.enter_plan_mode(self._get_runtime_session_id(), reason=reason)
+        return json.dumps(payload.to_dict(), ensure_ascii=False, indent=2)
+
+    def _tool_exit_plan_mode(self, summary: str = "") -> str:
+        payload = runtime_state.exit_plan_mode(self._get_runtime_session_id(), reason=summary)
+        return json.dumps(payload.to_dict(), ensure_ascii=False, indent=2)
+
+    def _detect_repo_root(self, cwd: Optional[Path] = None) -> Optional[Path]:
+        current = (cwd or Path(self._refresh_runtime_working_directory())).resolve()
+        for candidate in (current, *current.parents):
+            if (candidate / ".git").exists():
+                return candidate
+        return None
+
+    def _tool_enter_worktree(self, branch_name: str = "", path: str = "", base_ref: str = "HEAD") -> str:
+        self._ensure_server_tool_mode("EnterWorktree")
+        if self._tool_blocked_in_plan_mode("EnterWorktree"):
+            return "EnterWorktree is blocked while the session is in plan mode."
+        repo_root = self._detect_repo_root()
+        if repo_root is None:
+            return json.dumps({"error": "No git repository found for worktree creation."}, ensure_ascii=False, indent=2)
+        branch = branch_name.strip() or f"ovagent/{self._get_runtime_session_id()}"
+        if path:
+            worktree_path = self._resolve_local_path(path, allow_relative=True)
+        else:
+            worktree_root = Path.home() / ".ovagent" / "worktrees"
+            worktree_root.mkdir(parents=True, exist_ok=True)
+            worktree_path = worktree_root / branch.replace("/", "_")
+        self._request_tool_approval(
+            "EnterWorktree",
+            reason=f"Create or switch git worktree {worktree_path}",
+            payload={"branch_name": branch, "path": str(worktree_path)},
+        )
+        if not worktree_path.exists():
+            proc = subprocess.run(
+                ["git", "-C", str(repo_root), "worktree", "add", str(worktree_path), "-b", branch, base_ref],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if proc.returncode != 0:
+                # Branch may already exist; try attaching existing branch.
+                proc = subprocess.run(
+                    ["git", "-C", str(repo_root), "worktree", "add", str(worktree_path), branch],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            if proc.returncode != 0:
+                return json.dumps(
+                    {"error": proc.stderr.strip() or proc.stdout.strip() or "git worktree add failed"},
+                    ensure_ascii=False,
+                    indent=2,
+                )
+        worktree = runtime_state.set_worktree(
+            self._get_runtime_session_id(),
+            path=str(worktree_path),
+            repo_root=str(repo_root),
+            branch=branch,
+            base_branch=base_ref,
+        )
+        return json.dumps(worktree.to_dict(), ensure_ascii=False, indent=2)
+
+    def _tool_skill(self, query: str, mode: str = "search") -> str:
+        if mode == "load":
+            return self._load_skill_guidance(query)
+        exact = None
+        if self.skill_registry and self.skill_registry.skill_metadata:
+            for meta in self.skill_registry.skill_metadata.values():
+                if query.strip().lower() in {meta.slug.lower(), meta.name.lower()}:
+                    exact = meta.slug
+                    break
+        if exact:
+            return self._load_skill_guidance(exact)
+        return self._tool_search_skills(query)
+
+    def _tool_list_mcp_resources(self, server: str = "") -> str:
+        manifest_path = os.environ.get("OV_AGENT_MCP_MANIFEST", "").strip()
+        if not manifest_path:
+            return json.dumps(
+                {"available": False, "reason": "OV_AGENT_MCP_MANIFEST is not configured.", "resources": []},
+                ensure_ascii=False,
+                indent=2,
+            )
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        resources = manifest.get("resources", [])
+        if server:
+            resources = [item for item in resources if item.get("server") == server]
+        return json.dumps({"available": True, "resources": resources}, ensure_ascii=False, indent=2)
+
+    def _tool_read_mcp_resource(self, server: str, uri: str) -> str:
+        manifest_path = os.environ.get("OV_AGENT_MCP_MANIFEST", "").strip()
+        if not manifest_path:
+            return json.dumps(
+                {"available": False, "reason": "OV_AGENT_MCP_MANIFEST is not configured."},
+                ensure_ascii=False,
+                indent=2,
+            )
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        for item in manifest.get("resources", []):
+            if item.get("server") == server and item.get("uri") == uri:
+                target = item.get("path", "")
+                if not target:
+                    return json.dumps(item, ensure_ascii=False, indent=2)
+                return self._tool_read(target)
+        return json.dumps({"error": "MCP resource not found"}, ensure_ascii=False, indent=2)
+
+    def _tool_ask_user_question(self, question: str, header: str = "", options: Optional[list[str]] = None) -> str:
+        record = runtime_state.create_question(
+            self._get_runtime_session_id(),
+            turn_id=getattr(getattr(self, "_last_run_trace", None), "turn_id", ""),
+            trace_id=getattr(getattr(self, "_last_run_trace", None), "trace_id", ""),
+            question=question,
+            header=header,
+            options=list(options or []),
+        )
+        answer = self._request_interaction(
+            {
+                "kind": "question",
+                "question_id": record.question_id,
+                "question": question,
+                "header": header,
+                "options": list(options or []),
+                "session_id": self._get_runtime_session_id(),
+                "trace_id": record.trace_id,
+                "turn_id": record.turn_id,
+            }
+        )
+        if isinstance(answer, dict):
+            resolved = runtime_state.resolve_question(
+                self._get_runtime_session_id(),
+                record.question_id,
+                str(answer.get("answer", "")),
+            )
+        else:
+            resolved = runtime_state.resolve_question(
+                self._get_runtime_session_id(),
+                record.question_id,
+                str(answer or ""),
+            )
+        payload = resolved.to_dict() if resolved is not None else record.to_dict()
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _background_bash_worker(
+        self,
+        task_id: str,
+        *,
+        command: str,
+        cwd: str,
+        timeout_ms: int,
+    ) -> None:
+        session_id = self._get_runtime_session_id()
+        proc = subprocess.Popen(
+            ["bash", "-lc", command],
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        runtime_state.bind_process(session_id, task_id, proc)
+        assert proc.stdout is not None
+        start = time.time()
+        for line in proc.stdout:
+            runtime_state.append_task_output(session_id, task_id, line.rstrip("\n"))
+            if time.time() - start > timeout_ms / 1000:
+                proc.terminate()
+                runtime_state.update_task(session_id, task_id, status="failed", summary="Background command timed out")
+                return
+        return_code = proc.wait()
+        status = "completed" if return_code == 0 else "failed"
+        runtime_state.update_task(session_id, task_id, status=status, summary=f"Exit code {return_code}")
+
+    def _tool_bash(
+        self,
+        command: str,
+        description: str = "",
+        timeout: int = 120000,
+        run_in_background: bool = False,
+        dangerouslyDisableSandbox: bool = False,
+    ) -> str:
+        self._ensure_server_tool_mode("Bash")
+        if self._tool_blocked_in_plan_mode("Bash"):
+            return "Bash is blocked while the session is in plan mode."
+        reason = description or f"Run shell command: {command[:120]}"
+        self._request_tool_approval(
+            "Bash",
+            reason=reason,
+            payload={
+                "command": command,
+                "dangerouslyDisableSandbox": dangerouslyDisableSandbox,
+            },
+        )
+        cwd = self._refresh_runtime_working_directory()
+        if run_in_background:
+            task = runtime_state.create_task(
+                self._get_runtime_session_id(),
+                title=description or command[:80],
+                description=command,
+                kind="background_command",
+                status="in_progress",
+                background=True,
+                tool_name="Bash",
+                metadata={"cwd": cwd, "command": command},
+            )
+            proc = subprocess.Popen(
+                ["bash", "-lc", command],
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            runtime_state.attach_background_process(
+                self._get_runtime_session_id(),
+                task.task_id,
+                proc,
+            )
+            return json.dumps(
+                {
+                    "task_id": task.task_id,
+                    "status": "in_progress",
+                    "cwd": cwd,
+                    "command": command,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        proc = subprocess.run(
+            ["bash", "-lc", command],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=max(1, int(timeout)) / 1000,
+            check=False,
+        )
+        output = (proc.stdout or "") + ((proc.stderr or "") if proc.stderr else "")
+        return json.dumps(
+            {
+                "cwd": cwd,
+                "command": command,
+                "returncode": proc.returncode,
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+                "output": output.strip(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
     # ----- Subagent prompt builders -----
 
     _CODE_QUALITY_RULES = (
@@ -1582,10 +2370,7 @@ User request: "quality control with nUMI>500, mito<0.2"
         config = SUBAGENT_CONFIGS[agent_type]
 
         # Filter tools to only those allowed for this subagent type
-        subagent_tools = [
-            t for t in self.AGENT_TOOLS
-            if t["name"] in config.allowed_tools
-        ]
+        subagent_tools = self._get_visible_agent_tools(allowed_names=set(config.allowed_tools))
 
         # Build independent message history
         messages = [
@@ -1656,14 +2441,32 @@ User request: "quality control with nUMI>500, mito<0.2"
         prompt = (
             "You are OmicVerse Agent, an expert bioinformatics assistant that processes "
             "single-cell, bulk RNA-seq, and spatial transcriptomics data.\n\n"
-            "You have tools to inspect data, execute code, search for functions, "
-            "and search domain-specific skills. Follow this workflow:\n"
-            "1. First use inspect_data to understand the dataset structure\n"
-            "2. Use search_functions to find relevant OmicVerse functions "
+            "You have OmicVerse data tools plus a Claude-style coding tool catalog.\n"
+            "Core Claude tools are ToolSearch, Bash, and Read. Deferred Claude tools "
+            "must be loaded through ToolSearch before use. High-risk tools require approval.\n\n"
+            "Use the legacy OmicVerse tools for dataset inspection and execution, and "
+            "use Claude-style tools for files, tasks, planning, worktrees, and questions.\n\n"
+            "Do not narrate future actions without taking them in the same turn. "
+            "If a tool is needed, call it now instead of saying that you will call it later.\n\n"
+            "CODING / FILESYSTEM:\n"
+            "- Use ToolSearch when you need deferred tools such as Edit, Write, Glob, Grep, NotebookEdit, Task*, or EnterWorktree\n"
+            "- Use Read for local files instead of shelling out to cat/head/sed when possible\n"
+            "- Use AskUserQuestion when a turn genuinely needs user clarification\n\n"
+            "WEB ACCESS:\n"
+            "- Use WebFetch(url) or web_fetch(url) to read any web page (GEO datasets, papers, docs)\n"
+            "- Use WebSearch(query) or web_search(query) to search the internet for information\n"
+            "- Use web_download(url) to download files (datasets, h5ad, csv, gz) to disk\n"
+            "- When the user provides a URL, ALWAYS fetch it first instead of asking them to paste content\n"
+            "- When you need background info (gene functions, diseases, methods), search the web\n"
+            "- To download GEO data, fetch the GEO page first to find download links, then use web_download\n\n"
+            "WORKFLOW:\n"
+            "1. If the user provides a URL, use web_fetch to read it\n"
+            "2. Use inspect_data to understand the dataset structure\n"
+            "3. Use search_functions to find relevant OmicVerse functions "
             "(includes prerequisite chains and examples)\n"
-            "3. For complex multi-step workflows, use search_skills for domain guidance\n"
-            "4. Execute code step by step, checking results between steps\n"
-            "5. Call finish() when the task is complete\n\n"
+            "4. For complex multi-step workflows, use search_skills for domain guidance\n"
+            "5. Execute code step by step, checking results between steps\n"
+            "6. Call finish() when the task is complete\n\n"
             "MANDATORY CODE QUALITY RULES:\n"
             "- NEVER use f-strings in print() - use string concatenation: "
             "print('Result: ' + str(value))\n"
@@ -1696,9 +2499,9 @@ User request: "quality control with nUMI>500, mito<0.2"
             "- All OmicVerse functions are called via ov.* (e.g. ov.pp.preprocess, ov.pp.scale)\n"
             "- When saving files, use the output directory or current working directory\n\n"
             "DELEGATION STRATEGY (use the delegate tool for complex tasks):\n"
-            "- delegate('explore', ...) — read-only data characterization (fast, 5 turns max)\n"
-            "- delegate('plan', ...) — design multi-step workflow before execution\n"
-            "- delegate('execute', ...) — focused execution of a well-defined processing step\n"
+            "- Agent(subagent_type='explore', ...) or delegate('explore', ...) — read-only data characterization\n"
+            "- Agent(subagent_type='plan', ...) or delegate('plan', ...) — design workflow before execution\n"
+            "- Agent(subagent_type='execute', ...) or delegate('execute', ...) — focused execution step\n"
             "- For simple single-step operations, execute directly without delegation\n"
             "- Subagents have their own context window (prevents context overflow)\n"
         )
@@ -1720,15 +2523,317 @@ User request: "quality control with nUMI>500, mito<0.2"
                 msg += f"Dataset ({dtype}): {adata.shape[0]} cells x {adata.shape[1]} features\n"
             if dtype == "MuData" and hasattr(adata, 'mod'):
                 msg += f"Modalities: {list(adata.mod.keys())}\n"
-        msg += "Use inspect_data to learn more about the dataset structure before writing code."
+            msg += "Use inspect_data to learn more about the dataset structure before writing code."
+        else:
+            msg += (
+                "No dataset is loaded yet. You can still help with:\n"
+                "- Use web_fetch/web_search to look up information\n"
+                "- Use web_download to download datasets from URLs\n"
+                "- Answer bioinformatics questions\n"
+                "- Plan analysis workflows\n"
+            )
         return msg
+
+    def _get_harness_session_id(self) -> str:
+        """Best-effort session identifier for harness traces/history."""
+        web_session_id = getattr(self, "_web_session_id", "")
+        if web_session_id:
+            return web_session_id
+        if self._filesystem_context is not None:
+            return self._filesystem_context.session_id
+        if self._notebook_executor is not None and self._notebook_executor.current_session:
+            return self._notebook_executor.current_session.get("session_id", "")
+        return ""
+
+    def _get_runtime_session_id(self) -> str:
+        """Return the session key used by the harness runtime registry."""
+        return self._get_harness_session_id() or "default"
+
+    def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
+        """Return the currently visible tool schemas for this session."""
+        session_id = self._get_runtime_session_id()
+        loaded = runtime_state.get_loaded_tools(session_id)
+        tools = get_visible_tool_schemas(loaded) + list(self.LEGACY_AGENT_TOOLS)
+        if allowed_names is None:
+            return tools
+        normalized_allowed = {normalize_tool_name(name) for name in allowed_names}
+        return [
+            tool for tool in tools
+            if tool["name"] in allowed_names or normalize_tool_name(tool["name"]) in normalized_allowed
+        ]
+
+    def _get_loaded_tool_names(self) -> list[str]:
+        return runtime_state.get_loaded_tools(self._get_runtime_session_id())
+
+    def _refresh_runtime_working_directory(self) -> str:
+        """Keep runtime cwd aligned with the active worktree / filesystem context."""
+        session_id = self._get_runtime_session_id()
+        cwd = runtime_state.get_working_directory(session_id)
+        if cwd:
+            return cwd
+        current = os.getcwd()
+        if self._filesystem_context is not None:
+            current = str(self._filesystem_context._workspace_dir)
+        runtime_state.set_working_directory(session_id, current)
+        return current
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        spec = get_tool_spec(tool_name)
+        session_state = runtime_state.get_summary(self._get_runtime_session_id())
+        plan_mode = bool((session_state.get("plan_mode") or {}).get("enabled", False))
+        if not plan_mode:
+            return False
+        if spec is not None:
+            return spec.high_risk or spec.name in {"Bash", "Edit", "Write", "NotebookEdit", "EnterWorktree"}
+        return tool_name in {"execute_code", "web_download"}
+
+    def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
+        """Best-effort classification for action-oriented requests.
+
+        Codex CLI keeps `tool_choice=auto`, but its turn loop is item-driven and
+        prompt-trained to continue acting. Our backend is less structured, so we
+        add a small compatibility shim for clearly action-oriented requests.
+        """
+        text = (request or "").strip()
+        if not text:
+            return False
+        if self._URL_PATTERN.search(text):
+            return True
+        if adata is not None:
+            return True
+        lowered = text.lower()
+        if any(marker in lowered for marker in ("数据", "dataset", "下载", "分析", "处理", "读取", "打开", "搜索")):
+            return True
+        return bool(self._ACTION_REQUEST_PATTERN.search(text))
+
+    def _response_is_promissory(self, content: str) -> bool:
+        text = (content or "").strip()
+        if not text:
+            return False
+        if self._PROMISSORY_PATTERN.search(text):
+            return True
+        lowered = text.lower()
+        chinese_markers = (
+            "我先", "让我", "我会", "我将", "先获取", "先下载", "先读取",
+            "先去", "现在开始", "重新开始", "可以继续吗", "继续吗",
+        )
+        return any(marker in text for marker in chinese_markers) or lowered.startswith("okay, i")
+
+    def _select_agent_tool_choice(
+        self,
+        *,
+        request: str,
+        adata: Any,
+        turn_index: int,
+        had_meaningful_tool_call: bool,
+        forced_retry: bool,
+    ) -> str:
+        if forced_retry:
+            return "required"
+        if turn_index == 0 and not had_meaningful_tool_call and self._request_requires_tool_action(request, adata):
+            return "required"
+        return "auto"
+
+    def _should_continue_after_text_response(
+        self,
+        *,
+        request: str,
+        response_content: str,
+        adata: Any,
+        had_meaningful_tool_call: bool,
+    ) -> bool:
+        text = (response_content or "").strip()
+        if not text:
+            return False
+        if had_meaningful_tool_call:
+            return False
+        if self._BLOCKER_PATTERN.search(text):
+            return False
+        if self._response_is_promissory(text):
+            return True
+        if self._request_requires_tool_action(request, adata) and not self._RESULT_PATTERN.search(text):
+            # If the request clearly needs action and the model only produced a
+            # vague narrative without evidence of real work, force a follow-up.
+            return True
+        return False
+
+    def _build_no_tool_follow_up_message(
+        self, request: str, *, retry_count: int = 0, max_retries: int = 2,
+    ) -> str:
+        if retry_count >= max_retries - 1:
+            # Final retry — forceful
+            base = (
+                "IMPORTANT: You MUST call a tool in this response. "
+                "Do NOT respond with text only. Use one of your available tools now. "
+                "If you cannot proceed, call the 'finish' tool with a summary of what went wrong."
+            )
+        else:
+            base = (
+                "Do not describe future actions without taking them. "
+                "Either call the appropriate tool now or provide the final answer only if the task is already complete."
+            )
+        if self._URL_PATTERN.search(request or ""):
+            return (
+                base
+                + " The user provided a URL, so fetch it in this turn with `WebFetch`/`web_fetch` before continuing."
+            )
+        return base
+
+    def _persist_harness_history(self, request: str) -> None:
+        """Persist the latest trace into session history when enabled."""
+        if self._session_history is None or self._last_run_trace is None:
+            return
+
+        trace = self._last_run_trace
+        def _step_type(step):
+            return step.get("step_type") if isinstance(step, dict) else step.step_type
+
+        def _step_name(step):
+            return step.get("name") if isinstance(step, dict) else step.name
+
+        def _step_data(step):
+            return step.get("data", {}) if isinstance(step, dict) else step.data
+
+        generated_code = "\n\n".join(
+            _step_data(step).get("code", "")
+            for step in trace.steps
+            if _step_type(step) == "code" and _step_data(step).get("code")
+        )
+        tool_names = [
+            _step_name(step)
+            for step in trace.steps
+            if _step_type(step) == "tool_call" and _step_name(step)
+        ]
+        artifact_refs = [
+            artifact.to_dict() if hasattr(artifact, "to_dict") else dict(artifact)
+            for artifact in trace.artifacts
+        ]
+        self._session_history.append(
+            HistoryEntry(
+                session_id=trace.session_id or self._get_harness_session_id(),
+                timestamp=trace.finished_at or trace.started_at,
+                request=request,
+                trace_id=trace.trace_id,
+                generated_code=generated_code,
+                result_summary=trace.result_summary,
+                tool_names=tool_names,
+                artifact_refs=artifact_refs,
+                usage=trace.usage or coerce_usage_payload(self.last_usage),
+                usage_breakdown=self.last_usage_breakdown,
+                success=trace.status == "success",
+            )
+        )
+
+    def _append_tool_results(self, messages: list, tool_results: list) -> None:
+        """Append tool results to the conversation in the correct format.
+
+        For Anthropic Messages API, all tool results from a single assistant
+        response must be in ONE ``user`` message with multiple ``tool_result``
+        content blocks.  For OpenAI, each result is a separate ``tool`` message.
+
+        Parameters
+        ----------
+        messages : list
+            Conversation message list (mutated in-place).
+        tool_results : list of (tool_call_id, tool_name, tool_output)
+        """
+        if not tool_results:
+            return
+
+        provider_info = None
+        if self._llm:
+            from .model_config import get_provider
+            provider_info = get_provider(self._llm.config.provider)
+
+        # Check if the upstream model is Anthropic (native OR proxy to Claude).
+        # Anthropic requires all tool results batched in one user message.
+        model_name = self._llm.config.model if self._llm else ""
+        is_anthropic_wire = (
+            (provider_info is not None and provider_info.wire_api.value == "anthropic")
+            or "claude" in model_name.lower()
+        )
+
+        if is_anthropic_wire:
+            # Batch all tool results into a single user message
+            content_blocks = []
+            for tc_id, tc_name, tc_output in tool_results:
+                content_blocks.append({
+                    "type": "tool_result",
+                    "tool_use_id": tc_id,
+                    "content": tc_output,
+                })
+            messages.append({"role": "user", "content": content_blocks})
+        else:
+            # OpenAI-compatible: each tool result is a separate message
+            for tc_id, tc_name, tc_output in tool_results:
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "name": tc_name,
+                    "content": tc_output,
+                })
 
     async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
         """Dispatch a tool call and return the result."""
-        name = tool_call.name
+        name = normalize_tool_name(tool_call.name)
         args = tool_call.arguments
 
-        if name == "inspect_data":
+        if self._tool_blocked_in_plan_mode(name):
+            return f"{name} is blocked because the session is currently in plan mode."
+
+        if name == "ToolSearch":
+            return self._tool_tool_search(
+                args.get("query", ""),
+                max_results=args.get("max_results", 5),
+            )
+        elif name == "Bash":
+            return self._tool_bash(
+                args.get("command", ""),
+                description=args.get("description", ""),
+                timeout=args.get("timeout", 120000),
+                run_in_background=bool(args.get("run_in_background", False)),
+                dangerouslyDisableSandbox=bool(args.get("dangerouslyDisableSandbox", False)),
+            )
+        elif name == "Read":
+            return self._tool_read(
+                args.get("file_path", ""),
+                offset=args.get("offset", 0),
+                limit=args.get("limit", 2000),
+                pages=args.get("pages", ""),
+            )
+        elif name == "Edit":
+            return self._tool_edit(
+                args.get("file_path", ""),
+                args.get("old_string", ""),
+                args.get("new_string", ""),
+                replace_all=bool(args.get("replace_all", False)),
+            )
+        elif name == "Write":
+            return self._tool_write(
+                args.get("file_path", ""),
+                args.get("content", ""),
+            )
+        elif name == "Glob":
+            return self._tool_glob(
+                args.get("pattern", ""),
+                root=args.get("root", ""),
+                max_results=args.get("max_results", 200),
+            )
+        elif name == "Grep":
+            return self._tool_grep(
+                args.get("pattern", ""),
+                root=args.get("root", ""),
+                glob=args.get("glob", ""),
+                max_results=args.get("max_results", 200),
+            )
+        elif name == "NotebookEdit":
+            return self._tool_notebook_edit(
+                args.get("file_path", ""),
+                cell_index=args.get("cell_index", 0),
+                source=args.get("source", ""),
+                cell_type=args.get("cell_type", ""),
+            )
+        elif name == "inspect_data":
             return await asyncio.to_thread(
                 self._tool_inspect_data, current_adata, args.get("aspect", "full")
             )
@@ -1754,8 +2859,8 @@ User request: "quality control with nUMI>500, mito<0.2"
             return await asyncio.to_thread(
                 self._tool_search_skills, args.get("query", "")
             )
-        elif name == "delegate":
-            agent_type = args.get("agent_type", "explore")
+        elif name in {"Agent", "delegate"}:
+            agent_type = args.get("subagent_type", args.get("agent_type", "explore"))
             task = args.get("task", "")
             context = args.get("context", "")
             print(f"   -> Delegating to {agent_type} subagent: {task[:80]}...")
@@ -1769,13 +2874,84 @@ User request: "quality control with nUMI>500, mito<0.2"
             if agent_type == "execute":
                 return {"adata": sub_result["adata"], "output": sub_result["result"]}
             return sub_result["result"]
+        elif name == "AskUserQuestion":
+            return self._tool_ask_user_question(
+                args.get("question", ""),
+                header=args.get("header", ""),
+                options=args.get("options", []),
+            )
+        elif name == "TaskCreate":
+            return self._tool_create_task(
+                args.get("title", ""),
+                description=args.get("description", ""),
+                status=args.get("status", "pending"),
+            )
+        elif name == "TaskGet":
+            return self._tool_get_task(args.get("task_id", ""))
+        elif name == "TaskList":
+            return self._tool_list_tasks(status=args.get("status", ""))
+        elif name == "TaskOutput":
+            return self._tool_task_output(
+                args.get("task_id", ""),
+                offset=args.get("offset", 0),
+                limit=args.get("limit", 200),
+            )
+        elif name == "TaskStop":
+            return self._tool_task_stop(args.get("task_id", ""))
+        elif name == "TaskUpdate":
+            return self._tool_task_update(
+                args.get("task_id", ""),
+                args.get("status", ""),
+                summary=args.get("summary", ""),
+            )
+        elif name == "EnterPlanMode":
+            return self._tool_enter_plan_mode(reason=args.get("reason", ""))
+        elif name == "ExitPlanMode":
+            return self._tool_exit_plan_mode(summary=args.get("summary", ""))
+        elif name == "EnterWorktree":
+            return self._tool_enter_worktree(
+                branch_name=args.get("branch_name", ""),
+                path=args.get("path", ""),
+                base_ref=args.get("base_ref", "HEAD"),
+            )
+        elif name == "Skill":
+            return self._tool_skill(
+                args.get("query", ""),
+                mode=args.get("mode", "search"),
+            )
+        elif name == "WebFetch":
+            return self._tool_web_fetch(
+                args.get("url", ""),
+                prompt=args.get("prompt"),
+            )
+        elif name == "WebSearch":
+            return self._tool_web_search(
+                args.get("query", ""),
+                num_results=args.get("num_results", 5),
+            )
+        elif name == "ListMcpResourcesTool":
+            return self._tool_list_mcp_resources(server=args.get("server", ""))
+        elif name == "ReadMcpResourceTool":
+            return self._tool_read_mcp_resource(
+                args.get("server", ""),
+                args.get("uri", ""),
+            )
+        elif name == "web_download":
+            return self._tool_web_download(
+                args.get("url", ""),
+                filename=args.get("filename"),
+                directory=args.get("directory"),
+            )
         elif name == "finish":
             return {"finished": True, "summary": args.get("summary", "")}
         else:
             return f"Unknown tool: {name}"
 
     async def _run_agentic_loop(self, request: str, adata: Any,
-                               event_callback=None) -> Any:
+                               event_callback=None,
+                               cancel_event=None,
+                               history=None,
+                               approval_handler=None) -> Any:
         """Execute the agentic loop: LLM decides tools to call iteratively.
 
         Parameters
@@ -1786,108 +2962,570 @@ User request: "quality control with nUMI>500, mito<0.2"
             AnnData/MuData object to process.
         event_callback : callable, optional
             Async callback ``await event_callback(event_dict)`` for streaming.
-            When provided, events are emitted at key points (llm_chunk, code,
-            result, finish, error, usage). When None (default), no events are
-            emitted and behavior is identical to the pre-callback version.
+            When provided, events are emitted at key points (tool_call,
+            llm_chunk, code, result, done, error, usage). When None
+            (default), no events are emitted and behavior is identical to
+            the pre-callback version.
+        cancel_event : threading.Event, optional
+            When set, the loop will stop at the next safe checkpoint (between
+            tool calls / LLM rounds), emit a ``done`` event with
+            ``cancelled=True``, and return the adata in its last consistent
+            state.
+        history : list, optional
+            List of prior conversation messages as dicts with ``role`` and
+            ``content`` keys.  Injected between the system prompt and the
+            current user message so the LLM has conversational context.
         """
         config = self._config if hasattr(self, '_config') else None
         max_turns = config.execution.max_agent_turns if config else 15
+        recorder = RunTraceRecorder(
+            request=request,
+            model=self.model,
+            provider=self.provider,
+            session_id=self._get_harness_session_id(),
+        )
+        self._last_run_trace = recorder.trace
+        final_summary = ""
+        runtime_session_id = self._get_runtime_session_id()
+        def _sync_runtime_trace() -> None:
+            runtime_summary = runtime_state.get_summary(runtime_session_id)
+            recorder.trace.loaded_tools = list(runtime_summary.get("loaded_tools", []))
+            recorder.trace.plan_mode = bool((runtime_summary.get("plan_mode") or {}).get("enabled", False))
+            recorder.trace.worktree = dict(runtime_summary.get("worktree") or {})
+            recorder.trace.task_ids = [
+                task.get("task_id", "")
+                for task in runtime_summary.get("tasks", [])
+                if task.get("task_id")
+            ]
+            recorder.trace.question_ids = [
+                question.get("question_id", "")
+                for question in runtime_summary.get("pending_questions", [])
+                if question.get("question_id")
+            ]
+
+        _sync_runtime_trace()
 
         async def emit(event):
+            recorder.add_event(event)
             if event_callback:
                 await event_callback(event)
 
         # Build initial messages
+        system_prompt = self._build_agentic_system_prompt()
+        session_id = self._get_harness_session_id()
+        if self._session_history is not None and session_id:
+            history_context = self._session_history.build_context_for_llm(session_id)
+            if history_context:
+                system_prompt += "\n\n" + history_context
+
+        harness_config = getattr(self._config, "harness", None)
+        if (
+            self._trace_store is not None
+            and harness_config is not None
+            and getattr(harness_config, "include_recent_failures_in_prompt", False)
+        ):
+            failures_context = self._trace_store.build_context_for_prompt(
+                limit=getattr(harness_config, "max_recent_failures", 3),
+            )
+            if failures_context:
+                system_prompt += "\n\n" + failures_context
+
+        if self._context_compactor is not None and self._context_compactor.needs_compaction(system_prompt, request):
+            compaction = await self._context_compactor.compact_bundle(system_prompt)
+            recorder.add_step(
+                "context_compaction",
+                summary="context compacted for handoff",
+                data={
+                    "original_tokens": compaction.original_tokens,
+                    "compacted_tokens": compaction.compacted_tokens,
+                    "summary": compaction.summary,
+                },
+            )
+            if harness_config is not None and getattr(harness_config, "record_artifacts", False):
+                recorder.add_artifact(
+                    "context_summary",
+                    label="compacted_system_prompt",
+                    description=compaction.summary[:240],
+                    metadata={
+                        "original_tokens": compaction.original_tokens,
+                        "compacted_tokens": compaction.compacted_tokens,
+                    },
+                )
+            system_prompt = compaction.handoff_text
+
         messages = [
-            {"role": "system", "content": self._build_agentic_system_prompt()},
-            {"role": "user", "content": self._build_initial_user_message(request, adata)},
+            {"role": "system", "content": system_prompt},
         ]
+        # Inject conversation history (prior turns) for multi-turn context
+        if history:
+            for msg in history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+        messages.append(
+            {"role": "user", "content": self._build_initial_user_message(request, adata)},
+        )
 
         current_adata = adata
+        completed_without_tool_calls = False
+        meaningful_tool_call_seen = False
+        no_tool_retry_count = 0
+        # Anthropic benefits from an extra follow-up retry before giving up.
+        llm_model_name = getattr(getattr(self._llm, "config", None), "model", None) or self.model
+        _is_anthropic_model = "claude" in str(llm_model_name).lower()
+        max_no_tool_retries = 3 if _is_anthropic_model else 2
+        chat_timeout = float(os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "45"))
+        self._approval_handler = approval_handler
 
-        for turn in range(max_turns):
-            print(f"   🔄 Turn {turn + 1}/{max_turns}")
+        def _is_cancelled():
+            return cancel_event is not None and cancel_event.is_set()
 
-            # LLM call with tools
-            response = await self._llm.chat(
-                messages, tools=self.AGENT_TOOLS, tool_choice="auto"
-            )
-
-            # Track usage
-            if response.usage:
-                self.last_usage = response.usage
-
-            # Append assistant response to conversation
-            if response.raw_message:
-                messages.append(response.raw_message)
-            elif response.content:
-                messages.append({"role": "assistant", "content": response.content})
-
-            # Emit reasoning text from this turn (whether tool-calling or final).
-            # This lets streaming UIs (e.g. Telegram bot) show the LLM thinking
-            # in real time instead of only receiving a single chunk at the very end.
-            if response.content:
-                print(f"   💬 Agent response: {response.content[:200]}")
-                await emit({"type": "llm_chunk", "content": response.content})
-
-            # If text-only response with no tool calls, treat as done
-            if not response.tool_calls:
-                break
-
-            # Process each tool call
-            for tc in response.tool_calls:
-                print(f"   🔧 Tool: {tc.name}({', '.join(f'{k}=' for k in tc.arguments)})")
-
-                result = await self._dispatch_tool(tc, current_adata, request)
-
-                # Handle tools that return dict with adata (execute_code, delegate/execute)
-                if tc.name in ("execute_code", "delegate") and isinstance(result, dict) and "adata" in result:
-                    current_adata = result["adata"]
-                    tool_output = result.get("output", "Code executed.")
-                    if tc.name == "execute_code":
-                        desc = tc.arguments.get("description", "Code executed")
-                        print(f"      ✅ {desc}")
-                        await emit({
-                            "type": "code",
-                            "content": tc.arguments.get("code", ""),
-                            "description": desc,
-                        })
-                    else:
-                        print(f"      ✅ delegate({tc.arguments.get('agent_type', '')}) completed")
-                    await emit({
-                        "type": "result",
-                        "content": current_adata,
-                        "shape": (current_adata.shape[0], current_adata.shape[1])
-                            if hasattr(current_adata, "shape") else None,
-                    })
-                elif tc.name == "finish":
-                    summary = tc.arguments.get("summary", "Task completed")
-                    print(f"   ✅ Finished: {summary}")
-                    await emit({"type": "finish", "content": summary})
-                    if self.last_usage:
-                        await emit({"type": "usage", "content": self.last_usage})
+        try:
+            for turn in range(max_turns):
+                # --- Cancel checkpoint: before LLM call ---
+                if _is_cancelled():
+                    print("   ⛔ Cancelled before LLM call")
+                    recorder.add_step("status", summary="cancelled_before_llm")
+                    recorder.finish(status="cancelled", result_summary="Cancelled before LLM call", usage=self.last_usage)
+                    if self._trace_store is not None:
+                        recorder.save(self._trace_store)
+                    await emit(build_stream_event(
+                        "done", "Cancelled", turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id, session_id=recorder.trace.session_id,
+                        category="lifecycle",
+                    ) | {"cancelled": True})
                     self._save_conversation_log(messages)
                     return current_adata
-                elif isinstance(result, str):
-                    tool_output = result
-                else:
-                    tool_output = str(result)
 
-                # Truncate very long tool outputs
-                if len(tool_output) > 8000:
-                    tool_output = tool_output[:7500] + "\n... (truncated)"
-
-                # Append tool result to conversation
-                tool_msg = self._llm.format_tool_result_message(
-                    tc.id, tc.name, tool_output
+                print(f"   🔄 Turn {turn + 1}/{max_turns}")
+                tool_choice = self._select_agent_tool_choice(
+                    request=request,
+                    adata=current_adata,
+                    turn_index=turn,
+                    had_meaningful_tool_call=meaningful_tool_call_seen,
+                    forced_retry=no_tool_retry_count > 0,
                 )
-                messages.append(tool_msg)
 
-        print(f"   ⚠️  Max turns ({max_turns}) reached, returning current result")
-        if self.last_usage:
-            await emit({"type": "usage", "content": self.last_usage})
-        self._save_conversation_log(messages)
-        return current_adata
+                # LLM call with tools (stall-guarded)
+                logger.info(
+                    "agentic_llm_call_start turn=%d/%d tool_choice=%s messages=%d post_tool=%s",
+                    turn + 1, max_turns, tool_choice, len(messages),
+                    "yes" if meaningful_tool_call_seen else "no",
+                )
+                t_llm_start = time.time()
+                stall_retries = 0
+                response = None
+                while response is None:
+                    try:
+                        response = await asyncio.wait_for(
+                            self._llm.chat(
+                                messages,
+                                tools=self._get_visible_agent_tools(),
+                                tool_choice=tool_choice,
+                            ),
+                            timeout=chat_timeout + 15,  # grace above backend timeout
+                        )
+                    except (asyncio.TimeoutError, Exception) as exc:
+                        is_timeout = isinstance(exc, asyncio.TimeoutError) or "timeout" in str(exc).lower()
+                        if is_timeout and stall_retries < 1:
+                            stall_retries += 1
+                            logger.warning(
+                                "llm_chat_stall_retry attempt=%d turn=%d",
+                                stall_retries, turn + 1,
+                            )
+                            recorder.add_step("status", summary=f"llm_chat_stall_retry_{stall_retries}")
+                            continue
+                        # Stall persists or non-timeout error
+                        logger.error("llm_chat_stall_final turn=%d error=%s", turn + 1, exc)
+                        recorder.add_step("error", summary=f"LLM stall after {stall_retries} retries: {exc}")
+                        recorder.finish(
+                            status="stall",
+                            result_summary=f"LLM stall: {exc}",
+                            usage=self.last_usage,
+                        )
+                        if self._trace_store is not None:
+                            recorder.save(self._trace_store)
+                        await emit(build_stream_event(
+                            "done",
+                            f"LLM stall detected after tool execution (retries={stall_retries})",
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="lifecycle",
+                        ) | {"stall": True, "error": str(exc)})
+                        self._save_conversation_log(messages)
+                        self._last_run_trace = recorder.trace
+                        return current_adata
+                logger.info(
+                    "agentic_llm_call_done turn=%d/%d elapsed_s=%.2f has_tool_calls=%s content_len=%d",
+                    turn + 1, max_turns, time.time() - t_llm_start,
+                    bool(response.tool_calls), len(response.content or ""),
+                )
+
+                # Track usage
+                if response.usage:
+                    self.last_usage = response.usage
+
+                # Append assistant response to conversation
+                if response.raw_message:
+                    messages.append(response.raw_message)
+                elif response.content:
+                    messages.append({"role": "assistant", "content": response.content})
+
+                # If text-only response with no tool calls, only treat as done
+                # when it looks like an actual terminal answer rather than a
+                # promise to act later. This approximates Codex's item-driven
+                # follow-up loop on top of our simpler chat backend.
+                if not response.tool_calls:
+                    if response.content:
+                        final_summary = response.content
+                        recorder.add_step("llm_chunk", summary=response.content[:200])
+                        print(f"   💬 Agent response: {response.content[:200]}")
+                        await emit(build_stream_event(
+                            "llm_chunk",
+                            response.content,
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="assistant",
+                        ))
+                    should_follow_up = self._should_continue_after_text_response(
+                        request=request,
+                        response_content=response.content or "",
+                        adata=current_adata,
+                        had_meaningful_tool_call=meaningful_tool_call_seen,
+                    )
+                    logger.info(
+                        "follow_up_gate turn=%d should_continue=%s retry=%d/%d meaningful_tool=%s",
+                        turn + 1, should_follow_up, no_tool_retry_count,
+                        max_no_tool_retries, meaningful_tool_call_seen,
+                    )
+                    if should_follow_up and no_tool_retry_count < max_no_tool_retries:
+                        no_tool_retry_count += 1
+                        guidance = self._build_no_tool_follow_up_message(
+                            request,
+                            retry_count=no_tool_retry_count,
+                            max_retries=max_no_tool_retries,
+                        )
+                        messages.append({"role": "user", "content": guidance})
+                        recorder.add_step(
+                            "status",
+                            summary="follow_up_required_after_text_only_response",
+                            data={
+                                "retry_count": no_tool_retry_count,
+                                "max_retries": max_no_tool_retries,
+                                "tool_choice": tool_choice,
+                            },
+                        )
+                        await emit(build_stream_event(
+                            "status",
+                            {
+                                "follow_up_required": True,
+                                "retry_count": no_tool_retry_count,
+                                "max_retries": max_no_tool_retries,
+                                "reason": "action_request_text_only_response",
+                            },
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="runtime",
+                        ))
+                        continue
+                    # Exhaustion: follow-up retries used up or not needed
+                    if should_follow_up and not meaningful_tool_call_seen:
+                        logger.warning(
+                            "follow_up_exhausted turn=%d retries=%d",
+                            turn + 1, no_tool_retry_count,
+                        )
+                        recorder.add_step("status", summary="follow_up_exhausted_no_tool_calls")
+                        await emit(build_stream_event(
+                            "status",
+                            {
+                                "follow_up_exhausted": True,
+                                "retry_count": no_tool_retry_count,
+                            },
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="runtime",
+                        ))
+                    completed_without_tool_calls = True
+                    break
+
+                # Process each tool call and collect results
+                tool_results = []  # (tool_call_id, tool_name, tool_output)
+                finished = False
+                no_tool_retry_count = 0
+
+                for tc in response.tool_calls:
+                    canonical_tool_name = normalize_tool_name(tc.name)
+                    # --- Cancel checkpoint: before each tool dispatch ---
+                    if _is_cancelled():
+                        print("   ⛔ Cancelled before tool dispatch")
+                        recorder.add_step("status", summary="cancelled_before_tool_dispatch")
+                        recorder.finish(status="cancelled", result_summary="Cancelled before tool dispatch", usage=self.last_usage)
+                        if self._trace_store is not None:
+                            recorder.save(self._trace_store)
+                        await emit(build_stream_event(
+                            "done", "Cancelled", turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id, session_id=recorder.trace.session_id,
+                            category="lifecycle",
+                        ) | {"cancelled": True})
+                        self._save_conversation_log(messages)
+                        return current_adata
+
+                    tool_step_id = recorder.add_step(
+                        "tool_call",
+                        name=canonical_tool_name or tc.name,
+                        summary=f"{canonical_tool_name or tc.name} dispatched",
+                        data={"arguments": tc.arguments},
+                    )
+                    print(f"   🔧 Tool: {canonical_tool_name or tc.name}({', '.join(f'{k}=' for k in tc.arguments)})")
+
+                    await emit(build_stream_event(
+                        "item_started",
+                        {"item_type": "tool_call", "name": canonical_tool_name or tc.name},
+                        turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id,
+                        step_id=tool_step_id,
+                        session_id=recorder.trace.session_id,
+                        category="item",
+                    ))
+                    await emit(build_stream_event(
+                        "tool_call",
+                        {"name": canonical_tool_name or tc.name, "arguments": tc.arguments},
+                        turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id,
+                        step_id=tool_step_id,
+                        session_id=recorder.trace.session_id,
+                        category="tool",
+                    ))
+
+                    result = await self._dispatch_tool(tc, current_adata, request)
+                    if canonical_tool_name not in {"finish", "TaskGet", "TaskList", "TaskOutput", "ToolSearch"}:
+                        meaningful_tool_call_seen = True
+
+                    # Handle tools that return dict with adata (execute_code, delegate/execute)
+                    if canonical_tool_name in ("execute_code", "Agent", "delegate") and isinstance(result, dict) and "adata" in result:
+                        current_adata = result["adata"]
+                        tool_output = result.get("output", "Code executed.")
+                        if canonical_tool_name == "execute_code":
+                            code = tc.arguments.get("code", "")
+                            recorder.add_step(
+                                "code",
+                                name=canonical_tool_name,
+                                summary=tc.arguments.get("description", "Code executed"),
+                                data={"code": code},
+                            )
+                            recorder.add_artifact("code", label=tc.arguments.get("description", "execute_code"))
+                            print(f"      ✅ {tc.arguments.get('description', 'Code executed')}")
+                            await emit(build_stream_event(
+                                "code",
+                                code,
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                session_id=recorder.trace.session_id,
+                                category="execution",
+                            ))
+                        else:
+                            print(f"      ✅ delegate({tc.arguments.get('agent_type', '')}) completed")
+
+                        shape = (
+                            (current_adata.shape[0], current_adata.shape[1])
+                            if hasattr(current_adata, "shape") else None
+                        )
+                        recorder.add_step(
+                            "result",
+                            name=canonical_tool_name or tc.name,
+                            summary="adata updated",
+                            data={"shape": shape},
+                        )
+                        await emit(build_stream_event(
+                            "result",
+                            current_adata,
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="execution",
+                        ) | {"shape": shape})
+                    elif canonical_tool_name == "finish":
+                        summary = tc.arguments.get("summary", "Task completed")
+                        final_summary = summary
+                        recorder.add_step("done", name=canonical_tool_name, summary=summary)
+                        print(f"   ✅ Finished: {summary}")
+                        tool_output = f"Task finished: {summary}"
+                        finished = True
+                    elif isinstance(result, str):
+                        tool_output = result
+                    else:
+                        tool_output = str(result)
+
+                    # Truncate very long tool outputs before feeding them back
+                    # into the next model turn. Web/content fetches are kept
+                    # tighter because they otherwise produce oversized follow-up
+                    # requests in OpenAI-compatible proxy setups.
+                    max_tool_output_chars = 8000
+                    if canonical_tool_name in {"WebFetch", "WebSearch", "web_fetch", "web_search"}:
+                        max_tool_output_chars = 4000
+                    if len(tool_output) > max_tool_output_chars:
+                        tool_output = tool_output[: max_tool_output_chars - 500] + "\n... (truncated)"
+
+                    try:
+                        parsed_tool_output = json.loads(tool_output)
+                    except Exception:
+                        parsed_tool_output = None
+
+                    if isinstance(parsed_tool_output, dict):
+                        if canonical_tool_name == "ToolSearch":
+                            await emit(build_stream_event(
+                                "status",
+                                {
+                                    "loaded_tools": parsed_tool_output.get("loaded_tools", []),
+                                    "newly_loaded": parsed_tool_output.get("newly_loaded", []),
+                                },
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="runtime",
+                            ))
+                        elif canonical_tool_name in {"EnterPlanMode", "ExitPlanMode"}:
+                            await emit(build_stream_event(
+                                "status",
+                                {"plan_mode": parsed_tool_output},
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="runtime",
+                            ))
+                        elif canonical_tool_name == "EnterWorktree":
+                            await emit(build_stream_event(
+                                "status",
+                                {"worktree": parsed_tool_output},
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="runtime",
+                            ))
+                        elif canonical_tool_name in {"TaskCreate", "TaskUpdate", "TaskStop", "Bash"}:
+                            await emit(build_stream_event(
+                                "task_update",
+                                parsed_tool_output,
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="task",
+                            ))
+
+                    tool_results.append((tc.id, tc.name, tool_output))
+                    _sync_runtime_trace()
+                    await emit(build_stream_event(
+                        "item_completed",
+                        {"item_type": "tool_call", "name": canonical_tool_name or tc.name, "status": "success"},
+                        turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id,
+                        step_id=tool_step_id,
+                        session_id=recorder.trace.session_id,
+                        category="item",
+                    ))
+
+                # Batch all tool results into conversation messages.
+                # For Anthropic: must be a single "user" message with all tool_result blocks.
+                # For OpenAI: each tool result is a separate "tool" message.
+                self._append_tool_results(messages, tool_results)
+
+                if finished:
+                    summary = final_summary or tc.arguments.get("summary", "Task completed")
+                    recorder.finish(status="success", result_summary=summary, usage=self.last_usage)
+                    if self._trace_store is not None:
+                        recorder.save(self._trace_store)
+                    await emit(build_stream_event(
+                        "done",
+                        summary,
+                        turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id,
+                        session_id=recorder.trace.session_id,
+                        category="lifecycle",
+                    ))
+                    if self.last_usage:
+                        await emit(build_stream_event(
+                            "usage",
+                            self.last_usage,
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
+                            category="usage",
+                        ))
+                    self._save_conversation_log(messages)
+                    self._last_run_trace = recorder.trace
+                    return current_adata
+
+            if completed_without_tool_calls:
+                recorder.finish(status="success", result_summary=final_summary or "Completed", usage=self.last_usage)
+                if self._trace_store is not None:
+                    recorder.save(self._trace_store)
+                await emit(build_stream_event(
+                    "done",
+                    final_summary or "Completed",
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
+                    category="lifecycle",
+                ))
+            else:
+                logger.warning(
+                    "agentic_loop_max_turns max_turns=%d meaningful_tool=%s",
+                    max_turns, meaningful_tool_call_seen,
+                )
+                print(f"   ⚠️  Max turns ({max_turns}) reached, returning current result")
+                final_summary = final_summary or f"Reached max turns ({max_turns})"
+                recorder.finish(status="max_turns", result_summary=final_summary, usage=self.last_usage)
+                if self._trace_store is not None:
+                    recorder.save(self._trace_store)
+                await emit(build_stream_event(
+                    "done",
+                    final_summary,
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
+                    category="lifecycle",
+                ) | {"max_turns": True})
+            if self.last_usage:
+                await emit(build_stream_event(
+                    "usage",
+                    self.last_usage,
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
+                    category="usage",
+                ))
+            self._save_conversation_log(messages)
+            self._last_run_trace = recorder.trace
+            return current_adata
+        except Exception as exc:
+            recorder.add_step("error", summary=str(exc))
+            recorder.finish(status="error", result_summary=str(exc), usage=self.last_usage)
+            if self._trace_store is not None:
+                recorder.save(self._trace_store)
+            self._last_run_trace = recorder.trace
+            try:
+                await emit(build_stream_event(
+                    "done",
+                    f"Error: {exc}",
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
+                    category="lifecycle",
+                ) | {"error": True})
+            except Exception:
+                pass
+            raise
+        finally:
+            self._approval_handler = None
 
     def _save_conversation_log(self, messages: list) -> None:
         """Save the full conversation to a JSON file for debugging.
@@ -2845,6 +4483,24 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
         bool
             True if user approves execution, False otherwise.
         """
+        if self._approval_handler is not None:
+            trace = getattr(self, "_last_run_trace", None)
+            payload = {
+                "request_id": make_turn_id(),
+                "title": "Execution approval required",
+                "message": "Generated code requires approval before execution.",
+                "code": code,
+                "violations": [v.__dict__ if hasattr(v, "__dict__") else str(v) for v in violations],
+                "trace_id": getattr(trace, "trace_id", ""),
+                "session_id": self._get_harness_session_id(),
+                "approval_mode": self._security_config.approval_mode.value,
+            }
+            try:
+                return bool(self._approval_handler(payload))
+            except Exception as exc:
+                logger.warning("Approval handler failed, denying execution: %s", exc)
+                return False
+
         print("\n" + "=" * 60)
         print("GENERATED CODE REVIEW")
         print("=" * 60)
@@ -3602,6 +5258,7 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
 
         try:
             result = await self._run_agentic_loop(request, adata)
+            self._persist_harness_history(request)
 
             print()
             print(f"{'=' * 70}")
@@ -3610,6 +5267,7 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
 
             return result
         except Exception as e:
+            self._persist_harness_history(request)
             print()
             print(f"{'=' * 70}")
             print(f"❌ ERROR - Agentic loop failed: {e}")
@@ -3695,7 +5353,9 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         ]
         return "\n".join(lines)
 
-    async def stream_async(self, request: str, adata: Any):
+    async def stream_async(self, request: str, adata: Any,
+                           cancel_event=None, history=None,
+                           approval_handler=None):
         """
         Stream agentic-loop events as the agent processes a request.
 
@@ -3709,16 +5369,22 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
             Natural language description of what to do.
         adata : Any
             AnnData/MuData object to process.
+        cancel_event : threading.Event, optional
+            When set, signals the agentic loop to stop at the next safe
+            checkpoint.
+        history : list, optional
+            Prior conversation messages for multi-turn context.
 
         Yields
         ------
         dict
             Dictionary with ``'type'`` and ``'content'`` keys. Types:
 
+            - ``'tool_call'``: Agent dispatched a tool (``content`` has ``name`` and ``arguments``).
             - ``'llm_chunk'``: LLM assistant text response.
             - ``'code'``: Python code sent to ``execute_code``.
             - ``'result'``: Updated adata after execution (also has ``'shape'``).
-            - ``'finish'``: Agent declared the task complete.
+            - ``'done'``: Agent declared the task complete (may have ``'cancelled': True``).
             - ``'error'``: An error occurred.
             - ``'usage'``: Token usage statistics (final event).
 
@@ -3741,10 +5407,32 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         async def _run_loop():
             try:
                 await self._run_agentic_loop(
-                    request, adata, event_callback=_event_callback,
+                    request, adata,
+                    event_callback=_event_callback,
+                    cancel_event=cancel_event,
+                    history=history,
+                    approval_handler=approval_handler,
                 )
             except Exception as exc:
-                await queue.put({"type": "error", "content": str(exc)})
+                trace_id = getattr(getattr(self, "_last_run_trace", None), "trace_id", "")
+                turn_id = getattr(getattr(self, "_last_run_trace", None), "turn_id", "")
+                await queue.put(build_stream_event(
+                    "error",
+                    str(exc),
+                    turn_id=turn_id,
+                    trace_id=trace_id,
+                    session_id=self._get_harness_session_id(),
+                    category="runtime",
+                ))
+                # Defense-in-depth: ensure a done event is always emitted
+                await queue.put(build_stream_event(
+                    "done",
+                    f"Error: {exc}",
+                    turn_id=turn_id,
+                    trace_id=trace_id,
+                    session_id=self._get_harness_session_id(),
+                    category="lifecycle",
+                ) | {"error": True})
             finally:
                 await queue.put(None)  # sentinel
 
