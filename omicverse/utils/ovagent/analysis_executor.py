@@ -841,6 +841,11 @@ class AnalysisExecutor:
                 allowed_modules[root_name] = __import__(root_name)
             if root_name == "scvi":
                 _apply_scvi_shims()
+            root_module = allowed_modules[root_name]
+            if not fromlist:
+                return root_module
+            if name == root_name:
+                return root_module
             return __import__(name, globals, locals, fromlist, level)
 
         safe_builtins["__import__"] = limited_import
