@@ -488,7 +488,7 @@ def interpret_results(
         return {"error": f"Failed to read AnnData: {exc}"}
 
     registry = get_registry()
-    output_dir = output_dir or os.path.dirname(adata_path)
+    output_dir = output_dir or os.path.dirname(adata_path) or "."
     os.makedirs(output_dir, exist_ok=True)
 
     metrics: dict = {}
