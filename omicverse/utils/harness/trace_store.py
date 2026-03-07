@@ -5,6 +5,7 @@ Trace persistence and replay helpers for OVAgent harness runs.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -53,7 +54,13 @@ class RunTraceStore:
         return path
 
     def load(self, trace_id: str) -> dict[str, Any]:
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", trace_id):
+            raise ValueError("Invalid trace identifier")
         path = self.traces_dir / f"{trace_id}.json"
+        traces_root = self.traces_dir.resolve()
+        candidate = path.resolve()
+        if candidate.parent != traces_root:
+            raise ValueError("Invalid trace path")
         return json.loads(path.read_text(encoding="utf-8"))
 
     def list_recent(self, limit: int = 20) -> list[Path]:
