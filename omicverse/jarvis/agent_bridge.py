@@ -11,6 +11,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, List, Optional, Set
 
 
+MAX_HARVEST_BYTES = 5 * 1024 * 1024
+
+
 @dataclass
 class AgentArtifact:
     filename: str
@@ -176,11 +179,10 @@ class AgentBridge:
                 roots.append(Path(ws))
         except Exception:
             pass
-        # Always include cwd so relative-path saves (e.g. ./output/*.png) are found
-        try:
-            roots.append(Path.cwd())
-        except Exception:
-            pass
+
+        allowed_roots = self._resolve_roots(roots)
+        if not allowed_roots:
+            return figs
 
         png_candidates: List[Path] = []
         for d in self._candidate_dirs(roots):
@@ -199,7 +201,7 @@ class AgentBridge:
                 key = f"file:{p.resolve()}:{st.st_size}:{int(st.st_mtime)}"
                 if key in seen:
                     continue
-                data = p.read_bytes()
+                data = self._read_file_if_safe(p, allowed_roots, MAX_HARVEST_BYTES)
                 if not data:
                     continue
                 seen.add(key)
@@ -268,8 +270,10 @@ class AgentBridge:
                 roots.append(Path(ws))
         except Exception:
             pass
-        # Some tools write to process cwd/output
-        roots.append(Path.cwd())
+
+        allowed_roots = self._resolve_roots(roots)
+        if not allowed_roots:
+            return artifacts
 
         exts = {".md", ".pdf", ".csv", ".tsv", ".txt", ".html", ".xlsx"}
         candidates: List[Path] = []
@@ -291,7 +295,7 @@ class AgentBridge:
                 key = f"{p.resolve()}:{st.st_size}:{int(st.st_mtime)}"
                 if key in seen_key:
                     continue
-                data = p.read_bytes()
+                data = self._read_file_if_safe(p, allowed_roots, MAX_HARVEST_BYTES)
                 if not data:
                     continue
                 seen_key.add(key)
@@ -299,6 +303,36 @@ class AgentBridge:
             except Exception:
                 pass
         return artifacts
+
+    @staticmethod
+    def _resolve_roots(roots: List[Path]) -> List[Path]:
+        resolved: List[Path] = []
+        seen: Set[Path] = set()
+        for root in roots:
+            try:
+                rr = root.resolve(strict=True)
+            except Exception:
+                continue
+            if rr in seen or not rr.is_dir():
+                continue
+            seen.add(rr)
+            resolved.append(rr)
+        return resolved
+
+    @staticmethod
+    def _read_file_if_safe(p: Path, allowed_roots: List[Path], max_bytes: int) -> bytes:
+        try:
+            if p.is_symlink():
+                return b""
+            resolved = p.resolve(strict=True)
+            if not any(resolved.is_relative_to(root) for root in allowed_roots):
+                return b""
+            st = resolved.stat()
+            if st.st_size <= 0 or st.st_size > max_bytes:
+                return b""
+            return resolved.read_bytes()
+        except Exception:
+            return b""
 
     @staticmethod
     def _candidate_dirs(roots: List[Path]) -> List[Path]:
