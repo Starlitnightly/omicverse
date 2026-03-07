@@ -91,6 +91,7 @@ def hematopoiesis()->anndata.AnnData:
     related=["single.TrajInfer", "single.scRNA_hematopoiesis", "pp.neighbors", "utils.embedding"]
 )
 class pyVIA(object):
+    """VIA-based trajectory inference and lineage visualization wrapper."""
 
     def __init__(self,adata:anndata.AnnData,adata_key:str='X_pca',adata_ncomps:int=80,basis:str='X_umap',
                  clusters:str='',dist_std_local:float=2, jac_std_global=0.15, labels:np.ndarray=None,
@@ -115,119 +116,143 @@ class pyVIA(object):
         Parameters
         ----------
         adata : anndata.AnnData
-            Input single-cell AnnData.
+            Input single-cell AnnData object.
         adata_key : str, default='X_pca'
-            Embedding key in ``adata.obsm`` used to build the VIA graph.
+            Key in ``adata.obsm`` used as low-dimensional input for VIA graph construction.
         adata_ncomps : int, default=80
-            Number of embedding dimensions used from ``adata_key``.
+            Number of components retained from ``adata.obsm[adata_key]``.
         basis : str, default='X_umap'
-            Embedding key used for downstream visualization.
+            Embedding key in ``adata.obsm`` used for plotting and trajectory overlays.
         clusters : str, default=''
-            Obs column containing initial cluster labels.
+            Column name in ``adata.obs`` storing initial cluster/cell-type labels.
         dist_std_local : float, default=2
-            Local graph-pruning level for PARC.
-        jac_std_global : float or str, default=0.15
-            Global graph-pruning level for PARC.
-        labels : numpy.ndarray or None, default=None
-            Optional external cluster labels.
+            Local pruning strength for PARC/VIA graph edges.
+        jac_std_global : float, default=0.15
+            Global Jaccard-based pruning threshold.
+        labels : numpy.ndarray, optional
+            Optional external labels used instead of ``adata.obs[clusters]``.
         keep_all_local_dist : str or bool, default='auto'
             Whether to keep all local distances before pruning.
         too_big_factor : float, default=0.4
-            Re-cluster clusters larger than this cell-fraction threshold.
+            Re-partition clusters larger than this fraction of total cells.
         resolution_parameter : float, default=1.0
-            Resolution parameter used by partitioning.
+            Leiden/PARC partition resolution.
         partition_type : str, default='ModularityVP'
-            PARC partition type.
+            Graph partition strategy passed to PARC/VIA.
         small_pop : int, default=10
-            Minimum cluster size threshold.
+            Minimum cluster size considered stable.
         jac_weighted_edges : bool, default=True
-            Whether to use Jaccard-weighted edges.
+            Whether to weight graph edges by Jaccard overlap.
         knn : int, default=30
-            K-nearest neighbors for graph construction.
+            Number of nearest neighbors used to build the cell graph.
         n_iter_leiden : int, default=5
-            Number of Leiden iterations.
+            Number of Leiden refinement iterations.
         random_seed : int, default=42
-            Random seed.
+            Random seed for reproducible graph partitioning.
         num_threads : int, default=-1
-            Number of worker threads.
+            Number of CPU threads; ``-1`` lets backend decide automatically.
         distance : str, default='l2'
-            Distance metric used in KNN search.
+            Distance metric used in neighbor search.
         time_smallpop : int, default=15
-            Time budget for handling very small populations.
+            Iteration/time control for handling small populations.
+        super_cluster_labels : bool, default=False
+            Whether to compute super-cluster labels on top of base clusters.
+        super_node_degree_list : bool, default=False
+            Whether to expose super-node degree statistics.
+        super_terminal_cells : bool, default=False
+            Whether to infer terminal states at super-cluster granularity.
         x_lazy : float, default=0.95
-            Lazy random-walk parameter.
+            Lazy random-walk parameter controlling self-transition probability.
         alpha_teleport : float, default=0.99
-            Teleportation parameter.
-        root_user : list or None, default=None
-            Optional user-defined root cells/groups.
+            Teleportation probability for Markov diffusion.
+        root_user : list, optional
+            User-defined root cell indices or root groups for pseudotime orientation.
         preserve_disconnected : bool, default=True
-            Keep disconnected components during trajectory construction.
+            Keep disconnected graph components during trajectory construction.
         dataset : str, default=''
-            Root specification mode.
-        secondary_annotations : list or None, default=None
-            Additional annotation tracks.
+            Dataset/root mode flag used by VIA internals.
+        super_terminal_clusters : list, default=[]
+            User-provided terminal super-cluster IDs.
+        is_coarse : bool, default=True
+            Whether current model is coarse stage in a coarse-to-fine workflow.
+        csr_full_graph : numpy.ndarray or scipy.sparse matrix, optional
+            Optional precomputed full graph adjacency.
+        csr_array_locally_pruned : numpy.ndarray or scipy.sparse matrix, optional
+            Optional precomputed locally pruned graph.
+        ig_full_graph : igraph.Graph, optional
+            Optional pre-built igraph object.
+        full_neighbor_array : numpy.ndarray, optional
+            Optional precomputed neighbor index array.
+        full_distance_array : numpy.ndarray, optional
+            Optional precomputed neighbor distance array.
+        df_annot : pandas.DataFrame, optional
+            Cell annotation table used by VIA plotting and summaries.
+        preserve_disconnected_after_pruning : bool, default=False
+            Whether to retain disconnected components after graph pruning.
+        secondary_annotations : list, optional
+            Additional annotation tracks for visualization.
         pseudotime_threshold_TS : int, default=30
-            Terminal-state pseudotime threshold.
+            Threshold used in terminal-state calling for time-series mode.
         cluster_graph_pruning_std : float, default=0.15
-            Pruning level for cluster graph.
+            Pruning strength for cluster-level graph.
         visual_cluster_graph_pruning : float, default=0.15
-            Extra pruning used in non-bundled graph visualization.
+            Additional pruning for visualized cluster graph.
         neighboring_terminal_states_threshold : int, default=3
-            De-duplication threshold for neighboring terminal states.
+            Merge threshold for nearby terminal states.
         num_mcmc_simulations : int, default=1300
-            Number of random-walk simulations.
+            Number of random-walk/MCMC simulations for lineage probabilities.
         piegraph_arrow_head_width : float, default=0.1
-            Arrow-head width in pie-graph plots.
+            Arrow head width in pie-chart trajectory graph.
         piegraph_edgeweight_scalingfactor : float, default=1.5
-            Edge-width scaling in pie-graph plots.
+            Edge-width scaling in pie-chart trajectory graph.
         max_visual_outgoing_edges : int, default=2
-            Maximum outgoing edges per node in unbundled visualization.
-        via_coarse : object or None, default=None
-            Optional coarse VIA model in two-stage analyses.
-        velocity_matrix : numpy.ndarray or None, default=None
-            Cell-by-gene RNA velocity matrix.
-        gene_matrix : numpy.ndarray or None, default=None
-            Cell-by-gene expression matrix matched to ``velocity_matrix``.
+            Maximum outgoing edges per node in visual graph rendering.
+        via_coarse : object, optional
+            Optional coarse VIA model used for hierarchical runs.
+        velocity_matrix : numpy.ndarray, optional
+            RNA velocity matrix used to orient transitions.
+        gene_matrix : numpy.ndarray, optional
+            Expression matrix aligned with ``velocity_matrix``.
         velo_weight : float, default=0.5
-            Weight for velocity-derived transition direction.
-        edgebundle_pruning : float or None, default=None
-            Edge-bundle pruning level.
-        A_velo : numpy.ndarray or None, default=None
+            Relative weight of velocity-informed transitions.
+        edgebundle_pruning : float, optional
+            Pruning threshold before edge bundling.
+        A_velo : numpy.ndarray, optional
             Cluster-level velocity transition matrix.
-        CSM : Any, default=None
-            Optional transition similarity matrix.
+        CSM : Any, optional
+            Optional custom transition/similarity matrix.
         edgebundle_pruning_twice : bool, default=False
-            Whether to apply secondary pruning before edge bundling.
-        pca_loadings : numpy.ndarray or None, default=None
-            PCA loadings for velocity projection.
+            Whether to apply two-pass pruning before edge bundling.
+        pca_loadings : numpy.ndarray, optional
+            PCA loadings used in velocity projection.
         time_series : bool, default=False
-            Whether data is time-series.
-        time_series_labels : list or None, default=None
-            Temporal labels per cell.
+            Whether to enable time-series constraints.
+        time_series_labels : list, optional
+            Ordered temporal labels per cell.
         knn_sequential : int, default=10
-            Sequential KNN edges from time ``t`` to ``t+1``.
+            Number of forward temporal neighbors (``t`` to ``t+1``).
         knn_sequential_reverse : int, default=0
-            Reverse sequential KNN edges.
+            Number of reverse temporal neighbors (``t`` to ``t-1``).
         t_diff_step : int, default=1
-            Maximum allowed temporal jump in sequential KNN.
-        single_cell_transition_matrix : Any, default=None
+            Maximum temporal step size allowed in sequential KNN links.
+        single_cell_transition_matrix : Any, optional
             Optional precomputed single-cell transition matrix.
         embedding_type : str, default='via-mds'
-            VIA embedding algorithm.
+            Embedding algorithm used by VIA (for example ``'via-mds'``).
         do_compute_embedding : bool, default=False
             Whether to compute VIA embedding during initialization.
-        color_dict : dict or None, default=None
-            Optional annotation color mapping.
+        color_dict : dict, optional
+            Mapping from category to plotting color.
         user_defined_terminal_cell : list, default=[]
-            User-defined terminal cells.
+            User-defined terminal cell indices.
         user_defined_terminal_group : list, default=[]
-            User-defined terminal groups.
+            User-defined terminal cluster/group labels.
         do_gaussian_kernel_edgeweights : bool, default=False
-            Use Gaussian-kernel edge weighting.
+            Whether to use Gaussian-kernel edge weights.
         RW2_mode : bool, default=False
-            Advanced random-walk mode switch.
+            Enable RW2 random-walk mode in VIA.
         working_dir_fp : str, default='/home/shobi/Trajectory/Datasets/'
-            Working directory for VIA internals.
+            Working directory used by VIA for intermediate files.
         """
         
         self.adata = adata

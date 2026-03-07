@@ -31,6 +31,19 @@ import pandas as pd
     related=["single.get_obs_value", "single.plot_metacells", "pp.scale"]
 )
 class MetaCell(object):
+    """SEACells-based metacell construction workflow.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    use_rep : str
+        Embedding key in ``adata.obsm`` used for kernel construction.
+    n_metacells : int or None, optional
+        Number of metacells to learn.
+    use_gpu : bool, default=False
+        Whether to enable GPU acceleration.
+    """
 
     def __init__(self,adata,use_rep,
                  n_metacells=None,

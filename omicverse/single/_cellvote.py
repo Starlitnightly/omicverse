@@ -29,6 +29,13 @@ from .._registry import register_function
     related=["single.get_celltype_marker", "single.gptcelltype", "single.pySCSA"]
 )
 class CellVote(object):
+    """Ensemble cell-type annotation manager with multiple backends.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Query single-cell AnnData to annotate.
+    """
 
     def __init__(self, adata) -> None:
         self.adata = adata

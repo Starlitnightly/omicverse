@@ -45,6 +45,23 @@ from .._registry import register_function
     related=["single.DEG", "external.pertpy", "pp.neighbors"]
 )
 class DCT:
+    """Differential cell-type abundance testing wrapper.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    condition : str
+        Condition column in ``adata.obs``.
+    ctrl_group : str
+        Control-group label.
+    test_group : str
+        Test-group label.
+    cell_type_key : str
+        Cell-type annotation column.
+    method : str, default='sccoda'
+        Differential-abundance backend.
+    """
     def __init__(self, 
                  adata: AnnData, 
                  condition: str,
@@ -250,6 +267,23 @@ class DCT:
     related=["single.DCT", "bulk.pyDEG", "tl.rank_genes_groups"]
 )
 class DEG:
+    """Differential gene-expression testing wrapper for single-cell datasets.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    condition : str
+        Condition column in ``adata.obs``.
+    ctrl_group : str
+        Control-group label.
+    test_group : str
+        Test-group label.
+    method : str, default='wilcoxon'
+        DEG method name.
+    use_raw : bool or None, default=None
+        Whether to use ``adata.raw`` as expression matrix.
+    """
     def __init__(self,
                  adata: AnnData,
                  condition: str,

@@ -763,6 +763,26 @@ def embedding_adjust(
     related=["pl.embedding", "pl.calculate_gene_density", "pl.add_density_contour"]
 )
 def embedding_density(adata,basis,groupby,target_clusters,**kwargs):
+    """Plot cluster-specific density on an existing embedding.
+
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData containing embedding coordinates and group labels.
+    basis : str
+        Embedding key (e.g., ``'X_umap'``).
+    groupby : str
+        Observation column defining cluster labels.
+    target_clusters : str or list
+        Cluster label(s) to highlight in density map.
+    **kwargs
+        Extra plotting arguments forwarded to ``embedding``.
+
+    Returns
+    -------
+    Any
+        Return value of ``embedding(...)`` with temporary density color.
+    """
     if 'X_' in basis:
         basis1=basis.split('_')[1]
     sc.tl.embedding_density(adata,
@@ -796,6 +816,40 @@ def embedding_density(adata,basis,groupby,target_clusters,**kwargs):
 def bardotplot(adata,groupby,color,figsize=(8,3),return_values=False,
                fontsize=12,xlabel='',ylabel='',xticks_rotation=90,ax=None,
                bar_kwargs=None,scatter_kwargs=None):
+    """Create a combined bar-and-dot summary plot by groups.
+
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData containing expression/metadata used for plotting.
+    groupby : str
+        Grouping column in ``adata.obs``.
+    color : str
+        Feature in ``adata.var_names`` or ``adata.obs`` to summarize.
+    figsize : tuple, default=(8, 3)
+        Figure size.
+    return_values : bool, default=False
+        Whether to return computed grouped values instead of plotting.
+    fontsize : int, default=12
+        Font size.
+    xlabel : str, default=''
+        X-axis label.
+    ylabel : str, default=''
+        Y-axis label.
+    xticks_rotation : int, default=90
+        Rotation angle of x tick labels.
+    ax : matplotlib.axes.Axes, optional
+        Existing axis for plotting.
+    bar_kwargs : dict, optional
+        Keyword arguments forwarded to ``plt.bar``.
+    scatter_kwargs : dict, optional
+        Keyword arguments forwarded to ``plt.scatter``.
+
+    Returns
+    -------
+    pandas.DataFrame or tuple
+        Grouped values when ``return_values=True``; otherwise plotting handles.
+    """
     
     if bar_kwargs is None:
         bar_kwargs = {}
@@ -1117,6 +1171,32 @@ def single_group_boxplot(adata,
 def contour(ax,adata,groupby,clusters,basis='X_umap',
             grid_density=100,contour_threshold=0.1,
            **kwargs):
+    """Overlay a KDE contour for selected clusters on embedding axes.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axis where contour lines are drawn.
+    adata : AnnData
+        AnnData containing embedding coordinates and cluster labels.
+    groupby : str
+        Observation column for cluster filtering.
+    clusters : list
+        Cluster labels to include in contour estimation.
+    basis : str, default='X_umap'
+        Embedding key in ``adata.obsm``.
+    grid_density : int, default=100
+        Resolution of contour estimation grid.
+    contour_threshold : float, default=0.1
+        Relative density threshold used for outer contour level.
+    **kwargs
+        Additional arguments forwarded to ``ax.contour``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axis with contour overlay.
+    """
     from scipy.stats import gaussian_kde
     umap_embedding=adata[adata.obs[groupby].isin(clusters)].obsm[basis]
     kde = gaussian_kde(umap_embedding.T)

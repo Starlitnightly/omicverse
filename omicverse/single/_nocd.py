@@ -44,7 +44,7 @@ class scnocd(object):
             global_imports("torch")
             global_imports("torch.nn","nn")
             global_imports("torch.nn.functional","F")
-            globals()['nocd'] = __import__("omicverse.nocd",fromlist=['nocd'])
+            globals()['nocd'] = __import__("omicverse.external.nocd",fromlist=['nocd'])
         self.adata_raw=adata
         self.adata=adata.copy()
         self.device  = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
