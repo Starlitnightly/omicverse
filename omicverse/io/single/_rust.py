@@ -36,7 +36,19 @@ Colors = _PlainColors()
     related=["utils.read", "pp.preprocess", "utils.store_layers"]
 )
 def convert_to_pandas(df_obj):
-    """Convert PyDataFrameElem or similar objects to pandas DataFrame."""
+    """Convert Rust-backed dataframe-like objects to ``pandas.DataFrame``.
+
+    Parameters
+    ----------
+    df_obj : Any
+        Input dataframe-like object. Supported objects include wrappers that expose
+        ``to_pandas()``, slicing-based dataframe access, or column-based retrieval.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Converted pandas DataFrame. Returns an empty DataFrame when conversion fails.
+    """
     try:
         if hasattr(df_obj, 'to_pandas'):
             return df_obj.to_pandas()
@@ -153,7 +165,19 @@ class PyDataFrameElemWrapper:
     related=["utils.convert_to_pandas", "utils.read"]
 )
 def wrap_dataframe(df_obj):
-    """Wrap PyDataFrameElem to provide pandas DataFrame-like convenience methods."""
+    """Wrap a Rust-backed dataframe-like object with a pandas-style interface.
+
+    Parameters
+    ----------
+    df_obj : Any
+        Input dataframe-like object (for example, Rust backend ``obs``/``var``).
+
+    Returns
+    -------
+    PyDataFrameElemWrapper
+        Wrapper object that lazily converts content to pandas and exposes common
+        DataFrame methods (``head``, ``tail``, ``shape``, ``columns``, etc.).
+    """
     return PyDataFrameElemWrapper(df_obj)
 
 
@@ -168,7 +192,31 @@ def wrap_dataframe(df_obj):
     related=["utils.read", "utils.convert_to_pandas", "pp.preprocess"]
 )
 def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=True):
-    """Convert AnnData object to be compatible with Rust backend using snapatac2.AnnData."""
+    """Convert an AnnData object into a Rust-backend compatible ``.h5ad`` file.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input AnnData object to convert.
+    output_file : str or None, default=None
+        Output ``.h5ad`` file path. If ``None``, a temporary file is created.
+    verbose : bool, default=True
+        Whether to print conversion progress and diagnostics.
+    close_file : bool, default=True
+        Whether to close the created ``snapatac2.AnnData`` handle before returning.
+
+    Returns
+    -------
+    str
+        Path to the converted Rust-compatible ``.h5ad`` file.
+
+    Raises
+    ------
+    ImportError
+        If ``snapatac2`` is not installed.
+    Exception
+        Re-raises backend conversion exceptions after cleanup.
+    """
     try:
         import snapatac2 as snap
     except ImportError:

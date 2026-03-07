@@ -1,7 +1,11 @@
 from pathlib import Path
 
 import pandas as pd
-import scanpy as sc
+
+try:
+    from anndata.io import read_h5ad as _anndata_read_h5ad
+except ImportError:
+    from anndata import read_h5ad as _anndata_read_h5ad
 
 from ..._registry import register_function
 
@@ -30,23 +34,30 @@ def read(path, backend='python', **kwargs):
 
     Parameters
     ----------
-    path : str
+    path : str or pathlib.Path
         Input file path.
-    backend : str
-        Backend used for ``.h5ad`` reading: ``'python'`` or ``'rust'``.
+    backend : {'python', 'rust'}, default='python'
+        Backend used for ``.h5ad`` reading.
     **kwargs
         Additional keyword arguments forwarded to backend readers.
 
     Returns
     -------
-    AnnData or pd.DataFrame
+    anndata.AnnData or pandas.DataFrame
         Loaded AnnData object (for ``.h5ad``) or DataFrame (for table files).
+
+    Raises
+    ------
+    ImportError
+        If ``backend='rust'`` is requested but ``snapatac2`` is unavailable.
+    ValueError
+        If ``backend`` is invalid for ``.h5ad`` reading or the file suffix is unsupported.
     """
     ext = Path(path).suffix.lower()
 
     if ext == '.h5ad':
         if backend == 'python':
-            return sc.read_h5ad(path, **kwargs)
+            return _anndata_read_h5ad(path, **kwargs)
 
         if backend == 'rust':
             try:

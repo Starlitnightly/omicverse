@@ -814,4 +814,52 @@ results = deg_obj.get_results()
 - ✅ `np.prod` available in all NumPy versions
 - ✅ Custom compatibility wrapper handles `trapz`/`trapezoid` transition
 
+## v 1.7.10
+
+### Scope
+- This release note summarizes changes from commit `cd3d151` (version set to `1.7.10rc1`) to current `HEAD`.
+- Total code delta in this window: `252 files changed`, `+46,992 / -9,752`.
+
+### Agent & Runtime
+- Upgraded `ov.Agent` architecture to modern agentic tool-calling workflows with subagent delegation (v4/v5 evolution).
+- Improved GPT-5.2 robustness, response parsing, and backend error handling.
+- Added harness runtime components for execution contracts, tool catalog, runtime state, tracing, and cleanup policies.
+- Strengthened sandbox behavior with restricted import controls for internal modules.
+- Added web bridge and session-level execution improvements for agent workflows.
+
+### New Modules
+- Added `omicverse.biocontext` for biomedical knowledge queries via BioContext MCP tooling.
+- Added `omicverse.fm` (foundation-model adapters, routing, registry, and API).
+- Added structured `omicverse.io` namespaces for general/single/bulk/spatial I/O paths.
+- Added `omicverse.jarvis` multi-channel bot framework (Feishu/QQ/Telegram) with bridge support.
+
+### Core OmicVerse Improvements
+- Continued enhancements across `pp`, `pl`, `single`, `space`, and `utils` modules.
+- Fixed circular import between preprocessing utility internals (`_utils.py` and `_scale.py` path).
+- Added/updated function-level metadata and documentation quality in key analysis modules (preprocessing, annotation, trajectory, spatial, datasets, bulk).
+- Extended dataset utilities with new signature resources and improved loading pathways.
+
+### Registry & Help System
+- Improved registry behavior and module import exposure in package entrypoints.
+- Enhanced function/class registration metadata coverage for agent discoverability.
+- Registry help generation now better aligns with class constructor documentation in class-based tools.
+
+### Web & UI
+- Single-cell analysis UI received iterative upgrades:
+  - Better code cell management and undo behavior
+  - Improved AnnData slot detail retrieval and display
+  - Better DataFrame rendering and integration
+  - Plot density/point style control refinements
+  - i18n and UX polish for analysis panels
+- `omicverse_web` service layer expanded with session-oriented agent service support.
+
+### Developer Experience & Testing
+- Added FM test suite and multiple harness/ovagent test modules.
+- Removed obsolete legacy-priority and complexity-classifier test paths.
+- Added workflow and harness documentation pages for runtime contracts and operational guidance.
+
+### Documentation
+- Updated and expanded agent architecture and streaming API docs.
+- Updated `t_preprocess_cpu.ipynb` to match latest GPU/version detection behavior.
+- Added bilingual and deployment-oriented guidance for Jarvis and agent-related workflows.
 

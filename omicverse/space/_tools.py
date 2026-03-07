@@ -1118,6 +1118,105 @@ def bin2cell(
     from ..external.bin2cell import bin_to_cell
     return bin_to_cell(adata, labels_key=labels_key, 
                 spatial_keys=spatial_keys,diameter_scale_factor=diameter_scale_factor)
+
+
+@register_function(
+    aliases=[
+        "同步VisiumHD分割几何",
+        "sync_visium_hd_seg_geometries",
+        "sync_hd_seg_geometries",
+    ],
+    category="space",
+    description="Sync Visium HD segmentation geometries in adata.uns['spatial'] after AnnData subsetting",
+    examples=[
+        "# Subset and sync segmentation geometries",
+        "adata_sub = adata[adata.obs['classification'] == 'Cluster-1'].copy()",
+        "ov.space.sync_visium_hd_seg_geometries(adata_sub, sample='sample1')",
+    ],
+    related=["io.spatial.read_visium_hd"],
+)
+def sync_visium_hd_seg_geometries(adata, sample=None):
+    """
+    Synchronize ``adata.uns["spatial"][sample]["geometries"]`` with current ``adata.obs_names``.
+
+    This utility is intended for AnnData objects loaded by ``read_visium_hd_seg``.
+    After subsetting AnnData, ``adata.obs`` and ``adata.obsm`` are subset automatically,
+    but the geometry table stored in ``adata.uns["spatial"][sample]["geometries"]`` may
+    still contain rows for cells that are no longer present. This function filters that
+    GeoDataFrame by current cell IDs and updates it in place.
+
+    Parameters
+    ----------
+    adata : sc.AnnData
+        A (possibly subsetted) AnnData object containing spatial segmentation metadata.
+    sample : str, optional
+        Sample key under ``adata.uns["spatial"]``. If ``None``, the first available key
+        is used (with a warning when multiple samples exist).
+
+    Returns
+    -------
+    sc.AnnData
+        The same ``adata`` object, modified in place.
+    """
+    import warnings
+    import geopandas as gpd
+
+    if "spatial" not in adata.uns:
+        warnings.warn(
+            "No spatial information found in adata.uns['spatial']. "
+            "This function is intended for data loaded with read_visium_hd_seg()."
+        )
+        return adata
+
+    if sample is None:
+        available_samples = list(adata.uns["spatial"].keys())
+        if len(available_samples) == 0:
+            warnings.warn("No samples found in adata.uns['spatial'].")
+            return adata
+        sample = available_samples[0]
+        if len(available_samples) > 1:
+            warnings.warn(
+                f"Multiple samples found: {available_samples}. "
+                f"Using '{sample}'. Specify `sample` explicitly to use a different one."
+            )
+
+    if sample not in adata.uns["spatial"]:
+        warnings.warn(f"Sample '{sample}' not found in adata.uns['spatial'].")
+        return adata
+
+    spatial_info = adata.uns["spatial"][sample]
+    if "geometries" not in spatial_info:
+        warnings.warn(
+            f"No geometries found in adata.uns['spatial']['{sample}']['geometries']. "
+            "This function is intended for data loaded with read_visium_hd_seg()."
+        )
+        return adata
+
+    geometries = spatial_info["geometries"]
+    current_cell_ids = set(adata.obs_names)
+
+    if isinstance(geometries, gpd.GeoDataFrame):
+        try:
+            geometries_subset = geometries.loc[geometries.index.isin(current_cell_ids)]
+        except (KeyError, IndexError) as e:
+            common_indices = geometries.index.intersection(current_cell_ids)
+            if len(common_indices) > 0:
+                geometries_subset = geometries.loc[common_indices]
+            else:
+                warnings.warn(
+                    f"Could not filter geometries by index. "
+                    f"Geometries may not be properly indexed by cell IDs. "
+                    f"Error: {e}"
+                )
+                return adata
+        spatial_info["geometries"] = geometries_subset
+    else:
+        warnings.warn(
+            f"Unexpected geometry format in adata.uns['spatial']['{sample}']['geometries']. "
+            "Expected GeoDataFrame."
+        )
+
+    return adata
     
     
     

@@ -20,7 +20,7 @@ def read_csv(**kwargs):
 
     Parameters
     ----------
-    **kwargs
+    **kwargs : Any
         Keyword arguments accepted by ``pandas.read_csv`` (for example ``filepath_or_buffer``,
         ``sep``, ``index_col``, ``dtype``).
 
@@ -30,4 +30,3 @@ def read_csv(**kwargs):
         Parsed table.
     """
     return pd.read_csv(**kwargs)
-
