@@ -226,6 +226,25 @@ from ..._registry import register_function
     related=["utils.LDA_topic", "utils.cluster", "pl.embedding"]
 )
 class cNMF():
+    """Consensus NMF workflow wrapper for robust gene-program discovery.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell expression AnnData.
+    components : array-like
+        Candidate rank values (number of programs/topics) to evaluate.
+    n_iter : int, default=100
+        Number of NMF restarts per rank.
+    output_dir : str, optional
+        Directory used to store temporary and result files.
+    name : str, optional
+        Analysis name prefix for output artifacts.
+    use_gpu : bool, default=True
+        Whether to use GPU-accelerated factorization when available.
+    gpu_id : int, default=0
+        CUDA device index.
+    """
 
 
     def __init__(self, adata, components, n_iter = 100, densify=False, tpm_fn=None, seed=None,

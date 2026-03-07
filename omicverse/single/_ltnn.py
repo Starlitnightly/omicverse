@@ -123,8 +123,8 @@ class scLTNN(object):
     def cal_model_time(self):
         r"""
         predict the latent time by primriary ANN model
-
-        Arguments:
+    Parameters
+    ----------
         
         """
         print('......predict model_time')
@@ -141,8 +141,8 @@ class scLTNN(object):
         r"""
         Calculated the gene with the same trend in the expression gene amount of cell
         
-        Arguments: 
-        
+        Parameters
+    ----------
         """
         res_pd=find_related_gene(self.adata)
         h_gene=res_pd.loc[res_pd['cor']>0.5,'gene'].values
@@ -185,8 +185,8 @@ class scLTNN(object):
     def cal_dpt_pseudotime(self,leiden_range_start=0.01,leiden_range_end=0.01,leiden_range_mid=0.05,rev=False):
         r"""
         calculate the diffusion pseudotime of anndata by start node selected automatically
-
-        Arguments:
+    Parameters
+    ----------
             leiden_range_start: the range of start node
             leiden_range_end: the range of end node
             leiden_range_mid: the range of middle node
@@ -251,8 +251,8 @@ class scLTNN(object):
     def ANN(self,batch_size=30,n_epochs=200,verbose=0,mode='p_time'):
         r"""
         regression of latent time by start and end node using ANN model
-        
-        Arguments:
+    Parameters
+    ----------
             batch_size: the batch_size of ANN model
             epochs: the epochs of ANN model
             verbose: the visualization of ANN model summary
@@ -370,8 +370,8 @@ class scLTNN(object):
         r"""
         
         calculate the distribution of ANN time and diffusion pseudotime
-        
-        Arguments:
+    Parameters
+    ----------
         
         """
 
@@ -396,16 +396,16 @@ class scLTNN(object):
     def distribute_fun(self,mode,x1,x2):
         r"""
         calculate the distribution of model
-
-        Arguments:
+    Parameters
+    ----------
             mode:
                 Norm: the normal module of scLTNN distribution
                 Best_all: the best distribution to use in scLTNN time calcultion
                 Best_dweibull: the best distribution of ANN model time to use in  scLTNN time calcultion
             x1: the dpt_pseudotime of adata
             x2: the p_ANN_time of adata
-        
-        Returns:
+    Returns
+    -------
         x: the composition of x1 and x2 by special distribution
         
         """
@@ -424,8 +424,8 @@ class scLTNN(object):
     def cal_scLTNN_time(self,mode='Norm'):
         r"""
         calcualte the scLTNN time of anndata
-        
-        Arguments:
+    Parameters
+    ----------
             mode:
                 'Norm': the normal module of scLTNN distribution
                 'Best_all' the best distribution to use in scLTNN time calcultion
@@ -445,11 +445,11 @@ class scLTNN(object):
 def find_related_gene(adata):
     r"""
     Find out the gene with postivate relation of the amounts of cells
-   
-    Arguments:
+    Parameters
+    ----------
         adata: the anndata performed LTNN analysis
-
-    Returns:
+    Returns
+    -------
         res_pd: the pandas of correlation with genes and the amounts of cells
 
     """
@@ -584,11 +584,11 @@ class RadioModel(nn.Module):
 def find_related_gene(adata):
     r"""
     Find out the gene with postivate relation of the amounts of cells
-    
-    Arguments:
+    Parameters
+    ----------
         adata: the anndata performed LTNN analysis
-
-    Returns:
+    Returns
+    -------
         res_pd: the pandas of correlation with genes and the amounts of cells
 
     """
@@ -618,13 +618,13 @@ def find_related_gene(adata):
 def plot_origin_tesmination(adata,basis,origin,tesmination,figsize=(4,4),**kwargs):
     r"""
     plot the origin and tesmination cell of scRNA-seq
-    
-    Arguments:
+    Parameters
+    ----------
         adata: the anndata performed LTNN analysis
         origin: the origin cell list/numpy.nparray
         tesmination: the tesmination cell list/numpy.nparray
-
-    Returns:
+    Returns
+    -------
         ax: the axex subplot of heatmap
     
     """
@@ -690,11 +690,11 @@ Array = Union[np.ndarray, scipy.sparse.spmatrix]
 def tfidf(X: Array) -> Array:
     r"""
     TF-IDF normalization (following the Seurat v3 approach)
-
-    Arguments:
+    Parameters
+    ----------
         X: Input matrix
-
-    Returns:
+    Returns
+    -------
     X_tfidf: TF-IDF normalized matrix
     
     """

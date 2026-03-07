@@ -206,6 +206,17 @@ def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
         raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
 
 
+@register_function(
+    aliases=['get_adata', '加载AnnData', 'download and load adata'],
+    category="datasets",
+    description="Download a dataset file and load it into AnnData with automatic format detection.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.get_adata(url, filename="dataset.h5ad")'],
+    related=['datasets.download_data_requests', 'datasets.download_data']
+)
 def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     """Download example data to local folder.
 
@@ -255,6 +266,17 @@ def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     return adata
 
 
+@register_function(
+    aliases=['download_data_requests', 'requests下载数据', 'robust downloader'],
+    category="datasets",
+    description="Download dataset files with HTTP headers and streaming to avoid mirror access failures.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['path = ov.datasets.download_data_requests(url, file_path="pbmc3k.h5ad")'],
+    related=['datasets.download_data', 'datasets.get_adata']
+)
 def download_data_requests(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
     """Download data with custom headers to reduce HTTP 403 failures.
 
@@ -319,31 +341,97 @@ def download_data_requests(url: str, file_path: Optional[str] = None, dir: str =
 
 
 # add our toy sample data
+@register_function(
+    aliases=['gillespie', 'gillespie_dataset', '占位数据集_gillespie'],
+    category="datasets",
+    description="Placeholder loader for Gillespie simulation dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.gillespie()'],
+    related=['datasets.toggleswitch', 'datasets.krumsiek11']
+)
 def gillespie():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['hl60', 'hl60_dataset', '占位数据集_hl60'],
+    category="datasets",
+    description="Placeholder loader for HL60 dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.hl60()'],
+    related=['datasets.hematopoiesis', 'datasets.pbmc3k']
+)
 def hl60():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['nascseq', 'nascent_seq', '占位数据集_nascseq'],
+    category="datasets",
+    description="Placeholder loader for NASC-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.nascseq()'],
+    related=['datasets.scslamseq', 'datasets.scifate']
+)
 def nascseq():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['scslamseq', 'scSLAM-seq', '占位数据集_scslamseq'],
+    category="datasets",
+    description="Placeholder loader for scSLAM-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.scslamseq()'],
+    related=['datasets.nascseq', 'datasets.scifate']
+)
 def scslamseq():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['scifate', 'sci-fate', '占位数据集_scifate'],
+    category="datasets",
+    description="Placeholder loader for sci-fate dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.scifate()'],
+    related=['datasets.nascseq', 'datasets.scslamseq']
+)
 def scifate():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['神经元剪接数据', 'scnt_seq_neuron_splicing', 'neuron_splicing_dataset'],
+    category="datasets",
+    description="Load scNT-seq neuron splicing dataset for RNA velocity/splicing dynamics analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.scnt_seq_neuron_splicing()'],
+    related=['datasets.scnt_seq_neuron_labeling', 'datasets.get_adata']
+)
 def scnt_seq_neuron_splicing(
     filename: str = "neuron_splicing.h5ad",
 ) -> AnnData:
@@ -357,6 +445,17 @@ def scnt_seq_neuron_splicing(
     return adata
 
 
+@register_function(
+    aliases=['神经元标记数据', 'scnt_seq_neuron_labeling', 'neuron_labeling_dataset'],
+    category="datasets",
+    description="Load scNT-seq neuron labeling dataset for RNA labeling kinetics analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.scnt_seq_neuron_labeling()'],
+    related=['datasets.scnt_seq_neuron_splicing', 'datasets.get_adata']
+)
 def scnt_seq_neuron_labeling(
     filename: str = "neuron_labeling.h5ad",
 ) -> AnnData:
@@ -370,10 +469,43 @@ def scnt_seq_neuron_labeling(
     return adata
 
 
+@register_function(
+    aliases=['cite_seq', 'CITE-seq', '占位数据集_cite_seq'],
+    category="datasets",
+    description="Placeholder loader for CITE-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.cite_seq()'],
+    related=['datasets.pbmc3k', 'datasets.pbmc8k']
+)
 def cite_seq():
+    """Placeholder for CITE-seq dataset loader.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Function is currently not implemented and returns ``None``.
+    """
     pass
 
 
+@register_function(
+    aliases=['zebrafish', '斑马鱼数据', 'zebrafish_dataset'],
+    category="datasets",
+    description="Load zebrafish single-cell dataset for developmental trajectory studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.zebrafish()'],
+    related=['datasets.dentate_gyrus', 'datasets.hematopoiesis']
+)
 def zebrafish(
     filename: str = "zebrafish.h5ad",
 ) -> AnnData:
@@ -387,6 +519,17 @@ def zebrafish(
     return adata
 
 
+@register_function(
+    aliases=['dentate_gyrus', '齿状回数据', 'DG_loom_dataset'],
+    category="datasets",
+    description="Load Dentate Gyrus loom dataset commonly used in RNA velocity analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.dentate_gyrus()'],
+    related=['datasets.dentate_gyrus_scvelo', 'datasets.get_adata']
+)
 def dentate_gyrus(
     url: str = "http://pklab.med.harvard.edu/velocyto/DentateGyrus/DentateGyrus.loom",
     filename: Optional[str] = None,
@@ -401,6 +544,17 @@ def dentate_gyrus(
     return adata
 
 
+@register_function(
+    aliases=['bone_marrow', '骨髓数据', 'bone_marrow_dataset'],
+    category="datasets",
+    description="Load bone marrow single-cell dataset for hematopoietic analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bone_marrow()'],
+    related=['datasets.hematopoiesis', 'datasets.bm']
+)
 def bone_marrow(
     filename: str = "bone_marrow.h5ad",
 ) -> AnnData:
@@ -414,6 +568,17 @@ def bone_marrow(
     return adata
 
 
+@register_function(
+    aliases=['haber', 'Haber_dataset', '小肠上皮数据'],
+    category="datasets",
+    description="Load Haber et al. intestinal epithelium dataset with cell-cycle gene annotations.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.haber()'],
+    related=['datasets.hg_forebrain_glutamatergic', 'datasets.get_adata']
+)
 def haber(
     url: str = "http://pklab.med.harvard.edu/velocyto/Haber_et_al/Haber_et_al.loom",
     filename: Optional[str] = None,
@@ -433,6 +598,17 @@ def haber(
     return adata
 
 
+@register_function(
+    aliases=['hg_forebrain_glutamatergic', '前脑谷氨酸能数据', 'hgForebrainGlut'],
+    category="datasets",
+    description="Load human forebrain glutamatergic loom dataset for velocity benchmark analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hg_forebrain_glutamatergic()'],
+    related=['datasets.haber', 'datasets.chromaffin']
+)
 def hg_forebrain_glutamatergic(
     url: str = "http://pklab.med.harvard.edu/velocyto/hgForebrainGlut/hgForebrainGlut.loom",
     filename: Optional[str] = None,
@@ -452,6 +628,17 @@ def hg_forebrain_glutamatergic(
     return adata
 
 
+@register_function(
+    aliases=['chromaffin', '嗜铬细胞数据', 'chromaffin_dataset'],
+    category="datasets",
+    description="Load chromaffin-cell loom dataset used in velocity and lineage studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.chromaffin()'],
+    related=['datasets.bm', 'datasets.get_adata']
+)
 def chromaffin(
     filename: str = "onefilepercell_A1_unique_and_others_J2CH1.loom",
 ) -> AnnData:  #
@@ -467,6 +654,17 @@ def chromaffin(
     return adata
 
 
+@register_function(
+    aliases=['bm', 'mouse_bm_dataset', '小鼠骨髓loom'],
+    category="datasets",
+    description="Load mouse bone marrow loom dataset for differentiation trajectory analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bm()'],
+    related=['datasets.bone_marrow', 'datasets.hematopoiesis']
+)
 def bm(
     url: str = "http://pklab.med.harvard.edu/velocyto/mouseBM/SCG71.loom",
     filename: Optional[str] = None,
@@ -506,6 +704,17 @@ def pancreatic_endocrinogenesis(
 
     return adata
 
+@register_function(
+    aliases=['pancreas_cellrank', 'cellrank_pancreas', '胰腺cellrank数据'],
+    category="datasets",
+    description="Load CellRank pancreas benchmark dataset for fate and lineage analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pancreas_cellrank()'],
+    related=['datasets.pancreatic_endocrinogenesis', 'datasets.get_adata']
+)
 def pancreas_cellrank(
     url: str = "https://figshare.com/ndownloader/files/25060877",
     filename: str = "pancreas_cellrank.h5ad",
@@ -519,6 +728,17 @@ def pancreas_cellrank(
 
 
 
+@register_function(
+    aliases=['dentate_gyrus_scvelo', 'DG_scvelo', '齿状回scvelo数据'],
+    category="datasets",
+    description="Load processed Dentate Gyrus dataset from scVelo examples.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.dentate_gyrus_scvelo()'],
+    related=['datasets.dentate_gyrus', 'datasets.scnt_seq_neuron_splicing']
+)
 def dentate_gyrus_scvelo(
     filename: str = "dentategyrus_scv.h5ad",
 ) -> AnnData:
@@ -533,6 +753,17 @@ def dentate_gyrus_scvelo(
     return adata
 
 
+@register_function(
+    aliases=['sceu_seq_rpe1', 'rpe1_dataset', 'scEU_seq_RPE1'],
+    category="datasets",
+    description="Load scEU-seq RPE1 dataset for RNA labeling kinetics analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.sceu_seq_rpe1()'],
+    related=['datasets.sceu_seq_organoid', 'datasets.get_adata']
+)
 def sceu_seq_rpe1(
     filename: str = "rpe1.h5ad",
 ):
@@ -546,6 +777,17 @@ def sceu_seq_rpe1(
     return adata
 
 
+@register_function(
+    aliases=['sceu_seq_organoid', 'organoid_dataset', 'scEU_seq_organoid'],
+    category="datasets",
+    description="Load scEU-seq organoid dataset for temporal transcription dynamics studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.sceu_seq_organoid()'],
+    related=['datasets.sceu_seq_rpe1', 'datasets.get_adata']
+)
 def sceu_seq_organoid(
     filename: str = "organoid.h5ad",
 ):
@@ -559,6 +801,17 @@ def sceu_seq_organoid(
     return adata
 
 
+@register_function(
+    aliases=['hematopoiesis', '造血数据', 'hematopoiesis_processed'],
+    category="datasets",
+    description="Load processed hematopoiesis dataset for trajectory and lineage benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hematopoiesis()'],
+    related=['datasets.hematopoiesis_raw', 'datasets.bone_marrow']
+)
 def hematopoiesis(
     filename: str = "hematopoiesis.h5ad",
 ) -> AnnData:
@@ -569,6 +822,17 @@ def hematopoiesis(
     return adata
 
 
+@register_function(
+    aliases=['multi_brain_5k', '10x_multiome_brain_5k', '小鼠脑multiome'],
+    category="datasets",
+    description="Download and assemble 10x E18 mouse brain 5k multiome dataset resources.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['mdata = ov.datasets.multi_brain_5k()'],
+    related=['datasets.download_data_requests', 'multi.read_10x_multiome_h5']
+)
 def multi_brain_5k():
     """Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed."""
     print(f"{Colors.HEADER}🧠 Downloading raw Fresh Embryonic E18 Mouse Brain (5k){Colors.ENDC}")
@@ -615,6 +879,17 @@ def multi_brain_5k():
         return None
 
 
+@register_function(
+    aliases=['hematopoiesis_raw', '造血原始数据', 'hematopoiesis_unprocessed'],
+    category="datasets",
+    description="Load raw hematopoiesis dataset for custom preprocessing pipelines.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hematopoiesis_raw()'],
+    related=['datasets.hematopoiesis', 'pp.preprocess']
+)
 def hematopoiesis_raw(
     filename: str = "hematopoiesis_raw.h5ad",
 ) -> AnnData:
@@ -625,6 +900,17 @@ def hematopoiesis_raw(
     return adata
 
 
+@register_function(
+    aliases=['human_tfs', '人类转录因子列表', 'human_transcription_factors'],
+    category="datasets",
+    description="Download curated human transcription factor table.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['tfs = ov.datasets.human_tfs()'],
+    related=['single.get_celltype_marker', 'bulk.pyDEG']
+)
 def human_tfs(
     filename: str = "human_tfs.txt",
 ) -> pd.DataFrame:
@@ -636,6 +922,17 @@ def human_tfs(
 
 
 # Scanpy-inspired datasets with dynamo pattern
+@register_function(
+    aliases=['blobs', 'gaussian_blobs', '模拟聚类数据'],
+    category="datasets",
+    description="Generate Gaussian blob synthetic AnnData for clustering benchmarks.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.blobs(n_centers=5, n_observations=1000)'],
+    related=['datasets.create_mock_dataset', 'datasets.krumsiek11']
+)
 def blobs(
     n_variables: int = 11,
     n_centers: int = 5,
@@ -683,6 +980,17 @@ def blobs(
         return create_mock_dataset(n_cells=n_observations, n_genes=n_variables, n_cell_types=n_centers, with_clustering=False)
 
 
+@register_function(
+    aliases=['burczynski06', 'UC_CD_bulk', '炎症性肠病bulk数据'],
+    category="datasets",
+    description="Load Burczynski06 UC/CD PBMC bulk expression dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.burczynski06()'],
+    related=['datasets.bhattacherjee', 'datasets.get_adata']
+)
 def burczynski06(
     url: str = "ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS1nnn/GDS1615/soft/GDS1615_full.soft.gz",
     filename: str = "GDS1615_full.soft.gz",
@@ -699,6 +1007,17 @@ def burczynski06(
     return adata
 
 
+@register_function(
+    aliases=['moignard15', 'embryo_hematopoiesis', '小鼠胚胎造血数据'],
+    category="datasets",
+    description="Load Moignard15 embryo hematopoiesis single-cell qRT-PCR dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.moignard15()'],
+    related=['datasets.paul15', 'datasets.hematopoiesis']
+)
 def moignard15(
     url: str = "https://static-content.springer.com/esm/art%3A10.1038%2Fnbt.3154/MediaObjects/41587_2015_BFnbt3154_MOESM4_ESM.xlsx",
     filename: str = "nbt.3154-S3.xlsx",
@@ -739,6 +1058,17 @@ def moignard15(
         return create_mock_dataset(n_cells=3934, n_genes=42, n_cell_types=5, with_clustering=True)
 
 
+@register_function(
+    aliases=['paul15', 'myeloid_progenitors', '髓系祖细胞数据'],
+    category="datasets",
+    description="Load Paul15 myeloid progenitor dataset with curated lineage labels.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.paul15()'],
+    related=['datasets.krumsiek11', 'datasets.moignard15']
+)
 def paul15(
     url: str = "https://falexwolf.de/data/paul15.h5",
     filename: str = "paul15.h5",
@@ -787,6 +1117,17 @@ def paul15(
         return create_mock_dataset(n_cells=2730, n_genes=3451, n_cell_types=13, with_clustering=True)
 
 
+@register_function(
+    aliases=['pbmc8k', 'pbmc_8k', 'PBMC8K数据集'],
+    category="datasets",
+    description="Load 10x PBMC 8k dataset for immune-cell method benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pbmc8k()'],
+    related=['datasets.pbmc3k', 'datasets.seqfish']
+)
 def pbmc8k(
     url: str = "https://stacks.stanford.edu/file/cv694yk7414/pbmc8k.h5ad", 
     filename: str = "pbmc8k.h5ad"
@@ -798,6 +1139,17 @@ def pbmc8k(
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['seqfish', 'seqFISH数据', 'spatial_seqfish_dataset'],
+    category="datasets",
+    description="Load seqFISH spatial transcriptomics dataset for spatial algorithm demos.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.seqfish()'],
+    related=['space.svg', 'space.clusters', 'datasets.pbmc8k']
+)
 def seqfish(
     url: str = "https://stacks.stanford.edu/file/cv694yk7414/seqfish.h5ad", 
     filename: str = "seqfish.h5ad"
@@ -810,6 +1162,17 @@ def seqfish(
     return adata
 
 
+@register_function(
+    aliases=['toggleswitch', 'toggle_switch_simulation', '开关模型模拟数据'],
+    category="datasets",
+    description="Generate two-gene toggle-switch simulation data.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.toggleswitch()'],
+    related=['datasets.krumsiek11', 'datasets.blobs']
+)
 def toggleswitch(
     filename: str = "toggleswitch.txt"
 ) -> AnnData:
@@ -843,6 +1206,17 @@ def toggleswitch(
         return create_mock_dataset(n_cells=200, n_genes=2, n_cell_types=2, with_clustering=False)
 
 
+@register_function(
+    aliases=['krumsiek11', 'myeloid_simulation', '髓系分化模拟数据'],
+    category="datasets",
+    description="Generate Krumsiek11-inspired myeloid differentiation simulation dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.krumsiek11()'],
+    related=['datasets.toggleswitch', 'datasets.paul15']
+)
 def krumsiek11() -> AnnData:
     """Simulated myeloid progenitors (Krumsiek et al. 2011).
 
@@ -888,6 +1262,17 @@ def krumsiek11() -> AnnData:
 
 
 # Mock datasets (following dynamo pattern)
+@register_function(
+    aliases=['create_mock_dataset', 'mock_adata', '模拟单细胞数据'],
+    category="datasets",
+    description="Create configurable mock single-cell AnnData for pipeline testing.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.create_mock_dataset(n_cells=1000, n_cell_types=5)'],
+    related=['datasets.pbmc3k', 'datasets.blobs']
+)
 def create_mock_dataset(
     n_cells: int = 2000,
     n_genes: int = 1500, 
@@ -1093,6 +1478,17 @@ def sc_ref_Lymph_Node(
     return adata
 
 
+@register_function(
+    aliases=['pbmc3k', 'PBMC3K', 'pbmc_3k_dataset'],
+    category="datasets",
+    description="Load PBMC3k dataset with optional processed/raw mode and mock fallback.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pbmc3k(processed=True)'],
+    related=['datasets.pbmc8k', 'datasets.create_mock_dataset']
+)
 def pbmc3k(processed: bool = False) -> AnnData:
     """
     Load PBMC 3k dataset from URL.
@@ -1135,6 +1531,17 @@ def pbmc3k(processed: bool = False) -> AnnData:
         return create_mock_dataset(n_cells=2700, n_genes=32738, n_cell_types=8, with_clustering=processed)
 
 
+@register_function(
+    aliases=['bhattacherjee', 'cocaine_pfc_dataset', 'bhattacherjee_pfc'],
+    category="datasets",
+    description="Load Bhattacherjee mouse PFC cocaine-administration scRNA-seq dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bhattacherjee(processed=True)'],
+    related=['datasets.pbmc3k', 'datasets.create_mock_dataset']
+)
 def bhattacherjee(processed: bool = True) -> AnnData:
     """Processed single-cell data PFC adult mice under cocaine self-administration.
 
@@ -1181,6 +1588,3 @@ def bhattacherjee(processed: bool = True) -> AnnData:
         print(f"{Colors.WARNING}🔄 Generating mock data as fallback...{Colors.ENDC}")
         return create_mock_dataset(n_cells=5000, n_genes=2000, n_cell_types=10, with_clustering=processed)
 
-
-if __name__ == "__main__":
-    pass

@@ -625,13 +625,26 @@ class QQRuntime:
             tail = max_len - head - 20
             return text[:head] + "\n...\n" + text[-max(150, tail):]
 
+        last_progress_send: float = 0.0
+        _PROGRESS_GAP = 12.0  # throttle: send progress at most every 12 s
+
         async def llm_chunk_cb(chunk: str) -> None:
             nonlocal llm_buf
             if chunk:
                 llm_buf += chunk
 
         async def progress_cb(msg: str) -> None:
-            pass  # QQ doesn't support message editing; skip draft updates
+            nonlocal last_progress_send
+            # QQ can't edit messages; send throttled progress snapshots instead
+            # (mirrors Feishu's edit_card live updates, just less frequent)
+            now = time.monotonic()
+            if now - last_progress_send < _PROGRESS_GAP:
+                return
+            last_progress_send = now
+            try:
+                await asyncio.to_thread(self._send_text, target, f"⚙️ {msg[:200]}", msg_id)
+            except Exception:
+                pass
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:

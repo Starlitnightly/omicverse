@@ -133,11 +133,40 @@ def recover_counts(X, mult_value, max_range, log_base=None, chunk_size=1000):
     '''
     return counts, size_factors_all
 
+@register_function(
+    aliases=["二分搜索", "binary_search", "size_factor_search", "大小因子搜索", "计数反推搜索"],
+    category="preprocessing",
+    description="Infer a cell-specific size factor by binary search from normalized profile",
+    prerequisites={
+        "functions": ["recover_counts"]
+    },
+    requires={},
+    produces={},
+    auto_fix="none",
+    examples=[
+        "sf = ov.pp.binary_search(vec, min_r=100, max_r=100000)",
+    ],
+    related=["recover_counts"],
+)
 def binary_search(vec, min_r=0, max_r=100000):
-    """
-    For a given gene expression vector corresponding to a single cell
-    or gene expression profile, infer the unknown size factor using
-    binary search.
+    """Infer a size factor from one normalized expression vector.
+
+    Parameters
+    ----------
+    vec : array-like
+        Normalized expression vector for one cell (or one profile), where the
+        minimum non-zero value is assumed to correspond to one raw count after
+        multiplying by the unknown size factor.
+    min_r : int, default=0
+        Lower bound of the integer search interval.
+    max_r : int, default=100000
+        Upper bound of the integer search interval.
+
+    Returns
+    -------
+    int
+        Estimated integer size factor that best maps the minimum non-zero value
+        back to one count.
     """
     # Find the smallest non-zero expression value. We assume
     # that this value corresponds to a count of one.

@@ -49,17 +49,14 @@ class STT(object):
     for analyzing cell state transitions, developmental trajectories, and spatial dynamics
     in tissue organization.
 
-    Arguments:
-        adata: AnnData
-            Annotated data matrix containing spatial transcriptomics data.
-            Must contain:
-            - Spliced counts in adata.layers['spliced']
-            - Unspliced counts in adata.layers['unspliced']
-            - Spatial coordinates in adata.obsm[spatial_loc]
-        spatial_loc: str, optional (default='xy_loc')
-            Key in adata.obsm containing spatial coordinates.
-        region: str, optional (default='Region')
-            Column name in adata.obs containing region annotations.
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing spliced/unspliced layers and coordinates.
+    spatial_loc : str, default='xy_loc'
+        Coordinate key in ``adata.obsm``.
+    region : str, default='Region'
+        Region annotation column in ``adata.obs``.
 
     Attributes:
         adata: AnnData
@@ -90,13 +87,14 @@ class STT(object):
     def __init__(self,adata,spatial_loc='xy_loc',region='Region'):
         r"""Initialize STT spatial transition analysis object.
         
-        Arguments:
-            adata: AnnData
-                Annotated data matrix with spatial and velocity data.
-            spatial_loc: str, optional (default='xy_loc')
-                Key for spatial coordinates in adata.obsm.
-            region: str, optional (default='Region')
-                Column name for region annotations in adata.obs.
+        Parameters
+        ----------
+        adata : AnnData
+            Input AnnData with spatial and velocity-related layers.
+        spatial_loc : str, default='xy_loc'
+            Coordinate key in ``adata.obsm``.
+        region : str, default='Region'
+            Region key in ``adata.obs``.
         """
         self.adata=adata
         self.adata_aggr=None
@@ -112,12 +110,14 @@ class STT(object):
         developmental stages through clustering. It uses a combination of PCA, nearest
         neighbor graph construction, and Leiden clustering to identify distinct cell stages.
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
 
-        Returns:
-            None
-            Updates adata.obs['joint_leiden'] with stage assignments.
+        Returns
+        -------
+        None
+            Writes stage labels to ``adata.obs['joint_leiden']``.
 
         Notes:
             - Requires spliced/unspliced counts in adata.layers
@@ -154,25 +154,27 @@ class STT(object):
         patterns and cell state transitions. It combines connectivity constraints with
         spatial information to model developmental trajectories.
 
-        Arguments:
-            n_states: int, optional (default=9)
-                Number of states for transition modeling.
-            n_iter: int, optional (default=15)
-                Number of iterations for model training.
-            weight_connectivities: float, optional (default=0.5)
-                Weight for connectivity constraints in range [0,1].
-            n_neighbors: int, optional (default=50)
-                Number of neighbors for graph construction.
-            thresh_ms_gene: float, optional (default=0.2)
-                Threshold for marker gene selection.
-            spa_weight: float, optional (default=0.3)
-                Weight for spatial constraints in range [0,1].
-            **kwargs: 
-                Additional arguments for dynamical iteration.
+        Parameters
+        ----------
+        n_states : int, default=9
+            Number of latent transition states.
+        n_iter : int, default=15
+            Iterations for dynamical optimization.
+        weight_connectivities : float, default=0.5
+            Connectivity-term weight.
+        n_neighbors : int, default=50
+            Neighbors used in graph construction.
+        thresh_ms_gene : float, default=0.2
+            Threshold used in marker/feature filtering.
+        spa_weight : float, default=0.3
+            Spatial-term weight.
+        **kwargs : Any
+            Additional options passed to ``tl.dynamical_iteration``.
 
-        Returns:
-            None
-            Updates self.adata_aggr with trained model results.
+        Returns
+        -------
+        None
+            Stores aggregated STT result in ``self.adata_aggr``.
 
         Notes:
             - Higher spa_weight emphasizes spatial relationships
@@ -196,15 +198,17 @@ class STT(object):
         This method allows loading previously trained STT model results, enabling
         analysis continuation or result sharing.
 
-        Arguments:
-            adata: AnnData
-                Original AnnData object with spatial data.
-            adata_aggr: AnnData
-                Aggregated AnnData object from previous training.
+        Parameters
+        ----------
+        adata : AnnData
+            Original spatial AnnData.
+        adata_aggr : AnnData
+            Aggregated STT result AnnData.
 
-        Returns:
-            None
-            Updates self.adata and self.adata_aggr with loaded data.
+        Returns
+        -------
+        None
+            Updates internal references to loaded objects.
 
         Notes:
             - Useful for sharing analysis results
@@ -221,20 +225,17 @@ class STT(object):
         This method identifies and computes transition pathways between cell states
         in spatial context, revealing developmental trajectories and cell fate decisions.
 
-        Arguments:
-            pathway_dict: dict
-                Dictionary defining pathway parameters including:
-                - start_states: list of starting cell states
-                - end_states: list of target cell states
-                - intermediate_states: optional list of intermediate states
-                - constraints: optional spatial or temporal constraints
+        Parameters
+        ----------
+        pathway_dict : dict
+            Pathway specification for STT pathway computation.
+        n_components : int, default=10
+            Number of decomposition components for pathway computation.
 
-        Returns:
-            dict
-                Computed pathway information including:
-                - transition_probabilities: array of state transition probabilities
-                - path_coordinates: spatial coordinates of the pathway
-                - path_states: sequence of states along the pathway
+        Returns
+        -------
+        dict
+            Pathway computation result from STT backend.
 
         Notes:
             - Pathways are computed using transition tensors
@@ -249,20 +250,17 @@ class STT(object):
         This method visualizes computed transition pathways in spatial context,
         showing how cells transition between states while maintaining spatial organization.
 
-        Arguments:
-            label_fontsize: int, optional (default=20)
-                Font size for axis labels.
-            **kwargs: 
-                Additional arguments passed to plotting function:
-                - color_by: feature to color points by
-                - alpha: transparency of points
-                - size: size of points
-                - title: plot title
-                - save: path to save figure
+        Parameters
+        ----------
+        label_fontsize : int, default=20
+            Axis label font size.
+        **kwargs : Any
+            Extra options passed to STT plotting backend.
 
-        Returns:
-            matplotlib.figure.Figure
-                Figure object containing the pathway visualization.
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Pathway visualization figure.
 
         Notes:
             - Multiple pathways can be visualized simultaneously
@@ -283,19 +281,17 @@ class STT(object):
         tensor decomposition results, highlighting the continuous nature of cell state
         transitions in space.
 
-        Arguments:
-            pathway_name: str
-                Name of the pathway to visualize.
-            **kwargs:
-                Additional plotting arguments:
-                - show_transitions: bool, whether to show transition arrows
-                - color_scheme: colormap for states
-                - edge_width: width of transition edges
-                - node_size: size of state nodes
+        Parameters
+        ----------
+        pathway_name : str
+            Name of pathway to visualize.
+        **kwargs : Any
+            Extra tensor-pathway plotting arguments.
 
-        Returns:
-            matplotlib.axes.Axes
-                Axes object containing the tensor pathway plot.
+        Returns
+        -------
+        matplotlib.axes.Axes
+            Tensor-pathway axes.
 
         Notes:
             - Tensor visualization shows transition probabilities
@@ -313,22 +309,17 @@ class STT(object):
         This method visualizes the learned transition tensors, showing how cells
         transition between states while considering spatial constraints.
 
-        Arguments:
-            list_attractor: list
-                List of attractor regions or states to visualize.
-            **kwargs:
-                Additional plotting arguments:
-                - mode: visualization mode ('2D' or '3D')
-                - show_labels: whether to show state labels
-                - cmap: colormap for tensor values
-                - edge_threshold: minimum value for showing transitions
+        Parameters
+        ----------
+        list_attractor : list
+            Attractor/state list to visualize.
+        **kwargs : Any
+            Extra arguments for tensor plotting.
 
-        Returns:
-            dict
-                Dictionary containing plotting results:
-                - fig: matplotlib figure object
-                - tensors: plotted tensor values
-                - coordinates: spatial coordinates used
+        Returns
+        -------
+        dict
+            Plotting objects/metadata returned by STT backend.
 
         Notes:
             - Tensors show transition probabilities between states
@@ -345,18 +336,17 @@ class STT(object):
         This method builds a continuous landscape representation of cell state transitions
         in spatial context, useful for understanding developmental potential and barriers.
 
-        Arguments:
-            coord_key: str, optional (default='X_xy_loc')
-                Key for spatial coordinates in adata.obsm.
-            **kwargs:
-                Additional landscape construction arguments:
-                - n_neighbors: number of neighbors for graph construction
-                - smoothing: smoothing factor for landscape
-                - resolution: grid resolution for landscape
+        Parameters
+        ----------
+        coord_key : str, default='X_xy_loc'
+            Coordinate key used for landscape construction.
+        **kwargs : Any
+            Additional backend options for landscape construction.
 
-        Returns:
-            None
-            Updates adata.obsm['trans_coord'] with landscape coordinates.
+        Returns
+        -------
+        None
+            Writes landscape coordinates to ``adata.obsm['trans_coord']``.
 
         Notes:
             - Landscape represents continuous transition space
@@ -373,20 +363,15 @@ class STT(object):
         This method reconstructs developmental lineages by analyzing transition
         patterns and spatial relationships between cell states.
 
-        Arguments:
-            **kwargs:
-                Additional lineage inference arguments:
-                - start_state: starting cell state
-                - end_states: target cell states
-                - min_branch_len: minimum branch length
-                - max_steps: maximum steps in lineage
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional lineage-inference options.
 
-        Returns:
-            dict
-                Lineage inference results containing:
-                - branches: list of inferred lineage branches
-                - states: ordered states in each branch
-                - confidence: confidence scores for branches
+        Returns
+        -------
+        dict
+            Inferred lineage result.
 
         Notes:
             - Combines spatial and transcriptional information
@@ -402,17 +387,15 @@ class STT(object):
         This method creates a visual representation of the constructed transition
         landscape, showing the continuous spectrum of cell states in spatial context.
 
-        Arguments:
-            **kwargs:
-                Additional plotting arguments:
-                - color_by: feature to color points by
-                - show_trajectory: whether to show transition trajectories
-                - contour: whether to show landscape contours
-                - grid_size: resolution of landscape grid
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional landscape plotting arguments.
 
-        Returns:
-            matplotlib.figure.Figure
-                Figure containing the landscape visualization.
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Landscape plot.
 
         Notes:
             - Colors indicate cell states or features
@@ -428,15 +411,17 @@ class STT(object):
         This method creates a Sankey diagram showing the flow of cells between
         different states or conditions, useful for understanding transition dynamics.
 
-        Arguments:
-            vector1: array-like
-                Source state assignments for cells.
-            vector2: array-like
-                Target state assignments for cells.
+        Parameters
+        ----------
+        vector1 : array-like
+            Source-state labels.
+        vector2 : array-like
+            Target-state labels.
 
-        Returns:
-            matplotlib.figure.Figure
-                Figure containing the Sankey diagram.
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Sankey figure.
 
         Notes:
             - Width of flows indicates transition frequency
@@ -452,17 +437,15 @@ class STT(object):
         This method identifies and visualizes genes that are most important in
         determining cell state transitions and spatial patterns.
 
-        Arguments:
-            **kwargs:
-                Additional plotting arguments:
-                - n_genes: number of top genes to show
-                - groupby: how to group genes
-                - show_labels: whether to show gene names
-                - scale: whether to scale expression values
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional arguments for top-gene plotting.
 
-        Returns:
-            matplotlib.figure.Figure
-                Figure showing top genes visualization.
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Top-gene visualization.
 
         Notes:
             - Highlights genes driving state transitions

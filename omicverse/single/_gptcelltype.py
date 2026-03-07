@@ -42,19 +42,41 @@ from .._registry import register_function
 def gptcelltype(input, tissuename=None, speciename='human',
                 provider='qwen',model='qwen-plus', topgenenumber=10,
                 base_url=None):
-    r"""Annotate cell types using AGI (Artificial General Intelligence) models.
+    r"""Annotate cluster cell types with a remote LLM service.
 
-    Arguments:
-        input: Dictionary with clusters as keys and gene markers as values, or DataFrame with cluster information
-        tissuename (str): Tissue name for context (default: None)
-        speciename (str): Species name for annotation context (default: 'human')
-        provider (str): AI model provider - choose from 'openai', 'kimi', 'qwen' (default: 'qwen')
-        model (str): Specific model name to use (default: 'qwen-plus')
-        topgenenumber (int): Number of top genes to use for annotation (default: 10)
-        base_url (str): Custom API base URL (default: None)
+    Parameters
+    ----------
+    input : dict or pandas.DataFrame
+        Cluster marker input. Use either:
+        1) ``dict[cluster_id -> list[str]]`` of marker genes, or
+        2) DE result table containing ``cluster``, ``names``, and
+           ``logfoldchanges`` columns.
+    tissuename : str or None, default=None
+        Tissue context provided to the model prompt (for example, PBMC or brain).
+    speciename : str, default='human'
+        Species context string included in the prompt.
+    provider : str, default='qwen'
+        LLM provider preset used to infer default API endpoint.
+        Supported values are ``'openai'``, ``'kimi'``, and ``'qwen'``.
+    model : str, default='qwen-plus'
+        Chat-completion model name used by the selected provider.
+    topgenenumber : int, default=10
+        Number of top marker genes retained per cluster before prompting.
+    base_url : str or None, default=None
+        Custom chat-completion endpoint base URL. If ``None``, it is selected
+        from ``provider``.
 
-    Returns:
-        dict or str: Cell type annotations for each cluster, or prompt string if API key not found
+    Returns
+    -------
+    dict or str
+        When ``AGI_API_KEY`` is available, returns ``dict[cluster_id -> celltype]``.
+        Otherwise returns the generated prompt text for manual use.
+
+    Examples
+    --------
+    >>> markers = {"0": ["MS4A1", "CD79A"], "1": ["NKG7", "PRF1"]}
+    >>> res = gptcelltype(markers, tissuename="PBMC", speciename="human")
+    >>> adata.obs["gpt_celltype"] = adata.obs["leiden"].map(res)
     """
     from openai import OpenAI
     import os
@@ -125,19 +147,37 @@ def gptcelltype(input, tissuename=None, speciename='human',
 def gpt4celltype(input_data, tissuename=None, speciename='human',
                 provider='qwen', model='qwen-plus', topgenenumber=10,
                 base_url=None):
-    r"""Enhanced cell type annotation using AGI models with improved processing.
+    r"""Annotate cell types with batched HTTP requests to chat-completion APIs.
 
-    Arguments:
-        input_data: Dictionary with clusters as keys and gene markers as values, or DataFrame with cluster information
-        tissuename (str): Tissue name for context (default: None)
-        speciename (str): Species name for annotation context (default: 'human')
-        provider (str): AI model provider - choose from 'openai', 'kimi', 'qwen' (default: 'qwen')
-        model (str): Specific model name to use (default: 'qwen-plus')
-        topgenenumber (int): Number of top genes to use for annotation (default: 10)
-        base_url (str): Custom API base URL (default: None)
+    Parameters
+    ----------
+    input_data : dict or pandas.DataFrame
+        Marker definition per cluster. Same accepted formats as
+        :func:`gptcelltype`.
+    tissuename : str or None, default=None
+        Tissue context used in prompts.
+    speciename : str, default='human'
+        Species context used in prompts.
+    provider : str, default='qwen'
+        Provider preset used to infer a default ``base_url``.
+    model : str, default='qwen-plus'
+        Model name passed to the provider chat-completion API.
+    topgenenumber : int, default=10
+        Maximum number of marker genes retained for each cluster.
+    base_url : str or None, default=None
+        Custom API base URL. If ``None``, inferred from ``provider``.
 
-    Returns:
-        dict or str: Cell type annotations for each cluster, or prompt string if API key not found
+    Returns
+    -------
+    dict or str
+        Returns a mapping from cluster IDs to predicted cell types when API
+        credentials are present. Returns prompt text when ``AGI_API_KEY`` is
+        unavailable.
+
+    Examples
+    --------
+    >>> markers = {"0": ["LYZ", "S100A8"], "1": ["CD3D", "IL7R"]}
+    >>> res = gpt4celltype(markers, tissuename="Blood", provider="qwen")
     """
     input=input_data.copy()
     input_data=input
@@ -231,6 +271,31 @@ def gpt4celltype(input_data, tissuename=None, speciename='human',
 
 def get_cluster_celltype(cluster_celltypes, cluster_markers, species, organization,
                         model,base_url,provider):
+    """Resolve the best cell type per cluster from candidate labels and markers.
+
+    Parameters
+    ----------
+    cluster_celltypes : dict
+        Candidate cell types for each cluster,
+        typically ``dict[cluster_id -> list[str]]``.
+    cluster_markers : dict
+        Marker genes per cluster, typically ``dict[cluster_id -> list[str]]``.
+    species : str
+        Species context used to constrain annotation.
+    organization : str
+        Tissue or organ context used in the prompt.
+    model : str
+        Chat model name used for API requests.
+    base_url : str or None
+        Base URL for chat-completion endpoint.
+    provider : str
+        Provider preset used when ``base_url`` is not supplied.
+
+    Returns
+    -------
+    dict
+        Mapping ``cluster_id -> predicted_cell_type``.
+    """
     import os
     import numpy as np
     import pandas as pd

@@ -31,6 +31,19 @@ import pandas as pd
     related=["single.get_obs_value", "single.plot_metacells", "pp.scale"]
 )
 class MetaCell(object):
+    """SEACells-based metacell construction workflow.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    use_rep : str
+        Embedding key in ``adata.obsm`` used for kernel construction.
+    n_metacells : int or None, optional
+        Number of metacells to learn.
+    use_gpu : bool, default=False
+        Whether to enable GPU acceleration.
+    """
 
     def __init__(self,adata,use_rep,
                  n_metacells=None,
@@ -42,20 +55,33 @@ class MetaCell(object):
                 l2_penalty: float = 0,
                 max_franke_wolfe_iters: int = 50,
                 use_sparse: bool = False,) -> None:
-        r"""Initialize MetaCell object for constructing metacells using SEACells.
+        r"""Initialize a SEACells-based metacell model.
 
-        Arguments:
-            adata: AnnData object containing single-cell data
-            use_rep (str): Key in adata.obsm for representation used to compute kernel (e.g., 'X_pca')
-            n_metacells (int): Number of metacells to compute (default: None, auto-computed as n_cells//75)
-            use_gpu (bool): Whether to use GPU for computation (default: False)
-            verbose (bool): Whether to show progress information (default: True)
-            n_waypoint_eigs (int): Number of eigenvectors for waypoint initialization (default: 10)
-            n_neighbors (int): Number of nearest neighbors for graph construction (default: 15)
-            convergence_epsilon (float): Convergence threshold for Franke-Wolfe algorithm (default: 1e-3)
-            l2_penalty (float): L2 penalty for Franke-Wolfe algorithm (default: 0)
-            max_franke_wolfe_iters (int): Maximum iterations for Franke-Wolfe algorithm (default: 50)
-            use_sparse (bool): Whether to use sparse matrix operations (default: False)
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Single-cell data matrix and metadata.
+        use_rep : str
+            Embedding key in ``adata.obsm`` used to build the similarity kernel.
+        n_metacells : int or None, default=None
+            Number of metacells to learn. If ``None``, defaults to
+            ``adata.n_obs // 75``.
+        use_gpu : bool, default=False
+            Whether to use GPU acceleration in SEACells.
+        verbose : bool, default=True
+            Whether to print model progress information.
+        n_waypoint_eigs : int, default=10
+            Number of eigenvectors used during waypoint initialization.
+        n_neighbors : int, default=15
+            Number of neighbors for graph/kernel construction.
+        convergence_epsilon : float, default=1e-3
+            Convergence threshold for the Franke-Wolfe optimization.
+        l2_penalty : float, default=0
+            L2 regularization strength.
+        max_franke_wolfe_iters : int, default=50
+            Maximum Franke-Wolfe iterations per optimization cycle.
+        use_sparse : bool, default=False
+            Whether to use sparse operations in the backend.
         """
         
         if n_metacells is None:
@@ -78,12 +104,18 @@ class MetaCell(object):
 
 
     def initialize_archetypes(self,**kwargs):
-        r"""Initialize metacell archetypes for SEACells algorithm.
-        
-        This method constructs the kernel matrix and initializes archetype positions.
-        
-        Arguments:
-            **kwargs: Additional arguments passed to initialize_archetypes method
+        r"""Construct kernel matrix and initialize archetypes.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments passed to
+            ``SEACells.initialize_archetypes``.
+
+        Returns
+        -------
+        None
+            Updates model state in place.
         """
         self.model.construct_kernel_matrix()
         self.M = self.model.kernel_matrix
@@ -91,12 +123,21 @@ class MetaCell(object):
         self.model.initialize_archetypes(**kwargs)
     
     def train(self,min_iter=10, max_iter=50,**kwargs):
-        r"""Train the SEACells model to learn metacell assignments.
-        
-        Arguments:
-            min_iter (int): Minimum number of training iterations (default: 10)
-            max_iter (int): Maximum number of training iterations (default: 50)
-            **kwargs: Additional arguments passed to the fit method
+        r"""Train the SEACells model.
+
+        Parameters
+        ----------
+        min_iter : int, default=10
+            Minimum number of optimization iterations.
+        max_iter : int, default=50
+            Maximum number of optimization iterations.
+        **kwargs
+            Additional keyword arguments passed to ``SEACells.fit``.
+
+        Returns
+        -------
+        None
+            Writes SEACell assignments to ``adata.obs['SEACell']``.
         """
         self.model.fit(min_iter=min_iter, max_iter=max_iter,**kwargs)
         self.model.seacells_dict=dict(zip(self.adata.obs.index.tolist(),
@@ -105,16 +146,24 @@ class MetaCell(object):
 
     def predicted(self,method='soft',celltype_label='celltype',
                   summarize_layer='raw',minimum_weight=0.05):
-        r"""Generate metacell summary from trained SEACells model.
-        
-        Arguments:
-            method (str): Summarization method - 'soft' or 'hard' (default: 'soft')
-            celltype_label (str): Key in adata.obs containing cell type information (default: 'celltype')
-            summarize_layer (str): Layer to summarize for gene expression (default: 'raw')
-            minimum_weight (float): Minimum weight threshold for soft assignment (default: 0.05)
-            
-        Returns:
-            AnnData: Metacell AnnData object with summarized gene expression
+        r"""Summarize single cells into metacell expression profiles.
+
+        Parameters
+        ----------
+        method : str, default='soft'
+            Aggregation strategy: ``'soft'`` uses weighted memberships;
+            ``'hard'`` uses discrete SEACell assignments.
+        celltype_label : str, default='celltype'
+            Obs column used for cell-type metadata propagation.
+        summarize_layer : str, default='raw'
+            Expression layer used for metacell summarization.
+        minimum_weight : float, default=0.05
+            Minimum membership weight used in soft aggregation.
+
+        Returns
+        -------
+        anndata.AnnData
+            Metacell-level AnnData object.
         """
         if method=='soft':
             ad=summarize_by_soft_SEACell(self.adata, self.model.A_, 
@@ -134,10 +183,16 @@ class MetaCell(object):
         return ad
     
     def save(self,model_path='seacells/model.pkl'):
-        r"""Save the trained SEACells model to disk.
-        
-        Arguments:
-            model_path (str): Path to save the model file (default: 'seacells/model.pkl')
+        r"""Save trained SEACells model to disk.
+
+        Parameters
+        ----------
+        model_path : str, default='seacells/model.pkl'
+            Output path for serialized model.
+
+        Returns
+        -------
+        None
         """
         import pickle
 
@@ -146,10 +201,17 @@ class MetaCell(object):
         return None
 
     def load(self,model_path='seacells/model.pkl'):
-        r"""Load a pre-trained SEACells model from disk.
-        
-        Arguments:
-            model_path (str): Path to the model file (default: 'seacells/model.pkl')
+        r"""Load a serialized SEACells model from disk.
+
+        Parameters
+        ----------
+        model_path : str, default='seacells/model.pkl'
+            Path to model pickle file.
+
+        Returns
+        -------
+        None
+            Restores model state and reloads ``adata.obs['SEACell']``.
         """
         import pickle
         with open(model_path, "rb") as f:
@@ -159,10 +221,16 @@ class MetaCell(object):
             self.adata.obs['SEACell']=[self.model.seacells_dict[i] for i in self.adata.obs.index.tolist()]
 
     def step(self,n_steps=5):
-        r"""Run additional training iterations step-wise.
-        
-        Arguments:
-            n_steps (int): Number of additional training steps to run (default: 5)
+        r"""Run additional incremental optimization steps.
+
+        Parameters
+        ----------
+        n_steps : int, default=5
+            Number of extra ``SEACells.step()`` calls.
+
+        Returns
+        -------
+        None
         """
         # You can force the model to run additional iterations step-wise using the .step() function
         print(f'Ran for {len(self.model.RSS_iters)} iterations')
@@ -211,21 +279,33 @@ class MetaCell(object):
 def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
                    size=15,
                    edgecolors='b',linewidths=0.6,alpha=1,**kwargs,):
-    r"""Plot metacells on an existing axis.
-    
-    Arguments:
-        ax: Matplotlib axis object for plotting
-        metacells_ad: AnnData object containing metacell data
-        use_rep (str): Representation to use for coordinates (default: 'X_umap')
-        color (str): Color for metacell points (default: '#1f77b4')
-        size (int): Size of metacell points (default: 15)
-        edgecolors (str): Edge color for points (default: 'b')
-        linewidths (float): Line width for point edges (default: 0.6)
-        alpha (float): Transparency of points (default: 1)
-        **kwargs: Additional arguments passed to scatter plot
-        
-    Returns:
-        matplotlib.axes.Axes: The modified axis object
+    r"""Plot metacell centroids on a given embedding axis.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axis used for plotting.
+    metacells_ad : anndata.AnnData
+        Metacell-level AnnData containing ``SEACell`` assignments.
+    use_rep : str, default='X_umap'
+        Embedding key in ``metacells_ad.obsm`` for coordinates.
+    color : str, default='#1f77b4'
+        Marker face color.
+    size : int, default=15
+        Marker size.
+    edgecolors : str, default='b'
+        Marker edge color.
+    linewidths : float, default=0.6
+        Marker edge width.
+    alpha : float, default=1
+        Marker transparency.
+    **kwargs
+        Additional keyword arguments passed to ``Axes.scatter``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axis with metacell points overlaid.
     """
     umap = pd.DataFrame(metacells_ad.obsm[use_rep]).set_index(metacells_ad.obs_names).join(metacells_ad.obs["SEACell"])
     umap["SEACell"] = umap["SEACell"].astype("category")
@@ -251,13 +331,25 @@ def plot_metacells(ax,metacells_ad,use_rep='X_umap',color='#1f77b4',
     related=["single.MetaCell", "single.plot_metacells", "utils.transfer_obs"]
 )
 def get_obs_value(ad,adata,groupby,type='int'):
-    r"""Transfer observation values from single-cell to metacell data.
-    
-    Arguments:
-        ad: Metacell AnnData object
-        adata: Original single-cell AnnData object  
-        groupby (str): Column name in adata.obs to transfer
-        type (str): Aggregation method - 'str', 'int', 'max', 'mean', 'min' (default: 'int')
+    r"""Transfer per-cell annotations/statistics to metacells.
+
+    Parameters
+    ----------
+    ad : anndata.AnnData
+        Metacell AnnData object receiving aggregated values.
+    adata : anndata.AnnData
+        Original single-cell AnnData object with ``SEACell`` assignments.
+    groupby : str
+        Obs column in ``adata`` to aggregate into ``ad.obs``.
+    type : str, default='int'
+        Aggregation mode. ``'str'`` uses majority vote for categorical labels;
+        other values are passed to ``groupby.agg`` (for example ``'mean'``,
+        ``'max'``, ``'min'``).
+
+    Returns
+    -------
+    None
+        Writes aggregated values into ``ad.obs[groupby]``.
     """
     if type=='str':
         grouped_data = adata.obs.groupby('SEACell')[groupby]

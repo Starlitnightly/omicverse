@@ -29,15 +29,15 @@ def lazy_step_qc(
 ):
     """
     Step 1: Quality control and doublet detection.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         species: 'human' or 'mouse'
         sample_key: batch key for QC
         output_path: path to save the result (optional)
         **qc_kwargs: additional arguments for qc function
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 1/10: Quality Control and Doublet Detection")
@@ -78,13 +78,13 @@ def lazy_step_qc(
 def lazy_step_preprocess(adata, output_path=None, **preprocess_kwargs):
     """
     Step 2: Normalization and highly variable gene selection.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
         **preprocess_kwargs: additional arguments for preprocess function
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 2/10: Normalization and HVG Selection")
@@ -116,12 +116,12 @@ def lazy_step_preprocess(adata, output_path=None, **preprocess_kwargs):
 def lazy_step_scale(adata, output_path=None):
     """
     Step 3: Data scaling.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 3/10: Data Scaling")
@@ -139,13 +139,13 @@ def lazy_step_scale(adata, output_path=None):
 def lazy_step_pca(adata, output_path=None, **pca_kwargs):
     """
     Step 4: Principal Component Analysis.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
         **pca_kwargs: additional arguments for PCA
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 4/10: Principal Component Analysis")
@@ -213,13 +213,13 @@ def lazy_step_pca(adata, output_path=None, **pca_kwargs):
 def lazy_step_cell_cycle(adata, species="human", output_path=None):
     """
     Step 5: Cell cycle scoring.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         species: 'human' or 'mouse'
         output_path: path to save the result (optional)
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 5/10: Cell Cycle Scoring")
@@ -237,14 +237,14 @@ def lazy_step_cell_cycle(adata, species="human", output_path=None):
 def lazy_step_harmony(adata, sample_key, output_path=None, **harmony_kwargs):
     """
     Step 6: Harmony batch correction (memory intensive).
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         sample_key: batch key for correction
         output_path: path to save the result (optional)
         **harmony_kwargs: additional arguments for harmony
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 6a/10: Harmony Batch Correction")
@@ -300,14 +300,14 @@ def lazy_step_harmony(adata, sample_key, output_path=None, **harmony_kwargs):
 def lazy_step_scvi(adata, sample_key, output_path=None, **scvi_kwargs):
     """
     Step 6b: scVI batch correction (memory intensive, optional).
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         sample_key: batch key for correction
         output_path: path to save the result (optional)
         **scvi_kwargs: additional arguments for scVI
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 6b/10: scVI Batch Correction")
@@ -380,12 +380,12 @@ def lazy_step_scvi(adata, sample_key, output_path=None, **scvi_kwargs):
 def lazy_step_select_best_method(adata, output_path=None):
     """
     Step 7: Select best batch correction method.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 7/10: Select Best Batch Correction Method")
@@ -410,12 +410,12 @@ def lazy_step_select_best_method(adata, output_path=None):
 def lazy_step_mde(adata, output_path=None):
     """
     Step 8: MDE embedding computation (memory intensive).
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 8/10: MDE Embedding")
@@ -445,13 +445,13 @@ def lazy_step_mde(adata, output_path=None):
 def lazy_step_clustering(adata, output_path=None, max_iterations=10):
     """
     Step 9: Automated clustering with SCCAF (memory intensive).
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
         max_iterations: maximum SCCAF iterations
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 9/10: Automated Clustering")
@@ -519,12 +519,12 @@ def lazy_step_clustering(adata, output_path=None, max_iterations=10):
 def lazy_step_final_embeddings(adata, output_path=None):
     """
     Step 10: Final UMAP and tSNE embeddings.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         output_path: path to save the result (optional)
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
     print("🔧 Step 10/10: Final Embeddings")

@@ -28,14 +28,20 @@ class PrettyEnum(Enum):
 
 
 def _pretty_raise_enum(cls: Type["ErrorFormatterABC"], func: Callable) -> Callable:
-    r"""Decorator to provide pretty error messages for enum classes.
-    
-    Arguments:
-        cls: Enum class type
-        func: Function to wrap
-        
-    Returns:
-        Wrapped function with improved error formatting
+    r"""Wrap enum constructors to emit readable invalid-option errors.
+
+    Parameters
+    ----------
+    cls : Type[ErrorFormatterABC]
+        Enum class implementing custom error formatting.
+    func : Callable
+        Original ``__new__``/constructor function to wrap.
+
+    Returns
+    -------
+    Callable
+        Wrapped constructor that rewrites ``ValueError`` messages using
+        ``cls._format``.
     """
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> "ErrorFormatterABC":
@@ -79,13 +85,17 @@ class ErrorFormatterABC(ABC):
 
     @classmethod
     def _format(cls, value) -> str:
-        r"""Format error message for invalid enum value.
-        
-        Arguments:
-            value: Invalid value that was provided
-            
-        Returns:
-            Formatted error message string
+        r"""Format an invalid-enum error message.
+
+        Parameters
+        ----------
+        value : Any
+            Invalid option value provided by the caller.
+
+        Returns
+        -------
+        str
+            Human-readable error message with allowed enum values.
         """
         return cls.__error_format__.format(
             value, cls.__name__, [m.value for m in cls.__members__.values()]
@@ -95,14 +105,20 @@ class ErrorFormatterABC(ABC):
 class ModeEnum(str, ErrorFormatterABC, PrettyEnum, metaclass=ABCEnumMeta):
     r"""String-based enum with error formatting capabilities."""
     def _generate_next_value_(self, start, count, last_values):
-        r"""Generate next value for auto() enum members.
-        
-        Arguments:
-            start: Starting value
-            count: Current count
-            last_values: Previously generated values
-            
-        Returns:
-            Lowercase string representation
+        r"""Generate lowercase values for auto-enum members.
+
+        Parameters
+        ----------
+        start : Any
+            Initial value (unused).
+        count : int
+            Index of current enum value (unused).
+        last_values : list
+            Previously generated values (unused).
+
+        Returns
+        -------
+        str
+            Lowercase string of the current enum name.
         """
         return str(self).lower()

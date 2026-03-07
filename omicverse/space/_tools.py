@@ -809,6 +809,20 @@ def read_visium_10x(
         adata,
         **kwargs,
 ):
+    """Read and standardize 10x Visium data with bin2cell-compatible loader.
+
+    Parameters
+    ----------
+    adata : str or AnnData
+        Input Visium path/object accepted by ``bin2cell.read_visium``.
+    **kwargs
+        Additional arguments forwarded to ``read_visium``.
+
+    Returns
+    -------
+    AnnData
+        Visium AnnData with unique variable names.
+    """
     from ..external.bin2cell import read_visium
     adata = read_visium(adata, **kwargs)
     adata.var_names_make_unique()
@@ -896,6 +910,26 @@ def visium_10x_hd_cellpose_expand(
         expanded_labels_key="labels_he_expanded",
         **kwargs,
 ):
+    """Expand segmentation labels from nuclei to nearby bins.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Visium HD AnnData containing primary segmentation labels.
+    max_bin_distance : int, default=4
+        Maximum bin distance for expansion.
+    labels_key : str, default='labels_he'
+        Source label column/key.
+    expanded_labels_key : str, default='labels_he_expanded'
+        Output label key for expanded labels.
+    **kwargs
+        Extra arguments forwarded to ``expand_labels``.
+
+    Returns
+    -------
+    None
+        Updates labels in ``adata`` in place.
+    """
     from ..external.bin2cell import expand_labels
     expand_labels(adata, 
                   labels_key=labels_key, 
@@ -934,6 +968,38 @@ def visium_10x_hd_cellpose_gex(
         buffer=150,
         **kwargs,
 ):
+    """Run expression-image segmentation and map labels back to spatial bins.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Visium HD AnnData.
+    obs_key : str, default='n_counts_adjusted'
+        Observation value used to generate gene-expression image.
+    log1p : bool, default=False
+        Whether to log-transform values when generating image.
+    mpp : float, default=0.3
+        Microns-per-pixel scale.
+    sigma : int, default=5
+        Gaussian smoothing parameter for grid image generation.
+    gex_save_path : str, default='stardist/gex_colon.tiff'
+        Output path of generated expression image.
+    prob_thresh : float, default=0.01
+        StarDist probability threshold.
+    nms_thresh : float, default=0.1
+        StarDist non-max-suppression threshold.
+    gpu : bool, default=True
+        Whether to use GPU in StarDist inference.
+    buffer : int, default=150
+        Crop buffer used for spatial coordinate key.
+    **kwargs
+        Additional StarDist arguments.
+
+    Returns
+    -------
+    None
+        Writes ``labels_gex`` back into ``adata``.
+    """
     from ..external.bin2cell import grid_image, stardist, insert_labels,destripe
     #if gex_save_path's file exist, jump grid_image to stardist
     if obs_key not in adata.obs.keys():
@@ -982,6 +1048,26 @@ def salvage_secondary_labels(
         labels_key="labels_joint",
         **kwargs,
 ):
+    """Merge primary and secondary segmentation labels.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Visium HD AnnData with multiple label layers.
+    primary_label : str, default='labels_he'
+        Primary segmentation label key.
+    secondary_label : str, default='labels_gex'
+        Secondary segmentation label key.
+    labels_key : str, default='labels_joint'
+        Output merged-label key.
+    **kwargs
+        Reserved keyword arguments.
+
+    Returns
+    -------
+    None
+        Updates merged labels in ``adata``.
+    """
     from ..external.bin2cell import salvage_secondary_labels
     salvage_secondary_labels(adata, primary_label=primary_label,
                              secondary_label=secondary_label,
@@ -1011,6 +1097,24 @@ def bin2cell(
         spatial_keys=["spatial"],
         diameter_scale_factor=None,
 ):
+    """Aggregate binned Visium signals into cell-level profiles.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial bin-level AnnData.
+    labels_key : str, default='labels_joint'
+        Label key assigning bins to cells.
+    spatial_keys : list, default=['spatial']
+        Spatial coordinate keys to aggregate.
+    diameter_scale_factor : float, optional
+        Optional scaling factor for estimated cell diameters.
+
+    Returns
+    -------
+    AnnData
+        Cell-level AnnData generated from labeled bins.
+    """
     from ..external.bin2cell import bin_to_cell
     return bin_to_cell(adata, labels_key=labels_key, 
                 spatial_keys=spatial_keys,diameter_scale_factor=diameter_scale_factor)
