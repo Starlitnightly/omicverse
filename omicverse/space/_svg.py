@@ -40,41 +40,29 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
     PROST (Pattern RecognitiOn of Spatial Transcriptomics), Pearson correlation,
     and Spateo-based analysis.
 
-    Arguments:
-        adata: AnnData
-            Annotated data matrix containing spatial transcriptomics data.
-            Must contain:
-            - Raw counts in adata.X or adata.layers['counts']
-            - Spatial coordinates in adata.obsm['spatial']
-        mode: str, optional (default='prost')
-            Method for identifying spatially variable genes:
-            - 'prost': Pattern RecognitiOn of Spatial Transcriptomics
-            - 'pearsonr': Pearson correlation-based method
-            - 'spateo': Spateo-based analysis using Wasserstein distance
-        n_svgs: int, optional (default=3000)
-            Number of spatially variable genes to select.
-        target_sum: float, optional (default=50*1e4)
-            Target sum for library size normalization.
-        platform: str, optional (default="visium")
-            Spatial transcriptomics platform type.
-        mt_startwith: str, optional (default='MT-')
-            Prefix for mitochondrial genes to exclude from analysis.
-        **kwargs:
-            Additional arguments passed to specific SVG methods:
-            For 'spateo':
-                - log2fc: Minimum log2 fold change (default: 1)
-                - rank_p: Maximum rank-based p-value (default: 0.05)
-                - adj_pvalue: Maximum adjusted p-value (default: 0.05)
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing expression matrix and coordinates in
+        ``adata.obsm['spatial']``.
+    mode : {'prost', 'pearsonr', 'spateo'}, default='prost'
+        SVG detection backend.
+    n_svgs : int, default=3000
+        Number of spatially variable genes to select.
+    target_sum : float, default=50*1e4
+        Target-sum used during normalization.
+    platform : str, default='visium'
+        Platform identifier used by PROST preprocessing.
+    mt_startwith : str, default='MT-'
+        Mitochondrial gene prefix excluded by default.
+    **kwargs
+        Additional method-specific options (primarily for ``spateo`` mode).
 
-    Returns:
-        AnnData
-            Input AnnData object updated with:
-            - adata.var['space_variable_features']: Boolean mask of selected SVGs
-            - adata.var['highly_variable']: Alias for space_variable_features
-            For 'prost' mode:
-                - Additional PROST-specific metrics in adata.var
-            For 'spateo' mode:
-                - Wasserstein distance statistics in adata.var
+    Returns
+    -------
+    AnnData
+        Updated AnnData with SVG flags in
+        ``adata.var['space_variable_features']`` and ``adata.var['highly_variable']``.
 
     Notes:
         - PROST mode requires opencv-python package

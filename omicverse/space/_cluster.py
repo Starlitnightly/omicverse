@@ -50,29 +50,30 @@ class pySTAGATE:
     """
     A class representing the PyTorch implementation of STAGATE (Spatial Transcriptomics Analysis using Graph Attention autoEncoder).
 
-    Arguments:
-        adata: AnnData object
-            Annotated data matrix containing spatial transcriptomics data.
-        num_batch_x: int
-            Number of batches in x direction for spatial partitioning.
-        num_batch_y: int
-            Number of batches in y direction for spatial partitioning.
-        spatial_key: list, optional (default=['X','Y'])
-            List of keys in adata.obs containing spatial coordinates.
-        batch_size: int, optional (default=1)
-            Size of batches for training.
-        rad_cutoff: int, optional (default=200)
-            Radius cutoff for spatial network construction.
-        num_epoch: int, optional (default=1000)
-            Number of epochs for training.
-        lr: float, optional (default=0.001)
-            Learning rate for optimization.
-        weight_decay: float, optional (default=1e-4)
-            Weight decay (L2 penalty) for optimization.
-        hidden_dims: list, optional (default=[512, 30])
-            List of hidden dimensions for the neural network layers.
-        device: str, optional (default='cuda:0')
-            Device to run the model on ('cuda:0' or 'cpu').
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData with coordinates and expression matrix.
+    num_batch_x : int
+        Number of tiles along x-axis for mini-batch graph construction.
+    num_batch_y : int
+        Number of tiles along y-axis for mini-batch graph construction.
+    spatial_key : list, default=['X', 'Y']
+        Coordinate columns in ``adata.obs`` used to build spatial graph.
+    batch_size : int, default=1
+        Number of tiled graphs per optimization step.
+    rad_cutoff : int, default=200
+        Radius cutoff when constructing spatial neighbors.
+    num_epoch : int, default=1000
+        Number of training epochs.
+    lr : float, default=0.001
+        Learning rate for Adam optimizer.
+    weight_decay : float, default=1e-4
+        L2 regularization strength.
+    hidden_dims : list, default=[512, 30]
+        Hidden-layer sizes of STAGATE encoder.
+    device : str, default='cuda:0'
+        Device specifier; falls back to CPU when CUDA is unavailable.
 
     Attributes:
         device: torch.device
@@ -113,6 +114,33 @@ class pySTAGATE:
                 weight_decay: float = 1e-4,
                 hidden_dims: list = [512, 30],
                 device: str = 'cuda:0')-> None:
+        """Initialize STAGATE training components.
+
+        Parameters
+        ----------
+        adata : AnnData
+            Spatial AnnData for representation learning.
+        num_batch_x : int
+            Number of x-axis tiles for batch graph generation.
+        num_batch_y : int
+            Number of y-axis tiles for batch graph generation.
+        spatial_key : list, default=['X', 'Y']
+            Coordinate columns in ``adata.obs``.
+        batch_size : int, default=1
+            Number of tiled samples per gradient step.
+        rad_cutoff : int, default=200
+            Radius cutoff for neighborhood graph construction.
+        num_epoch : int, default=1000
+            Number of epochs for training.
+        lr : float, default=0.001
+            Learning rate for optimizer.
+        weight_decay : float, default=1e-4
+            Weight decay for optimizer.
+        hidden_dims : list, default=[512, 30]
+            Hidden dimensions for STAGATE network.
+        device : str, default='cuda:0'
+            Compute device string.
+        """
         # Initialize device
         device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.device=device
@@ -158,11 +186,13 @@ class pySTAGATE:
         For each epoch, it processes batches of data, computes the loss using mean squared error,
         and updates the model parameters through backpropagation.
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
 
-        Returns:
-            None
+        Returns
+        -------
+        None
 
         Notes:
             - The training progress is displayed using a progress bar.
@@ -189,11 +219,13 @@ class pySTAGATE:
         1. STAGATE embeddings (stored in adata.obsm['STAGATE'])
         2. Reconstructed expression values (stored in adata.layers['STAGATE_ReX'])
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
 
-        Returns:
-            None
+        Returns
+        -------
+        None
 
         Notes:
             - Negative values in reconstructed expression are set to 0
@@ -225,20 +257,21 @@ class pySTAGATE:
         3. Computing diffusion pseudotime
         4. Storing results in the AnnData object
 
-        Arguments:
-            n_neighbors: int, optional (default=20)
-                Number of neighbors for the kNN graph construction.
-            resolution: float, optional (default=1)
-                Resolution parameter for Leiden clustering.
-            max_cell_for_subsampling: int, optional (default=5000)
-                Maximum number of cells to use for distance calculation.
-                If exceeded, cells will be subsampled.
-            psm_key: str, optional (default='pSM_STAGATE')
-                Key under which to store the pseudo-spatial map in adata.obs.
+        Parameters
+        ----------
+        n_neighbors : int, default=20
+            Neighbors used to build kNN graph from STAGATE embedding.
+        resolution : int, default=1
+            Leiden clustering resolution before DPT.
+        max_cell_for_subsampling : int, default=5000
+            Maximum number of cells used in root-cell distance estimation.
+        psm_key : str, default='pSM_STAGATE'
+            Output column name for pseudo-spatial scores in ``adata.obs``.
 
-        Returns:
-            numpy.ndarray
-                Array containing the computed pseudo-spatial map values.
+        Returns
+        -------
+        numpy.ndarray
+            Pseudo-spatial map values derived from diffusion pseudotime.
 
         Notes:
             - If number of cells exceeds max_cell_for_subsampling, random subsampling is performed
@@ -322,30 +355,25 @@ def clusters(adata,
     This function supports multiple clustering methods including STAGATE, GraphST, CAST, and BINARY.
     Each method processes the spatial data differently and stores its results in the AnnData object.
 
-    Arguments:
-        adata: AnnData
-            Annotated data matrix containing spatial transcriptomics data.
-        methods: list
-            List of methods to use for clustering. Supported methods are:
-            - 'STAGATE': Graph attention autoencoder-based clustering
-            - 'GraphST': Graph-based spatial transcriptomics clustering
-            - 'CAST': Clustering And Spatial Transcriptomics
-            - 'BINARY': Binary-based spatial clustering
-        methods_kwargs: dict
-            Dictionary containing method-specific parameters. Each key should correspond
-            to a method name and contain a dictionary of parameters for that method.
-        batch_key: str, optional (default=None)
-            Key in adata.obs for batch information. If None, all cells are treated as one batch.
-        lognorm: float, optional (default=50*1e4)
-            Normalization factor for log transformation when recovering counts.
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData object to be clustered/embedded.
+    methods : list
+        Ordered list of methods to run, e.g. ``['STAGATE', 'GraphST']``.
+    methods_kwargs : dict
+        Method-specific configuration dictionary.
+    batch_key : str, optional
+        Batch/sample key in ``adata.obs`` for multi-sample methods.
+    spatial_key : str, default='spatial'
+        Spatial coordinate key in ``adata.obsm``.
+    lognorm : float, default=50*1e4
+        Target-sum scale used when recovering counts from log-normalized data.
 
-    Returns:
-        AnnData
-            The input AnnData object with added clustering results in various slots:
-            - STAGATE: Results in adata.obsm['STAGATE'] and adata.layers['STAGATE_ReX']
-            - GraphST: Results in adata.obsm['GraphST_embedding']
-            - CAST: Results in adata.obsm['X_cast']
-            - BINARY: Results in adata.obsm['BINARY']
+    Returns
+    -------
+    AnnData
+        Updated AnnData containing method-specific embeddings/layers.
 
     Notes:
         - For STAGATE: If n_top_genes is specified, highly variable genes are selected
@@ -621,25 +649,27 @@ def merge_cluster(adata,
     based on a distance threshold. It can optionally visualize the dendrogram showing
     the merging process.
 
-    Arguments:
-        adata: AnnData
-            Annotated data matrix containing cluster information.
-        groupby: str, optional (default='mclust')
-            Key in adata.obs containing the cluster labels to be merged.
-        use_rep: str, optional (default='STAGATE')
-            Key in adata.obsm to use for calculating distances between clusters.
-        threshold: float, optional (default=0.05)
-            Distance threshold for merging clusters. Lower values result in more merging.
-        plot: bool, optional (default=True)
-            Whether to plot the dendrogram with the merging threshold line.
-        start_idx: int, optional (default=0)
-            Starting index for cluster numbering in the output.
-        **kwargs:
-            Additional arguments passed to scanpy.pl.dendrogram().
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData containing existing cluster labels and embeddings.
+    groupby : str, default='mclust'
+        Cluster label column in ``adata.obs`` to merge.
+    use_rep : str, default='STAGATE'
+        Embedding key in ``adata.obsm`` used for dendrogram distance.
+    threshold : float, default=0.05
+        Hierarchical-clustering distance threshold for merging.
+    plot : bool, default=True
+        Whether to display dendrogram with threshold line.
+    start_idx : int, default=0
+        Index offset applied to original cluster IDs before remapping.
+    **kwargs
+        Extra arguments passed to ``scanpy.pl.dendrogram``.
 
-    Returns:
-        dict
-            Dictionary mapping original cluster labels to merged cluster labels.
+    Returns
+    -------
+    dict
+        Mapping from original cluster id to merged cluster label.
 
     Notes:
         - The function uses scipy's hierarchical clustering implementation
