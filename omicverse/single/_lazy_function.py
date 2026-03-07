@@ -13,8 +13,20 @@ import scanpy as sc
 import numpy as np
 
 from .._settings import add_reference, settings
+from .._registry import register_function
 
 
+@register_function(
+    aliases=['一键单细胞流程', 'lazy', 'lazy scRNA pipeline', 'automatic single-cell pipeline'],
+    category="single",
+    description="Execute an end-to-end single-cell analysis pipeline with automatic QC, normalization, integration, clustering, and annotation helpers.",
+    prerequisites={'optional_functions': ['pp.qc']},
+    requires={'layers': ['counts (recommended)']},
+    produces={'obsm': ['X_pca', 'X_umap'], 'obsp': ['connectivities'], 'uns': ['neighbors', 'lazy_pipeline']},
+    auto_fix='auto',
+    examples=['ov.single.lazy(adata, species="human", sample_key="batch")'],
+    related=['pp.preprocess', 'single.generate_scRNA_report', 'single.gptcelltype']
+)
 def lazy(
     adata,
     species="human",
@@ -27,14 +39,41 @@ def lazy(
     scvi_kwargs=None,
 ):
     """
-    This is a very interesting function. We can use this function to avoid many unnecessary steps.
-
-    arguments:
-        adata: the data to analysis
-        reforce_steps: we can reforce run lazy step, because some step have been run and will be skipped.
-                        ['qc','pca','preprocess','scaled','Harmony','scVI','eval_bench','eval_clusters']
-        sample_key: the key store in `adata.obs` to batch correction.
-
+    Execute an end-to-end single-cell analysis pipeline with automatic QC, normalization, integration, clustering, and annotation helpers
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `lazy`.
+    species : Any, optional, default="human"
+        Input parameter for `lazy`.
+    reforce_steps : Any, optional, default=[]
+        Input parameter for `lazy`.
+    sample_key : Any, optional, default=None
+        Input parameter for `lazy`.
+    qc_kwargs : Any, optional, default=None
+        Input parameter for `lazy`.
+    preprocess_kwargs : Any, optional, default=None
+        Input parameter for `lazy`.
+    pca_kwargs : Any, optional, default=None
+        Input parameter for `lazy`.
+    harmony_kwargs : Any, optional, default=None
+        Input parameter for `lazy`.
+    scvi_kwargs : Any, optional, default=None
+        Input parameter for `lazy`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `lazy`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.lazy(adata, species="human", sample_key="batch")
     """
     mode = settings.mode
     print(f"🔧 The mode of lazy is {mode}")

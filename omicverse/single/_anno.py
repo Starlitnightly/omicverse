@@ -313,16 +313,32 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                anno_name:str='major',
                                clustertype:str='leiden',
                                )->None:
-    r"""Add cell type annotation from dict to anndata object.
-
-    Arguments:
-        adata: AnnData object of scRNA-seq after preprocessing
-        anno_dict: Dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`
-        anno_name: The name of annotation. ('major')
-        clustertype: Clustering name used in scanpy. ('leiden')
-
-    Returns:
-        None
+    """
+    Manual cell type annotation from cluster-to-celltype dictionary mapping
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `scanpy_cellanno_from_dict`.
+    anno_dict : dict
+        Input parameter for `scanpy_cellanno_from_dict`.
+    anno_name : str, optional, default='major'
+        Input parameter for `scanpy_cellanno_from_dict`.
+    clustertype : str, optional, default='leiden'
+        Input parameter for `scanpy_cellanno_from_dict`.
+    
+    Returns
+    -------
+    None
+        Output produced by `scanpy_cellanno_from_dict`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic manual annotation from dictionary
     """
 
     adata.obs[anno_name+'_celltype'] = adata.obs[clustertype].map(anno_dict).astype('category')
@@ -366,59 +382,93 @@ def get_celltype_marker(adata:anndata.AnnData,
                             foldchange=None,topgenenumber=10,unique=True,
                             global_unique=False,use_raw:Optional[bool]=None,
                             layer:Optional[str]=None,**kwargs)->dict:
-        r"""Get marker genes for each clusters.
-        
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. (leiden)
-            log2fc_min: Minimum log2 fold change of marker genes. (2)
-            pval_cutoff: Maximum p value of marker genes. (0.05)
-            rank: Whether to rank genes by wilcoxon test. (True)
-            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
-            unique: Whether to remove duplicates within each cell type. (True)
-            global_unique: Whether to remove duplicates across all cell types. (False)
-
-        Returns:
-            cellmarker: A dictionary of marker genes for each clusters.
-        """
-        print('...get cell type marker')
-        celltypes = sorted(adata.obs[clustertype].unique())
-        cell_marker_dict={}
-        if key not in adata.uns.keys() or rank:
-            rg_kwargs = dict(method=method, key_added=key)
-            if use_raw is not None:
-                rg_kwargs['use_raw'] = use_raw
-            if layer is not None:
-                rg_kwargs['layer'] = layer
-            rg_kwargs.update(kwargs)
-            sc.tl.rank_genes_groups(adata, clustertype, **rg_kwargs)
+    """
+    Extract cell type-specific marker genes from differential expression analysis
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `get_celltype_marker`.
+    clustertype : str, optional, default='leiden'
+        Input parameter for `get_celltype_marker`.
+    log2fc_min : int, optional, default=2
+        Input parameter for `get_celltype_marker`.
+    scores_type : Any, optional, default='scores'
+        Input parameter for `get_celltype_marker`.
+    pval_cutoff : float, optional, default=0.05
+        Input parameter for `get_celltype_marker`.
+    rank : bool, optional, default=True
+        Input parameter for `get_celltype_marker`.
+    key : Any, optional, default='rank_genes_groups'
+        Input parameter for `get_celltype_marker`.
+    method : Any, optional, default='wilcoxon'
+        Input parameter for `get_celltype_marker`.
+    foldchange : Any, optional, default=None
+        Input parameter for `get_celltype_marker`.
+    topgenenumber : Any, optional, default=10
+        Input parameter for `get_celltype_marker`.
+    unique : Any, optional, default=True
+        Input parameter for `get_celltype_marker`.
+    global_unique : Any, optional, default=False
+        Input parameter for `get_celltype_marker`.
+    use_raw : Optional[bool], optional, default=None
+        Input parameter for `get_celltype_marker`.
+    layer : Optional[str], optional, default=None
+        Input parameter for `get_celltype_marker`.
+    **kwargs : Any
+        Input parameter for `get_celltype_marker`.
+    
+    Returns
+    -------
+    dict
+        Output produced by `get_celltype_marker`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Get markers for all cell types
+    """
+    print('...get cell type marker')
+    celltypes = sorted(adata.obs[clustertype].unique())
+    cell_marker_dict={}
+    if key not in adata.uns.keys() or rank:
+        rg_kwargs = dict(method=method, key_added=key)
+        if use_raw is not None:
+            rg_kwargs['use_raw'] = use_raw
+        if layer is not None:
+            rg_kwargs['layer'] = layer
+        rg_kwargs.update(kwargs)
+        sc.tl.rank_genes_groups(adata, clustertype, **rg_kwargs)
+    for celltype in celltypes:
+        degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
+                                        pval_cutoff=pval_cutoff)
+        foldp=np.histogram(degs[scores_type])
+        if foldchange is None:
+            try:
+                foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+            except:
+                foldchange=degs[scores_type].mean()
+                
+        cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
+        cell_marker_dict[celltype]=cellmarker
+    if unique==True:
+        for key in cell_marker_dict.keys():
+            cell_marker_dict[key]=list(set(cell_marker_dict[key]))
+    
+    # Global uniqueness across all cell types
+    if global_unique:
+        used_genes = set()
         for celltype in celltypes:
-            degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
-                                            pval_cutoff=pval_cutoff)
-            foldp=np.histogram(degs[scores_type])
-            if foldchange is None:
-                try:
-                    foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
-                except:
-                    foldchange=degs[scores_type].mean()
-                    
-            cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
-            cell_marker_dict[celltype]=cellmarker
-        if unique==True:
-            for key in cell_marker_dict.keys():
-                cell_marker_dict[key]=list(set(cell_marker_dict[key]))
-        
-        # Global uniqueness across all cell types
-        if global_unique:
-            used_genes = set()
-            for celltype in celltypes:
-                if celltype in cell_marker_dict:
-                    # Filter out genes that have been used in previous cell types
-                    unique_genes = [gene for gene in cell_marker_dict[celltype] if gene not in used_genes]
-                    cell_marker_dict[celltype] = unique_genes
-                    used_genes.update(unique_genes)
-        
-        return cell_marker_dict
+            if celltype in cell_marker_dict:
+                # Filter out genes that have been used in previous cell types
+                unique_genes = [gene for gene in cell_marker_dict[celltype] if gene not in used_genes]
+                cell_marker_dict[celltype] = unique_genes
+                used_genes.update(unique_genes)
+    
+    return cell_marker_dict
 
 
 
@@ -464,6 +514,61 @@ def get_celltype_marker(adata:anndata.AnnData,
     related=["single.scanpy_cellanno_from_dict", "single.get_celltype_marker", "utils.embedding"]
 )
 class pySCSA(object):
+    """
+    Automated cell type annotation using SCSA (Single Cell Signature Analysis) with multiple databases. IMPORTANT: Use 'clustertype' parameter (NOT 'cluster') in cell_auto_anno()!
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Configuration argument used when constructing `pySCSA`.
+    foldchange : float, optional, default=1.5
+        Configuration argument used when constructing `pySCSA`.
+    pvalue : float, optional, default=0.05
+        Configuration argument used when constructing `pySCSA`.
+    output : str, optional, default='temp/rna_anno.txt'
+        Configuration argument used when constructing `pySCSA`.
+    model_path : str, optional, default=''
+        Configuration argument used when constructing `pySCSA`.
+    outfmt : str, optional, default='txt'
+        Configuration argument used when constructing `pySCSA`.
+    Gensymbol : bool, optional, default=True
+        Configuration argument used when constructing `pySCSA`.
+    species : str, optional, default='Human'
+        Configuration argument used when constructing `pySCSA`.
+    weight : int, optional, default=100
+        Configuration argument used when constructing `pySCSA`.
+    tissue : str, optional, default='All'
+        Configuration argument used when constructing `pySCSA`.
+    target : str, optional, default='cellmarker'
+        Configuration argument used when constructing `pySCSA`.
+    celltype : str, optional, default='normal'
+        Configuration argument used when constructing `pySCSA`.
+    norefdb : bool, optional, default=False
+        Configuration argument used when constructing `pySCSA`.
+    cellrange : str, optional, default=None
+        Configuration argument used when constructing `pySCSA`.
+    noprint : bool, optional, default=True
+        Configuration argument used when constructing `pySCSA`.
+    list_tissue : bool, optional, default=False
+        Configuration argument used when constructing `pySCSA`.
+    tissuename : str, optional, default=None
+        Configuration argument used when constructing `pySCSA`.
+    speciename : str, optional, default=None
+        Configuration argument used when constructing `pySCSA`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # CRITICAL: Use clustertype='leiden', NOT cluster='leiden'!
+    """
 
     def __init__(self,adata:anndata.AnnData,
                 foldchange:float=1.5,pvalue:float=0.05,
@@ -536,13 +641,22 @@ class pySCSA(object):
             self.model_path=model_path
 
     def get_model_tissue(self,species:str="Human")->None:
-        r"""List all available tissues in the database.
+        """
+        List all available tissues in the database
         
-        Arguments:
-            species: Species for annotation. Only used for cellmarker database. ('Human')
-
-        Returns:
-            None
+        Parameters
+        ----------
+        species : str, optional, default="Human"
+            Input parameter for `get_model_tissue`.
+        
+        Returns
+        -------
+        None
+            Output produced by `get_model_tissue`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         
         anno = Annotator(foldchange=self.foldchange,
@@ -571,15 +685,26 @@ class pySCSA(object):
 
     def cell_anno(self,clustertype:str='leiden',
                   cluster:str='all',rank_rep=False)->pd.DataFrame:
-        r"""Annotate cell type for each cluster.
+        """
+        Annotate cell type for each cluster
         
-        Arguments:
-            clustertype: Clustering name used in scanpy. ('leiden')
-            cluster: Only deal with one cluster of marker genes. ('all')
-            rank_rep: Whether to repeat ranking. (False)
+        Parameters
+        ----------
+        clustertype : str, optional, default='leiden'
+            Input parameter for `cell_anno`.
+        cluster : str, optional, default='all'
+            Input parameter for `cell_anno`.
+        rank_rep : Any, optional, default=False
+            Input parameter for `cell_anno`.
         
-        Returns:
-            result: Annotation result as DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `cell_anno`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv',rank_rep=rank_rep)
@@ -619,10 +744,22 @@ class pySCSA(object):
         return result
     
     def cell_anno_print(self)->None:
-        r"""Print the annotation result.
-
-        Returns:
-            None
+        """
+        Print the annotation result
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        None
+            Output produced by `cell_anno_print`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         for i in set(self.result['Cluster']):
             test=self.result.loc[self.result['Cluster']==i].iloc[:2]
@@ -641,15 +778,26 @@ class pySCSA(object):
 
     def cell_auto_anno(self,adata:anndata.AnnData,
                        clustertype:str='leiden',key='scsa_celltype')->None:
-        r"""Add cell type annotation to anndata.obs['scsa_celltype'].
+        """
+        Add cell type annotation to anndata.obs['scsa_celltype']
         
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. ('leiden')
-            key: Key to store cell type annotation. ('scsa_celltype')
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `cell_auto_anno`.
+        clustertype : str, optional, default='leiden'
+            Input parameter for `cell_auto_anno`.
+        key : Any, optional, default='scsa_celltype'
+            Input parameter for `cell_auto_anno`.
         
-        Returns:
-            None
+        Returns
+        -------
+        None
+            Output produced by `cell_auto_anno`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         # If annotation results are not present, run cell_anno first
         if not hasattr(self, "result") or self.result is None:
@@ -671,20 +819,36 @@ class pySCSA(object):
                             log2fc_min:int=2,scores_type='scores',
                             pval_cutoff:float=0.05,rank:bool=True,
                             unique:bool=True,global_unique:bool=False)->dict:
-        r"""Get marker genes for each clusters.
+        """
+        Get marker genes for each clusters
         
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. (leiden)
-            log2fc_min: Minimum log2 fold change of marker genes. (2)
-            pval_cutoff: Maximum p value of marker genes. (0.05)
-            rank: Whether to rank genes by wilcoxon test. (True)
-            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
-            unique: Whether to remove duplicates within each cell type. (True)
-            global_unique: Whether to remove duplicates across all cell types. (False)
-
-        Returns:
-            cellmarker: A dictionary of marker genes for each clusters.
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_celltype_marker`.
+        clustertype : str, optional, default='leiden'
+            Input parameter for `get_celltype_marker`.
+        log2fc_min : int, optional, default=2
+            Input parameter for `get_celltype_marker`.
+        scores_type : Any, optional, default='scores'
+            Input parameter for `get_celltype_marker`.
+        pval_cutoff : float, optional, default=0.05
+            Input parameter for `get_celltype_marker`.
+        rank : bool, optional, default=True
+            Input parameter for `get_celltype_marker`.
+        unique : bool, optional, default=True
+            Input parameter for `get_celltype_marker`.
+        global_unique : bool, optional, default=False
+            Input parameter for `get_celltype_marker`.
+        
+        Returns
+        -------
+        dict
+            Output produced by `get_celltype_marker`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         print('...get cell type marker')
         cell_marker_dict=get_celltype_marker(adata=adata,
@@ -697,12 +861,40 @@ class pySCSA(object):
     
 
 
+@register_function(
+    aliases=['MetaTiME注释器', 'MetaTiME', 'tumor microenvironment meta-components'],
+    category="single",
+    description="MetaTiME wrapper for tumor microenvironment cell-state annotation using pretrained meta-components.",
+    prerequisites={'optional_functions': ['pp.preprocess', 'pp.neighbors']},
+    requires={'obs': ['cluster labels'], 'obsm': ['embedding (recommended)']},
+    produces={'obs': ['MetaTiME annotations'], 'uns': ['MetaTiME scoring tables']},
+    auto_fix='none',
+    examples=['TiME_object = ov.single.MetaTiME(adata, mode="table")', 'TiME_object.predictTiME()'],
+    related=['single.generate_scRNA_report', 'utils.plot_embedding_celltype']
+)
 class MetaTiME(object):
     """
-    MetaTiME: Meta-components in Tumor immune MicroEnvironment
-
-    Github: https://github.com/yi-zhang/MetaTiME/
+    MetaTiME wrapper for tumor microenvironment cell-state annotation using pretrained meta-components
     
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Configuration argument used when constructing `MetaTiME`.
+    mode : str, optional, default='table'
+        Configuration argument used when constructing `MetaTiME`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> TiME_object = ov.single.MetaTiME(adata, mode="table")
     """
     
     def __init__(self,adata:anndata.AnnData,mode:str='table'):
@@ -749,12 +941,24 @@ class MetaTiME(object):
                 clustercol :str = 'overcluster'):
         """
         Overcluster single cell data to get cluster level cell state annotation
-
-        Arguments:
-            resolution: resolution for leiden clustering
-            random_state: random state for leiden clustering
-            clustercol: column name for cluster level cell state annotation
         
+        Parameters
+        ----------
+        resolution : float, optional, default=8
+            Input parameter for `overcluster`.
+        random_state : int, optional, default=0
+            Input parameter for `overcluster`.
+        clustercol : str, optional, default='overcluster'
+            Input parameter for `overcluster`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `overcluster`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         print('...overclustering using leiden')
@@ -765,10 +969,20 @@ class MetaTiME(object):
     def predictTiME(self,save_obs_name:str='MetaTiME'):
         """
         Predict TiME celtype for each cell
-
-        Arguments:
-            save_obs_name: column name for cell type annotation in adata.obs
         
+        Parameters
+        ----------
+        save_obs_name : str, optional, default='MetaTiME'
+            Input parameter for `predictTiME`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `predictTiME`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         print('...projecting MeC scores')
         self.pdata=mecmapper.projectMecAnn(self.adata, self.mecmodel.mec_score)
@@ -793,24 +1007,39 @@ class MetaTiME(object):
              min_cell:int=5, title=None,figsize:tuple=(6,6),
              dpi:int=80,frameon:bool=False,legend_loc=None,palette=None):
         """
-        Plot annotated cells with  non-overlapping fonts.
-
-        Arguments:
-            basis: basis for plotting
-            cluster_key: column name for cell type annotation in adata.obs
-            fontsize: fontsize for plotting
-            min_cell: minimum number of cells for plotting
-            title: title for plotting
-            figsize: figure size for plotting
-            dpi: dpi for plotting
-            frameon: frameon for plotting
-            legend_loc: legend_loc for plotting
-            palette: palette for plotting
-
-        Returns:
-            fig: figure object
-            ax: axis object
+        Plot annotated cells with  non-overlapping fonts
         
+        Parameters
+        ----------
+        basis : str, optional, default='X_umap'
+            Input parameter for `plot`.
+        cluster_key : str, optional, default='MetaTiME'
+            Input parameter for `plot`.
+        fontsize : int, optional, default=8
+            Input parameter for `plot`.
+        min_cell : int, optional, default=5
+            Input parameter for `plot`.
+        title : Any, optional, default=None
+            Input parameter for `plot`.
+        figsize : tuple, optional, default=(6,6)
+            Input parameter for `plot`.
+        dpi : int, optional, default=80
+            Input parameter for `plot`.
+        frameon : bool, optional, default=False
+            Input parameter for `plot`.
+        legend_loc : Any, optional, default=None
+            Input parameter for `plot`.
+        palette : Any, optional, default=None
+            Input parameter for `plot`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `plot`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         import matplotlib.pyplot as plt
         if not title:

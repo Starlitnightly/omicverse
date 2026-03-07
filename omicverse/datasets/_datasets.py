@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from anndata import AnnData, read_h5ad, read_loom
 import warnings
+from .._registry import register_function
 
 # Import omicverse color settings
 try:
@@ -108,8 +109,43 @@ DATA_DOWNLOAD_LINK_DICT = {
     },
 }
 
+@register_function(
+    aliases=['下载数据', 'download_data', 'dataset downloader'],
+    category="datasets",
+    description="Download OmicVerse tutorial datasets or resources to local cache with progress and integrity checks.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.download_data(url, file_path="pbmc3k.h5ad", dir="data")'],
+    related=['datasets.pancreatic_endocrinogenesis', 'datasets.sc_ref_Lymph_Node']
+)
 def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download example data to local folder."""
+    """
+    Download OmicVerse tutorial datasets or resources to local cache with progress and integrity checks
+    
+    Parameters
+    ----------
+    url : str
+        Input parameter for `download_data`.
+    file_path : Optional[str], optional, default=None
+        Input parameter for `download_data`.
+    dir : str, optional, default="./data"
+        Input parameter for `download_data`.
+    
+    Returns
+    -------
+    str
+        Output produced by `download_data`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.datasets.download_data(url, file_path="pbmc3k.h5ad", dir="data")
+    """
     file_path = ntpath.basename(url) if file_path is None else file_path
     file_path = os.path.join(dir, file_path)
     print(f"{Colors.BLUE}{EMOJI['start']} Downloading data to {file_path}{Colors.ENDC}")
@@ -429,14 +465,43 @@ def bm(
     return adata
 
 
+@register_function(
+    aliases=['胰腺内分泌发生数据', 'pancreatic_endocrinogenesis', 'pancreas development dataset'],
+    category="datasets",
+    description="Load or download the pancreatic endocrinogenesis reference dataset for developmental trajectory and lineage analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pancreatic_endocrinogenesis()'],
+    related=['datasets.download_data', 'utils.cal_paga', 'pp.preprocess']
+)
 def pancreatic_endocrinogenesis(
     url: str = "https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad",
     filename: Optional[str] = None,
 ) -> AnnData:
-    """Pancreatic endocrinogenesis. Data from scvelo.
-
-    Pancreatic epithelial and Ngn3-Venus fusion (NVF) cells during secondary transition / embryonic day 15.5.
-    https://dev.biologists.org/content/146/12/dev173849
+    """
+    Load or download the pancreatic endocrinogenesis reference dataset for developmental trajectory and lineage analyses
+    
+    Parameters
+    ----------
+    url : str, optional, default="https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad"
+        Input parameter for `pancreatic_endocrinogenesis`.
+    filename : Optional[str], optional, default=None
+        Input parameter for `pancreatic_endocrinogenesis`.
+    
+    Returns
+    -------
+    AnnData
+        Output produced by `pancreatic_endocrinogenesis`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> adata = ov.datasets.pancreatic_endocrinogenesis()
     """
 
     adata = get_adata(url, filename)
@@ -952,37 +1017,123 @@ def create_mock_dataset(
     return adata
 
 
+@register_function(
+    aliases=['DeCOV bulk COVID', 'decov_bulk_covid_bulk', 'covid bulk dataset'],
+    category="datasets",
+    description="Load the bulk RNA-seq cohort used in DeCOV spatial deconvolution examples for cross-platform reference mapping.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['bulk_df = ov.datasets.decov_bulk_covid_bulk()'],
+    related=['datasets.decov_bulk_covid_single', 'space.Deconvolution']
+)
 def decov_bulk_covid_bulk(
     filename: str = "COVID_PBMC_bulk.h5ad"
 ) -> AnnData:
-    """COVID-19 PBMC bulk data from Decov et al. 2020.
-
-    This data consists of 10,000 cells × 15,000 genes.
+    """
+    Load the bulk RNA-seq cohort used in DeCOV spatial deconvolution examples for cross-platform reference mapping
+    
+    Parameters
+    ----------
+    filename : str, optional, default="COVID_PBMC_bulk.h5ad"
+        Input parameter for `decov_bulk_covid_bulk`.
+    
+    Returns
+    -------
+    AnnData
+        Output produced by `decov_bulk_covid_bulk`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> bulk_df = ov.datasets.decov_bulk_covid_bulk()
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC bulk data{Colors.ENDC}")
     url = get_dataset_url("COVID_PBMC_bulk")
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['DeCOV single-cell COVID', 'decov_bulk_covid_single', 'covid scRNA dataset'],
+    category="datasets",
+    description="Load the single-cell reference cohort paired with DeCOV bulk data for cell-type signature derivation and transfer.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata_sc = ov.datasets.decov_bulk_covid_single()'],
+    related=['datasets.decov_bulk_covid_bulk', 'space.calculate_gene_signature']
+)
 def decov_bulk_covid_single(
     filename: str = "COVID_PBMC_single.h5ad"
 ) -> AnnData:
-    """COVID-19 PBMC single-cell data from Decov et al. 2020.
-
-    This data consists of 10,000 cells × 15,000 genes.
+    """
+    Load the single-cell reference cohort paired with DeCOV bulk data for cell-type signature derivation and transfer
+    
+    Parameters
+    ----------
+    filename : str, optional, default="COVID_PBMC_single.h5ad"
+        Input parameter for `decov_bulk_covid_single`.
+    
+    Returns
+    -------
+    AnnData
+        Output produced by `decov_bulk_covid_single`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> adata_sc = ov.datasets.decov_bulk_covid_single()
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC single-cell data{Colors.ENDC}")
     url = get_dataset_url("COVID_PBMC_single")
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['淋巴结单细胞参考', 'sc_ref_Lymph_Node', 'lymph node reference'],
+    category="datasets",
+    description="Load a lymph-node single-cell reference dataset for immune-cell annotation and spatial deconvolution benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata_ref = ov.datasets.sc_ref_Lymph_Node()'],
+    related=['datasets.download_data', 'single.scanpy_cellanno_from_dict']
+)
 def sc_ref_Lymph_Node(
     url: str = "https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad",
     filename: str = "sc_ref_Lymph_Node.h5ad"
 ) -> AnnData:
-    """SC reference data for Lymph Node.
+    """
+    Load a lymph-node single-cell reference dataset for immune-cell annotation and spatial deconvolution benchmarking
     
-    This data consists of 10,000 cells × 15,000 genes.
+    Parameters
+    ----------
+    url : str, optional, default="https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad"
+        Input parameter for `sc_ref_Lymph_Node`.
+    filename : str, optional, default="sc_ref_Lymph_Node.h5ad"
+        Input parameter for `sc_ref_Lymph_Node`.
+    
+    Returns
+    -------
+    AnnData
+        Output produced by `sc_ref_Lymph_Node`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> adata_ref = ov.datasets.sc_ref_Lymph_Node()
     """
     print(f"{Colors.HEADER}🧬 Loading SC reference data for Lymph Node{Colors.ENDC}")
     adata = get_adata(url, filename)

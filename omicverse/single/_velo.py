@@ -1,13 +1,64 @@
 from .._settings import Colors, EMOJI
 from .._monitor import monitor
+from .._registry import register_function
 
 
+@register_function(
+    aliases=['RNA velocity分析器', 'Velo', 'velocity pipeline', 'dynamo scvelo wrapper'],
+    category="single",
+    description="Unified RNA velocity workflow wrapper supporting dynamo, scvelo, latentvelo and graphvelo backends for dynamic cell-state transition analysis.",
+    prerequisites={'optional_functions': ['pp.preprocess', 'pp.neighbors']},
+    requires={'layers': ['spliced/unspliced or counts'], 'obsm': ['X_umap (recommended)']},
+    produces={'layers': ['velocity-related layers'], 'obsm': ['velocity embeddings'], 'uns': ['velocity graphs']},
+    auto_fix='escalate',
+    examples=['velo_obj = ov.single.Velo(adata)', 'velo_obj.cal_velocity(method="dynamo")', 'velo_obj.plot_cell_velocity()'],
+    related=['single.Velo', 'pl.add_streamplot', 'utils.cal_paga']
+)
 class Velo:
+    """
+    Unified RNA velocity workflow wrapper supporting dynamo, scvelo, latentvelo and graphvelo backends for dynamic cell-state transition analysis
+    
+    Parameters
+    ----------
+    adata : Any
+        Configuration argument used when constructing `Velo`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> velo_obj = ov.single.Velo(adata)
+    """
+
     def __init__(self, adata):
         self.adata = adata
         print(f"{Colors.WARNING}In Velo module, you should keep all genes' expression not normalized.{Colors.ENDC}")
 
     def run(self):
+        """
+        Print a quick summary of the current velocity input AnnData
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `run`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Vela Analysis Initialization:{Colors.ENDC}")
         print(f"   {Colors.CYAN}Input data shape: {Colors.BOLD}{self.adata.shape[0]} cells × {self.adata.shape[1]} genes{Colors.ENDC}")
         print(f"   {Colors.BLUE}Total UMI counts: {Colors.BOLD}{self.adata.X.sum():,.0f}{Colors.ENDC}")
@@ -15,6 +66,25 @@ class Velo:
         print(f"   {Colors.GREEN}Vela Analysis Completed:{Colors.ENDC}")
 
     def filter_genes(self,min_shared_counts=20,**kwargs):
+        """
+        Filter genes for velocity analysis using scVelo gene filtering
+        
+        Parameters
+        ----------
+        min_shared_counts : Any, optional, default=20
+            Input parameter for `filter_genes`.
+        **kwargs : Any
+            Input parameter for `filter_genes`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `filter_genes`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         from scvelo.pp import filter_genes
         filter_genes(self.adata,min_shared_counts=min_shared_counts,**kwargs)
 
@@ -22,6 +92,29 @@ class Velo:
                    n_neighbors=30,
                    n_pcs=30,
                    **kwargs):
+        """
+        Run dynamo preprocessing and build a neighborhood graph
+        
+        Parameters
+        ----------
+        recipe : Any, optional, default='monocle'
+            Input parameter for `preprocess`.
+        n_neighbors : Any, optional, default=30
+            Input parameter for `preprocess`.
+        n_pcs : Any, optional, default=30
+            Input parameter for `preprocess`.
+        **kwargs : Any
+            Input parameter for `preprocess`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `preprocess`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         import dynamo as dyn 
         preprocessor = dyn.pp.Preprocessor(cell_cycle_score_enable=True,**kwargs)
         preprocessor.preprocess_adata(self.adata, recipe=recipe)
@@ -29,6 +122,29 @@ class Velo:
         neighbors(self.adata,n_neighbors=n_neighbors,n_pcs=n_pcs,use_rep='X_pca')
 
     def moments(self,backend='dynamo',n_pcs=30,n_neighbors=30,**kwargs):
+        """
+        Compute first/second order moments for selected velocity backend
+        
+        Parameters
+        ----------
+        backend : Any, optional, default='dynamo'
+            Input parameter for `moments`.
+        n_pcs : Any, optional, default=30
+            Input parameter for `moments`.
+        n_neighbors : Any, optional, default=30
+            Input parameter for `moments`.
+        **kwargs : Any
+            Input parameter for `moments`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `moments`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         if backend == 'dynamo':
             import dynamo as dyn 
             dyn.tl.moments(self.adata,n_pca_components=n_pcs,n_neighbors=n_neighbors,**kwargs)
@@ -41,6 +157,25 @@ class Velo:
             raise ValueError(f"Backend {backend} not supported")
     
     def dynamics(self,backend='dynamo',**kwargs):
+        """
+        Fit transcriptional dynamics model for the selected backend
+        
+        Parameters
+        ----------
+        backend : Any, optional, default='dynamo'
+            Input parameter for `dynamics`.
+        **kwargs : Any
+            Input parameter for `dynamics`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `dynamics`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         if backend == 'dynamo':
             import dynamo as dyn 
             dyn.tl.dynamics(self.adata,**kwargs)
@@ -63,6 +198,39 @@ class Velo:
         latentvelo_VAE_kwargs={},
         **kwargs
     ):
+        """
+        Estimate RNA velocity vectors and store them in ``adata.layers``
+        
+        Parameters
+        ----------
+        method : Any, optional, default='dynamo'
+            Input parameter for `cal_velocity`.
+        batch_key : Any, optional, default=None
+            Input parameter for `cal_velocity`.
+        celltype_key : Any, optional, default=None
+            Input parameter for `cal_velocity`.
+        velocity_key : Any, optional, default='velocity_S'
+            Input parameter for `cal_velocity`.
+        n_jobs : Any, optional, default=1
+            Input parameter for `cal_velocity`.
+        n_top_genes : Any, optional, default=2000
+            Input parameter for `cal_velocity`.
+        param_name_key : Any, optional, default='tmp/latentvelo_params'
+            Input parameter for `cal_velocity`.
+        latentvelo_VAE_kwargs : Any, optional, default={}
+            Input parameter for `cal_velocity`.
+        **kwargs : Any
+            Input parameter for `cal_velocity`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `cal_velocity`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         
         if method == 'dynamo':
             import dynamo as dyn 
@@ -121,6 +289,33 @@ class Velo:
         gene_subset=None,
         **kwargs
     ):
+        """
+        Refine velocity fields with GraphVelo and project to embeddings
+        
+        Parameters
+        ----------
+        xkey : Any, optional, default='Ms'
+            Input parameter for `graphvelo`.
+        vkey : Any, optional, default='velocity_S'
+            Input parameter for `graphvelo`.
+        n_jobs : Any, optional, default=1
+            Input parameter for `graphvelo`.
+        basis_keys : Any, optional, default=['X_umap','X_pca']
+            Input parameter for `graphvelo`.
+        gene_subset : Any, optional, default=None
+            Input parameter for `graphvelo`.
+        **kwargs : Any
+            Input parameter for `graphvelo`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `graphvelo`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         from ..external.graphvelo.graph_velocity import GraphVelo
         from ..external.graphvelo.utils import adj_to_knn
         indices, _ = adj_to_knn(self.adata.obsp['connectivities'])
@@ -139,10 +334,52 @@ class Velo:
 
 
     def velocity_graph(self,basis='umap',vkey='velocity_S',**kwargs):
+        """
+        Construct velocity graph from precomputed velocity vectors
+        
+        Parameters
+        ----------
+        basis : Any, optional, default='umap'
+            Input parameter for `velocity_graph`.
+        vkey : Any, optional, default='velocity_S'
+            Input parameter for `velocity_graph`.
+        **kwargs : Any
+            Input parameter for `velocity_graph`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `velocity_graph`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         import scvelo as scv
         scv.tl.velocity_graph(self.adata, vkey=vkey, **kwargs)
     
     def velocity_embedding(self,basis='umap',vkey='velocity_S',**kwargs):   
+        """
+        Project velocity vectors onto a low-dimensional embedding
+        
+        Parameters
+        ----------
+        basis : Any, optional, default='umap'
+            Input parameter for `velocity_embedding`.
+        vkey : Any, optional, default='velocity_S'
+            Input parameter for `velocity_embedding`.
+        **kwargs : Any
+            Input parameter for `velocity_embedding`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `velocity_embedding`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         import scvelo as scv
         scv.tl.velocity_embedding(self.adata, basis=basis, vkey=vkey, **kwargs)
         #return self.adata

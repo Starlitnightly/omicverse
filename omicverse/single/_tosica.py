@@ -27,10 +27,67 @@ import torch.optim.lr_scheduler as lr_scheduler
 import time
 import anndata
 from .._settings import add_reference
+from .._registry import register_function
 
 
 
+@register_function(
+    aliases=['TOSICA注释器', 'pyTOSICA', 'transformer cell annotation'],
+    category="single",
+    description="TOSICA wrapper for pathway-informed transformer-based cell-type annotation and transfer learning.",
+    prerequisites={'optional_functions': ['utils.download_tosica_gmt', 'pp.preprocess']},
+    requires={'obs': ['cell type labels (training mode)'], 'var': ['gene symbols']},
+    produces={'obs': ['predicted cell types'], 'uns': ['tosica model outputs']},
+    auto_fix='none',
+    examples=['tosica_obj = ov.single.pyTOSICA(adata=ref_adata, project_path="./tosica")', 'tosica_obj.train()'],
+    related=['single.pySCSA', 'utils.download_tosica_gmt']
+)
 class pyTOSICA(object):
+    """
+    TOSICA wrapper for pathway-informed transformer-based cell-type annotation and transfer learning
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Configuration argument used when constructing `pyTOSICA`.
+    project_path : str
+        Configuration argument used when constructing `pyTOSICA`.
+    gmt_path : Any, optional, default=None
+        Configuration argument used when constructing `pyTOSICA`.
+    label_name : str, optional, default='Celltype'
+        Configuration argument used when constructing `pyTOSICA`.
+    mask_ratio : float, optional, default=0.015
+        Configuration argument used when constructing `pyTOSICA`.
+    max_g : int, optional, default=300
+        Configuration argument used when constructing `pyTOSICA`.
+    max_gs : int, optional, default=300
+        Configuration argument used when constructing `pyTOSICA`.
+    n_unannotated : int, optional, default=1
+        Configuration argument used when constructing `pyTOSICA`.
+    embed_dim : int, optional, default=48
+        Configuration argument used when constructing `pyTOSICA`.
+    depth : int, optional, default=1
+        Configuration argument used when constructing `pyTOSICA`.
+    num_heads : int, optional, default=4
+        Configuration argument used when constructing `pyTOSICA`.
+    batch_size : int, optional, default=8
+        Configuration argument used when constructing `pyTOSICA`.
+    device : str, optional, default='cuda:0'
+        Configuration argument used when constructing `pyTOSICA`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> tosica_obj = ov.single.pyTOSICA(adata=ref_adata, project_path="./tosica")
+    """
 
     def __init__(self,adata:anndata.AnnData,project_path:str,gmt_path=None,
                  label_name:str='Celltype',mask_ratio:float=0.015,
@@ -135,17 +192,28 @@ class pyTOSICA(object):
         pass
 
     def train(self,pre_weights:str='',lr:float=0.001, epochs:int= 10, lrf:float=0.01):
-        r"""Train the TOSICA model for cell type classification.
-
-        Arguments:
-            pre_weights (str): Path to pre-trained weights (default: '')
-            lr (float): Learning rate for optimization (default: 0.001)
-            epochs (int): Number of training epochs (default: 10)
-            lrf (float): Learning rate factor for cosine annealing (default: 0.01)
-
-        Returns:
-            torch.nn.Module: The trained TOSICA model
+        """
+        Train the TOSICA model for cell type classification
         
+        Parameters
+        ----------
+        pre_weights : str, optional, default=''
+            Input parameter for `train`.
+        lr : float, optional, default=0.001
+            Input parameter for `train`.
+        epochs : int, optional, default=10
+            Input parameter for `train`.
+        lrf : float, optional, default=0.01
+            Input parameter for `train`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `train`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if pre_weights != "":
             assert os.path.exists(pre_weights), "pre_weights file: '{}' not exist.".format(pre_weights)
@@ -182,12 +250,22 @@ class pyTOSICA(object):
         return self.model
     
     def save(self,save_path=None):
-        r"""Save the trained TOSICA model.
-
-        Arguments:
-            save_path (str): Path to save the model (default: None)
-                           If None, saves to project_path/model-best.pth
+        """
+        Save the trained TOSICA model
         
+        Parameters
+        ----------
+        save_path : Any, optional, default=None
+            Input parameter for `save`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `save`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if save_path==None:
             save_path = self.project_path+'/model-best.pth'
@@ -195,12 +273,22 @@ class pyTOSICA(object):
         print('Model saved!')
 
     def load(self,load_path=None):
-        r"""Load a pre-trained TOSICA model.
-
-        Arguments:
-            load_path (str): Path to the model file (default: None)
-                           If None, loads from project_path/model-best.pth
-
+        """
+        Load a pre-trained TOSICA model
+        
+        Parameters
+        ----------
+        load_path : Any, optional, default=None
+            Input parameter for `load`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `load`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if load_path==None:
             load_path = self.project_path+'/model-best.pth'
@@ -210,18 +298,30 @@ class pyTOSICA(object):
         
     def predicted(self,pre_adata:anndata.AnnData,laten:bool=False,n_step:int=10000,cutoff:float=0.1,
         batch_size:int=50,):
-        r"""Predict cell types for new single-cell data.
-
-        Arguments:
-            pre_adata: AnnData object containing new data for prediction
-            laten (bool): Whether to return latent representation instead of pathway attention (default: False)
-            n_step (int): Number of steps for batch processing (default: 10000)
-            cutoff (float): Confidence cutoff for predictions (default: 0.1)
-            batch_size (int): Batch size for prediction (default: 50)
-
-        Returns:
-            AnnData: New AnnData object with predicted cell types and confidence scores
+        """
+        Predict cell types for new single-cell data
         
+        Parameters
+        ----------
+        pre_adata : anndata.AnnData
+            Input parameter for `predicted`.
+        laten : bool, optional, default=False
+            Input parameter for `predicted`.
+        n_step : int, optional, default=10000
+            Input parameter for `predicted`.
+        cutoff : float, optional, default=0.1
+            Input parameter for `predicted`.
+        batch_size : int, optional, default=50
+            Input parameter for `predicted`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `predicted`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         mask_path = os.getcwd()+'/%s'%self.project_path+'/mask.npy'

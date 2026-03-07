@@ -508,7 +508,7 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
 
 @monitor
 @register_function(
-    aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
+    aliases=["预处理", "preprocess", "preprocessing", "数据预处理","HVG","HVGs","高变基因","高变基因选择"],
     category="preprocessing",
     description="Complete preprocessing pipeline including normalization, HVG selection, scaling, and PCA",
     prerequisites={

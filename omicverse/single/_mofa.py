@@ -15,6 +15,7 @@ import scanpy as sc
 from typing import Union,Tuple,Optional
 import matplotlib
 from .._settings import add_reference
+from .._registry import register_function
 
 
 mofax_install=False
@@ -43,7 +44,41 @@ def check_mofax():
             'Please install the mofax: `pip install mofax`.'
         )
 
+@register_function(
+    aliases=['GLUE配对器', 'GLUE_pair', 'RNA-ATAC cell pairing'],
+    category="single",
+    description="Pair cells across RNA and ATAC modalities using GLUE embeddings and correlation-based nearest-neighbor matching.",
+    prerequisites={'optional_functions': ['alignment integration with GLUE']},
+    requires={'obsm': ['X_glue in RNA and ATAC objects']},
+    produces={'obs': ['paired-cell labels'], 'uns': ['pairing diagnostics']},
+    auto_fix='none',
+    examples=['pair_obj = ov.single.GLUE_pair(rna, atac)', 'pair_obj.correlation(); pair_df = pair_obj.find_neighbor_cell()'],
+    related=['single.pyMOFA', 'single.factor_exact']
+)
 class GLUE_pair(object):
+    """
+    Pair cells across RNA and ATAC modalities using GLUE embeddings and correlation-based nearest-neighbor matching
+    
+    Parameters
+    ----------
+    rna : anndata.AnnData
+        Configuration argument used when constructing `GLUE_pair`.
+    atac : anndata.AnnData
+        Configuration argument used when constructing `GLUE_pair`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> pair_obj = ov.single.GLUE_pair(rna, atac)
+    """
 
     def __init__(self,rna:anndata.AnnData,
               atac:anndata.AnnData) -> None:
@@ -62,10 +97,22 @@ class GLUE_pair(object):
         self.atac_loc=pd.DataFrame(atac.obsm['X_glue'], index=atac.obs.index)
 
     def correlation(self):
-        r"""Perform Pearson Correlation analysis in the layer of GLUE.
+        """
+        Perform Pearson Correlation analysis in the layer of GLUE
         
-        Returns:
-            None: Updates self.rna_pd and self.atac_pd attributes
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `correlation`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         
         print('......Prepare for pair')
@@ -105,15 +152,24 @@ class GLUE_pair(object):
         self.atac_pd=n_pd
 
     def find_neighbor_cell(self,depth:int=10,cor:float=0.9)->pd.DataFrame:
-        r"""Find the neighbor cells between two omics using pearson correlation.
+        """
+        Find the neighbor cells between two omics using pearson correlation
         
-        Arguments:
-            depth: The depth of the search for the nearest neighbor. (10)
-            cor: Correlation threshold for pairing. (0.9)
-
-        Returns:
-            result: The pair result as DataFrame
-
+        Parameters
+        ----------
+        depth : int, optional, default=10
+            Input parameter for `find_neighbor_cell`.
+        cor : float, optional, default=0.9
+            Input parameter for `find_neighbor_cell`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `find_neighbor_cell`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
 
@@ -146,16 +202,24 @@ class GLUE_pair(object):
         return result
     
     def pair_omic(self,omic1:anndata.AnnData,omic2:anndata.AnnData)->Tuple[anndata.AnnData,anndata.AnnData]:
-        r"""Pair the omics using the result of find_neighbor_cell.
-
-        Arguments:
-            omic1: The AnnData of first omic.
-            omic2: The AnnData of second omic.
-
-        Returns:
-            rna1: The paired AnnData of first omic.
-            atac1: The paired AnnData of second omic.
-
+        """
+        Pair the omics using the result of find_neighbor_cell
+        
+        Parameters
+        ----------
+        omic1 : anndata.AnnData
+            Input parameter for `pair_omic`.
+        omic2 : anndata.AnnData
+            Input parameter for `pair_omic`.
+        
+        Returns
+        -------
+        Tuple[anndata.AnnData,anndata.AnnData]
+            Output produced by `pair_omic`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         rna1=omic1[self.res_pair['omic_1']].copy()
         atac1=omic2[self.res_pair['omic_2']].copy()
@@ -260,20 +324,45 @@ def normalization(data):
     _range = np.max(abs(data))
     return data / _range
 
+@register_function(
+    aliases=['提取 MOFA 权重', 'get_weights', 'mofa weights'],
+    category="single",
+    description="Extract feature loadings of selected MOFA factors for one omics view to interpret latent biological programs.",
+    prerequisites={'functions': ['pyMOFA']},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.single.get_weights("mofa.hdf5", view="rna", factor=1, scale=True)'],
+    related=['single.factor_exact', 'single.factor_correlation', 'single.pyMOFA']
+)
 def get_weights(hdf5_path:str,view:str,
                 factor:int,scale:bool=True)->pd.DataFrame:
-    r"""
-    Get the weights of each feature in a specific factor.
-
-    Arguments:
-        hdf5_path: the path of hdf5 file.
-        view: the name of view.
-        factor: the number of factor.
-        scale: whether to scale the weights.
-
-    Returns:
-        res: the weights of each feature in a specific factor.
-
+    """
+    Extract feature loadings of selected MOFA factors for one omics view to interpret latent biological programs
+    
+    Parameters
+    ----------
+    hdf5_path : str
+        Input parameter for `get_weights`.
+    view : str
+        Input parameter for `get_weights`.
+    factor : int
+        Input parameter for `get_weights`.
+    scale : bool, optional, default=True
+        Input parameter for `get_weights`.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Output produced by `get_weights`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.get_weights("mofa.hdf5", view="rna", factor=1, scale=True)
     """
     f = h5py.File(hdf5_path,'r')  
     view_names=f['views']['views'][:]
@@ -293,17 +382,40 @@ def get_weights(hdf5_path:str,view:str,
 
     return res
 
+@register_function(
+    aliases=['MOFA 因子提取', 'factor_exact', 'extract mofa factors'],
+    category="single",
+    description="Project MOFA latent factors to cells and store them in AnnData for downstream trajectory, clustering, and phenotype association analyses.",
+    prerequisites={'functions': ['pyMOFA']},
+    requires={'obs': ['cell metadata (optional)']},
+    produces={'obsm': ['X_mofa'], 'obs': ['factor scores']},
+    auto_fix='none',
+    examples=['ov.single.factor_exact(adata, hdf5_path="mofa.hdf5")'],
+    related=['single.get_weights', 'single.factor_correlation']
+)
 def factor_exact(adata:anndata.AnnData,hdf5_path:str)->anndata.AnnData:
-    r"""
-    Extract the factor information from hdf5 file.
-
-    Arguments:
-        adata: The AnnData object.
-        hdf5_path: The path of hdf5 file.
-
-    Returns:
-        adata: The AnnData object with factor information.
-
+    """
+    Project MOFA latent factors to cells and store them in AnnData for downstream trajectory, clustering, and phenotype association analyses
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `factor_exact`.
+    hdf5_path : str
+        Input parameter for `factor_exact`.
+    
+    Returns
+    -------
+    anndata.AnnData
+        Output produced by `factor_exact`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.factor_exact(adata, hdf5_path="mofa.hdf5")
     """
     f_pos = h5py.File(hdf5_path,'r')  
     g_name=f_pos['groups']['groups'][:][0]
@@ -311,20 +423,45 @@ def factor_exact(adata:anndata.AnnData,hdf5_path:str)->anndata.AnnData:
         adata.obs['factor{0}'.format(i+1)]=f_pos['expectations']['Z'][g_name][i] 
     return adata
 
+@register_function(
+    aliases=['MOFA 因子相关性', 'factor_correlation', 'factor phenotype correlation'],
+    category="single",
+    description="Compute correlations between MOFA factors and cell annotations to prioritize biologically interpretable latent axes.",
+    prerequisites={'functions': ['factor_exact']},
+    requires={'obs': ['cluster or phenotype labels']},
+    produces={'uns': ['mofa_factor_correlation']},
+    auto_fix='none',
+    examples=['ov.single.factor_correlation(adata, cluster="celltype", factor_list=[1,2,3], p_threshold=0.05)'],
+    related=['single.factor_exact', 'single.get_weights']
+)
 def factor_correlation(adata:anndata.AnnData,cluster:str,
                        factor_list:list,p_threshold:int=500)->pd.DataFrame:
-    r"""
-    Calculate the correlation between factors and cluster.
-
-    Arguments:
-        adata: The AnnData object.
-        cluster: The name of cluster.
-        factor_list: The list of factors.
-        p_threshold: The threshold of p-value.
-
-    Returns:
-        cell_pd: The correlation between factors and cluster.
-
+    """
+    Compute correlations between MOFA factors and cell annotations to prioritize biologically interpretable latent axes
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `factor_correlation`.
+    cluster : str
+        Input parameter for `factor_correlation`.
+    factor_list : list
+        Input parameter for `factor_correlation`.
+    p_threshold : int, optional, default=500
+        Input parameter for `factor_correlation`.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Output produced by `factor_correlation`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.factor_correlation(adata, cluster="celltype", factor_list=[1,2,3], p_threshold=0.05)
     """
     plot_data=adata.obs
     cell_t=list(set(plot_data[cluster]))
@@ -342,9 +479,40 @@ def factor_correlation(adata:anndata.AnnData,cluster:str,
         cell_pd['factor'+str(i)]=test
     return cell_pd
 
+@register_function(
+    aliases=['MOFA训练器', 'pyMOFA', 'multi-omics factor model'],
+    category="single",
+    description="Train MOFA models for multi-omics factor decomposition and latent biology discovery across modalities.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={},
+    produces={'obsm': ['X_mofa'], 'uns': ['mofa model']},
+    auto_fix='none',
+    examples=['test_mofa = ov.single.pyMOFA(omics=[rna, atac], omics_name=["rna","atac"])', 'test_mofa.mofa_run()'],
+    related=['single.get_weights', 'single.factor_exact', 'single.pyMOFAART']
+)
 class pyMOFA(object):
-    r"""
-    MOFA class.
+    """
+    Train MOFA models for multi-omics factor decomposition and latent biology discovery across modalities
+    
+    Parameters
+    ----------
+    omics : list
+        Configuration argument used when constructing `pyMOFA`.
+    omics_name : list
+        Configuration argument used when constructing `pyMOFA`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> test_mofa = ov.single.pyMOFA(omics=[rna, atac], omics_name=["rna","atac"])
     """
     def __init__(self,omics:list,omics_name:list):
         r"""
@@ -359,8 +527,22 @@ class pyMOFA(object):
         self.M=len(omics)
 
     def mofa_preprocess(self):
-        r"""
-        Preprocess the data.
+        """
+        Preprocess the data
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `mofa_preprocess`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         self.data_mat=[[None for g in range(1)] for m in range(len(self.omics))]
         self.feature_name=[]
@@ -375,25 +557,50 @@ class pyMOFA(object):
                 spikeslab_weights:bool = True,startELBO:int = 1, freqELBO:int = 1, dropR2:float = 0.001, gpu_mode:bool = True, 
                 gpu_device: Optional[int] = None, verbose:bool = False, seed:int = 112,scale_groups:bool = False, 
                 scale_views:bool = False,center_groups:bool=True,)->None:
-        r"""
-        Train the MOFA model.
-
-        Arguments:
-            outfile: The path of output file.
-            factors: The number of factors.
-            iter: The number of iterations.
-            convergence_mode: The mode of convergence.
-            spikeslab_weights: Whether to use spikeslab weights.
-            startELBO: The start of ELBO.
-            freqELBO: The frequency of ELBO.
-            dropR2: The drop of R2.
-            gpu_mode: Whether to use gpu mode.
-            verbose: Whether to print the information.
-            seed: The seed of random number.
-            scale_groups: Whether to scale groups.
-            scale_views: Whether to scale views.
-            center_groups: Whether to center groups.
-
+        """
+        Train the MOFA model
+        
+        Parameters
+        ----------
+        outfile : str, optional, default='res.hdf5'
+            Input parameter for `mofa_run`.
+        factors : int, optional, default=20
+            Input parameter for `mofa_run`.
+        iter : int, optional, default=1000
+            Input parameter for `mofa_run`.
+        convergence_mode : str, optional, default="fast"
+            Input parameter for `mofa_run`.
+        spikeslab_weights : bool, optional, default=True
+            Input parameter for `mofa_run`.
+        startELBO : int, optional, default=1
+            Input parameter for `mofa_run`.
+        freqELBO : int, optional, default=1
+            Input parameter for `mofa_run`.
+        dropR2 : float, optional, default=0.001
+            Input parameter for `mofa_run`.
+        gpu_mode : bool, optional, default=True
+            Input parameter for `mofa_run`.
+        gpu_device : Optional[int], optional, default=None
+            Input parameter for `mofa_run`.
+        verbose : bool, optional, default=False
+            Input parameter for `mofa_run`.
+        seed : int, optional, default=112
+            Input parameter for `mofa_run`.
+        scale_groups : bool, optional, default=False
+            Input parameter for `mofa_run`.
+        scale_views : bool, optional, default=False
+            Input parameter for `mofa_run`.
+        center_groups : bool, optional, default=True
+            Input parameter for `mofa_run`.
+        
+        Returns
+        -------
+        None
+            Output produced by `mofa_run`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         ent1 = entry_point()
         ent1.set_data_options(
@@ -432,7 +639,39 @@ class pyMOFA(object):
 
     
 
+@register_function(
+    aliases=['MOFA模型读取器', 'pyMOFAART', 'mofa model loader'],
+    category="single",
+    description="Load and analyze pretrained MOFA models for downstream factor interpretation without retraining.",
+    prerequisites={'optional_functions': ['pyMOFA']},
+    requires={},
+    produces={'obsm': ['X_mofa'], 'uns': ['mofa factor summaries']},
+    auto_fix='none',
+    examples=['pymofa_obj = ov.single.pyMOFAART(model_path="data/sample/MOFA_POS.hdf5")', 'pymofa_obj.get_factors()'],
+    related=['single.pyMOFA', 'single.factor_correlation']
+)
 class pyMOFAART(object):
+    """
+    Load and analyze pretrained MOFA models for downstream factor interpretation without retraining
+    
+    Parameters
+    ----------
+    model_path : str
+        Configuration argument used when constructing `pyMOFAART`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> pymofa_obj = ov.single.pyMOFAART(model_path="data/sample/MOFA_POS.hdf5")
+    """
     
     def __init__(self,model_path:str):
         """
@@ -458,11 +697,21 @@ class pyMOFAART(object):
        
     def get_factors(self,adata:anndata.AnnData):
         """
-        Get the factors of MOFA to anndata object.
-
-        Arguments:
-            adata: The anndata object.
+        Get the factors of MOFA to anndata object
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_factors`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_factors`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         print('......Add factors to adata and store to adata.obsm["X_mofa"]')
         adata.obsm['X_mofa']=self.factors
@@ -471,9 +720,20 @@ class pyMOFAART(object):
     def get_r2(self,)->pd.DataFrame:
         """
         Get the varience of each factor
-
-        Returns:
-            r2: the varience of each factor
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_r2`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         return self.r2
@@ -482,19 +742,29 @@ class pyMOFAART(object):
                 ticks_fontsize:int=10,labels_fontsize:int=12,
                 save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        plot the varience of each factor.
-
-        Arguments:
-            figsize: The size of figure.
-            cmap: The color map.
-            ticks_fontsize: The size of ticks.
-            labels_fontsize: The size of labels.
-            save: Whether to save the figure.
-
-        Returns:
-            fig: The figure of varience.
-            ax: The axes of varience.
+        plot the varience of each factor
         
+        Parameters
+        ----------
+        figsize : tuple, optional, default=(2,3)
+            Input parameter for `plot_r2`.
+        cmap : str, optional, default='Greens'
+            Input parameter for `plot_r2`.
+        ticks_fontsize : int, optional, default=10
+            Input parameter for `plot_r2`.
+        labels_fontsize : int, optional, default=12
+            Input parameter for `plot_r2`.
+        save : bool, optional, default=False
+            Input parameter for `plot_r2`.
+        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_r2`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         fig, ax = plt.subplots(figsize=figsize)
         sns.heatmap(self.r2,cmap=cmap,ax=ax,xticklabels=True,yticklabels=True,
@@ -510,16 +780,25 @@ class pyMOFAART(object):
     
     def get_cor(self,adata:anndata.AnnData,cluster:str,factor_list=None)->pd.DataFrame:
         """
-        get the correlation of each factor with cluster type in anndata object.
-
-        Arguments:
-            adata: The anndata object.
-            cluster: The cluster type.
-            factor_list: The list of factors.
-
-        Returns:
-            plot_data1: The correlation of each factor with cluster type.
+        get the correlation of each factor with cluster type in anndata object
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_cor`.
+        cluster : str
+            Input parameter for `get_cor`.
+        factor_list : Any, optional, default=None
+            Input parameter for `get_cor`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_cor`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         if factor_list==None:
@@ -531,23 +810,37 @@ class pyMOFAART(object):
                  cmap:str='Purples',ticks_fontsize:int=10,labels_fontsize:int=12,title:str='Correlation',
                  save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the correlation of each factor with cluster type in anndata object.
-
-        Arguments:
-            adata: The anndata object in MOFA pre trained.
-            cluster: The cluster type in adata.obs.
-            factor_list: The list of factors.
-            figsize: The size of figure.
-            cmap: The color map.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            title: The title of figure.
-            save: Whether to save the figure.
-
-        Returns:
-            fig: The figure of correlation.
-            ax: The axes of correlation.
+        Plot the correlation of each factor with cluster type in anndata object
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `plot_cor`.
+        cluster : str
+            Input parameter for `plot_cor`.
+        factor_list : Any, optional, default=None
+            Input parameter for `plot_cor`.
+        figsize : tuple, optional, default=(6,3)
+            Input parameter for `plot_cor`.
+        cmap : str, optional, default='Purples'
+            Input parameter for `plot_cor`.
+        ticks_fontsize : int, optional, default=10
+            Input parameter for `plot_cor`.
+        labels_fontsize : int, optional, default=12
+            Input parameter for `plot_cor`.
+        title : str, optional, default='Correlation'
+            Input parameter for `plot_cor`.
+        save : bool, optional, default=False
+            Input parameter for `plot_cor`.
+        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_cor`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         if factor_list==None:
@@ -569,22 +862,35 @@ class pyMOFAART(object):
                     factor1:int=1,factor2:int=2,palette:list=None,
                     save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the factor of MOFA in anndata object.
+        Plot the factor of MOFA in anndata object
         
-        Arguments:
-            adata: The anndata object.
-            cluster: The cluster type in adata.obs.
-            title: The title of figure.
-            figsize: The size of figure.
-            factor1: The first factor.
-            factor2: The second factor.
-            palette: The color map.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `plot_factor`.
+        cluster : str
+            Input parameter for `plot_factor`.
+        title : str
+            Input parameter for `plot_factor`.
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_factor`.
+        factor1 : int, optional, default=1
+            Input parameter for `plot_factor`.
+        factor2 : int, optional, default=2
+            Input parameter for `plot_factor`.
+        palette : list, optional, default=None
+            Input parameter for `plot_factor`.
+        save : bool, optional, default=False
+            Input parameter for `plot_factor`.
         
-        Returns:
-            fig: The figure of factor.
-            ax: The axes of factor.
-
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_factor`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         if 'X_mofa' not in adata.obsm.keys():
@@ -614,26 +920,43 @@ class pyMOFAART(object):
                             weith_threshold:float=0.5,figsize:tuple=(3,3),
                             save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the weight of gene in each factor of MOFA in anndata object in dimension 1.
-
-        Arguments:
-            view: The view of MOFA.
-            factor1: The first factor.
-            factor2: The second factor.
-            colors_dict: The color dict of up, down and normal. default is {'normal':'#c2c2c2','up':'#a51616','down':'#0d6a3b'}
-            plot_gene_num: The number of genes to plot.
-            title: The title of figure.
-            title_fontsize: The font size of title.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            weith_threshold: The threshold of weight.
-            figsize: The size of figure.
-            save: Whether to save the figure.
-
-        Returns:
-            fig: The figure of weight.
-            ax: The axes of weight.
+        Plot the weight of gene in each factor of MOFA in anndata object in dimension 1
         
+        Parameters
+        ----------
+        view : str
+            Input parameter for `plot_weight_gene_d1`.
+        factor1 : int
+            Input parameter for `plot_weight_gene_d1`.
+        factor2 : int
+            Input parameter for `plot_weight_gene_d1`.
+        colors_dict : dict, optional, default=None
+            Input parameter for `plot_weight_gene_d1`.
+        plot_gene_num : int, optional, default=5
+            Input parameter for `plot_weight_gene_d1`.
+        title : str, optional, default=''
+            Input parameter for `plot_weight_gene_d1`.
+        title_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d1`.
+        ticks_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d1`.
+        labels_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d1`.
+        weith_threshold : float, optional, default=0.5
+            Input parameter for `plot_weight_gene_d1`.
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_weight_gene_d1`.
+        save : bool, optional, default=False
+            Input parameter for `plot_weight_gene_d1`.
+        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_weight_gene_d1`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         factor_w=pd.DataFrame()
         for i in range(self.factors.shape[1]):
@@ -711,26 +1034,43 @@ class pyMOFAART(object):
                             weith_threshold:float=0.5,figsize:tuple=(3,3),
                             save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the weight of gene in each factor of MOFA in anndata object in dimension 2.
-
-        Arguments:
-            view: The view of MOFA.
-            factor1: The first factor.
-            factor2: The second factor.
-            colors_dict: The color dict. default is {'up-up':'#a51616','up-down':'#e25d5d','down-up':'#1a6e1a','down-down':'#5de25d','normal':'#c2c2c2'}
-            plot_gene_num: The number of genes to plot.
-            title: The title of figure.
-            title_fontsize: The font size of title.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            weith_threshold: The threshold of weight.
-            figsize: The size of figure.
-            save: Whether to save the figure.
-
-        Returns:
-            fig: The figure of weight.
-            ax: The axes of weight.
+        Plot the weight of gene in each factor of MOFA in anndata object in dimension 2
         
+        Parameters
+        ----------
+        view : str
+            Input parameter for `plot_weight_gene_d2`.
+        factor1 : int
+            Input parameter for `plot_weight_gene_d2`.
+        factor2 : int
+            Input parameter for `plot_weight_gene_d2`.
+        colors_dict : dict, optional, default=None
+            Input parameter for `plot_weight_gene_d2`.
+        plot_gene_num : int, optional, default=5
+            Input parameter for `plot_weight_gene_d2`.
+        title : str, optional, default=''
+            Input parameter for `plot_weight_gene_d2`.
+        title_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d2`.
+        ticks_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d2`.
+        labels_fontsize : int, optional, default=12
+            Input parameter for `plot_weight_gene_d2`.
+        weith_threshold : float, optional, default=0.5
+            Input parameter for `plot_weight_gene_d2`.
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_weight_gene_d2`.
+        save : bool, optional, default=False
+            Input parameter for `plot_weight_gene_d2`.
+        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_weight_gene_d2`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         
         factor_w=pd.DataFrame()
@@ -817,23 +1157,40 @@ class pyMOFAART(object):
                      title=None,save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
         Plot the weights of each gene in the factor
-
-        Arguments:
-            view: str, the view of the factor
-            factor: int, the factor number
-            color: str, the color of the plot
-            figsize: tuple, the size of the figure
-            plot_gene_num: int, the number of genes to plot
-            ascending: bool, whether to sort the genes by weights
-            labels_fontsize: int, the fontsize of the labels
-            ticks_fontsize: int, the fontsize of the ticks
-            title_fontsize: int, the fontsize of the title
-            title: str, the title of the plot
-            save: bool, whether to save the plot.
-
-        Returns:
-            fig: The figure object.
-            ax: The axis object.
+        
+        Parameters
+        ----------
+        view : str
+            Input parameter for `plot_weights_gene_factor`.
+        factor : int
+            Input parameter for `plot_weights_gene_factor`.
+        color : str, optional, default='#a51616'
+            Input parameter for `plot_weights_gene_factor`.
+        figsize : tuple, optional, default=(3,4)
+            Input parameter for `plot_weights_gene_factor`.
+        plot_gene_num : int, optional, default=10
+            Input parameter for `plot_weights_gene_factor`.
+        ascending : bool, optional, default=False
+            Input parameter for `plot_weights_gene_factor`.
+        labels_fontsize : int, optional, default=12
+            Input parameter for `plot_weights_gene_factor`.
+        ticks_fontsize : int, optional, default=12
+            Input parameter for `plot_weights_gene_factor`.
+        title_fontsize : int, optional, default=12
+            Input parameter for `plot_weights_gene_factor`.
+        title : Any, optional, default=None
+            Input parameter for `plot_weights_gene_factor`.
+        save : bool, optional, default=False
+            Input parameter for `plot_weights_gene_factor`.
+        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
+            Output produced by `plot_weights_gene_factor`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         factor_w=pd.DataFrame()
         for i in range(self.factors.shape[1]):
@@ -885,14 +1242,25 @@ class pyMOFAART(object):
         """
         Plot the top features of each factor in dotplot
         
-        Arguments:
-            view: str, the view of the factor
-            cmap: str, the color map of the plot
-            n_genes: int, the number of genes to plot
-
-        Returns:
-            axes: the list of the figure
-
+        Parameters
+        ----------
+        view : str
+            Input parameter for `plot_top_feature_dotplot`.
+        cmap : str, optional, default='bwr'
+            Input parameter for `plot_top_feature_dotplot`.
+        n_genes : int, optional, default=3
+            Input parameter for `plot_top_feature_dotplot`.
+        n_pcs : int, optional, default=50
+            Input parameter for `plot_top_feature_dotplot`.
+        
+        Returns
+        -------
+        list
+            Output produced by `plot_top_feature_dotplot`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         factor_w=pd.DataFrame()
@@ -915,14 +1283,25 @@ class pyMOFAART(object):
         """
         Plot the top features of each factor in dotplot
         
-        Arguments:
-            view: str, the view of the factor
-            cmap: str, the color map of the plot
-            n_genes: int, the number of genes to plot
-
-        Returns:
-            axes: the list of the figure
-
+        Parameters
+        ----------
+        view : str
+            Input parameter for `plot_top_feature_heatmap`.
+        cmap : str, optional, default='bwr'
+            Input parameter for `plot_top_feature_heatmap`.
+        n_genes : int, optional, default=3
+            Input parameter for `plot_top_feature_heatmap`.
+        n_pcs : int, optional, default=50
+            Input parameter for `plot_top_feature_heatmap`.
+        
+        Returns
+        -------
+        list
+            Output produced by `plot_top_feature_heatmap`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         factor_w=pd.DataFrame()
@@ -944,15 +1323,24 @@ class pyMOFAART(object):
     def get_top_feature(self,view:str,log2fc_min:int=3,pval_cutoff:float=0.1)->dict:
         """
         Get the top features of each factor
-
-        Arguments:
-            view: str, the view of the factor
-            log2fc_min: float, the minimum log2fc of the feature
-            pval_cutoff: float, the maximum pval of the feature
-
-        Returns:
-            top_feature: dict, the top features of each factor
-
+        
+        Parameters
+        ----------
+        view : str
+            Input parameter for `get_top_feature`.
+        log2fc_min : int, optional, default=3
+            Input parameter for `get_top_feature`.
+        pval_cutoff : float, optional, default=0.1
+            Input parameter for `get_top_feature`.
+        
+        Returns
+        -------
+        dict
+            Output produced by `get_top_feature`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
 
@@ -6008,6 +6396,5 @@ def compute_coexpression_modules(mdata,
         return nmf_coexpression_modules(
             mdata, view1, view2, n_components, correlation_threshold,
             method, random_state, corr_df)
-
 
 
