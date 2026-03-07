@@ -474,6 +474,8 @@ class AnalysisExecutor:
                     }
                 if self._ctx.enable_filesystem_context and self._ctx._filesystem_context:
                     self.process_context_directives(code, {})
+                if capture_stdout:
+                    return {"adata": result_adata, "stdout": ""}
                 return result_adata
 
             except Exception as e:
@@ -768,7 +770,6 @@ class AnalysisExecutor:
             "float", "int", "isinstance", "iter", "len", "list", "map",
             "max", "min", "next", "pow", "print", "range", "round", "set",
             "sorted", "str", "sum", "tuple", "zip", "filter", "type",
-            "open",
             "hasattr", "getattr", "setattr",
             "ImportError", "AttributeError", "IndexError",
             "FileNotFoundError", "OSError", "Exception", "ValueError",
@@ -841,6 +842,11 @@ class AnalysisExecutor:
                 allowed_modules[root_name] = __import__(root_name)
             if root_name == "scvi":
                 _apply_scvi_shims()
+            root_module = allowed_modules[root_name]
+            if not fromlist:
+                return root_module
+            if name == root_name:
+                return root_module
             return __import__(name, globals, locals, fromlist, level)
 
         safe_builtins["__import__"] = limited_import

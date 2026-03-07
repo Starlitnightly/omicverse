@@ -72,6 +72,7 @@ def run_feishu_bot(
     *,
     app_id: str,
     app_secret: str,
+    verification_token: str,
     session_manager: Any,
     host: str = "0.0.0.0",
     port: int = 8080,
@@ -141,10 +142,19 @@ def run_feishu_bot(
 
             # URL verification
             if body.get("type") == "url_verification":
+                if body.get("token") != verification_token:
+                    self.send_response(403)
+                    self.end_headers()
+                    return
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"challenge": body.get("challenge", "")}).encode("utf-8"))
+                return
+
+            if body.get("token") != verification_token:
+                self.send_response(403)
+                self.end_headers()
                 return
 
             event = body.get("event", {})

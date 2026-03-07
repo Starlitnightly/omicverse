@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="USER",
         help=(
             "Allowed Telegram username or numeric ID.  "
-            "Repeat for multiple users.  Omit to allow everyone."
+            "Repeat for multiple users.  Required for Telegram channel."
         ),
     )
     parser.add_argument(
@@ -82,6 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         dest="feishu_app_secret",
         help="Feishu app_secret (or FEISHU_APP_SECRET env var)",
+    )
+    parser.add_argument(
+        "--feishu-verification-token",
+        default=None,
+        dest="feishu_verification_token",
+        help="Feishu event subscription verification token (or FEISHU_VERIFICATION_TOKEN env var)",
     )
     parser.add_argument(
         "--feishu-host",
@@ -145,17 +151,27 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 1
         from .channels.telegram import AccessControl, run_bot
 
-        ac = AccessControl(allowed=args.allowed_users or None)
+        if not args.allowed_users:
+            print(
+                "ERROR: at least one --allowed-user is required for Telegram channel.\n"
+                "  Repeat --allowed-user for each authorized username or numeric ID.",
+                file=sys.stderr,
+            )
+            return 1
+
+        ac = AccessControl(allowed=args.allowed_users)
         print(f"OmicVerse Jarvis starting (channel=telegram, model={args.model}) ...")
         run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
         return 0
 
     app_id = args.feishu_app_id or os.environ.get("FEISHU_APP_ID")
     app_secret = args.feishu_app_secret or os.environ.get("FEISHU_APP_SECRET")
-    if not app_id or not app_secret:
+    verification_token = args.feishu_verification_token or os.environ.get("FEISHU_VERIFICATION_TOKEN")
+    if not app_id or not app_secret or not verification_token:
         print(
-            "ERROR: Feishu app credentials are required.\n"
-            "  Pass --feishu-app-id/--feishu-app-secret or set FEISHU_APP_ID/FEISHU_APP_SECRET.",
+            "ERROR: Feishu app credentials and verification token are required.\n"
+            "  Pass --feishu-app-id/--feishu-app-secret/--feishu-verification-token or set "
+            "FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_VERIFICATION_TOKEN.",
             file=sys.stderr,
         )
         return 1
@@ -168,6 +184,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     run_feishu_bot(
         app_id=app_id,
         app_secret=app_secret,
+        verification_token=verification_token,
         session_manager=sm,
         host=args.feishu_host,
         port=args.feishu_port,
