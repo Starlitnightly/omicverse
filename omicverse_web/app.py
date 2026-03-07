@@ -1122,20 +1122,20 @@ def trajectory_plot_heatmap():
         if not pseudotime_col or pseudotime_col not in adata.obs.columns:
             return jsonify({'error': '未找到拟时序列，请先运行轨迹推断工具'}), 400
 
-        # Build expression matrix
+        # Build expression matrix (slice genes first to avoid densifying all features)
         if layer and layer in adata.layers:
             X = adata.layers[layer]
         else:
             X = adata.X
-        if hasattr(X, 'toarray'):
-            X = X.toarray()
-        else:
-            X = _np.asarray(X)
 
         # Gene indices
         var_names = list(adata.var_names)
         gene_idx  = [var_names.index(g) for g in genes]
         expr      = X[:, gene_idx]           # (n_cells, n_genes)
+        if hasattr(expr, 'toarray'):
+            expr = expr.toarray()
+        else:
+            expr = _np.asarray(expr)
 
         # Sort by pseudotime, drop NaN cells
         pt = _np.array(adata.obs[pseudotime_col].values, dtype=float)
