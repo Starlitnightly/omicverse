@@ -230,15 +230,48 @@ def _verify_checksums(target_dir: Path, checksums: Mapping[str, str]) -> None:
 
 def _extract_downloaded_archives(target_dir: Path) -> None:
     """Extract any supported archives already present in ``target_dir``."""
+
+    def _resolve_extraction_path(base_dir: Path, member_name: str, source: Path) -> Path:
+        destination = (base_dir / member_name).resolve()
+        if base_dir not in destination.parents and destination != base_dir:
+            raise ValueError(
+                f"Refusing to extract unsafe path '{member_name}' from archive: {source}"
+            )
+        return destination
+
+    def _resolve_link_target(base_dir: Path, link_name: str, link_target: str, source: Path) -> None:
+        if not link_target:
+            return
+        link_parent = (base_dir / link_name).resolve().parent
+        resolved_target = (link_parent / link_target).resolve()
+        if base_dir not in resolved_target.parents and resolved_target != base_dir:
+            raise ValueError(
+                f"Refusing to extract unsafe link target '{link_target}' from archive: {source}"
+            )
+
     for archive_path in sorted(target_dir.iterdir()):
         if archive_path.is_dir():
             continue
         name = archive_path.name.lower()
         if name.endswith((".tar.gz", ".tgz", ".tar")):
             with tarfile.open(archive_path, "r:*") as tar:
-                tar.extractall(target_dir)
+                for member in tar.getmembers():
+                    _resolve_extraction_path(target_dir, member.name, archive_path)
+                    if member.issym() or member.islnk():
+                        _resolve_link_target(
+                            target_dir,
+                            member.name,
+                            getattr(member, "linkname", ""),
+                            archive_path,
+                        )
+                extractall_kwargs = {"path": target_dir}
+                if "filter" in tarfile.TarFile.extractall.__code__.co_varnames:
+                    extractall_kwargs["filter"] = "data"
+                tar.extractall(**extractall_kwargs)
         elif name.endswith(".zip"):
             with zipfile.ZipFile(archive_path, "r") as zf:
+                for member in zf.infolist():
+                    _resolve_extraction_path(target_dir, member.filename, archive_path)
                 zf.extractall(target_dir)
 
 
