@@ -20,6 +20,19 @@ logger = logging.getLogger(__name__)
 def calculate_normalized_affinity(
     W: csr_matrix
 ) -> Tuple[csr_matrix, np.array, np.array]:
+    """
+    Symmetrically normalize affinity graph for diffusion-map eigendecomposition.
+
+    Parameters
+    ----------
+    W : csr_matrix
+        Cell-cell affinity/connectivity matrix.
+
+    Returns
+    -------
+    Tuple[csr_matrix, np.array, np.array]
+        Normalized affinity matrix, degree vector, and square-root degree vector.
+    """
     diag = W.sum(axis=1).A1
     diag_half = np.sqrt(diag)
     W_norm = W.tocoo(copy=True)
@@ -31,13 +44,41 @@ def calculate_normalized_affinity(
 
 
 def calc_von_neumann_entropy(lambdas: List[float], t: float) -> float:
+    """
+    Compute von Neumann entropy of diffusion operator at diffusion time ``t``.
+
+    Parameters
+    ----------
+    lambdas : List[float]
+        Diffusion eigenvalues (excluding the trivial first component).
+    t : float
+        Diffusion time.
+
+    Returns
+    -------
+    float
+        Von Neumann entropy value used for knee-point search.
+    """
     etas = 1.0 - lambdas ** t
     etas = etas / etas.sum()
     return entropy(etas)
 
 
 def find_knee_point(x: List[float], y: List[float]) -> int:
-    """ Return the knee point, which is defined as the point furthest from line between two end points
+    """
+    Find elbow/knee index via maximum distance to end-point connecting line.
+
+    Parameters
+    ----------
+    x : List[float]
+        X coordinates (monotonic sequence).
+    y : List[float]
+        Y coordinates (curve values).
+
+    Returns
+    -------
+    int
+        Index of detected knee point.
     """
     p1 = np.array((x[0], y[0]))
     p2 = np.array((x[-1], y[-1]))
@@ -58,6 +99,33 @@ def find_knee_point(x: List[float], y: List[float]) -> int:
 def calculate_diffusion_map(
     W: csr_matrix, n_components: int, solver: str, max_t: int, n_jobs: int, random_state: int,
 ) -> Tuple[np.array, np.array, np.array]:
+    """
+    Compute diffusion-map coordinates from an affinity graph.
+
+    Parameters
+    ----------
+    W : csr_matrix
+        Cell-cell affinity/connectivity matrix.
+    n_components : int
+        Number of eigen components to compute (including trivial first one
+        before internal removal).
+    solver : str
+        Eigen solver, either ``'eigsh'`` or ``'randomized'``.
+    max_t : int
+        Maximum diffusion time for knee-point-based time selection. Use ``-1``
+        to apply analytical scaling ``lambda/(1-lambda)``.
+    n_jobs : int
+        Number of threads used in linear algebra backend.
+    random_state : int
+        Random seed used by stochastic solvers/initialization.
+
+    Returns
+    -------
+    Tuple[np.array, np.array, np.array]
+        ``(X_diffmap, evals, X_phi)`` where ``X_diffmap`` is pseudo-time-scaled
+        diffusion embedding, ``evals`` are non-trivial eigenvalues, and
+        ``X_phi`` are normalized eigenvectors.
+    """
     from threadpoolctl import threadpool_limits
     assert issparse(W)
 
@@ -115,42 +183,31 @@ def diffmap(
     n_jobs: int = -1,
     random_state: int = 0,
 ) -> None:
-    """Calculate Diffusion Map.
+    """
+    Compute diffusion-map embedding and store results in AnnData-like object.
 
     Parameters
     ----------
-    data: ``pegasusio.MultimodalData``
-        Annotated data matrix with rows for cells and columns for genes.
-
-    n_components: ``int``, optional, default: ``100``
-        Number of diffusion components to calculate.
-
-    rep: ``str``, optional, default: ``"pca"``
-        Embedding Representation of data used for calculating the Diffusion Map. By default, use PCA coordinates.
-
-    solver: ``str``, optional, default: ``"eigsh"``
-        Solver for eigen decomposition:
-            * ``"eigsh"``: default setting. Use *scipy* `eigsh <https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.eigsh.html>`_ as the solver to find eigenvalus and eigenvectors using the Implicitly Restarted Lanczos Method.
-            * ``"randomized"``: Use *scikit-learn* `randomized_svd <https://scikit-learn.org/stable/modules/generated/sklearn.utils.extmath.randomized_svd.html>`_ as the solver to calculate a truncated randomized SVD.
-
-    max_t: ``float``, optional, default: ``5000``
-        pegasus tries to determine the best t to sum up to between ``[1, max_t]``.
-
-    n_jobs : `int`, optional (default: -1)
-        Number of threads to use. -1 refers to using all physical CPU cores.
-
-    random_state: ``int``, optional, default: ``0``
-        Random seed set for reproducing results.
+    data : AnnData-like
+        Data object containing representation matrices and graph metadata.
+    n_components : int, optional
+        Number of diffusion components to compute.
+    rep : str, optional
+        Representation key used to build/connect graph (for example ``'pca'``).
+    solver : str, optional
+        Eigensolver method: ``'eigsh'`` or ``'randomized'``.
+    max_t : float, optional
+        Upper bound for automatic diffusion-time knee search.
+    n_jobs : int, optional
+        Number of compute threads. ``-1`` uses all available CPU cores.
+    random_state : int, optional
+        Random seed.
 
     Returns
     -------
-    ``None``
-
-    Update ``data.obsm``:
-        * ``data.obsm["X_diffmap"]``: Diffusion Map matrix of the data.
-
-    Update ``data.uns``:
-        * ``data.uns["diffmap_evals"]``: Eigenvalues corresponding to Diffusion Map matrix.
+    None
+        Updates ``data.obsm['X_diffmap']``, ``data.obsm['X_phi']`` and
+        ``data.uns['diffmap_evals']`` in place.
 
     Examples
     --------

@@ -25,35 +25,31 @@ from .._registry import register_function
 )
 class BulkTrajBlend(object):
     """
-    Integrate bulk and single-cell signals to infer transitional cell states and trajectory dynamics through bulk-to-single reconstruction plus graph modeling
-    
+    Integrate bulk and single-cell information to infer transitional cell-state trajectories.
+
     Parameters
     ----------
-    bulk_seq : pd.DataFrame
-        Configuration argument used when constructing `BulkTrajBlend`.
-    single_seq : anndata.AnnData
-        Configuration argument used when constructing `BulkTrajBlend`.
-    celltype_key : str
-        Configuration argument used when constructing `BulkTrajBlend`.
-    bulk_group : Optional[Any], optional, default=None
-        Configuration argument used when constructing `BulkTrajBlend`.
-    max_single_cells : int, optional, default=5000
-        Configuration argument used when constructing `BulkTrajBlend`.
-    top_marker_num : int, optional, default=500
-        Configuration argument used when constructing `BulkTrajBlend`.
-    ratio_num : int, optional, default=1
-        Configuration argument used when constructing `BulkTrajBlend`.
-    gpu : Union[int, str], optional, default=0
-        Configuration argument used when constructing `BulkTrajBlend`.
+    bulk_seq:pd.DataFrame
+        Bulk expression matrix with genes in rows and samples in columns.
+    single_seq:anndata.AnnData
+        Reference single-cell dataset used to define cell identities.
+    celltype_key:str
+        Column name in ``single_seq.obs`` containing cell-type labels.
+    bulk_group:Optional[Any]
+        Optional grouping key/list for averaging bulk replicates.
+    max_single_cells:int
+        Maximum number of reference cells retained for model fitting.
+    top_marker_num:int
+        Number of top marker genes used in Bulk2Single preparation.
+    ratio_num:int
+        Ratio controlling generated cell numbers per cell type.
+    gpu:Union[int,str]
+        Compute device specification (CUDA index, ``'mps'``, or CPU fallback).
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes bulk-trajectory blending workflow.
     
     Examples
     --------
@@ -66,17 +62,27 @@ class BulkTrajBlend(object):
         r"""
         Initialize BulkTrajBlend for trajectory inference and cell blending.
 
-        Arguments:
-            bulk_seq: Bulk RNA-seq data with genes as rows and samples as columns
-            single_seq: Single-cell RNA-seq reference data as AnnData object
-            celltype_key: Column name in single_seq.obs containing cell type annotations
-            bulk_group: Column names in bulk_seq for sample grouping. Default: None
-            max_single_cells: Maximum number of single cells to use. Default: 5000
-            top_marker_num: Number of top marker genes per cell type. Default: 500
-            ratio_num: Cell selection ratio for each cell type. Default: 1
-            gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon. Default: 0
+        Parameters
+        ----------
+        bulk_seq:pd.DataFrame
+            Bulk RNA-seq matrix with genes as rows and samples as columns.
+        single_seq:anndata.AnnData
+            Single-cell reference AnnData used for cell-state prior information.
+        celltype_key:str
+            Column in ``single_seq.obs`` that stores cell-type annotation.
+        bulk_group:Optional[Any]
+            Optional grouping used to aggregate bulk replicates.
+        max_single_cells:int
+            Maximum number of single cells used in internal Bulk2Single model.
+        top_marker_num:int
+            Number of marker genes per cell type used during preparation.
+        ratio_num:int
+            Cell-number ratio used when converting fractions into target counts.
+        gpu:Union[int,str]
+            Compute device selector for VAE/GNN workflows.
 
-        Returns:
+        Returns
+        -------
             None
         """
 
@@ -101,22 +107,20 @@ class BulkTrajBlend(object):
         pass
 
     def bulk_preprocess_lazy(self,)->None:
-        """
-        Preprocess bulk RNA-seq data for trajectory analysis
+        r"""
+        Preprocess bulk RNA-seq data for trajectory analysis.
         
+        Performs normalization, log transformation, and optional group averaging
+        of bulk data for downstream trajectory inference.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+            
         Returns
         -------
         None
-            Output produced by `bulk_preprocess_lazy`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Updates ``self.bulk_seq`` and ``self.bulk_seq_group`` in place.
         """
 
         print("......drop duplicates index in bulk data")
@@ -136,22 +140,21 @@ class BulkTrajBlend(object):
         return None
     
     def single_preprocess_lazy(self,target_sum:int=1e4)->None:
-        """
-        Preprocess single-cell reference data for trajectory analysis
+        r"""
+        Preprocess single-cell reference data for trajectory analysis.
         
+        Normalizes single-cell data and makes cell/gene names unique for
+        consistent integration with bulk data.
+
         Parameters
         ----------
-        target_sum : int, optional, default=1e4
-            Input parameter for `single_preprocess_lazy`.
-        
+        target_sum:int
+            Library-size target used for total-count normalization.
+            
         Returns
         -------
         None
-            Output produced by `single_preprocess_lazy`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Updates ``self.single_seq`` in place.
         """
 
         print("......normalize the single data")
@@ -164,24 +167,23 @@ class BulkTrajBlend(object):
         return None
     
     def vae_configure(self, cell_target_num: Optional[int] = None, **kwargs: Any) -> None:
-        """
-        Configure the VAE model for bulk-to-single-cell generation
-        
+        r"""
+        Configure the VAE model for bulk-to-single-cell generation.
+
+        Sets up the Bulk2Single model with cell-type target numbers either from
+        deconvolution prediction or manual specification.
+
         Parameters
         ----------
-        cell_target_num : Optional[int], optional, default=None
-            Input parameter for `vae_configure`.
-        **kwargs : Any
-            Input parameter for `vae_configure`.
-        
+        cell_target_num:Optional[int]
+            Fixed number of generated cells per cell type. If ``None``, cell
+            fractions are first estimated from bulk data.
+        **kwargs:Any
+            Extra keyword arguments forwarded to ``predicted_fraction``.
+
         Returns
         -------
-        None
-            Output produced by `vae_configure`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
         """
         self.vae_model=Bulk2Single(bulk_data=self.bulk_seq,single_data=self.single_seq,
                                    celltype_key=self.celltype_key,bulk_group=self.group,
@@ -208,44 +210,43 @@ class BulkTrajBlend(object):
             generate_save_dir:str='output',
             generate_save_name:str='output',
             batch_size:int=512,
-            learning_rate:int=1e-4,
+            learning_rate:float=1e-4,
             hidden_size:int=256,
             epoch_num:int=5000,
             patience:int=50,save:bool=True):
-        """
-        Train the VAE model for trajectory-aware single-cell generation
+        r"""
+        Train the VAE model for trajectory-aware single-cell generation.
         
+        Trains the underlying Bulk2Single VAE model to generate synthetic single
+        cells that preserve trajectory information from bulk data.
+
         Parameters
         ----------
-        vae_save_dir : str, optional, default='save_model'
-            Input parameter for `vae_train`.
-        vae_save_name : str, optional, default='vae'
-            Input parameter for `vae_train`.
-        generate_save_dir : str, optional, default='output'
-            Input parameter for `vae_train`.
-        generate_save_name : str, optional, default='output'
-            Input parameter for `vae_train`.
-        batch_size : int, optional, default=512
-            Input parameter for `vae_train`.
-        learning_rate : int, optional, default=1e-4
-            Input parameter for `vae_train`.
-        hidden_size : int, optional, default=256
-            Input parameter for `vae_train`.
-        epoch_num : int, optional, default=5000
-            Input parameter for `vae_train`.
-        patience : int, optional, default=50
-            Input parameter for `vae_train`.
-        save : bool, optional, default=True
-            Input parameter for `vae_train`.
-        
+        vae_save_dir:str
+            Directory where trained VAE weights will be saved.
+        vae_save_name:str
+            Filename prefix for the saved VAE checkpoint.
+        generate_save_dir:str
+            Reserved output directory for generated single-cell matrices.
+        generate_save_name:str
+            Reserved output filename prefix for generated matrices.
+        batch_size:int
+            Mini-batch size for VAE optimization.
+        learning_rate:float
+            Learning rate for VAE optimizer.
+        hidden_size:int
+            Hidden dimension of encoder/decoder blocks.
+        epoch_num:int
+            Maximum training epochs.
+        patience:int
+            Early-stopping patience.
+        save:bool
+            Whether to persist trained model and metadata.
+            
         Returns
         -------
-        Any
-            Output produced by `vae_train`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Updates ``self.vae_net`` with the trained model.
         """
         
         self.vae_net=self.vae_model.train(
@@ -261,24 +262,23 @@ class BulkTrajBlend(object):
         
         
     def vae_load(self,vae_load_dir:str,hidden_size:int=256):
-        """
-        Load a pre-trained VAE model for trajectory analysis
+        r"""
+        Load a pre-trained VAE model for trajectory analysis.
         
+        Loads a previously trained VAE model for generating trajectory-aware
+        single-cell data.
+
         Parameters
         ----------
-        vae_load_dir : str
-            Input parameter for `vae_load`.
-        hidden_size : int, optional, default=256
-            Input parameter for `vae_load`.
-        
+        vae_load_dir:str
+            Path to a saved VAE checkpoint.
+        hidden_size:int
+            Hidden dimension used to reconstruct model architecture.
+            
         Returns
         -------
-        Any
-            Output produced by `vae_load`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Loads weights into the internal VAE model.
         """
 
         print(f'loading model from {vae_load_dir}')
@@ -287,30 +287,29 @@ class BulkTrajBlend(object):
 
     def vae_generate(self,highly_variable_genes:bool=True,max_value:float=10,
                      n_comps:int=100,svd_solver:str='auto',leiden_size:int=50)->anndata.AnnData:
-        """
-        Generate trajectory-aware single-cell data with quality filtering
+        r"""
+        Generate trajectory-aware single-cell data with quality filtering.
         
+        Uses the trained VAE to generate synthetic single cells and applies
+        quality control filtering to remove noisy clusters.
+
         Parameters
         ----------
-        highly_variable_genes : bool, optional, default=True
-            Input parameter for `vae_generate`.
-        max_value : float, optional, default=10
-            Input parameter for `vae_generate`.
-        n_comps : int, optional, default=100
-            Input parameter for `vae_generate`.
-        svd_solver : str, optional, default='auto'
-            Input parameter for `vae_generate`.
-        leiden_size : int, optional, default=50
-            Input parameter for `vae_generate`.
-        
+        highly_variable_genes:bool
+            Whether to restrict clustering to highly variable genes.
+        max_value:float
+            Clipping threshold used during scaling.
+        n_comps:int
+            Number of principal components for graph construction.
+        svd_solver:str
+            SVD solver used in PCA.
+        leiden_size:int
+            Minimum accepted Leiden cluster size; smaller clusters are removed.
+
         Returns
         -------
         anndata.AnnData
-            Output produced by `vae_generate`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Generated AnnData after filtering noisy clusters.
         """
         import scanpy as sc
 
@@ -342,48 +341,46 @@ class BulkTrajBlend(object):
                      balance_loss: bool = True,
                      stochastic_loss: bool = True,
                      batch_size: int = 2000, num_workers: int = 5) -> None:
-        """
-        Configure Graph Neural Network for trajectory and transition state analysis
-        
+        r"""
+        Configure Graph Neural Network for trajectory and transition state analysis.
+
+        Sets up the NOCD (Non-Overlapping Cell-type Decomposition) GNN model
+        for identifying cellular trajectories and intermediate states.
+
         Parameters
         ----------
-        use_rep : str, optional, default='X'
-            Input parameter for `gnn_configure`.
-        neighbor_rep : str, optional, default='X_pca'
-            Input parameter for `gnn_configure`.
-        gpu : Union[int, str], optional, default=0
-            Input parameter for `gnn_configure`.
-        hidden_size : int, optional, default=128
-            Input parameter for `gnn_configure`.
-        weight_decay : float, optional, default=1e-2
-            Input parameter for `gnn_configure`.
-        dropout : float, optional, default=0.5
-            Input parameter for `gnn_configure`.
-        batch_norm : bool, optional, default=True
-            Input parameter for `gnn_configure`.
-        lr : float, optional, default=1e-3
-            Input parameter for `gnn_configure`.
-        max_epochs : int, optional, default=500
-            Input parameter for `gnn_configure`.
-        display_step : int, optional, default=25
-            Input parameter for `gnn_configure`.
-        balance_loss : bool, optional, default=True
-            Input parameter for `gnn_configure`.
-        stochastic_loss : bool, optional, default=True
-            Input parameter for `gnn_configure`.
-        batch_size : int, optional, default=2000
-            Input parameter for `gnn_configure`.
-        num_workers : int, optional, default=5
-            Input parameter for `gnn_configure`.
-        
+        use_rep:str
+            Representation key in ``adata`` used as GNN input features.
+        neighbor_rep:str
+            Representation key used to build neighborhood graph.
+        gpu:Union[int,str]
+            Device selector for GNN training.
+        hidden_size:int
+            Hidden dimension of GNN layers.
+        weight_decay:float
+            L2 regularization strength.
+        dropout:float
+            Dropout probability.
+        batch_norm:bool
+            Whether to apply batch normalization.
+        lr:float
+            Learning rate for GNN optimization.
+        max_epochs:int
+            Maximum number of GNN training epochs.
+        display_step:int
+            Epoch interval for progress logging.
+        balance_loss:bool
+            Whether to balance positive/negative terms in the objective.
+        stochastic_loss:bool
+            Whether to enable stochastic objective approximation.
+        batch_size:int
+            Batch size for edge/node sampling.
+        num_workers:int
+            Number of workers for preprocessing data loaders.
+
         Returns
         -------
-        None
-            Output produced by `gnn_configure`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
         """
         nocd_obj=scnocd(self.generate_adata,use_rep=use_rep,
                         neighbor_rep=neighbor_rep,gpu=gpu)
@@ -401,26 +398,25 @@ class BulkTrajBlend(object):
     
     def gnn_train(self,thresh:float=0.5,gnn_save_dir:str='save_model',
             gnn_save_name:str='gnn'):
-        """
-        Train the GNN model for trajectory and transition state inference
+        r"""
+        Train the GNN model for trajectory and transition state inference.
         
+        Trains the NOCD model to identify cellular trajectories and overlapping
+        cell communities representing transition states.
+
         Parameters
         ----------
-        thresh : float, optional, default=0.5
-            Input parameter for `gnn_train`.
-        gnn_save_dir : str, optional, default='save_model'
-            Input parameter for `gnn_train`.
-        gnn_save_name : str, optional, default='gnn'
-            Input parameter for `gnn_train`.
-        
+        thresh:float
+            Probability threshold for assigning community membership.
+        gnn_save_dir:str
+            Directory where trained GNN model is saved.
+        gnn_save_name:str
+            Filename prefix for saved GNN checkpoint.
+            
         Returns
         -------
-        Any
-            Output produced by `gnn_train`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Fits the NOCD model and stores inferred communities.
         """
         self.nocd_obj.GNN_model()
         self.nocd_obj.GNN_result(thresh=thresh)
@@ -428,46 +424,42 @@ class BulkTrajBlend(object):
         self.nocd_obj.save(gnn_save_dir=gnn_save_dir,gnn_save_name=gnn_save_name)
 
     def gnn_load(self,gnn_load_dir:str,thresh:float=0.5,):
-        """
-        Load a pre-trained GNN model for trajectory analysis
+        r"""
+        Load a pre-trained GNN model for trajectory analysis.
         
+        Loads a previously trained NOCD model and computes trajectory results.
+
         Parameters
         ----------
-        gnn_load_dir : str
-            Input parameter for `gnn_load`.
-        thresh : float, optional, default=0.5
-            Input parameter for `gnn_load`.
-        
+        gnn_load_dir:str
+            Path to directory containing saved GNN checkpoint.
+        thresh:float
+            Probability threshold for assigning community membership.
+            
         Returns
         -------
-        Any
-            Output produced by `gnn_load`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Loads trained model and recomputes community assignments.
         """
         self.nocd_obj.load(gnn_load_dir)
         self.nocd_obj.GNN_result(thresh=thresh)
         self.nocd_obj.cal_nocd()
     
     def gnn_generate(self)->pd.DataFrame:
-        """
-        Generate overlapping cell communities representing transition states
+        r"""
+        Generate overlapping cell communities representing transition states.
         
+        Identifies and names cell communities based on trajectory analysis,
+        creating binary matrix indicating community membership for each cell.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+            
         Returns
         -------
         pd.DataFrame
-            Output produced by `gnn_generate`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Binary matrix of NOCD community assignments per cell.
         """
         '''
         pair_dict_r={}
@@ -518,24 +510,24 @@ class BulkTrajBlend(object):
         return res_pd 
     
     def interpolation(self,celltype:str,adata:anndata.AnnData=None,)->anndata.AnnData:
-        """
-        Interpolate trajectory communities back to original data space
+        r"""
+        Interpolate trajectory communities back to original data space.
         
+        Integrates identified cell communities from generated data back with
+        original single-cell reference data for downstream analysis.
+
         Parameters
         ----------
-        celltype : str
-            Input parameter for `interpolation`.
-        adata : anndata.AnnData, optional, default=None
-            Input parameter for `interpolation`.
-        
+        celltype:str
+            Community label suffix used in ``obs['nocd_<celltype>']``.
+        adata:anndata.AnnData or None
+            Target AnnData to merge with inferred transition-state cells. If
+            ``None``, ``self.single_seq`` is used.
+
         Returns
         -------
         anndata.AnnData
-            Output produced by `interpolation`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Concatenated AnnData containing selected transition cells and source data.
         """
         if adata is None:
             adata=self.single_seq
@@ -548,5 +540,3 @@ class BulkTrajBlend(object):
             print("The cell type {} is not in the nocd result".format(celltype))
         return adata1
     
-
-

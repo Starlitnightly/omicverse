@@ -6,61 +6,61 @@ import pandas as pd
 from .._registry import register_function
 
 @register_function(
-    aliases=["空间解卷积", "deconvolution", "spatial_deconvolution", "空间解卷积分析", "空间映射"],
+    aliases=["空间解卷积", "spatial deconvolution", "Deconvolution", "cell type mapping", "空间细胞类型映射"],
     category="space",
-    description="Spatial deconvolution for mapping scRNA-seq cell types to spatial locations",
+    description="Class for transferring single-cell cell-type information onto spatial transcriptomics spots using Tangram/cell2location/Starfysh/FlashDeconv backends.",
     prerequisites={
-        'functions': []  # Requires scRNA-seq with annotations and spatial data
+        'optional_functions': ['pp.preprocess', 'space.svg']
     },
     requires={
-        'obs': ['cell_type'],  # Requires clusters column in scRNA-seq (user-specified)
+        'obs': ['reference cell-type labels in adata_sc.obs'],
+        'layers': ['counts (recommended for both adata_sc and adata_sp)']
     },
     produces={
-        'obsm': []  # Cell type predictions in spatial data
+        'obsm': ['prop_celltypes / method-specific proportion matrices'],
+        'layers': ['cell-type-specific imputed layers (cell2location mode)'],
+        'uns': ['method-specific model metadata']
     },
     auto_fix='escalate',
     examples=[
-        "# Basic Deconvolution analysis",
-        "deconvolution = ov.space.Deconvolution(adata_sp=spatial_adata, adata_sc=sc_adata)",
-        "decov_obj.deconvolution(method='Tangram', celltype_key_sc='cell_type')",
-        "decov_obj.deconvolution(method='cell2location', celltype_key_sc='cell_type')",
-        "decov_obj.deconvolution(method='FlashDeconv', celltype_key_sc='cell_type')",
-        "decov_obj.deconvolution(method='starfysh', celltype_key_sc='cell_type')",
+        "decov = ov.space.Deconvolution(adata_sp=adata_sp, adata_sc=adata_sc)",
+        "decov.preprocess_sc(mode='shiftlog|pearson', n_HVGs=3000)",
+        "decov.preprocess_sp(mode='pearsonr', n_svgs=3000)",
+        "decov.deconvolution(method='Tangram', celltype_key_sc='cell_type')",
+        "decov.deconvolution(method='cell2location', celltype_key_sc='cell_type')",
     ],
+    related=['space.calculate_gene_signature', 'space.svg', 'single.get_celltype_marker']
 )
 class Deconvolution(object):
     """
-    Spatial deconvolution for mapping scRNA-seq cell types to spatial locations
+    Spatial deconvolution pipeline that aligns scRNA-seq references with spatial transcriptomics.
     
     Parameters
     ----------
-    adata_sp : Any
-        Configuration argument used when constructing `Deconvolution`.
-    adata_sc : Any, optional, default=None
-        Configuration argument used when constructing `Deconvolution`.
+    adata_sp:AnnData
+        Spatial transcriptomics AnnData object (spots x genes).
+    adata_sc:AnnData or None
+        Single-cell reference AnnData (cells x genes) containing cell-type labels.
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes the deconvolution manager and backend placeholders.
     
     Examples
     --------
-    >>> # Basic Deconvolution analysis
+    >>> decov = ov.space.Deconvolution(adata_sp=adata_sp, adata_sc=adata_sc)
+    >>> decov.deconvolution(method='Tangram', celltype_key_sc='cell_type')
     """
 
     def __init__(self, adata_sp,adata_sc=None, ):
         r"""Initialize Deconvolution object.
         Parameters
         ----------
-        adata_sp : AnnData
+        adata_sp:AnnData
             Spatial transcriptomics data.
-        adata_sc : AnnData, optional
-            Single-cell RNA-seq data, by default None.
+        adata_sc:AnnData or None
+            Single-cell RNA-seq reference. If ``None``, only spatial object is initialized.
         """
         self.adata_sc = adata_sc
         self.adata_sp = adata_sp
@@ -108,27 +108,27 @@ class Deconvolution(object):
 
     def preprocess_sc(self,mode='shiftlog|pearson',n_HVGs=3000,target_sum=1e4,**kwargs):
         """
-        Preprocess the scRNA-seq data
-        
+        Preprocess the scRNA-seq reference before spatial mapping.
+
         Parameters
         ----------
-        mode : Any, optional, default='shiftlog|pearson'
-            Input parameter for `preprocess_sc`.
-        n_HVGs : Any, optional, default=3000
-            Input parameter for `preprocess_sc`.
-        target_sum : Any, optional, default=1e4
-            Input parameter for `preprocess_sc`.
-        **kwargs : Any
-            Input parameter for `preprocess_sc`.
-        
+        mode:str
+            Preprocessing recipe used by ``ov.pp.preprocess``.
+        n_HVGs:int
+            Number of highly variable genes to retain.
+        target_sum:float
+            Library-size normalization target sum.
+        **kwargs
+            Additional keyword arguments passed to ``ov.pp.preprocess``.
+
         Returns
         -------
-        Any
-            Output produced by `preprocess_sc`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Updates ``self.adata_sc`` in-place and subsets to HVGs.
+
+        Examples
+        --------
+        >>> decov.preprocess_sc(mode='shiftlog|pearson', n_HVGs=3000, target_sum=1e4)
         """
         from ..pp import preprocess
         self.adata_sc=preprocess(self.adata_sc,mode=mode,n_HVGs=n_HVGs,target_sum=target_sum,**kwargs)
@@ -143,33 +143,33 @@ class Deconvolution(object):
         subset_genes=True,
         **kwargs):
         """
-        Preprocess the spatial transcriptomics data
-        
+        Preprocess spatial transcriptomics data and select spatially variable genes.
+
         Parameters
         ----------
-        mode : Any, optional, default='pearsonr'
-            Input parameter for `preprocess_sp`.
-        n_svgs : Any, optional, default=3000
-            Input parameter for `preprocess_sp`.
-        target_sum : Any, optional, default=50*1e4
-            Input parameter for `preprocess_sp`.
-        platform : Any, optional, default="visium"
-            Input parameter for `preprocess_sp`.
-        mt_startwith : Any, optional, default='MT-'
-            Input parameter for `preprocess_sp`.
-        subset_genes : Any, optional, default=True
-            Input parameter for `preprocess_sp`.
-        **kwargs : Any
-            Input parameter for `preprocess_sp`.
-        
+        mode:str
+            SVG selection mode passed to ``ov.space.svg``.
+        n_svgs:int
+            Number of spatially variable genes to keep.
+        target_sum:float
+            Library-size normalization target sum for spatial data.
+        platform:str
+            Spatial platform identifier.
+        mt_startwith:str
+            Prefix used to identify mitochondrial genes.
+        subset_genes:bool
+            Whether to subset ``self.adata_sp`` to selected SVGs.
+        **kwargs
+            Additional keyword arguments forwarded to ``ov.space.svg``.
+
         Returns
         -------
-        Any
-            Output produced by `preprocess_sp`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Updates ``self.adata_sp`` and ``self.adata_sp_raw`` in-place.
+
+        Examples
+        --------
+        >>> decov.preprocess_sp(mode='pearsonr', n_svgs=3000, platform='visium')
         """
 
         from ._svg import svg
@@ -211,49 +211,51 @@ class Deconvolution(object):
         categorical_covariate_keys_sc=None,
     ):
         """
-        Deconvolution the spatial transcriptomics data
-        
+        Infer spot-level cell-type composition from single-cell references.
+
         Parameters
         ----------
-        method : Any, optional, default='Tangram'
-            Input parameter for `deconvolution`.
-        celltype_key_sc : Any, optional, default='cell_type'
-            Input parameter for `deconvolution`.
-        batch_key_sc : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        batch_key_sp : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        tangram_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        cell2location_scrna_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        cell2location_spatial_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        N_cells_per_location : Any, optional, default=30
-            Input parameter for `deconvolution`.
-        detection_alpha : Any, optional, default=200
-            Input parameter for `deconvolution`.
-        sample_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        flashdeconv_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        starfysh_kwargs : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        spatial_type : Any, optional, default='visium'
-            Input parameter for `deconvolution`.
-        gene_sig : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        categorical_covariate_keys_sc : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        
+        method:{'Tangram', 'cell2location', 'FlashDeconv', 'starfysh'}
+            Deconvolution backend.
+        celltype_key_sc:str
+            Cell-type label key in ``adata_sc.obs``.
+        batch_key_sc:str or None
+            Batch key in scRNA-seq reference for batch-aware models.
+        batch_key_sp:str or None
+            Batch key in spatial data.
+        tangram_kwargs:dict or None
+            Keyword arguments for Tangram model training.
+        cell2location_scrna_kwargs:dict or None
+            Keyword arguments for cell2location reference regression model.
+        cell2location_spatial_kwargs:dict or None
+            Keyword arguments for cell2location spatial model.
+        N_cells_per_location:int
+            Expected number of cells per spatial location (cell2location).
+        detection_alpha:float
+            Detection alpha hyper-parameter used by cell2location.
+        sample_kwargs:dict or None
+            Posterior sampling options for cell2location.
+        flashdeconv_kwargs:dict or None
+            Additional parameters for FlashDeconv.
+        starfysh_kwargs:dict or None
+            Additional parameters for Starfysh.
+        spatial_type:str
+            Spatial platform type used by backend-specific wrappers.
+        gene_sig:pandas.DataFrame or None
+            Gene-signature table used by Starfysh.
+        categorical_covariate_keys_sc:list[str] or None
+            Categorical covariates used by cell2location regression.
+
         Returns
         -------
-        Any
-            Output produced by `deconvolution`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        object
+            Backend-specific trained model object for methods that explicitly return one
+            (for example Tangram); otherwise results are stored in object attributes.
+
+        Examples
+        --------
+        >>> decov.deconvolution(method='Tangram', celltype_key_sc='cell_type')
+        >>> decov.deconvolution(method='cell2location', celltype_key_sc='cell_type')
         """
         if method=='Tangram':
             self.method='Tangram'
@@ -583,21 +585,25 @@ class Deconvolution(object):
 
     def impute(self,method='Tangram'):
         """
-        Impute spatial expression or cell-type signals from a trained model
-        
+        Generate spot-level imputation outputs from a fitted spatial deconvolution model.
+
         Parameters
         ----------
-        method : Any, optional, default='Tangram'
-            Input parameter for `impute`.
-        
+        method:{'Tangram', 'cell2location'}
+            Imputation backend. ``'Tangram'`` runs the loaded Tangram model and stores
+            the imputed AnnData in ``self.adata_impute``. ``'cell2location'`` computes
+            expected cell-type-specific expression and writes each cell type into
+            ``self.adata_sp.layers``.
+
         Returns
         -------
-        Any
-            Output produced by `impute`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Results are stored in object attributes in-place.
+
+        Examples
+        --------
+        >>> deconv.impute(method='Tangram')
+        >>> deconv.impute(method='cell2location')
         """
         if method=='Tangram':
             self.method='Tangram'
@@ -619,21 +625,21 @@ class Deconvolution(object):
     
     def load_cell2location_model(self,mod_sp_path):
         """
-        Load a previously saved cell2location model object
-        
+        Load a previously trained cell2location spatial model.
+
         Parameters
         ----------
-        mod_sp_path : Any
-            Input parameter for `load_cell2location_model`.
-        
+        mod_sp_path:str
+            Path to a serialized model object produced by ``ov.utils.save``.
+
         Returns
         -------
-        Any
-            Output produced by `load_cell2location_model`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores loaded model in ``self.mod_sp``.
+
+        Examples
+        --------
+        >>> decov.load_cell2location_model('results/mod_sp.pkl')
         """
         self.method='cell2location'
         from ..utils import load
@@ -644,21 +650,24 @@ class Deconvolution(object):
 
     def cell2location_inference(self,sample_kwargs=None):
         """
-        Run posterior export and convert abundances to cell-type proportions
-        
+        Export cell2location posterior and derive normalized cell-type proportions.
+
         Parameters
         ----------
-        sample_kwargs : Any, optional, default=None
-            Input parameter for `cell2location_inference`.
-        
+        sample_kwargs:dict or None
+            Parameters passed to ``self.mod_sp.export_posterior``.
+            Defaults to ``{'num_samples': 1000, 'batch_size': 2500}``.
+
         Returns
         -------
-        Any
-            Output produced by `cell2location_inference`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes posterior outputs to ``self.adata_sp`` and stores normalized proportion
+            AnnData in ``self.adata_cell2location``.
+
+        Examples
+        --------
+        >>> decov.cell2location_inference()
+        >>> decov.cell2location_inference(sample_kwargs={'num_samples': 500, 'batch_size': 2048})
         """
         if sample_kwargs is None:
             sample_kwargs={"num_samples": 1000, "batch_size": 2500}
@@ -686,21 +695,21 @@ class Deconvolution(object):
 
     def load_tangram_model(self,model_path):
         """
-        Load a serialized Tangram model for downstream inference
-        
+        Load a pre-trained Tangram model for downstream projection/inference.
+
         Parameters
         ----------
-        model_path : Any
-            Input parameter for `load_tangram_model`.
-        
+        model_path:str
+            Path to a serialized Tangram model object.
+
         Returns
         -------
-        Any
-            Output produced by `load_tangram_model`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores loaded model in ``self.tangram_model``.
+
+        Examples
+        --------
+        >>> decov.load_tangram_model('results/tangram_model.pkl')
         """
         self.method='Tangram'
         #from ._tangram import Tangram
@@ -712,21 +721,21 @@ class Deconvolution(object):
 
     def tangram_inference(self,sample_kwargs=None):
         """
-        Infer spatial cell-type proportions using a loaded Tangram model
-        
+        Infer spot-level cell-type proportions using a loaded Tangram model.
+
         Parameters
         ----------
-        sample_kwargs : Any, optional, default=None
-            Input parameter for `tangram_inference`.
-        
+        sample_kwargs:dict or None
+            Reserved argument for API consistency. Current implementation does not use it.
+
         Returns
         -------
-        Any
-            Output produced by `tangram_inference`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores inferred proportions in ``self.adata_cell2location``.
+
+        Examples
+        --------
+        >>> decov.tangram_inference()
         """
         self.adata_cell2location=self.tangram_model.cell2location()
         print(f"{Colors.GREEN}✓ Tangram is done{Colors.ENDC}")
@@ -734,15 +743,18 @@ class Deconvolution(object):
 
 
 @register_function(
-    aliases=['计算细胞类型签名', 'calculate_gene_signature', 'cell type signature genes'],
+    aliases=['计算细胞类型签名', 'calculate_gene_signature', 'celltype_marker_signature', '构建细胞类型特征基因'],
     category="space",
-    description="Derive marker-gene signatures from single-cell references for spatial deconvolution and cell-type abundance estimation.",
-    prerequisites={'optional_functions': ['pp.preprocess', 'single.DEG']},
-    requires={'obs': ['cell type labels'], 'var': ['gene names']},
-    produces={'uns': ['gene_signatures']},
+    description="Generate per-cell-type marker gene signatures from scRNA-seq references for spatial deconvolution methods such as Starfysh.",
+    prerequisites={'optional_functions': ['single.get_celltype_marker']},
+    requires={'obs': ['clustertype labels'], 'var': ['gene symbols']},
+    produces={'table': ['gene signature matrix (columns=cell types)']},
     auto_fix='none',
-    examples=['ov.space.calculate_gene_signature(adata_sc, clustertype="celltype", topgenenumber=200)'],
-    related=['space.Deconvolution', 'datasets.decov_bulk_covid_single']
+    examples=[
+        "gene_sig = ov.space.calculate_gene_signature(adata_sc, clustertype='celltype', topgenenumber=50)",
+        "decov.deconvolution(method='starfysh', gene_sig=gene_sig, celltype_key_sc='celltype')",
+    ],
+    related=['space.Deconvolution', 'single.get_celltype_marker']
 )
 def calculate_gene_signature(
     adata_sc,clustertype,
@@ -752,35 +764,32 @@ def calculate_gene_signature(
     topgenenumber=20 
 ):
     """
-    Derive marker-gene signatures from single-cell references for spatial deconvolution and cell-type abundance estimation
-    
+    Build a marker-gene signature table for each cell type in a reference scRNA-seq dataset.
+
     Parameters
     ----------
-    adata_sc : Any
-        Input parameter for `calculate_gene_signature`.
-    clustertype : Any
-        Input parameter for `calculate_gene_signature`.
-    rank : Any, optional, default=True
-        Input parameter for `calculate_gene_signature`.
-    key : Any, optional, default='rank_genes_groups'
-        Input parameter for `calculate_gene_signature`.
-    foldchange : Any, optional, default=2
-        Input parameter for `calculate_gene_signature`.
-    topgenenumber : Any, optional, default=20
-        Input parameter for `calculate_gene_signature`.
-    
+    adata_sc:AnnData
+        Single-cell reference AnnData.
+    clustertype:str
+        Cell-type label key in ``adata_sc.obs``.
+    rank:bool
+        Whether to use ranked markers from differential expression analysis.
+    key:str
+        ``adata.uns`` key for ranked genes (used when ``rank=True``).
+    foldchange:float
+        Fold-change threshold for marker selection.
+    topgenenumber:int
+        Number of top marker genes retained per cell type.
+
     Returns
     -------
-    Any
-        Output produced by `calculate_gene_signature`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    pandas.DataFrame
+        Gene-signature matrix where each column corresponds to one cell type and each
+        cell stores a marker gene (padded with NA when needed).
+
     Examples
     --------
-    >>> ov.space.calculate_gene_signature(adata_sc, clustertype="celltype", topgenenumber=200)
+    >>> gene_sig = ov.space.calculate_gene_signature(adata_sc, clustertype='celltype', topgenenumber=50)
     """
     # 1) 用“已注释细胞类型”作为分组
     from ..single import get_celltype_marker
@@ -800,4 +809,3 @@ def calculate_gene_signature(
     })
 
     return gene_sig
-

@@ -44,45 +44,41 @@ from .._registry import register_function
 )
 class pyTOSICA(object):
     """
-    TOSICA wrapper for pathway-informed transformer-based cell-type annotation and transfer learning
+    TOSICA wrapper for pathway-informed transformer-based cell-type annotation.
     
     Parameters
     ----------
-    adata : anndata.AnnData
-        Configuration argument used when constructing `pyTOSICA`.
-    project_path : str
-        Configuration argument used when constructing `pyTOSICA`.
-    gmt_path : Any, optional, default=None
-        Configuration argument used when constructing `pyTOSICA`.
-    label_name : str, optional, default='Celltype'
-        Configuration argument used when constructing `pyTOSICA`.
-    mask_ratio : float, optional, default=0.015
-        Configuration argument used when constructing `pyTOSICA`.
-    max_g : int, optional, default=300
-        Configuration argument used when constructing `pyTOSICA`.
-    max_gs : int, optional, default=300
-        Configuration argument used when constructing `pyTOSICA`.
-    n_unannotated : int, optional, default=1
-        Configuration argument used when constructing `pyTOSICA`.
-    embed_dim : int, optional, default=48
-        Configuration argument used when constructing `pyTOSICA`.
-    depth : int, optional, default=1
-        Configuration argument used when constructing `pyTOSICA`.
-    num_heads : int, optional, default=4
-        Configuration argument used when constructing `pyTOSICA`.
-    batch_size : int, optional, default=8
-        Configuration argument used when constructing `pyTOSICA`.
-    device : str, optional, default='cuda:0'
-        Configuration argument used when constructing `pyTOSICA`.
+    adata:anndata.AnnData
+        Training/reference AnnData with labels.
+    project_path:str
+        Output directory for TOSICA checkpoints and logs.
+    gmt_path:str|None, optional, default=None
+        Pathway GMT file path. If ``None``, default gene-set resources are used.
+    label_name:str, optional, default='Celltype'
+        Label column in ``adata.obs``.
+    mask_ratio:float, optional, default=0.015
+        Ratio of masked genes/tokens used for training regularization.
+    max_g:int, optional, default=300
+        Maximum number of genes used per pathway/tokenization unit.
+    max_gs:int, optional, default=300
+        Maximum number of gene sets used in the model.
+    n_unannotated:int, optional, default=1
+        Number of unlabeled classes reserved during training.
+    embed_dim:int, optional, default=48
+        Transformer embedding dimension.
+    depth:int, optional, default=1
+        Number of transformer encoder layers.
+    num_heads:int, optional, default=4
+        Number of attention heads.
+    batch_size:int, optional, default=8
+        Mini-batch size used during training/inference.
+    device:str, optional, default='cuda:0'
+        Device used for model training/inference.
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes TOSICA model configuration and training resources.
     
     Examples
     --------
@@ -97,20 +93,34 @@ class pyTOSICA(object):
                  ) -> None:
         r"""Initialize a pyTOSICA object for cell type classification.
 
-        Arguments:
-            adata: AnnData object containing single-cell data
-            project_path (str): Path to save the results and model files
-            gmt_path (str): Gene set name or path - choose from 'human_gobp', 'human_immune', 'human_reactome', 'human_tf', 'mouse_gobp', 'mouse_reactome', 'mouse_tf' (default: None)
-            label_name (str): Column name of the label to predict in adata.obs (default: 'Celltype')
-            mask_ratio (float): Ratio of connections reserved when no mask is available (default: 0.015)
-            max_g (int): Maximum number of genes per pathway (default: 300)
-            max_gs (int): Maximum number of pathways/tokens (default: 300)
-            n_unannotated (int): Number of unannotated/fully-connected tokens to add (default: 1)
-            embed_dim (int): Dimension of pathway/token embedding (default: 48)
-            depth (int): Number of transformer layers (default: 1)
-            num_heads (int): Number of attention heads (default: 4)
-            batch_size (int): Batch size for training (default: 8)
-            device (str): Device for computation (default: 'cuda:0')
+        Parameters
+        ----------
+        adata:anndata.AnnData
+            Training/reference AnnData for TOSICA.
+        project_path:str
+            Directory used to save masks, labels, checkpoints, and logs.
+        gmt_path:str or None
+            Pathway GMT identifier/path. If ``None``, full-connection mask is used.
+        label_name:str
+            Label column in ``adata.obs``.
+        mask_ratio:float
+            Random mask ratio used when pathway mask is unavailable.
+        max_g:int
+            Maximum number of genes per pathway.
+        max_gs:int
+            Maximum number of pathway tokens used by the model.
+        n_unannotated:int
+            Number of extra unannotated tokens appended to pathway mask.
+        embed_dim:int
+            Transformer embedding dimension.
+        depth:int
+            Number of transformer layers.
+        num_heads:int
+            Number of attention heads.
+        batch_size:int
+            Training batch size.
+        device:str
+            Preferred device string (for example ``'cuda:0'``).
 
         
         """
@@ -192,28 +202,24 @@ class pyTOSICA(object):
         pass
 
     def train(self,pre_weights:str='',lr:float=0.001, epochs:int= 10, lrf:float=0.01):
-        """
-        Train the TOSICA model for cell type classification
-        
+        r"""Train the TOSICA model for cell type classification.
+
         Parameters
         ----------
-        pre_weights : str, optional, default=''
-            Input parameter for `train`.
-        lr : float, optional, default=0.001
-            Input parameter for `train`.
-        epochs : int, optional, default=10
-            Input parameter for `train`.
-        lrf : float, optional, default=0.01
-            Input parameter for `train`.
-        
+        pre_weights:str
+            Optional path to pretrained weights.
+        lr:float
+            Initial learning rate.
+        epochs:int
+            Number of training epochs.
+        lrf:float
+            Final learning-rate factor used in cosine schedule.
+
         Returns
         -------
-        Any
-            Output produced by `train`.
+        torch.nn.Module
+            Trained TOSICA model.
         
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
         """
         if pre_weights != "":
             assert os.path.exists(pre_weights), "pre_weights file: '{}' not exist.".format(pre_weights)
@@ -250,22 +256,14 @@ class pyTOSICA(object):
         return self.model
     
     def save(self,save_path=None):
-        """
-        Save the trained TOSICA model
-        
+        r"""Save the trained TOSICA model.
+
         Parameters
         ----------
-        save_path : Any, optional, default=None
-            Input parameter for `save`.
+        save_path:str or None
+            Checkpoint output path. If ``None``, defaults to
+            ``project_path/model-best.pth``.
         
-        Returns
-        -------
-        Any
-            Output produced by `save`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
         """
         if save_path==None:
             save_path = self.project_path+'/model-best.pth'
@@ -273,22 +271,14 @@ class pyTOSICA(object):
         print('Model saved!')
 
     def load(self,load_path=None):
-        """
-        Load a pre-trained TOSICA model
-        
+        r"""Load a pre-trained TOSICA model.
+
         Parameters
         ----------
-        load_path : Any, optional, default=None
-            Input parameter for `load`.
-        
-        Returns
-        -------
-        Any
-            Output produced by `load`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        load_path:str or None
+            Checkpoint path to load. If ``None``, defaults to
+            ``project_path/model-best.pth``.
+
         """
         if load_path==None:
             load_path = self.project_path+'/model-best.pth'
@@ -298,30 +288,26 @@ class pyTOSICA(object):
         
     def predicted(self,pre_adata:anndata.AnnData,laten:bool=False,n_step:int=10000,cutoff:float=0.1,
         batch_size:int=50,):
-        """
-        Predict cell types for new single-cell data
-        
+        r"""Predict cell types for new single-cell data.
+
         Parameters
         ----------
-        pre_adata : anndata.AnnData
-            Input parameter for `predicted`.
-        laten : bool, optional, default=False
-            Input parameter for `predicted`.
-        n_step : int, optional, default=10000
-            Input parameter for `predicted`.
-        cutoff : float, optional, default=0.1
-            Input parameter for `predicted`.
-        batch_size : int, optional, default=50
-            Input parameter for `predicted`.
-        
+        pre_adata:anndata.AnnData
+            Query AnnData used for inference.
+        laten:bool
+            Whether to export latent embedding rather than pathway attention.
+        n_step:int
+            Number of cells processed per outer step.
+        cutoff:float
+            Prediction confidence cutoff.
+        batch_size:int
+            Inference batch size.
+
         Returns
         -------
-        Any
-            Output produced by `predicted`.
+        anndata.AnnData
+            Query AnnData augmented with predicted labels and model outputs.
         
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
         """
 
         mask_path = os.getcwd()+'/%s'%self.project_path+'/mask.npy'
@@ -423,7 +409,8 @@ def train(adata, gmt_path, project=None,pre_weights='',
     r"""
     Fit the model with reference data
     
-    Arguments:
+    Parameters
+    ----------
         adatas: Single-cell datasets
         gmt_path: The name (human_gobp; human_immune; human_reactome; human_tf; mouse_gobp; mouse_reactome and mouse_tf) or path of mask to be used.
         project: The name of project. Default: gmt_path_today.
@@ -441,7 +428,8 @@ def train(adata, gmt_path, project=None,pre_weights='',
         epochs: The number of epoch will be trained.
         lrf: The hyper-parameter of Cosine Annealing.
     
-    Returns:
+    Returns
+    -------
         ./mask.npy: Mask matrix
         ./pathway.csv: Gene set list
         ./label_dictionary.csv: Label list
@@ -460,7 +448,8 @@ def pre(adata,model_weight_path,project,laten=False,save_att = 'X_att',
     r"""
     Prediect query data with the model and pre-trained weights.
     
-    Arguments:
+    Parameters
+    ----------
         adatas: Query single-cell datasets.
         model_weight_path: The path to the pre-trained weights.
         mask_path: The path to the mask matrix.
@@ -477,7 +466,8 @@ def pre(adata,model_weight_path,project,laten=False,save_att = 'X_att',
         depth: The number of multi-head self-attention layer. Should be the same as train.
         num_heads: The number of head in one self-attention layer. Should be the same as train.
     
-    Returns:
+    Returns
+    -------
         adata: adata.X : Attention matrix
         adata.obs['Prediction'] : Predicted labels
         adata.obs['Probability'] : Probability of the prediction

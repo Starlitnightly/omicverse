@@ -203,37 +203,29 @@ def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html",
                          species='human', sample_key=None, template_dir=None,
                          enable_analytics=True, analytics_id="OV-001"):
     """
-    Generate an HTML report summarizing single-cell QC, clustering, markers, and embedding views for reproducible interpretation
-    
+    Generate a MultiQC-style HTML report for single-cell RNA-seq analysis.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `generate_scRNA_report`.
-    output_path : Any, optional, default="scRNA_analysis_report.html"
-        Input parameter for `generate_scRNA_report`.
-    species : Any, optional, default='human'
-        Input parameter for `generate_scRNA_report`.
-    sample_key : Any, optional, default=None
-        Input parameter for `generate_scRNA_report`.
-    template_dir : Any, optional, default=None
-        Input parameter for `generate_scRNA_report`.
-    enable_analytics : Any, optional, default=True
-        Input parameter for `generate_scRNA_report`.
-    analytics_id : Any, optional, default="OV-001"
-        Input parameter for `generate_scRNA_report`.
-    
+    adata:AnnData object
+        Analyzed single-cell AnnData, typically produced by ``ov.single.lazy``.
+    output_path:str
+        Output path of generated HTML report.
+    species:str
+        Species label shown in report metadata.
+    sample_key:str or None
+        Column in ``adata.obs`` used as sample/batch grouping.
+    template_dir:str or None
+        Directory containing HTML templates. If ``None``, built-in templates are used.
+    enable_analytics:bool
+        Whether analytics snippet is injected into final HTML.
+    analytics_id:str
+        Analytics identifier used when tracking is enabled.
+
     Returns
     -------
-    Any
-        Output produced by `generate_scRNA_report`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.generate_scRNA_report(adata, output_path="reports/pbmc_report.html", species="human")
+    str
+        Path to saved report file.
     """
     
     # Initialize report generator

@@ -29,35 +29,31 @@ warnings.filterwarnings("ignore")
 )
 class Bulk2Single:
     """
-    VAE-based bulk-to-single deconvolution class that estimates cell-type fractions and generates synthetic single-cell profiles from bulk RNA-seq
-    
+    VAE-based bulk-to-single framework for reconstructing pseudo single cells from bulk RNA-seq.
+
     Parameters
     ----------
-    bulk_data : pd.DataFrame
-        Configuration argument used when constructing `Bulk2Single`.
-    single_data : anndata.AnnData
-        Configuration argument used when constructing `Bulk2Single`.
-    celltype_key : str
-        Configuration argument used when constructing `Bulk2Single`.
-    bulk_group : Optional[Any], optional, default=None
-        Configuration argument used when constructing `Bulk2Single`.
-    max_single_cells : int, optional, default=5000
-        Configuration argument used when constructing `Bulk2Single`.
-    top_marker_num : int, optional, default=500
-        Configuration argument used when constructing `Bulk2Single`.
-    ratio_num : int, optional, default=1
-        Configuration argument used when constructing `Bulk2Single`.
-    gpu : Union[int, str], optional, default=0
-        Configuration argument used when constructing `Bulk2Single`.
+    bulk_data:pd.DataFrame
+        Bulk expression matrix with genes in rows and samples in columns.
+    single_data:anndata.AnnData
+        Reference single-cell dataset used to learn cell-type expression patterns.
+    celltype_key:str
+        Column in ``single_data.obs`` containing cell-type labels.
+    bulk_group:Optional[Any]
+        Optional sample grouping information for averaging bulk replicates.
+    max_single_cells:int
+        Maximum number of reference cells retained for model fitting.
+    top_marker_num:int
+        Number of marker genes per cell type used by downstream preparation.
+    ratio_num:int
+        Multiplier controlling total generated cell counts.
+    gpu:Union[int,str]
+        Device selector for training (CUDA index, ``'mps'``, or CPU fallback).
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes bulk2single deconvolution and simulation workflow.
     
     Examples
     --------
@@ -69,15 +65,24 @@ class Bulk2Single:
         r"""
         Initialize the Bulk2Single class for bulk-to-single-cell deconvolution.
 
-        Arguments:
-            bulk_data: Bulk RNA-seq expression data as DataFrame with genes as rows and samples as columns
-            single_data: Reference single-cell RNA-seq data as AnnData object
-            celltype_key: Column name in single_data.obs containing cell type annotations
-            bulk_group: Column names in bulk_data for grouping samples (None)
-            max_single_cells: Maximum number of single cells to use from reference (5000)
-            top_marker_num: Number of top marker genes to select per cell type (500)
-            ratio_num: Ratio between single cells and target converted cells (1)
-            gpu: GPU device ID for computation; -1 for CPU, 'mps' for Apple Silicon (0)
+        Parameters
+        ----------
+        bulk_data:pd.DataFrame
+            Bulk RNA-seq expression matrix. Rows are genes and columns are samples.
+        single_data:anndata.AnnData
+            Single-cell reference with compatible gene symbols and cell metadata.
+        celltype_key:str
+            Name of the column in ``single_data.obs`` that stores cell-type labels.
+        bulk_group:Optional[Any]
+            Optional grouping key/list used to aggregate replicate bulk samples.
+        max_single_cells:int
+            Maximum number of reference cells used during initialization.
+        top_marker_num:int
+            Intended number of marker genes per cell type for preprocessing steps.
+        ratio_num:int
+            Generation ratio used when estimating target cell counts.
+        gpu:Union[int,str]
+            Compute device specification; supports CUDA indices and ``'mps'``.
 
         """
         single_data.var_names_make_unique()
@@ -118,46 +123,45 @@ class Bulk2Single:
                         mode='overall', adaptive=True, variance_threshold=0.98,
                         save_model_name=None,
                         batch_size=128, epochs=128, seed=1,scale_size=2):
-        """
-        Predict cell-type fractions from bulk RNA-seq data using deconvolution
+        r"""
+        Predict cell-type fractions from bulk RNA-seq data using deconvolution.
         
+        Uses machine learning approaches (SCADEN or TAPE) to estimate cell-type
+        proportions in bulk samples based on single-cell reference data.
+
         Parameters
         ----------
-        method : Any, optional, default='scaden'
-            Input parameter for `predicted_fraction`.
-        sep : Any, optional, default='\t'
-            Input parameter for `predicted_fraction`.
-        scaler : Any, optional, default='mms'
-            Input parameter for `predicted_fraction`.
-        datatype : Any, optional, default='counts'
-            Input parameter for `predicted_fraction`.
-        genelenfile : Any, optional, default=None
-            Input parameter for `predicted_fraction`.
-        mode : Any, optional, default='overall'
-            Input parameter for `predicted_fraction`.
-        adaptive : Any, optional, default=True
-            Input parameter for `predicted_fraction`.
-        variance_threshold : Any, optional, default=0.98
-            Input parameter for `predicted_fraction`.
-        save_model_name : Any, optional, default=None
-            Input parameter for `predicted_fraction`.
-        batch_size : Any, optional, default=128
-            Input parameter for `predicted_fraction`.
-        epochs : Any, optional, default=128
-            Input parameter for `predicted_fraction`.
-        seed : Any, optional, default=1
-            Input parameter for `predicted_fraction`.
-        scale_size : Any, optional, default=2
-            Input parameter for `predicted_fraction`.
-        
+        method:str
+            Deconvolution backend, currently ``'scaden'`` or ``'tape'``.
+        sep:str
+            Delimiter used for intermediate text matrix I/O.
+        scaler:str
+            Scaling strategy used before model fitting.
+        datatype:str
+            Expression data type passed to backend (for example ``'counts'``).
+        genelenfile:str or None
+            Gene-length file path when backend requires TPM transformation.
+        mode:str
+            Inference mode for TAPE.
+        adaptive:bool
+            Whether adaptive feature filtering is enabled.
+        variance_threshold:float
+            Variance cutoff for selecting informative genes.
+        save_model_name:str or None
+            Optional path/prefix for saving backend model artifacts.
+        batch_size:int
+            Batch size for neural-network-based training.
+        epochs:int
+            Number of training epochs.
+        seed:int
+            Random seed for reproducibility.
+        scale_size:int
+            Scaling factor used to convert predicted fractions into cell counts.
+
         Returns
         -------
-        Any
-            Output produced by `predicted_fraction`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        pd.DataFrame
+            Cell-fraction estimates for each bulk sample.
         """
         from ..external.tape import Deconvolution,ScadenDeconvolution
         sc_ref=self.sc_ref.copy()
@@ -211,22 +215,21 @@ class Bulk2Single:
         return CellFractionPrediction
 
     def bulk_preprocess_lazy(self,)->None:
-        """
-        Preprocess bulk RNA-seq data for deconvolution
+        r"""
+        Preprocess bulk RNA-seq data for deconvolution.
         
+        Performs normalization, log transformation, and group averaging of bulk data.
+        Steps include duplicate removal, DESeq2 normalization, log10 transformation,
+        and optional group-wise averaging.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+
         Returns
         -------
         None
-            Output produced by `bulk_preprocess_lazy`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Updates ``self.bulk_seq_group`` in place.
         """
 
         print("......drop duplicates index in bulk data")
@@ -247,22 +250,21 @@ class Bulk2Single:
         return None
     
     def single_preprocess_lazy(self,target_sum:int=1e4)->None:
-        """
-        Preprocess single-cell reference data
+        r"""
+        Preprocess single-cell reference data.
         
+        Normalizes single-cell data using scanpy's standard preprocessing pipeline
+        including total count normalization and log1p transformation.
+
         Parameters
         ----------
-        target_sum : int, optional, default=1e4
-            Input parameter for `single_preprocess_lazy`.
-        
+        target_sum:int
+            Library-size target used in total-count normalization.
+            
         Returns
         -------
         None
-            Output produced by `single_preprocess_lazy`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Updates ``self.single_data`` in place.
         """
 
         print("......normalize the single data")
@@ -273,22 +275,21 @@ class Bulk2Single:
         return None
     
     def prepare_input(self,):
-        """
-        Prepare input data for VAE training
+        r"""
+        Prepare input data for VAE training.
         
+        Formats and aligns bulk and single-cell data for training the VAE model.
+        This step matches genes between datasets and prepares the data structure
+        needed for model training.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+            
         Returns
         -------
-        Any
-            Output produced by `prepare_input`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Updates ``self.input_data`` with aligned bulk/single matrices.
         """
         print("......prepare the input of bulk2single")
         self.input_data=bulk2single_data_prepare(self.bulk_seq_group,
@@ -302,44 +303,44 @@ class Bulk2Single:
             generate_save_dir:str='output',
             generate_save_name:str='output',
             batch_size:int=512,
-            learning_rate:int=1e-4,
+            learning_rate:float=1e-4,
             hidden_size:int=256,
             epoch_num:int=5000,
             patience:int=50,save:bool=True)->torch.nn.Module:
-        """
-        Train the VAE model for single-cell data generation
+        r"""
+        Train the VAE model for single-cell data generation.
         
+        Trains a beta-VAE model to learn the mapping from bulk to single-cell expression
+        patterns. The model learns to generate synthetic single cells that match the
+        bulk expression profile and predicted cell-type proportions.
+
         Parameters
         ----------
-        vae_save_dir : str, optional, default='save_model'
-            Input parameter for `train`.
-        vae_save_name : str, optional, default='vae'
-            Input parameter for `train`.
-        generate_save_dir : str, optional, default='output'
-            Input parameter for `train`.
-        generate_save_name : str, optional, default='output'
-            Input parameter for `train`.
-        batch_size : int, optional, default=512
-            Input parameter for `train`.
-        learning_rate : int, optional, default=1e-4
-            Input parameter for `train`.
-        hidden_size : int, optional, default=256
-            Input parameter for `train`.
-        epoch_num : int, optional, default=5000
-            Input parameter for `train`.
-        patience : int, optional, default=50
-            Input parameter for `train`.
-        save : bool, optional, default=True
-            Input parameter for `train`.
-        
+        vae_save_dir:str
+            Directory for storing trained model checkpoints.
+        vae_save_name:str
+            File prefix for the serialized VAE model.
+        generate_save_dir:str
+            Reserved output directory for generated cells.
+        generate_save_name:str
+            Reserved output prefix for generated datasets.
+        batch_size:int
+            Mini-batch size used for model optimization.
+        learning_rate:float
+            Learning rate for the VAE optimizer.
+        hidden_size:int
+            Hidden dimension size of VAE encoder/decoder layers.
+        epoch_num:int
+            Maximum number of training epochs.
+        patience:int
+            Early-stopping patience based on loss trend.
+        save:bool
+            Whether to persist the trained model and target cell counts.
+
         Returns
         -------
         torch.nn.Module
-            Output produced by `train`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Trained VAE model.
         """
         if self.input_data==None:
             self.prepare_input()
@@ -382,24 +383,22 @@ class Bulk2Single:
     
     def save(self, vae_save_dir: str = 'save_model',
             vae_save_name: str = 'vae') -> None:
-        """
-        Save the trained VAE model and cell target numbers
-        
+        r"""
+        Save the trained VAE model and cell target numbers.
+
+        Saves both the model state dict and the predicted cell-type target numbers
+        needed for generation.
+
         Parameters
         ----------
-        vae_save_dir : str, optional, default='save_model'
-            Input parameter for `save`.
-        vae_save_name : str, optional, default='vae'
-            Input parameter for `save`.
-        
+        vae_save_dir:str
+            Directory where model weights and fraction metadata are written.
+        vae_save_name:str
+            Filename prefix for the saved checkpoint.
+
         Returns
         -------
-        None
-            Output produced by `save`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
         """
         path_save = os.path.join(vae_save_dir, f"{vae_save_name}.pth")
         if not os.path.exists(vae_save_dir):
@@ -412,22 +411,20 @@ class Bulk2Single:
         print(f"...save trained vae in {path_save}.")
     
     def generate(self)->anndata.AnnData:
-        """
-        Generate synthetic single-cell data from trained VAE model
+        r"""
+        Generate synthetic single-cell data from trained VAE model.
         
+        Uses the trained VAE to generate single-cell expression profiles that match
+        the bulk expression and predicted cell-type proportions.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+            
         Returns
         -------
         anndata.AnnData
-            Output produced by `generate`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Generated single-cell AnnData with ``celltype_key`` annotations.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
@@ -441,22 +438,20 @@ class Bulk2Single:
         return sc_g
     
     def load_fraction(self, fraction_path: str) -> None:
-        """
-        Load predicted cell-type target numbers from file
-        
+        r"""
+        Load predicted cell-type target numbers from file.
+
+        Loads previously computed cell-type target numbers that specify how many
+        cells of each type to generate.
+
         Parameters
         ----------
-        fraction_path : str
-            Input parameter for `load_fraction`.
-        
+        fraction_path:str
+            Path to a pickle file containing ``cell_target_num`` dictionary.
+
         Returns
         -------
-        None
-            Output produced by `load_fraction`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
         """
         #load cell_target_num
         import pickle
@@ -465,24 +460,22 @@ class Bulk2Single:
         
     
     def load(self,vae_load_dir:str,hidden_size:int=256):
-        """
-        Load a pre-trained VAE model
+        r"""
+        Load a pre-trained VAE model.
         
+        Loads a previously trained VAE model from disk for generating single-cell data.
+
         Parameters
         ----------
-        vae_load_dir : str
-            Input parameter for `load`.
-        hidden_size : int, optional, default=256
-            Input parameter for `load`.
-        
+        vae_load_dir:str
+            Path to the saved ``.pth`` model checkpoint.
+        hidden_size:int
+            Hidden dimension used when reconstructing the VAE architecture.
+            
         Returns
         -------
-        Any
-            Output produced by `load`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Loads model weights into ``self.vae_net``.
         """
 
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -494,24 +487,23 @@ class Bulk2Single:
     def load_and_generate(self,
                               vae_load_dir:str,  # load_dir
                               hidden_size:int=256)->anndata.AnnData:
-        """
-        Load pre-trained VAE model and generate single-cell data
+        r"""
+        Load pre-trained VAE model and generate single-cell data.
         
+        Convenience method that loads a trained model and immediately generates
+        synthetic single-cell data.
+
         Parameters
         ----------
-        vae_load_dir : str
-            Input parameter for `load_and_generate`.
-        hidden_size : int, optional, default=256
-            Input parameter for `load_and_generate`.
-        
+        vae_load_dir:str
+            Path to the saved ``.pth`` model checkpoint.
+        hidden_size:int
+            Hidden dimension used when rebuilding model structure.
+
         Returns
         -------
         anndata.AnnData
-            Output produced by `load_and_generate`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Generated single-cell AnnData with cell-type labels.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
@@ -531,32 +523,31 @@ class Bulk2Single:
     
     def filtered(self,generate_adata,highly_variable_genes:bool=True,max_value:float=10,
                      n_comps:int=100,svd_solver:str='auto',leiden_size:int=50):
-        """
-        Filter generated single-cell data by removing low-quality clusters
+        r"""
+        Filter generated single-cell data by removing low-quality clusters.
         
+        Applies quality control filtering to generated single-cell data by identifying
+        and removing small clusters that may represent noise or artifacts.
+
         Parameters
         ----------
-        generate_adata : Any
-            Input parameter for `filtered`.
-        highly_variable_genes : bool, optional, default=True
-            Input parameter for `filtered`.
-        max_value : float, optional, default=10
-            Input parameter for `filtered`.
-        n_comps : int, optional, default=100
-            Input parameter for `filtered`.
-        svd_solver : str, optional, default='auto'
-            Input parameter for `filtered`.
-        leiden_size : int, optional, default=50
-            Input parameter for `filtered`.
-        
+        generate_adata:anndata.AnnData
+            Generated single-cell AnnData to be quality-filtered.
+        highly_variable_genes:bool
+            Whether to restrict PCA/clustering to highly variable genes.
+        max_value:float
+            Clipping threshold used during scaling.
+        n_comps:int
+            Number of principal components used for neighborhood graph.
+        svd_solver:str
+            SVD backend passed to PCA.
+        leiden_size:int
+            Minimum accepted cluster size; smaller clusters are removed.
+            
         Returns
         -------
-        Any
-            Output produced by `filtered`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        anndata.AnnData
+            Filtered generated AnnData.
         """
         generate_adata.raw = generate_adata
         import scanpy as sc
@@ -575,22 +566,22 @@ class Bulk2Single:
         return generate_adata
     
     def plot_loss(self,figsize:tuple=(4,4))->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
-        """
-        Plot training loss curve of the VAE model
+        r"""
+        Plot training loss curve of the VAE model.
         
+        Visualizes the training loss progression to assess model convergence.
+
         Parameters
         ----------
-        figsize : tuple, optional, default=(4,4)
-            Input parameter for `plot_loss`.
-        
+        figsize:tuple
+            Figure size passed to matplotlib.
+
         Returns
         -------
-        Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]
-            Output produced by `plot_loss`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        matplotlib.figure.Figure
+            Figure object containing the training-loss curve.
+        matplotlib.axes.Axes
+            Axes object where the curve is drawn.
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.plot(range(len(self.history)),self.history)

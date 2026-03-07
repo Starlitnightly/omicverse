@@ -29,74 +29,67 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
                      plot_genes:list=None,plot_genes_num:int=10,plot_genes_fontsize:int=10,
                      ticks_fontsize:int=12,pval_threshold:float=0.05,fc_max:float=1.5,fc_min:float=-1.5,
                      ax = None,):
-    """
-    Create volcano plot for differential expression analysis visualization
+    r"""
+    Create a volcano plot for differential expression analysis.
     
     Parameters
     ----------
-    result : Any
-        Input parameter for `volcano`.
-    pval_name : Any, optional, default='qvalue'
-        Input parameter for `volcano`.
-    fc_name : Any, optional, default='log2FC'
-        Input parameter for `volcano`.
-    pval_max : Any, optional, default=None
-        Input parameter for `volcano`.
-    FC_max : Any, optional, default=None
-        Input parameter for `volcano`.
-    figsize : tuple, optional, default=(4,4)
-        Input parameter for `volcano`.
-    title : str, optional, default=''
-        Input parameter for `volcano`.
-    titlefont : dict, optional, default={'weight':'normal','size':14,}
-        Input parameter for `volcano`.
-    up_color : str, optional, default='#e25d5d'
-        Input parameter for `volcano`.
-    down_color : str, optional, default='#7388c1'
-        Input parameter for `volcano`.
-    normal_color : str, optional, default='#d7d7d7'
-        Input parameter for `volcano`.
-    up_fontcolor : str, optional, default='#e25d5d'
-        Input parameter for `volcano`.
-    down_fontcolor : str, optional, default='#7388c1'
-        Input parameter for `volcano`.
-    normal_fontcolor : str, optional, default='#d7d7d7'
-        Input parameter for `volcano`.
-    legend_bbox : tuple, optional, default=(0.8, -0.2)
-        Input parameter for `volcano`.
-    legend_ncol : int, optional, default=2
-        Input parameter for `volcano`.
-    legend_fontsize : int, optional, default=12
-        Input parameter for `volcano`.
-    plot_genes : list, optional, default=None
-        Input parameter for `volcano`.
-    plot_genes_num : int, optional, default=10
-        Input parameter for `volcano`.
-    plot_genes_fontsize : int, optional, default=10
-        Input parameter for `volcano`.
-    ticks_fontsize : int, optional, default=12
-        Input parameter for `volcano`.
-    pval_threshold : float, optional, default=0.05
-        Input parameter for `volcano`.
-    fc_max : float, optional, default=1.5
-        Input parameter for `volcano`.
-    fc_min : float, optional, default=-1.5
-        Input parameter for `volcano`.
-    ax : Any, optional, default=None
-        Input parameter for `volcano`.
-    
+    result : pd.DataFrame
+        Differential-expression result table containing at least p-value,
+        fold-change, and ``sig`` classification columns.
+    pval_name : str
+        Column name of adjusted p-values or q-values.
+    fc_name : str
+        Column name of log fold-change values.
+    pval_max : float or None
+        Optional y-axis upper bound in transformed p-value scale.
+    FC_max : float or None
+        Optional x-axis absolute range cap.
+    figsize : tuple
+        Figure size passed to matplotlib.
+    title : str
+        Plot title.
+    titlefont : dict
+        Font dict for title/axis labels.
+    up_color : str
+        Point color for up-regulated genes.
+    down_color : str
+        Point color for down-regulated genes.
+    normal_color : str
+        Point color for non-significant genes.
+    up_fontcolor : str
+        Label color for up-regulated genes.
+    down_fontcolor : str
+        Label color for down-regulated genes.
+    normal_fontcolor : str
+        Label color for non-significant genes.
+    legend_bbox : tuple
+        Legend anchor position.
+    legend_ncol : int
+        Number of legend columns.
+    legend_fontsize : int
+        Legend font size.
+    plot_genes : list or None
+        Explicit gene list to annotate.
+    plot_genes_num : int
+        Number of top genes automatically annotated when ``plot_genes`` is None.
+    plot_genes_fontsize : int
+        Font size for annotated gene labels.
+    ticks_fontsize : int
+        Tick label font size.
+    pval_threshold : float
+        Significance threshold used to define highlighted genes.
+    fc_max : float
+        Positive fold-change cutoff.
+    fc_min : float
+        Negative fold-change cutoff.
+    ax : matplotlib.axes.Axes or None
+        Existing axes object to draw on.
+        
     Returns
     -------
-    Any
-        Output produced by `volcano`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Basic volcano plot
+    matplotlib.axes.Axes
+        Axes containing the volcano plot.
     """
     
     # Color codes for terminal output
@@ -366,44 +359,36 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
 def venn(sets={}, out='./', palette='bgrc',
              ax=False, ext='png', dpi=300, fontsize=3.5,
              bbox_to_anchor=(.5, .99),nc=2,cs=4):
-    """
-    Create Venn diagram to visualize set overlaps and intersections
+    r"""
+    Create a Venn diagram to visualize set overlaps.
     
     Parameters
     ----------
-    sets : Any, optional, default={}
-        Input parameter for `venn`.
-    out : Any, optional, default='./'
-        Input parameter for `venn`.
-    palette : Any, optional, default='bgrc'
-        Input parameter for `venn`.
-    ax : Any, optional, default=False
-        Input parameter for `venn`.
-    ext : Any, optional, default='png'
-        Input parameter for `venn`.
-    dpi : Any, optional, default=300
-        Input parameter for `venn`.
-    fontsize : Any, optional, default=3.5
-        Input parameter for `venn`.
-    bbox_to_anchor : Any, optional, default=(.5, .99)
-        Input parameter for `venn`.
-    nc : Any, optional, default=2
-        Input parameter for `venn`.
-    cs : Any, optional, default=4
-        Input parameter for `venn`.
-    
+    sets : dict
+        Dictionary mapping set names to Python sets.
+    out : str
+        Output directory for saved figure.
+    palette : str or list
+        Color palette passed to backend venn renderer.
+    ax : matplotlib.axes.Axes or bool
+        Existing axes; if ``False`` a new figure/axes is created.
+    ext : str
+        Output file extension.
+    dpi : int
+        Resolution of saved image.
+    fontsize : float
+        Font size for labels.
+    bbox_to_anchor : tuple
+        Legend anchor position.
+    nc : int
+        Number of legend columns.
+    cs : float
+        Legend font size.
+        
     Returns
     -------
-    Any
-        Output produced by `venn`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Basic Venn diagram
+    matplotlib.axes.Axes or bool
+        Axes handle returned by caller/backend context.
     """
     
     from ..utils import venny4py
@@ -434,48 +419,40 @@ def venn(sets={}, out='./', palette='bgrc',
 def boxplot(data,hue,x_value,y_value,width=0.3,title='',
                  figsize=(6,3),palette=None,fontsize=10,
                  legend_bbox=(1, 0.55),legend_ncol=1,hue_order=None):
-    """
-    Create boxplot with jittered points for data distribution visualization
+    r"""
+    Create a boxplot with jittered points to visualize data distribution across categories.
     
     Parameters
     ----------
-    data : Any
-        Input parameter for `boxplot`.
-    hue : Any
-        Input parameter for `boxplot`.
-    x_value : Any
-        Input parameter for `boxplot`.
-    y_value : Any
-        Input parameter for `boxplot`.
-    width : Any, optional, default=0.3
-        Input parameter for `boxplot`.
-    title : Any, optional, default=''
-        Input parameter for `boxplot`.
-    figsize : Any, optional, default=(6,3)
-        Input parameter for `boxplot`.
-    palette : Any, optional, default=None
-        Input parameter for `boxplot`.
-    fontsize : Any, optional, default=10
-        Input parameter for `boxplot`.
-    legend_bbox : Any, optional, default=(1, 0.55)
-        Input parameter for `boxplot`.
-    legend_ncol : Any, optional, default=1
-        Input parameter for `boxplot`.
-    hue_order : Any, optional, default=None
-        Input parameter for `boxplot`.
-    
+    data : pd.DataFrame
+        Input table containing grouping and numeric columns.
+    hue : str
+        Column name used for color grouping.
+    x_value : str
+        Column name used as x-axis category.
+    y_value : str
+        Column name containing numeric values.
+    width : float
+        Width of each box element.
+    title : str
+        Plot title.
+    figsize : tuple
+        Figure size passed to matplotlib.
+    palette : list or None
+        Color list for hue groups; default palette is used when ``None``.
+    fontsize : int
+        Base font size for ticks/labels.
+    legend_bbox : tuple
+        Legend anchor position.
+    legend_ncol : int
+        Number of legend columns.
+    hue_order : list or None
+        Explicit order of hue categories.
+        
     Returns
     -------
-    Any
-        Output produced by `boxplot`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Basic boxplot
+    Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure and axes of generated boxplot.
     """
 
     # Color codes for terminal output
@@ -515,15 +492,17 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
         """
         Calculate evenly distributed positions for boxes within the range [-0.5, 0.5].
         
-        Args:
-            n_hues: int
-                Number of hue categories
-            spacing: float
-                Fraction of the total range to use for spacing boxes (0.8 means use 80% of [-0.5, 0.5])
+        Parameters
+        ----------
+        n_hues : int
+            Number of hue categories.
+        spacing : float
+            Fraction of interval ``[-0.5, 0.5]`` occupied by boxes.
             
-        Returns:
-            positions: list
-                List of positions for each hue
+        Returns
+        -------
+        list
+            Relative x-offsets for each hue group.
         """
         if n_hues == 1:
             return [0.0]
@@ -756,37 +735,29 @@ def plot_grouped_fractions(res, obs, group_key,
                            figsize=(4, 4),
                           ):
     """
-    Plot grouped cell-fraction summaries (e.g., by sample, condition, or response) for compositional comparison
-    
+    Plot grouped cell-fraction summaries as stacked bars.
+
     Parameters
     ----------
-    res : Any
-        Input parameter for `plot_grouped_fractions`.
-    obs : Any
-        Input parameter for `plot_grouped_fractions`.
-    group_key : Any
-        Input parameter for `plot_grouped_fractions`.
-    color_dict : Any, optional, default=None
-        Input parameter for `plot_grouped_fractions`.
-    agg : Any, optional, default='mean'
-        Input parameter for `plot_grouped_fractions`.
-    normalize : Any, optional, default=True
-        Input parameter for `plot_grouped_fractions`.
-    figsize : Any, optional, default=(4, 4)
-        Input parameter for `plot_grouped_fractions`.
-    
+    res : pd.DataFrame
+        Predicted cell-fraction matrix with samples as rows and cell types as columns.
+    obs : pd.DataFrame
+        Sample metadata table aligned to ``res`` index.
+    group_key : str
+        Metadata column used to group samples (for example severity/condition).
+    color_dict : dict or None
+        Mapping from cell-type names to colors. If provided, column order follows keys.
+    agg : str
+        Group aggregation method: ``'mean'``, ``'median'``, or ``'sum'``.
+    normalize : bool
+        Whether each grouped row is normalized to sum to 1.
+    figsize : tuple
+        Figure size passed to pandas/matplotlib plotting backend.
+
     Returns
     -------
-    Any
-        Output produced by `plot_grouped_fractions`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.pl.plot_grouped_fractions(res, obs=adata.obs, group_key="condition")
+    matplotlib.axes.Axes
+        Axes containing the grouped stacked-bar chart.
     """
     # 1) 对齐索引（样本名）
     common = res.index.intersection(obs.index)

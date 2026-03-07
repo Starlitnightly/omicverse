@@ -35,28 +35,19 @@ import time
     related=['pp.leiden', 'utils.cluster']
 )
 def autoResolution(adata,cpus=4):
-    """
-    Search clustering resolutions and select a stable/optimal Leiden resolution for biologically coherent cluster granularity
-    
+    r"""Automatically determine clustering resolution.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `autoResolution`.
-    cpus : Any, optional, default=4
-        Input parameter for `autoResolution`.
+    adata:anndata.AnnData
+        Input single-cell AnnData for louvain resolution search.
+    cpus:int
+        Number of worker processes used for subsampling evaluations.
     
     Returns
     -------
-    Any
-        Output produced by `autoResolution`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.autoResolution(adata, cpus=8)
+    Tuple[anndata.AnnData,float,pd.DataFrame]
+        Updated AnnData, selected resolution, and silhouette-score table.
     """
     print("Automatically determine clustering resolution...")
     start = time.time()
@@ -129,11 +120,15 @@ def autoResolution(adata,cpus=4):
 def writeGEP(adata_GEP,path):
     r"""Write the gene expression profile to a file.
 
-    Arguments:
-        adata_GEP: The single cell data with gene expression profile.
-        path: The path to save the gene expression profile.
+    Parameters
+    ----------
+    adata_GEP:anndata.AnnData
+        AnnData containing expression matrix and ``obs['louvain']`` labels.
+    path:str
+        Output directory path for ``GEP.txt``.
     
-    Returns:
+    Returns
+    -------
         None
 
     """
@@ -161,37 +156,33 @@ def writeGEP(adata_GEP,path):
 )
 class Drug_Response:
     """
-    Predict drug sensitivity from single-cell transcriptomes using CaDRReS and pharmacogenomic reference resources
-    
+    Predict drug sensitivity from single-cell transcriptomes using CaDRReS models.
+
     Parameters
     ----------
-    adata : Any
-        Configuration argument used when constructing `Drug_Response`.
-    scriptpath : Any
-        Configuration argument used when constructing `Drug_Response`.
-    modelpath : Any
-        Configuration argument used when constructing `Drug_Response`.
-    output : Any, optional, default='./'
-        Configuration argument used when constructing `Drug_Response`.
-    model : Any, optional, default='GDSC'
-        Configuration argument used when constructing `Drug_Response`.
-    clusters : Any, optional, default='All'
-        Configuration argument used when constructing `Drug_Response`.
-    cell : Any, optional, default='A549'
-        Configuration argument used when constructing `Drug_Response`.
-    cpus : Any, optional, default=4
-        Configuration argument used when constructing `Drug_Response`.
-    n_drugs : Any, optional, default=10
-        Configuration argument used when constructing `Drug_Response`.
-    
+    adata:AnnData
+        Query single-cell AnnData.
+    scriptpath:str
+        Path to CaDRReS-Sc scripts.
+    modelpath:str
+        Path to pretrained pharmacogenomic model/data resources.
+    output:str, optional
+        Output directory for prediction tables and plots.
+    model:{'GDSC', 'PRISM'}, optional
+        Pharmacogenomic reference model.
+    clusters:str, optional
+        Cluster subset to analyze (``'All'`` uses all cells).
+    cell:str, optional
+        Cell-line context used by the model.
+    cpus:int, optional
+        CPU threads used by downstream steps.
+    n_drugs:int, optional
+        Number of top drugs to report/plot.
+
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes drug-response prediction workflow state.
     
     Examples
     --------
@@ -202,18 +193,29 @@ class Drug_Response:
         
         r"""Initialize the Drug_Response class.
 
-        Arguments:
-            adata: Annotated data matrix with cells as rows and genes as columns.
-            scriptpath: Path to the directory containing the CaDRReS scripts for the analysis. You need to download the scripts according to `git clone https://github.com/CSB5/CaDRReS-Sc.git` and set the path to the directory.
-            modelpath: Path to the directory containing the pre-trained models. You need to download the models according to `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()` and set the path to the directory.
-            output: Path to the directory where the output files will be saved. ('./')
-            model: The name of the pre-trained model to be used for the analysis. ('GDSC')
-            clusters: The cluster labels to be used for the analysis. Default is all cells. ('All')
-            cell: The cell line to be analyzed. ('A549')
-            cpus: The number of CPUs to be used for the analysis. (4)
-            n_drugs: The number of top drugs to be selected based on the predicted sensitivity. (10)
+        Parameters
+        ----------
+        adata:anndata.AnnData
+            Input AnnData used for single-cell drug-response prediction.
+        scriptpath:str
+            Path to cloned ``CaDRReS-Sc`` script directory.
+        modelpath:str
+            Path containing pretrained CaDRReS model/data files.
+        output:str
+            Output directory for prediction tables and figures.
+        model:str
+            Pharmacogenomic reference model, typically ``'GDSC'`` or ``'PRISM'``.
+        clusters:str
+            Comma-separated louvain cluster IDs, or ``'All'``.
+        cell:str
+            Cell-line context label used by CaDRReS.
+        cpus:int
+            Number of CPUs used by downstream routines.
+        n_drugs:int
+            Number of top drugs displayed in output figures.
 
-        Returns:
+        Returns
+        -------
             None
         """
 
@@ -244,22 +246,12 @@ class Drug_Response:
         self.figure_output()
 
     def load_model(self):
-        """
-        Load the pre-trained model
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
+        r"""Load the pre-trained model.
+
         Returns
         -------
-        Any
-            Output produced by `load_model`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
+
         """
         from cadrres_sc import pp, model, evaluation, utility
         ### IC50/AUC prediction
@@ -277,22 +269,9 @@ class Drug_Response:
         self.cadrres_model = model.load_model(model_file)
 
     def drug_info(self):
-        """
-        read the drug information
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `drug_info`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        r"""
+        read the drug information.
+
         """
         ## Read drug information
         if self.model == 'GDSC':
@@ -302,22 +281,9 @@ class Drug_Response:
             self.drug_info_df = pd.read_csv(self.scriptpath + '/preprocessed_data/PRISM/PRISM_drug_info.csv', index_col='broad_id')
         
     def bulk_exp(self):
-        """
-        extract the bulk gene expression data
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `bulk_exp`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        r"""
+        extract the bulk gene expression data.
+
         """
         ## Read test data
         if self.model == 'GDSC':
@@ -334,22 +300,8 @@ class Drug_Response:
             self.gene_exp_df.index = [gene.split(sep=' (')[0] for gene in self.gene_exp_df.index]
 
     def sc_exp(self):
-        """
+        r"""
         Load cluster-specific gene expression profile
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `sc_exp`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
         """
         ## Load cluster-specific gene expression profile
         if self.clusters == 'All':
@@ -363,22 +315,9 @@ class Drug_Response:
                                                  if np.sum(self.adata.raw.X[self.adata.obs['louvain']==cluster]) else 0.0
 
     def kernel_feature_preparartion(self):
-        """
+        r"""
         kernel feature preparation
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `kernel_feature_preparartion`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+
         """
         from cadrres_sc import pp, model, evaluation, utility
         ## Read essential genes list
@@ -397,22 +336,9 @@ class Drug_Response:
         self.test_kernel_df = pp.gexp.calculate_kernel_feature(cluster_norm_exp_df, cell_line_log2_mean_fc_exp_df, ess_gene_list)
     
     def sensitivity_prediction(self):
-        """
+        r"""
         Predict drug sensitivity
         
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `sensitivity_prediction`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
         """
         from cadrres_sc import pp, model, evaluation, utility
         ## Drug response prediction
@@ -427,22 +353,9 @@ class Drug_Response:
         add_reference(self.adata,'scDrug','drug response prediction with CaDRReS')
 
     def cell_death_proportion(self):
-        """
+        r"""
         Predict cell death proportion and cell death percentage at the ref_type dosage
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `cell_death_proportion`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+
         """
         ### Drug kill prediction
         ref_type = 'log2_median_ic50'
@@ -457,21 +370,20 @@ class Drug_Response:
     
     def output_result(self):
         """
-        Write normalized drug-response predictions to CSV files
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
+        Export predicted drug response tables to CSV files.
+
         Returns
         -------
-        Any
-            Output produced by `output_result`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes normalized prediction files to ``self.output``:
+            ``IC50_prediction.csv``/``drug_kill_prediction.csv`` for GDSC, or
+            ``PRISM_prediction.csv`` for PRISM.
+
+        Examples
+        --------
+        >>> dr.sensitivity_prediction()
+        >>> dr.cell_death_proportion()
+        >>> dr.output_result()
         """
         if self.model == 'GDSC':
             drug_df = pd.DataFrame({'Drug ID': self.drug_list, 
@@ -494,28 +406,19 @@ class Drug_Response:
             self.pred_auc_df.round(3).to_csv(os.path.join(self.output, 'PRISM_prediction.csv'))
     
     def draw_plot(self, df, n_drug=10, name='', figsize=()):
-        """
+        r"""
         plot heatmap of drug response prediction
-        
+
         Parameters
         ----------
-        df : Any
-            Input parameter for `draw_plot`.
-        n_drug : Any, optional, default=10
-            Input parameter for `draw_plot`.
-        name : Any, optional, default=''
-            Input parameter for `draw_plot`.
-        figsize : Any, optional, default=()
-            Input parameter for `draw_plot`.
-        
-        Returns
-        -------
-        Any
-            Output produced by `draw_plot`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        df:pd.DataFrame
+            Drug-response matrix to visualize.
+        n_drug:int
+            Number of top drugs shown in heatmap.
+        name:str
+            Output figure filename prefix.
+        figsize:tuple
+            Figure size for heatmap.
         """
         def select_drug(df, n_drug):
             selected_drugs = []
@@ -554,22 +457,9 @@ class Drug_Response:
             plt.close()
 
     def figure_output(self):
-        """
+        r"""
         plot figures
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
-        Returns
-        -------
-        Any
-            Output produced by `figure_output`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+
         """
         print('...Ploting figures...')
         ## GDSC figures
