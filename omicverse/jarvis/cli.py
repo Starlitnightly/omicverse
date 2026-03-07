@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="USER",
         help=(
             "Allowed Telegram username or numeric ID.  "
-            "Repeat for multiple users.  Omit to allow everyone."
+            "Repeat for multiple users.  Required for Telegram channel."
         ),
     )
     parser.add_argument(
@@ -151,7 +151,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 1
         from .channels.telegram import AccessControl, run_bot
 
-        ac = AccessControl(allowed=args.allowed_users or None)
+        if not args.allowed_users:
+            print(
+                "ERROR: at least one --allowed-user is required for Telegram channel.\n"
+                "  Repeat --allowed-user for each authorized username or numeric ID.",
+                file=sys.stderr,
+            )
+            return 1
+
+        ac = AccessControl(allowed=args.allowed_users)
         print(f"OmicVerse Jarvis starting (channel=telegram, model={args.model}) ...")
         run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
         return 0

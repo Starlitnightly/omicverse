@@ -28,7 +28,7 @@ logger = logging.getLogger("omicverse.jarvis")
 # ---------------------------------------------------------------------------
 
 class AccessControl:
-    """Allow all users when *allowed* is empty; otherwise whitelist."""
+    """Whitelist-only access control for Telegram users."""
 
     def __init__(self, allowed: Optional[List[str]] = None) -> None:
         self._ids: Set[int] = set()
@@ -40,13 +40,9 @@ class AccessControl:
             else:
                 self._usernames.add(entry.lstrip("@").lower())
 
-    @property
-    def _open(self) -> bool:
-        return not self._ids and not self._usernames
-
     def allows(self, user_id: int, username: Optional[str]) -> bool:
-        if self._open:
-            return True
+        if not self._ids and not self._usernames:
+            return False
         if user_id in self._ids:
             return True
         if username and username.lower() in self._usernames:
