@@ -8,6 +8,7 @@ and extracting tasks from notebooks.
 import sys
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +28,7 @@ from ..harness.server_cli import (
     run_scenario,
     summarize_trace,
 )
+from ..ovagent import RunStore, load_workflow_document
 
 
 def cmd_verify(args):
@@ -327,6 +329,99 @@ def cmd_cleanup(args):
     sys.exit(0)
 
 
+def cmd_workflow_show(args):
+    """Show the resolved OVAgent workflow contract."""
+    workflow = load_workflow_document(
+        repo_root=Path(args.repo_root).resolve() if args.repo_root else None,
+        workflow_path=Path(args.workflow_path).resolve() if args.workflow_path else None,
+    )
+    dump_json(workflow.to_dict(), args.output)
+    sys.exit(0)
+
+
+def cmd_workflow_validate(args):
+    """Validate the repo-owned OVAgent workflow contract."""
+    workflow = load_workflow_document(
+        repo_root=Path(args.repo_root).resolve() if args.repo_root else None,
+        workflow_path=Path(args.workflow_path).resolve() if args.workflow_path else None,
+    )
+    issues = workflow.config.validate()
+    payload = workflow.to_dict()
+    payload["issues"] = issues
+    payload["valid"] = not issues
+    dump_json(payload, args.output)
+    sys.exit(0 if not issues else 1)
+
+
+def cmd_run_start(args):
+    """Create a file-backed analysis run manifest."""
+    workflow = load_workflow_document(
+        repo_root=Path(args.repo_root).resolve() if args.repo_root else None,
+        workflow_path=Path(args.workflow_path).resolve() if args.workflow_path else None,
+    )
+    store = RunStore(root=Path(args.run_root).resolve() if args.run_root else None)
+    run = store.start_run(
+        request=args.request,
+        model=args.model,
+        provider=args.provider,
+        session_id=args.session_id or "",
+        workflow=workflow,
+        metadata={"created_via": "verifier_cli"},
+    )
+    dump_json(store.build_bundle(run.run_id), args.output)
+    sys.exit(0)
+
+
+def cmd_run_status(args):
+    """Show the current status of a stored analysis run."""
+    store = RunStore(root=Path(args.run_root).resolve() if args.run_root else None)
+    payload = store.build_bundle(args.run_id) if args.full else store.load_run(args.run_id).to_dict()
+    dump_json(payload, args.output)
+    sys.exit(0)
+
+
+def cmd_run_resume(args):
+    """Mark a run for manual continuation and return the updated manifest."""
+    store = RunStore(root=Path(args.run_root).resolve() if args.run_root else None)
+    run = store.load_run(args.run_id)
+    metadata = dict(run.metadata)
+    metadata["resume_requested_at"] = time.time()
+    if args.note:
+        metadata["resume_note"] = args.note
+    run.metadata = metadata
+    run.updated_at = time.time()
+    store.save_run(run)
+    dump_json(store.build_bundle(run.run_id), args.output)
+    sys.exit(0)
+
+
+def cmd_run_replay(args):
+    """Replay the latest stored trace linked to a run."""
+    require_server_only_mode()
+    store = RunStore(root=Path(args.run_root).resolve() if args.run_root else None)
+    run = store.load_run(args.run_id)
+    if not run.trace_ids:
+        raise ValueError(f"Run {args.run_id} has no linked traces to replay.")
+    trace_id = run.trace_ids[-1]
+    payload = load_trace_payload(trace_id, root=args.trace_root)
+    if args.full:
+        dump_json(payload, args.output)
+    else:
+        dump_json({
+            "run_id": run.run_id,
+            "trace_id": trace_id,
+            "summary": summarize_trace(payload),
+        }, args.output)
+    sys.exit(0)
+
+
+def cmd_run_bundle(args):
+    """Print the proof bundle for a stored run."""
+    store = RunStore(root=Path(args.run_root).resolve() if args.run_root else None)
+    dump_json(store.build_bundle(args.run_id), args.output)
+    sys.exit(0)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -591,6 +686,150 @@ def main():
         help='Optional JSON output path'
     )
     cleanup_parser.set_defaults(func=cmd_cleanup)
+
+    # Workflow commands
+    workflow_parser = subparsers.add_parser(
+        'workflow',
+        help='Inspect the repo-owned OVAgent workflow contract'
+    )
+    workflow_subparsers = workflow_parser.add_subparsers(dest='workflow_command')
+
+    workflow_show_parser = workflow_subparsers.add_parser(
+        'show',
+        help='Show the resolved workflow document'
+    )
+    workflow_show_parser.add_argument(
+        '--repo-root',
+        type=str,
+        help='Repository root containing WORKFLOW.md'
+    )
+    workflow_show_parser.add_argument(
+        '--workflow-path',
+        type=str,
+        help='Explicit WORKFLOW.md path'
+    )
+    workflow_show_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    workflow_show_parser.set_defaults(func=cmd_workflow_show)
+
+    workflow_validate_parser = workflow_subparsers.add_parser(
+        'validate',
+        help='Validate the resolved workflow document'
+    )
+    workflow_validate_parser.add_argument(
+        '--repo-root',
+        type=str,
+        help='Repository root containing WORKFLOW.md'
+    )
+    workflow_validate_parser.add_argument(
+        '--workflow-path',
+        type=str,
+        help='Explicit WORKFLOW.md path'
+    )
+    workflow_validate_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    workflow_validate_parser.set_defaults(func=cmd_workflow_validate)
+
+    # Analysis run commands
+    run_parser = subparsers.add_parser(
+        'run',
+        help='Create and inspect file-backed OVAgent analysis runs'
+    )
+    run_subparsers = run_parser.add_subparsers(dest='run_command')
+
+    run_start_parser = run_subparsers.add_parser(
+        'start',
+        help='Create a new analysis run manifest'
+    )
+    run_start_parser.add_argument(
+        'request',
+        type=str,
+        help='Analysis task description'
+    )
+    run_start_parser.add_argument(
+        '--model',
+        type=str,
+        default='gpt-5.2',
+        help='Model name to record with the run'
+    )
+    run_start_parser.add_argument(
+        '--provider',
+        type=str,
+        default='openai',
+        help='Provider name to record with the run'
+    )
+    run_start_parser.add_argument(
+        '--session-id',
+        type=str,
+        help='Optional runtime session identifier'
+    )
+    run_start_parser.add_argument(
+        '--repo-root',
+        type=str,
+        help='Repository root containing WORKFLOW.md'
+    )
+    run_start_parser.add_argument(
+        '--workflow-path',
+        type=str,
+        help='Explicit WORKFLOW.md path'
+    )
+    run_start_parser.add_argument(
+        '--run-root',
+        type=str,
+        help='Override run store root directory'
+    )
+    run_start_parser.add_argument(
+        '--output',
+        type=str,
+        help='Optional JSON output path'
+    )
+    run_start_parser.set_defaults(func=cmd_run_start)
+
+    run_status_parser = run_subparsers.add_parser(
+        'status',
+        help='Show the status of a stored analysis run'
+    )
+    run_status_parser.add_argument('run_id', type=str, help='Analysis run identifier')
+    run_status_parser.add_argument('--run-root', type=str, help='Override run store root directory')
+    run_status_parser.add_argument('--full', action='store_true', help='Show bundle paths and manifest')
+    run_status_parser.add_argument('--output', type=str, help='Optional JSON output path')
+    run_status_parser.set_defaults(func=cmd_run_status)
+
+    run_resume_parser = run_subparsers.add_parser(
+        'resume',
+        help='Mark an analysis run for manual continuation'
+    )
+    run_resume_parser.add_argument('run_id', type=str, help='Analysis run identifier')
+    run_resume_parser.add_argument('--run-root', type=str, help='Override run store root directory')
+    run_resume_parser.add_argument('--note', type=str, help='Optional operator note')
+    run_resume_parser.add_argument('--output', type=str, help='Optional JSON output path')
+    run_resume_parser.set_defaults(func=cmd_run_resume)
+
+    run_replay_parser = run_subparsers.add_parser(
+        'replay',
+        help='Replay the latest trace linked to a run (server-only)'
+    )
+    run_replay_parser.add_argument('run_id', type=str, help='Analysis run identifier')
+    run_replay_parser.add_argument('--run-root', type=str, help='Override run store root directory')
+    run_replay_parser.add_argument('--trace-root', type=str, help='Override trace store root directory')
+    run_replay_parser.add_argument('--full', action='store_true', help='Show the full stored trace')
+    run_replay_parser.add_argument('--output', type=str, help='Optional JSON output path')
+    run_replay_parser.set_defaults(func=cmd_run_replay)
+
+    run_bundle_parser = run_subparsers.add_parser(
+        'bundle',
+        help='Show the proof bundle for a stored analysis run'
+    )
+    run_bundle_parser.add_argument('run_id', type=str, help='Analysis run identifier')
+    run_bundle_parser.add_argument('--run-root', type=str, help='Override run store root directory')
+    run_bundle_parser.add_argument('--output', type=str, help='Optional JSON output path')
+    run_bundle_parser.set_defaults(func=cmd_run_bundle)
 
     # Parse and execute
     args = parser.parse_args()
