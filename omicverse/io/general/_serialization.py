@@ -24,6 +24,11 @@ def save(file, path):
         Python object to serialize.
     path : str
         Output file path.
+
+    Returns
+    -------
+    None
+        Writes serialized bytes to disk.
     """
     print("💾 Save Operation:")
     print(f"   Target path: {path}")
@@ -65,8 +70,18 @@ def load(path, backend=None):
     ----------
     path : str
         Input file path.
-    backend : str or None
+    backend : {'pickle', 'cloudpickle'} or None, default=None
         Preferred deserializer backend (``'pickle'`` or ``'cloudpickle'``).
+
+    Returns
+    -------
+    Any
+        Deserialized Python object.
+
+    Raises
+    ------
+    ValueError
+        If ``backend`` is not one of ``None``, ``'pickle'``, or ``'cloudpickle'``.
     """
     print("📂 Load Operation:")
     print(f"   Source path: {path}")
