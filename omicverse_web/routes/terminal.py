@@ -25,6 +25,22 @@ from flask import Blueprint, request, jsonify, Response
 
 terminal_bp = Blueprint('terminal', __name__)
 
+
+def _terminal_access_allowed() -> bool:
+    """Allow terminal API only when explicitly enabled for local requests."""
+    if os.environ.get('OMICVERSE_ENABLE_TERMINAL', '').lower() not in {'1', 'true', 'yes'}:
+        return False
+
+    remote_addr = request.remote_addr or ''
+    return remote_addr in {'127.0.0.1', '::1', 'localhost'}
+
+
+@terminal_bp.before_request
+def guard_terminal_api():
+    """Block terminal endpoints unless explicitly enabled and local-only."""
+    if not _terminal_access_allowed():
+        return jsonify({'error': 'terminal API disabled'}), 403
+
 # Global registry of live sessions
 _sessions: dict = {}
 _sessions_lock = threading.Lock()
