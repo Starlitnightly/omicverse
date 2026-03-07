@@ -353,11 +353,12 @@ class pyCEFCON(object):
              edge_threshold_param=8,
              remove_self_loops=False,
              topK_drivers=100,
-             solver = 'GUROBI',
+            solver = 'GUROBI',
         #     out_dir='./output'
             ):
         """
-        Arguments:
+        Parameters
+        ----------
             input_expData (str or sc.AnnData or pd.DataFrame): input gene expression data. It can be the path to a csv file, an AnnData object, or a pandas dataframe. If the input is an AnnData object, the lineage name must be contained in AnnData.uns['lineages'], and the lineage information (can be the pseudotime, where non-NA data denotes cells in the lineage) must be contained in AnnData.obs. If no lineage information is detected, all cell expressions will be regarded as one lineage, which will be named 'all' by default.
             input_priorNet (str or pd.DataFrame): input prior gene interaction network. It can be the path to a csv file or a pandas dataframe
             input_genesDE (str or pd.DataFrame): input gene differential expression score. It can be the path to a csv file or a pandas dataframe
@@ -375,7 +376,10 @@ class pyCEFCON(object):
             remove_self_loops (bool, optional): whether to remove all self-loops (default: True)
             topK_drivers (int, optional): number of top-ranked candidate driver genes according to their influence scores (default: 100)
             solver (str, optional): Solver ('GUROBI', 'SCIP') for solving the integer linear programming problems (for identifying drive regulators) (default: 'GUROBI')
-    
+
+        Returns
+        -------
+        None
         """   
         self.input_expData = input_expData
         self.input_priorNet = input_priorNet

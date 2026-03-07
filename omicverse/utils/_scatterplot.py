@@ -142,7 +142,8 @@ def embedding(
 ) -> Union[Figure, Axes, None]:
     r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         basis: Name of the obsm basis to use
         color: Keys for annotations of observations/cells or variables/genes (None)
@@ -191,7 +192,8 @@ def embedding(
         marker: Marker style ('.') 
         **kwargs: Additional arguments passed to scatter
         
-    Returns:
+    Returns
+    -------
         Matplotlib axes or figure object if show=False
     """
     #####################
@@ -778,11 +780,13 @@ def _wraps_plot_scatter(wrapper):
 def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in UMAP basis.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'umap', **kwargs)
@@ -798,11 +802,13 @@ def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
 def tsne(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in tSNE basis.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'tsne', **kwargs)
@@ -920,7 +926,8 @@ def pca(
 ) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in PCA coordinates.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         annotate_var_explained: Annotate explained variance (False)
         show: Show the plot (None)
@@ -928,7 +935,8 @@ def pca(
         save: Save the plot (None)
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     if not annotate_var_explained:
@@ -1754,11 +1762,13 @@ def _embedding(
     """\
     Scatter plot for user specified embedding basis (e.g. umap, pca, etc)
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix.
         basis: Name of the `obsm` basis to use.
-        
-    Returns:
+
+    Returns
+    -------
         If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
     """
 
