@@ -233,9 +233,15 @@ class LLMTableSelector:
 @register_function(
     aliases=[
         "单细胞自动注释",
+        "single cell automatic annotation",
+        "细胞类型自动注释",
+        "cell type automatic annotation",
         "Annotation",
         "annotation manager",
         "reference annotation selector",
+        "celltypist annotation",
+        "scsa annotation",
+        "gpt4celltype annotation",
     ],
     category="single",
     description="Unified annotation manager that supports CellTypist/SCSA/GPT-based labeling and reference retrieval for single-cell datasets.",

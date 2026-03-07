@@ -9,6 +9,11 @@ from .._registry import register_function
 @register_function(
     aliases=[
         "参考映射注释",
+        "reference mapping annotation",
+        "细胞类型参考映射注释",
+        "cell type reference mapping annotation",
+        "细胞类型图谱注释",
+        "cell type atlas annotation",
         "AnnotationRef",
         "reference transfer annotation",
         "query to reference label transfer",

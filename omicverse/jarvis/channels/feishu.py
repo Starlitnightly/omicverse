@@ -186,6 +186,61 @@ class FeishuClient:
         resp.raise_for_status()
         return resp.content
 
+    def send_post(self, chat_id: str, text: str, title: str = "") -> Optional[str]:
+        """Send a post message with basic markdown (bold, italic, links, inline code)."""
+        zh_content: Dict[str, Any] = {
+            "content": [[{"tag": "md", "text": text[:3000]}]]
+        }
+        if title:
+            zh_content["title"] = title[:80]
+        return self._send_message(chat_id, "post", {"zh_cn": zh_content})
+
+    def send_markdown_card(
+        self,
+        chat_id: str,
+        content: str,
+        title: str = "",
+        color: str = "blue",
+    ) -> Optional[str]:
+        """Send an interactive card with full markdown rendering (code blocks, tables)."""
+        elements = [{"tag": "markdown", "content": content[:5000]}]
+        card: Dict[str, Any] = {"schema": "2.0", "body": {"elements": elements}}
+        if title:
+            card["header"] = {
+                "title": {"tag": "plain_text", "content": title[:60]},
+                "template": color,
+            }
+        return self._send_message(chat_id, "interactive", card)
+
+    def edit_card(
+        self,
+        message_id: str,
+        content: str,
+        title: str = "",
+        color: str = "blue",
+    ) -> bool:
+        """Edit an existing interactive card message with updated markdown content."""
+        elements = [{"tag": "markdown", "content": content[:5000]}]
+        card: Dict[str, Any] = {"schema": "2.0", "body": {"elements": elements}}
+        if title:
+            card["header"] = {
+                "title": {"tag": "plain_text", "content": title[:60]},
+                "template": color,
+            }
+        payload = {
+            "msg_type": "interactive",
+            "content": json.dumps(card, ensure_ascii=False),
+        }
+        resp = requests.patch(
+            f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}",
+            headers=self._headers(),
+            json=payload,
+            timeout=20,
+        )
+        if resp.status_code >= 400:
+            return False
+        return resp.json().get("code") == 0
+
 
 class FeishuDeduper:
     """Memory + disk dedupe cache for webhook event/message IDs."""
@@ -553,9 +608,14 @@ class FeishuRuntime:
     async def _spawn_analysis(
         self, chat_id: str, route: str, session: Any, user_text: str
     ) -> None:
-        """Build full_request, create draft message, and launch _analysis_wrapper task."""
+        """Build full_request, create draft card, and launch _analysis_wrapper task."""
         full_request = self._build_full_request(session, user_text)
-        draft_id = self._client.send_text(chat_id, "💭 思考中…")
+        try:
+            draft_id = self._client.send_markdown_card(
+                chat_id, "💭 思考中…", title="OmicVerse Jarvis", color="grey"
+            )
+        except Exception:
+            draft_id = self._client.send_text(chat_id, "💭 思考中…")
         task = asyncio.create_task(
             self._analysis_wrapper(chat_id, route, session, user_text, draft_id, full_request)
         )
@@ -804,8 +864,12 @@ class FeishuRuntime:
             now = time.monotonic()
             if (not force) and (now - last_edit < edit_gap):
                 return
-            text = _draft_text()
-            ok = await asyncio.to_thread(self._client.edit_text, draft_id, text)
+            content = _draft_text()
+            ok = await asyncio.to_thread(
+                self._client.edit_card, draft_id, content, "💭 分析中…", "grey"
+            )
+            if not ok:
+                ok = await asyncio.to_thread(self._client.edit_text, draft_id, content)
             if ok:
                 last_edit = now
 
@@ -826,14 +890,23 @@ class FeishuRuntime:
             result = await bridge.run(full_request or user_text, session.adata)
         except asyncio.CancelledError:
             if draft_id:
-                await asyncio.to_thread(self._client.edit_text, draft_id, "🚫 已取消当前分析。")
+                ok = await asyncio.to_thread(
+                    self._client.edit_card, draft_id, "🚫 已取消当前分析。", "取消", "red"
+                )
+                if not ok:
+                    await asyncio.to_thread(self._client.edit_text, draft_id, "🚫 已取消当前分析。")
             raise
         except Exception as exc:
             logger.exception("Feishu analysis failed")
+            err_msg = f"❌ 分析失败: {exc}"
             if draft_id:
-                await asyncio.to_thread(self._client.edit_text, draft_id, f"❌ 分析失败: {exc}")
+                ok = await asyncio.to_thread(
+                    self._client.edit_card, draft_id, err_msg, "❌ 分析失败", "red"
+                )
+                if not ok:
+                    await asyncio.to_thread(self._client.edit_text, draft_id, err_msg)
             else:
-                await asyncio.to_thread(self._client.send_text, chat_id, f"❌ 分析失败: {exc}")
+                await asyncio.to_thread(self._client.send_text, chat_id, err_msg)
             return
 
         if result.adata is not None:
@@ -864,17 +937,30 @@ class FeishuRuntime:
             if llm_buf.strip():
                 err_text += f"\n\n最后模型输出片段:\n{_trim(llm_buf, max_len=1200)}"
             if draft_id:
-                await asyncio.to_thread(self._client.edit_text, draft_id, err_text)
+                ok = await asyncio.to_thread(
+                    self._client.edit_card, draft_id, err_text, "❌ 分析失败", "red"
+                )
+                if not ok:
+                    await asyncio.to_thread(self._client.edit_text, draft_id, err_text)
             else:
                 await asyncio.to_thread(self._client.send_text, chat_id, err_text)
             return
 
         if draft_id:
-            await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成，正在发送结果…")
+            ok = await asyncio.to_thread(
+                self._client.edit_card, draft_id, "✅ 分析完成，正在发送结果…", "💭 分析中…", "grey"
+            )
+            if not ok:
+                await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成，正在发送结果…")
 
         for rep in list(result.reports or []):
-            for chunk in self._text_chunks(rep):
-                await asyncio.to_thread(self._client.send_text, chat_id, chunk)
+            if len(rep) <= 4800:
+                await asyncio.to_thread(
+                    self._client.send_markdown_card, chat_id, rep, "📊 分析报告"
+                )
+            else:
+                for chunk in self._text_chunks(rep):
+                    await asyncio.to_thread(self._client.send_text, chat_id, chunk)
 
         for i, fig in enumerate(list(result.figures or []), start=1):
             try:
@@ -909,10 +995,19 @@ class FeishuRuntime:
                 summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
             else:
                 summary = "✅ 分析完成"
-        for chunk in self._text_chunks(summary):
-            await asyncio.to_thread(self._client.send_text, chat_id, chunk)
+        if len(summary) <= 4800:
+            await asyncio.to_thread(
+                self._client.send_markdown_card, chat_id, summary, "✅ 分析完成", "green"
+            )
+        else:
+            for chunk in self._text_chunks(summary):
+                await asyncio.to_thread(self._client.send_text, chat_id, chunk)
         if draft_id:
-            await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成")
+            ok = await asyncio.to_thread(
+                self._client.edit_card, draft_id, "✅ 分析完成", "✅ 分析完成", "green"
+            )
+            if not ok:
+                await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成")
 
     async def _handle_cancel(self, chat_id: str, route: str) -> None:
         self._pending.pop(route, None)  # clear queued messages on cancel
