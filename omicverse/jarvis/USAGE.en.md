@@ -90,6 +90,7 @@ omicverse jarvis \
   --channel feishu \
   --feishu-app-id "$FEISHU_APP_ID" \
   --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events
@@ -115,6 +116,7 @@ Parameter reference:
 - `--channel`: backend channel (`telegram` or `feishu`, default: `telegram`)
 - `--feishu-app-id`: Feishu app id (or `FEISHU_APP_ID`)
 - `--feishu-app-secret`: Feishu app secret (or `FEISHU_APP_SECRET`)
+- `--feishu-verification-token`: Feishu event verification token (or `FEISHU_VERIFICATION_TOKEN`)
 - `--feishu-host/--feishu-port/--feishu-path`: Feishu webhook listen settings
 - `--model`: model name (default: `claude-sonnet-4-6`)
 - `--api-key`: LLM key (or `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`)
