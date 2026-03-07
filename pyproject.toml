@@ -171,3 +171,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+  "integration: integration tests that exercise the public fm API",
+  "fm_real: real foundation-model inference tests intended for the Taiwan GPU server",
+  "fm_gpu: GPU-backed foundation-model tests intended for the Taiwan GPU server",
+]

@@ -24,6 +24,25 @@ class ModelFactory:
     from .geneformer_model import GeneformerModel
     from .cellplm_model import CellPLMModel
     from .uce_model import UCEModel
+    from .scmulan_model import ScMulanModel
+    from .external_model_stubs import (
+        ScBERTModel,
+        GeneCompassModel,
+        NicheformerModel,
+        TGPTModel,
+        CellFMModel,
+        ScCelloModel,
+        ScPrintModel,
+        AiDocellModel,
+        PulsarModel,
+        AtacformerModel,
+        ScPlantLLMModel,
+        LangCellModel,
+        Cell2SentenceModel,
+        GenePTModel,
+        ChatCellModel,
+        TabulaModel,
+    )
 
     _models = {
         "scgpt": ScGPTModel,
@@ -31,9 +50,23 @@ class ModelFactory:
         "geneformer": GeneformerModel,
         "cellplm": CellPLMModel,
         "uce": UCEModel,
-        # Future models can be added here:
-        # "scbert": ScBERTModel,
-        # "celllm": CellLMModel,
+        "scmulan": ScMulanModel,
+        "scbert": ScBERTModel,
+        "genecompass": GeneCompassModel,
+        "nicheformer": NicheformerModel,
+        "tgpt": TGPTModel,
+        "cellfm": CellFMModel,
+        "sccello": ScCelloModel,
+        "scprint": ScPrintModel,
+        "aidocell": AiDocellModel,
+        "pulsar": PulsarModel,
+        "atacformer": AtacformerModel,
+        "scplantllm": ScPlantLLMModel,
+        "langcell": LangCellModel,
+        "cell2sentence": Cell2SentenceModel,
+        "genept": GenePTModel,
+        "chatcell": ChatCellModel,
+        "tabula": TabulaModel,
     }
     
     
@@ -94,6 +127,14 @@ class ModelFactory:
             except ImportError:
                 import warnings
                 warnings.warn("accelerate is recommended for UCE functionality. Install with `pip install accelerate`.")
+        elif model_type.lower() == "scmulan":
+            try:
+                import torch
+                import scanpy as sc
+                from scipy.sparse import csc_matrix  # noqa: F401
+            except ImportError:
+                import warnings
+                warnings.warn("torch, scanpy and scipy are recommended for scMulan functionality.")
             
         # Extract UCE-specific asset paths from kwargs
         uce_assets = {}

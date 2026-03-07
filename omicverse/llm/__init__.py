@@ -65,7 +65,7 @@ but accessed on-demand via SCLLMManager or from model_factory module directly.
 """
 
 # Core imports - always available
-from .base import SCLLMBase, ModelConfig, TaskConfig
+from .base import SCLLMBase, ModelConfig, TaskConfig, ModelExecutionBlockedError
 
 from .model_factory import SCLLMManager, ModelFactory
 from . import dr
@@ -75,6 +75,7 @@ __all__ = [
     "SCLLMBase",
     "ModelConfig",
     "TaskConfig",
+    "ModelExecutionBlockedError",
     "SCLLMManager",
     "ModelFactory",
     "dr",
