@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--channel",
         default="telegram",
-        choices=["telegram", "feishu"],
+        choices=["telegram", "feishu", "qq"],
         help="Channel backend to run (default: telegram)",
     )
     parser.add_argument(
@@ -121,6 +121,46 @@ def build_parser() -> argparse.ArgumentParser:
         dest="feishu_encrypt_key",
         help="Feishu webhook encrypt key (or FEISHU_ENCRYPT_KEY env var)",
     )
+    # QQ Bot arguments
+    parser.add_argument(
+        "--qq-app-id",
+        default=None,
+        dest="qq_app_id",
+        help="QQ Bot AppID (or QQ_APP_ID env var)",
+    )
+    parser.add_argument(
+        "--qq-client-secret",
+        default=None,
+        dest="qq_client_secret",
+        help="QQ Bot ClientSecret / AppSecret (or QQ_CLIENT_SECRET env var)",
+    )
+    parser.add_argument(
+        "--qq-image-host",
+        default=None,
+        dest="qq_image_host",
+        help=(
+            "Public base URL for serving analysis figures to QQ "
+            "(e.g. http://YOUR_IP:8081). Required to send figures. "
+            "Also set via QQ_IMAGE_HOST env var."
+        ),
+    )
+    parser.add_argument(
+        "--qq-image-server-port",
+        type=int,
+        default=8081,
+        dest="qq_image_server_port",
+        help="Local port for QQ image hosting server (default: 8081)",
+    )
+    parser.add_argument(
+        "--qq-markdown",
+        action="store_true",
+        default=False,
+        dest="qq_markdown",
+        help=(
+            "Enable markdown reply format for QQ Bot (msg_type=2). "
+            "Requires bot to have markdown message permission on QQ Open Platform."
+        ),
+    )
     return parser
 
 
@@ -167,6 +207,34 @@ def main(argv: Optional[List[str]] = None) -> int:
         ac = AccessControl(allowed=args.allowed_users or None)
         print(f"OmicVerse Jarvis starting (channel=telegram, model={args.model}) ...")
         run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
+        return 0
+
+    if args.channel == "qq":
+        qq_app_id = args.qq_app_id or os.environ.get("QQ_APP_ID")
+        qq_client_secret = args.qq_client_secret or os.environ.get("QQ_CLIENT_SECRET")
+        if not qq_app_id or not qq_client_secret:
+            print(
+                "ERROR: QQ Bot credentials are required.\n"
+                "  Pass --qq-app-id/--qq-client-secret or set QQ_APP_ID/QQ_CLIENT_SECRET.",
+                file=sys.stderr,
+            )
+            return 1
+        qq_image_host = args.qq_image_host or os.environ.get("QQ_IMAGE_HOST")
+        from .channels.qq import run_qq_bot
+
+        print(
+            f"OmicVerse Jarvis starting (channel=qq, model={args.model}, "
+            f"markdown={'on' if args.qq_markdown else 'off'}, "
+            f"image_host={'set' if qq_image_host else 'not configured'}) ..."
+        )
+        run_qq_bot(
+            app_id=qq_app_id,
+            client_secret=qq_client_secret,
+            session_manager=sm,
+            markdown=args.qq_markdown,
+            image_host=qq_image_host,
+            image_server_port=args.qq_image_server_port,
+        )
         return 0
 
     app_id = args.feishu_app_id or os.environ.get("FEISHU_APP_ID")
