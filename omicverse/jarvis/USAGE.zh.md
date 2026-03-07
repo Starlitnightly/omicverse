@@ -90,6 +90,7 @@ omicverse jarvis \
   --channel feishu \
   --feishu-app-id "$FEISHU_APP_ID" \
   --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events
@@ -115,6 +116,7 @@ omicverse jarvis \
 - `--channel`: 渠道后端（`telegram` 或 `feishu`，默认 `telegram`）
 - `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
 - `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
+- `--feishu-verification-token`: Feishu 事件校验 token（或 `FEISHU_VERIFICATION_TOKEN`）
 - `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数
 - `--model`: 默认 `claude-sonnet-4-6`
 - `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
