@@ -1884,6 +1884,18 @@ _PYPI_MIRRORS = [
 ]
 
 
+def _env_install_enabled_for_request():
+    """Gate package-install endpoints to explicit local-only opt-in."""
+    if os.environ.get('OV_WEB_ENABLE_ENV_INSTALL', '0') != '1':
+        return False
+
+    remote_addr = request.remote_addr or ''
+    if remote_addr not in ('127.0.0.1', '::1', 'localhost'):
+        return False
+
+    return True
+
+
 @app.route('/api/env/info', methods=['GET'])
 def env_info():
     """Return current Python environment information."""
@@ -2038,6 +2050,11 @@ def env_test_mirrors():
 @app.route('/api/env/install_pip', methods=['POST'])
 def env_install_pip():
     """Stream uv pip install output via SSE."""
+    if not _env_install_enabled_for_request():
+        return jsonify({
+            'error': 'endpoint disabled; set OV_WEB_ENABLE_ENV_INSTALL=1 and use localhost',
+        }), 403
+
     import subprocess, shutil
     payload = request.json or {}
     package  = payload.get('package', '').strip()
@@ -2076,6 +2093,11 @@ def env_install_pip():
 @app.route('/api/env/install_conda', methods=['POST'])
 def env_install_conda():
     """Stream mamba install output via SSE."""
+    if not _env_install_enabled_for_request():
+        return jsonify({
+            'error': 'endpoint disabled; set OV_WEB_ENABLE_ENV_INSTALL=1 and use localhost',
+        }), 403
+
     import subprocess, shutil
     payload  = request.json or {}
     package  = payload.get('package', '').strip()
