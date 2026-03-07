@@ -1124,6 +1124,21 @@ class TurnController:
                                 )
                             )
 
+                    await emit(
+                        build_stream_event(
+                            "tool_result",
+                            {
+                                "name": canonical or tc.name,
+                                "output": tool_output[:1200],
+                            },
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            step_id=tool_step_id,
+                            session_id=recorder.trace.session_id,
+                            category="tool",
+                        )
+                    )
+
                     tool_results.append(
                         (tc.id, tc.name, tool_output)
                     )

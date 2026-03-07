@@ -3,9 +3,60 @@ import numpy as np
 import anndata as ad
 from anndata import AnnData
 import scanpy as sc
+from .._registry import register_function
 
 
+@register_function(
+    aliases=[
+        "参考映射注释",
+        "AnnotationRef",
+        "reference transfer annotation",
+        "query to reference label transfer",
+    ],
+    category="single",
+    description="Reference-based annotation transfer class that aligns query and reference data, integrates embeddings, and transfers cell-type labels via weighted kNN.",
+    prerequisites={
+        'optional_functions': ['pp.preprocess', 'single.batch_correction']
+    },
+    requires={
+        'var': ['shared genes between query and reference'],
+        'obs': ['reference celltype labels']
+    },
+    produces={
+        'obsm': ['X_pca_harmony_anno', 'X_scVI_anno', 'X_scanorama_anno'],
+        'obs': ['harmony_prediction', 'scVI_prediction', 'scanorama_prediction']
+    },
+    auto_fix='escalate',
+    examples=[
+        "ref_anno = ov.single.AnnotationRef(adata_query, adata_ref, celltype_key='celltype')",
+        "ref_anno.train(method='harmony')",
+        "adata_query = ref_anno.predict(method='harmony', n_neighbors=15)"
+    ],
+    related=[
+        "single.Annotation",
+        "single.batch_correction",
+        "utils.weighted_knn_trainer",
+        "utils.weighted_knn_transfer",
+    ]
+)
 class AnnotationRef(object):
+    """
+    Reference-based annotation transfer helper.
+    
+    Parameters
+    ----------
+    adata_query : AnnData
+        Initialization argument for `AnnotationRef`.
+    adata_ref : AnnData
+        Initialization argument for `AnnotationRef`.
+    celltype_key : str, optional, default='celltype'
+        Initialization argument for `AnnotationRef`.
+    
+    Returns
+    -------
+    None
+        Creates a configured class instance.
+    """
     def __init__(self, adata_query: AnnData, adata_ref: AnnData, celltype_key: str = 'celltype'):
         self.adata_query = adata_query
         self.adata_ref = adata_ref
@@ -36,6 +87,23 @@ class AnnotationRef(object):
         print(f"Concatenated adata saved to self.adata_new")
 
     def preprocess(self,mode='shiftlog|pearson',n_HVGs=3000,batch_key='integrate_batch'):
+        """
+        Preprocess concatenated query+reference AnnData for integration.
+        
+        Parameters
+        ----------
+        mode : Any, optional, default='shiftlog|pearson'
+            Input parameter for `preprocess`.
+        n_HVGs : Any, optional, default=3000
+            Input parameter for `preprocess`.
+        batch_key : Any, optional, default='integrate_batch'
+            Input parameter for `preprocess`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `preprocess`.
+        """
         from ..pp._preprocess import preprocess,scale,pca
         self.adata_new=preprocess(self.adata_new,mode=mode,
                        n_HVGs=n_HVGs,batch_key=batch_key)
@@ -47,6 +115,21 @@ class AnnotationRef(object):
         self,method='harmony',
         **kwargs
     ):
+        """
+        Train/compute integrated embedding for transfer annotation.
+        
+        Parameters
+        ----------
+        method : Any, optional, default='harmony'
+            Input parameter for `train`.
+        **kwargs : Any
+            Input parameter for `train`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `train`.
+        """
         from ._batch import batch_correction
         if method=='harmony':
             batch_correction(self.adata_new,batch_key='integrate_batch',methods='harmony',**kwargs)
@@ -68,6 +151,25 @@ class AnnotationRef(object):
         return self.adata_query
 
     def predict(self,method='harmony',n_neighbors=15,pred_key=None,uncert_key=None):
+        """
+        Transfer reference labels to query cells using weighted kNN.
+        
+        Parameters
+        ----------
+        method : Any, optional, default='harmony'
+            Input parameter for `predict`.
+        n_neighbors : Any, optional, default=15
+            Input parameter for `predict`.
+        pred_key : Any, optional, default=None
+            Input parameter for `predict`.
+        uncert_key : Any, optional, default=None
+            Input parameter for `predict`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `predict`.
+        """
         if method=='harmony':
             if pred_key is None:
                 pred_key='harmony_prediction'

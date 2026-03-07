@@ -146,6 +146,7 @@ jarvis = [
   "requests>=2.0",
   "pillow>=9.0",
   "nbformat>=5.0",
+  "lark-oapi>=1.0",
 ]
 
 tests = [

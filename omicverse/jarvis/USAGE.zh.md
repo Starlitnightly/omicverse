@@ -90,10 +90,26 @@ omicverse jarvis \
   --channel feishu \
   --feishu-app-id "$FEISHU_APP_ID" \
   --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY" \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events
 ```
+
+Feishu 长连接渠道（WebSocket 事件订阅）：
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-connection-mode websocket \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY"
+```
+
+`websocket` 模式下，请在飞书后台将事件订阅配置为“长连接订阅”；`--feishu-host/--feishu-port/--feishu-path` 不生效。
 
 ### 4.1 飞书专用部署教程（Webhook 模式）
 
@@ -138,6 +154,7 @@ omicverse jarvis \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events \
+  --api-key "$ANTHROPIC_API_KEY" \
   --model claude-sonnet-4-6 \
   --max-prompts 0 \
   --verbose
@@ -195,7 +212,10 @@ omicverse jarvis \
 - `--channel`: 渠道后端（`telegram` 或 `feishu`，默认 `telegram`）
 - `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
 - `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
-- `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数
+- `--feishu-connection-mode`: `webhook` 或 `websocket`（默认 `websocket`）
+- `--feishu-verification-token`: Webhook 校验 token（或 `FEISHU_VERIFICATION_TOKEN`）
+- `--feishu-encrypt-key`: Webhook 加密密钥（用于加密回调，或 `FEISHU_ENCRYPT_KEY`）
+- `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数（仅 `webhook` 模式使用）
 - `--model`: 默认 `claude-sonnet-4-6`
 - `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
 - `--max-prompts`: 单 kernel 最大请求数（`0` 表示不自动重启，默认 0）
