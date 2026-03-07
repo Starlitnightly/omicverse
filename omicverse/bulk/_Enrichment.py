@@ -44,22 +44,42 @@ def geneset_enrichment(gene_list:list,pathways_dict:dict,
                        organism:str='Human',description:str='None',
                        background:list=None,
                        outdir:str='./enrichr',cutoff:float=0.5)->pd.DataFrame:
-    r"""Perform gene set enrichment analysis using Enrichr API.
-
-    Arguments:
-        gene_list: List of gene symbols to be tested for enrichment.
-        pathways_dict: Dictionary of pathway library names and corresponding Enrichr API URLs.
-        pvalue_threshold: P-value threshold for significant pathways. (0.05)
-        pvalue_type: Type of p-value correction to use. 'auto' uses Benjamini-Hochberg correction for small gene sets (<500 genes) and Bonferroni correction for larger gene sets. 'bh' uses only Benjamini-Hochberg correction. 'bonferroni' uses only Bonferroni correction. ('auto')
-        organism: Organism of the input gene list. ('Human')
-        description: Description of the input gene list. ('None')
-        background: Background gene list to use for enrichment analysis. If None, the background gene list is automatically set to the organism-specific gene list. (None)
-        outdir: Output directory for Enrichr results. ('./enrichr')
-        cutoff: Show enriched terms which Adjusted P-value < cutoff. (0.5)
-
-    Returns:
-        enrich_res: A pandas DataFrame containing the enrichment results.
-
+    """
+    Perform gene set enrichment analysis. IMPORTANT: pathways_dict must be a dictionary loaded via ov.utils.geneset_prepare(), NOT a file path string!
+    
+    Parameters
+    ----------
+    gene_list : list
+        Input parameter for `geneset_enrichment`.
+    pathways_dict : dict
+        Input parameter for `geneset_enrichment`.
+    pvalue_threshold : float, optional, default=0.05
+        Input parameter for `geneset_enrichment`.
+    pvalue_type : str, optional, default='auto'
+        Input parameter for `geneset_enrichment`.
+    organism : str, optional, default='Human'
+        Input parameter for `geneset_enrichment`.
+    description : str, optional, default='None'
+        Input parameter for `geneset_enrichment`.
+    background : list, optional, default=None
+        Input parameter for `geneset_enrichment`.
+    outdir : str, optional, default='./enrichr'
+        Input parameter for `geneset_enrichment`.
+    cutoff : float, optional, default=0.5
+        Input parameter for `geneset_enrichment`.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Output produced by `geneset_enrichment`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # STEP 1: Download pathway database (run once)
     """
     from ..external.gseapy import enrichr
     #import gseapy as gp
@@ -161,29 +181,62 @@ def geneset_enrichment_GSEA(gene_rnk:pd.DataFrame,pathways_dict:dict,
     enrich_res['P-value']=enrich_res['fdr']
     return enrich_res
 
+@register_function(
+    aliases=['多组富集可视化', 'geneset_plot_multi', 'multi geneset plot'],
+    category="bulk",
+    description="Visualize multiple gene-set enrichment result tables side-by-side to compare pathway activity patterns across conditions.",
+    prerequisites={'functions': ['geneset_enrichment']},
+    requires={'uns': ['enrichment results']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.bulk.geneset_plot_multi(enr_dict=enrich_dict, colors_dict=color_dict, num=10)'],
+    related=['bulk.geneset_enrichment', 'bulk.geneset_plot']
+)
 def geneset_plot_multi(enr_dict: Dict[str, pd.DataFrame], colors_dict: Dict[str, str], num: int = 5, fontsize: int = 10,
                         fig_title: str = '', fig_xlabel: str = 'Fractions of genes',
                         figsize: tuple = (2, 4), cmap: str = 'YlGnBu',
                         text_knock: int = 5, text_maxsize: int = 20, ax: Optional[matplotlib.axes._axes.Axes] = None
                         ) -> matplotlib.axes._axes.Axes:
-    r"""Enrichment multi genesets analysis using GSEA.
-
-    Arguments:
-        enr_dict: A dictionary of enrichment results.
-        colors_dict: A dictionary of colors for each gene set.
-        num: The number of enriched terms to plot. (5)
-        fontsize: The fontsize of the plot. (10)
-        fig_title: The title of the plot. ('')
-        fig_xlabel: The label of the x-axis. ('Fractions of genes')
-        figsize: The size of the plot. ((2,4))
-        cmap: The colormap to use for the plot. ('YlGnBu')
-        text_knock: The number of characters to knock off the end of the term name. (5)
-        text_maxsize: The maximum fontsize of the term names. (20)
-        ax: A matplotlib.axes.Axes object. (None)
-
-    Returns:
-        ax: The matplotlib axes object
-
+    """
+    Visualize multiple gene-set enrichment result tables side-by-side to compare pathway activity patterns across conditions
+    
+    Parameters
+    ----------
+    enr_dict : Dict[str, pd.DataFrame]
+        Input parameter for `geneset_plot_multi`.
+    colors_dict : Dict[str, str]
+        Input parameter for `geneset_plot_multi`.
+    num : int, optional, default=5
+        Input parameter for `geneset_plot_multi`.
+    fontsize : int, optional, default=10
+        Input parameter for `geneset_plot_multi`.
+    fig_title : str, optional, default=''
+        Input parameter for `geneset_plot_multi`.
+    fig_xlabel : str, optional, default='Fractions of genes'
+        Input parameter for `geneset_plot_multi`.
+    figsize : tuple, optional, default=(2, 4)
+        Input parameter for `geneset_plot_multi`.
+    cmap : str, optional, default='YlGnBu'
+        Input parameter for `geneset_plot_multi`.
+    text_knock : int, optional, default=5
+        Input parameter for `geneset_plot_multi`.
+    text_maxsize : int, optional, default=20
+        Input parameter for `geneset_plot_multi`.
+    ax : Optional[matplotlib.axes._axes.Axes], optional, default=None
+        Input parameter for `geneset_plot_multi`.
+    
+    Returns
+    -------
+    matplotlib.axes._axes.Axes
+        Output produced by `geneset_plot_multi`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.bulk.geneset_plot_multi(enr_dict=enrich_dict, colors_dict=color_dict, num=10)
     """
     from PyComplexHeatmap import HeatmapAnnotation,DotClustermapPlotter,anno_label,anno_simple,AnnotationBase
     for key in enr_dict.keys():
@@ -269,27 +322,54 @@ def geneset_plot(enrich_res: pd.DataFrame, num: int = 10, node_size: list = [5, 
                         text_knock: int = 5, text_maxsize: int = 20,
                         bbox_to_anchor_used: tuple = (-0.45, -13), node_diameter: int = 10,
                         custom_ticks: list = [5, 10], ax: Optional[matplotlib.axes._axes.Axes] = None) -> matplotlib.axes._axes.Axes:
-    r"""Plot the gene set enrichment result.
-
-    Arguments:
-        enrich_res: Enrichment results DataFrame.
-        num: The number of enriched terms to plot. Default: 10.
-        node_size: A list of integers defining the size of nodes in the plot. Default: [5,10,15].
-        cax_loc: The location, width and height of the colorbar on the plot. Default: [2, 0.55, 0.5, 0.02].
-        cax_fontsize: The fontsize of the colorbar label. Default: 12.
-        fig_title: The title of the plot. Default: ''.
-        fig_xlabel: The label of the x-axis. Default: 'Fractions of genes'.
-        figsize: The size of the plot. Default: (2,4).
-        cmap: The colormap to use for the plot. Default: 'YlGnBu'.
-        text_knock: The number of characters to knock off the end of the term name. Default: 5.
-        text_maxsize: The maximum fontsize of the term names. Default: 20.
-        bbox_to_anchor_used: The anchor point for placing the legend. Default: (-0.45, -13).
-        node_diameter: The base size for nodes in the plot. Default: 10.
-        custom_ticks: Custom tick marks for the plot. Default: [5,10].
-        ax: Matplotlib axes object. Default: None.
-
-    Returns:
-        ax: A matplotlib.axes.Axes object containing the enrichment bubble plot.
+    """
+    Visualize gene set enrichment analysis results with bubble plot
+    
+    Parameters
+    ----------
+    enrich_res : pd.DataFrame
+        Input parameter for `geneset_plot`.
+    num : int, optional, default=10
+        Input parameter for `geneset_plot`.
+    node_size : list, optional, default=[5, 10, 15]
+        Input parameter for `geneset_plot`.
+    cax_loc : list, optional, default=[2, 0.55, 0.5, 0.02]
+        Input parameter for `geneset_plot`.
+    cax_fontsize : int, optional, default=12
+        Input parameter for `geneset_plot`.
+    fig_title : str, optional, default=''
+        Input parameter for `geneset_plot`.
+    fig_xlabel : str, optional, default='Fractions of genes'
+        Input parameter for `geneset_plot`.
+    figsize : tuple, optional, default=(2, 4)
+        Input parameter for `geneset_plot`.
+    cmap : str, optional, default='YlGnBu'
+        Input parameter for `geneset_plot`.
+    text_knock : int, optional, default=5
+        Input parameter for `geneset_plot`.
+    text_maxsize : int, optional, default=20
+        Input parameter for `geneset_plot`.
+    bbox_to_anchor_used : tuple, optional, default=(-0.45, -13)
+        Input parameter for `geneset_plot`.
+    node_diameter : int, optional, default=10
+        Input parameter for `geneset_plot`.
+    custom_ticks : list, optional, default=[5, 10]
+        Input parameter for `geneset_plot`.
+    ax : Optional[matplotlib.axes._axes.Axes], optional, default=None
+        Input parameter for `geneset_plot`.
+    
+    Returns
+    -------
+    matplotlib.axes._axes.Axes
+        Output produced by `geneset_plot`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic usage
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
@@ -409,6 +489,37 @@ class pyGSE(object):
     related=["bulk.geneset_enrichment", "bulk.pyDEG.ranking2gsea", "utils.geneset_prepare"]
 )
 class pyGSEA(object):
+    """
+    Gene Set Enrichment Analysis (GSEA) for ranked gene lists
+    
+    Parameters
+    ----------
+    gene_rnk : pd.DataFrame
+        Configuration argument used when constructing `pyGSEA`.
+    pathways_dict : dict
+        Configuration argument used when constructing `pyGSEA`.
+    processes : int, optional, default=8
+        Configuration argument used when constructing `pyGSEA`.
+    permutation_num : int, optional, default=100
+        Configuration argument used when constructing `pyGSEA`.
+    outdir : str, optional, default='./enrichr_gsea'
+        Configuration argument used when constructing `pyGSEA`.
+    cutoff : float, optional, default=0.5
+        Configuration argument used when constructing `pyGSEA`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Initialize GSEA object
+    """
 
     def __init__(self,gene_rnk:pd.DataFrame,pathways_dict:dict,
                  processes:int=8,permutation_num:int=100,
@@ -433,14 +544,26 @@ class pyGSEA(object):
     
     
     def enrichment(self,format:str='png', pval=0.05,seed:int=112)->pd.DataFrame:
-        """gene set enrichment analysis.
+        """
+        gene set enrichment analysis
         
-        Arguments:
-            format: Matplotlib figure format. Default: 'png'.
-            seed: Random seed. Default: 112.
+        Parameters
+        ----------
+        format : str, optional, default='png'
+            Input parameter for `enrichment`.
+        pval : Any, optional, default=0.05
+            Input parameter for `enrichment`.
+        seed : int, optional, default=112
+            Input parameter for `enrichment`.
         
-        Returns:
-            enrich_res:A pandas.DataFrame object containing the enrichment results.
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `enrichment`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         
@@ -464,18 +587,32 @@ class pyGSEA(object):
                   cmap:str='RdBu_r',
                   title_fontsize:int=12,
                   title_y:float=0.95)->matplotlib.figure.Figure:
-        """Plot the gene set enrichment result.
+        """
+        Plot the gene set enrichment result
         
-        Arguments:
-            term_num: The number of enriched terms to plot. Default is 0.
-            gene_set_title: The title of the plot. Default is an empty string.
-            figsize: The size of the plot. Default is (3,4).
-            cmap: The colormap to use for the plot. Default is 'RdBu_r'.
-            title_fontsize: The fontsize of the title. Default is 12.
-            title_y: The y coordinate of the title. Default is 0.95.
-
-        Returns:
-            fig: A matplotlib.figure.Figure object.
+        Parameters
+        ----------
+        term_num : int, optional, default=0
+            Input parameter for `plot_gsea`.
+        gene_set_title : str, optional, default=''
+            Input parameter for `plot_gsea`.
+        figsize : tuple, optional, default=(3,4)
+            Input parameter for `plot_gsea`.
+        cmap : str, optional, default='RdBu_r'
+            Input parameter for `plot_gsea`.
+        title_fontsize : int, optional, default=12
+            Input parameter for `plot_gsea`.
+        title_y : float, optional, default=0.95
+            Input parameter for `plot_gsea`.
+        
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Output produced by `plot_gsea`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         from ..external.gseapy.plot import GSEAPlot
         #from gseapy.plot import GSEAPlot
@@ -498,22 +635,40 @@ class pyGSEA(object):
                         figsize:tuple=(2,4),cmap:str='YlGnBu',
                         text_knock:int=2,text_maxsize:int=20)->matplotlib.axes._axes.Axes:
         
-        """Plot the gene set enrichment result.
+        """
+        Plot the gene set enrichment result
         
-        Arguments:
-            num: The number of enriched terms to plot. Default is 10.
-            node_size: A list of integers defining the size of nodes in the plot. Default is [5,10,15].
-            cax_loc: The location of the colorbar on the plot. Default is 2.
-            cax_fontsize: The fontsize of the colorbar label. Default is 12.
-            fig_title: The title of the plot. Default is an empty string.
-            fig_xlabel: The label of the x-axis. Default is 'Fractions of genes'.
-            figsize: The size of the plot. Default is (2,4).
-            cmap: The colormap to use for the plot. Default is 'YlGnBu'.
-            text_knock: The number of terms to knock out for text labels. Default is 2.
-            text_maxsize: The maximum fontsize of text labels. Default is 20.
-
-        Returns:
-            ax: A matplotlib.axes.Axes object.
+        Parameters
+        ----------
+        num : int, optional, default=10
+            Input parameter for `plot_enrichment`.
+        node_size : list, optional, default=[5,10,15]
+            Input parameter for `plot_enrichment`.
+        cax_loc : int, optional, default=2
+            Input parameter for `plot_enrichment`.
+        cax_fontsize : int, optional, default=12
+            Input parameter for `plot_enrichment`.
+        fig_title : str, optional, default=''
+            Input parameter for `plot_enrichment`.
+        fig_xlabel : str, optional, default='Fractions of genes'
+            Input parameter for `plot_enrichment`.
+        figsize : tuple, optional, default=(2,4)
+            Input parameter for `plot_enrichment`.
+        cmap : str, optional, default='YlGnBu'
+            Input parameter for `plot_enrichment`.
+        text_knock : int, optional, default=2
+            Input parameter for `plot_enrichment`.
+        text_maxsize : int, optional, default=20
+            Input parameter for `plot_enrichment`.
+        
+        Returns
+        -------
+        matplotlib.axes._axes.Axes
+            Output produced by `plot_enrichment`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         return geneset_plot(self.enrich_res,num,node_size,cax_loc,cax_fontsize,
                             fig_title,fig_xlabel,figsize,cmap,text_knock,text_maxsize)

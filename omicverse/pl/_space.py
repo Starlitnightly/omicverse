@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
+from .._registry import register_function
 
 def html_to_rgb(html_color):
     r"""
@@ -424,21 +425,46 @@ def plot_spatial_general(
         return fig
 
 
+@register_function(
+    aliases=['空间表达绘图', 'plot_spatial', 'spatial abundance plot', 'deconvolution spatial plot'],
+    category="pl",
+    description="Render spatial abundance or expression on tissue coordinates with optional histology background for spot-level interpretation.",
+    prerequisites={},
+    requires={'obsm': ['spatial'], 'uns': ['spatial']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.plot_spatial(adata=decov_obj.adata_cell2location, color=clust_labels, labels=clust_labels, show_img=True, style="fast")'],
+    related=['pl.add_pie2spatial', 'space.crop_space_visium', 'space.map_spatial_auto']
+)
 def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
-    r"""
-    Create spatial plot from Visium data with color gradient and interpolation.
+    """
+    Render spatial abundance or expression on tissue coordinates with optional histology background for spot-level interpretation
     
-    Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `plot_spatial`.
+    color : Any
+        Input parameter for `plot_spatial`.
+    img_key : Any, optional, default="hires"
+        Input parameter for `plot_spatial`.
+    show_img : Any, optional, default=True
+        Input parameter for `plot_spatial`.
+    **kwargs : Any
+        Input parameter for `plot_spatial`.
     
-    Args:
-        adata: AnnData object with spatial coordinates in adata.obsm['spatial']
-        color: List of column names from adata.obs to plot
-        img_key: Image resolution key - 'hires' or 'lowres' ('hires')
-        show_img: Whether to display background tissue image (True)
-        **kwargs: Additional arguments passed to plot_spatial_general
-        
-    Returns:
-        fig: matplotlib.figure.Figure object
+    Returns
+    -------
+    Any
+        Output produced by `plot_spatial`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.pl.plot_spatial(adata=decov_obj.adata_cell2location, color=clust_labels, labels=clust_labels, show_img=True, style="fast")
     """
 
     if show_img is True:
@@ -741,6 +767,17 @@ def _data_radius_from_pixels(ax, r_px: float) -> float:
     dx = abs(p1[0] - p0[0]); dy = abs(p1[1] - p0[1])
     return r_px * min(dx, dy)
 
+@register_function(
+    aliases=['空间饼图叠加', 'add_pie2spatial', 'pie chart on spatial'],
+    category="pl",
+    description="Overlay per-spot cell-type proportion pie charts onto spatial coordinates to inspect local microenvironment composition.",
+    prerequisites={},
+    requires={'obsm': ['spatial'], 'obs': ['cell-type proportion columns']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.add_pie2spatial(adata, cell_type_columns=clust_labels, pie_radius=0.45)'],
+    related=['pl.plot_spatial', 'utils.plot_cellproportion']
+)
 def add_pie2spatial(
     adata,
     cell_type_columns,
@@ -760,6 +797,59 @@ def add_pie2spatial(
     legend_loc=(1.05, 1.0),
     ncols=3,
 ):
+    """
+    Overlay per-spot cell-type proportion pie charts onto spatial coordinates to inspect local microenvironment composition
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `add_pie2spatial`.
+    cell_type_columns : Any
+        Input parameter for `add_pie2spatial`.
+    ax : Any
+        Input parameter for `add_pie2spatial`.
+    pie_radius : Any, optional, default=15
+        Input parameter for `add_pie2spatial`.
+    img_key : Any, optional, default='hires'
+        Input parameter for `add_pie2spatial`.
+    spatial_coords : Any, optional, default=None
+        Input parameter for `add_pie2spatial`.
+    pie_radius_px : Any, optional, default=None
+        Input parameter for `add_pie2spatial`.
+    min_proportion : Any, optional, default=0.01
+        Input parameter for `add_pie2spatial`.
+    colors : Any, optional, default=None
+        Input parameter for `add_pie2spatial`.
+    alpha : Any, optional, default=0.9
+        Input parameter for `add_pie2spatial`.
+    remainder : Any, optional, default='gap'
+        Input parameter for `add_pie2spatial`.
+    remainder_color : Any, optional, default='lightgray'
+        Input parameter for `add_pie2spatial`.
+    remainder_alpha : Any, optional, default=0.5
+        Input parameter for `add_pie2spatial`.
+    renormalize_if_sum_gt1 : Any, optional, default=True
+        Input parameter for `add_pie2spatial`.
+    zorder : Any, optional, default=80
+        Input parameter for `add_pie2spatial`.
+    legend_loc : Any, optional, default=(1.05, 1.0)
+        Input parameter for `add_pie2spatial`.
+    ncols : Any, optional, default=3
+        Input parameter for `add_pie2spatial`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `add_pie2spatial`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.pl.add_pie2spatial(adata, cell_type_columns=clust_labels, pie_radius=0.45)
+    """
     if 'spatial' not in adata.obsm:
         raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
 

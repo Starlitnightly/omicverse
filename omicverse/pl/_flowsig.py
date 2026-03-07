@@ -6,6 +6,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
 
 from ._palette import palette_112
+from .._registry import register_function
 
 def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
     r"""
@@ -235,26 +236,53 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
     return fig, ax
 
 
+@register_function(
+    aliases=['FlowSig 网络图', 'plot_flowsig_network', 'intercellular flow network plot'],
+    category="pl",
+    description="Visualize inferred intercellular signal-flow graphs, highlighting pathway-level directional communication structure.",
+    prerequisites={'optional_functions': ['pathway_enrichment']},
+    requires={'uns': ['flow network results']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.plot_flowsig_network(flow_network, gem_plot=True)'],
+    related=['single.pathway_enrichment', 'pl.plot_spatial']
+)
 def plot_flowsig_network(flow_network,
                          gem_plot,
                          figsize=(8,4),
                         curve_awarg={'eps':2},
                         node_shape={'GEM':'^','Sender':'o','Receptor':'o'},
                         **kwargs):
-    r"""
-    Create a flowsig network visualization showing GEM modules and gene flows.
+    """
+    Visualize inferred intercellular signal-flow graphs, highlighting pathway-level directional communication structure
     
-    Args:
-        flow_network: NetworkX graph with flow connections
-        gem_plot: List of GEM modules to include in plot
-        figsize: Figure dimensions as (width, height) ((8,4))
-        curve_awarg: Arguments for curved edge drawing ({'eps':2})
-        node_shape: Dictionary mapping node types to shapes ({'GEM':'^','Sender':'o','Receptor':'o'})
-        **kwargs: Additional arguments passed to plot_curve_network
-        
-    Returns:
-        fig: matplotlib.figure.Figure object
-        ax: matplotlib.axes.Axes object
+    Parameters
+    ----------
+    flow_network : Any
+        Input parameter for `plot_flowsig_network`.
+    gem_plot : Any
+        Input parameter for `plot_flowsig_network`.
+    figsize : Any, optional, default=(8,4)
+        Input parameter for `plot_flowsig_network`.
+    curve_awarg : Any, optional, default={'eps':2}
+        Input parameter for `plot_flowsig_network`.
+    node_shape : Any, optional, default={'GEM':'^','Sender':'o','Receptor':'o'}
+        Input parameter for `plot_flowsig_network`.
+    **kwargs : Any
+        Input parameter for `plot_flowsig_network`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_flowsig_network`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.pl.plot_flowsig_network(flow_network, gem_plot=True)
     """
     
     gem_li=[i for i in flow_network.nodes if 'GEM' in i]
