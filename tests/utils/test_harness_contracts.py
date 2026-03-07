@@ -62,3 +62,12 @@ def test_run_trace_recorder_round_trip(tmp_path):
     assert loaded["adata_shape"] == [100, 200]
     assert loaded["history_size"] == 2
     assert loaded["status"] == "success"
+
+
+def test_run_trace_store_rejects_path_traversal(tmp_path):
+    store = RunTraceStore(root=tmp_path / "harness")
+    outside = tmp_path / "secret.json"
+    outside.write_text('{"secret": true}', encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        store.load("../secret")
