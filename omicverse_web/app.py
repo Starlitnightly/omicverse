@@ -3414,11 +3414,24 @@ def plot_gpu_colors():
         vmax_req  = req.get('vmax', None)
         density_adjust = _parse_density_adjust(req.get('density_adjust', 1.0))
         density_active = bool(req.get('density_active', False))
-        n         = req.get('n_cells', None)   # supplied by frontend
+        n_req     = req.get('n_cells', None)   # supplied by frontend
+        n_obs     = int(state.current_adaptor.n_obs)
 
-        # If n_cells unknown, fetch from adaptor
-        if n is None:
-            n = state.current_adaptor.n_obs
+        # Always size buffers from trusted server-side dataset dimensions.
+        # Keep parsing n_cells only for logging/debugging compatibility.
+        if n_req is not None:
+            try:
+                n_req_int = int(n_req)
+                if n_req_int != n_obs:
+                    logging.warning(
+                        'plot_gpu_colors ignored client n_cells=%s; using n_obs=%s',
+                        n_req_int,
+                        n_obs,
+                    )
+            except (TypeError, ValueError):
+                logging.warning('plot_gpu_colors received invalid n_cells=%r; using n_obs=%s', n_req, n_obs)
+
+        n = n_obs
 
         x_all = None
         y_all = None
