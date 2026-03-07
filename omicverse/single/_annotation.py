@@ -13,6 +13,7 @@ from anndata import AnnData
 import scanpy as sc
 
 from ..datasets import download_data
+from .._registry import register_function
 
 
 _PROMPT_DESCRIPTION_LIMIT = 400
@@ -229,7 +230,53 @@ class LLMTableSelector:
         return pd.DataFrame([entry], columns=self._result_columns())
 
 
+@register_function(
+    aliases=[
+        "单细胞自动注释",
+        "Annotation",
+        "annotation manager",
+        "reference annotation selector",
+    ],
+    category="single",
+    description="Unified annotation manager that supports CellTypist/SCSA/GPT-based labeling and reference retrieval for single-cell datasets.",
+    prerequisites={
+        'optional_functions': ['pp.preprocess', 'pp.neighbors', 'pp.leiden']
+    },
+    requires={
+        'var': ['gene identifiers'],
+        'obs': ['cluster labels (recommended)']
+    },
+    produces={
+        'obs': ['celltypist_prediction', 'scsa_prediction', 'gpt4celltype_prediction'],
+        'obsm': ['celltypist_decision_matrix', 'celltypist_probability_matrix']
+    },
+    auto_fix='escalate',
+    examples=[
+        "anno = ov.single.Annotation(adata)",
+        "anno.query_reference(source='celltypist', data_desc='human PBMC scRNA-seq')",
+        "anno.annotate(method='celltypist', cluster_key='leiden')"
+    ],
+    related=[
+        "single.AnnotationRef",
+        "single.pySCSA",
+        "single.get_celltype_marker",
+        "single.gptcelltype",
+    ]
+)
 class Annotation(object):
+    """
+    Unified single-cell annotation manager.
+    
+    Parameters
+    ----------
+    adata : AnnData
+        Initialization argument for `Annotation`.
+    
+    Returns
+    -------
+    None
+        Creates a configured class instance.
+    """
 
     def __init__(self, adata: AnnData,):
         self.adata = adata
@@ -254,6 +301,23 @@ class Annotation(object):
         cluster_key='leiden',
         **kwargs
     ):
+        """
+        Run cell-type annotation with the selected backend.
+        
+        Parameters
+        ----------
+        method : Any, optional, default='celltypist'
+            Input parameter for `annotate`.
+        cluster_key : Any, optional, default='leiden'
+            Input parameter for `annotate`.
+        **kwargs : Any
+            Input parameter for `annotate`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `annotate`.
+        """
         if method=='celltypist':
             import celltypist
             predictions = celltypist.annotate(
@@ -328,33 +392,74 @@ class Annotation(object):
 
 
     def add_reference_sc(self, reference: AnnData, celltype_key: str = 'celltype'):
+        """
+        Attach an AnnData reference atlas for transfer-style annotation.
+        
+        Parameters
+        ----------
+        reference : AnnData
+            Input parameter for `add_reference_sc`.
+        celltype_key : str, optional, default='celltype'
+            Input parameter for `add_reference_sc`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `add_reference_sc`.
+        """
         self.adata_ref=reference
         self.celltype_key=celltype_key
 
 
     def add_reference_pkl(self, reference: str):
+        """
+        Attach a CellTypist model file and load it into memory.
+        
+        Parameters
+        ----------
+        reference : str
+            Input parameter for `add_reference_pkl`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `add_reference_pkl`.
+        """
         self.pkl_ref=reference
 
         from celltypist import models
         self.model = models.Model.load(model = self.pkl_ref)
 
     def add_reference_scsa_db(self, reference: str):
+        """
+        Attach a local SCSA database path.
+        
+        Parameters
+        ----------
+        reference : str
+            Input parameter for `add_reference_scsa_db`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `add_reference_scsa_db`.
+        """
         self.scsa_db_path = reference
 
 
     def download_scsa_db(self, save_path: str = 'temp/pySCSA_2023_v2_plus.db'):
-        """Download SCSA database with fallback mirrors.
-
-        Tries Stanford repository first, falls back to Figshare if download fails.
-
-        Args:
-            save_path: Path to save the database file. Default: 'temp/pySCSA_2023_v2_plus.db'
-
-        Returns:
-            Path to the downloaded database file.
-
-        Raises:
-            Exception: If download fails from all mirrors.
+        """
+        Download SCSA database with fallback mirrors.
+        
+        Parameters
+        ----------
+        save_path : str, optional, default='temp/pySCSA_2023_v2_plus.db'
+            Input parameter for `download_scsa_db`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `download_scsa_db`.
         """
         # Define download mirrors (Stanford preferred, Figshare as fallback)
         mirrors = [
@@ -402,7 +507,23 @@ class Annotation(object):
         reference_name: str, 
         save_path: str,
         force_download: bool = False) -> str:
-        """Download a CellTypist model pickle file by name and return its path."""
+        """
+        Download a CellTypist model pickle file by name and return its path.
+        
+        Parameters
+        ----------
+        reference_name : str
+            Input parameter for `download_reference_pkl`.
+        save_path : str
+            Input parameter for `download_reference_pkl`.
+        force_download : bool, optional, default=False
+            Input parameter for `download_reference_pkl`.
+        
+        Returns
+        -------
+        str
+            Output produced by `download_reference_pkl`.
+        """
 
         if not reference_name or not str(reference_name).strip():
             raise ValueError("Please provide a valid `reference_name` that matches the CellTypist model list.")
@@ -459,33 +580,30 @@ class Annotation(object):
         llm_base_url='https://api.openai.com/v1',
         llm_extra_params: Optional[Dict[str, Any]] = None,
     ):
-        """Use an LLM to identify relevant reference resources based on a description.
-
+        """
+        Use an LLM to identify relevant reference resources based on a description.
+        
         Parameters
         ----------
-        source : str
-            Data source identifier. Supported values: ``'cellxgene'`` and ``'celltypist'``.
-        data_desc : str
-            Free-text description of the dataset you are trying to match.
-        llm_model : str
-            Model name passed to the selected LLM provider.
-        llm_api_key : str
-            API key for the LLM provider. If left as a placeholder (e.g. ``'sk*'``),
-            the method will attempt to read provider-specific environment variables.
-        llm_provider : str
-            LLM provider identifier. Implemented providers: ``'openai'``,
-            ``'custom_openai'`` (OpenAI-compatible), ``'doubao'``, ``'anthropic'`` and ``'ollama'``.
-        llm_base_url : str
-            Base URL for OpenAI-compatible endpoints. Ignored for providers that do
-            not use it.
-        llm_extra_params : dict
-            Additional parameters forwarded directly to the LLM API call.
-
+        source : Any, optional, default='cellxgene'
+            Input parameter for `query_reference`.
+        data_desc : str, optional, default=None
+            Input parameter for `query_reference`.
+        llm_model : Any, optional, default='gpt-4o-mini'
+            Input parameter for `query_reference`.
+        llm_api_key : Any, optional, default='sk*'
+            Input parameter for `query_reference`.
+        llm_provider : Any, optional, default='openai'
+            Input parameter for `query_reference`.
+        llm_base_url : Any, optional, default='https://api.openai.com/v1'
+            Input parameter for `query_reference`.
+        llm_extra_params : Optional[Dict[str, Any]], optional, default=None
+            Input parameter for `query_reference`.
+        
         Returns
         -------
-        pandas.DataFrame
-            Selected entries with source-specific columns (e.g. ``collection_id``/``collection_url``
-            for CellxGene, ``model`` for CellTypist) plus ``llm_reason``.
+        Any
+            Output produced by `query_reference`.
         """
 
         source_lower = (source or 'cellxgene').strip().lower()

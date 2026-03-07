@@ -102,6 +102,25 @@ def build_parser() -> argparse.ArgumentParser:
         dest="feishu_path",
         help="Feishu webhook path (default: /feishu/events)",
     )
+    parser.add_argument(
+        "--feishu-connection-mode",
+        default="websocket",
+        choices=["webhook", "websocket"],
+        dest="feishu_connection_mode",
+        help="Feishu connection mode: webhook or websocket (default: websocket)",
+    )
+    parser.add_argument(
+        "--feishu-verification-token",
+        default=None,
+        dest="feishu_verification_token",
+        help="Feishu webhook verification token (or FEISHU_VERIFICATION_TOKEN env var)",
+    )
+    parser.add_argument(
+        "--feishu-encrypt-key",
+        default=None,
+        dest="feishu_encrypt_key",
+        help="Feishu webhook encrypt key (or FEISHU_ENCRYPT_KEY env var)",
+    )
     return parser
 
 
@@ -152,6 +171,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     app_id = args.feishu_app_id or os.environ.get("FEISHU_APP_ID")
     app_secret = args.feishu_app_secret or os.environ.get("FEISHU_APP_SECRET")
+    verification_token = args.feishu_verification_token or os.environ.get("FEISHU_VERIFICATION_TOKEN")
+    encrypt_key = args.feishu_encrypt_key or os.environ.get("FEISHU_ENCRYPT_KEY")
     if not app_id or not app_secret:
         print(
             "ERROR: Feishu app credentials are required.\n"
@@ -159,20 +180,35 @@ def main(argv: Optional[List[str]] = None) -> int:
             file=sys.stderr,
         )
         return 1
-    from .channels.feishu import run_feishu_bot
+    from .channels.feishu import run_feishu_bot, run_feishu_ws_bot
 
-    print(
-        f"OmicVerse Jarvis starting (channel=feishu, model={args.model}, "
-        f"listen={args.feishu_host}:{args.feishu_port}{args.feishu_path}) ..."
-    )
-    run_feishu_bot(
-        app_id=app_id,
-        app_secret=app_secret,
-        session_manager=sm,
-        host=args.feishu_host,
-        port=args.feishu_port,
-        path=args.feishu_path,
-    )
+    if args.feishu_connection_mode == "websocket":
+        print(
+            f"OmicVerse Jarvis starting (channel=feishu, model={args.model}, "
+            "mode=websocket) ..."
+        )
+        run_feishu_ws_bot(
+            app_id=app_id,
+            app_secret=app_secret,
+            session_manager=sm,
+            verification_token=verification_token,
+            encrypt_key=encrypt_key,
+        )
+    else:
+        print(
+            f"OmicVerse Jarvis starting (channel=feishu, model={args.model}, "
+            f"mode=webhook, listen={args.feishu_host}:{args.feishu_port}{args.feishu_path}) ..."
+        )
+        run_feishu_bot(
+            app_id=app_id,
+            app_secret=app_secret,
+            session_manager=sm,
+            host=args.feishu_host,
+            port=args.feishu_port,
+            path=args.feishu_path,
+            verification_token=verification_token,
+            encrypt_key=encrypt_key,
+        )
     return 0
 
 

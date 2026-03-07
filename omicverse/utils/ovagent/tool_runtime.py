@@ -635,6 +635,10 @@ class ToolRuntime:
         import urllib.parse
         import urllib.request
 
+        query = (query or "").strip()
+        if not query:
+            return "Error: WebSearch requires a non-empty query."
+
         num_results = max(1, min(int(num_results), 10))
         encoded_q = urllib.parse.urlencode({"q": query})
         url = f"https://html.duckduckgo.com/html/?{encoded_q}"
@@ -1300,6 +1304,10 @@ class ToolRuntime:
         options: Optional[list[str]] = None,
     ) -> str:
         from ..harness.contracts import make_turn_id  # noqa: F811
+
+        question = (question or "").strip()
+        if not question:
+            return "Error: AskUserQuestion requires a non-empty question."
 
         session_id = self._ctx._get_runtime_session_id()
         trace = getattr(self._ctx, "_last_run_trace", None)
