@@ -768,7 +768,6 @@ class AnalysisExecutor:
             "float", "int", "isinstance", "iter", "len", "list", "map",
             "max", "min", "next", "pow", "print", "range", "round", "set",
             "sorted", "str", "sum", "tuple", "zip", "filter", "type",
-            "open",
             "hasattr", "getattr", "setattr",
             "ImportError", "AttributeError", "IndexError",
             "FileNotFoundError", "OSError", "Exception", "ValueError",
