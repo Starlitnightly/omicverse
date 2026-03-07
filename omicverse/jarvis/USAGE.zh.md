@@ -90,10 +90,107 @@ omicverse jarvis \
   --channel feishu \
   --feishu-app-id "$FEISHU_APP_ID" \
   --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY" \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events
 ```
+
+Feishu 长连接渠道（WebSocket 事件订阅）：
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-connection-mode websocket \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY"
+```
+
+`websocket` 模式下，请在飞书后台将事件订阅配置为“长连接订阅”；`--feishu-host/--feishu-port/--feishu-path` 不生效。
+
+### 4.1 飞书专用部署教程（Webhook 模式）
+
+本节是飞书渠道的最小可用 checklist，按顺序完成即可。
+
+#### A. 飞书应用准备
+
+1. 在飞书开放平台创建企业自建应用。  
+2. 获取并保存：
+   - `App ID`
+   - `App Secret`
+3. 将机器人添加到目标群聊（或可私聊使用的场景）。
+
+#### B. 事件订阅与回调
+
+1. 在“事件订阅”中开启订阅。  
+2. 回调地址填写：
+   - `http://<你的公网域名或IP>:8080/feishu/events`
+   - 若你改过参数，请与 `--feishu-host/--feishu-port/--feishu-path` 保持一致。  
+3. 订阅事件：
+   - `im.message.receive_v1`
+4. 保存后，飞书会发起 URL 验证（`challenge`）；Jarvis 内置已支持该握手。
+
+#### C. 权限建议（按飞书后台实际命名勾选）
+
+至少确保机器人具备：
+- 读取消息内容（用于接收文本/命令）
+- 发送消息（文本）
+- 上传并发送图片
+- 上传并发送文件
+- 下载文件（用于接收 `.h5ad`）
+
+说明：飞书权限名在不同版本控制台中可能有细微差异，按“消息读取/发送、图片文件上传下载”对应项勾选即可。
+
+#### D. 启动命令（推荐）
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-host 0.0.0.0 \
+  --feishu-port 8080 \
+  --feishu-path /feishu/events \
+  --api-key "$ANTHROPIC_API_KEY" \
+  --model claude-sonnet-4-6 \
+  --max-prompts 0 \
+  --verbose
+```
+
+#### E. 联调验证步骤
+
+1. 飞书发送 `/status`，应返回当前会话状态。  
+2. 飞书发送 `/kernel`，应看到 kernel 状态。  
+3. 上传一个 `.h5ad` 文件，应提示“已上传并加载”。  
+4. 发送一句分析请求，应先出现“思考中”草稿，再出现结果文本/图片/附件。
+
+#### F. 飞书通道当前支持能力
+
+- Draft 流式预览（消息编辑）
+- 图片发送（analysis figures）
+- 文件附件发送（report/csv/pdf/h5ad 等）
+- `.h5ad` 上传并自动加载
+- `/cancel` `/status` `/reset`
+- `/kernel` `/kernel ls` `/kernel new` `/kernel use`
+
+#### G. 常见故障排查（飞书）
+
+1. 回调验证失败  
+   - 检查回调 URL 与启动参数一致。  
+   - 确认端口可从公网访问（必要时通过反向代理/隧道）。  
+
+2. 能收消息但不能发图片/文件  
+   - 通常是权限不足；检查“图片/文件上传发送”相关权限是否已开并生效。  
+
+3. 上传 `.h5ad` 后未自动加载  
+   - 检查文件后缀是否为 `.h5ad`。  
+   - 查看 `--verbose` 日志中是否有下载或读取报错。  
+
+4. `/cancel` 无效  
+   - 仅取消当前正在运行的分析任务；若任务已结束会提示“当前没有运行中的分析”。
 
 完整参数示例（覆盖当前全部 CLI 参数）：
 
@@ -115,7 +212,10 @@ omicverse jarvis \
 - `--channel`: 渠道后端（`telegram` 或 `feishu`，默认 `telegram`）
 - `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
 - `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
-- `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数
+- `--feishu-connection-mode`: `webhook` 或 `websocket`（默认 `websocket`）
+- `--feishu-verification-token`: Webhook 校验 token（或 `FEISHU_VERIFICATION_TOKEN`）
+- `--feishu-encrypt-key`: Webhook 加密密钥（用于加密回调，或 `FEISHU_ENCRYPT_KEY`）
+- `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数（仅 `webhook` 模式使用）
 - `--model`: 默认 `claude-sonnet-4-6`
 - `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
 - `--max-prompts`: 单 kernel 最大请求数（`0` 表示不自动重启，默认 0）

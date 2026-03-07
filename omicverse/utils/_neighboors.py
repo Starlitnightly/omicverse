@@ -17,7 +17,19 @@ def W_from_rep(
     rep: str,
 ) -> csr_matrix:
     """
-    Return affinity matrix W based on representation rep.
+    Fetch affinity matrix corresponding to a representation key.
+
+    Parameters
+    ----------
+    data : AnnData-like
+        Data object containing precomputed affinity matrices in ``obsp``.
+    rep : str
+        Representation suffix used in ``obsp['W_' + rep]``.
+
+    Returns
+    -------
+    csr_matrix
+        Affinity matrix for requested representation.
     """
     rep_key = "W_" + rep
     if rep_key not in data.obsp:
@@ -26,8 +38,21 @@ def W_from_rep(
 
 def X_from_rep(data, rep: str, n_comps: int = None) -> np.array:
     """
-    If rep is not mat, first check if X_rep is in data.obsm. If not, raise an error.
-    If rep is None, return data.X as a numpy array
+    Retrieve feature matrix from representation key.
+
+    Parameters
+    ----------
+    data : AnnData-like
+        Data object containing embeddings in ``obsm``.
+    rep : str
+        Representation name. ``'mat'`` refers to expression matrix ``data.X``.
+    n_comps : int or None
+        Number of leading components to keep. If ``None``, keep all.
+
+    Returns
+    -------
+    np.array
+        Dense matrix for neighbor computation.
     """
     if rep != "mat":
         rep_key = "X_" + rep
@@ -43,12 +68,35 @@ def X_from_rep(data, rep: str, n_comps: int = None) -> np.array:
         return data.X if not issparse(data.X) else data.X.toarray()
 
 def update_rep(rep: str) -> str:
-    """ If rep is None, return rep as mat, which refers to the whole expression matrix
+    """
+    Normalize representation key.
+
+    Parameters
+    ----------
+    rep : str or None
+        Representation name.
+
+    Returns
+    -------
+    str
+        ``rep`` if provided; otherwise ``'mat'``.
     """
     return rep if rep is not None else "mat"
 
 def eff_n_jobs(n_jobs: int) -> int:
-    """ If n_jobs < 0, set it as the number of physical cores _cpu_count """
+    """
+    Resolve effective number of CPU threads.
+
+    Parameters
+    ----------
+    n_jobs : int
+        Requested number of jobs. Negative values mean auto-detect.
+
+    Returns
+    -------
+    int
+        Effective number of worker threads.
+    """
     if n_jobs > 0:
         return n_jobs
 
@@ -90,30 +138,29 @@ def calculate_nearest_neighbors(
 
     Parameters
     ----------
-
-    X : `np.array`
+    X : np.array
         An array of n_samples by n_features.
-    K : `int`, optional (default: 100)
+    K : int, optional
         Number of neighbors, including the data point itself. If K is None, determine K by sqrt(X.shape[0]).
-    n_jobs : `int`, optional (default: -1)
+    n_jobs : int, optional
         Number of threads to use. -1 refers to using all physical CPU cores.
-    method: `str`, optional (default: 'hnsw')
+    method : str, optional
         Choosing from 'hnsw' for approximate nearest neighbor search or 'sklearn' for exact nearest neighbor search. If X.shape[0] <= 1000, method will be automatically set to "sklearn" for exact KNN search
-    exact_k: `bool`, optional (default: 'False')
+    exact_k : bool, optional
         If True, use exactly the K passed to the function; otherwise K is determined as min(K, sqrt(X.shape[0])).
-    M, efC, efS: `int`, optional (20, 200, 200)
+    M, efC, efS : int, optional
         HNSW algorithm parameters.
-    random_state: `int`, optional (default: 0)
+    random_state : int, optional
         Random seed for random number generator.
-    full_speed: `bool`, optional (default: False)
+    full_speed : bool, optional
         If full_speed, use multiple threads in constructing hnsw index. However, the kNN results are not reproducible. If not full_speed, use only one thread to make sure results are reproducible.
-    dist: `str`, optional (default: 'l2')
+    dist : str, optional
         Distance metric to use. By default, use squared L2 distance. Available options, 'l2', inner product 'ip' or cosine similarity 'cosine'.
 
     Returns
     -------
-
-    kNN indices array, distances array and adjusted K.
+    Tuple[List[int], List[float], int]
+        kNN indices array, distance array, and adjusted ``K``.
 
     Examples
     --------
@@ -201,34 +248,33 @@ def get_neighbors(
 
     Parameters
     ----------
-
-    data : `pegasusio.MultimodalData`
-        An AnnData object.
-    K : `int`, optional (default: 100)
+    data : AnnData-like
+        Input data object.
+    K : int, optional
         Number of neighbors, including the data point itself.
-    rep : `str`, optional (default: 'pca')
+    rep : str, optional
         Representation used to calculate kNN. If `None` use data.X
-    n_comps: `int`, optional (default: None)
+    n_comps : int, optional
         Number of components to be used in the `rep`. If n_comps == None, use all components; otherwise, use the minimum of n_comps and rep's dimensions.
-    n_jobs : `int`, optional (default: -1)
+    n_jobs : int, optional
         Number of threads to use. -1 refers to using all physical CPU cores.
-    random_state: `int`, optional (default: 0)
+    random_state : int, optional
         Random seed for random number generator.
-    full_speed: `bool`, optional (default: False)
+    full_speed : bool, optional
         If full_speed, use multiple threads in constructing hnsw index. However, the kNN results are not reproducible. If not full_speed, use only one thread to make sure results are reproducible.
-    use_cache: `bool`, optional (default: False)
+    use_cache : bool, optional
         If use_cache and found cached knn results, will not recompute.
-    dist: `str`, optional (default: 'l2')
+    dist : str, optional
         Distance metric to use. By default, use squared L2 distance. Available options, 'l2' or inner product 'ip' or cosine similarity 'cosine'.
-    method: `str`, optional (default: 'hnsw')
+    method : str, optional
         Choosing from 'hnsw' for approximate nearest neighbor search or 'sklearn' for exact nearest neighbor search.
-    exact_k: `bool`, optional (default: 'False')
+    exact_k : bool, optional
         If True, use exactly the K passed to the function; otherwise K is determined as min(K, sqrt(X.shape[0])).
 
     Returns
     -------
-
-    kNN indices array, distances array, and adjusted K.
+    Tuple[List[int], List[float], int]
+        kNN index matrix, distance matrix, and adjusted ``K``.
 
     Examples
     --------
@@ -283,6 +329,21 @@ def get_symmetric_matrix(csr_mat: "csr_matrix") -> "csr_matrix":
 def calculate_affinity_matrix(
     indices: List[int], distances: List[float]
 ) -> "csr_matrix":
+    """
+    Build locally scaled symmetric affinity matrix from kNN outputs.
+
+    Parameters
+    ----------
+    indices : List[int]
+        kNN index matrix of shape ``(n_cells, K)``.
+    distances : List[float]
+        kNN distance matrix aligned with ``indices``.
+
+    Returns
+    -------
+    csr_matrix
+        Density-normalized symmetric affinity matrix.
+    """
 
     nsample = indices.shape[0]
     K = indices.shape[1]
@@ -337,45 +398,44 @@ def neighbors(
 
     Parameters
     ----------
-
-    data: ``pegasusio.MultimodalData``
+    data : AnnData-like
         Annotated data matrix with rows for cells and columns for genes.
 
-    K: ``int``, optional, default: ``100``
+    K : int, optional
         Number of neighbors, including the data point itself.
 
-    rep: ``str``, optional, default: ``"pca"``
+    rep : str, optional
         Embedding representation used to calculate kNN. If ``None``, use ``data.X``; otherwise, keyword ``'X_' + rep`` must exist in ``data.obsm``.
 
-    n_comps: `int`, optional (default: None)
+    n_comps : int, optional
         Number of components to be used in the `rep`. If n_comps == None, use all components; otherwise, use the minimum of n_comps and rep's dimensions.
 
-    n_jobs: ``int``, optional, default: ``-1``
+    n_jobs : int, optional
         Number of threads to use. If ``-1``, use all physical CPU cores.
 
-    random_state: ``int``, optional, default: ``0``
+    random_state : int, optional
         Random seed set for reproducing results.
 
-    full_speed: ``bool``, optional, default: ``False``
+    full_speed : bool, optional
         * If ``True``, use multiple threads in constructing ``hnsw`` index. However, the kNN results are not reproducible.
         * Otherwise, use only one thread to make sure results are reproducible.
 
-    use_cache: ``bool``, optional, default: ``False``
+    use_cache : bool, optional
         * If ``True`` and found cached knn results, Pegasus will use cached results and do not recompute.
         * Otherwise, compute kNN irrespective of caching status.
 
-    dist: ``str``, optional (default: ``"l2"``)
+    dist : str, optional
         Distance metric to use. By default, use squared L2 distance. Available options, ``"l2"`` or inner product ``"ip"`` or cosine similarity ``"cosine"``.
 
-    method: ``str``, optional (default: ``"hnsw"``)
+    method : str, optional
         Choose from "hnsw" or "sklearn". "hnsw" uses HNSW algorithm for approximate nearest neighbor search and "sklearn" uses sklearn package for exact nearest neighbor search.
 
-    exact_k: ``bool``, optional (default: ``False``)
+    exact_k : bool, optional
         If True, use exactly the K passed to the function; otherwise K is determined as min(K, sqrt(X.shape[0])).
 
     Returns
     -------
-    ``None``
+    None
 
     Update ``data.obsm``:
         * ``data.obsm[rep + "_knn_indices"]``: kNN index matrix. Row i is the index list of kNN of cell i (excluding itself), sorted from nearest to farthest.
@@ -452,42 +512,42 @@ def calc_kBET(
 
     Parameters
     ----------
-    data: ``pegasusio.MultimodalData``
+    data : AnnData-like
         Annotated data matrix with rows for cells and columns for genes.
 
-    attr: ``str``
+    attr : str
         The sample attribute to consider. Must exist in ``data.obs``.
 
-    rep: ``str``, optional, default: ``"pca"``
+    rep : str, optional
         The embedding representation to be used. The key ``'X_' + rep`` must exist in ``data.obsm``. By default, use PCA coordinates.
 
-    K: ``int``, optional, default: ``25``
+    K : int, optional
         Number of nearest neighbors, using L2 metric.
 
-    alpha: ``float``, optional, default: ``0.05``
+    alpha : float, optional
         Acceptance rate threshold. A cell is accepted if its kBET p-value is greater than or equal to ``alpha``.
 
-    n_jobs: ``int``, optional, default: ``-1``
+    n_jobs : int, optional
         Number of threads used. If ``-1``, use all physical CPU cores.
 
-    random_state: ``int``, optional, default: ``0``
+    random_state : int, optional
         Random seed set for reproducing results.
 
-    temp_folder: ``str``, optional, default: ``None``
+    temp_folder : str, optional
         Temporary folder for joblib execution.
 
-    use_cache: ``bool``, optional, default: ``True``
+    use_cache : bool, optional
         If use cache results for kNN.
 
     Returns
     -------
-    stat_mean: ``float``
+    stat_mean : float
         Mean kBET chi-square statistic over all cells.
 
-    pvalue_mean: ``float``
+    pvalue_mean : float
         Mean kBET p-value over all cells.
 
-    accept_rate: ``float``
+    accept_rate : float
         kBET Acceptance rate of the sample.
 
     Examples
@@ -558,36 +618,36 @@ def calc_kSIM(
 
     Parameters
     ----------
-    data: ``pegasusio.MultimodalData``
+    data : AnnData-like
         Annotated data matrix with rows for cells and columns for genes.
 
-    attr: ``str``
+    attr : str
         The sample attribute to consider. Must exist in ``data.obs``.
 
-    rep: ``str``, optional, default: ``"pca"``
+    rep : str, optional
         The embedding representation to consider. The key ``'X_' + rep`` must exist in ``data.obsm``.
 
-    K: ``int``, optional, default: ``25``
+    K : int, optional
         The number of nearest neighbors to be considered.
 
-    min_rate: ``float``, optional, default: ``0.9``
+    min_rate : float, optional
         Acceptance rate threshold. A cell is accepted if its kSIM rate is larger than or equal to ``min_rate``.
 
-    n_jobs: ``int``, optional, default: ``-1``
+    n_jobs : int, optional
         Number of threads used. If ``-1``, use all physical CPU cores.
 
-    random_state: ``int``, optional, default: ``0``
+    random_state : int, optional
         Random seed set for reproducing results.
 
-    use_cache: ``bool``, optional, default: ``True``
+    use_cache : bool, optional
         If use cache results for kNN.
 
     Returns
     -------
-    kSIM_mean: ``float``
+    kSIM_mean : float
         Mean kSIM rate over all the cells.
 
-    kSIM_accept_rate: ``float``
+    kSIM_accept_rate : float
         kSIM Acceptance rate of the sample.
 
     Examples

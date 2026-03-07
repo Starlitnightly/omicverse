@@ -71,6 +71,7 @@ _LAZY_MODULES = {
     'pp',
     'space',
     'pl',
+    'utils',
     'datasets',
     'external',
     'llm',
@@ -207,11 +208,13 @@ def __getattr__(name):
                 _lazy_modules[name] = None
                 return None
 
-        # utils needs special handling
+        # utils needs special handling: cannot use `from . import utils` here
+        # because _handle_fromlist would call __getattr__('utils') again → recursion.
         elif name == 'utils':
-            from . import utils
-            _lazy_modules[name] = utils
-            return utils
+            import importlib as _il
+            module = _il.import_module('omicverse.utils')
+            _lazy_modules[name] = module
+            return module
 
         # Standard module import
         else:

@@ -26,6 +26,7 @@ class AgentRunResult:
     summary: str             = ""
     error:   Optional[str]   = None
     usage:   Optional[Any]   = None   # token usage object from the LLM
+    diagnostics: List[str]   = field(default_factory=list)
 
 
 class AgentBridge:
@@ -55,6 +56,7 @@ class AgentBridge:
     async def run(self, request: str, adata: Optional[Any]) -> AgentRunResult:
         result = AgentRunResult()
         seen: Set[str] = set()
+        diag_seen: Set[str] = set()
         self._run_started_at = time.time()
 
         async for event in self._agent.stream_async(request, adata):
@@ -79,8 +81,52 @@ class AgentBridge:
                 result.adata = content
                 result.figures.extend(self._harvest_figures(seen))
 
+            elif etype == "tool_call":
+                call = content if isinstance(content, dict) else {}
+                name = str(call.get("name") or "tool")
+                args = call.get("arguments")
+                arg_keys: List[str] = []
+                if isinstance(args, dict):
+                    arg_keys = [str(k) for k in args.keys()]
+                if arg_keys:
+                    await self._progress(f"工具: {name}({', '.join(arg_keys[:4])})")
+                else:
+                    await self._progress(f"工具: {name}(无参数)")
+                    self._push_diagnostic(result, diag_seen, f"{name} 调用时参数为空")
+
+            elif etype == "tool_result":
+                payload = content if isinstance(content, dict) else {}
+                name = str(payload.get("name") or "tool")
+                output = str(payload.get("output") or "")
+                if output:
+                    msg = self._tool_output_diagnostic(name, output)
+                    if msg:
+                        self._push_diagnostic(result, diag_seen, msg)
+
+            elif etype == "status":
+                info = content if isinstance(content, dict) else {}
+                if info.get("follow_up_exhausted"):
+                    self._push_diagnostic(
+                        result,
+                        diag_seen,
+                        "多轮尝试后仍未得到有效工具参数或可执行方案",
+                    )
+
             elif etype == "finish":
                 result.summary = str(content) if content else ""
+
+            elif etype == "done":
+                done_text = str(content or "").strip()
+                if done_text:
+                    result.summary = done_text
+                if event.get("max_turns"):
+                    self._push_diagnostic(
+                        result,
+                        diag_seen,
+                        "达到最大轮次，模型未给出可执行完成路径",
+                    )
+                if event.get("error") and done_text:
+                    result.error = done_text
 
             elif etype == "error":
                 result.error = str(content)
@@ -104,6 +150,28 @@ class AgentBridge:
                 await self._progress_cb(msg)
             except Exception:
                 pass
+
+    @staticmethod
+    def _push_diagnostic(result: AgentRunResult, seen: Set[str], message: str) -> None:
+        msg = (message or "").strip()
+        if not msg:
+            return
+        if msg in seen:
+            return
+        seen.add(msg)
+        result.diagnostics.append(msg)
+
+    @staticmethod
+    def _tool_output_diagnostic(tool_name: str, output: str) -> str:
+        text = (output or "").strip()
+        if not text:
+            return ""
+        first_line = text.splitlines()[0].strip()
+        if first_line.lower().startswith("error:"):
+            return f"{tool_name} 返回错误: {first_line[6:].strip() or '未知错误'}"
+        if first_line.lower().startswith("search error:"):
+            return f"{tool_name} 返回错误: {first_line}"
+        return ""
 
     @staticmethod
     def _extract_description(code: str) -> str:

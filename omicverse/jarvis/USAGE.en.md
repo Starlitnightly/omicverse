@@ -90,10 +90,26 @@ omicverse jarvis \
   --channel feishu \
   --feishu-app-id "$FEISHU_APP_ID" \
   --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY" \
   --feishu-host 0.0.0.0 \
   --feishu-port 8080 \
   --feishu-path /feishu/events
 ```
+
+Feishu long-connection channel (WebSocket event subscription):
+
+```bash
+omicverse jarvis \
+  --channel feishu \
+  --feishu-connection-mode websocket \
+  --feishu-app-id "$FEISHU_APP_ID" \
+  --feishu-app-secret "$FEISHU_APP_SECRET" \
+  --feishu-verification-token "$FEISHU_VERIFICATION_TOKEN" \
+  --feishu-encrypt-key "$FEISHU_ENCRYPT_KEY"
+```
+
+For `websocket` mode, configure Feishu event subscription as long connection in the developer console. `--feishu-host/--feishu-port/--feishu-path` are not used.
 
 Full example (all current CLI arguments):
 
@@ -115,7 +131,10 @@ Parameter reference:
 - `--channel`: backend channel (`telegram` or `feishu`, default: `telegram`)
 - `--feishu-app-id`: Feishu app id (or `FEISHU_APP_ID`)
 - `--feishu-app-secret`: Feishu app secret (or `FEISHU_APP_SECRET`)
-- `--feishu-host/--feishu-port/--feishu-path`: Feishu webhook listen settings
+- `--feishu-connection-mode`: `webhook` or `websocket` (default: `websocket`)
+- `--feishu-verification-token`: webhook verification token (or `FEISHU_VERIFICATION_TOKEN`)
+- `--feishu-encrypt-key`: webhook encrypt key for encrypted callbacks (or `FEISHU_ENCRYPT_KEY`)
+- `--feishu-host/--feishu-port/--feishu-path`: Feishu webhook listen settings (used in `webhook` mode)
 - `--model`: model name (default: `claude-sonnet-4-6`)
 - `--api-key`: LLM key (or `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`)
 - `--max-prompts`: max prompts per kernel session (`0` disables auto-restart; default: 0)

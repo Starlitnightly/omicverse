@@ -13,6 +13,7 @@ from anndata import AnnData
 import scanpy as sc
 
 from ..datasets import download_data
+from .._registry import register_function
 
 
 _PROMPT_DESCRIPTION_LIMIT = 400
@@ -82,6 +83,37 @@ class LLMTableSelector:
         max_prompt_rows: Optional[int] = None,
         extra_columns: Optional[List[str]] = None,
     ) -> None:
+        """
+        Initialize a reusable LLM-based table selector.
+
+        Parameters
+        ----------
+        table : pd.DataFrame
+            Candidate table to select from.
+        id_column : str
+            Unique identifier column used to map LLM selections back to rows.
+        description_column : str
+            Text column containing biological/context descriptions.
+        name_column : str or None
+            Optional display name column.
+        url_column : str or None
+            Optional URL column for returned entries.
+        table_label : str
+            Human-readable record type used in prompts (for example
+            ``'CellxGene collection'``).
+        json_root_key : str
+            Root key expected in LLM JSON response.
+        json_id_key : str or None
+            JSON field name that carries selected record IDs.
+        json_url_key : str or None
+            JSON field name that carries selected URLs.
+        json_reason_keys : list or None
+            Candidate JSON keys searched to extract explanation text.
+        max_prompt_rows : int or None
+            Maximum number of candidate rows included in one prompt.
+        extra_columns : list or None
+            Additional columns included in prompts/results.
+        """
         self.table = table.reset_index(drop=True).copy()
         self.id_column = id_column
         self.description_column = description_column
@@ -112,6 +144,37 @@ class LLMTableSelector:
         fallback_reason: str = 'Fallback to first entry (LLM unavailable or returned no results).',
         max_prompt_rows: Optional[int] = None,
     ) -> pd.DataFrame:
+        """
+        Run LLM-based candidate selection and return matched rows.
+
+        Parameters
+        ----------
+        query_text : str
+            Free-text dataset/task description used for matching.
+        system_prompt : str
+            System instruction controlling model behavior and output schema.
+        llm_model : str
+            Model name for the chosen provider.
+        llm_api_key : str
+            API key for provider authentication.
+        llm_provider : str
+            Provider identifier (for example ``'openai'`` or ``'ollama'``).
+        llm_base_url : str
+            Base URL for OpenAI-compatible providers.
+        llm_extra_params : dict or None
+            Additional provider-specific generation parameters.
+        client_factory : callable or None
+            Optional client factory returning ``(client, runtime_config)``.
+        fallback_reason : str
+            Reason text stored when fallback row selection is used.
+        max_prompt_rows : int or None
+            Per-call override of maximum prompt candidate rows.
+
+        Returns
+        -------
+        pd.DataFrame
+            Selected candidate rows with ``llm_reason`` column.
+        """
         if self.table.empty:
             print("⚠️ No entries available for LLM selection.")
             return pd.DataFrame(columns=self._result_columns())
@@ -229,9 +292,69 @@ class LLMTableSelector:
         return pd.DataFrame([entry], columns=self._result_columns())
 
 
+@register_function(
+    aliases=[
+        "单细胞自动注释",
+        "single cell automatic annotation",
+        "细胞类型自动注释",
+        "cell type automatic annotation",
+        "Annotation",
+        "annotation manager",
+        "reference annotation selector",
+        "celltypist annotation",
+        "scsa annotation",
+        "gpt4celltype annotation",
+    ],
+    category="single",
+    description="Single-cell annotation manager supporting CellTypist, SCSA, GPT-based marker annotation, and reference-mapping workflows.",
+    prerequisites={
+        'optional_functions': ['pp.preprocess', 'pp.neighbors', 'pp.leiden']
+    },
+    requires={
+        'var': ['gene identifiers'],
+        'obs': ['cluster labels (recommended)']
+    },
+    produces={
+        'obs': ['celltypist_prediction', 'scsa_prediction', 'gpt4celltype_prediction'],
+        'obsm': ['celltypist_decision_matrix', 'celltypist_probability_matrix']
+    },
+    auto_fix='escalate',
+    examples=[
+        "anno = ov.single.Annotation(adata)",
+        "anno.query_reference(source='celltypist', data_desc='human PBMC scRNA-seq')",
+        "anno.annotate(method='celltypist', cluster_key='leiden')"
+    ],
+    related=[
+        "single.AnnotationRef",
+        "single.pySCSA",
+        "single.get_celltype_marker",
+        "single.gptcelltype",
+    ]
+)
 class Annotation(object):
+    """
+    Unified single-cell annotation manager for cell-type labeling.
+    
+    Parameters
+    ----------
+    adata : AnnData
+        Query single-cell AnnData to annotate.
+    
+    Returns
+    -------
+    None
+        Initializes annotation manager state and reference caches.
+    """
 
     def __init__(self, adata: AnnData,):
+        """
+        Initialize annotation manager with a query AnnData object.
+
+        Parameters
+        ----------
+        adata : AnnData
+            Query dataset to annotate.
+        """
         self.adata = adata
 
         self.cellxgene_desc_df = None
@@ -254,6 +377,29 @@ class Annotation(object):
         cluster_key='leiden',
         **kwargs
     ):
+        """
+        Annotate cells or clusters using the selected annotation backend.
+
+        Parameters
+        ----------
+        method : {'celltypist', 'scsa', 'gpt4celltype', 'harmony', 'scVI', 'scanorama'}
+            Annotation backend.
+        cluster_key : str
+            Cluster label key used by marker-based methods (SCSA/GPT4CellType).
+        **kwargs
+            Additional backend-specific keyword arguments.
+
+        Returns
+        -------
+        object
+            Returns backend-specific results (for example a prediction table or updated AnnData).
+            Predictions are also written into ``self.adata.obs``/``.obsm``.
+
+        Examples
+        --------
+        >>> anno.annotate(method='celltypist')
+        >>> anno.annotate(method='gpt4celltype', cluster_key='leiden')
+        """
         if method=='celltypist':
             import celltypist
             predictions = celltypist.annotate(
@@ -328,17 +474,70 @@ class Annotation(object):
 
 
     def add_reference_sc(self, reference: AnnData, celltype_key: str = 'celltype'):
+        """
+        Register a single-cell reference atlas for transfer-based annotation.
+
+        Parameters
+        ----------
+        reference : AnnData
+            Reference dataset containing annotated cell types.
+        celltype_key : str
+            Column in ``reference.obs`` containing cell-type labels.
+
+        Returns
+        -------
+        None
+            Stores reference AnnData and label key on the object.
+
+        Examples
+        --------
+        >>> anno.add_reference_sc(adata_ref, celltype_key='celltype')
+        """
         self.adata_ref=reference
         self.celltype_key=celltype_key
 
 
     def add_reference_pkl(self, reference: str):
+        """
+        Register a CellTypist model file for supervised annotation.
+
+        Parameters
+        ----------
+        reference : str
+            Path to a CellTypist ``.pkl`` model.
+
+        Returns
+        -------
+        None
+            Loads and stores the model for ``method='celltypist'`` annotation.
+
+        Examples
+        --------
+        >>> anno.add_reference_pkl('Immune_All_Low.pkl')
+        """
         self.pkl_ref=reference
 
         from celltypist import models
         self.model = models.Model.load(model = self.pkl_ref)
 
     def add_reference_scsa_db(self, reference: str):
+        """
+        Register a local SCSA marker database file.
+
+        Parameters
+        ----------
+        reference : str
+            Path to SCSA SQLite database file.
+
+        Returns
+        -------
+        None
+            Stores database path for SCSA-based annotation.
+
+        Examples
+        --------
+        >>> anno.add_reference_scsa_db('temp/pySCSA_2023_v2_plus.db')
+        """
         self.scsa_db_path = reference
 
 
@@ -347,14 +546,20 @@ class Annotation(object):
 
         Tries Stanford repository first, falls back to Figshare if download fails.
 
-        Args:
-            save_path: Path to save the database file. Default: 'temp/pySCSA_2023_v2_plus.db'
+        Parameters
+        ----------
+        save_path : str
+            Path where the downloaded SCSA SQLite database will be saved.
 
-        Returns:
-            Path to the downloaded database file.
+        Returns
+        -------
+        str
+            Local path of downloaded database file.
 
-        Raises:
-            Exception: If download fails from all mirrors.
+        Raises
+        ------
+        Exception
+            If download fails from all configured mirrors.
         """
         # Define download mirrors (Stanford preferred, Figshare as fallback)
         mirrors = [
@@ -402,7 +607,23 @@ class Annotation(object):
         reference_name: str, 
         save_path: str,
         force_download: bool = False) -> str:
-        """Download a CellTypist model pickle file by name and return its path."""
+        """
+        Download a CellTypist model by model name and store it locally.
+
+        Parameters
+        ----------
+        reference_name : str
+            Model name (or filename) from CellTypist model registry.
+        save_path : str
+            Local output path of downloaded ``.pkl`` file.
+        force_download : bool
+            If ``True``, remove existing file and re-download.
+
+        Returns
+        -------
+        str
+            Absolute local path of downloaded model file.
+        """
 
         if not reference_name or not str(reference_name).strip():
             raise ValueError("Please provide a valid `reference_name` that matches the CellTypist model list.")
@@ -452,7 +673,7 @@ class Annotation(object):
     def query_reference(
         self,
         source='cellxgene',
-        data_desc:str=None,
+        data_desc: str = None,
         llm_model='gpt-4o-mini',
         llm_api_key='sk*',
         llm_provider='openai',
@@ -478,7 +699,7 @@ class Annotation(object):
         llm_base_url : str
             Base URL for OpenAI-compatible endpoints. Ignored for providers that do
             not use it.
-        llm_extra_params : dict
+        llm_extra_params : dict or None
             Additional parameters forwarded directly to the LLM API call.
 
         Returns
@@ -596,6 +817,27 @@ class Annotation(object):
         base_url: Optional[str],
         extra_params: Optional[Dict[str, Any]],
     ):
+        """
+        Build or reuse an LLM client based on current runtime configuration.
+
+        Parameters
+        ----------
+        provider : str
+            LLM provider identifier.
+        api_key : str or None
+            Provider API key.
+        model : str
+            Model name.
+        base_url : str or None
+            Optional OpenAI-compatible endpoint base URL.
+        extra_params : dict or None
+            Extra generation/runtime parameters.
+
+        Returns
+        -------
+        tuple
+            ``(client, runtime_config)`` for downstream LLM calls.
+        """
         provider = (provider or 'openai').lower()
         resolved_key = _resolve_api_key(provider, api_key)
 
@@ -629,6 +871,21 @@ class Annotation(object):
 
 
 def _resolve_api_key(provider: str, provided_key: Optional[str]) -> Optional[str]:
+    """
+    Resolve provider API key from explicit input or environment variables.
+
+    Parameters
+    ----------
+    provider : str
+        LLM provider identifier.
+    provided_key : str or None
+        User-provided API key candidate.
+
+    Returns
+    -------
+    str or None
+        Resolved API key, or ``None`` if unavailable.
+    """
     if provided_key:
         trimmed = provided_key.strip()
         if trimmed and not trimmed.endswith('*') and trimmed not in {'sk*', 'sk-***'}:
@@ -655,6 +912,27 @@ def _setup_llm_client(
     base_url: Optional[str],
     extra_params: Dict[str, Any],
 ):
+    """
+    Initialize provider-specific LLM client and runtime config.
+
+    Parameters
+    ----------
+    provider : str
+        LLM provider identifier.
+    api_key : str or None
+        Provider API key.
+    model : str
+        Model name.
+    base_url : str or None
+        Optional custom endpoint URL for OpenAI-compatible providers.
+    extra_params : dict
+        Additional generation/runtime parameters.
+
+    Returns
+    -------
+    tuple
+        ``(client, runtime_config)`` used by internal LLM call wrappers.
+    """
     provider = provider.lower()
     extra_params = extra_params or {}
     runtime_config = {
@@ -704,6 +982,25 @@ def _call_llm_for_collections(
     system_prompt: str,
     user_prompt: str,
 ) -> str:
+    """
+    Call configured LLM backend and return raw text response.
+
+    Parameters
+    ----------
+    client : Any
+        Provider client object or ``None`` for backends using raw HTTP calls.
+    config : dict
+        Runtime configuration dictionary from ``_setup_llm_client``.
+    system_prompt : str
+        System-level instruction text.
+    user_prompt : str
+        User prompt containing candidate table and JSON output schema.
+
+    Returns
+    -------
+    str
+        Raw model response text.
+    """
     provider = config.get('provider')
     model = config.get('model')
     extra_params = dict(config.get('extra_params') or {})
@@ -761,6 +1058,19 @@ def _call_llm_for_collections(
 
 
 def _strip_code_fence(text: str) -> str:
+    """
+    Remove surrounding Markdown code-fence wrappers from text.
+
+    Parameters
+    ----------
+    text : str
+        Raw model response text.
+
+    Returns
+    -------
+    str
+        Unfenced text content.
+    """
     match = re.match(r"^```[a-zA-Z0-9_-]*\n?(.*?)\n?```$", text.strip(), flags=re.DOTALL)
     if match:
         return match.group(1)
@@ -768,6 +1078,21 @@ def _strip_code_fence(text: str) -> str:
 
 
 def _parse_llm_collection_response(raw_text: Optional[str], root_key: str = 'collections') -> List[Dict[str, Any]]:
+    """
+    Parse LLM JSON response into a list of selection dictionaries.
+
+    Parameters
+    ----------
+    raw_text : str or None
+        Raw response text from LLM.
+    root_key : str
+        Expected top-level JSON key containing selection list.
+
+    Returns
+    -------
+    List[Dict[str, Any]]
+        Parsed selection items.
+    """
     if not raw_text:
         return []
 
@@ -810,6 +1135,37 @@ def _build_selection_dataframe(
     json_reason_keys: Optional[List[str]] = None,
     extra_columns: Optional[List[str]] = None,
 ) -> pd.DataFrame:
+    """
+    Build a DataFrame of selected rows from parsed LLM selections.
+
+    Parameters
+    ----------
+    candidates_df : pd.DataFrame
+        Candidate table used in prompting.
+    selections : list
+        Parsed selection dictionaries from LLM response.
+    id_column : str
+        Candidate ID column name.
+    name_column : str or None
+        Optional display-name column.
+    description_column : str or None
+        Optional description column.
+    url_column : str or None
+        Optional URL column.
+    json_id_key : str
+        Key used by selections to identify candidate IDs.
+    json_url_key : str or None
+        Optional key used by selections to provide URL values.
+    json_reason_keys : list or None
+        Candidate keys used to extract rationale text.
+    extra_columns : list or None
+        Additional columns retained in output.
+
+    Returns
+    -------
+    pd.DataFrame
+        Selection table with standardized output columns and ``llm_reason``.
+    """
     reason_keys = json_reason_keys or ['reason', 'explanation', 'note']
     extra_columns = [col for col in (extra_columns or []) if col]
     core_columns = [col for col in [id_column, url_column, name_column, description_column] if col]
@@ -855,6 +1211,21 @@ def _build_selection_dataframe(
 
 
 def _truncate_text(text: Optional[str], limit: int) -> str:
+    """
+    Truncate text to a maximum length with ellipsis.
+
+    Parameters
+    ----------
+    text : str or None
+        Input text.
+    limit : int
+        Maximum character length.
+
+    Returns
+    -------
+    str
+        Truncated text.
+    """
     if not text:
         return ''
     text = str(text).strip()
@@ -876,6 +1247,39 @@ def _build_table_prompt(
     table_label: str = 'entry',
     extra_columns: Optional[List[str]] = None,
 ) -> str:
+    """
+    Build structured table-selection prompt for LLM ranking.
+
+    Parameters
+    ----------
+    query_text : str
+        Free-text description of user dataset/task.
+    candidates_df : pd.DataFrame
+        Candidate table rows to include in prompt.
+    id_column : str
+        Candidate ID column.
+    description_column : str
+        Candidate description column.
+    name_column : str or None
+        Optional candidate display-name column.
+    url_column : str or None
+        Optional candidate URL column.
+    json_root_key : str
+        Expected output JSON root key.
+    json_id_key : str
+        Expected output JSON ID key.
+    json_url_key : str or None
+        Optional expected output JSON URL key.
+    table_label : str
+        Human-readable row type label.
+    extra_columns : list or None
+        Additional candidate columns rendered in prompt.
+
+    Returns
+    -------
+    str
+        Prompt text containing candidate records and strict JSON schema.
+    """
     extra_columns = [col for col in (extra_columns or []) if col not in {id_column, name_column, description_column, url_column}]
     lines = [
         f"We need to select the most relevant {table_label} records for the analysis.",
@@ -920,7 +1324,14 @@ def _build_table_prompt(
 
 # 方案3: 直接访问 API (如果可用)
 def _cellxgene_scrape_with_api():
-    """尝试直接访问 CellxGene API"""
+    """
+    Fetch CellxGene collection metadata directly from public API.
+
+    Returns
+    -------
+    pd.DataFrame or None
+        Collection metadata table when request succeeds, otherwise ``None``.
+    """
     api_url = "https://api.cellxgene.cziscience.com/curation/v1/collections"
 
     headers = {
@@ -951,6 +1362,14 @@ def _cellxgene_scrape_with_api():
 
 
 def _celltypist_models_description() -> pd.DataFrame:
+    """
+    Download and normalize CellTypist model registry metadata.
+
+    Returns
+    -------
+    pd.DataFrame
+        Standardized model table with ``model``, ``description`` and URL fields.
+    """
     response = requests.get(_CELLTYPIST_MODELS_URL, timeout=30)
     if response.status_code != 200:
         raise RuntimeError(
