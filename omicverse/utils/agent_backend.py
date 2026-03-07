@@ -47,6 +47,19 @@ T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
+def _request_timeout_seconds() -> float:
+    """Request timeout used for blocking SDK calls in agentic tool loops."""
+    raw = os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "").strip()
+    if raw:
+        try:
+            value = float(raw)
+            if value > 0:
+                return value
+        except ValueError:
+            pass
+    return 45.0
+
+
 # ---------------------------------------------------------------------------
 # Wire-API → method dispatch tables  (P0-1: replaces if/elif chains)
 # ---------------------------------------------------------------------------
@@ -500,6 +513,19 @@ class OmicVerseLLMBackend:
         )
         return result
 
+    def _wire_model_name(self) -> str:
+        """Return the model name suitable for the wire API.
+
+        Strips provider prefixes (``anthropic/``, ``gemini/``, etc.) that are
+        used internally for routing but not accepted by the upstream APIs.
+        """
+        model = self.config.model
+        for prefix in ("anthropic/", "gemini/", "deepseek/", "moonshot/",
+                       "grok/", "zhipu/", "qwen/"):
+            if model.startswith(prefix):
+                return model[len(prefix):]
+        return model
+
     def _chat_sync(
         self,
         messages: List[Dict[str, Any]],
@@ -512,6 +538,14 @@ class OmicVerseLLMBackend:
             raise RuntimeError(
                 f"Provider '{self.config.provider}' is not registered."
             )
+
+        # When a custom endpoint is provided, choose protocol based on model:
+        # - Claude models → Anthropic Messages API (handles tool_use/tool_result correctly)
+        # - Other models → OpenAI Chat Completions
+        if self.config.endpoint:
+            if "claude" in self.config.model.lower():
+                return self._chat_tools_anthropic(messages, tools, tool_choice)
+            return self._chat_tools_openai(messages, tools, tool_choice)
 
         wire = provider_info.wire_api
         if wire == WireAPI.CHAT_COMPLETIONS:
@@ -556,7 +590,8 @@ class OmicVerseLLMBackend:
 
         try:
             from openai import OpenAI  # type: ignore
-            client = OpenAI(base_url=base_url, api_key=api_key)
+            timeout_s = _request_timeout_seconds()
+            client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
 
             def _make_call():
                 # GPT-5 series requires max_completion_tokens instead of max_tokens
@@ -566,7 +601,7 @@ class OmicVerseLLMBackend:
                     token_param = {"max_tokens": self.config.max_tokens}
 
                 kwargs = {
-                    "model": self.config.model,
+                    "model": self._wire_model_name(),
                     "messages": messages,
                     "temperature": self.config.temperature,
                     **token_param,
@@ -575,7 +610,23 @@ class OmicVerseLLMBackend:
                     kwargs["tools"] = self._convert_tools_openai(tools)
                     kwargs["tool_choice"] = tool_choice or "auto"
 
+                logger.info(
+                    "openai_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+                    self.config.model,
+                    self.config.provider,
+                    base_url,
+                    kwargs.get("tool_choice", "none"),
+                    len(messages),
+                    len(tools or []),
+                    timeout_s,
+                )
                 resp = client.chat.completions.create(**kwargs)
+                logger.info(
+                    "openai_tool_chat_done model=%s finish_reason=%s choices=%d",
+                    self.config.model,
+                    getattr((resp.choices or [None])[0], "finish_reason", None),
+                    len(resp.choices or []),
+                )
                 choice = (resp.choices or [None])[0]
                 if not choice or not getattr(choice, "message", None):
                     raise RuntimeError("No choices returned from the model")
@@ -658,7 +709,26 @@ class OmicVerseLLMBackend:
 
         try:
             import anthropic  # type: ignore
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                # Proxy endpoints often use /v1 suffix for OpenAI compat.
+                # The Anthropic SDK prepends /v1/messages itself, so strip
+                # trailing /v1 to avoid /v1/v1/messages.
+                base = self.config.endpoint.rstrip("/")
+                if base.endswith("/v1"):
+                    base = base[:-3]
+                client_kwargs["base_url"] = base
+            timeout_s = _request_timeout_seconds()
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s
+            client = anthropic.Anthropic(**client_kwargs)
+            logger.info(
+                "anthropic_tool_chat_start model=%s timeout_s=%.1f messages=%d tools=%d",
+                self.config.model, timeout_s, len(messages), len(tools or []),
+            )
 
             # Separate system message from conversation messages
             system_text = self.config.system_prompt
@@ -669,9 +739,11 @@ class OmicVerseLLMBackend:
                 else:
                     conv_messages.append(m)
 
+            wire_model = self._wire_model_name()
+
             def _make_call():
                 kwargs = {
-                    "model": self.config.model,
+                    "model": wire_model,
                     "max_tokens": self.config.max_tokens,
                     "system": system_text,
                     "messages": conv_messages,
@@ -688,6 +760,10 @@ class OmicVerseLLMBackend:
                             pass  # Don't set tool_choice
 
                 resp = client.messages.create(**kwargs)
+                logger.info(
+                    "anthropic_tool_chat_done model=%s stop_reason=%s",
+                    self.config.model, getattr(resp, "stop_reason", None),
+                )
 
                 # Capture usage
                 usage_obj = None
@@ -982,7 +1058,14 @@ class OmicVerseLLMBackend:
                 "Please choose a supported model or register the provider first."
             )
 
-        method_name = _SYNC_DISPATCH.get(provider_info.wire_api)
+        # Custom endpoint: Claude → Anthropic protocol, others → OpenAI
+        if self.config.endpoint:
+            if "claude" in self.config.model.lower():
+                method_name = _SYNC_DISPATCH.get(WireAPI.ANTHROPIC_MESSAGES)
+            else:
+                method_name = _SYNC_DISPATCH.get(WireAPI.CHAT_COMPLETIONS)
+        else:
+            method_name = _SYNC_DISPATCH.get(provider_info.wire_api)
         if method_name is None:
             raise RuntimeError(
                 f"Provider '{self.config.provider}' (wire={provider_info.wire_api.value}) "
@@ -1664,12 +1747,26 @@ class OmicVerseLLMBackend:
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                base = self.config.endpoint.rstrip("/")
+                if base.endswith("/v1"):
+                    base = base[:-3]
+                client_kwargs["base_url"] = base
+            timeout_s = _request_timeout_seconds()
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s
+            client = anthropic.Anthropic(**client_kwargs)
+
+            wire_model = self._wire_model_name()
 
             # Wrap Anthropic SDK call with retry logic
             def _make_anthropic_call():
                 resp = client.messages.create(
-                    model=self.config.model,
+                    model=wire_model,
                     max_tokens=self.config.max_tokens,
                     system=self.config.system_prompt,
                     messages=[
@@ -2109,13 +2206,23 @@ class OmicVerseLLMBackend:
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                client_kwargs["base_url"] = self.config.endpoint
+            timeout_s = _request_timeout_seconds()
+            try:
+                import httpx  # type: ignore
+                client_kwargs["timeout"] = httpx.Timeout(timeout_s * 3, connect=10.0)  # streaming gets more time
+            except ImportError:
+                client_kwargs["timeout"] = timeout_s * 3
+            client = anthropic.Anthropic(**client_kwargs)
+            wire_model = self._wire_model_name()
 
             # Generator function for streaming with retry on session creation
             def _stream_sdk():
                 def _create_stream():
                     return client.messages.stream(
-                        model=self.config.model,
+                        model=wire_model,
                         max_tokens=self.config.max_tokens,
                         system=self.config.system_prompt,
                         messages=[
