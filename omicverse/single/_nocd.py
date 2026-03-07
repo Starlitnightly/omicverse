@@ -151,10 +151,14 @@ class scnocd(object):
         """
         Saves the trained GNN model and necessary metadata.
 
-        Arguments:
+        Parameters
+        ----------
             gnn_save_dir: the directory to save the trained GNN model. Default is 'save_model'.
             gnn_save_name: the name of the saved GNN model. Default is 'gnn'.
 
+        Returns
+        -------
+        None
         """
         path_save = os.path.join(gnn_save_dir, f"{gnn_save_name}.pth")
         if not os.path.exists(gnn_save_dir):
@@ -184,9 +188,13 @@ class scnocd(object):
         """
         Loads the trained GNN model and restores necessary metadata.
 
-        Arguments:
+        Parameters
+        ----------
             gnn_load_dir: the directory to load the trained GNN model.
 
+        Returns
+        -------
+        None
         """
         print(f'loading model from {gnn_load_dir}')
         

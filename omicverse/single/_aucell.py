@@ -34,11 +34,13 @@ def create_rankings(ex_mtx: pd.DataFrame, seed=None) -> pd.DataFrame:
     This function ranks genes for each cell based on expression levels,
     creating rankings suitable for AUCell gene set enrichment analysis.
 
-    Arguments:
+    Parameters
+    ----------
         ex_mtx: Expression matrix with cells as rows and genes as columns (n_cells x n_genes)
         seed (int): Random seed for reproducible ranking (default: None)
     
-    Returns:
+    Returns
+    -------
         pd.DataFrame: Gene rankings matrix with same dimensions as input (n_cells x n_genes)
 
     """
@@ -105,11 +107,13 @@ def derive_auc_threshold(ex_mtx: csr_matrix, AUC_threshold: float = None) -> pd.
     It is important to check that most cells have a substantial fraction of expressed/detected genes in the calculation of
     the AUC.
     
-    Arguments:
+    Parameters
+    ----------
         ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).
         AUC_threshold: Specific AUC threshold to include in the quantile calculation. If None, returns default quantiles.
     
-    Returns:
+    Returns
+    -------
         A dataframe with AUC threshold for different quantiles over the number cells: a fraction of 0.01 designates that when using this value as the AUC threshold for 99% of the cells all ranked genes used for AUC calculation will have had a detected expression in the single-cell experiment.
 
     """
@@ -174,7 +178,8 @@ def aucell4r(
     """
     Calculate enrichment of gene signatures for single cells.
 
-    Arguments:
+    Parameters
+    ----------
         df_rnk: The rank matrix (n_cells x n_genes).
         signatures: The gene signatures or regulons.
         auc_threshold: The fraction of the ranked genome to take into account for the calculation of the Area Under the recovery Curve.
@@ -183,7 +188,8 @@ def aucell4r(
         num_workers: The number of cores to use.
         gene_overlap_threshold: Minimum fraction of genes that must be present (default: 0.80 = 80%).
 
-    Returns:
+    Returns
+    -------
         A dataframe with the AUCs (n_cells x n_modules).
 
     """
@@ -306,7 +312,8 @@ def aucell(
     AUCell quantifies gene set enrichment by calculating the Area Under the Curve (AUC)
     of gene rankings for each cell, providing a robust measure of pathway activity.
 
-    Arguments:
+    Parameters
+    ----------
         exp_mtx: Expression matrix (n_cells x n_genes) - DataFrame or sparse matrix
         signatures: Gene signatures or regulons for enrichment analysis
         auc_threshold (float): Fraction of ranked genes to consider for AUC calculation (default: 0.05)
@@ -318,7 +325,8 @@ def aucell(
         columns: Custom column names for output DataFrame (default: None)
         gene_overlap_threshold (float): Minimum fraction of genes that must be present (default: 0.80 = 80%)
 
-    Returns:
+    Returns
+    -------
         pd.DataFrame: AUC enrichment scores with cells as rows and signatures as columns
 
     """

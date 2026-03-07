@@ -17,22 +17,30 @@ def odds_ratio(
     confidence_level: float = 0.95,
     correction_method: str = 'bonferroni'
 ) -> pd.DataFrame:
-    """
-    Calculate odds ratios for each cell type comparing different sample groups.
-    
-    This function performs pairwise comparisons between sample groups for each cell type,
-    calculating odds ratios and confidence intervals using Fisher's exact test.
-    
-    Arguments:
-        adata: AnnData object containing cell type and sample information.
-        sample_key: Key for sample/group information in adata.obs.
-        cell_type_key: Key for cell type information in adata.obs.
-        reference_group: Reference group for comparison. If None, uses the first group alphabetically.
-        confidence_level: Confidence level for intervals (default: 0.95).
-        correction_method: Multiple testing correction method ('bonferroni', 'fdr_bh', or 'none').
-    
-    Returns:
-        DataFrame containing odds ratios, confidence intervals, and p-values for each comparison.
+    """Compute cell-type enrichment odds ratios between sample groups.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input object with sample and cell-type annotations in ``adata.obs``.
+    sample_key : str
+        Column name in ``adata.obs`` defining biological groups/conditions.
+    cell_type_key : str
+        Column name in ``adata.obs`` containing cell-type labels.
+    reference_group : str or None, default=None
+        Baseline group used in pairwise comparisons. If ``None``, uses the
+        alphabetically first group.
+    confidence_level : float, default=0.95
+        Confidence level for odds-ratio interval estimation.
+    correction_method : str, default='bonferroni'
+        Multiple-testing correction method: ``'bonferroni'``, ``'fdr_bh'``,
+        or ``'none'``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format table containing odds ratios, confidence intervals,
+        p-values, and adjusted p-values.
     
     Examples:
         >>> import omicverse as ov
@@ -174,17 +182,29 @@ def plot_odds_ratio_heatmap(
     cmap: str = 'RdBu_r',
     save_path: Optional[str] = None
 ) -> None:
-    """
-    Plot heatmap of odds ratios for cell types across sample groups.
-    
-    Arguments:
-        adata: AnnData object with odds ratio results stored in .uns.
-        figsize: Figure size as (width, height).
-        log_scale: Whether to plot log2-transformed odds ratios.
-        show_ci: Whether to annotate confidence intervals.
-        significance_threshold: P-value threshold for significance marking.
-        cmap: Colormap for the heatmap.
-        save_path: Path to save the figure.
+    """Plot a heatmap of odds ratios across groups and cell types.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Object containing ``odds_ratio_results`` in ``adata.uns``.
+    figsize : Tuple[int, int], default=(10, 8)
+        Figure size in inches.
+    log_scale : bool, default=True
+        Whether to display ``log2(odds_ratio)`` values.
+    show_ci : bool, default=False
+        Whether to annotate confidence intervals in each heatmap cell.
+    significance_threshold : float, default=0.05
+        Adjusted p-value threshold used for significance marks.
+    cmap : str, default='RdBu_r'
+        Colormap name.
+    save_path : str or None, default=None
+        Optional path for saving the generated figure.
+
+    Returns
+    -------
+    None
+        Displays and optionally saves the figure.
     """
     
     if 'odds_ratio_results' not in adata.uns:

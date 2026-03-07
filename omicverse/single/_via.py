@@ -36,8 +36,8 @@ from .._registry import register_function
 )
 def hematopoiesis()->anndata.AnnData:
     r"""Load scRNA-seq hematopoiesis dataset for trajectory inference.
-    
-    Returns:
+        Returns
+        -------
         AnnData: Preprocessed hematopoiesis dataset with embeddings and annotations.
     
     Examples:
@@ -110,74 +110,126 @@ class pyVIA(object):
                  time_series_labels:list=None, knn_sequential:int = 10, knn_sequential_reverse:int = 0,t_diff_step:int = 1,single_cell_transition_matrix = None,
                  embedding_type:str='via-mds',do_compute_embedding:bool=False, color_dict:dict=None,user_defined_terminal_cell:list=[], user_defined_terminal_group:list=[],
                  do_gaussian_kernel_edgeweights:bool=False,RW2_mode:bool=False,working_dir_fp:str ='/home/shobi/Trajectory/Datasets/') -> None:
-        r"""Initialize a pyVIA object for trajectory inference.
+        r"""Initialize a pyVIA trajectory inference model.
 
-        Arguments:
-            adata: An AnnData object containing the single-cell RNA-seq data
-            adata_key (str): The key of the AnnData in obsm to perform VIA on (default: 'X_pca')
-            adata_ncomps (int): The number of components to use from the AnnData in obsm (default: 80)
-            basis (str): The key of the AnnData in obsm to use as the basis for embedding (default: 'X_umap')
-            clusters (str): The clusters to use for the VIA analysis (default: '')
-            dist_std_local: local level of pruning for PARC graph clustering stage. Range (0.1,3) higher numbers mean more edge retention
-            jac_std_global: (optional, default = 0.15, can also set as 'median') global level graph pruning for PARC clustering stage. Number of standard deviations below the network’s mean-jaccard-weighted edges. 0.1-1 provide reasonable pruning.higher value means less pruning (more edges retained). e.g. a value of 0.15 means all edges that are above mean(edgeweight)-0.15*std(edge-weights) are retained. We find both 0.15 and ‘median’ to yield good results/starting point and resulting in pruning away ~ 50-60% edges
-            labels: default is None. and PARC clusters are used for the viagraph. alternatively provide a list of clustermemberships that are integer values (not strings) to construct the viagraph using another clustering method or available annotations
-            keep_all_local_dist: default value of 'auto' means that for smaller datasets local-pruning is done prior to clustering, but for large datasets local pruning is set to False for speed.
-            
-            too_big_factor: (optional, default=0.4). Forces clusters > 0.4*n_cells to be re-clustered
-            resolution_parameter: (float) the resolution parameter for the Louvain algorithm.
-            partition_type: (str, default: "ModularityVP") the partitioning algorithm to use.
-            small_pop: (int, default: 10) the number of cells to be considered in a small population.
-            jac_weighted_edges: (bool, default: True) whether to use weighted edges in the PARC clustering step.
-            knn: (int, optional, default: 30) the number of K-Nearest Neighbors for HNSWlib KNN graph. Larger knn means more graph connectivity. Lower knn means more loosely connected clusters/cells.
-            n_iter_leiden: (int) the number of iterations for the Leiden algorithm.
-            random_seed: (int) the random seed to pass to the clustering algorithm.
-            num_threads: (int) the number of threads to use for the clustering algorithm.
-            distance: (str, default: 'l2') the distance metric to use for graph construction and similarity. Options are 'l2', 'ip', and 'cosine'.
-            visual_cluster_graph_pruning: (float, default: 0.15) the pruning level for the cluster graph. This only comes into play if the user deliberately chooses not to use the default edge-bundling method of visualizating edges (draw_piechart_graph()) and instead calls draw_piechart_graph_nobundle(). It controls the number of edges plotted for visual effect. This does not impact computation of terminal states, pseudotime, or lineage likelihoods.
-            cluster_graph_pruning_std: (float, default: 0.15) the pruning level of the cluster graph. Often set to the same value as the PARC clustering level of jac_std_global. Reasonable range is [0.1, 1]. To retain more connectivity in the clustergraph underlying the trajectory computations, increase the value.
-            time_smallpop: (max time to be allowed handling singletons) the maximum time allowed to handle singletons.
-            super_cluster_labels:
-            super_node_degree_list:
-            super_terminal_cells:
-            x_lazy: (float, default: 0.95) 1-x = probability of staying in the same node (lazy). Values between 0.9-0.99 are reasonable.
-            alpha_teleport: (float, default: 0.99) 1-alpha is probability of jumping. Values between 0.95-0.99 are reasonable unless prior knowledge of teleportation.
-            root_user: (list, None) the root user list. Can be a list of strings, a list of int, or None. The default is None. When the root_user is set as None and an RNA velocity matrix is available, a root will be automatically computed. If the root_user is None and no velocity matrix is provided, then an arbitrary root is selected. If the root_user is ['celltype_earlystage'] where the str corresponds to an item in true_label, then a suitable starting point will be selected corresponding to this group.
-            preserve_disconnected: bool (default = True) If you believe there may be disconnected trajectories then set this to False
-            dataset: str Can be set to 'group' or '' (default). this refers to the type of root label (group level root or single cell index) you are going to provide. if your true_label has a sensible group of cells for a root then you can set dataset to 'group' and make the root parameter ['labelname_root_cell_type'] if your root corresponds to one particular cell then set dataset = '' (default)
-            embedding: ndarray (optional, default = None) embedding (e.g. precomputed tsne, umap, phate, via-umap) for plotting data. Size n_cells x 2 If an embedding is provided when running VIA, then a scatterplot colored by pseudotime, highlighting terminal fates
-            velo_weight: float (optional, default = 0.5) #float between [0,1]. the weight assigned to directionality and connectivity derived from scRNA-velocity
-            neighboring_terminal_states_threshold:int (default = 3). Candidates for terminal states that are neighbors of each other may be removed from the list if they have this number of more of terminal states as neighbors
-            knn_sequential:int (default =10) number of knn in the adjacent time-point for time-series data (t_i and t_i+1)
-            knn_sequential_reverse: int (default = 0) number of knn enforced from current to previous time point
-            t_diff_step: int (default =1) Number of permitted temporal intervals between connected nodes. If time data is labeled as [0,25,50,75,100,..] then t_diff_step=1 corresponds to '25' and only edges within t_diff_steps are retained
-            is_coarse:bool (default = True) If running VIA in two iterations where you wish to link the second fine-grained iteration with the initial iteration, then you set to False
-            via_coarse: VIA (default = None) If instantiating a second iteration of VIA that needs to be linked to a previous iteration (e.g. via0), then set via_coarse to the previous via0 object
-            df_annot: DataFrame (default None) used for the Mouse Organ data
-            preserve_disconnected_after_pruning:bool (default = True) If you believe there are disconnected trajectories then set this to False and test your hypothesis
-            A_velo: ndarray Cluster Graph Transition matrix based on rna velocity [n_clus x n_clus]
-            velocity_matrix: matrix (default None) matrix of size [n_samples x n_genes]. this is the velocity matrix computed by scVelo (or similar package) and stored in adata.layers['velocity']. The genes used for computing velocity should correspond to those useing in gene_matrix Requires gene_matrix to be provided too.
-            gene_matrix: matrix (default None) Only used if Velocity_matrix is available. matrix of size [n_samples x n_genes]. We recommend using a subset like HVGs rather than full set of genes. (need to densify input if taking from adata = adata.X.todense())
-            time_series: if the data has time-series labels then set to True
-            time_series_labels:list (default None) list of integer values of temporal annotations corresponding to e.g. hours (post fert), days, or sequential ordering
-            pca_loadings: array (default None) the loadings of the pcs used to project the cells (to projected euclidean location based on velocity). n_cells x n_pcs
-            secondary_annotations: None (default None)
-            edgebundle_pruning:float (default=None) will by default be set to the same as the cluster_graph_pruning_std and influences the visualized level of pruning of edges. Typical values can be between [0,1] with higher numbers retaining more edges
-            edgebundle_pruning_twice:bool default: False. When True, the edgebundling is applied to a further visually pruned (visual_cluster_graph_pruning) and can sometimes simplify the visualization. it does not impact the pseudotime and lineage computations
-            piegraph_arrow_head_width: float (default = 0.1) size of arrow heads in via cluster graph
-            piegraph_edgeweight_scalingfactor: (defaulf = 1.5) scaling factor for edge thickness in via cluster graph
-            max_visual_outgoing_edges: int (default =2) Rarely comes into play. Only used if the user later chooses to plot the via-graph without edgebunding using draw_piechart_graph_nobundle() Only allows max_visual_outgoing_edges to come out of any given node.
-            edgebundle_pruning:float (default=None) will by default be set to the same as the cluster_graph_pruning_std and influences the visualized level of pruning of edges. Typical values can be between [0,1] with higher numbers retaining more edges
-            edgebundle_pruning_twice:bool default: False. When True, the edgebundling is applied to a further visually pruned (visual_cluster_graph_pruning) and can sometimes simplify the visualization. it does not impact the pseudotime and lineage computations
-            pseudotime_threshold_TS: int (default = 30) corresponds to the criteria for a state to be considered a candidate terminal cell fate to be 30% or later of the computed pseudotime range
-            num_mcmc_simulations:int (default = 1300) number of random walk simulations conducted
-            embedding_type: str (default = 'via-mds', other options are 'via-umap' and 'via-force'
-            do_compute_embedding: bool (default = False) If you want an embedding (n_samples x2) to be computed on the basis of the via sc graph then set this to True
-            do_gaussian_kernel_edgeweights: bool (default = False) Type of edgeweighting on the graph edges
-
-        
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input single-cell AnnData.
+        adata_key : str, default='X_pca'
+            Embedding key in ``adata.obsm`` used to build the VIA graph.
+        adata_ncomps : int, default=80
+            Number of embedding dimensions used from ``adata_key``.
+        basis : str, default='X_umap'
+            Embedding key used for downstream visualization.
+        clusters : str, default=''
+            Obs column containing initial cluster labels.
+        dist_std_local : float, default=2
+            Local graph-pruning level for PARC.
+        jac_std_global : float or str, default=0.15
+            Global graph-pruning level for PARC.
+        labels : numpy.ndarray or None, default=None
+            Optional external cluster labels.
+        keep_all_local_dist : str or bool, default='auto'
+            Whether to keep all local distances before pruning.
+        too_big_factor : float, default=0.4
+            Re-cluster clusters larger than this cell-fraction threshold.
+        resolution_parameter : float, default=1.0
+            Resolution parameter used by partitioning.
+        partition_type : str, default='ModularityVP'
+            PARC partition type.
+        small_pop : int, default=10
+            Minimum cluster size threshold.
+        jac_weighted_edges : bool, default=True
+            Whether to use Jaccard-weighted edges.
+        knn : int, default=30
+            K-nearest neighbors for graph construction.
+        n_iter_leiden : int, default=5
+            Number of Leiden iterations.
+        random_seed : int, default=42
+            Random seed.
+        num_threads : int, default=-1
+            Number of worker threads.
+        distance : str, default='l2'
+            Distance metric used in KNN search.
+        time_smallpop : int, default=15
+            Time budget for handling very small populations.
+        x_lazy : float, default=0.95
+            Lazy random-walk parameter.
+        alpha_teleport : float, default=0.99
+            Teleportation parameter.
+        root_user : list or None, default=None
+            Optional user-defined root cells/groups.
+        preserve_disconnected : bool, default=True
+            Keep disconnected components during trajectory construction.
+        dataset : str, default=''
+            Root specification mode.
+        secondary_annotations : list or None, default=None
+            Additional annotation tracks.
+        pseudotime_threshold_TS : int, default=30
+            Terminal-state pseudotime threshold.
+        cluster_graph_pruning_std : float, default=0.15
+            Pruning level for cluster graph.
+        visual_cluster_graph_pruning : float, default=0.15
+            Extra pruning used in non-bundled graph visualization.
+        neighboring_terminal_states_threshold : int, default=3
+            De-duplication threshold for neighboring terminal states.
+        num_mcmc_simulations : int, default=1300
+            Number of random-walk simulations.
+        piegraph_arrow_head_width : float, default=0.1
+            Arrow-head width in pie-graph plots.
+        piegraph_edgeweight_scalingfactor : float, default=1.5
+            Edge-width scaling in pie-graph plots.
+        max_visual_outgoing_edges : int, default=2
+            Maximum outgoing edges per node in unbundled visualization.
+        via_coarse : object or None, default=None
+            Optional coarse VIA model in two-stage analyses.
+        velocity_matrix : numpy.ndarray or None, default=None
+            Cell-by-gene RNA velocity matrix.
+        gene_matrix : numpy.ndarray or None, default=None
+            Cell-by-gene expression matrix matched to ``velocity_matrix``.
+        velo_weight : float, default=0.5
+            Weight for velocity-derived transition direction.
+        edgebundle_pruning : float or None, default=None
+            Edge-bundle pruning level.
+        A_velo : numpy.ndarray or None, default=None
+            Cluster-level velocity transition matrix.
+        CSM : Any, default=None
+            Optional transition similarity matrix.
+        edgebundle_pruning_twice : bool, default=False
+            Whether to apply secondary pruning before edge bundling.
+        pca_loadings : numpy.ndarray or None, default=None
+            PCA loadings for velocity projection.
+        time_series : bool, default=False
+            Whether data is time-series.
+        time_series_labels : list or None, default=None
+            Temporal labels per cell.
+        knn_sequential : int, default=10
+            Sequential KNN edges from time ``t`` to ``t+1``.
+        knn_sequential_reverse : int, default=0
+            Reverse sequential KNN edges.
+        t_diff_step : int, default=1
+            Maximum allowed temporal jump in sequential KNN.
+        single_cell_transition_matrix : Any, default=None
+            Optional precomputed single-cell transition matrix.
+        embedding_type : str, default='via-mds'
+            VIA embedding algorithm.
+        do_compute_embedding : bool, default=False
+            Whether to compute VIA embedding during initialization.
+        color_dict : dict or None, default=None
+            Optional annotation color mapping.
+        user_defined_terminal_cell : list, default=[]
+            User-defined terminal cells.
+        user_defined_terminal_group : list, default=[]
+            User-defined terminal groups.
+        do_gaussian_kernel_edgeweights : bool, default=False
+            Use Gaussian-kernel edge weighting.
+        RW2_mode : bool, default=False
+            Advanced random-walk mode switch.
+        working_dir_fp : str, default='/home/shobi/Trajectory/Datasets/'
+            Working directory for VIA internals.
         """
-
-
+        
         self.adata = adata
         #self.adata_key = adata_key
         data = adata.obsm[adata_key][:, 0:adata_ncomps]
@@ -223,12 +275,18 @@ class pyVIA(object):
     def get_piechart_dict(self,label:int=0,clusters:str='')->dict:
         r"""Get cluster composition dictionary for pie chart visualization.
 
-        Arguments:
-            label (int): Cluster label of pie chart (default: 0)
-            clusters (str): The celltype column name of interest (default: '')
-        
-        Returns:
-            dict: Cluster composition dictionary for visualization
+        Parameters
+        ----------
+        label : int, default=0
+            VIA cluster label to summarize.
+        clusters : str, default=''
+            Obs column used for category counts. If empty, uses
+            ``self.clusters``.
+
+        Returns
+        -------
+        dict
+            Category-to-count mapping for cells in the selected VIA cluster.
         """
         if clusters=='':
             clusters=self.clusters
@@ -240,10 +298,15 @@ class pyVIA(object):
     def get_pseudotime(self,adata=None):
         r"""Extract the pseudotime values computed by VIA.
 
-        Arguments:
-            adata: An AnnData object to add pseudotime to (default: None)
-                  If None, pseudotime will be added to self.adata.obs['pt_via']
+        Parameters
+        ----------
+        adata : anndata.AnnData or None, default=None
+            Optional output object for storing pseudotime in ``obs['pt_via']``.
+            If ``None``, writes to ``self.adata``.
 
+        Returns
+        -------
+        None
         """
 
         print('...the pseudotime of VIA added to AnnData obs named `pt_via`')
@@ -262,27 +325,46 @@ class pyVIA(object):
                                                                                                           matplotlib.axes._axes.Axes,
                                                                                                           matplotlib.axes._axes.Axes]:
         r"""Plot two subplots with clustergraph representation showing cluster composition and pseudotime/gene expression.
-    
-        Arguments:
-            clusters (str): Column name of the adata.obs dataframe containing cluster labels (default: '')
-            type_data (str): Type of data for coloring nodes - 'pt' for pseudotime or 'gene' (default: 'pt')
-            gene_exp (list): List of values for gene expression to color nodes at cluster level (default: [])
-            title (str): Title for the plot (default: '')
-            cmap (str): Colormap - automatically chooses coolwarm for gene or viridis_r for pseudotime (default: None)
-            ax_text (bool): Whether to annotate nodes with cluster number and population (default: True)
-            figsize (tuple): Figure size (default: (8,4))
-            dpi (int): DPI for the figure (default: 150)
-            headwidth_arrow (float): Width of arrowhead for directed edges (default: 0.1)
-            alpha_edge (float): Transparency of edges (default: 0.4)
-            linewidth_edge (float): Width of edges (default: 2)
-            edge_color (str): Color of edges (default: 'darkblue')
-            reference: List of categorical labels for cluster composition (default: None)
-            show_legend (bool): Whether to show legend (default: True)
-            pie_size_scale (float): Scaling factor of the piechart nodes (default: 0.8)
-            fontsize (float): Font size of text in piecharts (default: 8)
 
-        Returns:
-            tuple: (fig, ax, ax1) where fig is matplotlib figure, ax is left axis with cluster composition, ax1 is right axis with pseudotime/gene expression
+        Parameters
+        ----------
+        clusters : str, default=''
+            Obs column containing cluster/cell-type labels for pie slices.
+        type_data : str, default='pt'
+            Node color mode (for example ``'pt'`` or ``'gene'``).
+        gene_exp : list, default=[]
+            Cluster-level expression values used in gene mode.
+        title : str, default=''
+            Figure title.
+        cmap : str or None, default=None
+            Colormap.
+        ax_text : bool, default=True
+            Whether to draw node text labels.
+        figsize : tuple, default=(8, 4)
+            Figure size in inches.
+        dpi : int, default=150
+            Figure DPI.
+        headwidth_arrow : float, default=0.1
+            Arrow head width.
+        alpha_edge : float, default=0.4
+            Edge transparency.
+        linewidth_edge : float, default=2
+            Edge line width.
+        edge_color : str, default='darkblue'
+            Edge color.
+        reference : list or None, default=None
+            Optional category order for composition legend.
+        show_legend : bool, default=True
+            Whether to draw legend.
+        pie_size_scale : float, default=0.8
+            Pie-node size scale factor.
+        fontsize : float, default=8
+            Text font size.
+
+        Returns
+        -------
+        tuple
+            ``(fig, ax_left, ax_right)``.
         """
 
 
@@ -309,41 +391,71 @@ class pyVIA(object):
                    dpi=80 , title='Streamplot', b_bias=20, n_neighbors_velocity_grid=None,
                    other_labels:list = None,use_sequentially_augmented:bool=False, cmap_str:str='rainbow')->Tuple[matplotlib.figure.Figure,
                                                                                                           matplotlib.axes._axes.Axes]:
-        """Construct vector streamplot on the embedding to show a fine-grained view of inferred directions in the trajectory
+        """Plot streamlines of inferred cell-state flow on embedding.
 
-        Arguments:
-            clusters : column name of the adata.obs dataframe that contains the cluster labels
-            basis : str, default = 'X_umap', which to use for the embedding
-            density_grid : float, default = 0.5, density of the grid on which to project the directionality of cells
-            arrow_size : float, default = 0.7, size of the arrows in the streamplot
-            arrow_color : str, default = 'k', color of the arrows in the streamplot
-            arrow_style : str, default = "-|>", style of the arrows in the streamplot
-            max_length : int, default = 4, maximum length of the arrows in the streamplot
-            linewidth : float, default = 1, width of  lines in streamplot
-            min_mass : float, default = 1, minimum mass of the arrows in the streamplot
-            cutoff_perc : int, default = 5, cutoff percentage of the arrows in the streamplot
-            scatter_size : int, default = 500, size of scatter points
-            scatter_alpha : float, default = 0.5, transpsarency of scatter points
-            marker_edgewidth : float, default = 0.1, width of outline arround each scatter point
-            density_stream : int, default = 2, density of the streamplot
-            smooth_transition : int, default = 1, smoothness of the transition between the streamplot and the scatter points
-            smooth_grid : float, default = 0.5, smoothness of the grid on which to project the directionality of cells
-            color_scheme : str, default = 'annotation' corresponds to self.true_labels. Other options are 'time' (uses single-cell pseudotime) or 'clusters' (uses self.clusters)
-            add_outline_clusters : bool, default = False, whether to add an outline to the clusters
-            cluster_outline_edgewidth : float, default = 0.001, width of the outline around the clusters
-            gp_color : str, default = 'white', color of the grid points
-            bg_color : str, default = 'black', color of the background
-            dpi : int, default = 80, dpi of the figure
-            title : str, default = 'Streamplot', title of the figure
-            b_bias : int, default = 20, higher value makes the forward bias of pseudotime stronger
-            n_neighbors_velocity_grid : int, default = None, number of neighbors to use for the velocity grid
-            other_labels : list, default = None, list of other labels to plot in the streamplot
-            use_sequentially_augmented : bool, default = False, whether to use the sequentially augmented data
-            cmap_str : str, default = 'rainbow', color map to use for the streamplot
+        Parameters
+        ----------
+        clusters : str, default=''
+            Obs column containing cluster labels.
+        basis : str, default=''
+            Embedding key in ``adata.obsm``.
+        density_grid : float, default=0.5
+            Grid density for velocity interpolation.
+        arrow_size : float, default=0.7
+            Streamline arrow size.
+        arrow_color : str, default='k'
+            Arrow color.
+        arrow_style : str, default='-|>'
+            Arrow style.
+        max_length : int, default=4
+            Maximum streamline length.
+        linewidth : float, default=1
+            Streamline width.
+        min_mass : float, default=1
+            Minimum local flow mass.
+        cutoff_perc : int, default=5
+            Percentile cutoff for weak vectors.
+        scatter_size : int, default=500
+            Cell marker size.
+        scatter_alpha : float, default=0.5
+            Cell marker transparency.
+        marker_edgewidth : float, default=0.1
+            Cell marker edge width.
+        density_stream : int, default=2
+            Streamline density multiplier.
+        smooth_transition : int, default=1
+            Transition smoothing level.
+        smooth_grid : float, default=0.5
+            Grid smoothing level.
+        color_scheme : str, default='annotation'
+            Background color scheme.
+        add_outline_clusters : bool, default=False
+            Whether to draw cluster outlines.
+        cluster_outline_edgewidth : float, default=0.001
+            Cluster outline width.
+        gp_color : str, default='white'
+            Grid-point color.
+        bg_color : str, default='black'
+            Background color.
+        dpi : int, default=80
+            Figure DPI.
+        title : str, default='Streamplot'
+            Plot title.
+        b_bias : int, default=20
+            Forward-direction bias parameter.
+        n_neighbors_velocity_grid : int or None, default=None
+            Neighbor count used for velocity grid.
+        other_labels : list or None, default=None
+            Additional labels to display.
+        use_sequentially_augmented : bool, default=False
+            Whether to use sequentially augmented transitions.
+        cmap_str : str, default='rainbow'
+            Colormap for overlays.
 
-        Returns:
-            fig : matplotlib figure
-            ax : matplotlib axis
+        Returns
+        -------
+        tuple
+            ``(fig, ax)``.
         """
 
         if clusters=='':
@@ -371,28 +483,47 @@ class pyVIA(object):
                          highlight_terminal_states:bool=True, use_maxout_edgelist:bool =False)->Tuple[matplotlib.figure.Figure,
                                                                                                  matplotlib.axes._axes.Axes,
                                                                                                  matplotlib.axes._axes.Axes]:
-        """projects the graph based coarse trajectory onto a umap/tsne embedding
+        """Project coarse VIA trajectories onto embedding.
 
-        Arguments:
-            clusters : column name of the adata.obs dataframe that contains the cluster labels
-            basis : str, default = 'X_umap', which to use for the embedding
-            via_fine : via object suggest to use via_object only unless you found that running via_fine gave better pathways
-            idx : default: None. Or List. if you had previously computed a umap/tsne (embedding) only on a subset of the total n_samples (subsampled as per idx), then the via objects and results will be indexed according to idx too
-            title_str : title of figure
-            draw_all_curves : if the clustergraph has too many edges to project in a visually interpretable way, set this to False to get a simplified view of the graph pathways
-            arrow_width_scale_factor : the width of the arrows is proportional to the edge weight. This factor scales the width of the arrows
-            scatter_size : size of the scatter points
-            scatter_alpha : transparency of the scatter points
-            linewidth : width of the lines
-            marker_edgewidth : width of the outline around each scatter point
-            cmap_pseudotime : color map to use for the pseudotime
-            dpi : dpi of the figure
-            highlight_terminal_states :  whether or not to highlight/distinguish the clusters which are detected as the terminal states by via
+        Parameters
+        ----------
+        clusters : str, default=''
+            Obs column containing cluster labels.
+        basis : str, default=''
+            Embedding key in ``adata.obsm``.
+        via_fine : object or None, default=None
+            Optional refined VIA object.
+        idx : list or None, default=None
+            Optional cell-index subset used by embedding.
+        title_str : str, default='Pseudotime'
+            Figure title.
+        draw_all_curves : bool, default=True
+            Whether to draw all trajectory curves.
+        arrow_width_scale_factor : float, default=15.0
+            Scale factor for edge arrow widths.
+        scatter_size : float, default=50
+            Scatter marker size.
+        scatter_alpha : float, default=0.5
+            Scatter marker transparency.
+        figsize : tuple, default=(8, 4)
+            Figure size.
+        linewidth : float, default=1.5
+            Trajectory line width.
+        marker_edgewidth : float, default=1
+            Scatter marker edge width.
+        cmap_pseudotime : str, default='viridis_r'
+            Pseudotime colormap.
+        dpi : int, default=80
+            Figure DPI.
+        highlight_terminal_states : bool, default=True
+            Whether to highlight terminal states.
+        use_maxout_edgelist : bool, default=False
+            Use max-out edge list for simplification.
 
-        Returns:
-            fig : matplotlib figure
-            ax1 : matplotlib axis
-            ax2 : matplotlib axis
+        Returns
+        -------
+        tuple
+            ``(fig, ax1, ax2)``.
 
         """
 
@@ -416,23 +547,35 @@ class pyVIA(object):
                                 cmap:str='plasma', dpi:int=80, scatter_size =None,
                                 marker_lineages:list = [], fontsize:int=12)->Tuple[matplotlib.figure.Figure,
                                                                                    matplotlib.axes._axes.Axes]:
-        """G is the igraph knn (low K) used for shortest path in high dim space. no idx needed as it's made on full sample, knn_hnsw is the knn made in the embedded space used for query to find the nearest point in the downsampled embedding that corresponds to the single cells in the full graph
-        
-        Arguments:
-            clusters : column name of the adata.obs dataframe that contains the cluster labels
-            basis : str, default = 'X_umap', which to use for the embedding
-            via_fine : usually just set to same as via_coarse unless you ran a refined run and want to link it to initial via_coarse's terminal clusters
-            idx : if one uses a downsampled embedding of the original data, then idx is the selected indices of the downsampled samples used in the visualization
-            figsize : size of the figure
-            cmap : color map to use for the lineage probability
-            dpi : dpi of the figure
-            scatter_size : size of the scatter points
-            marker_lineages : Default is to use all lineage pathways. other provide a list of lineage number (terminal cluster number).
-            fontsize : fontsize of the title
+        """Plot lineage membership probabilities in embedding space.
 
-        Returns:
-            fig : matplotlib figure
-            axs : matplotlib axis
+        Parameters
+        ----------
+        clusters : str, default=''
+            Obs column containing cluster labels.
+        basis : str, default=''
+            Embedding key in ``adata.obsm``.
+        via_fine : object or None, default=None
+            Optional refined VIA object.
+        idx : list or None, default=None
+            Optional index subset used for embedding.
+        figsize : tuple, default=(8, 4)
+            Figure size.
+        cmap : str, default='plasma'
+            Colormap for probabilities.
+        dpi : int, default=80
+            Figure DPI.
+        scatter_size : float or None, default=None
+            Scatter marker size.
+        marker_lineages : list, default=[]
+            Terminal lineage IDs to display; empty uses all.
+        fontsize : int, default=12
+            Title font size.
+
+        Returns
+        -------
+        tuple
+            ``(fig, axs)``.
         """
 
 
@@ -453,25 +596,37 @@ class pyVIA(object):
                         marker_genes:list = [], linewidth:float = 2.0,
                         n_splines:int=10,  fontsize_:int=12, marker_lineages=[])->Tuple[matplotlib.figure.Figure,
                                                                                         matplotlib.axes._axes.Axes]:
-        """plots the gene expression trend along the pseudotime
+        """Plot smoothed gene trends along VIA pseudotime.
 
-        Arguments:
-            gene_list : list of genes to plot
-            figsize : size of the figure
-            magic_steps : number of magic steps to use for imputation
-            spline_order : order of the spline to use for smoothing
-            dpi : dpi of the figure
-            cmap : color map to use for the gene expression
-            marker_genes : Default is to use all genes in gene_exp. other provide a list of marker genes that will be used from gene_exp.
-            linewidth : width of the lines
-            n_splines : number of splines to use for smoothing
-            fontsize_ : fontsize of the title
-            marker_lineages : Default is to use all lineage pathways. other provide a list of lineage number (terminal cluster number).
+        Parameters
+        ----------
+        gene_list : list or None, default=None
+            Genes used for trend fitting.
+        figsize : tuple, default=(8, 4)
+            Figure size.
+        magic_steps : int, default=3
+            Imputation steps before trend estimation.
+        spline_order : int, default=5
+            Spline order used for smoothing.
+        dpi : int, default=80
+            Figure DPI.
+        cmap : str, default='jet'
+            Colormap.
+        marker_genes : list, default=[]
+            Optional subset of genes to highlight.
+        linewidth : float, default=2.0
+            Line width.
+        n_splines : int, default=10
+            Number of spline basis functions.
+        fontsize_ : int, default=12
+            Font size.
+        marker_lineages : list, default=[]
+            Terminal lineage IDs to display.
 
-        Returns:
-            fig : matplotlib figure
-            axs : matplotlib axis
-        
+        Returns
+        -------
+        tuple
+            ``(fig, axs)``.
         """
 
         df_magic = self.model.do_impute(self.adata[:,gene_list].to_df(), magic_steps=magic_steps, gene_list=gene_list)
@@ -484,19 +639,31 @@ class pyVIA(object):
     def plot_clustergraph(self,gene_list:list,arrow_head:float=0.1,figsize:tuple=(8,4),dpi=80,magic_steps=3,
                           edgeweight_scale:float=1.5, cmap=None, label_=True,)->Tuple[matplotlib.figure.Figure,
                                                                                         matplotlib.axes._axes.Axes]:
-        """plot the gene in pie chart for each cluster
+        """Plot cluster graph with aggregated gene-expression nodes.
 
-        Arguments:
-            gene_list : list of genes to plot
-            arrow_head : size of the arrow head
-            figsize : size of the figure
-            edgeweight_scale : scale of the edge weight
-            cmap : color map to use for the gene expression
-            label_ : whether to label the nodes
+        Parameters
+        ----------
+        gene_list : list
+            Genes to aggregate by VIA cluster.
+        arrow_head : float, default=0.1
+            Arrow-head size.
+        figsize : tuple, default=(8, 4)
+            Figure size.
+        dpi : int, default=80
+            Figure DPI.
+        magic_steps : int, default=3
+            Imputation steps before aggregation.
+        edgeweight_scale : float, default=1.5
+            Edge-width scaling factor.
+        cmap : str or None, default=None
+            Colormap.
+        label_ : bool, default=True
+            Whether to annotate node labels.
 
-        Returns:
-            fig : matplotlib figure
-            axs : matplotlib axis
+        Returns
+        -------
+        tuple
+            ``(fig, axs)``.
         """
         df_magic = self.model.do_impute(self.adata[:,gene_list].to_df(), magic_steps=magic_steps, gene_list=gene_list)
         df_magic['parc'] = self.model.labels
@@ -511,20 +678,29 @@ class pyVIA(object):
                              fontsize:int=8,cmap:str='viridis', normalize:bool=True, ytick_labelrotation:int = 0, 
                              figsize:tuple=(2,4))->Tuple[matplotlib.figure.Figure,
                                                                     list]:
-        """Plot the gene trends on heatmap: a heatmap is generated for each lineage (identified by terminal cluster number). Default selects all lineages
+        """Plot lineage-specific heatmaps of gene trends.
 
-        Arguments:
-            gene_list : list of genes to plot
-            marker_lineages : list default = None and plots all detected all lineages. Optionally provide a list of integers corresponding to the cluster number of terminal cell fates
-            fontsize : int default = 8
-            cmap : str default = 'viridis'
-            normalize : bool = True
-            ytick_labelrotation : int default = 0
-            figsize : size of the figure
+        Parameters
+        ----------
+        gene_list : list
+            Genes displayed in heatmaps.
+        marker_lineages : list, default=[]
+            Terminal lineage IDs to plot; empty uses all lineages.
+        fontsize : int, default=8
+            Label font size.
+        cmap : str, default='viridis'
+            Heatmap colormap.
+        normalize : bool, default=True
+            Whether to normalize trends.
+        ytick_labelrotation : int, default=0
+            Y-tick rotation angle.
+        figsize : tuple, default=(2, 4)
+            Figure size per panel.
 
-        Returns:
-            fig : matplotlib figure
-            axs : list of matplotlib axis       
+        Returns
+        -------
+        tuple
+            ``(fig, axs)`` where ``axs`` is a list of axes.
         """
         
         df_magic = self.model.do_impute(self.adata[:,gene_list].to_df(), magic_steps=3, gene_list=gene_list)

@@ -69,7 +69,8 @@ class Annotator(object):
         """
         Annotates marker genes using various databases and filtering criteria.
 
-        Arguments:
+        Parameters
+        ----------
             input: Input file for marker annotation (Only CSV format supported).
             output: Output file for marker annotation.
             db: Database for annotation (whole.db).
@@ -90,7 +91,10 @@ class Annotator(object):
             norefdb: Only using user-defined marker database for annotation.
             noprint: Do not print any detail results.
             list_tissue: List tissue names in database.
-            
+
+        Returns
+        -------
+        None
             """
         
         #self = args
